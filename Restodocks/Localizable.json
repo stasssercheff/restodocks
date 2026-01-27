@@ -1,0 +1,732 @@
+{
+  "app_name": {
+    "ru": "Restodocks",
+    "en": "Restodocks",
+    "es": "Restodocks",
+    "de": "Restodocks",
+    "fr": "Restodocks"
+  },
+
+  "kitchen_title": {
+    "ru": "Кухня",
+    "en": "Kitchen",
+    "es": "Cocina",
+    "de": "Küche",
+    "fr": "Cuisine"
+  },
+
+  "hot_kitchen": {
+    "ru": "Горячий цех",
+    "en": "Hot Kitchen",
+    "es": "Cocina caliente",
+    "de": "Heiße Küche",
+    "fr": "Cuisine chaude"
+  },
+
+  "cold_kitchen": {
+    "ru": "Холодный цех",
+    "en": "Cold Kitchen",
+    "es": "Cocina fría",
+    "de": "Kalte Küche",
+    "fr": "Cuisine froide"
+  },
+
+  "grill": {
+    "ru": "Гриль",
+    "en": "Grill",
+    "es": "Parrilla",
+    "de": "Grill",
+    "fr": "Grill"
+  },
+
+  "pizza": {
+    "ru": "Пицца",
+    "en": "Pizza",
+    "es": "Pizza",
+    "de": "Pizza",
+    "fr": "Pizza"
+  },
+
+  "sushi_bar": {
+    "ru": "Сушибар",
+    "en": "Sushi Bar",
+    "es": "Bar de sushi",
+    "de": "Sushi-Bar",
+    "fr": "Bar à sushi"
+  },
+
+  "prep": {
+    "ru": "Заготовка",
+    "en": "Prep",
+    "es": "Preparación",
+    "de": "Vorbereitung",
+    "fr": "Préparation"
+  },
+
+  "bakery": {
+    "ru": "Выпечка",
+    "en": "Bakery",
+    "es": "Panadería",
+    "de": "Bäckerei",
+    "fr": "Boulangerie"
+  },
+
+  "pastry": {
+    "ru": "Кондитерка",
+    "en": "Pastry",
+    "es": "Repostería",
+    "de": "Patisserie",
+    "fr": "Pâtisserie"
+  },
+
+  "kitchen": {
+    "ru": "Кухня",
+    "en": "Kitchen",
+    "es": "Cocina",
+    "de": "Küche",
+    "fr": "Cuisine"
+  },
+
+  "bar": {
+    "ru": "Бар",
+    "en": "Bar",
+    "es": "Bar",
+    "de": "Bar",
+    "fr": "Bar"
+  },
+
+  "hall": {
+    "ru": "Зал",
+    "en": "Hall",
+    "es": "Sala",
+    "de": "Saal",
+    "fr": "Salle"
+  },
+
+  "management": {
+    "ru": "Менеджмент",
+    "en": "Management",
+    "es": "Gestión",
+    "de": "Management",
+    "fr": "Gestion"
+  },
+
+  "administration": {
+    "ru": "Административный",
+    "en": "Administration",
+    "es": "Administración",
+    "de": "Verwaltung",
+    "fr": "Administration"
+  },
+
+  "admin_section": {
+    "ru": "Административный раздел",
+    "en": "Administration Section",
+    "es": "Sección de Administración",
+    "de": "Verwaltungsbereich",
+    "fr": "Section d’administration"
+  },
+
+  "staff": {
+    "ru": "Сотрудники",
+    "en": "Staff",
+    "es": "Personal",
+    "de": "Personal",
+    "fr": "Personnel"
+  },
+
+  "profile": {
+    "ru": "Учетная запись",
+    "en": "Account",
+    "es": "Cuenta",
+    "de": "Konto",
+    "fr": "Compte"
+  },
+
+  "settings": {
+    "ru": "Настройки",
+    "en": "Settings",
+    "es": "Ajustes",
+    "de": "Einstellungen",
+    "fr": "Paramètres"
+  },
+
+  "language": {
+    "ru": "Язык",
+    "en": "Language",
+    "es": "Idioma",
+    "de": "Sprache",
+    "fr": "Langue"
+  },
+
+  "russian": {
+    "ru": "Русский",
+    "en": "Russian",
+    "es": "Ruso",
+    "de": "Russisch",
+    "fr": "Russe"
+  },
+
+  "english": {
+    "ru": "Английский",
+    "en": "English",
+    "es": "Inglés",
+    "de": "Englisch",
+    "fr": "Anglais"
+  },
+
+  "pro_active": {
+    "ru": "PRO активирован",
+    "en": "PRO activated",
+    "es": "PRO activado",
+    "de": "PRO aktiviert",
+    "fr": "PRO activé"
+  },
+
+  "pro_not_active": {
+    "ru": "PRO не активирован",
+    "en": "PRO not activated",
+    "es": "PRO no activado",
+    "de": "PRO nicht aktiviert",
+    "fr": "PRO non activé"
+  },
+
+  "promo_code": {
+    "ru": "Промокод",
+    "en": "Promo code",
+    "es": "Código promocional",
+    "de": "Promo-Code",
+    "fr": "Code promo"
+  },
+
+  "pro_success": {
+    "ru": "Успех! PRO активирован.",
+    "en": "Success! PRO activated.",
+    "es": "¡Éxito! PRO activado.",
+    "de": "Erfolg! PRO aktiviert.",
+    "fr": "Succès ! PRO activé."
+  },
+
+  "pro_wrong_code": {
+    "ru": "Неверный код.",
+    "en": "Wrong code.",
+    "es": "Código incorrecto.",
+    "de": "Falscher Code.",
+    "fr": "Code incorrect."
+  },
+
+  "buy_pro": {
+    "ru": "Купить PRO",
+    "en": "Buy PRO",
+    "es": "Comprar PRO",
+    "de": "PRO kaufen",
+    "fr": "Acheter PRO"
+  },
+
+  "press_to_test": {
+    "ru": "Нажми кнопку, чтобы проверить подключение",
+    "en": "Press the button to test the connection",
+    "es": "Presiona el botón para probar la conexión",
+    "de": "Drücke den Knopf, um die Verbindung zu testen",
+    "fr": "Appuyez sur le bouton pour tester la connexion"
+  },
+
+  "test_connection": {
+    "ru": "Проверить подключение",
+    "en": "Test connection",
+    "es": "Probar conexión",
+    "de": "Verbindung testen",
+    "fr": "Tester la connexion"
+  },
+
+  "connection_success": {
+    "ru": "Успех! Получено строк:",
+    "en": "Success! Rows received:",
+    "es": "Éxito. Filas recibidas:",
+    "de": "Erfolg! Zeilen erhalten:",
+    "fr": "Succès ! Lignes reçues :"
+  },
+
+  "connection_error": {
+    "ru": "Ошибка:",
+    "en": "Error:",
+    "es": "Error:",
+    "de": "Fehler:",
+    "fr": "Erreur :"
+  },
+  "register_company": {
+    "ru": "Регистрация компании",
+    "en": "Company Registration",
+    "es": "Registro de la empresa",
+    "de": "Unternehmensregistrierung",
+    "fr": "Enregistrement de l'entreprise"
+  },
+  "register_employee": {
+    "ru": "Регистрация сотрудника",
+    "en": "Employee Registration",
+    "es": "Registro de empleado",
+    "de": "Mitarbeiterregistrierung",
+    "fr": "Enregistrement de l'employé"
+  },
+  "login": {
+    "ru": "Вход",
+    "en": "Login",
+    "es": "Iniciar sesión",
+    "de": "Anmelden",
+    "fr": "Connexion"
+  },
+  "create_company": {
+    "ru": "Создать компанию",
+    "en": "Create Company",
+    "es": "Crear empresa",
+    "de": "Unternehmen erstellen",
+    "fr": "Créer une entreprise"
+  },
+  "owner_email": {
+      "ru": "Email пользователя",
+      "en": "User Email",
+      "es": "Email del usuario",
+      "de": "Benutzer-E-Mail",
+      "fr": "Email de l'utilisateur"
+  },
+  "create_employee": {
+    "ru": "Создать сотрудника",
+    "en": "Create employee",
+    "es": "Crear empleado",
+    "de": "Mitarbeiter erstellen",
+    "fr": "Créer un employé"
+  },
+  "company_name": {
+    "ru": "Название компании",
+    "en": "Company Name",
+    "es": "Nombre de la empresa",
+    "de": "Unternehmensname",
+    "fr": "Nom de l'entreprise"
+  },
+  "password": {
+      "ru": "Пароль",
+      "en": "Password",
+      "es": "Contraseña",
+      "de": "Passwort",
+      "fr": "Mot de passe"
+    },
+    "confirm_password": {
+      "ru": "Подтвердите пароль",
+      "en": "Confirm Password",
+      "es": "Confirmar contraseña",
+      "de": "Passwort bestätigen",
+      "fr": "Confirmer le mot de passe"
+    },
+    "forgot_password": {
+      "ru": "Забыли пароль?",
+      "en": "Forgot Password?",
+      "es": "¿Olvidó su contraseña?",
+      "de": "Passwort vergessen?",
+      "fr": "Mot de passe oublié ?"
+    },
+    "continue": {
+      "ru": "Продолжить",
+      "en": "Continue",
+      "es": "Continuar",
+      "de": "Weiter",
+      "fr": "Continuer"
+    },
+    "cancel": {
+      "ru": "Отмена",
+      "en": "Cancel",
+      "es": "Cancelar",
+      "de": "Abbrechen",
+      "fr": "Annuler"
+    },
+    "save": {
+      "ru": "Сохранить",
+      "en": "Save",
+      "es": "Guardar",
+      "de": "Speichern",
+      "fr": "Enregistrer"
+    },
+    "email_error": {
+      "ru": "Некорректный Email",
+      "en": "Invalid Email",
+      "es": "Email inválido",
+      "de": "Ungültige E-Mail",
+      "fr": "Email invalide"
+    },
+    "registration_success": {
+      "ru": "Регистрация успешно завершена!",
+      "en": "Registration completed successfully!",
+      "es": "¡Registro completado con éxito!",
+      "de": "Registrierung erfolgreich abgeschlossen!",
+      "fr": "Inscription réussie !"
+    },
+    "wrong_pin": {
+        "ru": "Неверный ПИН-код",
+        "en": "Wrong PIN",
+        "es": "PIN incorrecto",
+        "de": "Falsche PIN",
+        "fr": "Code PIN incorrect"
+      },
+      
+    "pin_code": {
+      "ru": "ПИН-код",
+      "en": "PIN Code",
+      "es": "Código PIN",
+      "de": "PIN-Code",
+      "fr": "Code PIN"
+    },
+    "create_owner": {
+      "ru": "Создание владельца",
+      "en": "Create owner",
+      "es": "Crear propietario",
+      "de": "Inhaber erstellen",
+      "fr": "Créer un propriétaire"
+    },
+    "pin": {
+      "ru": "ПИН-код",
+      "en": "PIN Code",
+      "es": "Código PIN",
+      "de": "PIN-Code",
+      "fr": "Code PIN"
+    },
+    "company_setup": {
+      "ru": "Настройки компании",
+      "en": "Company Setup",
+      "es": "Configuración de la empresa",
+      "de": "Unternehmenskonfiguration",
+      "fr": "Configuration de l'entreprise"
+    },
+    "welcome": {
+      "ru": "Добро пожаловать",
+      "en": "Welcome",
+      "es": "Bienvenido",
+      "de": "Willkommen",
+      "fr": "Bienvenue"
+    },
+    "owner_name": {
+      "ru": "Имя пользователя",
+      "en": "User Name",
+      "es": "Nombre de usuario",
+      "de": "Benutzername",
+      "fr": "Nom d'utilisateur"
+    },
+    "create_owner_button": {
+      "ru": "Создать пользователя",
+      "en": "Create User",
+      "es": "Crear usuario",
+      "de": "Benutzer erstellen",
+      "fr": "Créer un utilisateur"
+    },
+    "owner_setup": {
+      "ru": "Настройка пользователя",
+      "en": "User Setup",
+      "es": "Configuración de usuario",
+      "de": "Benutzereinrichtung",
+      "fr": "Configuration de l'utilisateur"
+    },
+    "registration": {
+      "ru": "Регистрация",
+      "en": "Registration",
+      "es": "Registro",
+      "de": "Registrierung",
+      "fr": "Inscription"
+    },
+    "company_profile": {
+      "ru": "Профиль компании",
+      "en": "Company Profile",
+      "es": "Perfil de la empresa",
+      "de": "Unternehmensprofil",
+      "fr": "Profil de l'entreprise"
+    },
+    "owner_setup_description": {
+      "ru": "Создайте учетную запись владельца компании. PIN компании уже привязан автоматически.",
+      "en": "Create the company owner account. The company PIN is already linked automatically.",
+      "es": "Cree la cuenta del propietario de la empresa. El PIN de la empresa ya está vinculado automáticamente.",
+      "de": "Erstellen Sie das Unternehmenseigentümerkonto. Die Firmen-PIN ist bereits automatisch verknüpft.",
+      "fr": "Créez le compte du propriétaire de l’entreprise. Le PIN de l’entreprise est déjà lié automatiquement."
+    },
+    "home": {
+      "ru": "Главная",
+      "en": "Home",
+      "es": "Inicio",
+      "de": "Startseite",
+      "fr": "Accueil"
+    },
+    "logout": {
+      "ru": "Выйти",
+      "en": "Logout",
+      "es": "Cerrar sesión",
+      "de": "Abmelden",
+      "fr": "Déconnexion"
+    },
+    "done": {
+      "ru": "Готово",
+      "en": "Done",
+      "es": "Listo",
+      "de": "Fertig",
+      "fr": "Terminé"
+    },
+    "profile_title": {
+      "ru": "Профиль",
+      "en": "Profile",
+      "es": "Perfil",
+      "de": "Profil",
+      "fr": "Profil"
+    },
+    "company": {
+      "ru": "Компания",
+      "en": "Company",
+      "es": "Empresa",
+      "de": "Unternehmen",
+      "fr": "Entreprise"
+    },
+    "role": {
+      "ru": "Роль",
+      "en": "Role",
+      "es": "Rol",
+      "de": "Rolle",
+      "fr": "Rôle"
+    },
+    "owner": {
+      "ru": "Владелец",
+      "en": "Owner",
+      "es": "Propietario",
+      "de": "Inhaber",
+      "fr": "Propriétaire"
+    },
+    "company_pin": {
+      "ru": "PIN компании",
+      "en": "Company PIN",
+      "es": "PIN de la empresa",
+      "de": "Firmen-PIN",
+      "fr": "PIN de l’entreprise"
+    },
+    "add_partner": {
+      "ru": "Добавить партнёра",
+      "en": "Add partner",
+      "es": "Agregar socio",
+      "de": "Partner hinzufügen",
+      "fr": "Ajouter un partenaire"
+    },
+    "invite_partner": {
+      "ru": "Отправить приглашение",
+      "en": "Send invitation",
+      "es": "Enviar invitación",
+      "de": "Einladung senden",
+      "fr": "Envoyer une invitation"
+    },
+    "invitation_sent": {
+      "ru": "Приглашение отправлено",
+      "en": "Invitation sent",
+      "es": "Invitación enviada",
+      "de": "Einladung gesendet",
+      "fr": "Invitation envoyée"
+    },
+    "employees": {
+      "ru": "Сотрудники",
+      "en": "Employees",
+      "es": "Empleados",
+      "de": "Mitarbeiter",
+      "fr": "Employés"
+    },
+    "add_employee": {
+      "ru": "Добавить сотрудника",
+      "en": "Add employee",
+      "es": "Agregar empleado",
+      "de": "Mitarbeiter hinzufügen",
+      "fr": "Ajouter un employé"
+    },
+    "home_sections_title": {
+      "ru": "Разделы",
+      "en": "Sections",
+      "es": "Secciones",
+      "de": "Bereiche",
+      "fr": "Sections"
+    },
+    "products": {
+      "ru": "Продукты",
+      "en": "Products",
+      "es": "Productos",
+      "de": "Produkte",
+      "fr": "Produits"
+    },
+    "inventory": {
+      "ru": "Инвентаризация",
+      "en": "Inventory",
+      "es": "Inventario",
+      "de": "Inventar",
+      "fr": "Inventaire"
+    },
+    "hot_section": {
+      "ru": "Горячий цех",
+      "en": "Hot Section",
+      "es": "Sección caliente",
+      "de": "Warme Küche",
+      "fr": "Section chaude"
+    },
+    "cold_section": {
+      "ru": "Холодный цех",
+      "en": "Cold Section",
+      "es": "Sección fría",
+      "de": "Kalte Küche",
+      "fr": "Section froide"
+    },
+    "prep_section": {
+      "ru": "Заготовка",
+      "en": "Prep Section",
+      "es": "Preparación",
+      "de": "Vorbereitung",
+      "fr": "Préparation"
+    },
+    "menu": {
+      "ru": "Меню",
+      "en": "Menu",
+      "es": "Menú",
+      "de": "Menü",
+      "fr": "Menu"
+    },
+    "ttk": {
+      "ru": "ТТК",
+      "en": "Tech Cards",
+      "es": "Fichas técnicas",
+      "de": "Technologische Karten",
+      "fr": "Fiches techniques"
+    },
+    "schedule": {
+      "ru": "График",
+      "en": "Schedule",
+      "es": "Horario",
+      "de": "Zeitplan",
+      "fr": "Planning"
+    },
+    "chef": {
+      "ru": "Шеф-повар",
+      "en": "Head Chef",
+      "es": "Chef principal",
+      "de": "Küchenchef",
+      "fr": "Chef cuisinier"
+    },
+    "manager": {
+      "ru": "Управляющий",
+      "en": "Manager",
+      "es": "Gerente",
+      "de": "Manager",
+      "fr": "Gestionnaire"
+    },"suppliers": {
+        "ru": "Поставщики",
+        "en": "Suppliers",
+        "es": "Proveedores",
+        "de": "Lieferanten",
+        "fr": "Fournisseurs"
+      },
+      "product_list": {
+        "ru": "Список продуктов",
+        "en": "Product List",
+        "es": "Lista de productos",
+        "de": "Produktliste",
+        "fr": "Liste des produits"
+      },
+      "order_checklist": {
+        "ru": "Чек-лист заказа",
+        "en": "Order Checklist",
+        "es": "Lista de pedidos",
+        "de": "Bestellliste",
+        "fr": "Liste de commande"
+      },
+      "all_items": {
+        "ru": "Вся номенклатура",
+        "en": "All Items",
+        "es": "Todos los artículos",
+        "de": "Alle Artikel",
+        "fr": "Tous les articles"
+      },
+      "warehouse": {
+        "ru": "Склад",
+        "en": "Warehouse",
+        "es": "Almacén",
+        "de": "Lager",
+        "fr": "Entrepôt"
+      },
+      "freezer": {
+        "ru": "Морозильная камера",
+        "en": "Freezer",
+        "es": "Congelador",
+        "de": "Gefrierschrank",
+        "fr": "Congélateur"
+      },
+      "pro_feature": {
+        "ru": "Доступно в PRO",
+        "en": "Available in PRO",
+        "es": "Disponible en PRO",
+        "de": "Verfügbar in PRO",
+        "fr": "Disponible en PRO"
+      },
+      "employee_registration": {
+        "ru": "Регистрация сотрудника",
+        "en": "Employee Registration",
+        "es": "Registro de empleado",
+        "de": "Mitarbeiterregistrierung",
+        "fr": "Enregistrement de l'employé"
+      },
+      "employee_profile_setup": {
+        "ru": "Профиль сотрудника",
+        "en": "Employee Profile",
+        "es": "Perfil del empleado",
+        "de": "Mitarbeiterprofil",
+        "fr": "Profil de l’employé"
+      },
+      "employee_profile_explain": {
+        "ru": "Заполните данные для продолжения работы",
+        "en": "Please complete your profile to continue",
+        "es": "Complete su perfil para continuar",
+        "de": "Bitte Profil ausfüllen, um fortzufahren",
+        "fr": "Veuillez compléter votre profil pour continuer"
+      },
+      "first_name": {
+        "ru": "Имя",
+        "en": "First name",
+        "es": "Nombre",
+        "de": "Vorname",
+        "fr": "Prénom"
+      },
+      "last_name": {
+        "ru": "Фамилия",
+        "en": "Last name",
+        "es": "Apellido",
+        "de": "Nachname",
+        "fr": "Nom"
+      },
+      "birth_date": {
+        "ru": "Дата рождения",
+        "en": "Date of birth",
+        "es": "Fecha de nacimiento",
+        "de": "Geburtsdatum",
+        "fr": "Date de naissance"
+      },
+      "department": {
+        "ru": "Подразделение",
+        "en": "Department",
+        "es": "Departamento",
+        "de": "Abteilung",
+        "fr": "Département"
+      },
+      "position": {
+        "ru": "Должность",
+        "en": "Position",
+        "es": "Puesto",
+        "de": "Position",
+        "fr": "Poste"
+      },
+      "waiter": {
+          "ru": "Официант",
+          "en": "Waiter",
+          "es": "Camarero",
+          "de": "Kellner",
+          "fr": "Serveur"
+      }
+
+
+
+
+
+
+}

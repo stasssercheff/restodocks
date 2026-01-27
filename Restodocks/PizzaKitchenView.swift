@@ -1,0 +1,14 @@
+import SwiftUI
+
+struct PizzaKitchenView: View {
+    @ObservedObject var lang = LocalizationManager.shared
+
+    var body: some View {
+        List {
+            NavigationLink { PizzaMenuView() } label: { Text(lang.t("menu")) }
+            NavigationLink { PizzaTTKView() } label: { Text(lang.t("ttk")) }
+            NavigationLink { PizzaScheduleView() } label: { Text(lang.t("schedule")) }
+        }
+        .navigationTitle(lang.t("pizza"))
+    }
+}
