@@ -1,0 +1,42 @@
+import 'package:provider/provider.dart';
+import 'package:provider/single_child_widget.dart';
+
+import '../../services/services.dart';
+
+/// Настройка всех провайдеров приложения
+class AppProviders {
+  static List<SingleChildWidget> get providers => [
+        // Сервисы
+        ChangeNotifierProvider<LocalizationService>(
+          create: (_) => LocalizationService(),
+        ),
+        // Используем Supabase версии сервисов
+        Provider<AccountManagerSupabase>(
+          create: (_) => AccountManagerSupabase(),
+        ),
+        Provider<ProductStoreSupabase>(
+          create: (_) => ProductStoreSupabase(),
+        ),
+        Provider<ImageService>(
+          create: (_) => ImageService(),
+        ),
+        Provider<TechCardServiceSupabase>(
+          create: (_) => TechCardServiceSupabase(),
+        ),
+        Provider<ChecklistServiceSupabase>(
+          create: (_) => ChecklistServiceSupabase(),
+        ),
+
+        // Инициализация сервисов при запуске + загрузка продуктов после входа
+        FutureProvider<void>(
+          create: (context) async {
+            final accountManager = context.read<AccountManagerSupabase>();
+            await accountManager.initialize();
+            if (accountManager.isLoggedInSync) {
+              await context.read<ProductStoreSupabase>().loadProducts();
+            }
+          },
+          initialData: null,
+        ),
+      ];
+}

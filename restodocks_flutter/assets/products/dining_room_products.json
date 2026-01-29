@@ -1,0 +1,182 @@
+[
+  {
+    "id": "dining-0001",
+    "name": "Coffee",
+    "category": "hot_drinks",
+    "names": {
+      "ru": "Кофе",
+      "en": "Coffee"
+    },
+    "calories": 1,
+    "protein": 0.1,
+    "fat": 0.0,
+    "carbs": 0.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 2.00,
+    "currency": "RUB",
+    "unit": "кг"
+  },
+  {
+    "id": "dining-0002",
+    "name": "Tea Black",
+    "category": "hot_drinks",
+    "names": {
+      "ru": "Чай черный",
+      "en": "Black Tea"
+    },
+    "calories": 1,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.3,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 15.00,
+    "currency": "RUB",
+    "unit": "кг"
+  },
+  {
+    "id": "dining-0003",
+    "name": "Cappuccino",
+    "category": "coffee_drinks",
+    "names": {
+      "ru": "Каппучино",
+      "en": "Cappuccino"
+    },
+    "calories": 110,
+    "protein": 6.0,
+    "fat": 6.0,
+    "carbs": 9.0,
+    "containsGluten": false,
+    "containsLactose": true,
+    "basePrice": 3.50,
+    "currency": "RUB",
+    "unit": "порция"
+  },
+  {
+    "id": "dining-0004",
+    "name": "Chocolate Cake",
+    "category": "desserts",
+    "names": {
+      "ru": "Шоколадный торт",
+      "en": "Chocolate Cake"
+    },
+    "calories": 350,
+    "protein": 5.0,
+    "fat": 18.0,
+    "carbs": 45.0,
+    "containsGluten": true,
+    "containsLactose": true,
+    "basePrice": 8.00,
+    "currency": "RUB",
+    "unit": "порция"
+  },
+  {
+    "id": "dining-0005",
+    "name": "Cheesecake",
+    "category": "desserts",
+    "names": {
+      "ru": "Чизкейк",
+      "en": "Cheesecake"
+    },
+    "calories": 321,
+    "protein": 6.0,
+    "fat": 23.0,
+    "carbs": 25.0,
+    "containsGluten": true,
+    "containsLactose": true,
+    "basePrice": 7.50,
+    "currency": "RUB",
+    "unit": "порция"
+  },
+  {
+    "id": "dining-0006",
+    "name": "Ice Cream Vanilla",
+    "category": "ice_cream",
+    "names": {
+      "ru": "Мороженое ванильное",
+      "en": "Vanilla Ice Cream"
+    },
+    "calories": 207,
+    "protein": 3.5,
+    "fat": 11.0,
+    "carbs": 23.0,
+    "containsGluten": false,
+    "containsLactose": true,
+    "basePrice": 3.00,
+    "currency": "RUB",
+    "unit": "порция"
+  },
+  {
+    "id": "dining-0007",
+    "name": "Lemonade",
+    "category": "soft_drinks",
+    "names": {
+      "ru": "Лимонад",
+      "en": "Lemonade"
+    },
+    "calories": 30,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 7.5,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 2.50,
+    "currency": "RUB",
+    "unit": "л"
+  },
+  {
+    "id": "dining-0008",
+    "name": "Mineral Water",
+    "category": "water",
+    "names": {
+      "ru": "Минеральная вода",
+      "en": "Mineral Water"
+    },
+    "calories": 0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 1.00,
+    "currency": "RUB",
+    "unit": "л"
+  },
+  {
+    "id": "dining-0009",
+    "name": "Bread Basket",
+    "category": "bread",
+    "names": {
+      "ru": "Корзинка с хлебом",
+      "en": "Bread Basket"
+    },
+    "calories": 150,
+    "protein": 5.0,
+    "fat": 2.0,
+    "carbs": 28.0,
+    "containsGluten": true,
+    "containsLactose": false,
+    "basePrice": 3.00,
+    "currency": "RUB",
+    "unit": "порция"
+  },
+  {
+    "id": "dining-0010",
+    "name": "Butter",
+    "category": "dairy",
+    "names": {
+      "ru": "Сливочное масло",
+      "en": "Butter"
+    },
+    "calories": 717,
+    "protein": 0.9,
+    "fat": 81.0,
+    "carbs": 0.1,
+    "containsGluten": false,
+    "containsLactose": true,
+    "basePrice": 8.00,
+    "currency": "RUB",
+    "unit": "кг"
+  }
+]

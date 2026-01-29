@@ -1,0 +1,182 @@
+[
+  {
+    "id": "kitchen-0001",
+    "name": "Chicken Breast",
+    "category": "meat",
+    "names": {
+      "ru": "Куриная грудка",
+      "en": "Chicken Breast"
+    },
+    "calories": 165,
+    "protein": 31.0,
+    "fat": 3.6,
+    "carbs": 0.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 8.50,
+    "currency": "RUB",
+    "unit": "кг"
+  },
+  {
+    "id": "kitchen-0002",
+    "name": "Beef Tenderloin",
+    "category": "meat",
+    "names": {
+      "ru": "Говядина вырезка",
+      "en": "Beef Tenderloin"
+    },
+    "calories": 250,
+    "protein": 26.0,
+    "fat": 17.0,
+    "carbs": 0.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 25.00,
+    "currency": "RUB",
+    "unit": "кг"
+  },
+  {
+    "id": "kitchen-0003",
+    "name": "Potatoes",
+    "category": "vegetables",
+    "names": {
+      "ru": "Картофель",
+      "en": "Potatoes"
+    },
+    "calories": 77,
+    "protein": 2.0,
+    "fat": 0.1,
+    "carbs": 17.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 1.50,
+    "currency": "RUB",
+    "unit": "кг"
+  },
+  {
+    "id": "kitchen-0004",
+    "name": "Onions",
+    "category": "vegetables",
+    "names": {
+      "ru": "Лук",
+      "en": "Onions"
+    },
+    "calories": 40,
+    "protein": 1.1,
+    "fat": 0.1,
+    "carbs": 9.3,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 2.00,
+    "currency": "RUB",
+    "unit": "кг"
+  },
+  {
+    "id": "kitchen-0005",
+    "name": "Tomatoes",
+    "category": "vegetables",
+    "names": {
+      "ru": "Помидоры",
+      "en": "Tomatoes"
+    },
+    "calories": 18,
+    "protein": 0.9,
+    "fat": 0.2,
+    "carbs": 3.9,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 4.50,
+    "currency": "RUB",
+    "unit": "кг"
+  },
+  {
+    "id": "kitchen-0006",
+    "name": "Milk",
+    "category": "dairy",
+    "names": {
+      "ru": "Молоко",
+      "en": "Milk"
+    },
+    "calories": 61,
+    "protein": 3.3,
+    "fat": 3.2,
+    "carbs": 4.8,
+    "containsGluten": false,
+    "containsLactose": true,
+    "basePrice": 2.50,
+    "currency": "RUB",
+    "unit": "л"
+  },
+  {
+    "id": "kitchen-0007",
+    "name": "Eggs",
+    "category": "dairy",
+    "names": {
+      "ru": "Яйца",
+      "en": "Eggs"
+    },
+    "calories": 155,
+    "protein": 13.0,
+    "fat": 11.0,
+    "carbs": 1.1,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 6.00,
+    "currency": "RUB",
+    "unit": "десяток"
+  },
+  {
+    "id": "kitchen-0008",
+    "name": "Flour",
+    "category": "grains",
+    "names": {
+      "ru": "Мука",
+      "en": "Flour"
+    },
+    "calories": 364,
+    "protein": 10.0,
+    "fat": 1.0,
+    "carbs": 76.0,
+    "containsGluten": true,
+    "containsLactose": false,
+    "basePrice": 1.20,
+    "currency": "RUB",
+    "unit": "кг"
+  },
+  {
+    "id": "kitchen-0009",
+    "name": "Rice",
+    "category": "grains",
+    "names": {
+      "ru": "Рис",
+      "en": "Rice"
+    },
+    "calories": 130,
+    "protein": 2.7,
+    "fat": 0.3,
+    "carbs": 28.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 3.00,
+    "currency": "RUB",
+    "unit": "кг"
+  },
+  {
+    "id": "kitchen-0010",
+    "name": "Olive Oil",
+    "category": "oils",
+    "names": {
+      "ru": "Оливковое масло",
+      "en": "Olive Oil"
+    },
+    "calories": 884,
+    "protein": 0.0,
+    "fat": 100.0,
+    "carbs": 0.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 12.00,
+    "currency": "RUB",
+    "unit": "л"
+  }
+]

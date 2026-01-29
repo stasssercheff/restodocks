@@ -1,0 +1,64 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+
+import '../../services/services.dart';
+import '../../models/models.dart';
+
+/// Домашняя страница менеджмента (шеф, барменеджер, менеджер зала, управляющий).
+class ManagementHomeContent extends StatelessWidget {
+  const ManagementHomeContent({super.key, required this.employee});
+
+  final Employee employee;
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = context.watch<LocalizationService>();
+    final roles = employee.roles;
+    final isChef = roles.contains('executive_chef');
+    final isBarManager = roles.contains('bar_manager');
+    final isGeneral = roles.contains('general_manager');
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _Tile(icon: Icons.calendar_month, title: loc.t('schedule'), onTap: () => context.push('/schedule')),
+        _Tile(icon: Icons.notifications, title: loc.t('notifications'), onTap: () => context.push('/notifications')),
+        if (employee.department == 'kitchen')
+          _Tile(icon: Icons.checklist, title: loc.t('checklists'), onTap: () => context.push('/checklists')),
+        _Tile(icon: Icons.description, title: isBarManager ? loc.t('ttk_bar') : loc.t('ttk_kitchen'), onTap: () => context.push('/tech-cards')),
+        _Tile(icon: Icons.inventory_2, title: loc.t('nomenclature'), onTap: () => context.push('/products')),
+        if (isChef || isBarManager)
+          _Tile(icon: Icons.shopping_cart, title: loc.t('product_order'), onTap: () => context.push('/products')),
+        if (isChef) ...[
+          _Tile(icon: Icons.assignment, title: loc.t('inventory_blank'), onTap: () => context.push('/inventory')),
+          _Tile(icon: Icons.inbox, title: loc.t('inventory_received'), onTap: () => context.push('/inventory-received')),
+        ],
+        if (isGeneral) ...[
+          _Tile(icon: Icons.savings, title: '${loc.t('expenses')} (${loc.t('pro')})', onTap: () => context.push('/expenses')),
+        ],
+      ],
+    );
+  }
+}
+
+class _Tile extends StatelessWidget {
+  const _Tile({required this.icon, required this.title, required this.onTap});
+
+  final IconData icon;
+  final String title;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        leading: Icon(icon),
+        title: Text(title),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: onTap,
+      ),
+    );
+  }
+}

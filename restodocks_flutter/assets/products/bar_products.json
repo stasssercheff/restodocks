@@ -1,0 +1,182 @@
+[
+  {
+    "id": "bar-0001",
+    "name": "Cola",
+    "category": "soft_drinks",
+    "names": {
+      "ru": "Кола",
+      "en": "Cola"
+    },
+    "calories": 42,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 10.6,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 1.50,
+    "currency": "RUB",
+    "unit": "л"
+  },
+  {
+    "id": "bar-0002",
+    "name": "Sprite",
+    "category": "soft_drinks",
+    "names": {
+      "ru": "Спрайт",
+      "en": "Sprite"
+    },
+    "calories": 40,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 10.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 1.50,
+    "currency": "RUB",
+    "unit": "л"
+  },
+  {
+    "id": "bar-0003",
+    "name": "Fanta Orange",
+    "category": "soft_drinks",
+    "names": {
+      "ru": "Фанта Апельсин",
+      "en": "Fanta Orange"
+    },
+    "calories": 48,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 12.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 1.50,
+    "currency": "RUB",
+    "unit": "л"
+  },
+  {
+    "id": "bar-0004",
+    "name": "Orange Juice",
+    "category": "juice",
+    "names": {
+      "ru": "Апельсиновый сок",
+      "en": "Orange Juice"
+    },
+    "calories": 49,
+    "protein": 0.9,
+    "fat": 0.2,
+    "carbs": 11.3,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 2.50,
+    "currency": "RUB",
+    "unit": "л"
+  },
+  {
+    "id": "bar-0005",
+    "name": "Apple Juice",
+    "category": "juice",
+    "names": {
+      "ru": "Яблочный сок",
+      "en": "Apple Juice"
+    },
+    "calories": 46,
+    "protein": 0.2,
+    "fat": 0.1,
+    "carbs": 11.3,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 2.50,
+    "currency": "RUB",
+    "unit": "л"
+  },
+  {
+    "id": "bar-0006",
+    "name": "Mineral Water",
+    "category": "water",
+    "names": {
+      "ru": "Минеральная вода",
+      "en": "Mineral Water"
+    },
+    "calories": 0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 1.00,
+    "currency": "RUB",
+    "unit": "л"
+  },
+  {
+    "id": "bar-0007",
+    "name": "Beer Light",
+    "category": "beer",
+    "names": {
+      "ru": "Пиво светлое",
+      "en": "Light Beer"
+    },
+    "calories": 43,
+    "protein": 0.5,
+    "fat": 0.0,
+    "carbs": 3.6,
+    "containsGluten": true,
+    "containsLactose": false,
+    "basePrice": 3.00,
+    "currency": "RUB",
+    "unit": "л"
+  },
+  {
+    "id": "bar-0008",
+    "name": "Wine Red",
+    "category": "wine",
+    "names": {
+      "ru": "Вино красное",
+      "en": "Red Wine"
+    },
+    "calories": 85,
+    "protein": 0.1,
+    "fat": 0.0,
+    "carbs": 2.6,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 15.00,
+    "currency": "RUB",
+    "unit": "л"
+  },
+  {
+    "id": "bar-0009",
+    "name": "Vodka",
+    "category": "spirits",
+    "names": {
+      "ru": "Водка",
+      "en": "Vodka"
+    },
+    "calories": 231,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 20.00,
+    "currency": "RUB",
+    "unit": "л"
+  },
+  {
+    "id": "bar-0010",
+    "name": "Coffee",
+    "category": "hot_drinks",
+    "names": {
+      "ru": "Кофе",
+      "en": "Coffee"
+    },
+    "calories": 1,
+    "protein": 0.1,
+    "fat": 0.0,
+    "carbs": 0.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 2.00,
+    "currency": "RUB",
+    "unit": "кг"
+  }
+]
