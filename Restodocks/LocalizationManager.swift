@@ -6,10 +6,32 @@ final class LocalizationManager: ObservableObject {
     static let shared = LocalizationManager()
 
     // Используем @AppStorage для автоматической синхронизации с UserDefaults
-    @AppStorage("selected_language") var currentLang: String = "ru" {
+    @AppStorage("selected_language") var currentLang: String = "" {
         didSet {
             // При смене языка принудительно уведомляем SwiftUI об обновлении
             objectWillChange.send()
+        }
+    }
+
+    // Проверяем, выбран ли язык при запуске
+    var isLanguageSelected: Bool {
+        !currentLang.isEmpty
+    }
+
+    // Устанавливаем язык по умолчанию при первом запуске
+    func initializeLanguage() {
+        if currentLang.isEmpty {
+            // Определяем язык системы
+            let preferredLanguage = Locale.preferredLanguages.first?.prefix(2).lowercased() ?? "en"
+
+            // Поддерживаемые языки
+            let supportedLanguages = ["ru", "en", "es", "de", "fr"]
+
+            if supportedLanguages.contains(preferredLanguage) {
+                currentLang = String(preferredLanguage)
+            } else {
+                currentLang = "en" // Английский по умолчанию
+            }
         }
     }
 
@@ -17,6 +39,7 @@ final class LocalizationManager: ObservableObject {
 
     private init() {
         loadJSON()
+        initializeLanguage()
     }
 
     private func loadJSON() {
@@ -35,6 +58,7 @@ final class LocalizationManager: ObservableObject {
             DispatchQueue.main.async {
                 self.translations = decoded
                 print("✅ Словари успешно загружены. Ключей: \(decoded.count)")
+                print("📱 Текущий язык: \(self.currentLang)")
             }
         } catch {
             print("❌ ОШИБКА Декодирования: \(error)")
@@ -44,10 +68,24 @@ final class LocalizationManager: ObservableObject {
     // Функция перевода
     func t(_ key: String) -> String {
         guard !translations.isEmpty else { return key }
-        
-        return translations[key]?[currentLang]
-            ?? translations[key]?["en"]
-            ?? key
+
+        // Сначала пробуем текущий язык
+        if let translation = translations[key]?[currentLang], !translation.isEmpty {
+            return translation
+        }
+
+        // Fallback на русский
+        if let russian = translations[key]?["ru"], !russian.isEmpty {
+            return russian
+        }
+
+        // Fallback на английский
+        if let english = translations[key]?["en"], !english.isEmpty {
+            return english
+        }
+
+        // Возвращаем ключ если ничего не найдено
+        return key
     }
 
     func setLang(_ lang: String) {

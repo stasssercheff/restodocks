@@ -1,0 +1,422 @@
+[
+  {
+    "id": "bar-0001",
+    "name": "Cola",
+    "category": "soft_drinks",
+    "names": {
+      "ru": "Кола",
+      "en": "Cola",
+      "es": "Cola",
+      "de": "Cola",
+      "fr": "Cola"
+    },
+    "calories": 42,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 10.6,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 1.50,
+    "currency": "RUB",
+    "unit": "л"
+  },
+  {
+    "id": "bar-0002",
+    "name": "Sprite",
+    "category": "soft_drinks",
+    "names": {
+      "ru": "Спрайт",
+      "en": "Sprite",
+      "es": "Sprite",
+      "de": "Sprite",
+      "fr": "Sprite"
+    },
+    "calories": 40,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 10.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 1.50,
+    "currency": "RUB",
+    "unit": "л"
+  },
+  {
+    "id": "bar-0003",
+    "name": "Fanta Orange",
+    "category": "soft_drinks",
+    "names": {
+      "ru": "Фанта Апельсин",
+      "en": "Fanta Orange",
+      "es": "Fanta Naranja",
+      "de": "Fanta Orange",
+      "fr": "Fanta Orange"
+    },
+    "calories": 48,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 12.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 1.50,
+    "currency": "RUB",
+    "unit": "л"
+  },
+  {
+    "id": "bar-0004",
+    "name": "Orange Juice",
+    "category": "juice",
+    "names": {
+      "ru": "Апельсиновый сок",
+      "en": "Orange Juice",
+      "es": "Zumo de naranja",
+      "de": "Orangensaft",
+      "fr": "Jus d'orange"
+    },
+    "calories": 49,
+    "protein": 0.9,
+    "fat": 0.2,
+    "carbs": 11.3,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 2.50,
+    "currency": "RUB",
+    "unit": "л"
+  },
+  {
+    "id": "bar-0005",
+    "name": "Apple Juice",
+    "category": "juice",
+    "names": {
+      "ru": "Яблочный сок",
+      "en": "Apple Juice",
+      "es": "Zumo de manzana",
+      "de": "Apfelsaft",
+      "fr": "Jus de pomme"
+    },
+    "calories": 46,
+    "protein": 0.2,
+    "fat": 0.1,
+    "carbs": 11.3,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 2.50,
+    "currency": "RUB",
+    "unit": "л"
+  },
+  {
+    "id": "bar-0006",
+    "name": "Tomato Juice",
+    "category": "juice",
+    "names": {
+      "ru": "Томатный сок",
+      "en": "Tomato Juice",
+      "es": "Zumo de tomate",
+      "de": "Tomatensaft",
+      "fr": "Jus de tomate"
+    },
+    "calories": 17,
+    "protein": 0.8,
+    "fat": 0.1,
+    "carbs": 3.5,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 2.00,
+    "currency": "RUB",
+    "unit": "л"
+  },
+  {
+    "id": "bar-0007",
+    "name": "Mineral Water",
+    "category": "water",
+    "names": {
+      "ru": "Минеральная вода",
+      "en": "Mineral Water",
+      "es": "Agua mineral",
+      "de": "Mineralwasser",
+      "fr": "Eau minérale"
+    },
+    "calories": 0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 1.00,
+    "currency": "RUB",
+    "unit": "л"
+  },
+  {
+    "id": "bar-0008",
+    "name": "Beer Light",
+    "category": "beer",
+    "names": {
+      "ru": "Пиво светлое",
+      "en": "Light Beer",
+      "es": "Cerveza clara",
+      "de": "Helles Bier",
+      "fr": "Bière blonde"
+    },
+    "calories": 43,
+    "protein": 0.5,
+    "fat": 0.0,
+    "carbs": 3.6,
+    "containsGluten": true,
+    "containsLactose": false,
+    "basePrice": 3.00,
+    "currency": "RUB",
+    "unit": "л"
+  },
+  {
+    "id": "bar-0009",
+    "name": "Beer Dark",
+    "category": "beer",
+    "names": {
+      "ru": "Пиво темное",
+      "en": "Dark Beer",
+      "es": "Cerveza negra",
+      "de": "Dunkles Bier",
+      "fr": "Bière brune"
+    },
+    "calories": 48,
+    "protein": 0.6,
+    "fat": 0.0,
+    "carbs": 4.2,
+    "containsGluten": true,
+    "containsLactose": false,
+    "basePrice": 3.50,
+    "currency": "RUB",
+    "unit": "л"
+  },
+  {
+    "id": "bar-0010",
+    "name": "Wine Red",
+    "category": "wine",
+    "names": {
+      "ru": "Вино красное",
+      "en": "Red Wine",
+      "es": "Vino tinto",
+      "de": "Rotwein",
+      "fr": "Vin rouge"
+    },
+    "calories": 85,
+    "protein": 0.1,
+    "fat": 0.0,
+    "carbs": 2.6,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 15.00,
+    "currency": "RUB",
+    "unit": "л"
+  },
+  {
+    "id": "bar-0011",
+    "name": "Wine White",
+    "category": "wine",
+    "names": {
+      "ru": "Вино белое",
+      "en": "White Wine",
+      "es": "Vino blanco",
+      "de": "Weißwein",
+      "fr": "Vin blanc"
+    },
+    "calories": 82,
+    "protein": 0.1,
+    "fat": 0.0,
+    "carbs": 2.5,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 15.00,
+    "currency": "RUB",
+    "unit": "л"
+  },
+  {
+    "id": "bar-0012",
+    "name": "Champagne",
+    "category": "sparkling_wine",
+    "names": {
+      "ru": "Шампанское",
+      "en": "Champagne",
+      "es": "Champán",
+      "de": "Champagner",
+      "fr": "Champagne"
+    },
+    "calories": 82,
+    "protein": 0.1,
+    "fat": 0.0,
+    "carbs": 2.5,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 25.00,
+    "currency": "RUB",
+    "unit": "л"
+  },
+  {
+    "id": "bar-0013",
+    "name": "Vodka",
+    "category": "spirits",
+    "names": {
+      "ru": "Водка",
+      "en": "Vodka",
+      "es": "Vodka",
+      "de": "Wodka",
+      "fr": "Vodka"
+    },
+    "calories": 231,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 20.00,
+    "currency": "RUB",
+    "unit": "л"
+  },
+  {
+    "id": "bar-0014",
+    "name": "Whiskey",
+    "category": "spirits",
+    "names": {
+      "ru": "Виски",
+      "en": "Whiskey",
+      "es": "Whisky",
+      "de": "Whiskey",
+      "fr": "Whisky"
+    },
+    "calories": 250,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 30.00,
+    "currency": "RUB",
+    "unit": "л"
+  },
+  {
+    "id": "bar-0015",
+    "name": "Gin",
+    "category": "spirits",
+    "names": {
+      "ru": "Джин",
+      "en": "Gin",
+      "es": "Ginebra",
+      "de": "Gin",
+      "fr": "Gin"
+    },
+    "calories": 263,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 25.00,
+    "currency": "RUB",
+    "unit": "л"
+  },
+  {
+    "id": "bar-0016",
+    "name": "Rum",
+    "category": "spirits",
+    "names": {
+      "ru": "Ром",
+      "en": "Rum",
+      "es": "Ron",
+      "de": "Rum",
+      "fr": "Rhum"
+    },
+    "calories": 231,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 22.00,
+    "currency": "RUB",
+    "unit": "л"
+  },
+  {
+    "id": "bar-0017",
+    "name": "Tequila",
+    "category": "spirits",
+    "names": {
+      "ru": "Текила",
+      "en": "Tequila",
+      "es": "Tequila",
+      "de": "Tequila",
+      "fr": "Tequila"
+    },
+    "calories": 231,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 28.00,
+    "currency": "RUB",
+    "unit": "л"
+  },
+  {
+    "id": "bar-0018",
+    "name": "Coffee",
+    "category": "hot_drinks",
+    "names": {
+      "ru": "Кофе",
+      "en": "Coffee",
+      "es": "Café",
+      "de": "Kaffee",
+      "fr": "Café"
+    },
+    "calories": 1,
+    "protein": 0.1,
+    "fat": 0.0,
+    "carbs": 0.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 2.00,
+    "currency": "RUB",
+    "unit": "кг"
+  },
+  {
+    "id": "bar-0019",
+    "name": "Tea Black",
+    "category": "hot_drinks",
+    "names": {
+      "ru": "Чай черный",
+      "en": "Black Tea",
+      "es": "Té negro",
+      "de": "Schwarzer Tee",
+      "fr": "Thé noir"
+    },
+    "calories": 1,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.3,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 15.00,
+    "currency": "RUB",
+    "unit": "кг"
+  },
+  {
+    "id": "bar-0020",
+    "name": "Tea Green",
+    "category": "hot_drinks",
+    "names": {
+      "ru": "Чай зеленый",
+      "en": "Green Tea",
+      "es": "Té verde",
+      "de": "Grüner Tee",
+      "fr": "Thé vert"
+    },
+    "calories": 1,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.3,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 20.00,
+    "currency": "RUB",
+    "unit": "кг"
+  }
+]

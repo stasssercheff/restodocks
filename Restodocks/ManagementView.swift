@@ -2,18 +2,30 @@ import SwiftUI
 
 struct ManagementView: View {
     @EnvironmentObject var lang: LocalizationManager
+    @EnvironmentObject var accounts: AccountManager
 
     var body: some View {
-        AppNavigationView {
-            VStack {
-                Text(lang.t("management"))
-                    .font(.largeTitle)
-                    .bold()
-                    .padding()
+        List {
+            // Executive Chef
+            NavigationLink {
+                ExecutiveChefView()
+            } label: {
+                HStack {
+                    Image(systemName: "chef.hat")
+                    Text(lang.t("executive_chef"))
+                }
+            }
 
-                Spacer()
+            // General Manager
+            NavigationLink {
+                GeneralManagerView()
+            } label: {
+                HStack {
+                    Image(systemName: "person.badge.key")
+                    Text(lang.t("general_manager"))
+                }
+            }
             }
             .navigationTitle(lang.t("management"))
-        }
     }
 }

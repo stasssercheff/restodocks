@@ -4,17 +4,19 @@ struct ChefManagementView: View {
 
     var body: some View {
         List {
+
             NavigationLink {
-                ChefAddShiftView()
+                HotKitchenScheduleView()
             } label: {
-                Text("Edit Kitchen Schedule")
+                Text("Hot Kitchen Schedule")
             }
 
             NavigationLink {
-                KitchenScheduleView()
+                ColdKitchenScheduleView()
             } label: {
-                Text("Kitchen Schedule")
+                Text("Cold Kitchen Schedule")
             }
+
         }
         .navigationTitle("Head Chef")
     }

@@ -19,27 +19,27 @@ struct TabRootView: View {
             }
             .tabItem {
                 Image(systemName: "person.crop.circle")
-                Text("Профиль")
+                Text("Profile")
             }
             .tag(Tab.profile)
 
-            // ===== КАСТОМНАЯ КНОПКА =====
+            // ===== КАСТОМ =====
             NavigationStack {
                 CustomHomePlaceholderView()
             }
             .tabItem {
                 Image(systemName: "star.fill")
-                Text("Избранное")
+                Text("Favorites")
             }
             .tag(Tab.custom)
 
             // ===== ГЛАВНАЯ =====
             NavigationStack {
-                HomeContainerView()
+                HomeView() // ✅ ВАЖНО: НЕ HomeContainerView
             }
             .tabItem {
                 Image(systemName: "house.fill")
-                Text("Главная")
+                Text("Home")
             }
             .tag(Tab.home)
         }

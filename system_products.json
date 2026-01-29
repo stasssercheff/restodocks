@@ -1,1 +1,8 @@
-
+struct TechLossDefaults: Codable {
+    let cleaning: Double      // зачистка, %
+    let cutting: Double       // нарезка, %
+    let boiling: Double       // варка
+    let frying: Double        // жарка
+    let baking: Double        // запекание
+    let sousvide: Double
+}

@@ -1,35 +1,29 @@
+//
+//  RootRouterView.swift
+//  Restodocks
+//
+
 import SwiftUI
 
 struct RootRouterView: View {
 
-    @EnvironmentObject var accounts: AccountManager
+    @EnvironmentObject var appState: AppState
+    @EnvironmentObject var lang: LocalizationManager
+    @AppStorage("language_selection_completed") var languageSelected = false
 
     var body: some View {
-
-        // ❗️ NavigationStack должен быть ОДИН — здесь
-        NavigationStack {
-
-            // 1️⃣ Нет компании — старт
-            if accounts.establishment == nil {
-                RegistrationChoiceView()
-            }
-
-            // 2️⃣ Компания есть, но владелец не создан
-            else if accounts.owner == nil {
-                CreateOwnerView(
-                    companyPin: accounts.establishment!.pinCode
-                )
-            }
-
-            // 3️⃣ Пользователь вошёл
-            else if accounts.isLoggedIn {
-                AppRoute()
-            }
-
-            // 4️⃣ Компания есть, но никто не вошёл → СТАРТ
-            else {
-                RegistrationChoiceView()
+        Group {
+            // Показываем welcome screen если пользователь не вошел
+            if !appState.isLoggedIn {
+                WelcomeView()
+                    .transition(.opacity)
+            } else {
+                // Основное приложение
+                TabRootView()
+                    .transition(.opacity)
             }
         }
+        .animation(.easeInOut(duration: 0.5), value: appState.isLoggedIn)
     }
+
 }

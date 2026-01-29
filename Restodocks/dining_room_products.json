@@ -1,0 +1,422 @@
+[
+  {
+    "id": "dining-0001",
+    "name": "Coffee",
+    "category": "hot_drinks",
+    "names": {
+      "ru": "Кофе",
+      "en": "Coffee",
+      "es": "Café",
+      "de": "Kaffee",
+      "fr": "Café"
+    },
+    "calories": 1,
+    "protein": 0.1,
+    "fat": 0.0,
+    "carbs": 0.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 2.00,
+    "currency": "RUB",
+    "unit": "кг"
+  },
+  {
+    "id": "dining-0002",
+    "name": "Tea Black",
+    "category": "hot_drinks",
+    "names": {
+      "ru": "Чай черный",
+      "en": "Black Tea",
+      "es": "Té negro",
+      "de": "Schwarzer Tee",
+      "fr": "Thé noir"
+    },
+    "calories": 1,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.3,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 15.00,
+    "currency": "RUB",
+    "unit": "кг"
+  },
+  {
+    "id": "dining-0003",
+    "name": "Tea Green",
+    "category": "hot_drinks",
+    "names": {
+      "ru": "Чай зеленый",
+      "en": "Green Tea",
+      "es": "Té verde",
+      "de": "Grüner Tee",
+      "fr": "Thé vert"
+    },
+    "calories": 1,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.3,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 20.00,
+    "currency": "RUB",
+    "unit": "кг"
+  },
+  {
+    "id": "dining-0004",
+    "name": "Cappuccino",
+    "category": "coffee_drinks",
+    "names": {
+      "ru": "Каппучино",
+      "en": "Cappuccino",
+      "es": "Capuchino",
+      "de": "Cappuccino",
+      "fr": "Cappuccino"
+    },
+    "calories": 110,
+    "protein": 6.0,
+    "fat": 6.0,
+    "carbs": 9.0,
+    "containsGluten": false,
+    "containsLactose": true,
+    "basePrice": 3.50,
+    "currency": "RUB",
+    "unit": "порция"
+  },
+  {
+    "id": "dining-0005",
+    "name": "Latte",
+    "category": "coffee_drinks",
+    "names": {
+      "ru": "Латте",
+      "en": "Latte",
+      "es": "Latte",
+      "de": "Latte",
+      "fr": "Latte"
+    },
+    "calories": 120,
+    "protein": 7.0,
+    "fat": 6.0,
+    "carbs": 10.0,
+    "containsGluten": false,
+    "containsLactose": true,
+    "basePrice": 3.50,
+    "currency": "RUB",
+    "unit": "порция"
+  },
+  {
+    "id": "dining-0006",
+    "name": "Espresso",
+    "category": "coffee_drinks",
+    "names": {
+      "ru": "Эспрессо",
+      "en": "Espresso",
+      "es": "Espresso",
+      "de": "Espresso",
+      "fr": "Expresso"
+    },
+    "calories": 2,
+    "protein": 0.1,
+    "fat": 0.0,
+    "carbs": 0.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 2.50,
+    "currency": "RUB",
+    "unit": "порция"
+  },
+  {
+    "id": "dining-0007",
+    "name": "Chocolate Cake",
+    "category": "desserts",
+    "names": {
+      "ru": "Шоколадный торт",
+      "en": "Chocolate Cake",
+      "es": "Pastel de chocolate",
+      "de": "Schokoladenkuchen",
+      "fr": "Gâteau au chocolat"
+    },
+    "calories": 350,
+    "protein": 5.0,
+    "fat": 18.0,
+    "carbs": 45.0,
+    "containsGluten": true,
+    "containsLactose": true,
+    "basePrice": 8.00,
+    "currency": "RUB",
+    "unit": "порция"
+  },
+  {
+    "id": "dining-0008",
+    "name": "Cheesecake",
+    "category": "desserts",
+    "names": {
+      "ru": "Чизкейк",
+      "en": "Cheesecake",
+      "es": "Tarta de queso",
+      "de": "Käsekuchen",
+      "fr": "Cheesecake"
+    },
+    "calories": 321,
+    "protein": 6.0,
+    "fat": 23.0,
+    "carbs": 25.0,
+    "containsGluten": true,
+    "containsLactose": true,
+    "basePrice": 7.50,
+    "currency": "RUB",
+    "unit": "порция"
+  },
+  {
+    "id": "dining-0009",
+    "name": "Tiramisu",
+    "category": "desserts",
+    "names": {
+      "ru": "Тирамису",
+      "en": "Tiramisu",
+      "es": "Tiramisú",
+      "de": "Tiramisu",
+      "fr": "Tiramisu"
+    },
+    "calories": 240,
+    "protein": 4.0,
+    "fat": 12.0,
+    "carbs": 28.0,
+    "containsGluten": true,
+    "containsLactose": true,
+    "basePrice": 8.50,
+    "currency": "RUB",
+    "unit": "порция"
+  },
+  {
+    "id": "dining-0010",
+    "name": "Ice Cream Vanilla",
+    "category": "ice_cream",
+    "names": {
+      "ru": "Мороженое ванильное",
+      "en": "Vanilla Ice Cream",
+      "es": "Helado de vainilla",
+      "de": "Vanilleeis",
+      "fr": "Glace à la vanille"
+    },
+    "calories": 207,
+    "protein": 3.5,
+    "fat": 11.0,
+    "carbs": 23.0,
+    "containsGluten": false,
+    "containsLactose": true,
+    "basePrice": 3.00,
+    "currency": "RUB",
+    "unit": "порция"
+  },
+  {
+    "id": "dining-0011",
+    "name": "Ice Cream Chocolate",
+    "category": "ice_cream",
+    "names": {
+      "ru": "Мороженое шоколадное",
+      "en": "Chocolate Ice Cream",
+      "es": "Helado de chocolate",
+      "de": "Schokoladeneis",
+      "fr": "Glace au chocolat"
+    },
+    "calories": 216,
+    "protein": 3.8,
+    "fat": 11.0,
+    "carbs": 25.0,
+    "containsGluten": false,
+    "containsLactose": true,
+    "basePrice": 3.00,
+    "currency": "RUB",
+    "unit": "порция"
+  },
+  {
+    "id": "dining-0012",
+    "name": "Fruit Salad",
+    "category": "fresh_desserts",
+    "names": {
+      "ru": "Фруктовый салат",
+      "en": "Fruit Salad",
+      "es": "Ensalada de frutas",
+      "de": "Obstsalat",
+      "fr": "Salade de fruits"
+    },
+    "calories": 65,
+    "protein": 1.0,
+    "fat": 0.5,
+    "carbs": 16.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 5.50,
+    "currency": "RUB",
+    "unit": "порция"
+  },
+  {
+    "id": "dining-0013",
+    "name": "Lemonade",
+    "category": "soft_drinks",
+    "names": {
+      "ru": "Лимонад",
+      "en": "Lemonade",
+      "es": "Limonada",
+      "de": "Limonade",
+      "fr": "Limonade"
+    },
+    "calories": 30,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 7.5,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 2.50,
+    "currency": "RUB",
+    "unit": "л"
+  },
+  {
+    "id": "dining-0014",
+    "name": "Mineral Water",
+    "category": "water",
+    "names": {
+      "ru": "Минеральная вода",
+      "en": "Mineral Water",
+      "es": "Agua mineral",
+      "de": "Mineralwasser",
+      "fr": "Eau minérale"
+    },
+    "calories": 0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 1.00,
+    "currency": "RUB",
+    "unit": "л"
+  },
+  {
+    "id": "dining-0015",
+    "name": "Orange Juice",
+    "category": "juice",
+    "names": {
+      "ru": "Апельсиновый сок",
+      "en": "Orange Juice",
+      "es": "Zumo de naranja",
+      "de": "Orangensaft",
+      "fr": "Jus d'orange"
+    },
+    "calories": 49,
+    "protein": 0.9,
+    "fat": 0.2,
+    "carbs": 11.3,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 2.50,
+    "currency": "RUB",
+    "unit": "л"
+  },
+  {
+    "id": "dining-0016",
+    "name": "Apple Juice",
+    "category": "juice",
+    "names": {
+      "ru": "Яблочный сок",
+      "en": "Apple Juice",
+      "es": "Zumo de manzana",
+      "de": "Apfelsaft",
+      "fr": "Jus de pomme"
+    },
+    "calories": 46,
+    "protein": 0.2,
+    "fat": 0.1,
+    "carbs": 11.3,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 2.50,
+    "currency": "RUB",
+    "unit": "л"
+  },
+  {
+    "id": "dining-0017",
+    "name": "Bread Basket",
+    "category": "bread",
+    "names": {
+      "ru": "Корзинка с хлебом",
+      "en": "Bread Basket",
+      "es": "Cesta de pan",
+      "de": "Brotkorb",
+      "fr": "Corbeille à pain"
+    },
+    "calories": 150,
+    "protein": 5.0,
+    "fat": 2.0,
+    "carbs": 28.0,
+    "containsGluten": true,
+    "containsLactose": false,
+    "basePrice": 3.00,
+    "currency": "RUB",
+    "unit": "порция"
+  },
+  {
+    "id": "dining-0018",
+    "name": "Butter",
+    "category": "dairy",
+    "names": {
+      "ru": "Сливочное масло",
+      "en": "Butter",
+      "es": "Mantequilla",
+      "de": "Butter",
+      "fr": "Beurre"
+    },
+    "calories": 717,
+    "protein": 0.9,
+    "fat": 81.0,
+    "carbs": 0.1,
+    "containsGluten": false,
+    "containsLactose": true,
+    "basePrice": 8.00,
+    "currency": "RUB",
+    "unit": "кг"
+  },
+  {
+    "id": "dining-0019",
+    "name": "Olive Oil",
+    "category": "oils",
+    "names": {
+      "ru": "Оливковое масло",
+      "en": "Olive Oil",
+      "es": "Aceite de oliva",
+      "de": "Olivenöl",
+      "fr": "Huile d'olive"
+    },
+    "calories": 884,
+    "protein": 0.0,
+    "fat": 100.0,
+    "carbs": 0.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 12.00,
+    "currency": "RUB",
+    "unit": "л"
+  },
+  {
+    "id": "dining-0020",
+    "name": "Salt",
+    "category": "spices",
+    "names": {
+      "ru": "Соль",
+      "en": "Salt",
+      "es": "Sal",
+      "de": "Salz",
+      "fr": "Sel"
+    },
+    "calories": 0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "basePrice": 1.00,
+    "currency": "RUB",
+    "unit": "кг"
+  }
+]

@@ -7,25 +7,24 @@ import SwiftUI
 
 struct ShiftRowView: View {
 
-    let shift: WorkShift
+    let shift: ShiftEntity
 
     var body: some View {
 
         HStack {
 
             VStack(alignment: .leading) {
-                Text(shift.employeeName)
+
+                Text(shift.employee?.fullName ?? "—")
                     .font(.body)
                     .bold()
 
-                if !shift.fullDay,
-                   let start = shift.startTime,
-                   let end = shift.endTime {
-                    Text("\(start) – \(end)")
+                if shift.fullDay {
+                    Text("full_day")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 } else {
-                    Text("full_day")
+                    Text("\(shift.startHour):00 – \(shift.endHour):00")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }

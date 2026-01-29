@@ -1,28 +1,10 @@
 import SwiftUI
 
 struct HotKitchenView: View {
-    @ObservedObject var lang = LocalizationManager.shared
+    @EnvironmentObject var lang: LocalizationManager
 
     var body: some View {
-        List {
-            NavigationLink {
-                HotKitchenMenuView()
-            } label: {
-                Text(lang.t("menu"))
-            }
-
-            NavigationLink {
-                HotKitchenTTKView()
-            } label: {
-                Text(lang.t("ttk"))
-            }
-
-            NavigationLink {
-                HotKitchenScheduleView()
-            } label: {
-                Text(lang.t("schedule"))
-            }
-        }
-        .navigationTitle(lang.t("hot_kitchen"))
+        Text(lang.t("hot_kitchen"))
+            .navigationTitle(lang.t("hot_kitchen"))
     }
 }

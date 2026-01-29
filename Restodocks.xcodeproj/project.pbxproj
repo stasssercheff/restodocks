@@ -6,13 +6,38 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		A73187A22F1F546800FFE34F /* RestodocksModel.xcdatamodeld in Sources */ = {isa = PBXBuildFile; fileRef = A73187A02F1F546800FFE34F /* RestodocksModel.xcdatamodeld */; };
+		A799B3702EFE4CB60049E7A2 /* system_products.json in Resources */ = {isa = PBXBuildFile; fileRef = A799B36F2EFE4CB60049E7A2 /* system_products.json */; };
+		A799B3722EFE509B0049E7A2 /* system_products_01_vegetables.json in Resources */ = {isa = PBXBuildFile; fileRef = A799B3712EFE509B0049E7A2 /* system_products_01_vegetables.json */; };
+		A7EEF2D22EE522A1002FF0B7 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = A7EEF2D12EE522A1002FF0B7 /* Supabase */; };
+		A7EEF2E02EE522A2002FF0B7 /* Translation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A7EEF2E12EE522A2002FF0B7 /* Translation.framework */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
+		A73187A12F1F546800FFE34F /* RestodocksModel.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = RestodocksModel.xcdatamodel; sourceTree = "<group>"; };
+		A799B36F2EFE4CB60049E7A2 /* system_products.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = system_products.json; sourceTree = "<group>"; };
+		A799B3712EFE509B0049E7A2 /* system_products_01_vegetables.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = system_products_01_vegetables.json; sourceTree = "<group>"; };
 		A7EEF2C22EE51FFC002FF0B7 /* Restodocks.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Restodocks.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A7EEF2E12EE522A2002FF0B7 /* Translation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Translation.framework; path = System/Library/Frameworks/Translation.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		A773BAFA2EF284310044AF1E /* Exceptions for "Restodocks" folder in "Restodocks" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				migrate_texts_to_i18n.py,
+			);
+			target = A7EEF2C12EE51FFC002FF0B7 /* Restodocks */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		A7EEF2C42EE51FFC002FF0B7 /* Restodocks */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				A773BAFA2EF284310044AF1E /* Exceptions for "Restodocks" folder in "Restodocks" target */,
+			);
 			path = Restodocks;
 			sourceTree = "<group>";
 		};
@@ -23,6 +48,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A7EEF2D22EE522A1002FF0B7 /* Supabase in Frameworks */,
+				A7EEF2E02EE522A2002FF0B7 /* Translation.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -32,15 +59,18 @@
 		A7EEF2B92EE51FFC002FF0B7 = {
 			isa = PBXGroup;
 			children = (
-				A7EEF2C42EE51FFC002FF0B7 /* Restodocks */,
+				A73187A02F1F546800FFE34F /* RestodocksModel.xcdatamodeld */,
 				A7EEF2C32EE51FFC002FF0B7 /* Products */,
+				A7EEF2C42EE51FFC002FF0B7 /* Restodocks */,
 			);
 			sourceTree = "<group>";
 		};
 		A7EEF2C32EE51FFC002FF0B7 /* Products */ = {
 			isa = PBXGroup;
 			children = (
+				A799B3712EFE509B0049E7A2 /* system_products_01_vegetables.json */,
 				A7EEF2C22EE51FFC002FF0B7 /* Restodocks.app */,
+				A799B36F2EFE4CB60049E7A2 /* system_products.json */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -65,6 +95,7 @@
 			);
 			name = Restodocks;
 			packageProductDependencies = (
+				A7EEF2D12EE522A1002FF0B7 /* Supabase */,
 			);
 			productName = Restodocks;
 			productReference = A7EEF2C22EE51FFC002FF0B7 /* Restodocks.app */;
@@ -94,6 +125,9 @@
 			);
 			mainGroup = A7EEF2B92EE51FFC002FF0B7;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				A7EEF2D02EE522A1002FF0B7 /* XCRemoteSwiftPackageReference "supabase-swift" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A7EEF2C32EE51FFC002FF0B7 /* Products */;
 			projectDirPath = "";
@@ -109,6 +143,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A799B3722EFE509B0049E7A2 /* system_products_01_vegetables.json in Resources */,
+				A799B3702EFE4CB60049E7A2 /* system_products.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -119,6 +155,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A73187A22F1F546800FFE34F /* RestodocksModel.xcdatamodeld in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -251,8 +288,11 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 8WDW468W2S;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = RestoDocks;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.food-and-drink";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -282,8 +322,11 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 8WDW468W2S;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = RestoDocks;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.food-and-drink";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -328,6 +371,38 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A7EEF2D02EE522A1002FF0B7 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase/supabase-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.5.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A7EEF2D12EE522A1002FF0B7 /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A7EEF2D02EE522A1002FF0B7 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
+/* End XCSwiftPackageProductDependency section */
+
+/* Begin XCVersionGroup section */
+		A73187A02F1F546800FFE34F /* RestodocksModel.xcdatamodeld */ = {
+			isa = XCVersionGroup;
+			children = (
+				A73187A12F1F546800FFE34F /* RestodocksModel.xcdatamodel */,
+			);
+			currentVersion = A73187A12F1F546800FFE34F /* RestodocksModel.xcdatamodel */;
+			path = RestodocksModel.xcdatamodeld;
+			sourceTree = "<group>";
+			versionGroupType = wrapper.xcdatamodel;
+		};
+/* End XCVersionGroup section */
 	};
 	rootObject = A7EEF2BA2EE51FFC002FF0B7 /* Project object */;
 }

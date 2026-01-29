@@ -1,20 +1,24 @@
-//
-//  AccountView.swift
-//  Restodocks
-//
-
 import SwiftUI
+import CoreData
 
 struct AccountView: View {
 
     @EnvironmentObject var accounts: AccountManager
-    @EnvironmentObject var lang: LocalizationManager
+    @ObservedObject var lang = LocalizationManager.shared
+
+    @FetchRequest(
+        entity: EmployeeEntity.entity(),
+        sortDescriptors: [],
+        predicate: NSPredicate(format: "isActive == YES")
+    )
+    private var activeEmployees: FetchedResults<EmployeeEntity>
 
     var body: some View {
+
         VStack(spacing: 16) {
 
-            if let employee = accounts.currentEmployee {
-                Text(employee.fullName)
+            if let employee = activeEmployees.first {
+                Text(employee.fullName ?? "")
                     .font(.title2)
             }
 

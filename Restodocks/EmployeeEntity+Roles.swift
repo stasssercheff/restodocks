@@ -7,6 +7,7 @@ import Foundation
 
 extension EmployeeEntity {
 
+    // Transformable -> [String]
     var rolesArray: [String] {
         get {
             roles as? [String] ?? []
@@ -16,7 +17,7 @@ extension EmployeeEntity {
         }
     }
 
-    // MARK: - Helpers
+    // MARK: - Role helpers (READ ONLY)
 
     var isOwner: Bool {
         rolesArray.contains("owner")

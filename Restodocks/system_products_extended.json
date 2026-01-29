@@ -1,0 +1,952 @@
+[
+  {
+    "id": "00000000-0000-0000-0000-000000000001",
+    "name": "Milk",
+    "category": "dairy",
+    "names": {
+      "ru": "Молоко",
+      "en": "Milk",
+      "es": "Leche",
+      "de": "Milch",
+      "fr": "Lait"
+    },
+    "calories": 61,
+    "protein": 3.3,
+    "fat": 3.2,
+    "carbs": 4.8,
+    "containsGluten": false,
+    "containsLactose": true,
+    "unit": "л"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000002",
+    "name": "Bread",
+    "category": "bakery",
+    "names": {
+      "ru": "Хлеб",
+      "en": "Bread",
+      "es": "Pan",
+      "de": "Brot",
+      "fr": "Pain"
+    },
+    "calories": 265,
+    "protein": 9.0,
+    "fat": 3.2,
+    "carbs": 49.0,
+    "containsGluten": true,
+    "containsLactose": false,
+    "unit": "шт"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000003",
+    "name": "Chicken Breast",
+    "category": "meat",
+    "names": {
+      "ru": "Куриная грудка",
+      "en": "Chicken Breast",
+      "es": "Pechuga de pollo",
+      "de": "Hähnchenbrust",
+      "fr": "Blanc de poulet"
+    },
+    "calories": 165,
+    "protein": 31.0,
+    "fat": 3.6,
+    "carbs": 0.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000004",
+    "name": "Rice",
+    "category": "grains",
+    "names": {
+      "ru": "Рис",
+      "en": "Rice",
+      "es": "Arroz",
+      "de": "Reis",
+      "fr": "Riz"
+    },
+    "calories": 130,
+    "protein": 2.7,
+    "fat": 0.3,
+    "carbs": 28.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000005",
+    "name": "Tomatoes",
+    "category": "vegetables",
+    "names": {
+      "ru": "Помидоры",
+      "en": "Tomatoes",
+      "es": "Tomates",
+      "de": "Tomaten",
+      "fr": "Tomates"
+    },
+    "calories": 18,
+    "protein": 0.9,
+    "fat": 0.2,
+    "carbs": 3.9,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000006",
+    "name": "Cheese",
+    "category": "dairy",
+    "names": {
+      "ru": "Сыр",
+      "en": "Cheese",
+      "es": "Queso",
+      "de": "Käse",
+      "fr": "Fromage"
+    },
+    "calories": 402,
+    "protein": 7.0,
+    "fat": 33.0,
+    "carbs": 1.3,
+    "containsGluten": false,
+    "containsLactose": true,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000007",
+    "name": "Salmon",
+    "category": "seafood",
+    "names": {
+      "ru": "Лосось",
+      "en": "Salmon",
+      "es": "Salmón",
+      "de": "Lachs",
+      "fr": "Saumon"
+    },
+    "calories": 208,
+    "protein": 22.0,
+    "fat": 13.0,
+    "carbs": 0.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000008",
+    "name": "Pasta",
+    "category": "grains",
+    "names": {
+      "ru": "Макароны",
+      "en": "Pasta",
+      "es": "Pasta",
+      "de": "Nudeln",
+      "fr": "Pâtes"
+    },
+    "calories": 157,
+    "protein": 5.8,
+    "fat": 0.9,
+    "carbs": 31.0,
+    "containsGluten": true,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000009",
+    "name": "Eggs",
+    "category": "dairy",
+    "names": {
+      "ru": "Яйца",
+      "en": "Eggs",
+      "es": "Huevos",
+      "de": "Eier",
+      "fr": "Œufs"
+    },
+    "calories": 155,
+    "protein": 13.0,
+    "fat": 11.0,
+    "carbs": 1.1,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "шт"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000010",
+    "name": "Potatoes",
+    "category": "vegetables",
+    "names": {
+      "ru": "Картофель",
+      "en": "Potatoes",
+      "es": "Patatas",
+      "de": "Kartoffeln",
+      "fr": "Pommes de terre"
+    },
+    "calories": 77,
+    "protein": 2.0,
+    "fat": 0.1,
+    "carbs": 17.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000011",
+    "name": "Beef",
+    "category": "meat",
+    "names": {
+      "ru": "Говядина",
+      "en": "Beef",
+      "es": "Carne de res",
+      "de": "Rindfleisch",
+      "fr": "Boeuf"
+    },
+    "calories": 250,
+    "protein": 26.0,
+    "fat": 17.0,
+    "carbs": 0.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000012",
+    "name": "Pork",
+    "category": "meat",
+    "names": {
+      "ru": "Свинина",
+      "en": "Pork",
+      "es": "Cerdo",
+      "de": "Schweinefleisch",
+      "fr": "Porc"
+    },
+    "calories": 242,
+    "protein": 27.0,
+    "fat": 14.0,
+    "carbs": 0.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000013",
+    "name": "Butter",
+    "category": "dairy",
+    "names": {
+      "ru": "Масло сливочное",
+      "en": "Butter",
+      "es": "Mantequilla",
+      "de": "Butter",
+      "fr": "Beurre"
+    },
+    "calories": 717,
+    "protein": 0.9,
+    "fat": 81.0,
+    "carbs": 0.1,
+    "containsGluten": false,
+    "containsLactose": true,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000014",
+    "name": "Flour",
+    "category": "bakery",
+    "names": {
+      "ru": "Мука",
+      "en": "Flour",
+      "es": "Harina",
+      "de": "Mehl",
+      "fr": "Farine"
+    },
+    "calories": 364,
+    "protein": 10.0,
+    "fat": 1.0,
+    "carbs": 76.0,
+    "containsGluten": true,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000015",
+    "name": "Sugar",
+    "category": "pantry",
+    "names": {
+      "ru": "Сахар",
+      "en": "Sugar",
+      "es": "Azúcar",
+      "de": "Zucker",
+      "fr": "Sucre"
+    },
+    "calories": 387,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 100.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000016",
+    "name": "Olive Oil",
+    "category": "pantry",
+    "names": {
+      "ru": "Оливковое масло",
+      "en": "Olive Oil",
+      "es": "Aceite de oliva",
+      "de": "Olivenöl",
+      "fr": "Huile d'olive"
+    },
+    "calories": 884,
+    "protein": 0.0,
+    "fat": 100.0,
+    "carbs": 0.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "л"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000017",
+    "name": "Onions",
+    "category": "vegetables",
+    "names": {
+      "ru": "Лук",
+      "en": "Onions",
+      "es": "Cebollas",
+      "de": "Zwiebeln",
+      "fr": "Oignons"
+    },
+    "calories": 40,
+    "protein": 1.1,
+    "fat": 0.1,
+    "carbs": 9.3,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000018",
+    "name": "Garlic",
+    "category": "vegetables",
+    "names": {
+      "ru": "Чеснок",
+      "en": "Garlic",
+      "es": "Ajo",
+      "de": "Knoblauch",
+      "fr": "Ail"
+    },
+    "calories": 149,
+    "protein": 6.4,
+    "fat": 0.5,
+    "carbs": 33.1,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000019",
+    "name": "Apples",
+    "category": "fruits",
+    "names": {
+      "ru": "Яблоки",
+      "en": "Apples",
+      "es": "Manzanas",
+      "de": "Äpfel",
+      "fr": "Pommes"
+    },
+    "calories": 52,
+    "protein": 0.3,
+    "fat": 0.2,
+    "carbs": 13.8,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000020",
+    "name": "Bananas",
+    "category": "fruits",
+    "names": {
+      "ru": "Бананы",
+      "en": "Bananas",
+      "es": "Plátanos",
+      "de": "Bananen",
+      "fr": "Bananes"
+    },
+    "calories": 89,
+    "protein": 1.1,
+    "fat": 0.3,
+    "carbs": 23.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000021",
+    "name": "Chicken Thigh",
+    "category": "meat",
+    "names": {
+      "ru": "Куриное бедро",
+      "en": "Chicken Thigh",
+      "es": "Muslo de pollo",
+      "de": "Hähnchenschenkel",
+      "fr": "Cuisse de poulet"
+    },
+    "calories": 209,
+    "protein": 26.0,
+    "fat": 11.0,
+    "carbs": 0.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000022",
+    "name": "Turkey",
+    "category": "meat",
+    "names": {
+      "ru": "Индейка",
+      "en": "Turkey",
+      "es": "Pavo",
+      "de": "Truthahn",
+      "fr": "Dinde"
+    },
+    "calories": 135,
+    "protein": 30.0,
+    "fat": 1.0,
+    "carbs": 0.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000023",
+    "name": "Tuna",
+    "category": "seafood",
+    "names": {
+      "ru": "Тунец",
+      "en": "Tuna",
+      "es": "Atún",
+      "de": "Thunfisch",
+      "fr": "Thon"
+    },
+    "calories": 144,
+    "protein": 25.0,
+    "fat": 4.9,
+    "carbs": 0.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000024",
+    "name": "Shrimp",
+    "category": "seafood",
+    "names": {
+      "ru": "Креветки",
+      "en": "Shrimp",
+      "es": "Camarones",
+      "de": "Garnelen",
+      "fr": "Crevettes"
+    },
+    "calories": 85,
+    "protein": 20.4,
+    "fat": 0.5,
+    "carbs": 0.3,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000025",
+    "name": "Yogurt",
+    "category": "dairy",
+    "names": {
+      "ru": "Йогурт",
+      "en": "Yogurt",
+      "es": "Yogur",
+      "de": "Joghurt",
+      "fr": "Yaourt"
+    },
+    "calories": 61,
+    "protein": 3.5,
+    "fat": 3.3,
+    "carbs": 4.7,
+    "containsGluten": false,
+    "containsLactose": true,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000026",
+    "name": "Cream",
+    "category": "dairy",
+    "names": {
+      "ru": "Сливки",
+      "en": "Cream",
+      "es": "Crema",
+      "de": "Sahne",
+      "fr": "Crème"
+    },
+    "calories": 345,
+    "protein": 2.1,
+    "fat": 37.0,
+    "carbs": 3.0,
+    "containsGluten": false,
+    "containsLactose": true,
+    "unit": "л"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000027",
+    "name": "Cucumbers",
+    "category": "vegetables",
+    "names": {
+      "ru": "Огурцы",
+      "en": "Cucumbers",
+      "es": "Pepinos",
+      "de": "Gurken",
+      "fr": "Concombres"
+    },
+    "calories": 15,
+    "protein": 0.7,
+    "fat": 0.1,
+    "carbs": 3.6,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000028",
+    "name": "Lettuce",
+    "category": "vegetables",
+    "names": {
+      "ru": "Салат",
+      "en": "Lettuce",
+      "es": "Lechuga",
+      "de": "Salat",
+      "fr": "Laitue"
+    },
+    "calories": 15,
+    "protein": 1.4,
+    "fat": 0.2,
+    "carbs": 2.9,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000029",
+    "name": "Carrots",
+    "category": "vegetables",
+    "names": {
+      "ru": "Морковь",
+      "en": "Carrots",
+      "es": "Zanahorias",
+      "de": "Karotten",
+      "fr": "Carottes"
+    },
+    "calories": 41,
+    "protein": 0.9,
+    "fat": 0.2,
+    "carbs": 10.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000030",
+    "name": "Bell Peppers",
+    "category": "vegetables",
+    "names": {
+      "ru": "Болгарский перец",
+      "en": "Bell Peppers",
+      "es": "Pimientos",
+      "de": "Paprika",
+      "fr": "Poivrons"
+    },
+    "calories": 31,
+    "protein": 1.0,
+    "fat": 0.3,
+    "carbs": 6.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000031",
+    "name": "Broccoli",
+    "category": "vegetables",
+    "names": {
+      "ru": "Брокколи",
+      "en": "Broccoli",
+      "es": "Brócoli",
+      "de": "Brokkoli",
+      "fr": "Brocoli"
+    },
+    "calories": 34,
+    "protein": 2.8,
+    "fat": 0.4,
+    "carbs": 7.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000032",
+    "name": "Spinach",
+    "category": "vegetables",
+    "names": {
+      "ru": "Шпинат",
+      "en": "Spinach",
+      "es": "Espinacas",
+      "de": "Spinat",
+      "fr": "Épinards"
+    },
+    "calories": 23,
+    "protein": 2.9,
+    "fat": 0.4,
+    "carbs": 3.6,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000033",
+    "name": "Oranges",
+    "category": "fruits",
+    "names": {
+      "ru": "Апельсины",
+      "en": "Oranges",
+      "es": "Naranjas",
+      "de": "Orangen",
+      "fr": "Oranges"
+    },
+    "calories": 49,
+    "protein": 0.9,
+    "fat": 0.1,
+    "carbs": 12.5,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000034",
+    "name": "Lemons",
+    "category": "fruits",
+    "names": {
+      "ru": "Лимоны",
+      "en": "Lemons",
+      "es": "Limones",
+      "de": "Zitronen",
+      "fr": "Citrons"
+    },
+    "calories": 29,
+    "protein": 1.1,
+    "fat": 0.3,
+    "carbs": 9.3,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000035",
+    "name": "Strawberries",
+    "category": "fruits",
+    "names": {
+      "ru": "Клубника",
+      "en": "Strawberries",
+      "es": "Fresas",
+      "de": "Erdbeeren",
+      "fr": "Fraises"
+    },
+    "calories": 32,
+    "protein": 0.7,
+    "fat": 0.3,
+    "carbs": 7.7,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000036",
+    "name": "Grapes",
+    "category": "fruits",
+    "names": {
+      "ru": "Виноград",
+      "en": "Grapes",
+      "es": "Uvas",
+      "de": "Trauben",
+      "fr": "Raisins"
+    },
+    "calories": 69,
+    "protein": 0.7,
+    "fat": 0.2,
+    "carbs": 18.1,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000037",
+    "name": "Honey",
+    "category": "pantry",
+    "names": {
+      "ru": "Мед",
+      "en": "Honey",
+      "es": "Miel",
+      "de": "Honig",
+      "fr": "Miel"
+    },
+    "calories": 304,
+    "protein": 0.3,
+    "fat": 0.0,
+    "carbs": 82.4,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000038",
+    "name": "Salt",
+    "category": "pantry",
+    "names": {
+      "ru": "Соль",
+      "en": "Salt",
+      "es": "Sal",
+      "de": "Salz",
+      "fr": "Sel"
+    },
+    "calories": 0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000039",
+    "name": "Black Pepper",
+    "category": "pantry",
+    "names": {
+      "ru": "Черный перец",
+      "en": "Black Pepper",
+      "es": "Pimienta negra",
+      "de": "Schwarzer Pfeffer",
+      "fr": "Poivre noir"
+    },
+    "calories": 251,
+    "protein": 10.4,
+    "fat": 3.3,
+    "carbs": 64.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000040",
+    "name": "Cinnamon",
+    "category": "pantry",
+    "names": {
+      "ru": "Корица",
+      "en": "Cinnamon",
+      "es": "Canela",
+      "de": "Zimt",
+      "fr": "Cannelle"
+    },
+    "calories": 247,
+    "protein": 4.0,
+    "fat": 1.2,
+    "carbs": 81.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000041",
+    "name": "Basil",
+    "category": "herbs",
+    "names": {
+      "ru": "Базилик",
+      "en": "Basil",
+      "es": "Albahaca",
+      "de": "Basilikum",
+      "fr": "Basilic"
+    },
+    "calories": 23,
+    "protein": 3.2,
+    "fat": 0.6,
+    "carbs": 2.7,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000042",
+    "name": "Parsley",
+    "category": "herbs",
+    "names": {
+      "ru": "Петрушка",
+      "en": "Parsley",
+      "es": "Perejil",
+      "de": "Petersilie",
+      "fr": "Persil"
+    },
+    "calories": 36,
+    "protein": 3.0,
+    "fat": 0.8,
+    "carbs": 6.3,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000043",
+    "name": "Dill",
+    "category": "herbs",
+    "names": {
+      "ru": "Укроп",
+      "en": "Dill",
+      "es": "Eneldo",
+      "de": "Dill",
+      "fr": "Aneth"
+    },
+    "calories": 43,
+    "protein": 3.5,
+    "fat": 1.1,
+    "carbs": 7.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000044",
+    "name": "Coriander",
+    "category": "herbs",
+    "names": {
+      "ru": "Кинза",
+      "en": "Coriander",
+      "es": "Cilantro",
+      "de": "Koriander",
+      "fr": "Coriandre"
+    },
+    "calories": 23,
+    "protein": 2.1,
+    "fat": 0.5,
+    "carbs": 3.7,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000045",
+    "name": "Thyme",
+    "category": "herbs",
+    "names": {
+      "ru": "Тимьян",
+      "en": "Thyme",
+      "es": "Tomillo",
+      "de": "Thymian",
+      "fr": "Thym"
+    },
+    "calories": 101,
+    "protein": 5.6,
+    "fat": 1.7,
+    "carbs": 24.5,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000046",
+    "name": "Rosemary",
+    "category": "herbs",
+    "names": {
+      "ru": "Розмарин",
+      "en": "Rosemary",
+      "es": "Romero",
+      "de": "Rosmarin",
+      "fr": "Romarin"
+    },
+    "calories": 131,
+    "protein": 3.3,
+    "fat": 5.9,
+    "carbs": 21.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000047",
+    "name": "Oregano",
+    "category": "herbs",
+    "names": {
+      "ru": "Орегано",
+      "en": "Oregano",
+      "es": "Orégano",
+      "de": "Oregano",
+      "fr": "Origan"
+    },
+    "calories": 265,
+    "protein": 9.0,
+    "fat": 4.3,
+    "carbs": 69.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000048",
+    "name": "Cumin",
+    "category": "spices",
+    "names": {
+      "ru": "Тмин",
+      "en": "Cumin",
+      "es": "Comino",
+      "de": "Kreuzkümmel",
+      "fr": "Cumin"
+    },
+    "calories": 375,
+    "protein": 17.8,
+    "fat": 22.3,
+    "carbs": 44.2,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000049",
+    "name": "Paprika",
+    "category": "spices",
+    "names": {
+      "ru": "Паприка",
+      "en": "Paprika",
+      "es": "Pimentón",
+      "de": "Paprika",
+      "fr": "Paprika"
+    },
+    "calories": 282,
+    "protein": 14.1,
+    "fat": 12.9,
+    "carbs": 54.0,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000050",
+    "name": "Turmeric",
+    "category": "spices",
+    "names": {
+      "ru": "Куркума",
+      "en": "Turmeric",
+      "es": "Cúrcuma",
+      "de": "Kurkuma",
+      "fr": "Curcuma"
+    },
+    "calories": 312,
+    "protein": 9.7,
+    "fat": 3.3,
+    "carbs": 67.1,
+    "containsGluten": false,
+    "containsLactose": false,
+    "unit": "кг"
+  }
+]

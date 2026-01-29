@@ -1,23 +1,10 @@
-//
-//  Department.swift
-//  Restodocks
-//
-
 import Foundation
 
-enum Department: String, Codable, CaseIterable, Identifiable {
-
+enum Department: String, CaseIterable, Identifiable, Codable {
     case kitchen
     case bar
     case hall
     case management
-
-    // PRO
-    case grill
-    case pizza
-    case sushi
-    case bakery
-    case pastry
 
     var id: String { rawValue }
 }

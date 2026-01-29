@@ -5,6 +5,14 @@
 //  Created by Stanislav Rebrikov on 1/6/26.
 //
 
+
+//
+//  SushiBarScheduleView.swift
+//  Restodocks
+//
+//  Created by Stanislav Rebrikov on 1/6/26.
+//
+
 import SwiftUI
 
 struct SushiBarScheduleView: View {

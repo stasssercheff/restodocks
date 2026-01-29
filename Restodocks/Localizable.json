@@ -6,7 +6,6 @@
     "de": "Restodocks",
     "fr": "Restodocks"
   },
-
   "kitchen_title": {
     "ru": "Кухня",
     "en": "Kitchen",
@@ -14,7 +13,6 @@
     "de": "Küche",
     "fr": "Cuisine"
   },
-
   "hot_kitchen": {
     "ru": "Горячий цех",
     "en": "Hot Kitchen",
@@ -22,7 +20,6 @@
     "de": "Heiße Küche",
     "fr": "Cuisine chaude"
   },
-
   "cold_kitchen": {
     "ru": "Холодный цех",
     "en": "Cold Kitchen",
@@ -30,7 +27,6 @@
     "de": "Kalte Küche",
     "fr": "Cuisine froide"
   },
-
   "grill": {
     "ru": "Гриль",
     "en": "Grill",
@@ -38,7 +34,6 @@
     "de": "Grill",
     "fr": "Grill"
   },
-
   "pizza": {
     "ru": "Пицца",
     "en": "Pizza",
@@ -46,7 +41,6 @@
     "de": "Pizza",
     "fr": "Pizza"
   },
-
   "sushi_bar": {
     "ru": "Сушибар",
     "en": "Sushi Bar",
@@ -54,7 +48,6 @@
     "de": "Sushi-Bar",
     "fr": "Bar à sushi"
   },
-
   "prep": {
     "ru": "Заготовка",
     "en": "Prep",
@@ -62,7 +55,6 @@
     "de": "Vorbereitung",
     "fr": "Préparation"
   },
-
   "bakery": {
     "ru": "Выпечка",
     "en": "Bakery",
@@ -70,7 +62,6 @@
     "de": "Bäckerei",
     "fr": "Boulangerie"
   },
-
   "pastry": {
     "ru": "Кондитерка",
     "en": "Pastry",
@@ -78,7 +69,13 @@
     "de": "Patisserie",
     "fr": "Pâtisserie"
   },
-
+  "cleaning": {
+    "ru": "Клининг",
+    "en": "Cleaning",
+    "es": "Limpieza",
+    "de": "Reinigung",
+    "fr": "Nettoyage"
+  },
   "kitchen": {
     "ru": "Кухня",
     "en": "Kitchen",
@@ -86,7 +83,6 @@
     "de": "Küche",
     "fr": "Cuisine"
   },
-
   "bar": {
     "ru": "Бар",
     "en": "Bar",
@@ -94,7 +90,6 @@
     "de": "Bar",
     "fr": "Bar"
   },
-
   "hall": {
     "ru": "Зал",
     "en": "Hall",
@@ -102,7 +97,6 @@
     "de": "Saal",
     "fr": "Salle"
   },
-
   "management": {
     "ru": "Менеджмент",
     "en": "Management",
@@ -110,7 +104,6 @@
     "de": "Management",
     "fr": "Gestion"
   },
-
   "administration": {
     "ru": "Административный",
     "en": "Administration",
@@ -118,7 +111,6 @@
     "de": "Verwaltung",
     "fr": "Administration"
   },
-
   "admin_section": {
     "ru": "Административный раздел",
     "en": "Administration Section",
@@ -126,7 +118,6 @@
     "de": "Verwaltungsbereich",
     "fr": "Section d’administration"
   },
-
   "staff": {
     "ru": "Сотрудники",
     "en": "Staff",
@@ -134,7 +125,6 @@
     "de": "Personal",
     "fr": "Personnel"
   },
-
   "profile": {
     "ru": "Учетная запись",
     "en": "Account",
@@ -142,7 +132,6 @@
     "de": "Konto",
     "fr": "Compte"
   },
-
   "settings": {
     "ru": "Настройки",
     "en": "Settings",
@@ -150,7 +139,6 @@
     "de": "Einstellungen",
     "fr": "Paramètres"
   },
-
   "language": {
     "ru": "Язык",
     "en": "Language",
@@ -158,7 +146,6 @@
     "de": "Sprache",
     "fr": "Langue"
   },
-
   "russian": {
     "ru": "Русский",
     "en": "Russian",
@@ -166,7 +153,6 @@
     "de": "Russisch",
     "fr": "Russe"
   },
-
   "english": {
     "ru": "Английский",
     "en": "English",
@@ -174,7 +160,6 @@
     "de": "Englisch",
     "fr": "Anglais"
   },
-
   "pro_active": {
     "ru": "PRO активирован",
     "en": "PRO activated",
@@ -182,7 +167,6 @@
     "de": "PRO aktiviert",
     "fr": "PRO activé"
   },
-
   "pro_not_active": {
     "ru": "PRO не активирован",
     "en": "PRO not activated",
@@ -190,7 +174,6 @@
     "de": "PRO nicht aktiviert",
     "fr": "PRO non activé"
   },
-
   "promo_code": {
     "ru": "Промокод",
     "en": "Promo code",
@@ -198,7 +181,6 @@
     "de": "Promo-Code",
     "fr": "Code promo"
   },
-
   "pro_success": {
     "ru": "Успех! PRO активирован.",
     "en": "Success! PRO activated.",
@@ -206,7 +188,6 @@
     "de": "Erfolg! PRO aktiviert.",
     "fr": "Succès ! PRO activé."
   },
-
   "pro_wrong_code": {
     "ru": "Неверный код.",
     "en": "Wrong code.",
@@ -214,7 +195,13 @@
     "de": "Falscher Code.",
     "fr": "Code incorrect."
   },
-
+  "wrong_login_or_password": {
+    "ru": "Неверный логин или пароль.",
+    "en": "Wrong login or password.",
+    "es": "Usuario o contraseña incorrectos.",
+    "de": "Falscher Login oder falsches Passwort.",
+    "fr": "Identifiant ou mot de passe incorrect."
+  },
   "buy_pro": {
     "ru": "Купить PRO",
     "en": "Buy PRO",
@@ -222,7 +209,6 @@
     "de": "PRO kaufen",
     "fr": "Acheter PRO"
   },
-
   "press_to_test": {
     "ru": "Нажми кнопку, чтобы проверить подключение",
     "en": "Press the button to test the connection",
@@ -230,7 +216,6 @@
     "de": "Drücke den Knopf, um die Verbindung zu testen",
     "fr": "Appuyez sur le bouton pour tester la connexion"
   },
-
   "test_connection": {
     "ru": "Проверить подключение",
     "en": "Test connection",
@@ -238,7 +223,6 @@
     "de": "Verbindung testen",
     "fr": "Tester la connexion"
   },
-
   "connection_success": {
     "ru": "Успех! Получено строк:",
     "en": "Success! Rows received:",
@@ -246,7 +230,6 @@
     "de": "Erfolg! Zeilen erhalten:",
     "fr": "Succès ! Lignes reçues :"
   },
-
   "connection_error": {
     "ru": "Ошибка:",
     "en": "Error:",
@@ -267,6 +250,13 @@
     "es": "Registro de empleado",
     "de": "Mitarbeiterregistrierung",
     "fr": "Enregistrement de l'employé"
+  },
+  "register": {
+    "ru": "Зарегистрироваться",
+    "en": "Register",
+    "es": "Registrar",
+    "de": "Registrieren",
+    "fr": "S’inscrire"
   },
   "login": {
     "ru": "Вход",
@@ -298,9 +288,9 @@
   },
   "company_name": {
     "ru": "Название компании",
-    "en": "Company Name",
-    "es": "Nombre de la empresa",
-    "de": "Unternehmensname",
+    "en": "Company name",
+    "es": "Nombre de empresa",
+    "de": "Firmenname",
     "fr": "Nom de l'entreprise"
   },
   "password": {
@@ -328,7 +318,7 @@
       "ru": "Продолжить",
       "en": "Continue",
       "es": "Continuar",
-      "de": "Weiter",
+    "de": "Fortfahren",
       "fr": "Continuer"
     },
     "cancel": {
@@ -366,7 +356,6 @@
         "de": "Falsche PIN",
         "fr": "Code PIN incorrect"
       },
-      
     "pin_code": {
       "ru": "ПИН-код",
       "en": "PIN Code",
@@ -542,6 +531,13 @@
       "de": "Bereiche",
       "fr": "Sections"
     },
+    "nomenclature": {
+      "ru": "Номенклатура",
+      "en": "Nomenclature",
+      "es": "Nomenclatura",
+      "de": "Nomenklatur",
+      "fr": "Nomenclature"
+    },
     "products": {
       "ru": "Продукты",
       "en": "Products",
@@ -595,7 +591,7 @@
       "ru": "График",
       "en": "Schedule",
       "es": "Horario",
-      "de": "Zeitplan",
+    "de": "Dienstplan",
       "fr": "Planning"
     },
     "chef": {
@@ -611,7 +607,8 @@
       "es": "Gerente",
       "de": "Manager",
       "fr": "Gestionnaire"
-    },"suppliers": {
+  },
+  "suppliers": {
         "ru": "Поставщики",
         "en": "Suppliers",
         "es": "Proveedores",
@@ -688,6 +685,13 @@
         "de": "Vorname",
         "fr": "Prénom"
       },
+      "kitchen_section": {
+        "ru": "Цех",
+        "en": "Kitchen section",
+        "es": "Sección de cocina",
+        "de": "Küchenbereich",
+        "fr": "Section cuisine"
+      },
       "last_name": {
         "ru": "Фамилия",
         "en": "Last name",
@@ -709,6 +713,13 @@
         "de": "Abteilung",
         "fr": "Département"
       },
+      "kitchen_management": {
+          "ru": "Управление кухней",
+          "en": "Kitchen management",
+          "es": "Gestión de cocina",
+          "de": "Küchenleitung",
+          "fr": "Gestion de la cuisine"
+        },
       "position": {
         "ru": "Должность",
         "en": "Position",
@@ -722,11 +733,2228 @@
           "es": "Camarero",
           "de": "Kellner",
           "fr": "Serveur"
-      }
-
-
-
-
-
-
+      },
+      "headChef": {
+        "ru": "Шеф-повар",
+        "en": "Head Chef",
+        "es": "Chef principal",
+        "de": "Küchenchef",
+        "fr": "Chef cuisinier"
+      },
+      "sousChef": {
+        "ru": "Су-шеф",
+        "en": "Sous Chef",
+        "es": "Sous-chef",
+        "de": "Souschef",
+        "fr": "Sous-chef"
+      },
+      "brigadeLeader": {
+        "ru": "Бригадир",
+        "en": "Brigade Leader",
+        "es": "Jefe de brigada",
+        "de": "Postenführer",
+        "fr": "Chef de brigade"
+      },
+      "linecook": {
+        "ru": "Повар",
+        "en": "Line Cook",
+        "es": "Cocinero",
+        "de": "Koch",
+        "fr": "Cuisinier"
+      },
+      "serviceCook": {
+        "ru": "Повар раздачи",
+        "en": "Service Cook",
+        "es": "Cocinero de servicio",
+        "de": "Ausgabekoch",
+        "fr": "Cuisinier de service"
+      },
+      "prepCook": {
+        "ru": "Заготовщик",
+        "en": "Prep Cook",
+        "es": "Cocinero de preparación",
+        "de": "Vorbereitungskoch",
+        "fr": "Préparateur"
+      },
+      "dishwasher": {
+    "ru": "Сотрудник мойки",
+        "en": "Dishwasher",
+        "es": "Lavaplatos",
+    "de": "Spülkraft",
+        "fr": "Plongeur"
+      },
+      "grillCook": {
+        "ru": "Повар гриль",
+        "en": "Grill Cook",
+        "es": "Parrillero",
+        "de": "Grillkoch",
+        "fr": "Cuisinier grill"
+      },
+      "sushiChef": {
+        "ru": "Сушист",
+        "en": "Sushi Chef",
+        "es": "Sushero",
+        "de": "Sushi-Koch",
+        "fr": "Chef sushi"
+      },
+        "Pizzaiolo": {
+          "ru": "Пиццер",
+          "en": "Pizzaiolo",
+          "es": "Pizzero",
+          "de": "Pizzabäcker",
+          "fr": "Pizzaiolo"
+      },
+      "pastryChef": {
+        "ru": "Шеф-кондитер",
+        "en": "Pastry Chef",
+        "es": "Chef pastelero",
+        "de": "Chef-Patissier",
+        "fr": "Chef pâtissier"
+      },
+      "pastryCook": {
+        "ru": "Кондитер",
+        "en": "Pastry Cook",
+        "es": "Pastelero",
+        "de": "Konditor",
+        "fr": "Pâtissier"
+      },
+        "cook": {
+          "ru": "Повар",
+          "en": "Cook",
+          "es": "Cocinero",
+          "de": "Koch",
+          "fr": "Cuisinier"
+        },
+        "seniorCook": {
+          "ru": "Старший повар",
+          "en": "Senior Cook",
+          "es": "Cocinero jefe",
+          "de": "Chefkoch",
+          "fr": "Cuisinier principal"
+        },
+        "seniorPrepCook": {
+          "ru": "Старший заготовочного цеха",
+          "en": "Senior Prep Cook",
+          "es": "Jefe de preparación",
+          "de": "Leiter Vorbereitung",
+          "fr": "Chef préparateur"
+        },
+        "seniorGrillCook": {
+          "ru": "Старший гриль-повар",
+          "en": "Senior Grill Cook",
+          "es": "Jefe de parrilla",
+          "de": "Leitender Grillkoch",
+          "fr": "Chef grill"
+        },
+        "seniorSushiChef": {
+          "ru": "Старший сушист",
+          "en": "Senior Sushi Chef",
+          "es": "Jefe de sushi",
+          "de": "Leitender Sushi-Koch",
+          "fr": "Chef sushi principal"
+        },
+        "seniorPizzaiolo": {
+            "ru": "Старший пиццер",
+            "en": "Senior Pizzaiolo",
+            "es": "Pizzero principal",
+            "de": "Leitender Pizzabäcker",
+            "fr": "Chef pizzaiolo"
+  },
+  "pizzaiolo": {
+    "ru": "Пиццайоло",
+    "en": "Pizzaiolo",
+    "es": "Pizzaiolo",
+    "de": "Pizzabäcker",
+    "fr": "Pizzaiolo"
+  },
+        "seniorPastryChef": {
+          "ru": "Старший кондитер",
+          "en": "Senior Pastry Chef",
+          "es": "Jefe pastelero",
+          "de": "Leitender Konditor",
+          "fr": "Chef pâtissier"
+      },
+      "barManager": {
+        "ru": "Бар-менеджер",
+        "en": "Bar Manager",
+        "es": "Gerente de bar",
+        "de": "Barmanager",
+        "fr": "Responsable du bar"
+      },
+      "seniorBartender": {
+        "ru": "Старший бармен",
+        "en": "Senior Bartender",
+        "es": "Bartender senior",
+        "de": "Chef-Barkeeper",
+        "fr": "Barman senior"
+      },
+      "bartender": {
+        "ru": "Бармен",
+        "en": "Bartender",
+        "es": "Bartender",
+        "de": "Barkeeper",
+        "fr": "Barman"
+      },
+      "hallManager": {
+        "ru": "Менеджер зала",
+        "en": "Hall Manager",
+        "es": "Gerente de sala",
+        "de": "Saalmanager",
+        "fr": "Responsable de salle"
+      },
+      "cashier": {
+        "ru": "Кассир",
+        "en": "Cashier",
+        "es": "Cajero",
+        "de": "Kassierer",
+        "fr": "Caissier"
+      },
+      "runner": {
+        "ru": "Раннер",
+        "en": "Runner",
+        "es": "Runner",
+        "de": "Runner",
+        "fr": "Runner"
+      },
+      "director": {
+        "ru": "Директор",
+        "en": "Director",
+        "es": "Director",
+        "de": "Direktor",
+        "fr": "Directeur"
+      },
+      "generalManager": {
+        "ru": "Управляющий",
+        "en": "General Manager",
+        "es": "Gerente general",
+        "de": "Geschäftsführer",
+        "fr": "Directeur général"
+      },
+      "pro_features": {
+        "ru": "Возможности PRO",
+        "en": "PRO Features",
+        "es": "Funciones PRO",
+        "de": "PRO-Funktionen",
+        "fr": "Fonctionnalités PRO"
+      },
+      "pro_enter_or_buy": {
+        "ru": "Войти или купить PRO",
+        "en": "Sign in or Buy PRO",
+        "es": "Iniciar sesión o comprar PRO",
+        "de": "Anmelden oder PRO kaufen",
+        "fr": "Se connecter ou acheter PRO"
+      },
+      "product_catalog": {
+        "ru": "Каталог продуктов",
+        "en": "Product Catalog",
+        "es": "Catálogo de productos",
+        "de": "Produktkatalog",
+        "fr": "Catalogue de produits"
+      },
+      "menu_view": {
+        "ru": "Меню",
+        "en": "Menu",
+        "es": "Menú",
+        "de": "Menü",
+        "fr": "Menu"
+      },
+      "ttk_view": {
+        "ru": "ТТК",
+        "en": "Tech Cards",
+        "es": "Fichas técnicas",
+        "de": "Technologische Karten",
+        "fr": "Fiches techniques"
+      },
+      "schedule_view": {
+        "ru": "График",
+        "en": "Schedule",
+        "es": "Horario",
+        "de": "Zeitplan",
+        "fr": "Planning"
+      },
+      "display_only": {
+        "ru": "Только просмотр",
+        "en": "View only",
+        "es": "Solo lectura",
+        "de": "Nur anzeigen",
+        "fr": "Affichage uniquement"
+      },
+      "recalculation_available": {
+        "ru": "С функцией пересчёта",
+        "en": "With recalculation",
+        "es": "Con recálculo",
+        "de": "Mit Neuberechnung",
+        "fr": "Avec recalcul"
+      },
+      "hot_kitchen_short": {
+        "ru": "ГЦ",
+        "en": "Hot Section",
+        "es": "Sección caliente",
+        "de": "Warme Küche",
+        "fr": "Section chaude"
+      },
+      "cold_kitchen_short": {
+        "ru": "ХЦ",
+        "en": "Cold Section",
+        "es": "Sección fría",
+        "de": "Kalte Küche",
+        "fr": "Section froide"
+      },
+      "prep_section_full": {
+        "ru": "Заготовочный цех",
+        "en": "Prep Section",
+        "es": "Sección de preparación",
+        "de": "Vorbereitungsbereich",
+        "fr": "Section de préparation"
+      },
+      "bar_menu": {
+        "ru": "Меню бара",
+        "en": "Bar Menu",
+        "es": "Menú del bar",
+        "de": "Barkarte",
+        "fr": "Menu du bar"
+      },
+      "hall_menu": {
+        "ru": "Меню зала",
+        "en": "Hall Menu",
+        "es": "Menú del salón",
+        "de": "Saalmenü",
+        "fr": "Menu de la salle"
+      },
+      "head_chef_role": {
+        "ru": "Шеф-повар",
+        "en": "Head Chef",
+        "es": "Chef principal",
+        "de": "Küchenchef",
+        "fr": "Chef cuisinier"
+      },
+      "general_manager_role": {
+        "ru": "Управляющий",
+        "en": "General Manager",
+        "es": "Gerente general",
+        "de": "Betriebsleiter",
+        "fr": "Directeur général"
+      },
+      "price_list": {
+        "ru": "Список продуктов с ценами",
+        "en": "Product Price List",
+        "es": "Lista de precios",
+        "de": "Preisliste",
+        "fr": "Liste de prix"
+      },
+      "order_checklist_send": {
+        "ru": "Отправить чек-лист заказа",
+        "en": "Send Order Checklist",
+        "es": "Enviar lista de pedido",
+        "de": "Bestellliste senden",
+        "fr": "Envoyer la liste de commande"
+      },
+      "inventory_all": {
+        "ru": "Вся номенклатура",
+        "en": "All Inventory",
+        "es": "Todo el inventario",
+        "de": "Gesamtes Inventar",
+        "fr": "Tout l’inventaire"
+      },
+      "inventory_kitchen": {
+        "ru": "Номенклатура кухни",
+        "en": "Kitchen Inventory",
+        "es": "Inventario de cocina",
+        "de": "Kücheninventar",
+        "fr": "Inventaire cuisine"
+      },
+      "inventory_fridge": {
+        "ru": "Холодильники",
+        "en": "Refrigerators",
+        "es": "Refrigeradores",
+        "de": "Kühlschränke",
+        "fr": "Réfrigérateurs"
+      },
+      "inventory_freezer": {
+        "ru": "Морозильная камера",
+        "en": "Freezer",
+        "es": "Congelador",
+        "de": "Gefrierschrank",
+        "fr": "Congélateur"
+      },
+      "inventory_dry_storage": {
+        "ru": "Сухой склад",
+        "en": "Dry Storage",
+        "es": "Almacén seco",
+        "de": "Trockenlager",
+        "fr": "Stock sec"
+      },
+      "senior_cook": {
+        "ru": "Старший повар",
+        "en": "Senior Cook",
+        "es": "Cocinero senior",
+        "de": "Senior Koch",
+        "fr": "Chef senior"
+      },
+      "cleaner": {
+        "ru": "Уборщица",
+        "en": "Cleaner",
+        "es": "Personal de limpieza",
+        "de": "Reinigungskraft",
+        "fr": "Agent d’entretien"
+      },
+      "full_day": {
+    "ru": "Полный день",
+    "en": "Full Day",
+    "es": "Día completo",
+    "de": "Volltag",
+        "fr": "Journée complète"
+      },
+      "no_schedule": {
+        "ru": "График пока не заполнен",
+        "en": "No schedule yet",
+        "es": "El horario aún no está заполнен",
+        "de": "Dienstplan ist noch leer",
+        "fr": "Le planning n’est pas encore rempli"
+      },
+      "month_1": {
+          "ru": "Январь",
+          "en": "January",
+          "es": "Enero",
+          "de": "Januar",
+          "fr": "Janvier"
+        },
+        "month_2": {
+          "ru": "Февраль",
+          "en": "February",
+          "es": "Febrero",
+          "de": "Februar",
+          "fr": "Février"
+        },
+        "month_3": {
+          "ru": "Март",
+          "en": "March",
+          "es": "Marzo",
+          "de": "März",
+          "fr": "Mars"
+        },
+        "month_4": {
+          "ru": "Апрель",
+          "en": "April",
+          "es": "Abril",
+          "de": "April",
+          "fr": "Avril"
+        },
+        "month_5": {
+          "ru": "Май",
+          "en": "May",
+          "es": "Mayo",
+          "de": "Mai",
+          "fr": "Mai"
+        },
+        "month_6": {
+          "ru": "Июнь",
+          "en": "June",
+          "es": "Junio",
+          "de": "Juni",
+          "fr": "Juin"
+        },
+        "month_7": {
+          "ru": "Июль",
+          "en": "July",
+          "es": "Julio",
+          "de": "Juli",
+          "fr": "Juillet"
+        },
+        "month_8": {
+          "ru": "Август",
+          "en": "August",
+          "es": "Agosto",
+          "de": "August",
+          "fr": "Août"
+        },
+        "month_9": {
+          "ru": "Сентябрь",
+          "en": "September",
+          "es": "Septiembre",
+          "de": "September",
+          "fr": "Septembre"
+        },
+        "month_10": {
+          "ru": "Октябрь",
+          "en": "October",
+          "es": "Octubre",
+          "de": "Oktober",
+          "fr": "Octobre"
+        },
+        "month_11": {
+          "ru": "Ноябрь",
+          "en": "November",
+          "es": "Noviembre",
+          "de": "November",
+          "fr": "Novembre"
+        },
+        "month_12": {
+          "ru": "Декабрь",
+          "en": "December",
+          "es": "Diciembre",
+          "de": "Dezember",
+          "fr": "Décembre"
+        },
+        "invalid_email": {
+          "ru": "Введите корректный email",
+          "en": "Enter a valid email",
+          "es": "Introduce un correo válido",
+          "de": "Geben Sie eine gültige E-Mail ein",
+          "fr": "Entrez un email valide"
+  },
+  "standard_sections": {
+    "ru": "Стандартные цеха",
+    "en": "Standard Sections",
+    "es": "Secciones estándar",
+    "de": "Standard-Bereiche",
+    "fr": "Sections standard"
+  },
+  "pro_sections": {
+    "ru": "PRO цеха",
+    "en": "PRO Sections",
+    "es": "Secciones PRO",
+    "de": "PRO-Bereiche",
+    "fr": "Sections PRO"
+  },
+  "close": {
+    "ru": "Закрыть",
+    "en": "Close",
+    "es": "Cerrar",
+    "de": "Schließen",
+    "fr": "Fermer"
+  },
+  "employee_login": {
+    "ru": "Вход для сотрудника",
+    "en": "Employee Login",
+    "es": "Inicio de sesión de empleado",
+    "de": "Mitarbeiter-Anmeldung",
+    "fr": "Connexion employé"
+  },
+  "create_owner_title": {
+    "ru": "Владелец компании",
+    "en": "Company Owner",
+    "es": "Propietario de la empresa",
+    "de": "Unternehmensbesitzer",
+    "fr": "Propriétaire de l'entreprise"
+  },
+  "full_name": {
+    "ru": "Имя и фамилия",
+    "en": "Full Name",
+    "es": "Nombre completo",
+    "de": "Vollständiger Name",
+    "fr": "Nom complet"
+  },
+  "employee": {
+    "ru": "Сотрудник",
+    "en": "Employee",
+    "es": "Empleado",
+    "de": "Mitarbeiter",
+    "fr": "Employé"
+  },
+  "select_employee": {
+    "ru": "Выбери сотрудника",
+    "en": "Select Employee",
+    "es": "Seleccionar empleado",
+    "de": "Mitarbeiter auswählen",
+    "fr": "Sélectionner un employé"
+  },
+  "date": {
+    "ru": "Дата",
+    "en": "Date",
+    "es": "Fecha",
+    "de": "Datum",
+    "fr": "Date"
+  },
+  "shift_date": {
+    "ru": "Дата смены",
+    "en": "Shift Date",
+    "es": "Fecha del turno",
+    "de": "Schichtdatum",
+    "fr": "Date du quart"
+  },
+  "time": {
+    "ru": "Время",
+    "en": "Time",
+    "es": "Hora",
+    "de": "Zeit",
+    "fr": "Heure"
+  },
+  "start": {
+    "ru": "Начало",
+    "en": "Start",
+    "es": "Inicio",
+    "de": "Start",
+    "fr": "Début"
+  },
+  "end": {
+    "ru": "Конец",
+    "en": "End",
+    "es": "Fin",
+    "de": "Ende",
+    "fr": "Fin"
+  },
+  "create_shift": {
+    "ru": "Создать смену",
+    "en": "Create Shift",
+    "es": "Crear turno",
+    "de": "Schicht erstellen",
+    "fr": "Créer un quart"
+  },
+  "new_shift": {
+    "ru": "Новая смена",
+    "en": "New Shift",
+    "es": "Nuevo turno",
+    "de": "Neue Schicht",
+    "fr": "Nouveau quart"
+  },
+  "profile_tab": {
+    "ru": "Профиль",
+    "en": "Profile",
+    "es": "Perfil",
+    "de": "Profil",
+    "fr": "Profil"
+  },
+  "favorites_tab": {
+    "ru": "Избранное",
+    "en": "Favorites",
+    "es": "Favoritos",
+    "de": "Favoriten",
+    "fr": "Favoris"
+  },
+  "home_tab": {
+    "ru": "Главная",
+    "en": "Home",
+    "es": "Inicio",
+    "de": "Startseite",
+    "fr": "Accueil"
+  },
+  "hot_kitchen_menu": {
+    "ru": "Меню горячего цеха",
+    "en": "Hot Kitchen Menu",
+    "es": "Menú de cocina caliente",
+    "de": "Heißküchen-Menü",
+    "fr": "Menu de cuisine chaude"
+  },
+  "hot_kitchen_ttk": {
+    "ru": "Технологические карты горячего цеха",
+    "en": "Hot Kitchen Technical Cards",
+    "es": "Tarjetas técnicas de cocina caliente",
+    "de": "Heißküchen-Technikkarten",
+    "fr": "Cartes techniques de cuisine chaude"
+  },
+  "dining_room": {
+    "ru": "Зал",
+    "en": "Dining Room",
+    "es": "Comedor",
+    "de": "Speisesaal",
+    "fr": "Salle à manger"
+  },
+  "kitchen_main": {
+    "ru": "Кухня",
+    "en": "Kitchen",
+    "es": "Cocina",
+    "de": "Küche",
+    "fr": "Cuisine"
+  },
+  "kitchen_sections": {
+    "ru": "Цеха кухни",
+    "en": "Kitchen Sections",
+    "es": "Secciones de cocina",
+    "de": "Küchenbereiche",
+    "fr": "Sections de cuisine"
+  },
+  "view_only": {
+    "ru": "только просмотр",
+    "en": "view only",
+    "es": "solo lectura",
+    "de": "nur anzeigen",
+    "fr": "lecture seule"
+  },
+  "recipe_cards": {
+    "ru": "Технологические карты",
+    "en": "Recipe Cards",
+    "es": "Tarjetas de recetas",
+    "de": "Rezeptkarten",
+    "fr": "Cartes de recettes"
+  },
+  "menu_waitstaff": {
+    "ru": "Меню для официантов",
+    "en": "Menu (for waitstaff)",
+    "es": "Menú (para camareros)",
+    "de": "Menü (für Servicepersonal)",
+    "fr": "Menu (pour serveurs)"
+  },
+  "executive_chef": {
+    "ru": "Шеф-повар",
+    "en": "Executive Chef",
+    "es": "Chef Ejecutivo",
+    "de": "Küchenchef",
+    "fr": "Chef exécutif"
+  },
+  "general_manager": {
+    "ru": "Генеральный менеджер",
+    "en": "General Manager",
+    "es": "Gerente General",
+    "de": "Geschäftsführer",
+    "fr": "Directeur général"
+  },
+  "kitchen_schedule_editable": {
+    "ru": "График кухни (с редактированием)",
+    "en": "Kitchen Schedule (with editing)",
+    "es": "Horario de cocina (con edición)",
+    "de": "Küchenplan (mit Bearbeitung)",
+    "fr": "Planning cuisine (avec édition)"
+  },
+  "dining_room_schedule_editable": {
+    "ru": "График зала (с редактированием)",
+    "en": "Dining Room Schedule (with editing)",
+    "es": "Horario del comedor (con edición)",
+    "de": "Speisesaalplan (mit Bearbeitung)",
+    "fr": "Planning salle à manger (avec édition)"
+  },
+  "full_item_list": {
+    "ru": "Вся номенклатура",
+    "en": "Full Item List",
+    "es": "Lista completa de artículos",
+    "de": "Vollständige Artikelliste",
+    "fr": "Liste complète des articles"
+  },
+  "kitchen_inventory": {
+    "ru": "Инвентаризация кухни",
+    "en": "Kitchen Inventory",
+    "es": "Inventario de cocina",
+    "de": "Kücheninventar",
+    "fr": "Inventaire cuisine"
+  },
+  "refrigerator_inventory": {
+    "ru": "Инвентаризация холодильника",
+    "en": "Refrigerator Inventory",
+    "es": "Inventario de nevera",
+    "de": "Kühlschrankinventar",
+    "fr": "Inventaire réfrigérateur"
+  },
+  "freezer_inventory": {
+    "ru": "Инвентаризация морозильной камеры",
+    "en": "Freezer Inventory",
+    "es": "Inventario del congelador",
+    "de": "Gefrierschrankinventar",
+    "fr": "Inventaire congélateur"
+  },
+  "dry_storage_inventory": {
+    "ru": "Инвентаризация сухого склада",
+    "en": "Dry Storage Inventory",
+    "es": "Inventario de almacenamiento en seco",
+    "de": "Trockenlagerbestand",
+    "fr": "Inventaire stockage sec"
+  },
+  "storage_inventory": {
+    "ru": "Инвентаризация склада",
+    "en": "Storage Inventory",
+    "es": "Inventario de almacenamiento",
+    "de": "Lagerbestand",
+    "fr": "Inventaire stockage"
+  },
+  "bar_inventory": {
+    "ru": "Инвентаризация бара",
+    "en": "Bar Inventory",
+    "es": "Inventario del bar",
+    "de": "Barkartenbestand",
+    "fr": "Inventaire bar"
+  },
+  "household_supplies": {
+    "ru": "Хозяйственные принадлежности",
+    "en": "Household Supplies",
+    "es": "Suministros domésticos",
+    "de": "Haushaltswaren",
+    "fr": "Fournitures ménagères"
+  },
+  "administrative": {
+    "ru": "Административный",
+    "en": "Administrative",
+    "es": "Administrativo",
+    "de": "Verwaltung",
+    "fr": "Administratif"
+  },
+  "administrative_section": {
+    "ru": "Административный раздел",
+    "en": "Administrative Section",
+    "es": "Sección administrativa",
+    "de": "Verwaltungsbereich",
+    "fr": "Section administrative"
+  },
+  "with_recalculation": {
+    "ru": "с пересчётом по ключевому продукту",
+    "en": "with recalculation by key product",
+    "es": "con recálculo por producto clave",
+    "de": "mit Neuberechnung nach Schlüsselprodukt",
+    "fr": "avec recalcul par produit clé"
+  },
+  "product_list_prices": {
+    "ru": "Список продуктов с ценами",
+    "en": "Product list with prices",
+    "es": "Lista de productos con precios",
+    "de": "Produktliste mit Preisen",
+    "fr": "Liste de produits avec prix"
+  },
+  "with_calories_macros": {
+    "ru": "с калориями и макро",
+    "en": "with calories & macros",
+    "es": "con calorías y macros",
+    "de": "mit Kalorien & Makros",
+    "fr": "avec calories et macros"
+  },
+  "search": {
+    "ru": "Поиск",
+    "en": "Search",
+    "es": "Buscar",
+    "de": "Suchen",
+    "fr": "Rechercher"
+  },
+  "product_detail": {
+    "ru": "Детали продукта",
+    "en": "Product Details",
+    "es": "Detalles del producto",
+    "de": "Produktdetails",
+    "fr": "Détails du produit"
+  },
+  "nutrition_facts": {
+    "ru": "Пищевая ценность",
+    "en": "Nutrition Facts",
+    "es": "Información nutricional",
+    "de": "Nährwertangaben",
+    "fr": "Informations nutritionnelles"
+  },
+  "features": {
+    "ru": "Особенности",
+    "en": "Features",
+    "es": "Características",
+    "de": "Eigenschaften",
+    "fr": "Caractéristiques"
+  },
+  "gluten_free": {
+    "ru": "Без глютена",
+    "en": "Gluten Free",
+    "es": "Sin Gluten",
+    "de": "Glutenfrei",
+    "fr": "Sans Gluten"
+  },
+  "lactose_free": {
+    "ru": "Без лактозы",
+    "en": "Lactose Free",
+    "es": "Sin Lactosa",
+    "de": "Laktosefrei",
+    "fr": "Sans Lactose"
+  },
+  "schedule_by_department": {
+    "ru": "График по цехам",
+    "en": "Schedule by Department",
+    "es": "Horario por departamento",
+    "de": "Plan nach Abteilung",
+    "fr": "Planning par département"
+  },
+  "all_departments": {
+    "ru": "Все цеха",
+    "en": "All Departments",
+    "es": "Todos los departamentos",
+    "de": "Alle Abteilungen",
+    "fr": "Tous les départements"
+  },
+  "schedule_empty": {
+    "ru": "График пока не заполнен",
+    "en": "Schedule is empty",
+    "es": "El horario está vacío",
+    "de": "Zeitplan ist leer",
+    "fr": "L'horaire est vide"
+  },
+  "add_first_shift": {
+    "ru": "Добавьте первую смену",
+    "en": "Add first shift",
+    "es": "Agregar primer turno",
+    "de": "Erste Schicht hinzufügen",
+    "fr": "Ajouter le premier quart"
+  },
+  "unknown": {
+    "ru": "Неизвестно",
+    "en": "Unknown",
+    "es": "Desconocido",
+    "de": "Unbekannt",
+    "fr": "Inconnu"
+  },
+  "full_day_text": {
+    "ru": "Полный день",
+    "en": "Full day",
+    "es": "Día completo",
+    "de": "Volltag",
+    "fr": "Journée complète"
+  },
+  "loading_products": {
+    "ru": "Загрузка продуктов...",
+    "en": "Loading products...",
+    "es": "Cargando productos...",
+    "de": "Produkte laden...",
+    "fr": "Chargement des produits..."
+  },
+  "loading_error": {
+    "ru": "Ошибка загрузки",
+    "en": "Loading error",
+    "es": "Error de carga",
+    "de": "Ladefehler",
+    "fr": "Erreur de chargement"
+  },
+  "retry": {
+    "ru": "Повторить",
+    "en": "Retry",
+    "es": "Reintentar",
+    "de": "Wiederholen",
+    "fr": "Réessayer"
+  },
+  "products_count": {
+    "ru": "продуктов",
+    "en": "products",
+    "es": "productos",
+    "de": "Produkte",
+    "fr": "produits"
+  },
+  "per_unit": {
+    "ru": "за",
+    "en": "per",
+    "es": "por",
+    "de": "pro",
+    "fr": "par"
+  },
+  "nutrition_per_100g": {
+    "ru": "Пищевая ценность (на 100г)",
+    "en": "Nutrition Facts (per 100g)",
+    "es": "Información nutricional (por 100g)",
+    "de": "Nährwertangaben (pro 100g)",
+    "fr": "Informations nutritionnelles (pour 100g)"
+  },
+  "calories_short": {
+    "ru": "Калории",
+    "en": "C",
+    "es": "Cal",
+    "de": "Cal",
+    "fr": "Cal"
+  },
+  "protein_short": {
+    "ru": "Белки",
+    "en": "P",
+    "es": "Prot",
+    "de": "Prot",
+    "fr": "Prot"
+  },
+  "fat_short": {
+    "ru": "Жиры",
+    "en": "F",
+    "es": "Gr",
+    "de": "Fett",
+    "fr": "Lip"
+  },
+  "carbs_short": {
+    "ru": "Углеводы",
+    "en": "Carbs",
+    "es": "Carbohidratos",
+    "de": "Kohlenhydrate",
+    "fr": "Glucides"
+  },
+  "kcal": {
+    "ru": "ккал",
+    "en": "kcal",
+    "es": "kcal",
+    "de": "kcal",
+    "fr": "kcal"
+  },
+  "grams": {
+    "ru": "г",
+    "en": "g",
+    "es": "g",
+    "de": "g",
+    "fr": "g"
+  },
+  "gluten_free_label": {
+    "ru": "Без глютена",
+    "en": "Gluten Free",
+    "es": "Sin Gluten",
+    "de": "Glutenfrei",
+    "fr": "Sans Gluten"
+  },
+  "lactose_free_label": {
+    "ru": "Без лактозы",
+    "en": "Lactose Free",
+    "es": "Sin Lactosa",
+    "de": "Laktosefrei",
+    "fr": "Sans Lactose"
+  },
+  "product_title": {
+    "ru": "Продукт",
+    "en": "Product",
+    "es": "Producto",
+    "de": "Produkt",
+    "fr": "Produit"
+  },
+  "kitchen_checklists": {
+    "ru": "Чеклисты кухни",
+    "en": "Kitchen Checklists",
+    "es": "Listas de verificación de cocina",
+    "de": "Küchen-Checklisten",
+    "fr": "Listes de contrôle cuisine"
+  },
+  "checklists_title": {
+    "ru": "Чеклисты",
+    "en": "Checklists",
+    "es": "Listas de verificación",
+    "de": "Checklisten",
+    "fr": "Listes de contrôle"
+  },
+  "custom_button_placeholder": {
+    "ru": "Здесь будет настраиваемая кнопка",
+    "en": "Custom button will be here",
+    "es": "El botón personalizado estará aquí",
+    "de": "Benutzerdefinierte Schaltfläche wird hier sein",
+    "fr": "Le bouton personnalisé sera ici"
+  },
+  "favorites_title": {
+    "ru": "Избранное",
+    "en": "Favorites",
+    "es": "Favoritos",
+    "de": "Favoriten",
+    "fr": "Favoris"
+  },
+  "personal_cabinet": {
+    "ru": "Личный кабинет",
+    "en": "Personal Cabinet",
+    "es": "Gabinete Personal",
+    "de": "Persönliches Kabinett",
+    "fr": "Cabinet personnel"
+  },
+  "quick_action": {
+    "ru": "Быстрое действие",
+    "en": "Quick Action",
+    "es": "Acción Rápida",
+    "de": "Schnellaktion",
+    "fr": "Action Rapide"
+  },
+  "company_section": {
+    "ru": "Компания",
+    "en": "Company",
+    "es": "Empresa",
+    "de": "Unternehmen",
+    "fr": "Entreprise"
+  },
+  "name_label": {
+    "ru": "Название",
+    "en": "Name",
+    "es": "Nombre",
+    "de": "Name",
+    "fr": "Nom"
+  },
+  "used_for_registration": {
+    "ru": "Используется при регистрации сотрудников",
+    "en": "Used for employee registration",
+    "es": "Usado para el registro de empleados",
+    "de": "Wird für Mitarbeiterregistrierung verwendet",
+    "fr": "Utilisé pour l'enregistrement des employés"
+  },
+  "company_not_found": {
+    "ru": "Компания не найдена",
+    "en": "Company not found",
+    "es": "Empresa no encontrada",
+    "de": "Unternehmen nicht gefunden",
+    "fr": "Entreprise introuvable"
+  },
+  "company_title": {
+    "ru": "Компания",
+    "en": "Company",
+    "es": "Empresa",
+    "de": "Unternehmen",
+    "fr": "Entreprise"
+  },
+  "owner_title": {
+    "ru": "Владелец",
+    "en": "Owner",
+    "es": "Propietario",
+    "de": "Eigentümer",
+    "fr": "Propriétaire"
+  },
+  "calories_abbr": {
+    "ru": "К",
+    "en": "C",
+    "es": "Cal",
+    "de": "Cal",
+    "fr": "Cal"
+  },
+  "protein_abbr": {
+    "ru": "Б",
+    "en": "P",
+    "es": "Prot",
+    "de": "Prot",
+    "fr": "Prot"
+  },
+  "fat_abbr": {
+    "ru": "Ж",
+    "en": "F",
+    "es": "Gr",
+    "de": "Fett",
+    "fr": "Lip"
+  },
+  "carbs_abbr": {
+    "ru": "У",
+    "en": "Carb",
+    "es": "Carb",
+    "de": "KH",
+    "fr": "Gluc"
+  },
+  "10": {
+    "ru": "Яйца куриные (вариант 10)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "11": {
+    "ru": "Яблоки (вариант 11)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "3": {
+    "ru": "Яйца куриные (вариант 3)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "4": {
+    "ru": "Яйца куриные (вариант 4)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "5": {
+    "ru": "Яйца куриные (вариант 5)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "6": {
+    "ru": "Яйца куриные (вариант 6)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "7": {
+    "ru": "Яйца куриные (вариант 7)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "8": {
+    "ru": "Яйца куриные (вариант 8)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "9": {
+    "ru": "Яйца куриные (вариант 9)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "2": {
+    "ru": "Паприка (вариант 2)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "3_2": {
+    "ru": "Молоко коровье 3.2%",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "3_2_10": {
+    "ru": "Молоко коровье 3.2% (вариант 10)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "3_2_3": {
+    "ru": "Молоко коровье 3.2% (вариант 3)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "3_2_4": {
+    "ru": "Молоко коровье 3.2% (вариант 4)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "3_2_5": {
+    "ru": "Молоко коровье 3.2% (вариант 5)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "3_2_6": {
+    "ru": "Молоко коровье 3.2% (вариант 6)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "3_2_7": {
+    "ru": "Молоко коровье 3.2% (вариант 7)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "3_2_8": {
+    "ru": "Молоко коровье 3.2% (вариант 8)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "3_2_9": {
+    "ru": "Молоко коровье 3.2% (вариант 9)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "10_10": {
+    "ru": "Сметана 10% (вариант 10)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "10_3": {
+    "ru": "Сметана 10% (вариант 3)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "10_4": {
+    "ru": "Сметана 10% (вариант 4)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "10_5": {
+    "ru": "Сметана 10% (вариант 5)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "10_6": {
+    "ru": "Сметана 10% (вариант 6)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "10_7": {
+    "ru": "Сметана 10% (вариант 7)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "10_8": {
+    "ru": "Сметана 10% (вариант 8)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "10_9": {
+    "ru": "Сметана 10% (вариант 9)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "20": {
+    "ru": "Сметана 20%",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "20_10": {
+    "ru": "Сметана 20% (вариант 10)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "20_3": {
+    "ru": "Сметана 20% (вариант 3)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "20_4": {
+    "ru": "Сметана 20% (вариант 4)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "20_5": {
+    "ru": "Сметана 20% (вариант 5)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "20_6": {
+    "ru": "Сметана 20% (вариант 6)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "20_7": {
+    "ru": "Сметана 20% (вариант 7)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "20_8": {
+    "ru": "Сметана 20% (вариант 8)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "20_9": {
+    "ru": "Сметана 20% (вариант 9)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "5_10": {
+    "ru": "Творог 5% (вариант 10)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "5_3": {
+    "ru": "Творог 5% (вариант 3)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "5_4": {
+    "ru": "Творог 5% (вариант 4)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "5_5": {
+    "ru": "Творог 5% (вариант 5)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "5_6": {
+    "ru": "Творог 5% (вариант 6)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "5_7": {
+    "ru": "Творог 5% (вариант 7)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "5_8": {
+    "ru": "Творог 5% (вариант 8)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "5_9": {
+    "ru": "Творог 5% (вариант 9)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "unit": {
+    "ru": "за \\(unit)",
+    "en": "",
+    "es": "",
+    "de": "",
+    "fr": ""
+  },
+  "product_details": {
+    "ru": "Детали продукта",
+    "en": "Product Details",
+    "es": "Detalles del Producto",
+    "de": "Produktdetails",
+    "fr": "Détails du produit"
+  },
+  "name": {
+    "ru": "Имя",
+    "en": "Name",
+    "es": "Nombre",
+    "de": "Name",
+    "fr": "Nom"
+  },
+  "login_failed": {
+    "ru": "Ошибка входа",
+    "en": "Login failed",
+    "es": "Error de inicio de sesión",
+    "de": "Anmeldung fehlgeschlagen",
+    "fr": "Échec de connexion"
+  },
+  "cabinet": {
+    "ru": "Кабинет",
+    "en": "Cabinet",
+    "es": "Gabinete",
+    "de": "Schrank",
+    "fr": "Cabinet"
+  },
+  "enter_code": {
+    "ru": "Введите код",
+    "en": "Enter code",
+    "es": "Introducir código",
+    "de": "Code eingeben",
+    "fr": "Entrer le code"
+  },
+  "price": {
+    "ru": "Цена",
+    "en": "Price",
+    "es": "Precio",
+    "de": "Preis",
+    "fr": "Prix"
+  },
+  "owner_panel": {
+    "ru": "Панель владельца",
+    "en": "Owner Panel",
+    "es": "Panel del Propietario",
+    "de": "Besitzer-Panel",
+    "fr": "Panneau du propriétaire"
+  },
+  "quick": {
+    "ru": "Быстрый",
+    "en": "Quick",
+    "es": "Rápido",
+    "de": "Schnell",
+    "fr": "Rapide"
+  },
+  "activate": {
+    "ru": "Активировать",
+    "en": "Activate",
+    "es": "Activar",
+    "de": "Aktivieren",
+    "fr": "Activer"
+  },
+  "key": {
+    "ru": "Ключ",
+    "en": "Key",
+    "es": "Clave",
+    "de": "Schlüssel",
+    "fr": "Clé"
+  },
+  "wrong_code": {
+    "ru": "Неверный код",
+    "en": "Wrong code",
+    "es": "Código incorrecto",
+    "de": "Falscher Code",
+    "fr": "Code erroné"
+  },
+  "edit_product": {
+    "ru": "Редактировать продукт",
+    "en": "Edit Product",
+    "es": "Editar Producto",
+    "de": "Produkt bearbeiten",
+    "fr": "Modifier le produit"
+  },
+  "email": {
+    "ru": "Email",
+    "en": "Email",
+    "es": "Correo electrónico",
+    "de": "E-Mail",
+    "fr": "Email"
+  },
+  "account": {
+    "ru": "Аккаунт",
+    "en": "Account",
+    "es": "Cuenta",
+    "de": "Konto",
+    "fr": "Compte"
+  },
+  "{key}": {
+    "ru": "{ключ}",
+    "en": "{key}",
+    "es": "{clave}",
+    "de": "{schlüssel}",
+    "fr": "{clé}"
+  },
+  "product_name": {
+    "ru": "Название продукта",
+    "en": "Product Name",
+    "es": "Nombre del Producto",
+    "de": "Produktname",
+    "fr": "Nom du produit"
+  },
+  "employee_profile": {
+    "ru": "Профиль сотрудника",
+    "en": "Employee Profile",
+    "es": "Perfil del Empleado",
+    "de": "Mitarbeiterprofil",
+    "fr": "Profil employé"
+  },
+  "language_settings": {
+    "ru": "Язык приложения",
+    "en": "App Language",
+    "es": "Idioma de la aplicación",
+    "de": "App-Sprache",
+    "fr": "Langue de l'application"
+  },
+  "current_language": {
+    "ru": "Текущий язык",
+    "en": "Current language",
+    "es": "Idioma actual",
+    "de": "Aktuelle Sprache",
+    "fr": "Langue actuelle"
+  },
+  "personal_data": {
+    "ru": "Личные данные",
+    "en": "Personal Data",
+    "es": "Datos Personales",
+    "de": "Persönliche Daten",
+    "fr": "Données personnelles"
+  },
+  "change_photo": {
+    "ru": "Изменить фото",
+    "en": "Change Photo",
+    "es": "Cambiar Foto",
+    "de": "Foto ändern",
+    "fr": "Changer la photo"
+  },
+  "edit_profile": {
+    "ru": "Редактировать профиль",
+    "en": "Edit Profile",
+    "es": "Editar Perfil",
+    "de": "Profil bearbeiten",
+    "fr": "Modifier le profil"
+  },
+  "save": {
+    "ru": "Сохранить",
+    "en": "Save",
+    "es": "Guardar",
+    "de": "Speichern",
+    "fr": "Sauvegarder"
+  },
+  "cancel": {
+    "ru": "Отмена",
+    "en": "Cancel",
+    "es": "Cancelar",
+    "de": "Abbrechen",
+    "fr": "Annuler"
+  },
+  "my_schedule": {
+    "ru": "Мой график",
+    "en": "My Schedule",
+    "es": "Mi Horario",
+    "de": "Mein Zeitplan",
+    "fr": "Mon emploi du temps"
+  },
+  "select_language": {
+    "ru": "Выберите язык",
+    "en": "Select Language",
+    "es": "Seleccionar Idioma",
+    "de": "Sprache auswählen",
+    "fr": "Sélectionner la langue"
+  },
+  "done": {
+    "ru": "Готово",
+    "en": "Done",
+    "es": "Hecho",
+    "de": "Fertig",
+    "fr": "Terminé"
+  },
+  "name": {
+    "ru": "Имя",
+    "en": "Name",
+    "es": "Nombre",
+    "de": "Name",
+    "fr": "Nom"
+  },
+  "position": {
+    "ru": "Должность",
+    "en": "Position",
+    "es": "Posición",
+    "de": "Position",
+    "fr": "Poste"
+  },
+  "department": {
+    "ru": "Подразделение",
+    "en": "Department",
+    "es": "Departamento",
+    "de": "Abteilung",
+    "fr": "Département"
+  },
+  "company": {
+    "ru": "Компания",
+    "en": "Company",
+    "es": "Empresa",
+    "de": "Unternehmen",
+    "fr": "Entreprise"
+  },
+  "russian": {
+    "ru": "Русский",
+    "en": "Russian",
+    "es": "Ruso",
+    "de": "Russisch",
+    "fr": "Russe"
+  },
+  "all_categories": {
+    "ru": "Все категории",
+    "en": "All Categories",
+    "es": "Todas las categorías",
+    "de": "Alle Kategorien",
+    "fr": "Toutes les categorías"
+  },
+  "category": {
+    "ru": "Категория",
+    "en": "Category",
+    "es": "Categoría",
+    "de": "Kategorie",
+    "fr": "Catégorie"
+  },
+  "category_main": { "ru": "Основное блюдо", "en": "Main dish", "es": "Plato principal", "de": "Hauptgericht", "fr": "Plat principal" },
+  "category_appetizer": { "ru": "Закуска", "en": "Appetizer", "es": "Entrante", "de": "Vorspeise", "fr": "Entrée" },
+  "category_salad": { "ru": "Салат", "en": "Salad", "es": "Ensalada", "de": "Salat", "fr": "Salade" },
+  "category_soup": { "ru": "Суп", "en": "Soup", "es": "Sopa", "de": "Suppe", "fr": "Soupe" },
+  "category_dessert": { "ru": "Десерт", "en": "Dessert", "es": "Postre", "de": "Dessert", "fr": "Dessert" },
+  "category_drink": { "ru": "Напиток", "en": "Drink", "es": "Bebida", "de": "Getränk", "fr": "Boisson" },
+  "currency_settings": {
+    "ru": "Валюта",
+    "en": "Currency",
+    "es": "Moneda",
+    "de": "Währung",
+    "fr": "Devise"
+  },
+  "select_currency": {
+    "ru": "Выберите валюту",
+    "en": "Select Currency",
+    "es": "Seleccionar moneda",
+    "de": "Währung auswählen",
+    "fr": "Sélectionner la devise"
+  },
+  "price": {
+    "ru": "Цена",
+    "en": "Price",
+    "es": "Precio",
+    "de": "Preis",
+    "fr": "Prix"
+  },
+  "cooking_process": {
+    "ru": "Кулинарный процесс",
+    "en": "Cooking Process",
+    "es": "Proceso culinario",
+    "de": "Kochprozess",
+    "fr": "Processus culinaire"
+  },
+  "weight": {
+    "ru": "Вес",
+    "en": "Weight",
+    "es": "Peso",
+    "de": "Gewicht",
+    "fr": "Poids"
+  },
+  "quantity": {
+    "ru": "Количество",
+    "en": "Quantity",
+    "es": "Cantidad",
+    "de": "Menge",
+    "fr": "Quantité"
+  },
+  "cost": {
+    "ru": "Стоимость",
+    "en": "Cost",
+    "es": "Costo",
+    "de": "Kosten",
+    "fr": "Coût"
+  },
+  "processed": {
+    "ru": "Обработано",
+    "en": "Processed",
+    "es": "Procesado",
+    "de": "Verarbeitet",
+    "fr": "Traité"
+  },
+  "final_weight": {
+    "ru": "Финальный вес",
+    "en": "Final Weight",
+    "es": "Peso final",
+    "de": "Endgewicht",
+    "fr": "Poids final"
+  },
+  "weight_loss": {
+    "ru": "Потеря веса",
+    "en": "Weight Loss",
+    "es": "Pérdida de peso",
+    "de": "Gewichtsverlust",
+    "fr": "Perte de poids"
+  },
+  "select_cooking_process": {
+    "ru": "Выбрать кулинарный процесс",
+    "en": "Select Cooking Process",
+    "es": "Seleccionar proceso culinario",
+    "de": "Kochprozess auswählen",
+    "fr": "Sélectionner le processus culinaire"
+  },
+  "ingredient_calculator": {
+    "ru": "Калькулятор ингредиентов",
+    "en": "Ingredient Calculator",
+    "es": "Calculadora de ingredientes",
+    "de": "Zutatenrechner",
+    "fr": "Calculateur d'ingrédients"
+  },
+  "base_nutrition": {
+    "ru": "Базовая питательность",
+    "en": "Base Nutrition",
+    "es": "Nutrición base",
+    "de": "Grundernährung",
+    "fr": "Nutrition de base"
+  },
+  "processing_results": {
+    "ru": "Результаты обработки",
+    "en": "Processing Results",
+    "es": "Resultados del procesamiento",
+    "de": "Verarbeitungsergebnisse",
+    "fr": "Résultats du traitement"
+  },
+  "original_weight": {
+    "ru": "Исходный вес",
+    "en": "Original Weight",
+    "es": "Peso original",
+    "de": "Originalgewicht",
+    "fr": "Poids original"
+  },
+  "final_nutrition": {
+    "ru": "Итоговое питание",
+    "en": "Final Nutrition",
+    "es": "Nutrición final",
+    "de": "Endernährung",
+    "fr": "Nutrition finale"
+  },
+  "apply_to_recipe": {
+    "ru": "Применить к рецепту",
+    "en": "Apply to Recipe",
+    "es": "Aplicar a la receta",
+    "de": "Auf Rezept anwenden",
+    "fr": "Appliquer à la recette"
+  },
+  "dish_name": {
+    "ru": "Название блюда",
+    "en": "Dish Name",
+    "es": "Nombre del plato",
+    "de": "Gerichtname",
+    "fr": "Nom du plat"
+  },
+  "ingredients": {
+    "ru": "Ингредиенты",
+    "en": "Ingredients",
+    "es": "Ingredientes",
+    "de": "Zutaten",
+    "fr": "Ingrédients"
+  },
+  "gross": {
+    "ru": "Брутто",
+    "en": "Gross",
+    "es": "Bruto",
+    "de": "Brutto",
+    "fr": "Brut"
+  },
+  "net": {
+    "ru": "Нетто",
+    "en": "Net",
+    "es": "Neto",
+    "de": "Netto",
+    "fr": "Net"
+  },
+  "yield": {
+    "ru": "Выход",
+    "en": "Yield",
+    "es": "Rendimiento",
+    "de": "Ausbeute",
+    "fr": "Rendement"
+  },
+  "waste_percent": {
+    "ru": "Процент отхода",
+    "en": "Waste %",
+    "es": "% desperdicio",
+    "de": "Abfall %",
+    "fr": "% déchet"
+  },
+  "shrinkage_percent": {
+    "ru": "Ужарка %",
+    "en": "Shrinkage %",
+    "es": "% merma",
+    "de": "Schwund %",
+    "fr": "% réduction"
+  },
+  "output_weight": {
+    "ru": "Вес выхода блюда",
+    "en": "Dish output weight",
+    "es": "Peso salida plato",
+    "de": "Ausschussgewicht",
+    "fr": "Poids sortie plat"
+  },
+  "technology": {
+    "ru": "Технология",
+    "en": "Technology",
+    "es": "Tecnología",
+    "de": "Technologie",
+    "fr": "Technologie"
+  },
+  "dish_contains_lactose": {
+    "ru": "Содержит лактозу",
+    "en": "Contains lactose",
+    "es": "Contiene lactosa",
+    "de": "Enthält Laktose",
+    "fr": "Contient lactose"
+  },
+  "dish_contains_gluten": {
+    "ru": "Содержит глютен",
+    "en": "Contains gluten",
+    "es": "Contiene gluten",
+    "de": "Enthält Gluten",
+    "fr": "Contient gluten"
+  },
+  "no_lactose_gluten": {
+    "ru": "Без лактозы и глютена",
+    "en": "No lactose or gluten",
+    "es": "Sin lactosa ni gluten",
+    "de": "Keine Laktose oder Gluten",
+    "fr": "Sans lactose ni gluten"
+  },
+  "price_per_kg": {
+    "ru": "Цена за кг",
+    "en": "Price per kg",
+    "es": "Precio por kg",
+    "de": "Preis pro kg",
+    "fr": "Prix au kg"
+  },
+  "portions": {
+    "ru": "Порций",
+    "en": "Portions",
+    "es": "Porciones",
+    "de": "Portionen",
+    "fr": "Portions"
+  },
+  "portions_count": {
+    "ru": "%d порций",
+    "en": "%d portions",
+    "es": "%d porciones",
+    "de": "%d Portionen",
+    "fr": "%d portions"
+  },
+  "card_type": {
+    "ru": "Тип карточки",
+    "en": "Card type",
+    "es": "Tipo de ficha",
+    "de": "Kartentyp",
+    "fr": "Type de fiche"
+  },
+  "card_type_dish": {
+    "ru": "Блюдо",
+    "en": "Dish",
+    "es": "Plato",
+    "de": "Gericht",
+    "fr": "Plat"
+  },
+  "card_type_semi_finished": {
+    "ru": "Полуфабрикат",
+    "en": "Semi-finished",
+    "es": "Semielaborado",
+    "de": "Halbfertigprodukt",
+    "fr": "Semi-fini"
+  },
+  "description": {
+    "ru": "Описание",
+    "en": "Description",
+    "es": "Descripción",
+    "de": "Beschreibung",
+    "fr": "Description"
+  },
+  "translate_technology": {
+    "ru": "Перевести технологию",
+    "en": "Translate technology",
+    "es": "Traducir tecnología",
+    "de": "Technologie übersetzen",
+    "fr": "Traduire la technologie"
+  },
+  "translating": {
+    "ru": "Перевод…",
+    "en": "Translating…",
+    "es": "Traduciendo…",
+    "de": "Übersetzen…",
+    "fr": "Traduction…"
+  },
+  "translation_empty_source": {
+    "ru": "Нет текста для перевода.",
+    "en": "No text to translate.",
+    "es": "No hay texto para traducir.",
+    "de": "Kein Text zum Übersetzen.",
+    "fr": "Aucun texte à traduire."
+  },
+  "translation_not_available": {
+    "ru": "Перевод недоступен.",
+    "en": "Translation not available.",
+    "es": "Traducción no disponible.",
+    "de": "Übersetzung nicht verfügbar.",
+    "fr": "Traduction non disponible."
+  },
+  "translate_to": {
+    "ru": "Перевести на",
+    "en": "Translate to",
+    "es": "Traducir a",
+    "de": "Übersetzen in",
+    "fr": "Traduire en"
+  },
+  "lang_ru": { "ru": "Русский", "en": "Russian", "es": "Ruso", "de": "Russisch", "fr": "Russe" },
+  "lang_en": { "ru": "Английский", "en": "English", "es": "Inglés", "de": "Englisch", "fr": "Anglais" },
+  "lang_es": { "ru": "Испанский", "en": "Spanish", "es": "Español", "de": "Spanisch", "fr": "Espagnol" },
+  "lang_de": { "ru": "Немецкий", "en": "German", "es": "Alemán", "de": "Deutsch", "fr": "Allemand" },
+  "lang_fr": { "ru": "Французский", "en": "French", "es": "Francés", "de": "Französisch", "fr": "Français" },
+  "comment": {
+    "ru": "Комментарий",
+    "en": "Comment",
+    "es": "Comentario",
+    "de": "Kommentar",
+    "fr": "Commentaire"
+  },
+  "qty_pcs_g": {
+    "ru": "Шт/гр",
+    "en": "Pcs/g",
+    "es": "Ud/g",
+    "de": "Stk/g",
+    "fr": "Pce/g"
+  },
+  "view_card": {
+    "ru": "Карточка",
+    "en": "View card",
+    "es": "Ver ficha",
+    "de": "Karte anzeigen",
+    "fr": "Voir la fiche"
+  },
+  "reset_scaling": {
+    "ru": "Сбросить пересчёт",
+    "en": "Reset scaling",
+    "es": "Restablecer escala",
+    "de": "Skalierung zurücksetzen",
+    "fr": "Réinitialiser l'échelle"
+  },
+  "add_ingredient": {
+    "ru": "Добавить ингредиент",
+    "en": "Add Ingredient",
+    "es": "Agregar ingrediente",
+    "de": "Zutat hinzufügen",
+    "fr": "Ajouter un ingrédient"
+  },
+  "summary": {
+    "ru": "Итого",
+    "en": "Summary",
+    "es": "Resumen",
+    "de": "Zusammenfassung",
+    "fr": "Résumé"
+  },
+  "total_gross_weight": {
+    "ru": "Общий вес брутто",
+    "en": "Total Gross Weight",
+    "es": "Peso bruto total",
+    "de": "Gesamtbruttogewicht",
+    "fr": "Poids brut total"
+  },
+  "total_net_weight": {
+    "ru": "Общий вес нетто",
+    "en": "Total Net Weight",
+    "es": "Peso neto total",
+    "de": "Gesamtnettogewicht",
+    "fr": "Poids net total"
+  },
+  "total_calories": {
+    "ru": "Общие калории",
+    "en": "Total Calories",
+    "es": "Calorías totales",
+    "de": "Gesamtkalorien",
+    "fr": "Calories totales"
+  },
+  "total_protein": {
+    "ru": "Общий белок",
+    "en": "Total Protein",
+    "es": "Proteína total",
+    "de": "Gesamtprotein",
+    "fr": "Protéines totales"
+  },
+  "total_fat": {
+    "ru": "Общие жиры",
+    "en": "Total Fat",
+    "es": "Grasa total",
+    "de": "Gesamtfett",
+    "fr": "Graisses totales"
+  },
+  "total_carbs": {
+    "ru": "Общие углеводы",
+    "en": "Total Carbs",
+    "es": "Carbohidratos totales",
+    "de": "Gesamtkohlenhydrate",
+    "fr": "Glucides totaux"
+  },
+  "cost": {
+    "ru": "Стоимость",
+    "en": "Cost",
+    "es": "Costo",
+    "de": "Kosten",
+    "fr": "Coût"
+  },
+  "total_cost": {
+    "ru": "Общая стоимость",
+    "en": "Total Cost",
+    "es": "Costo total",
+    "de": "Gesamtkosten",
+    "fr": "Coût total"
+  },
+  "save_tech_card": {
+    "ru": "Сохранить ТТК",
+    "en": "Save Tech Card",
+    "es": "Guardar tarjeta técnica",
+    "de": "Technikkarte speichern",
+    "fr": "Enregistrer la carte technique"
+  },
+  "create_tech_card": {
+    "ru": "Создать ТТК",
+    "en": "Create Tech Card",
+    "es": "Crear tarjeta técnica",
+    "de": "Technikkarte erstellen",
+    "fr": "Créer la carte technique"
+  },
+  "select_product": {
+    "ru": "Выбрать продукт",
+    "en": "Select Product",
+    "es": "Seleccionar producto",
+    "de": "Produkt auswählen",
+    "fr": "Sélectionner le produit"
+  },
+  "select_process": {
+    "ru": "Выбрать процесс",
+    "en": "Select Process",
+    "es": "Seleccionar proceso",
+    "de": "Prozess auswählen",
+    "fr": "Sélectionner le processus"
+  },
+  "tech_cards": {
+    "ru": "Технологические карты",
+    "en": "Tech Cards",
+    "es": "Tarjetas técnicas",
+    "de": "Technikkarten",
+    "fr": "Cartes techniques"
+  },
+  "add_product": {
+    "ru": "Добавить продукт",
+    "en": "Add Product",
+    "es": "Agregar producto",
+    "de": "Produkt hinzufügen",
+    "fr": "Ajouter un produit"
+  },
+  "edit_product": {
+    "ru": "Редактировать продукт",
+    "en": "Edit Product",
+    "es": "Editar producto",
+    "de": "Produkt bearbeiten",
+    "fr": "Modifier le produit"
+  },
+  "product_details": {
+    "ru": "Детали продукта",
+    "en": "Product Details",
+    "es": "Detalles del producto",
+    "de": "Produktdetails",
+    "fr": "Détails du produit"
+  },
+  "unit": {
+    "ru": "Единица измерения",
+    "en": "Unit",
+    "es": "Unidad",
+    "de": "Einheit",
+    "fr": "Unité"
+  },
+  "nutrition": {
+    "ru": "Питательная ценность",
+    "en": "Nutrition",
+    "es": "Nutrición",
+    "de": "Ernährung",
+    "fr": "Nutrition"
+  },
+  "allergens": {
+    "ru": "Аллергены",
+    "en": "Allergens",
+    "es": "Alérgenos",
+    "de": "Allergene",
+    "fr": "Allergènes"
+  },
+  "contains_gluten": {
+    "ru": "Содержит глютен",
+    "en": "Contains Gluten",
+    "es": "Contiene gluten",
+    "de": "Enthält Gluten",
+    "fr": "Contient du gluten"
+  },
+  "contains_lactose": {
+    "ru": "Содержит лактозу",
+    "en": "Contains Lactose",
+    "es": "Contiene lactosa",
+    "de": "Enthält Laktose",
+    "fr": "Contient du lactose"
+  },
+  "change_photo": {
+    "ru": "Изменить фото",
+    "en": "Change Photo",
+    "es": "Cambiar foto",
+    "de": "Foto ändern",
+    "fr": "Changer la photo"
+  },
+  "currency": {
+    "ru": "Валюта",
+    "en": "Currency",
+    "es": "Moneda",
+    "de": "Währung",
+    "fr": "Devise"
+  },
+  "soft_drinks": {
+    "ru": "Безалкогольные напитки",
+    "en": "Soft Drinks",
+    "es": "Bebidas sin alcohol",
+    "de": "Erfrischungsgetränke",
+    "fr": "Boissons non alcoolisées"
+  },
+  "juice": {
+    "ru": "Соки",
+    "en": "Juice",
+    "es": "Jugos",
+    "de": "Säfte",
+    "fr": "Jus"
+  },
+  "water": {
+    "ru": "Вода",
+    "en": "Water",
+    "es": "Agua",
+    "de": "Wasser",
+    "fr": "Eau"
+  },
+  "beer": {
+    "ru": "Пиво",
+    "en": "Beer",
+    "es": "Cerveza",
+    "de": "Bier",
+    "fr": "Bière"
+  },
+  "wine": {
+    "ru": "Вино",
+    "en": "Wine",
+    "es": "Vino",
+    "de": "Wein",
+    "fr": "Vin"
+  },
+  "sparkling_wine": {
+    "ru": "Игристые вина",
+    "en": "Sparkling Wine",
+    "es": "Vinos espumosos",
+    "de": "Schaumweine",
+    "fr": "Vins mousseux"
+  },
+  "spirits": {
+    "ru": "Крепкие напитки",
+    "en": "Spirits",
+    "es": "Licores",
+    "de": "Spirituosen",
+    "fr": "Spiritueux"
+  },
+  "hot_drinks": {
+    "ru": "Горячие напитки",
+    "en": "Hot Drinks",
+    "es": "Bebidas calientes",
+    "de": "Heiße Getränke",
+    "fr": "Boissons chaudes"
+  },
+  "coffee_drinks": {
+    "ru": "Кофейные напитки",
+    "en": "Coffee Drinks",
+    "es": "Bebidas de café",
+    "de": "Kaffeegetränke",
+    "fr": "Boissons au café"
+  },
+  "desserts": {
+    "ru": "Десерты",
+    "en": "Desserts",
+    "es": "Postres",
+    "de": "Desserts",
+    "fr": "Desserts"
+  },
+  "ice_cream": {
+    "ru": "Мороженое",
+    "en": "Ice Cream",
+    "es": "Helado",
+    "de": "Eis",
+    "fr": "Glace"
+  },
+  "fresh_desserts": {
+    "ru": "Свежие десерты",
+    "en": "Fresh Desserts",
+    "es": "Postres frescos",
+    "de": "Frische Desserts",
+    "fr": "Desserts frais"
+  },
+  "bread": {
+    "ru": "Хлеб",
+    "en": "Bread",
+    "es": "Pan",
+    "de": "Brot",
+    "fr": "Pain"
+  },
+  "oils": {
+    "ru": "Масла",
+    "en": "Oils",
+    "es": "Aceites",
+    "de": "Öle",
+    "fr": "Huiles"
+  }
 }

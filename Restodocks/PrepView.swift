@@ -1,12 +1,10 @@
+import SwiftUI
+
 struct PrepView: View {
-    @ObservedObject var lang = LocalizationManager.shared
+    @EnvironmentObject var lang: LocalizationManager
 
     var body: some View {
-        List {
-            NavigationLink { PrepMenuView() } label: { Text(lang.t("menu")) }
-            NavigationLink { PrepTTKView() } label: { Text(lang.t("ttk")) }
-            NavigationLink { PrepScheduleView() } label: { Text(lang.t("schedule")) }
-        }
-        .navigationTitle(lang.t("prep"))
+        Text(lang.t("prep"))
+            .navigationTitle(lang.t("prep"))
     }
 }

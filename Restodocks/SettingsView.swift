@@ -2,7 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
 
-    @ObservedObject var lang = LocalizationManager.shared
+    @EnvironmentObject var lang: LocalizationManager
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -10,7 +10,7 @@ struct SettingsView: View {
             List {
 
                 Section(header: Text(lang.t("language"))) {
-                    languageRow(title: "Русский", code: "ru")
+                    languageRow(title: lang.t("russian"), code: "ru")
                     languageRow(title: "English", code: "en")
                     languageRow(title: "Español", code: "es")
                     languageRow(title: "Deutsch", code: "de")

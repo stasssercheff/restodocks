@@ -1,44 +1,37 @@
+//
+//  LoginView.swift
+//  Restodocks
+//
+
 import SwiftUI
 
 struct LoginView: View {
 
-    @EnvironmentObject var accounts: AccountManager
     @ObservedObject var lang = LocalizationManager.shared
 
-    @State private var email = ""
-    @State private var password = ""
-    @State private var error = false
-
     var body: some View {
-        VStack(spacing: 20) {
+
+        VStack(spacing: 24) {
 
             Text(lang.t("login"))
                 .font(.largeTitle)
                 .bold()
 
-            TextField(lang.t("email"), text: $email)
-                .keyboardType(.emailAddress)
-                .autocapitalization(.none)
-                .textFieldStyle(.roundedBorder)
-
-            SecureField(lang.t("password"), text: $password)
-                .textFieldStyle(.roundedBorder)
-
-            Button {
-                // ⚠️ ВРЕМЕННО:
-                // используем password как pin,
-                // чтобы НЕ ТРОГАТЬ AccountManager
-                let success = accounts.login(pin: password)
-                error = !success
+            NavigationLink {
+                EmployeeLoginView()
             } label: {
-                PrimaryButton(title: lang.t("login"))
+                Text(lang.t("employee_login"))
+                    .frame(maxWidth: .infinity)
             }
-            .disabled(email.isEmpty || password.isEmpty)
+            .buttonStyle(.borderedProminent)
 
-            if error {
-                Text(lang.t("wrong_login_or_password"))
-                    .foregroundColor(.red)
+            NavigationLink {
+                CreateOwnerView()
+            } label: {
+                Text(lang.t("create_owner"))
+                    .frame(maxWidth: .infinity)
             }
+            .buttonStyle(.bordered)
 
             Spacer()
         }

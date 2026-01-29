@@ -4,37 +4,37 @@
 //
 
 import SwiftUI
+import CoreData
 
 struct CreateShiftView: View {
-
-    @ObservedObject var lang = LocalizationManager.shared
+    @EnvironmentObject var lang: LocalizationManager
+    // Core Data
+    @Environment(\.managedObjectContext) private var context
     @Environment(\.dismiss) private var dismiss
 
-    // ВРЕМЕННО: потом будет из AccountManager
-    let employees: [EmployeeAccount]
+    // сотрудники
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \EmployeeEntity.fullName, ascending: true)],
+        animation: .default
+    )
+    private var employees: FetchedResults<EmployeeEntity>
 
-    @State private var selectedEmployee: EmployeeAccount?
-    @State private var selectedDate = Date()
-    @State private var fullDay = true
-
-    @State private var startTime = "09:00"
-    @State private var endTime = "18:00"
-
-    @State private var department: Department = .kitchen
-    @State private var kitchenSection: KitchenSection? = nil
-
-    let onSave: (WorkShift) -> Void
+    // state
+    @State private var selectedEmployee: EmployeeEntity?
+    @State private var date = Date()
+    @State private var fullDay = false
+    @State private var startHour: Int = 9
+    @State private var endHour: Int = 18
 
     var body: some View {
-
         Form {
 
             // ===== СОТРУДНИК =====
             Section(header: Text(lang.t("employee"))) {
-                Picker(lang.t("employee"), selection: $selectedEmployee) {
-                    ForEach(employees) { employee in
-                        Text(employee.fullName)
-                            .tag(Optional(employee))
+                Picker(lang.t("select_employee"), selection: $selectedEmployee) {
+                    ForEach(employees) { emp in
+                        Text(emp.fullName ?? "—")
+                            .tag(emp as EmployeeEntity?)
                     }
                 }
             }
@@ -42,86 +42,55 @@ struct CreateShiftView: View {
             // ===== ДАТА =====
             Section(header: Text(lang.t("date"))) {
                 DatePicker(
-                    lang.t("date"),
-                    selection: $selectedDate,
+                    lang.t("shift_date"),
+                    selection: $date,
                     displayedComponents: .date
                 )
             }
 
-            // ===== ПОДРАЗДЕЛЕНИЕ =====
-            Section(header: Text(lang.t("department"))) {
-                Picker(lang.t("department"), selection: $department) {
-                    ForEach(Department.allCases) { dep in
-                        Text(lang.t(dep.rawValue)).tag(dep)
-                    }
-                }
-            }
-
-            // ===== ЦЕХ КУХНИ =====
-            if department == .kitchen {
-                Section(header: Text(lang.t("kitchen_section"))) {
-                    Picker(lang.t("kitchen_section"), selection: $kitchenSection) {
-                        ForEach(KitchenSection.allCases) { section in
-                            Text(lang.t(kitchenKey(section)))
-                                .tag(Optional(section))
-                        }
-                    }
-                }
+            // ===== ТИП СМЕНЫ =====
+            Section {
+                Toggle(lang.t("full_day"), isOn: $fullDay)
             }
 
             // ===== ВРЕМЯ =====
-            Section(header: Text(lang.t("shift_time"))) {
-
-                Toggle(lang.t("full_day"), isOn: $fullDay)
-
-                if !fullDay {
-                    TextField(lang.t("start_time"), text: $startTime)
-                    TextField(lang.t("end_time"), text: $endTime)
+            if !fullDay {
+                Section(header: Text(lang.t("time"))) {
+                    Stepper("\(lang.t("start")): \(startHour):00", value: $startHour, in: 0...23)
+                    Stepper("\(lang.t("end")): \(endHour):00", value: $endHour, in: 0...23)
                 }
             }
 
             // ===== СОХРАНИТЬ =====
-            Button {
-                saveShift()
-            } label: {
-                Text(lang.t("save"))
+            Section {
+                Button(lang.t("create_shift")) {
+                    createShift()
+                }
+                .disabled(selectedEmployee == nil)
             }
-            .disabled(selectedEmployee == nil)
         }
-        .navigationTitle(lang.t("create_shift"))
+        .navigationTitle(lang.t("new_shift"))
     }
 
-    // ===== СОХРАНЕНИЕ =====
-    private func saveShift() {
+    // MARK: - CREATE
+
+    private func createShift() {
         guard let employee = selectedEmployee else { return }
 
-        let shift = WorkShift(
-            id: UUID(),
-            employeeId: employee.id,
-            employeeName: employee.fullName,
-            department: department,
-            kitchenSection: department == .kitchen ? kitchenSection : nil,
-            date: selectedDate,
-            fullDay: fullDay,
-            startTime: fullDay ? nil : startTime,
-            endTime: fullDay ? nil : endTime
-        )
+        let shift = ShiftEntity(context: context)
+        shift.id = UUID()
+        shift.date = date
+        shift.department = employee.department ?? "unknown"
+        shift.fullDay = fullDay
+        shift.startHour = fullDay ? 0 : Int16(startHour)
+        shift.endHour = fullDay ? 0 : Int16(endHour)
+        shift.employee = employee
 
-        onSave(shift)
-        dismiss()
-    }
-
-    // ===== КЛЮЧИ ПЕРЕВОДА =====
-    private func kitchenKey(_ section: KitchenSection) -> String {
-        switch section {
-        case .hotKitchen:  return "hot_kitchen"
-        case .coldKitchen: return "cold_kitchen"
-        case .grill:       return "grill"
-        case .pizza:       return "pizza"
-        case .sushi:       return "sushi_bar"
-        case .bakery:      return "bakery"
-        case .pastry:      return "pastry"
-        case .prep:        return "prep"
+        do {
+            try context.save()
+            dismiss()
+        } catch {
+            print("❌ Shift save error:", error)
         }
     }
 }

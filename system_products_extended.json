@@ -1,0 +1,5002 @@
+[
+  {
+    "name": "Картофель",
+    "calories": 77,
+    "protein": 2,
+    "fat": 0.1,
+    "carbs": 17,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Морковь",
+    "calories": 41,
+    "protein": 0.9,
+    "fat": 0.2,
+    "carbs": 10,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Лук репчатый",
+    "calories": 40,
+    "protein": 1.1,
+    "fat": 0.1,
+    "carbs": 9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Чеснок",
+    "calories": 149,
+    "protein": 6.4,
+    "fat": 0.5,
+    "carbs": 33,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Помидоры",
+    "calories": 18,
+    "protein": 0.9,
+    "fat": 0.2,
+    "carbs": 3.9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Огурцы",
+    "calories": 15,
+    "protein": 0.7,
+    "fat": 0.1,
+    "carbs": 2.6,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Капуста белокочанная",
+    "calories": 27,
+    "protein": 1.8,
+    "fat": 0.1,
+    "carbs": 5.4,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Яблоки",
+    "calories": 52,
+    "protein": 0.3,
+    "fat": 0.2,
+    "carbs": 14,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Бананы",
+    "calories": 89,
+    "protein": 1.1,
+    "fat": 0.3,
+    "carbs": 23,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Лимоны",
+    "calories": 29,
+    "protein": 1.1,
+    "fat": 0.3,
+    "carbs": 9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Говядина",
+    "calories": 250,
+    "protein": 26,
+    "fat": 15,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Свинина",
+    "calories": 242,
+    "protein": 27,
+    "fat": 14,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Курица",
+    "calories": 165,
+    "protein": 31,
+    "fat": 3.6,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Индейка",
+    "calories": 135,
+    "protein": 30,
+    "fat": 1,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Баранина",
+    "calories": 294,
+    "protein": 25,
+    "fat": 21,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Лосось",
+    "calories": 208,
+    "protein": 22,
+    "fat": 13,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Тунец",
+    "calories": 144,
+    "protein": 25,
+    "fat": 4.9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Сельдь",
+    "calories": 158,
+    "protein": 18,
+    "fat": 9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Креветки",
+    "calories": 85,
+    "protein": 20,
+    "fat": 0.5,
+    "carbs": 0.5,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Минтай",
+    "calories": 72,
+    "protein": 16,
+    "fat": 0.9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Молоко коровье 3.2%",
+    "calories": 61,
+    "protein": 3.3,
+    "fat": 3.2,
+    "carbs": 4.8,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "l"
+  },
+  {
+    "name": "Сыр твердый",
+    "calories": 360,
+    "protein": 29,
+    "fat": 25,
+    "carbs": 3.5,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Сметана 20%",
+    "calories": 206,
+    "protein": 2.8,
+    "fat": 20,
+    "carbs": 3.2,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Творог 5%",
+    "calories": 121,
+    "protein": 17,
+    "fat": 5,
+    "carbs": 1.8,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Йогурт натуральный",
+    "calories": 61,
+    "protein": 3.5,
+    "fat": 3.2,
+    "carbs": 4.1,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Хлеб пшеничный",
+    "calories": 266,
+    "protein": 8.1,
+    "fat": 1,
+    "carbs": 54,
+    "gluten_free": false,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Хлеб ржаной",
+    "calories": 214,
+    "protein": 6.6,
+    "fat": 1.2,
+    "carbs": 42,
+    "gluten_free": false,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Рис белый",
+    "calories": 130,
+    "protein": 2.7,
+    "fat": 0.3,
+    "carbs": 28,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Гречка",
+    "calories": 343,
+    "protein": 12.6,
+    "fat": 3.3,
+    "carbs": 62,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Овсянка",
+    "calories": 379,
+    "protein": 11.9,
+    "fat": 7.2,
+    "carbs": 61,
+    "gluten_free": false,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Масло сливочное",
+    "calories": 717,
+    "protein": 0.9,
+    "fat": 81,
+    "carbs": 0.1,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Масло подсолнечное",
+    "calories": 884,
+    "protein": 0,
+    "fat": 99.9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "l"
+  },
+  {
+    "name": "Масло оливковое",
+    "calories": 884,
+    "protein": 0,
+    "fat": 99.9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "l"
+  },
+  {
+    "name": "Сметана 10%",
+    "calories": 115,
+    "protein": 3,
+    "fat": 10,
+    "carbs": 2.9,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Яйца куриные",
+    "calories": 157,
+    "protein": 12.7,
+    "fat": 10.9,
+    "carbs": 0.7,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "pcs"
+  },
+  {
+    "name": "Сахар",
+    "calories": 387,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 100,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Мед",
+    "calories": 304,
+    "protein": 0.3,
+    "fat": 0,
+    "carbs": 82,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Шоколад черный",
+    "calories": 539,
+    "protein": 5.4,
+    "fat": 31,
+    "carbs": 52,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Вода",
+    "calories": 0,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "l"
+  },
+  {
+    "name": "Чай черный",
+    "calories": 1,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 0.3,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Кофе молотый",
+    "calories": 201,
+    "protein": 13.9,
+    "fat": 14.4,
+    "carbs": 15.6,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Томатная паста",
+    "calories": 24,
+    "protein": 1.5,
+    "fat": 0.1,
+    "carbs": 4.5,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Майонез",
+    "calories": 627,
+    "protein": 2.4,
+    "fat": 67,
+    "carbs": 2.6,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Горчица",
+    "calories": 162,
+    "protein": 5.7,
+    "fat": 9.8,
+    "carbs": 11,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Уксус столовый",
+    "calories": 11,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 2.4,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "l"
+  },
+  {
+    "name": "Соль",
+    "calories": 0,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Перец черный молотый",
+    "calories": 251,
+    "protein": 10.4,
+    "fat": 3.3,
+    "carbs": 38.7,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Куркума",
+    "calories": 312,
+    "protein": 9.7,
+    "fat": 3.3,
+    "carbs": 44.4,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Паприка",
+    "calories": 289,
+    "protein": 14.1,
+    "fat": 12.9,
+    "carbs": 33.9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Брокколи",
+    "calories": 38,
+    "protein": 3,
+    "fat": 0.1,
+    "carbs": 13,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Цветная капуста",
+    "calories": 45,
+    "protein": 1,
+    "fat": 1.1,
+    "carbs": 10,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Кабачки",
+    "calories": 37,
+    "protein": 2,
+    "fat": 1.1,
+    "carbs": 12,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Баклажаны",
+    "calories": 39,
+    "protein": 1,
+    "fat": 1.1,
+    "carbs": 14,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Перец сладкий",
+    "calories": 43,
+    "protein": 2,
+    "fat": 1.1,
+    "carbs": 8,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Свекла",
+    "calories": 36,
+    "protein": 1,
+    "fat": 0.1,
+    "carbs": 11,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Лук",
+    "calories": 33,
+    "protein": 1,
+    "fat": 1.1,
+    "carbs": 8,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Имбирь",
+    "calories": 36,
+    "protein": 1,
+    "fat": 0.1,
+    "carbs": 11,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Капуста",
+    "calories": 37,
+    "protein": 2,
+    "fat": 1.1,
+    "carbs": 12,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Шпинат",
+    "calories": 36,
+    "protein": 1,
+    "fat": 0.1,
+    "carbs": 11,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Салат",
+    "calories": 35,
+    "protein": 3,
+    "fat": 1.1,
+    "carbs": 10,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Укроп",
+    "calories": 35,
+    "protein": 3,
+    "fat": 1.1,
+    "carbs": 10,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Петрушка",
+    "calories": 38,
+    "protein": 3,
+    "fat": 0.1,
+    "carbs": 13,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Базилик",
+    "calories": 37,
+    "protein": 2,
+    "fat": 1.1,
+    "carbs": 12,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Мята",
+    "calories": 34,
+    "protein": 2,
+    "fat": 0.1,
+    "carbs": 9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Розмарин",
+    "calories": 38,
+    "protein": 3,
+    "fat": 0.1,
+    "carbs": 13,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Тимьян",
+    "calories": 36,
+    "protein": 1,
+    "fat": 0.1,
+    "carbs": 11,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Кролик",
+    "calories": 206,
+    "protein": 26,
+    "fat": 16,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Утка",
+    "calories": 204,
+    "protein": 24,
+    "fat": 14,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Гусь",
+    "calories": 204,
+    "protein": 24,
+    "fat": 14,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Фазан",
+    "calories": 205,
+    "protein": 25,
+    "fat": 15,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Куропатка",
+    "calories": 209,
+    "protein": 29,
+    "fat": 19,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Телятина",
+    "calories": 208,
+    "protein": 28,
+    "fat": 18,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Мозги говяжьи",
+    "calories": 213,
+    "protein": 23,
+    "fat": 23,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Печень говяжья",
+    "calories": 214,
+    "protein": 24,
+    "fat": 24,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Сердце говяжье",
+    "calories": 214,
+    "protein": 24,
+    "fat": 24,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Язык говяжий",
+    "calories": 212,
+    "protein": 22,
+    "fat": 22,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Колбаса вареная",
+    "calories": 215,
+    "protein": 25,
+    "fat": 10,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Колбаса копченая",
+    "calories": 216,
+    "protein": 26,
+    "fat": 11,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Бекон",
+    "calories": 205,
+    "protein": 25,
+    "fat": 15,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Ветчина",
+    "calories": 207,
+    "protein": 27,
+    "fat": 17,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Сардельки",
+    "calories": 209,
+    "protein": 29,
+    "fat": 19,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Судак",
+    "calories": 105,
+    "protein": 20,
+    "fat": 10,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Щука",
+    "calories": 104,
+    "protein": 19,
+    "fat": 9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Карп",
+    "calories": 104,
+    "protein": 19,
+    "fat": 9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Форель",
+    "calories": 106,
+    "protein": 21,
+    "fat": 11,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Сёмга",
+    "calories": 105,
+    "protein": 20,
+    "fat": 10,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Осётр",
+    "calories": 105,
+    "protein": 20,
+    "fat": 10,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Кальмары",
+    "calories": 108,
+    "protein": 23,
+    "fat": 13,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Осьминог",
+    "calories": 108,
+    "protein": 23,
+    "fat": 13,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Мидии",
+    "calories": 105,
+    "protein": 20,
+    "fat": 10,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Устрицы",
+    "calories": 107,
+    "protein": 22,
+    "fat": 12,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Краб",
+    "calories": 104,
+    "protein": 19,
+    "fat": 9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Омар",
+    "calories": 104,
+    "protein": 19,
+    "fat": 9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Раки",
+    "calories": 104,
+    "protein": 19,
+    "fat": 9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Икра красная",
+    "calories": 112,
+    "protein": 17,
+    "fat": 7,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Икра черная",
+    "calories": 111,
+    "protein": 16,
+    "fat": 6,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Куркума (вариант 2)",
+    "calories": 333,
+    "protein": 9.7,
+    "fat": 3.3,
+    "carbs": 44.4,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Паприка (вариант 2)",
+    "calories": 311,
+    "protein": 14.1,
+    "fat": 12.9,
+    "carbs": 33.9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Картофель (вариант 3)",
+    "calories": 100,
+    "protein": 2,
+    "fat": 0.1,
+    "carbs": 17,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Морковь (вариант 3)",
+    "calories": 65,
+    "protein": 0.9,
+    "fat": 0.2,
+    "carbs": 10,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Лук репчатый (вариант 3)",
+    "calories": 15,
+    "protein": 1.1,
+    "fat": 0.1,
+    "carbs": 9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Чеснок (вариант 3)",
+    "calories": 125,
+    "protein": 6.4,
+    "fat": 0.5,
+    "carbs": 33,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Помидоры (вариант 3)",
+    "calories": -5,
+    "protein": 0.9,
+    "fat": 0.2,
+    "carbs": 3.9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Огурцы (вариант 3)",
+    "calories": -7,
+    "protein": 0.7,
+    "fat": 0.1,
+    "carbs": 2.6,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Капуста белокочанная (вариант 3)",
+    "calories": 6,
+    "protein": 1.8,
+    "fat": 0.1,
+    "carbs": 5.4,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Яблоки (вариант 3)",
+    "calories": 32,
+    "protein": 0.3,
+    "fat": 0.2,
+    "carbs": 14,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Бананы (вариант 3)",
+    "calories": 70,
+    "protein": 1.1,
+    "fat": 0.3,
+    "carbs": 23,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Лимоны (вариант 3)",
+    "calories": 11,
+    "protein": 1.1,
+    "fat": 0.3,
+    "carbs": 9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Говядина (вариант 3)",
+    "calories": 233,
+    "protein": 26,
+    "fat": 15,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Свинина (вариант 3)",
+    "calories": 226,
+    "protein": 27,
+    "fat": 14,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Курица (вариант 3)",
+    "calories": 150,
+    "protein": 31,
+    "fat": 3.6,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Индейка (вариант 3)",
+    "calories": 121,
+    "protein": 30,
+    "fat": 1,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Баранина (вариант 3)",
+    "calories": 281,
+    "protein": 25,
+    "fat": 21,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Лосось (вариант 3)",
+    "calories": 196,
+    "protein": 22,
+    "fat": 13,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Тунец (вариант 3)",
+    "calories": 133,
+    "protein": 25,
+    "fat": 4.9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Сельдь (вариант 3)",
+    "calories": 148,
+    "protein": 18,
+    "fat": 9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Креветки (вариант 3)",
+    "calories": 76,
+    "protein": 20,
+    "fat": 0.5,
+    "carbs": 0.5,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Минтай (вариант 3)",
+    "calories": 64,
+    "protein": 16,
+    "fat": 0.9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Молоко коровье 3.2% (вариант 3)",
+    "calories": 54,
+    "protein": 3.3,
+    "fat": 3.2,
+    "carbs": 4.8,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "l"
+  },
+  {
+    "name": "Сыр твердый (вариант 3)",
+    "calories": 354,
+    "protein": 29,
+    "fat": 25,
+    "carbs": 3.5,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Сметана 20% (вариант 3)",
+    "calories": 201,
+    "protein": 2.8,
+    "fat": 20,
+    "carbs": 3.2,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Творог 5% (вариант 3)",
+    "calories": 117,
+    "protein": 17,
+    "fat": 5,
+    "carbs": 1.8,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Йогурт натуральный (вариант 3)",
+    "calories": 58,
+    "protein": 3.5,
+    "fat": 3.2,
+    "carbs": 4.1,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Хлеб пшеничный (вариант 3)",
+    "calories": 264,
+    "protein": 8.1,
+    "fat": 1,
+    "carbs": 54,
+    "gluten_free": false,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Хлеб ржаной (вариант 3)",
+    "calories": 213,
+    "protein": 6.6,
+    "fat": 1.2,
+    "carbs": 42,
+    "gluten_free": false,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Рис белый (вариант 3)",
+    "calories": 130,
+    "protein": 2.7,
+    "fat": 0.3,
+    "carbs": 28,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Гречка (вариант 3)",
+    "calories": 344,
+    "protein": 12.6,
+    "fat": 3.3,
+    "carbs": 62,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Овсянка (вариант 3)",
+    "calories": 381,
+    "protein": 11.9,
+    "fat": 7.2,
+    "carbs": 61,
+    "gluten_free": false,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Масло сливочное (вариант 3)",
+    "calories": 720,
+    "protein": 0.9,
+    "fat": 81,
+    "carbs": 0.1,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Масло подсолнечное (вариант 3)",
+    "calories": 888,
+    "protein": 0,
+    "fat": 99.9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "l"
+  },
+  {
+    "name": "Масло оливковое (вариант 3)",
+    "calories": 889,
+    "protein": 0,
+    "fat": 99.9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "l"
+  },
+  {
+    "name": "Сметана 10% (вариант 3)",
+    "calories": 121,
+    "protein": 3,
+    "fat": 10,
+    "carbs": 2.9,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Яйца куриные (вариант 3)",
+    "calories": 164,
+    "protein": 12.7,
+    "fat": 10.9,
+    "carbs": 0.7,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "pcs"
+  },
+  {
+    "name": "Сахар (вариант 3)",
+    "calories": 395,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 100,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Мед (вариант 3)",
+    "calories": 313,
+    "protein": 0.3,
+    "fat": 0,
+    "carbs": 82,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Шоколад черный (вариант 3)",
+    "calories": 549,
+    "protein": 5.4,
+    "fat": 31,
+    "carbs": 52,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Вода (вариант 3)",
+    "calories": 11,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "l"
+  },
+  {
+    "name": "Чай черный (вариант 3)",
+    "calories": 13,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 0.3,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Кофе молотый (вариант 3)",
+    "calories": 214,
+    "protein": 13.9,
+    "fat": 14.4,
+    "carbs": 15.6,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Томатная паста (вариант 3)",
+    "calories": 38,
+    "protein": 1.5,
+    "fat": 0.1,
+    "carbs": 4.5,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Майонез (вариант 3)",
+    "calories": 642,
+    "protein": 2.4,
+    "fat": 67,
+    "carbs": 2.6,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Горчица (вариант 3)",
+    "calories": 178,
+    "protein": 5.7,
+    "fat": 9.8,
+    "carbs": 11,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Уксус столовый (вариант 3)",
+    "calories": 28,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 2.4,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "l"
+  },
+  {
+    "name": "Соль (вариант 3)",
+    "calories": 18,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Перец черный молотый (вариант 3)",
+    "calories": 270,
+    "protein": 10.4,
+    "fat": 3.3,
+    "carbs": 38.7,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Куркума (вариант 3)",
+    "calories": 332,
+    "protein": 9.7,
+    "fat": 3.3,
+    "carbs": 44.4,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Паприка (вариант 3)",
+    "calories": 310,
+    "protein": 14.1,
+    "fat": 12.9,
+    "carbs": 33.9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Картофель (вариант 4)",
+    "calories": 99,
+    "protein": 2,
+    "fat": 0.1,
+    "carbs": 17,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Морковь (вариант 4)",
+    "calories": 64,
+    "protein": 0.9,
+    "fat": 0.2,
+    "carbs": 10,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Лук репчатый (вариант 4)",
+    "calories": 64,
+    "protein": 1.1,
+    "fat": 0.1,
+    "carbs": 9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Чеснок (вариант 4)",
+    "calories": 124,
+    "protein": 6.4,
+    "fat": 0.5,
+    "carbs": 33,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Помидоры (вариант 4)",
+    "calories": -6,
+    "protein": 0.9,
+    "fat": 0.2,
+    "carbs": 3.9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Огурцы (вариант 4)",
+    "calories": -8,
+    "protein": 0.7,
+    "fat": 0.1,
+    "carbs": 2.6,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Капуста белокочанная (вариант 4)",
+    "calories": 5,
+    "protein": 1.8,
+    "fat": 0.1,
+    "carbs": 5.4,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Яблоки (вариант 4)",
+    "calories": 31,
+    "protein": 0.3,
+    "fat": 0.2,
+    "carbs": 14,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Бананы (вариант 4)",
+    "calories": 69,
+    "protein": 1.1,
+    "fat": 0.3,
+    "carbs": 23,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Лимоны (вариант 4)",
+    "calories": 10,
+    "protein": 1.1,
+    "fat": 0.3,
+    "carbs": 9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Говядина (вариант 4)",
+    "calories": 232,
+    "protein": 26,
+    "fat": 15,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Свинина (вариант 4)",
+    "calories": 225,
+    "protein": 27,
+    "fat": 14,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Курица (вариант 4)",
+    "calories": 149,
+    "protein": 31,
+    "fat": 3.6,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Индейка (вариант 4)",
+    "calories": 120,
+    "protein": 30,
+    "fat": 1,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Баранина (вариант 4)",
+    "calories": 280,
+    "protein": 25,
+    "fat": 21,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Лосось (вариант 4)",
+    "calories": 195,
+    "protein": 22,
+    "fat": 13,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Тунец (вариант 4)",
+    "calories": 132,
+    "protein": 25,
+    "fat": 4.9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Сельдь (вариант 4)",
+    "calories": 147,
+    "protein": 18,
+    "fat": 9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Креветки (вариант 4)",
+    "calories": 75,
+    "protein": 20,
+    "fat": 0.5,
+    "carbs": 0.5,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Минтай (вариант 4)",
+    "calories": 63,
+    "protein": 16,
+    "fat": 0.9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Молоко коровье 3.2% (вариант 4)",
+    "calories": 53,
+    "protein": 3.3,
+    "fat": 3.2,
+    "carbs": 4.8,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "l"
+  },
+  {
+    "name": "Сыр твердый (вариант 4)",
+    "calories": 353,
+    "protein": 29,
+    "fat": 25,
+    "carbs": 3.5,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Сметана 20% (вариант 4)",
+    "calories": 200,
+    "protein": 2.8,
+    "fat": 20,
+    "carbs": 3.2,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Творог 5% (вариант 4)",
+    "calories": 116,
+    "protein": 17,
+    "fat": 5,
+    "carbs": 1.8,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Йогурт натуральный (вариант 4)",
+    "calories": 57,
+    "protein": 3.5,
+    "fat": 3.2,
+    "carbs": 4.1,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Хлеб пшеничный (вариант 4)",
+    "calories": 263,
+    "protein": 8.1,
+    "fat": 1,
+    "carbs": 54,
+    "gluten_free": false,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Хлеб ржаной (вариант 4)",
+    "calories": 212,
+    "protein": 6.6,
+    "fat": 1.2,
+    "carbs": 42,
+    "gluten_free": false,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Рис белый (вариант 4)",
+    "calories": 129,
+    "protein": 2.7,
+    "fat": 0.3,
+    "carbs": 28,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Гречка (вариант 4)",
+    "calories": 343,
+    "protein": 12.6,
+    "fat": 3.3,
+    "carbs": 62,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Овсянка (вариант 4)",
+    "calories": 380,
+    "protein": 11.9,
+    "fat": 7.2,
+    "carbs": 61,
+    "gluten_free": false,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Масло сливочное (вариант 4)",
+    "calories": 719,
+    "protein": 0.9,
+    "fat": 81,
+    "carbs": 0.1,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Масло подсолнечное (вариант 4)",
+    "calories": 887,
+    "protein": 0,
+    "fat": 99.9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "l"
+  },
+  {
+    "name": "Масло оливковое (вариант 4)",
+    "calories": 888,
+    "protein": 0,
+    "fat": 99.9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "l"
+  },
+  {
+    "name": "Сметана 10% (вариант 4)",
+    "calories": 120,
+    "protein": 3,
+    "fat": 10,
+    "carbs": 2.9,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Яйца куриные (вариант 4)",
+    "calories": 163,
+    "protein": 12.7,
+    "fat": 10.9,
+    "carbs": 0.7,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "pcs"
+  },
+  {
+    "name": "Сахар (вариант 4)",
+    "calories": 394,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 100,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Мед (вариант 4)",
+    "calories": 312,
+    "protein": 0.3,
+    "fat": 0,
+    "carbs": 82,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Шоколад черный (вариант 4)",
+    "calories": 548,
+    "protein": 5.4,
+    "fat": 31,
+    "carbs": 52,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Вода (вариант 4)",
+    "calories": 10,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "l"
+  },
+  {
+    "name": "Чай черный (вариант 4)",
+    "calories": 12,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 0.3,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Кофе молотый (вариант 4)",
+    "calories": 213,
+    "protein": 13.9,
+    "fat": 14.4,
+    "carbs": 15.6,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Томатная паста (вариант 4)",
+    "calories": 37,
+    "protein": 1.5,
+    "fat": 0.1,
+    "carbs": 4.5,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Майонез (вариант 4)",
+    "calories": 641,
+    "protein": 2.4,
+    "fat": 67,
+    "carbs": 2.6,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Горчица (вариант 4)",
+    "calories": 177,
+    "protein": 5.7,
+    "fat": 9.8,
+    "carbs": 11,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Уксус столовый (вариант 4)",
+    "calories": 27,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 2.4,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "l"
+  },
+  {
+    "name": "Соль (вариант 4)",
+    "calories": 17,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Перец черный молотый (вариант 4)",
+    "calories": 269,
+    "protein": 10.4,
+    "fat": 3.3,
+    "carbs": 38.7,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Куркума (вариант 4)",
+    "calories": 331,
+    "protein": 9.7,
+    "fat": 3.3,
+    "carbs": 44.4,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Паприка (вариант 4)",
+    "calories": 309,
+    "protein": 14.1,
+    "fat": 12.9,
+    "carbs": 33.9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Картофель (вариант 5)",
+    "calories": 98,
+    "protein": 2,
+    "fat": 0.1,
+    "carbs": 17,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Морковь (вариант 5)",
+    "calories": 63,
+    "protein": 0.9,
+    "fat": 0.2,
+    "carbs": 10,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Лук репчатый (вариант 5)",
+    "calories": 63,
+    "protein": 1.1,
+    "fat": 0.1,
+    "carbs": 9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Чеснок (вариант 5)",
+    "calories": 173,
+    "protein": 6.4,
+    "fat": 0.5,
+    "carbs": 33,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Помидоры (вариант 5)",
+    "calories": -7,
+    "protein": 0.9,
+    "fat": 0.2,
+    "carbs": 3.9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Огурцы (вариант 5)",
+    "calories": -9,
+    "protein": 0.7,
+    "fat": 0.1,
+    "carbs": 2.6,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Капуста белокочанная (вариант 5)",
+    "calories": 4,
+    "protein": 1.8,
+    "fat": 0.1,
+    "carbs": 5.4,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Яблоки (вариант 5)",
+    "calories": 30,
+    "protein": 0.3,
+    "fat": 0.2,
+    "carbs": 14,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Бананы (вариант 5)",
+    "calories": 68,
+    "protein": 1.1,
+    "fat": 0.3,
+    "carbs": 23,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Лимоны (вариант 5)",
+    "calories": 9,
+    "protein": 1.1,
+    "fat": 0.3,
+    "carbs": 9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Говядина (вариант 5)",
+    "calories": 231,
+    "protein": 26,
+    "fat": 15,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Свинина (вариант 5)",
+    "calories": 224,
+    "protein": 27,
+    "fat": 14,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Курица (вариант 5)",
+    "calories": 148,
+    "protein": 31,
+    "fat": 3.6,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Индейка (вариант 5)",
+    "calories": 119,
+    "protein": 30,
+    "fat": 1,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Баранина (вариант 5)",
+    "calories": 279,
+    "protein": 25,
+    "fat": 21,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Лосось (вариант 5)",
+    "calories": 194,
+    "protein": 22,
+    "fat": 13,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Тунец (вариант 5)",
+    "calories": 131,
+    "protein": 25,
+    "fat": 4.9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Сельдь (вариант 5)",
+    "calories": 146,
+    "protein": 18,
+    "fat": 9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Креветки (вариант 5)",
+    "calories": 74,
+    "protein": 20,
+    "fat": 0.5,
+    "carbs": 0.5,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Минтай (вариант 5)",
+    "calories": 62,
+    "protein": 16,
+    "fat": 0.9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Молоко коровье 3.2% (вариант 5)",
+    "calories": 52,
+    "protein": 3.3,
+    "fat": 3.2,
+    "carbs": 4.8,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "l"
+  },
+  {
+    "name": "Сыр твердый (вариант 5)",
+    "calories": 352,
+    "protein": 29,
+    "fat": 25,
+    "carbs": 3.5,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Сметана 20% (вариант 5)",
+    "calories": 199,
+    "protein": 2.8,
+    "fat": 20,
+    "carbs": 3.2,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Творог 5% (вариант 5)",
+    "calories": 115,
+    "protein": 17,
+    "fat": 5,
+    "carbs": 1.8,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Йогурт натуральный (вариант 5)",
+    "calories": 56,
+    "protein": 3.5,
+    "fat": 3.2,
+    "carbs": 4.1,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Хлеб пшеничный (вариант 5)",
+    "calories": 262,
+    "protein": 8.1,
+    "fat": 1,
+    "carbs": 54,
+    "gluten_free": false,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Хлеб ржаной (вариант 5)",
+    "calories": 211,
+    "protein": 6.6,
+    "fat": 1.2,
+    "carbs": 42,
+    "gluten_free": false,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Рис белый (вариант 5)",
+    "calories": 128,
+    "protein": 2.7,
+    "fat": 0.3,
+    "carbs": 28,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Гречка (вариант 5)",
+    "calories": 342,
+    "protein": 12.6,
+    "fat": 3.3,
+    "carbs": 62,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Овсянка (вариант 5)",
+    "calories": 379,
+    "protein": 11.9,
+    "fat": 7.2,
+    "carbs": 61,
+    "gluten_free": false,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Масло сливочное (вариант 5)",
+    "calories": 718,
+    "protein": 0.9,
+    "fat": 81,
+    "carbs": 0.1,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Масло подсолнечное (вариант 5)",
+    "calories": 886,
+    "protein": 0,
+    "fat": 99.9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "l"
+  },
+  {
+    "name": "Масло оливковое (вариант 5)",
+    "calories": 887,
+    "protein": 0,
+    "fat": 99.9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "l"
+  },
+  {
+    "name": "Сметана 10% (вариант 5)",
+    "calories": 119,
+    "protein": 3,
+    "fat": 10,
+    "carbs": 2.9,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Яйца куриные (вариант 5)",
+    "calories": 162,
+    "protein": 12.7,
+    "fat": 10.9,
+    "carbs": 0.7,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "pcs"
+  },
+  {
+    "name": "Сахар (вариант 5)",
+    "calories": 393,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 100,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Мед (вариант 5)",
+    "calories": 311,
+    "protein": 0.3,
+    "fat": 0,
+    "carbs": 82,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Шоколад черный (вариант 5)",
+    "calories": 547,
+    "protein": 5.4,
+    "fat": 31,
+    "carbs": 52,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Вода (вариант 5)",
+    "calories": 9,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "l"
+  },
+  {
+    "name": "Чай черный (вариант 5)",
+    "calories": 11,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 0.3,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Кофе молотый (вариант 5)",
+    "calories": 212,
+    "protein": 13.9,
+    "fat": 14.4,
+    "carbs": 15.6,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Томатная паста (вариант 5)",
+    "calories": 36,
+    "protein": 1.5,
+    "fat": 0.1,
+    "carbs": 4.5,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Майонез (вариант 5)",
+    "calories": 640,
+    "protein": 2.4,
+    "fat": 67,
+    "carbs": 2.6,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Горчица (вариант 5)",
+    "calories": 176,
+    "protein": 5.7,
+    "fat": 9.8,
+    "carbs": 11,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Уксус столовый (вариант 5)",
+    "calories": 26,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 2.4,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "l"
+  },
+  {
+    "name": "Соль (вариант 5)",
+    "calories": 16,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Перец черный молотый (вариант 5)",
+    "calories": 268,
+    "protein": 10.4,
+    "fat": 3.3,
+    "carbs": 38.7,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Куркума (вариант 5)",
+    "calories": 330,
+    "protein": 9.7,
+    "fat": 3.3,
+    "carbs": 44.4,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Паприка (вариант 5)",
+    "calories": 308,
+    "protein": 14.1,
+    "fat": 12.9,
+    "carbs": 33.9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Картофель (вариант 6)",
+    "calories": 97,
+    "protein": 2,
+    "fat": 0.1,
+    "carbs": 17,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Морковь (вариант 6)",
+    "calories": 62,
+    "protein": 0.9,
+    "fat": 0.2,
+    "carbs": 10,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Лук репчатый (вариант 6)",
+    "calories": 62,
+    "protein": 1.1,
+    "fat": 0.1,
+    "carbs": 9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Чеснок (вариант 6)",
+    "calories": 172,
+    "protein": 6.4,
+    "fat": 0.5,
+    "carbs": 33,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Помидоры (вариант 6)",
+    "calories": 42,
+    "protein": 0.9,
+    "fat": 0.2,
+    "carbs": 3.9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Огурцы (вариант 6)",
+    "calories": -10,
+    "protein": 0.7,
+    "fat": 0.1,
+    "carbs": 2.6,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Капуста белокочанная (вариант 6)",
+    "calories": 3,
+    "protein": 1.8,
+    "fat": 0.1,
+    "carbs": 5.4,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Яблоки (вариант 6)",
+    "calories": 29,
+    "protein": 0.3,
+    "fat": 0.2,
+    "carbs": 14,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Бананы (вариант 6)",
+    "calories": 67,
+    "protein": 1.1,
+    "fat": 0.3,
+    "carbs": 23,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Лимоны (вариант 6)",
+    "calories": 8,
+    "protein": 1.1,
+    "fat": 0.3,
+    "carbs": 9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Говядина (вариант 6)",
+    "calories": 230,
+    "protein": 26,
+    "fat": 15,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Свинина (вариант 6)",
+    "calories": 223,
+    "protein": 27,
+    "fat": 14,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Курица (вариант 6)",
+    "calories": 147,
+    "protein": 31,
+    "fat": 3.6,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Индейка (вариант 6)",
+    "calories": 118,
+    "protein": 30,
+    "fat": 1,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Баранина (вариант 6)",
+    "calories": 278,
+    "protein": 25,
+    "fat": 21,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Лосось (вариант 6)",
+    "calories": 193,
+    "protein": 22,
+    "fat": 13,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Тунец (вариант 6)",
+    "calories": 130,
+    "protein": 25,
+    "fat": 4.9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Сельдь (вариант 6)",
+    "calories": 145,
+    "protein": 18,
+    "fat": 9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Креветки (вариант 6)",
+    "calories": 73,
+    "protein": 20,
+    "fat": 0.5,
+    "carbs": 0.5,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Минтай (вариант 6)",
+    "calories": 61,
+    "protein": 16,
+    "fat": 0.9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Молоко коровье 3.2% (вариант 6)",
+    "calories": 51,
+    "protein": 3.3,
+    "fat": 3.2,
+    "carbs": 4.8,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "l"
+  },
+  {
+    "name": "Сыр твердый (вариант 6)",
+    "calories": 351,
+    "protein": 29,
+    "fat": 25,
+    "carbs": 3.5,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Сметана 20% (вариант 6)",
+    "calories": 198,
+    "protein": 2.8,
+    "fat": 20,
+    "carbs": 3.2,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Творог 5% (вариант 6)",
+    "calories": 114,
+    "protein": 17,
+    "fat": 5,
+    "carbs": 1.8,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Йогурт натуральный (вариант 6)",
+    "calories": 55,
+    "protein": 3.5,
+    "fat": 3.2,
+    "carbs": 4.1,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Хлеб пшеничный (вариант 6)",
+    "calories": 261,
+    "protein": 8.1,
+    "fat": 1,
+    "carbs": 54,
+    "gluten_free": false,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Хлеб ржаной (вариант 6)",
+    "calories": 210,
+    "protein": 6.6,
+    "fat": 1.2,
+    "carbs": 42,
+    "gluten_free": false,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Рис белый (вариант 6)",
+    "calories": 127,
+    "protein": 2.7,
+    "fat": 0.3,
+    "carbs": 28,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Гречка (вариант 6)",
+    "calories": 341,
+    "protein": 12.6,
+    "fat": 3.3,
+    "carbs": 62,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Овсянка (вариант 6)",
+    "calories": 378,
+    "protein": 11.9,
+    "fat": 7.2,
+    "carbs": 61,
+    "gluten_free": false,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Масло сливочное (вариант 6)",
+    "calories": 717,
+    "protein": 0.9,
+    "fat": 81,
+    "carbs": 0.1,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Масло подсолнечное (вариант 6)",
+    "calories": 885,
+    "protein": 0,
+    "fat": 99.9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "l"
+  },
+  {
+    "name": "Масло оливковое (вариант 6)",
+    "calories": 886,
+    "protein": 0,
+    "fat": 99.9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "l"
+  },
+  {
+    "name": "Сметана 10% (вариант 6)",
+    "calories": 118,
+    "protein": 3,
+    "fat": 10,
+    "carbs": 2.9,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Яйца куриные (вариант 6)",
+    "calories": 161,
+    "protein": 12.7,
+    "fat": 10.9,
+    "carbs": 0.7,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "pcs"
+  },
+  {
+    "name": "Сахар (вариант 6)",
+    "calories": 392,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 100,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Мед (вариант 6)",
+    "calories": 310,
+    "protein": 0.3,
+    "fat": 0,
+    "carbs": 82,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Шоколад черный (вариант 6)",
+    "calories": 546,
+    "protein": 5.4,
+    "fat": 31,
+    "carbs": 52,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Вода (вариант 6)",
+    "calories": 8,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "l"
+  },
+  {
+    "name": "Чай черный (вариант 6)",
+    "calories": 10,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 0.3,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Кофе молотый (вариант 6)",
+    "calories": 211,
+    "protein": 13.9,
+    "fat": 14.4,
+    "carbs": 15.6,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Томатная паста (вариант 6)",
+    "calories": 35,
+    "protein": 1.5,
+    "fat": 0.1,
+    "carbs": 4.5,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Майонез (вариант 6)",
+    "calories": 639,
+    "protein": 2.4,
+    "fat": 67,
+    "carbs": 2.6,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Горчица (вариант 6)",
+    "calories": 175,
+    "protein": 5.7,
+    "fat": 9.8,
+    "carbs": 11,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Уксус столовый (вариант 6)",
+    "calories": 25,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 2.4,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "l"
+  },
+  {
+    "name": "Соль (вариант 6)",
+    "calories": 15,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Перец черный молотый (вариант 6)",
+    "calories": 267,
+    "protein": 10.4,
+    "fat": 3.3,
+    "carbs": 38.7,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Куркума (вариант 6)",
+    "calories": 329,
+    "protein": 9.7,
+    "fat": 3.3,
+    "carbs": 44.4,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Паприка (вариант 6)",
+    "calories": 307,
+    "protein": 14.1,
+    "fat": 12.9,
+    "carbs": 33.9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Картофель (вариант 7)",
+    "calories": 96,
+    "protein": 2,
+    "fat": 0.1,
+    "carbs": 17,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Морковь (вариант 7)",
+    "calories": 61,
+    "protein": 0.9,
+    "fat": 0.2,
+    "carbs": 10,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Лук репчатый (вариант 7)",
+    "calories": 61,
+    "protein": 1.1,
+    "fat": 0.1,
+    "carbs": 9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Чеснок (вариант 7)",
+    "calories": 171,
+    "protein": 6.4,
+    "fat": 0.5,
+    "carbs": 33,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Помидоры (вариант 7)",
+    "calories": 41,
+    "protein": 0.9,
+    "fat": 0.2,
+    "carbs": 3.9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Огурцы (вариант 7)",
+    "calories": 39,
+    "protein": 0.7,
+    "fat": 0.1,
+    "carbs": 2.6,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Капуста белокочанная (вариант 7)",
+    "calories": 2,
+    "protein": 1.8,
+    "fat": 0.1,
+    "carbs": 5.4,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Яблоки (вариант 7)",
+    "calories": 28,
+    "protein": 0.3,
+    "fat": 0.2,
+    "carbs": 14,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Бананы (вариант 7)",
+    "calories": 66,
+    "protein": 1.1,
+    "fat": 0.3,
+    "carbs": 23,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Лимоны (вариант 7)",
+    "calories": 7,
+    "protein": 1.1,
+    "fat": 0.3,
+    "carbs": 9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Говядина (вариант 7)",
+    "calories": 229,
+    "protein": 26,
+    "fat": 15,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Свинина (вариант 7)",
+    "calories": 222,
+    "protein": 27,
+    "fat": 14,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Курица (вариант 7)",
+    "calories": 146,
+    "protein": 31,
+    "fat": 3.6,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Индейка (вариант 7)",
+    "calories": 117,
+    "protein": 30,
+    "fat": 1,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Баранина (вариант 7)",
+    "calories": 277,
+    "protein": 25,
+    "fat": 21,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Лосось (вариант 7)",
+    "calories": 192,
+    "protein": 22,
+    "fat": 13,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Тунец (вариант 7)",
+    "calories": 129,
+    "protein": 25,
+    "fat": 4.9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Сельдь (вариант 7)",
+    "calories": 144,
+    "protein": 18,
+    "fat": 9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Креветки (вариант 7)",
+    "calories": 72,
+    "protein": 20,
+    "fat": 0.5,
+    "carbs": 0.5,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Минтай (вариант 7)",
+    "calories": 60,
+    "protein": 16,
+    "fat": 0.9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Молоко коровье 3.2% (вариант 7)",
+    "calories": 50,
+    "protein": 3.3,
+    "fat": 3.2,
+    "carbs": 4.8,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "l"
+  },
+  {
+    "name": "Сыр твердый (вариант 7)",
+    "calories": 350,
+    "protein": 29,
+    "fat": 25,
+    "carbs": 3.5,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Сметана 20% (вариант 7)",
+    "calories": 197,
+    "protein": 2.8,
+    "fat": 20,
+    "carbs": 3.2,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Творог 5% (вариант 7)",
+    "calories": 113,
+    "protein": 17,
+    "fat": 5,
+    "carbs": 1.8,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Йогурт натуральный (вариант 7)",
+    "calories": 54,
+    "protein": 3.5,
+    "fat": 3.2,
+    "carbs": 4.1,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Хлеб пшеничный (вариант 7)",
+    "calories": 260,
+    "protein": 8.1,
+    "fat": 1,
+    "carbs": 54,
+    "gluten_free": false,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Хлеб ржаной (вариант 7)",
+    "calories": 209,
+    "protein": 6.6,
+    "fat": 1.2,
+    "carbs": 42,
+    "gluten_free": false,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Рис белый (вариант 7)",
+    "calories": 126,
+    "protein": 2.7,
+    "fat": 0.3,
+    "carbs": 28,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Гречка (вариант 7)",
+    "calories": 340,
+    "protein": 12.6,
+    "fat": 3.3,
+    "carbs": 62,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Овсянка (вариант 7)",
+    "calories": 377,
+    "protein": 11.9,
+    "fat": 7.2,
+    "carbs": 61,
+    "gluten_free": false,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Масло сливочное (вариант 7)",
+    "calories": 716,
+    "protein": 0.9,
+    "fat": 81,
+    "carbs": 0.1,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Масло подсолнечное (вариант 7)",
+    "calories": 884,
+    "protein": 0,
+    "fat": 99.9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "l"
+  },
+  {
+    "name": "Масло оливковое (вариант 7)",
+    "calories": 885,
+    "protein": 0,
+    "fat": 99.9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "l"
+  },
+  {
+    "name": "Сметана 10% (вариант 7)",
+    "calories": 117,
+    "protein": 3,
+    "fat": 10,
+    "carbs": 2.9,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Яйца куриные (вариант 7)",
+    "calories": 160,
+    "protein": 12.7,
+    "fat": 10.9,
+    "carbs": 0.7,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "pcs"
+  },
+  {
+    "name": "Сахар (вариант 7)",
+    "calories": 391,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 100,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Мед (вариант 7)",
+    "calories": 309,
+    "protein": 0.3,
+    "fat": 0,
+    "carbs": 82,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Шоколад черный (вариант 7)",
+    "calories": 545,
+    "protein": 5.4,
+    "fat": 31,
+    "carbs": 52,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Вода (вариант 7)",
+    "calories": 7,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "l"
+  },
+  {
+    "name": "Чай черный (вариант 7)",
+    "calories": 9,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 0.3,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Кофе молотый (вариант 7)",
+    "calories": 210,
+    "protein": 13.9,
+    "fat": 14.4,
+    "carbs": 15.6,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Томатная паста (вариант 7)",
+    "calories": 34,
+    "protein": 1.5,
+    "fat": 0.1,
+    "carbs": 4.5,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Майонез (вариант 7)",
+    "calories": 638,
+    "protein": 2.4,
+    "fat": 67,
+    "carbs": 2.6,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Горчица (вариант 7)",
+    "calories": 174,
+    "protein": 5.7,
+    "fat": 9.8,
+    "carbs": 11,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Уксус столовый (вариант 7)",
+    "calories": 24,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 2.4,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "l"
+  },
+  {
+    "name": "Соль (вариант 7)",
+    "calories": 14,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Перец черный молотый (вариант 7)",
+    "calories": 266,
+    "protein": 10.4,
+    "fat": 3.3,
+    "carbs": 38.7,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Куркума (вариант 7)",
+    "calories": 328,
+    "protein": 9.7,
+    "fat": 3.3,
+    "carbs": 44.4,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Паприка (вариант 7)",
+    "calories": 306,
+    "protein": 14.1,
+    "fat": 12.9,
+    "carbs": 33.9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Картофель (вариант 8)",
+    "calories": 95,
+    "protein": 2,
+    "fat": 0.1,
+    "carbs": 17,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Морковь (вариант 8)",
+    "calories": 60,
+    "protein": 0.9,
+    "fat": 0.2,
+    "carbs": 10,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Лук репчатый (вариант 8)",
+    "calories": 60,
+    "protein": 1.1,
+    "fat": 0.1,
+    "carbs": 9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Чеснок (вариант 8)",
+    "calories": 170,
+    "protein": 6.4,
+    "fat": 0.5,
+    "carbs": 33,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Помидоры (вариант 8)",
+    "calories": 40,
+    "protein": 0.9,
+    "fat": 0.2,
+    "carbs": 3.9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Огурцы (вариант 8)",
+    "calories": 38,
+    "protein": 0.7,
+    "fat": 0.1,
+    "carbs": 2.6,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Капуста белокочанная (вариант 8)",
+    "calories": 51,
+    "protein": 1.8,
+    "fat": 0.1,
+    "carbs": 5.4,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Яблоки (вариант 8)",
+    "calories": 27,
+    "protein": 0.3,
+    "fat": 0.2,
+    "carbs": 14,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Бананы (вариант 8)",
+    "calories": 65,
+    "protein": 1.1,
+    "fat": 0.3,
+    "carbs": 23,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Лимоны (вариант 8)",
+    "calories": 6,
+    "protein": 1.1,
+    "fat": 0.3,
+    "carbs": 9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Говядина (вариант 8)",
+    "calories": 228,
+    "protein": 26,
+    "fat": 15,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Свинина (вариант 8)",
+    "calories": 221,
+    "protein": 27,
+    "fat": 14,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Курица (вариант 8)",
+    "calories": 145,
+    "protein": 31,
+    "fat": 3.6,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Индейка (вариант 8)",
+    "calories": 116,
+    "protein": 30,
+    "fat": 1,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Баранина (вариант 8)",
+    "calories": 276,
+    "protein": 25,
+    "fat": 21,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Лосось (вариант 8)",
+    "calories": 191,
+    "protein": 22,
+    "fat": 13,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Тунец (вариант 8)",
+    "calories": 128,
+    "protein": 25,
+    "fat": 4.9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Сельдь (вариант 8)",
+    "calories": 143,
+    "protein": 18,
+    "fat": 9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Креветки (вариант 8)",
+    "calories": 71,
+    "protein": 20,
+    "fat": 0.5,
+    "carbs": 0.5,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Минтай (вариант 8)",
+    "calories": 59,
+    "protein": 16,
+    "fat": 0.9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Молоко коровье 3.2% (вариант 8)",
+    "calories": 49,
+    "protein": 3.3,
+    "fat": 3.2,
+    "carbs": 4.8,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "l"
+  },
+  {
+    "name": "Сыр твердый (вариант 8)",
+    "calories": 349,
+    "protein": 29,
+    "fat": 25,
+    "carbs": 3.5,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Сметана 20% (вариант 8)",
+    "calories": 196,
+    "protein": 2.8,
+    "fat": 20,
+    "carbs": 3.2,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Творог 5% (вариант 8)",
+    "calories": 112,
+    "protein": 17,
+    "fat": 5,
+    "carbs": 1.8,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Йогурт натуральный (вариант 8)",
+    "calories": 53,
+    "protein": 3.5,
+    "fat": 3.2,
+    "carbs": 4.1,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Хлеб пшеничный (вариант 8)",
+    "calories": 259,
+    "protein": 8.1,
+    "fat": 1,
+    "carbs": 54,
+    "gluten_free": false,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Хлеб ржаной (вариант 8)",
+    "calories": 208,
+    "protein": 6.6,
+    "fat": 1.2,
+    "carbs": 42,
+    "gluten_free": false,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Рис белый (вариант 8)",
+    "calories": 125,
+    "protein": 2.7,
+    "fat": 0.3,
+    "carbs": 28,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Гречка (вариант 8)",
+    "calories": 339,
+    "protein": 12.6,
+    "fat": 3.3,
+    "carbs": 62,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Овсянка (вариант 8)",
+    "calories": 376,
+    "protein": 11.9,
+    "fat": 7.2,
+    "carbs": 61,
+    "gluten_free": false,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Масло сливочное (вариант 8)",
+    "calories": 715,
+    "protein": 0.9,
+    "fat": 81,
+    "carbs": 0.1,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Масло подсолнечное (вариант 8)",
+    "calories": 883,
+    "protein": 0,
+    "fat": 99.9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "l"
+  },
+  {
+    "name": "Масло оливковое (вариант 8)",
+    "calories": 884,
+    "protein": 0,
+    "fat": 99.9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "l"
+  },
+  {
+    "name": "Сметана 10% (вариант 8)",
+    "calories": 116,
+    "protein": 3,
+    "fat": 10,
+    "carbs": 2.9,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Яйца куриные (вариант 8)",
+    "calories": 159,
+    "protein": 12.7,
+    "fat": 10.9,
+    "carbs": 0.7,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "pcs"
+  },
+  {
+    "name": "Сахар (вариант 8)",
+    "calories": 390,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 100,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Мед (вариант 8)",
+    "calories": 308,
+    "protein": 0.3,
+    "fat": 0,
+    "carbs": 82,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Шоколад черный (вариант 8)",
+    "calories": 544,
+    "protein": 5.4,
+    "fat": 31,
+    "carbs": 52,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Вода (вариант 8)",
+    "calories": 6,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "l"
+  },
+  {
+    "name": "Чай черный (вариант 8)",
+    "calories": 8,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 0.3,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Кофе молотый (вариант 8)",
+    "calories": 209,
+    "protein": 13.9,
+    "fat": 14.4,
+    "carbs": 15.6,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Томатная паста (вариант 8)",
+    "calories": 33,
+    "protein": 1.5,
+    "fat": 0.1,
+    "carbs": 4.5,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Майонез (вариант 8)",
+    "calories": 637,
+    "protein": 2.4,
+    "fat": 67,
+    "carbs": 2.6,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Горчица (вариант 8)",
+    "calories": 173,
+    "protein": 5.7,
+    "fat": 9.8,
+    "carbs": 11,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Уксус столовый (вариант 8)",
+    "calories": 23,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 2.4,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "l"
+  },
+  {
+    "name": "Соль (вариант 8)",
+    "calories": 13,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Перец черный молотый (вариант 8)",
+    "calories": 265,
+    "protein": 10.4,
+    "fat": 3.3,
+    "carbs": 38.7,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Куркума (вариант 8)",
+    "calories": 327,
+    "protein": 9.7,
+    "fat": 3.3,
+    "carbs": 44.4,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Паприка (вариант 8)",
+    "calories": 305,
+    "protein": 14.1,
+    "fat": 12.9,
+    "carbs": 33.9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Картофель (вариант 9)",
+    "calories": 94,
+    "protein": 2,
+    "fat": 0.1,
+    "carbs": 17,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Морковь (вариант 9)",
+    "calories": 59,
+    "protein": 0.9,
+    "fat": 0.2,
+    "carbs": 10,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Лук репчатый (вариант 9)",
+    "calories": 59,
+    "protein": 1.1,
+    "fat": 0.1,
+    "carbs": 9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Чеснок (вариант 9)",
+    "calories": 169,
+    "protein": 6.4,
+    "fat": 0.5,
+    "carbs": 33,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Помидоры (вариант 9)",
+    "calories": 39,
+    "protein": 0.9,
+    "fat": 0.2,
+    "carbs": 3.9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Огурцы (вариант 9)",
+    "calories": 37,
+    "protein": 0.7,
+    "fat": 0.1,
+    "carbs": 2.6,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Капуста белокочанная (вариант 9)",
+    "calories": 50,
+    "protein": 1.8,
+    "fat": 0.1,
+    "carbs": 5.4,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Яблоки (вариант 9)",
+    "calories": 76,
+    "protein": 0.3,
+    "fat": 0.2,
+    "carbs": 14,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Бананы (вариант 9)",
+    "calories": 64,
+    "protein": 1.1,
+    "fat": 0.3,
+    "carbs": 23,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Лимоны (вариант 9)",
+    "calories": 5,
+    "protein": 1.1,
+    "fat": 0.3,
+    "carbs": 9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Говядина (вариант 9)",
+    "calories": 227,
+    "protein": 26,
+    "fat": 15,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Свинина (вариант 9)",
+    "calories": 220,
+    "protein": 27,
+    "fat": 14,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Курица (вариант 9)",
+    "calories": 144,
+    "protein": 31,
+    "fat": 3.6,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Индейка (вариант 9)",
+    "calories": 115,
+    "protein": 30,
+    "fat": 1,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Баранина (вариант 9)",
+    "calories": 275,
+    "protein": 25,
+    "fat": 21,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Лосось (вариант 9)",
+    "calories": 190,
+    "protein": 22,
+    "fat": 13,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Тунец (вариант 9)",
+    "calories": 127,
+    "protein": 25,
+    "fat": 4.9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Сельдь (вариант 9)",
+    "calories": 142,
+    "protein": 18,
+    "fat": 9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Креветки (вариант 9)",
+    "calories": 70,
+    "protein": 20,
+    "fat": 0.5,
+    "carbs": 0.5,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Минтай (вариант 9)",
+    "calories": 58,
+    "protein": 16,
+    "fat": 0.9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Молоко коровье 3.2% (вариант 9)",
+    "calories": 48,
+    "protein": 3.3,
+    "fat": 3.2,
+    "carbs": 4.8,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "l"
+  },
+  {
+    "name": "Сыр твердый (вариант 9)",
+    "calories": 348,
+    "protein": 29,
+    "fat": 25,
+    "carbs": 3.5,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Сметана 20% (вариант 9)",
+    "calories": 195,
+    "protein": 2.8,
+    "fat": 20,
+    "carbs": 3.2,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Творог 5% (вариант 9)",
+    "calories": 111,
+    "protein": 17,
+    "fat": 5,
+    "carbs": 1.8,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Йогурт натуральный (вариант 9)",
+    "calories": 52,
+    "protein": 3.5,
+    "fat": 3.2,
+    "carbs": 4.1,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Хлеб пшеничный (вариант 9)",
+    "calories": 258,
+    "protein": 8.1,
+    "fat": 1,
+    "carbs": 54,
+    "gluten_free": false,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Хлеб ржаной (вариант 9)",
+    "calories": 207,
+    "protein": 6.6,
+    "fat": 1.2,
+    "carbs": 42,
+    "gluten_free": false,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Рис белый (вариант 9)",
+    "calories": 124,
+    "protein": 2.7,
+    "fat": 0.3,
+    "carbs": 28,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Гречка (вариант 9)",
+    "calories": 338,
+    "protein": 12.6,
+    "fat": 3.3,
+    "carbs": 62,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Овсянка (вариант 9)",
+    "calories": 375,
+    "protein": 11.9,
+    "fat": 7.2,
+    "carbs": 61,
+    "gluten_free": false,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Масло сливочное (вариант 9)",
+    "calories": 714,
+    "protein": 0.9,
+    "fat": 81,
+    "carbs": 0.1,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Масло подсолнечное (вариант 9)",
+    "calories": 882,
+    "protein": 0,
+    "fat": 99.9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "l"
+  },
+  {
+    "name": "Масло оливковое (вариант 9)",
+    "calories": 883,
+    "protein": 0,
+    "fat": 99.9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "l"
+  },
+  {
+    "name": "Сметана 10% (вариант 9)",
+    "calories": 115,
+    "protein": 3,
+    "fat": 10,
+    "carbs": 2.9,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Яйца куриные (вариант 9)",
+    "calories": 158,
+    "protein": 12.7,
+    "fat": 10.9,
+    "carbs": 0.7,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "pcs"
+  },
+  {
+    "name": "Сахар (вариант 9)",
+    "calories": 389,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 100,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Мед (вариант 9)",
+    "calories": 307,
+    "protein": 0.3,
+    "fat": 0,
+    "carbs": 82,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Шоколад черный (вариант 9)",
+    "calories": 543,
+    "protein": 5.4,
+    "fat": 31,
+    "carbs": 52,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Вода (вариант 9)",
+    "calories": 5,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "l"
+  },
+  {
+    "name": "Чай черный (вариант 9)",
+    "calories": 7,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 0.3,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Кофе молотый (вариант 9)",
+    "calories": 208,
+    "protein": 13.9,
+    "fat": 14.4,
+    "carbs": 15.6,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Томатная паста (вариант 9)",
+    "calories": 32,
+    "protein": 1.5,
+    "fat": 0.1,
+    "carbs": 4.5,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Майонез (вариант 9)",
+    "calories": 636,
+    "protein": 2.4,
+    "fat": 67,
+    "carbs": 2.6,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Горчица (вариант 9)",
+    "calories": 172,
+    "protein": 5.7,
+    "fat": 9.8,
+    "carbs": 11,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Уксус столовый (вариант 9)",
+    "calories": 22,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 2.4,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "l"
+  },
+  {
+    "name": "Соль (вариант 9)",
+    "calories": 12,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Перец черный молотый (вариант 9)",
+    "calories": 264,
+    "protein": 10.4,
+    "fat": 3.3,
+    "carbs": 38.7,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Куркума (вариант 9)",
+    "calories": 326,
+    "protein": 9.7,
+    "fat": 3.3,
+    "carbs": 44.4,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Паприка (вариант 9)",
+    "calories": 304,
+    "protein": 14.1,
+    "fat": 12.9,
+    "carbs": 33.9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Картофель (вариант 10)",
+    "calories": 93,
+    "protein": 2,
+    "fat": 0.1,
+    "carbs": 17,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Морковь (вариант 10)",
+    "calories": 58,
+    "protein": 0.9,
+    "fat": 0.2,
+    "carbs": 10,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Лук репчатый (вариант 10)",
+    "calories": 58,
+    "protein": 1.1,
+    "fat": 0.1,
+    "carbs": 9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Чеснок (вариант 10)",
+    "calories": 168,
+    "protein": 6.4,
+    "fat": 0.5,
+    "carbs": 33,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Помидоры (вариант 10)",
+    "calories": 38,
+    "protein": 0.9,
+    "fat": 0.2,
+    "carbs": 3.9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Огурцы (вариант 10)",
+    "calories": 36,
+    "protein": 0.7,
+    "fat": 0.1,
+    "carbs": 2.6,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Капуста белокочанная (вариант 10)",
+    "calories": 49,
+    "protein": 1.8,
+    "fat": 0.1,
+    "carbs": 5.4,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Яблоки (вариант 10)",
+    "calories": 75,
+    "protein": 0.3,
+    "fat": 0.2,
+    "carbs": 14,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Бананы (вариант 10)",
+    "calories": 113,
+    "protein": 1.1,
+    "fat": 0.3,
+    "carbs": 23,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Лимоны (вариант 10)",
+    "calories": 4,
+    "protein": 1.1,
+    "fat": 0.3,
+    "carbs": 9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Говядина (вариант 10)",
+    "calories": 226,
+    "protein": 26,
+    "fat": 15,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Свинина (вариант 10)",
+    "calories": 219,
+    "protein": 27,
+    "fat": 14,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Курица (вариант 10)",
+    "calories": 143,
+    "protein": 31,
+    "fat": 3.6,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Индейка (вариант 10)",
+    "calories": 114,
+    "protein": 30,
+    "fat": 1,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Баранина (вариант 10)",
+    "calories": 274,
+    "protein": 25,
+    "fat": 21,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Лосось (вариант 10)",
+    "calories": 189,
+    "protein": 22,
+    "fat": 13,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Тунец (вариант 10)",
+    "calories": 126,
+    "protein": 25,
+    "fat": 4.9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Сельдь (вариант 10)",
+    "calories": 141,
+    "protein": 18,
+    "fat": 9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Креветки (вариант 10)",
+    "calories": 69,
+    "protein": 20,
+    "fat": 0.5,
+    "carbs": 0.5,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Минтай (вариант 10)",
+    "calories": 57,
+    "protein": 16,
+    "fat": 0.9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Молоко коровье 3.2% (вариант 10)",
+    "calories": 47,
+    "protein": 3.3,
+    "fat": 3.2,
+    "carbs": 4.8,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "l"
+  },
+  {
+    "name": "Сыр твердый (вариант 10)",
+    "calories": 347,
+    "protein": 29,
+    "fat": 25,
+    "carbs": 3.5,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Сметана 20% (вариант 10)",
+    "calories": 194,
+    "protein": 2.8,
+    "fat": 20,
+    "carbs": 3.2,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Творог 5% (вариант 10)",
+    "calories": 110,
+    "protein": 17,
+    "fat": 5,
+    "carbs": 1.8,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Йогурт натуральный (вариант 10)",
+    "calories": 51,
+    "protein": 3.5,
+    "fat": 3.2,
+    "carbs": 4.1,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Хлеб пшеничный (вариант 10)",
+    "calories": 257,
+    "protein": 8.1,
+    "fat": 1,
+    "carbs": 54,
+    "gluten_free": false,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Хлеб ржаной (вариант 10)",
+    "calories": 206,
+    "protein": 6.6,
+    "fat": 1.2,
+    "carbs": 42,
+    "gluten_free": false,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Рис белый (вариант 10)",
+    "calories": 123,
+    "protein": 2.7,
+    "fat": 0.3,
+    "carbs": 28,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Гречка (вариант 10)",
+    "calories": 337,
+    "protein": 12.6,
+    "fat": 3.3,
+    "carbs": 62,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Овсянка (вариант 10)",
+    "calories": 374,
+    "protein": 11.9,
+    "fat": 7.2,
+    "carbs": 61,
+    "gluten_free": false,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Масло сливочное (вариант 10)",
+    "calories": 713,
+    "protein": 0.9,
+    "fat": 81,
+    "carbs": 0.1,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Масло подсолнечное (вариант 10)",
+    "calories": 881,
+    "protein": 0,
+    "fat": 99.9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "l"
+  },
+  {
+    "name": "Масло оливковое (вариант 10)",
+    "calories": 882,
+    "protein": 0,
+    "fat": 99.9,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "l"
+  },
+  {
+    "name": "Сметана 10% (вариант 10)",
+    "calories": 114,
+    "protein": 3,
+    "fat": 10,
+    "carbs": 2.9,
+    "gluten_free": true,
+    "lactose_free": false,
+    "unit": "kg"
+  },
+  {
+    "name": "Яйца куриные (вариант 10)",
+    "calories": 157,
+    "protein": 12.7,
+    "fat": 10.9,
+    "carbs": 0.7,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "pcs"
+  },
+  {
+    "name": "Сахар (вариант 10)",
+    "calories": 388,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 100,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Мед (вариант 10)",
+    "calories": 306,
+    "protein": 0.3,
+    "fat": 0,
+    "carbs": 82,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Шоколад черный (вариант 10)",
+    "calories": 542,
+    "protein": 5.4,
+    "fat": 31,
+    "carbs": 52,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Вода (вариант 10)",
+    "calories": 4,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "l"
+  },
+  {
+    "name": "Чай черный (вариант 10)",
+    "calories": 6,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 0.3,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Кофе молотый (вариант 10)",
+    "calories": 207,
+    "protein": 13.9,
+    "fat": 14.4,
+    "carbs": 15.6,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Томатная паста (вариант 10)",
+    "calories": 31,
+    "protein": 1.5,
+    "fat": 0.1,
+    "carbs": 4.5,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Майонез (вариант 10)",
+    "calories": 635,
+    "protein": 2.4,
+    "fat": 67,
+    "carbs": 2.6,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Горчица (вариант 10)",
+    "calories": 171,
+    "protein": 5.7,
+    "fat": 9.8,
+    "carbs": 11,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Уксус столовый (вариант 10)",
+    "calories": 21,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 2.4,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "l"
+  },
+  {
+    "name": "Соль (вариант 10)",
+    "calories": 11,
+    "protein": 0,
+    "fat": 0,
+    "carbs": 0,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Перец черный молотый (вариант 10)",
+    "calories": 263,
+    "protein": 10.4,
+    "fat": 3.3,
+    "carbs": 38.7,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Куркума (вариант 10)",
+    "calories": 325,
+    "protein": 9.7,
+    "fat": 3.3,
+    "carbs": 44.4,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Паприка (вариант 10)",
+    "calories": 303,
+    "protein": 14.1,
+    "fat": 12.9,
+    "carbs": 33.9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Картофель (вариант 11)",
+    "calories": 92,
+    "protein": 2,
+    "fat": 0.1,
+    "carbs": 17,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Морковь (вариант 11)",
+    "calories": 57,
+    "protein": 0.9,
+    "fat": 0.2,
+    "carbs": 10,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Лук репчатый (вариант 11)",
+    "calories": 57,
+    "protein": 1.1,
+    "fat": 0.1,
+    "carbs": 9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Чеснок (вариант 11)",
+    "calories": 167,
+    "protein": 6.4,
+    "fat": 0.5,
+    "carbs": 33,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Помидоры (вариант 11)",
+    "calories": 37,
+    "protein": 0.9,
+    "fat": 0.2,
+    "carbs": 3.9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Огурцы (вариант 11)",
+    "calories": 35,
+    "protein": 0.7,
+    "fat": 0.1,
+    "carbs": 2.6,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Капуста белокочанная (вариант 11)",
+    "calories": 48,
+    "protein": 1.8,
+    "fat": 0.1,
+    "carbs": 5.4,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Яблоки (вариант 11)",
+    "calories": 74,
+    "protein": 0.3,
+    "fat": 0.2,
+    "carbs": 14,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Бананы (вариант 11)",
+    "calories": 112,
+    "protein": 1.1,
+    "fat": 0.3,
+    "carbs": 23,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  },
+  {
+    "name": "Лимоны (вариант 11)",
+    "calories": 53,
+    "protein": 1.1,
+    "fat": 0.3,
+    "carbs": 9,
+    "gluten_free": true,
+    "lactose_free": true,
+    "unit": "kg"
+  }
+]

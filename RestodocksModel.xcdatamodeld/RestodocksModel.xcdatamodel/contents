@@ -1,2 +1,32 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="24411" systemVersion="25C56" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithSwiftData="YES" userDefinedModelVersionIdentifier=""/>
+<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="24411" systemVersion="25C56" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithSwiftData="YES" userDefinedModelVersionIdentifier="">
+    <entity name="EmployeeEntity" representedClassName="EmployeeEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="birthDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="department" optional="YES" attributeType="String"/>
+        <attribute name="email" optional="YES" attributeType="String"/>
+        <attribute name="fullName" optional="YES" attributeType="String"/>
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="isActive" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
+        <attribute name="password" optional="YES" attributeType="String"/>
+        <attribute name="pinCode" optional="YES" attributeType="String"/>
+        <attribute name="roles" optional="YES" attributeType="Transformable" valueTransformerName="NSSecureUnarchiveFromDataTransformerName"/>
+        <relationship name="establishment" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="EstablishmentEntity" inverseName="employees" inverseEntity="EstablishmentEntity"/>
+        <relationship name="shifts" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="ShiftEntity" inverseName="employee" inverseEntity="ShiftEntity"/>
+    </entity>
+    <entity name="EstablishmentEntity" representedClassName="EstablishmentEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="email" optional="YES" attributeType="String"/>
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="name" optional="YES" attributeType="String"/>
+        <attribute name="pinCode" optional="YES" attributeType="String"/>
+        <relationship name="employees" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="EmployeeEntity" inverseName="establishment" inverseEntity="EmployeeEntity"/>
+    </entity>
+    <entity name="ShiftEntity" representedClassName="ShiftEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="date" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="department" optional="YES" attributeType="String"/>
+        <attribute name="endHour" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="fullDay" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="startHour" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <relationship name="employee" optional="YES" maxCount="1" deletionRule="Cascade" destinationEntity="EmployeeEntity" inverseName="shifts" inverseEntity="EmployeeEntity"/>
+    </entity>
+</model>

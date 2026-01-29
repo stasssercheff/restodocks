@@ -1,60 +1,49 @@
 import SwiftUI
 
 struct RegistrationChoiceView: View {
-
-    @ObservedObject var lang = LocalizationManager.shared
-    @State private var showSettings = false
+    @EnvironmentObject var lang: LocalizationManager
 
     var body: some View {
         VStack(spacing: 24) {
 
-            Image("AppLogo")
-                .resizable()
-                .scaledToFit()
-                .frame(height: 80)
-                .padding(.top, 40)
-
-            Text(lang.t("app_name"))
-                .font(.largeTitle)
-                .bold()
-
-            NavigationLink {
-                LoginView()
-            } label: {
-                PrimaryButton(title: lang.t("login"))
-            }
-            .padding(.horizontal)
+            Spacer()
 
             NavigationLink {
                 CreateEstablishmentView()
             } label: {
-                PrimaryButton(title: lang.t("register_company"))
+                Text(lang.t("register_company"))
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(12)
             }
-            .padding(.horizontal)
 
             NavigationLink {
                 EmployeeRegistrationView()
             } label: {
-                SecondaryButton(title: lang.t("register_employee"))
+                Text(lang.t("register_employee"))
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(.gray)
+                    .foregroundColor(.white)
+                    .cornerRadius(12)
             }
-            .padding(.horizontal)
+
+            NavigationLink {
+                EmployeeLoginView()
+            } label: {
+                Text(lang.t("employee_login"))
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(.green)
+                    .foregroundColor(.white)
+                    .cornerRadius(12)
+            }
 
             Spacer()
         }
-        .padding(.horizontal)
+        .padding()
         .navigationTitle(lang.t("welcome"))
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    showSettings = true
-                } label: {
-                    Image(systemName: "gearshape")
-                }
-            }
-        }
-        .sheet(isPresented: $showSettings) {
-            SettingsView()
-        }
     }
 }

@@ -2,12 +2,21 @@
 //  CompanySettingsView.swift
 //  Restodocks
 //
+//  Created by Stanislav Rebrikov on 1/21/26.
+//
+
+
+//
+//  CompanySettingsView.swift
+//  Restodocks
+//
 
 import SwiftUI
 
 struct CompanySettingsView: View {
 
     @EnvironmentObject var accounts: AccountManager
+    @EnvironmentObject var lang: LocalizationManager
 
     var body: some View {
 
@@ -15,16 +24,16 @@ struct CompanySettingsView: View {
 
             if let company = accounts.establishment {
 
-                Section(header: Text("Компания")) {
+                Section(header: Text(lang.t("company_section"))) {
                     HStack {
-                        Text("Название")
+                        Text(lang.t("name_label"))
                         Spacer()
                         Text(company.name ?? "—")
                             .foregroundColor(.secondary)
                     }
                 }
 
-                Section(header: Text("PIN-код компании")) {
+                Section(header: Text(lang.t("company_pin"))) {
                     HStack {
                         Text("PIN")
                         Spacer()
@@ -33,16 +42,16 @@ struct CompanySettingsView: View {
                             .foregroundColor(.secondary)
                     }
 
-                    Text("Используется при регистрации сотрудников")
+                    Text(lang.t("used_for_registration"))
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
 
             } else {
-                Text("Компания не найдена")
+                Text(lang.t("company_not_found"))
                     .foregroundColor(.red)
             }
         }
-        .navigationTitle("Компания")
+        .navigationTitle(lang.t("company_title"))
     }
 }

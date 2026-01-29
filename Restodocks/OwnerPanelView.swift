@@ -1,52 +1,42 @@
+//
+//  OwnerPanelView.swift
+//  Restodocks
+//
+
 import SwiftUI
+import CoreData
 
 struct OwnerPanelView: View {
 
-    @EnvironmentObject var accounts: AccountManager
-    @ObservedObject var lang = LocalizationManager.shared
+    @Environment(\.managedObjectContext) private var context
+    @EnvironmentObject var lang: LocalizationManager
+
+    @FetchRequest(
+        sortDescriptors: [
+            NSSortDescriptor(keyPath: \EmployeeEntity.fullName, ascending: true)
+        ],
+        animation: .default
+    )
+    private var employees: FetchedResults<EmployeeEntity>
 
     var body: some View {
+        List {
 
-        VStack(spacing: 16) {
+            Section(header: Text(lang.t("staff"))) {
 
-            Text(lang.t("management"))
-                .font(.largeTitle)
-                .bold()
+                ForEach(employees) { employee in
+                    VStack(alignment: .leading, spacing: 4) {
 
-            if let employees = accounts.establishment?.employees {
+                        Text(employee.fullName ?? "—")
+                            .font(.headline)
 
-                ForEach(employees) { emp in
-                    employeeRow(emp)
+                        Text(employee.rolesArray.joined(separator: ", "))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
-
-            } else {
-                Text(lang.t("no_employees"))
-                    .foregroundColor(.secondary)
             }
-
-            Spacer()
         }
-        .padding()
-    }
-
-    private func employeeRow(_ emp: EmployeeAccount) -> some View {
-        HStack {
-            VStack(alignment: .leading) {
-                Text(emp.fullName)
-                    .font(.headline)
-
-                Text(lang.t(emp.role.rawValue))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-
-            Spacer()
-
-            Text(lang.t(emp.department.rawValue))
-                .font(.caption)
-        }
-        .padding()
-        .background(Color(.secondarySystemBackground))
-        .cornerRadius(12)
+        .navigationTitle(lang.t("owner_panel"))
     }
 }

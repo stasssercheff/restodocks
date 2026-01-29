@@ -1,111 +1,216 @@
+//
+//  AccountManager.swift
+//  Restodocks
+//
+
 import Foundation
+import CoreData
 import Combine
 
 final class AccountManager: ObservableObject {
 
-    @Published var establishment: EstablishmentAccount?
-    @Published var owner: EmployeeAccount?
-    @Published var currentEmployee: EmployeeAccount?
-    @Published var isLoggedIn: Bool = false
+    private let context =
+        PersistenceController.shared.container.viewContext
 
-    // MARK: - Company
-
-    func createEstablishment(name: String, email: String) {
-        let pin = Self.generateCompanyPin()
-
-        establishment = EstablishmentAccount(
-            name: name,
-            email: email,
-            pinCode: pin
-        )
-
-        print("✅ Company created. PIN:", pin)
+    // связь с AppState (НЕ дублируем логику)
+    weak var appState: AppState? {
+        didSet {
+            // ✅ Sync AppState when connection is established
+            if appState != nil {
+                syncAppState()
+            }
+        }
     }
 
-    // MARK: - Owner
+    @Published var establishment: EstablishmentEntity?
+    @Published var currentEmployee: EmployeeEntity?
 
+    init() {
+        loadEstablishment()
+        loadActiveEmployee()
+    }
+    
+    // MARK: - SYNC
+    private func syncAppState() {
+        if establishment != nil {
+            appState?.isCompanyCreated = true
+        }
+        if currentEmployee != nil {
+            appState?.isLoggedIn = true
+        }
+    }
+
+    // MARK: - COMPANY
+    func createEstablishment(name: String) -> String {
+
+        let entity = EstablishmentEntity(context: context)
+        entity.id = UUID()
+        entity.name = name
+
+        // Генерируем PIN код через AppState
+        let pinCode = appState?.generatePinCode() ?? "0000"
+        entity.pinCode = pinCode
+
+        saveContext()
+
+        establishment = entity
+        appState?.isCompanyCreated = true
+
+        return pinCode
+    }
+
+    // MARK: - OWNER
     func createOwner(
         fullName: String,
         email: String,
-        password: String,
-        pin: String
-    ) -> Bool {
+        password: String
+    ) {
+        guard let company = establishment else { return }
 
-        guard var est = establishment else { return false }
-        guard est.pinCode == pin else { return false }
-        guard owner == nil else { return false }
+        let owner = EmployeeEntity(context: context)
+        owner.id = UUID()
+        owner.fullName = fullName
+        owner.email = email
+        owner.password = password
+        owner.rolesArray = ["owner"]
+        owner.isActive = true
+        owner.pinCode = company.pinCode
+        owner.department = "management"
+        owner.establishment = company  // ✅ Set relationship
 
-        let ownerAccount = EmployeeAccount(
-            fullName: fullName,
-            email: email,
-            role: .owner,
-            department: .management,
-            birthDate: nil,
-            pinCode: pin
-        )
-
-        owner = ownerAccount
-        currentEmployee = ownerAccount
-        isLoggedIn = true
-
-        // ✅ сохраняем владельца в компании
-        est.employees.append(ownerAccount)
-        establishment = est
-
-        return true
-    }
-
-    // MARK: - Employee Registration
-
-    func registerEmployee(
-        fullName: String,
-        email: String,
-        role: EmployeeRole,
-        department: Department,
-        birthDate: Date?,
-        pin: String
-    ) -> Bool {
-
-        guard var est = establishment else { return false }
-        guard est.pinCode == pin else { return false }
-
-        let employee = EmployeeAccount(
-            fullName: fullName,
-            email: email,
-            role: role,
-            department: department,
-            birthDate: birthDate,
-            pinCode: pin
-        )
-
-        est.employees.append(employee)
-        establishment = est
-
-        currentEmployee = employee
-        isLoggedIn = true
-
-        return true
-    }
-
-    // MARK: - Login / Logout
-
-    func login(pin: String) -> Bool {
-        guard let est = establishment else { return false }
-        guard est.pinCode == pin else { return false }
+        saveContext()
 
         currentEmployee = owner
-        isLoggedIn = true
-        return true
+        appState?.isLoggedIn = true
+    }
+
+    // MARK: - EMPLOYEE
+    func createEmployee(
+        fullName: String,
+        email: String,
+        password: String,
+        department: String,
+        role: String
+    ) {
+        guard let company = establishment else { return }
+
+        let employee = EmployeeEntity(context: context)
+        employee.id = UUID()
+        employee.fullName = fullName
+        employee.email = email
+        employee.password = password
+        employee.department = department
+        employee.rolesArray = [role]
+        employee.isActive = true
+        employee.pinCode = appState?.generatePinCode() ?? "0000" // Генерируем персональный PIN
+        employee.establishment = company
+
+        print("👥 createEmployeeForCompany: saved employee \(fullName) with roles \(employee.rolesArray)")
+
+        saveContext()
+
+        currentEmployee = employee
+        appState?.isLoggedIn = true
+    }
+
+    // MARK: - EMPLOYEE REGISTRATION FOR EXISTING COMPANY
+    func createEmployeeForCompany(
+        _ company: EstablishmentEntity,
+        fullName: String,
+        email: String,
+        password: String,
+        department: String,
+        role: String
+    ) {
+        let employee = EmployeeEntity(context: context)
+        employee.id = UUID()
+        employee.fullName = fullName
+        employee.email = email
+        employee.password = password
+        employee.department = department
+        employee.rolesArray = [role]
+        employee.isActive = true
+        employee.pinCode = appState?.generatePinCode() ?? "0000" // Персональный PIN сотрудника
+        employee.establishment = company
+
+        saveContext()
+
+        currentEmployee = employee
+        establishment = company
+        appState?.currentEmployee = employee
+        appState?.isCompanyCreated = true
+        appState?.isLoggedIn = true
+    }
+
+    // MARK: - COMPANY SEARCH
+    func findCompanyByName(_ name: String) -> EstablishmentEntity? {
+        let req: NSFetchRequest<EstablishmentEntity> = EstablishmentEntity.fetchRequest()
+        req.predicate = NSPredicate(format: "name ==[c] %@", name)
+        req.fetchLimit = 1
+        return try? context.fetch(req).first
+    }
+
+    func findCompanyByPinCode(_ pinCode: String) -> EstablishmentEntity? {
+        let req: NSFetchRequest<EstablishmentEntity> = EstablishmentEntity.fetchRequest()
+        req.predicate = NSPredicate(format: "pinCode ==[c] %@", pinCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased())
+        req.fetchLimit = 1
+        return try? context.fetch(req).first
+    }
+
+    // MARK: - EMPLOYEE LOGIN
+    func findEmployeeByPinCode(_ pinCode: String) -> EmployeeEntity? {
+        let req: NSFetchRequest<EmployeeEntity> = EmployeeEntity.fetchRequest()
+        req.predicate = NSPredicate(format: "pinCode == %@", pinCode)
+        return try? context.fetch(req).first
+    }
+
+    func findEmployeeByEmailAndPassword(_ email: String, _ password: String, inCompany company: EstablishmentEntity) -> EmployeeEntity? {
+        let req: NSFetchRequest<EmployeeEntity> = EmployeeEntity.fetchRequest()
+        req.predicate = NSPredicate(format: "email ==[c] %@ AND password == %@ AND establishment == %@", email, password, company)
+        req.fetchLimit = 1
+        return try? context.fetch(req).first
+    }
+
+    // MARK: - LOAD
+    private func loadEstablishment() {
+        let req: NSFetchRequest<EstablishmentEntity> =
+            EstablishmentEntity.fetchRequest()
+        req.fetchLimit = 1
+        establishment = try? context.fetch(req).first
+
+        if let company = establishment {
+            appState?.isCompanyCreated = true
+            // Загружаем PIN код из Core Data в AppState
+            if let pinCode = company.pinCode {
+                appState?.companyPinCode = pinCode
+            }
+        }
+    }
+
+    private func loadActiveEmployee() {
+        let req: NSFetchRequest<EmployeeEntity> =
+            EmployeeEntity.fetchRequest()
+        req.predicate = NSPredicate(format: "isActive == YES")
+        req.fetchLimit = 1
+
+        if let emp = try? context.fetch(req).first {
+            currentEmployee = emp
+            appState?.isLoggedIn = true
+        }
     }
 
     func logout() {
+        currentEmployee?.isActive = false
+        saveContext()
         currentEmployee = nil
-        isLoggedIn = false
+        appState?.isLoggedIn = false
     }
 
-    // MARK: - PIN
+    func saveContext() {
+        try? context.save()
+    }
 
-    private static func generateCompanyPin() -> String {
+    private static func generatePin() -> String {
         let chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
         return String((0..<6).compactMap { _ in chars.randomElement() })
     }
