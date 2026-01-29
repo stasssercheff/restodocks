@@ -81,7 +81,7 @@ class ChecklistServiceSupabase {
         'sort_order': i,
       });
     }
-    return getChecklistById(c.id) ?? c;
+    return (await getChecklistById(c.id)) ?? c;
   }
 
   Future<void> saveChecklist(Checklist checklist) async {

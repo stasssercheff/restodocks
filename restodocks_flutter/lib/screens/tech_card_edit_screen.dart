@@ -6,6 +6,24 @@ import '../models/models.dart';
 import '../services/services.dart';
 
 /// Создание или редактирование ТТК. Ингредиенты — из номенклатуры или из других ТТК (ПФ).
+
+TechCard _applyEdits(
+  TechCard t, {
+  String? dishName,
+  String? category,
+  double? portionWeight,
+  double? yieldGrams,
+  List<TTIngredient>? ingredients,
+}) {
+  return t.copyWith(
+    dishName: dishName,
+    category: category,
+    portionWeight: portionWeight,
+    yield: yieldGrams,
+    ingredients: ingredients,
+  );
+}
+
 class TechCardEditScreen extends StatefulWidget {
   const TechCardEditScreen({super.key, required this.techCardId});
 
@@ -96,24 +114,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           establishmentId: est.id,
           createdBy: emp.id,
         );
-        var updated = created.copyWith(
-          portionWeight: portion,
-          yield: yieldVal,
-          ingredients: _ingredients,
-        );
+        var updated = _applyEdits(created, portionWeight: portion, yieldGrams: yieldVal, ingredients: _ingredients);
         await svc.saveTechCard(updated);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ТТК создана')));
           context.pushReplacement('/tech-cards/${created.id}');
         }
       } else {
-        final updated = tc.copyWith(
-          dishName: name,
-          category: category,
-          portionWeight: portion,
-          yield: yieldVal,
-          ingredients: _ingredients,
-        );
+        final updated = _applyEdits(tc, dishName: name, category: category, portionWeight: portion, yieldGrams: yieldVal, ingredients: _ingredients);
         await svc.saveTechCard(updated);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.read<LocalizationService>().t('save') + ' ✓')));
