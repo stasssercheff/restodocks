@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
+import '../models/culinary_units.dart';
 import '../models/models.dart';
 import '../services/nutrition_api_service.dart';
 import '../services/services.dart';
@@ -29,6 +30,10 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
   bool _filterManual = false;
   bool _filterGlutenFree = false;
   bool _filterLactoseFree = false;
+  // Фильтры номенклатуры
+  _CatalogSort _nomSort = _CatalogSort.nameAz;
+  bool _nomFilterGlutenFree = false;
+  bool _nomFilterLactoseFree = false;
 
   @override
   void initState() {
@@ -70,9 +75,11 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
       lactoseFree: _filterLactoseFree ? true : null,
     );
     catalogList = _sortProducts(catalogList, _catalogSort);
-    final nomProducts = estId != null
+    var nomProducts = estId != null
         ? store.getNomenclatureProducts(estId).where((p) {
             if (_category != null && p.category != _category) return false;
+            if (_nomFilterGlutenFree && !p.isGlutenFree) return false;
+            if (_nomFilterLactoseFree && !p.isLactoseFree) return false;
             if (_query.isNotEmpty) {
               final q = _query.toLowerCase();
               return p.name.toLowerCase().contains(q) ||
@@ -81,6 +88,7 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
             return true;
           }).toList()
         : <Product>[];
+    nomProducts = _sortProducts(nomProducts, _nomSort);
 
     return Scaffold(
       appBar: AppBar(
@@ -110,6 +118,11 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
           onTap: (_) => setState(() {}),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.attach_money),
+            onPressed: account.establishment != null ? () => _showCurrencyDialog(context, loc, account, store) : null,
+            tooltip: loc.t('default_currency'),
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () async {
@@ -184,6 +197,12 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
                   estId: estId ?? '',
                   canRemove: canEdit,
                   loc: loc,
+                  sort: _nomSort,
+                  filterGlutenFree: _nomFilterGlutenFree,
+                  filterLactoseFree: _nomFilterLactoseFree,
+                  onSortChanged: (s) => setState(() => _nomSort = s),
+                  onFilterGlutenChanged: (v) => setState(() => _nomFilterGlutenFree = v),
+                  onFilterLactoseChanged: (v) => setState(() => _nomFilterLactoseFree = v),
                   onRefresh: () => _ensureLoaded().then((_) => setState(() {})),
                   onSwitchToCatalog: () {
                     _tabController.animateTo(1);
@@ -364,6 +383,7 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
 
     var added = 0;
     var failed = 0;
+    final defCur = account.establishment?.defaultCurrency ?? 'VND';
     for (final item in items) {
       try {
         final product = Product(
@@ -377,7 +397,7 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
           carbs: null,
           unit: 'кг',
           basePrice: item.price,
-          currency: item.price != null ? 'VND' : null,
+          currency: item.price != null ? defCur : null,
         );
         await store.addProduct(product);
         await store.addToNomenclature(estId, product.id);
@@ -396,6 +416,31 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
         : '${loc.t('upload_added').replaceAll('%s', '$added')}. ${loc.t('upload_failed').replaceAll('%s', '$failed')}';
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
+
+  void _showCurrencyDialog(
+    BuildContext context,
+    LocalizationService loc,
+    AccountManagerSupabase account,
+    ProductStoreSupabase store,
+  ) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => _CurrencySettingsDialog(
+        establishment: account.establishment!,
+        store: store,
+        loc: loc,
+        onSaved: (Establishment updated) async {
+          await account.updateEstablishment(updated);
+          if (context.mounted) setState(() {});
+        },
+        onApplyToAll: (currency) async {
+          await store.bulkUpdateCurrency(currency);
+          await store.loadProducts();
+          if (context.mounted) setState(() {});
+        },
+      ),
+    );
+  }
 }
 
 class _NomenclatureTab extends StatelessWidget {
@@ -405,6 +450,12 @@ class _NomenclatureTab extends StatelessWidget {
     required this.estId,
     required this.canRemove,
     required this.loc,
+    required this.sort,
+    required this.filterGlutenFree,
+    required this.filterLactoseFree,
+    required this.onSortChanged,
+    required this.onFilterGlutenChanged,
+    required this.onFilterLactoseChanged,
     required this.onRefresh,
     required this.onSwitchToCatalog,
   });
@@ -414,6 +465,12 @@ class _NomenclatureTab extends StatelessWidget {
   final String estId;
   final bool canRemove;
   final LocalizationService loc;
+  final _CatalogSort sort;
+  final bool filterGlutenFree;
+  final bool filterLactoseFree;
+  final void Function(_CatalogSort) onSortChanged;
+  final void Function(bool) onFilterGlutenChanged;
+  final void Function(bool) onFilterLactoseChanged;
   final VoidCallback onRefresh;
   final VoidCallback onSwitchToCatalog;
 
@@ -427,75 +484,147 @@ class _NomenclatureTab extends StatelessWidget {
     return map[c] ?? c;
   }
 
+  bool _needsKbju(Product p) =>
+      (p.calories == null || p.calories == 0) && p.protein == null && p.fat == null && p.carbs == null;
+
+  Future<void> _loadKbjuForAll(BuildContext context, List<Product> list) async {
+    if (!context.mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => _LoadKbjuProgressDialog(
+        list: list,
+        store: store,
+        loc: loc,
+        onComplete: () {
+          Navigator.of(ctx).pop();
+          onRefresh();
+          if (ctx.mounted) {
+            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(loc.t('kbju_load_done'))));
+          }
+        },
+        onError: (e) {
+          if (ctx.mounted) {
+            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+          }
+        },
+      ),
+    );
+    if (context.mounted) onRefresh();
+  }
+
   @override
   Widget build(BuildContext context) {
     if (products.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+      return _NomenclatureEmpty(
+        loc: loc,
+        onSwitchToCatalog: onSwitchToCatalog,
+      );
+    }
+
+    final needsKbju = products.where((p) => p.category == 'manual' && _needsKbju(p)).toList();
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.start,
             children: [
-              Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey[400]),
-              const SizedBox(height: 16),
-              Text(
-                '${loc.t('nomenclature')}: пусто',
-                style: Theme.of(context).textTheme.titleMedium,
-                textAlign: TextAlign.center,
+              PopupMenuButton<_CatalogSort>(
+                icon: const Icon(Icons.sort),
+                tooltip: loc.t('sort_name_az').split(' ').take(2).join(' '),
+                onSelected: onSortChanged,
+                itemBuilder: (_) => [
+                  PopupMenuItem(value: _CatalogSort.nameAz, child: Text(loc.t('sort_name_az'))),
+                  PopupMenuItem(value: _CatalogSort.nameZa, child: Text(loc.t('sort_name_za'))),
+                  PopupMenuItem(value: _CatalogSort.priceAsc, child: Text(loc.t('sort_price_asc'))),
+                  PopupMenuItem(value: _CatalogSort.priceDesc, child: Text(loc.t('sort_price_desc'))),
+                ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                loc.t('add_from_catalog'),
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
-                textAlign: TextAlign.center,
+              FilterChip(
+                label: Text(loc.t('filter_gluten_free'), style: const TextStyle(fontSize: 11)),
+                selected: filterGlutenFree,
+                onSelected: onFilterGlutenChanged,
               ),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: onSwitchToCatalog,
-                icon: const Icon(Icons.add),
-                label: Text(loc.t('add_from_catalog')),
+              FilterChip(
+                label: Text(loc.t('filter_lactose_free'), style: const TextStyle(fontSize: 11)),
+                selected: filterLactoseFree,
+                onSelected: onFilterLactoseChanged,
               ),
             ],
           ),
         ),
-      );
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-      itemCount: products.length,
-      itemBuilder: (_, i) {
-        final p = products[i];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 6),
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-              child: Text(
-                (i + 1).toString(),
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Theme.of(context).colorScheme.onPrimaryContainer,
-                ),
-              ),
+        if (needsKbju.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: FilledButton.tonalIcon(
+              onPressed: () => _loadKbjuForAll(context, needsKbju),
+              icon: const Icon(Icons.cloud_download, size: 20),
+              label: Text(loc.t('load_kbju_for_all').replaceAll('%s', '${needsKbju.length}')),
             ),
-            title: Text(p.getLocalizedName(loc.currentLanguageCode)),
-            subtitle: Text(
-              (p.category == 'misc' || p.category == 'manual')
-                  ? '${p.calories?.round() ?? 0} ккал · ${p.unit ?? 'кг'}'
-                  : '${_categoryLabel(p.category)} · ${p.calories?.round() ?? 0} ккал · ${p.unit ?? 'кг'}',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            trailing: canRemove
-                ? IconButton(
-                    icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
-                    tooltip: loc.t('remove_from_nomenclature'),
-                    onPressed: () => _confirmRemove(context, p),
-                  )
-                : null,
           ),
-        );
-      },
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+            itemCount: products.length,
+            itemBuilder: (_, i) {
+              final p = products[i];
+              return Card(
+                margin: const EdgeInsets.only(bottom: 6),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                    child: Text(
+                      (i + 1).toString(),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onPrimaryContainer,
+                      ),
+                    ),
+                  ),
+                  title: Text(p.getLocalizedName(loc.currentLanguageCode)),
+                  subtitle: Text(
+                    (p.category == 'misc' || p.category == 'manual')
+                        ? '${p.calories?.round() ?? 0} ккал · ${p.unit ?? 'кг'}'
+                        : '${_categoryLabel(p.category)} · ${p.calories?.round() ?? 0} ккал · ${p.unit ?? 'кг'}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined),
+                        tooltip: loc.t('edit_product'),
+                        onPressed: () => _showEditProduct(context, p),
+                      ),
+                      if (canRemove)
+                        IconButton(
+                          icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                          tooltip: loc.t('remove_from_nomenclature'),
+                          onPressed: () => _confirmRemove(context, p),
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showEditProduct(BuildContext context, Product p) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => _ProductEditDialog(
+        product: p,
+        store: store,
+        loc: loc,
+        onSaved: onRefresh,
+      ),
     );
   }
 
@@ -526,6 +655,220 @@ class _NomenclatureTab extends StatelessWidget {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
       }
     }
+  }
+}
+
+class _NomenclatureEmpty extends StatelessWidget {
+  const _NomenclatureEmpty({
+    required this.loc,
+    required this.onSwitchToCatalog,
+  });
+
+  final LocalizationService loc;
+  final VoidCallback onSwitchToCatalog;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey[400]),
+              const SizedBox(height: 16),
+              Text(
+                '${loc.t('nomenclature')}: пусто',
+                style: Theme.of(context).textTheme.titleMedium,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                loc.t('add_from_catalog'),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: onSwitchToCatalog,
+                icon: const Icon(Icons.add),
+                label: Text(loc.t('add_from_catalog')),
+              ),
+            ],
+          ),
+        ),
+      );
+  }
+}
+
+class _AddAllProgressDialog extends StatefulWidget {
+  const _AddAllProgressDialog({
+    required this.list,
+    required this.store,
+    required this.estId,
+    required this.loc,
+    required this.onComplete,
+    required this.onError,
+  });
+
+  final List<Product> list;
+  final ProductStoreSupabase store;
+  final String estId;
+  final LocalizationService loc;
+  final VoidCallback onComplete;
+  final void Function(Object) onError;
+
+  @override
+  State<_AddAllProgressDialog> createState() => _AddAllProgressDialogState();
+}
+
+class _AddAllProgressDialogState extends State<_AddAllProgressDialog> {
+  int _done = 0;
+  bool _finished = false;
+  Object? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _run());
+  }
+
+  Future<void> _run() async {
+    for (final p in widget.list) {
+      if (_error != null) break;
+      try {
+        await widget.store.addToNomenclature(widget.estId, p.id);
+        if (!mounted) return;
+        setState(() => _done++);
+      } catch (e) {
+        if (!mounted) return;
+        setState(() => _error = e);
+        widget.onError(e);
+        return;
+      }
+    }
+    if (!mounted) return;
+    setState(() => _finished = true);
+    widget.onComplete();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final total = widget.list.length;
+    final progress = total > 0 ? (_done / total).clamp(0.0, 1.0) : 1.0;
+    return AlertDialog(
+      title: Text(widget.loc.t('add_all_to_nomenclature').replaceAll('%s', '$total')),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          LinearProgressIndicator(
+            value: _finished ? 1.0 : progress,
+            minHeight: 8,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '$_done / $total',
+            style: Theme.of(context).textTheme.bodyMedium,
+            textAlign: TextAlign.center,
+          ),
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                'Ошибка: $_error',
+                style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 12),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LoadKbjuProgressDialog extends StatefulWidget {
+  const _LoadKbjuProgressDialog({
+    required this.list,
+    required this.store,
+    required this.loc,
+    required this.onComplete,
+    required this.onError,
+  });
+
+  final List<Product> list;
+  final ProductStoreSupabase store;
+  final LocalizationService loc;
+  final VoidCallback onComplete;
+  final void Function(Object) onError;
+
+  @override
+  State<_LoadKbjuProgressDialog> createState() => _LoadKbjuProgressDialogState();
+}
+
+class _LoadKbjuProgressDialogState extends State<_LoadKbjuProgressDialog> {
+  int _done = 0;
+  int _updated = 0;
+  bool _finished = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _run());
+  }
+
+  Future<void> _run() async {
+    for (final p in widget.list) {
+      try {
+        final result = await NutritionApiService.fetchNutrition(p.getLocalizedName(widget.loc.currentLanguageCode));
+        if (!mounted) return;
+        if (result != null && result.hasData) {
+          final updated = p.copyWith(
+            calories: result.calories ?? p.calories,
+            protein: result.protein ?? p.protein,
+            fat: result.fat ?? p.fat,
+            carbs: result.carbs ?? p.carbs,
+          );
+          await widget.store.updateProduct(updated);
+          if (!mounted) return;
+          setState(() => _updated++);
+        }
+      } catch (_) {}
+      if (!mounted) return;
+      setState(() => _done++);
+    }
+    if (!mounted) return;
+    setState(() => _finished = true);
+    widget.onComplete();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final total = widget.list.length;
+    final progress = total > 0 ? (_done / total).clamp(0.0, 1.0) : 1.0;
+    return AlertDialog(
+      title: Text(widget.loc.t('load_kbju_for_all').replaceAll('%s', '$total')),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          LinearProgressIndicator(
+            value: _finished ? 1.0 : progress,
+            minHeight: 8,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          const SizedBox(height: 12),
+          Text('$_done / $total', style: Theme.of(context).textTheme.bodyMedium, textAlign: TextAlign.center),
+          Text(
+            '${widget.loc.t('kbju_updated')}: $_updated',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -574,27 +917,68 @@ class _CatalogTab extends StatelessWidget {
     return map[c] ?? c;
   }
 
-  Future<void> _addAllToNomenclature(BuildContext context, List<Product> list) async {
-    try {
-      for (final p in list) {
-        await store.addToNomenclature(estId, p.id);
-      }
-      onRefresh();
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('add_all_done').replaceAll('%s', '${list.length}'))),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
-      }
-    }
+  Future<void> _loadKbjuForAll(BuildContext context, List<Product> list) async {
+    if (!context.mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => _LoadKbjuProgressDialog(
+        list: list,
+        store: store,
+        loc: loc,
+        onComplete: () {
+          Navigator.of(ctx).pop();
+          onRefresh();
+          if (ctx.mounted) {
+            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(loc.t('kbju_load_done'))));
+          }
+        },
+        onError: (e) {
+          if (ctx.mounted) {
+            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+          }
+        },
+      ),
+    );
+    if (context.mounted) onRefresh();
   }
+
+  Future<void> _addAllToNomenclature(BuildContext context, List<Product> list) async {
+    if (!context.mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => _AddAllProgressDialog(
+        list: list,
+        store: store,
+        estId: estId,
+        loc: loc,
+        onComplete: () {
+          Navigator.of(ctx).pop();
+          onRefresh();
+          if (ctx.mounted) {
+            ScaffoldMessenger.of(ctx).showSnackBar(
+              SnackBar(content: Text(loc.t('add_all_done').replaceAll('%s', '${list.length}'))),
+            );
+          }
+        },
+        onError: (e) {
+          Navigator.of(ctx).pop();
+          if (ctx.mounted) {
+            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+          }
+        },
+      ),
+    );
+  }
+
+  bool _needsKbju(Product p) =>
+      (p.calories == null || p.calories == 0) && p.protein == null && p.fat == null && p.carbs == null;
 
   @override
   Widget build(BuildContext context) {
     final notInNom = products.where((p) => !store.isInNomenclature(p.id)).toList();
+    final needsKbju = store.allProducts.where((p) => p.category == 'manual' && _needsKbju(p)).toList();
     return Column(
       children: [
         Padding(
@@ -645,6 +1029,15 @@ class _CatalogTab extends StatelessWidget {
               onPressed: () => _addAllToNomenclature(context, notInNom),
               icon: const Icon(Icons.add_circle, size: 20),
               label: Text(loc.t('add_all_to_nomenclature').replaceAll('%s', '${notInNom.length}')),
+            ),
+          ),
+        if (needsKbju.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: FilledButton.tonalIcon(
+              onPressed: () => _loadKbjuForAll(context, needsKbju),
+              icon: const Icon(Icons.cloud_download, size: 20),
+              label: Text(loc.t('load_kbju_for_all').replaceAll('%s', '${needsKbju.length}')),
             ),
           ),
         Expanded(
@@ -713,6 +1106,11 @@ class _CatalogTab extends StatelessWidget {
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
+                                IconButton(
+                                  icon: const Icon(Icons.edit_outlined),
+                                  tooltip: loc.t('edit_product'),
+                                  onPressed: () => _showEditProduct(context, p),
+                                ),
                                 if ((p.calories == null || p.calories == 0) &&
                                     (p.protein == null && p.fat == null && p.carbs == null))
                                   IconButton(
@@ -737,6 +1135,18 @@ class _CatalogTab extends StatelessWidget {
                     ),
         ),
       ],
+    );
+  }
+
+  void _showEditProduct(BuildContext context, Product p) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => _ProductEditDialog(
+        product: p,
+        store: store,
+        loc: loc,
+        onSaved: onRefresh,
+      ),
     );
   }
 
@@ -796,6 +1206,354 @@ class _Chip extends StatelessWidget {
         selected: selected,
         onSelected: (_) => onTap(),
       ),
+    );
+  }
+}
+
+/// Карточка продукта — редактирование единицы измерения, КБЖУ, стоимости
+class _ProductEditDialog extends StatefulWidget {
+  const _ProductEditDialog({
+    required this.product,
+    required this.store,
+    required this.loc,
+    required this.onSaved,
+  });
+
+  final Product product;
+  final ProductStoreSupabase store;
+  final LocalizationService loc;
+  final VoidCallback onSaved;
+
+  static const _currencies = ['RUB', 'USD', 'EUR', 'VND'];
+
+  @override
+  State<_ProductEditDialog> createState() => _ProductEditDialogState();
+}
+
+class _ProductEditDialogState extends State<_ProductEditDialog> {
+  late final TextEditingController _nameController;
+  late final TextEditingController _priceController;
+  late final TextEditingController _caloriesController;
+  late final TextEditingController _proteinController;
+  late final TextEditingController _fatController;
+  late final TextEditingController _carbsController;
+  late String _unit;
+  late String _currency;
+  late bool _containsGluten;
+  late bool _containsLactose;
+
+  @override
+  void initState() {
+    super.initState();
+    final p = widget.product;
+    _nameController = TextEditingController(text: p.name);
+    _priceController = TextEditingController(text: p.basePrice?.toString() ?? '');
+    _caloriesController = TextEditingController(text: p.calories?.toString() ?? '');
+    _proteinController = TextEditingController(text: p.protein?.toString() ?? '');
+    _fatController = TextEditingController(text: p.fat?.toString() ?? '');
+    _carbsController = TextEditingController(text: p.carbs?.toString() ?? '');
+    final unitMap = {'кг': 'kg', 'г': 'g', 'шт': 'pcs', 'л': 'l', 'мл': 'ml'};
+    _unit = unitMap[p.unit] ?? p.unit ?? 'kg';
+    if (!CulinaryUnits.all.any((e) => e.id == _unit)) _unit = 'kg';
+    _currency = p.currency ?? 'VND';
+    _containsGluten = p.containsGluten ?? false;
+    _containsLactose = p.containsLactose ?? false;
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _priceController.dispose();
+    _caloriesController.dispose();
+    _proteinController.dispose();
+    _fatController.dispose();
+    _carbsController.dispose();
+    super.dispose();
+  }
+
+  double? _parseNum(String v) {
+    final s = v.trim().replaceAll(',', '.');
+    if (s.isEmpty) return null;
+    return double.tryParse(s);
+  }
+
+  Future<void> _save() async {
+    final name = _nameController.text.trim();
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(widget.loc.t('product_name_required'))));
+      return;
+    }
+    final updated = widget.product.copyWith(
+      name: name,
+      names: {'ru': name, 'en': name},
+      basePrice: _parseNum(_priceController.text),
+      currency: _currency,
+      unit: _unit,
+      calories: _parseNum(_caloriesController.text),
+      protein: _parseNum(_proteinController.text),
+      fat: _parseNum(_fatController.text),
+      carbs: _parseNum(_carbsController.text),
+      containsGluten: _containsGluten,
+      containsLactose: _containsLactose,
+    );
+    try {
+      await widget.store.updateProduct(updated);
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      widget.onSaved();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(widget.loc.t('product_saved'))));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final lang = widget.loc.currentLanguageCode;
+    return AlertDialog(
+      title: Text(widget.loc.t('edit_product')),
+      content: SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextFormField(
+                controller: _nameController,
+                decoration: InputDecoration(
+                  labelText: widget.loc.t('product_name'),
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: _unit,
+                decoration: InputDecoration(
+                  labelText: widget.loc.t('unit'),
+                  border: const OutlineInputBorder(),
+                ),
+                items: CulinaryUnits.all.map((e) => DropdownMenuItem(
+                  value: e.id,
+                  child: Text(lang == 'ru' ? e.ru : e.en),
+                )).toList(),
+                onChanged: (v) => setState(() => _unit = v ?? _unit),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: TextFormField(
+                      controller: _priceController,
+                      decoration: InputDecoration(
+                        labelText: widget.loc.t('price'),
+                        border: const OutlineInputBorder(),
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      value: _currency,
+                      decoration: InputDecoration(
+                        labelText: widget.loc.t('currency'),
+                        border: const OutlineInputBorder(),
+                      ),
+                      items: _ProductEditDialog._currencies.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                      onChanged: (v) => setState(() => _currency = v ?? _currency),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text(widget.loc.t('kbju_per_100g'), style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _caloriesController,
+                      decoration: InputDecoration(labelText: 'ккал', border: const OutlineInputBorder(), isDense: true),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _proteinController,
+                      decoration: InputDecoration(labelText: 'Б', border: const OutlineInputBorder(), isDense: true),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _fatController,
+                      decoration: InputDecoration(labelText: 'Ж', border: const OutlineInputBorder(), isDense: true),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _carbsController,
+                      decoration: InputDecoration(labelText: 'У', border: const OutlineInputBorder(), isDense: true),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              CheckboxListTile(
+                value: !_containsGluten,
+                onChanged: (v) => setState(() => _containsGluten = !(v ?? true)),
+                title: Text(widget.loc.t('filter_gluten_free'), style: const TextStyle(fontSize: 13)),
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+              ),
+              CheckboxListTile(
+                value: !_containsLactose,
+                onChanged: (v) => setState(() => _containsLactose = !(v ?? true)),
+                title: Text(widget.loc.t('filter_lactose_free'), style: const TextStyle(fontSize: 13)),
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(widget.loc.t('cancel'))),
+        FilledButton(onPressed: _save, child: Text(widget.loc.t('save'))),
+      ],
+    );
+  }
+}
+
+/// Диалог настройки валюты заведения
+class _CurrencySettingsDialog extends StatefulWidget {
+  const _CurrencySettingsDialog({
+    required this.establishment,
+    required this.store,
+    required this.loc,
+    required this.onSaved,
+    required this.onApplyToAll,
+  });
+
+  final Establishment establishment;
+  final ProductStoreSupabase store;
+  final LocalizationService loc;
+  final void Function(Establishment) onSaved;
+  final void Function(String) onApplyToAll;
+
+  static const _presetCurrencies = ['RUB', 'USD', 'EUR', 'VND', 'GBP'];
+
+  @override
+  State<_CurrencySettingsDialog> createState() => _CurrencySettingsDialogState();
+}
+
+class _CurrencySettingsDialogState extends State<_CurrencySettingsDialog> {
+  late String _currency;
+  bool _useCustom = false;
+  final _customController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _currency = widget.establishment.defaultCurrency;
+    _useCustom = !_CurrencySettingsDialog._presetCurrencies.contains(_currency);
+    if (_useCustom) _customController.text = _currency;
+  }
+
+  @override
+  void dispose() {
+    _customController.dispose();
+    super.dispose();
+  }
+
+  String get _effectiveCurrency => _useCustom
+      ? _customController.text.trim().toUpperCase().isEmpty ? 'RUB' : _customController.text.trim().toUpperCase()
+      : _currency;
+
+  Future<void> _saveAsDefault() async {
+    final c = _effectiveCurrency;
+    final updated = widget.establishment.copyWith(
+      defaultCurrency: c,
+      updatedAt: DateTime.now(),
+    );
+    await widget.onSaved(updated);
+    if (!mounted) return;
+    Navigator.of(context).pop();
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(widget.loc.t('currency_saved'))));
+  }
+
+  Future<void> _applyToAll() async {
+    final c = _effectiveCurrency;
+    await widget.onApplyToAll(c);
+    if (!mounted) return;
+    Navigator.of(context).pop();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(widget.loc.t('currency_applied_to_all').replaceAll('%s', widget.store.allProducts.length.toString()))),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.loc.t('default_currency')),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          CheckboxListTile(
+            value: _useCustom,
+            onChanged: (v) => setState(() => _useCustom = v ?? false),
+            title: Text(widget.loc.t('custom_currency'), style: const TextStyle(fontSize: 14)),
+            contentPadding: EdgeInsets.zero,
+            controlAffinity: ListTileControlAffinity.leading,
+          ),
+          if (_useCustom)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: TextField(
+                controller: _customController,
+                decoration: InputDecoration(
+                  labelText: widget.loc.t('currency_code'),
+                  hintText: 'UAH, KZT, THB...',
+                  border: const OutlineInputBorder(),
+                ),
+                textCapitalization: TextCapitalization.characters,
+                onChanged: (_) => setState(() {}),
+              ),
+            )
+          else
+            DropdownButtonFormField<String>(
+              value: _CurrencySettingsDialog._presetCurrencies.contains(_currency) ? _currency : _CurrencySettingsDialog._presetCurrencies.first,
+              decoration: InputDecoration(labelText: widget.loc.t('currency'), border: const OutlineInputBorder()),
+              items: _CurrencySettingsDialog._presetCurrencies
+                  .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                  .toList(),
+              onChanged: (v) => setState(() => _currency = v ?? _currency),
+            ),
+          const SizedBox(height: 16),
+          Text(
+            widget.loc.t('currency_apply_hint'),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(widget.loc.t('cancel'))),
+        FilledButton.tonal(
+          onPressed: _applyToAll,
+          child: Text(widget.loc.t('apply_currency_to_all')),
+        ),
+        FilledButton(onPressed: _saveAsDefault, child: Text(widget.loc.t('save'))),
+      ],
     );
   }
 }

@@ -89,6 +89,8 @@ class Establishment extends Equatable {
         return '€';
       case 'GBP':
         return '£';
+      case 'VND':
+        return '₫';
       default:
         return defaultCurrency;
     }

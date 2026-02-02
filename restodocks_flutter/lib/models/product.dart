@@ -172,6 +172,8 @@ class Product extends Equatable {
         return '€';
       case 'GBP':
         return '£';
+      case 'VND':
+        return '₫';
       default:
         return currency;
     }

@@ -139,6 +139,14 @@ class ProductStoreSupabase {
     }
   }
 
+  /// Обновить валюту у всех продуктов
+  Future<void> bulkUpdateCurrency(String currency) async {
+    for (final p in _allProducts) {
+      final updated = p.copyWith(currency: currency);
+      await updateProduct(updated);
+    }
+  }
+
   /// Удалить продукт
   Future<void> removeProduct(String productId) async {
     try {
