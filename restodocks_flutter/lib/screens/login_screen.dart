@@ -108,20 +108,22 @@ class _LoginScreenState extends State<LoginScreen> {
           labelText: loc.t('company_pin'),
           hintText: loc.t('enter_company_pin'),
           prefixIcon: const Icon(Icons.business),
+          counterText: '',
         ),
         keyboardType: TextInputType.text,
         textCapitalization: TextCapitalization.characters,
+        autocorrect: false,
+        enableSuggestions: false,
         maxLength: 8,
+        inputFormatters: [
+          FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9]')),
+          LengthLimitingTextInputFormatter(8),
+          _UpperCaseTextFormatter(),
+        ],
         validator: (value) {
           if (value == null || value.isEmpty) return loc.t('company_pin_required');
           if (value.length != 8) return loc.t('pin_must_be_8_chars');
           return null;
-        },
-        onChanged: (value) {
-          _companyPinController.text = value.toUpperCase();
-          _companyPinController.selection = TextSelection.fromPosition(
-            TextPosition(offset: _companyPinController.text.length),
-          );
         },
       ),
       const SizedBox(height: 16),
@@ -325,5 +327,19 @@ class _LoginScreenState extends State<LoginScreen> {
       case 'fr': return '🇫🇷';
       default: return '🏳️';
     }
+  }
+}
+
+/// Форматтер: ввод только заглавными
+class _UpperCaseTextFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    return TextEditingValue(
+      text: newValue.text.toUpperCase(),
+      selection: newValue.selection,
+    );
   }
 }
