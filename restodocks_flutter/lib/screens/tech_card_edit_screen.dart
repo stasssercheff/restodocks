@@ -60,7 +60,7 @@ class _EditableShrinkageCellState extends State<_EditableShrinkageCell> {
       onTap: () => setState(() {
         _editing = true;
         _ctrl.text = widget.value.toStringAsFixed(1);
-        _ctrl.selectAll();
+        _ctrl.selection = TextSelection(baseOffset: 0, extentOffset: _ctrl.text.length);
       }),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
@@ -263,11 +263,12 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     setState(() => _ingredients.add(ing));
   }
 
-  void _addTechCardIngredient(TechCard t, double weightG) {
+  void _addTechCardIngredient(TechCard t, double weightG, String unit, double? gramsPerPiece) {
     Navigator.of(context).pop();
     final totalNet = t.totalNetWeight;
     if (totalNet <= 0) return;
     final loc = context.read<LocalizationService>();
+    final weightConv = CulinaryUnits.toGrams(weightG, unit, gramsPerPiece: gramsPerPiece);
     final ing = TTIngredient.fromTechCardData(
       techCardId: t.id,
       techCardName: t.getLocalizedDishName(loc.currentLanguageCode),
@@ -277,7 +278,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
       totalFat: t.totalFat,
       totalCarbs: t.totalCarbs,
       totalCost: t.totalCost,
-      grossWeight: weightG,
+      grossWeight: weightConv,
+      unit: unit,
+      gramsPerPiece: gramsPerPiece,
     );
     setState(() => _ingredients.add(ing));
   }
@@ -526,7 +529,7 @@ class _ProductPickerState extends State<_ProductPicker> {
                           keyboardType: TextInputType.numberWithOptions(decimal: true),
                           decoration: InputDecoration(labelText: loc.t('quantity_label')),
                           autofocus: true,
-                          onSubmitted: (_) => _submit(p, c.text, wasteController.text, gppController.text, selectedProcess, selectedUnit, ctx),
+                          onSubmitted: (_) => _submit(p, c.text, wasteController.text, gppController.text, selectedProcess, selectedUnit, ctx, shrinkageController),
                         ),
                       ),
                       const SizedBox(width: 12),

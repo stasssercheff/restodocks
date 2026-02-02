@@ -24,7 +24,7 @@ class AppRouter {
   static final GoRouter router = GoRouter(
     initialLocation: '/splash',
     redirect: (context, state) async {
-      final loc = state.uri.path;
+      final loc = state.matchedLocation;
       if (_publicPaths.any((p) => loc.startsWith(p))) return null;
       final account = context.read<AccountManagerSupabase>();
       await account.initialize();

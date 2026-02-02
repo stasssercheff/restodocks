@@ -3,6 +3,7 @@ import 'package:json_annotation/json_annotation.dart';
 
 import 'product.dart';
 import 'cooking_process.dart';
+import 'culinary_units.dart';
 
 part 'tt_ingredient.g.dart';
 
