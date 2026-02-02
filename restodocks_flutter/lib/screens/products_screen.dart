@@ -1447,8 +1447,8 @@ class _CurrencySettingsDialog extends StatefulWidget {
   final Establishment establishment;
   final ProductStoreSupabase store;
   final LocalizationService loc;
-  final void Function(Establishment) onSaved;
-  final void Function(String) onApplyToAll;
+  final Future<void> Function(Establishment) onSaved;
+  final Future<void> Function(String) onApplyToAll;
 
   static const _presetCurrencies = ['RUB', 'USD', 'EUR', 'VND', 'GBP'];
 
