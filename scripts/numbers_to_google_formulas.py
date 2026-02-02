@@ -16,6 +16,7 @@
 import re
 import sys
 from pathlib import Path
+from typing import Optional
 
 try:
     import openpyxl
@@ -74,7 +75,7 @@ def convert_formula(text: str) -> str:
     return s
 
 
-def convert_workbook(path_in: str, path_out: str | None = None) -> None:
+def convert_workbook(path_in: str, path_out: Optional[str] = None) -> None:
     path_in = Path(path_in)
     if not path_in.exists():
         print(f"Файл не найден: {path_in}")
