@@ -27,16 +27,26 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadRememberedCredentials());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (mounted) _loadRememberedCredentials();
+      });
+    });
   }
 
   Future<void> _loadRememberedCredentials() async {
     final account = context.read<AccountManagerSupabase>();
     final saved = await account.loadRememberedCredentials();
     if (!mounted) return;
-    if (saved.pin != null && saved.pin!.isNotEmpty) _companyPinController.text = saved.pin!;
-    if (saved.email != null && saved.email!.isNotEmpty) _emailController.text = saved.email!;
-    if (saved.password != null && saved.password!.isNotEmpty) _passwordController.text = saved.password!;
+    if (saved.pin != null && saved.pin!.isNotEmpty) {
+      _companyPinController.text = saved.pin!.toUpperCase();
+    }
+    if (saved.email != null && saved.email!.isNotEmpty) {
+      _emailController.text = saved.email!;
+    }
+    if (saved.password != null && saved.password!.isNotEmpty) {
+      _passwordController.text = saved.password!;
+    }
     setState(() {});
   }
 
@@ -115,15 +125,19 @@ class _LoginScreenState extends State<LoginScreen> {
         autocorrect: false,
         enableSuggestions: false,
         maxLength: 8,
-        inputFormatters: [
-          FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9]')),
-          LengthLimitingTextInputFormatter(8),
-          _UpperCaseTextFormatter(),
-        ],
         validator: (value) {
           if (value == null || value.isEmpty) return loc.t('company_pin_required');
           if (value.length != 8) return loc.t('pin_must_be_8_chars');
           return null;
+        },
+        onChanged: (v) {
+          final up = v.toUpperCase();
+          if (up != v) {
+            _companyPinController.value = TextEditingValue(
+              text: up,
+              selection: TextSelection.collapsed(offset: up.length),
+            );
+          }
         },
       ),
       const SizedBox(height: 16),
@@ -168,6 +182,11 @@ class _LoginScreenState extends State<LoginScreen> {
         title: Text(loc.t('remember_credentials'), style: Theme.of(context).textTheme.bodyMedium),
         contentPadding: EdgeInsets.zero,
         controlAffinity: ListTileControlAffinity.leading,
+      ),
+      TextButton.icon(
+        onPressed: _loadRememberedCredentials,
+        icon: const Icon(Icons.restore, size: 18),
+        label: Text(loc.t('fill_saved_credentials')),
       ),
       const SizedBox(height: 16),
       if (_errorMessage != null)
@@ -327,19 +346,5 @@ class _LoginScreenState extends State<LoginScreen> {
       case 'fr': return '🇫🇷';
       default: return '🏳️';
     }
-  }
-}
-
-/// Форматтер: ввод только заглавными
-class _UpperCaseTextFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    return TextEditingValue(
-      text: newValue.text.toUpperCase(),
-      selection: newValue.selection,
-    );
   }
 }
