@@ -32,7 +32,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
   final ScrollController _vScrollLeft = ScrollController();
   final ScrollController _vScrollRight = ScrollController();
   final List<_InventoryRow> _rows = [];
-  int _quantityColumnCount = 1;
   DateTime _date = DateTime.now();
   TimeOfDay? _startTime;
   TimeOfDay? _endTime;
@@ -60,10 +59,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
     setState(() {
       for (final p in products) {
         if (_rows.any((r) => r.product.id == p.id)) continue;
-        _rows.add(_InventoryRow(
-          product: p,
-          quantities: List<double>.filled(_quantityColumnCount, 0.0),
-        ));
+        _rows.add(_InventoryRow(product: p, quantities: [0.0]));
       }
     });
   }
@@ -89,21 +85,19 @@ class _InventoryScreenState extends State<InventoryScreen> {
     _vScrollLeft.jumpTo(_vScrollRight.offset);
   }
 
-  void _addQuantityColumn() {
+  int get _maxQuantityColumns =>
+      _rows.isEmpty ? 1 : _rows.map((r) => r.quantities.length).reduce((a, b) => a > b ? a : b);
+
+  void _addQuantityToRow(int rowIndex) {
+    if (rowIndex < 0 || rowIndex >= _rows.length) return;
     setState(() {
-      _quantityColumnCount++;
-      for (final r in _rows) {
-        while (r.quantities.length < _quantityColumnCount) {
-          r.quantities.add(0.0);
-        }
-      }
+      _rows[rowIndex].quantities.add(0.0);
     });
   }
 
   void _addProduct(Product p) {
     setState(() {
-      final qty = List<double>.filled(_quantityColumnCount, 0.0);
-      _rows.add(_InventoryRow(product: p, quantities: qty));
+      _rows.add(_InventoryRow(product: p, quantities: [0.0]));
     });
   }
 
@@ -350,123 +344,58 @@ class _InventoryScreenState extends State<InventoryScreen> {
     Employee? employee,
   ) {
     final theme = Theme.of(context);
-    final greyBg = theme.colorScheme.surfaceContainerHighest;
     return Container(
-      color: greyBg,
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      color: theme.colorScheme.surfaceContainerHighest,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Wrap(
+        spacing: 20,
+        runSpacing: 8,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          Text(
-            loc.t('inventory_blank_title'),
-            textAlign: TextAlign.center,
-            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16),
-          Table(
-            columnWidths: const {
-              0: FlexColumnWidth(1),
-              1: FlexColumnWidth(1),
-              2: FlexColumnWidth(0.8),
-              3: FlexColumnWidth(1.2),
-            },
-            children: [
-              TableRow(
-                children: [
-                  _headerCell(theme, greyBg, loc.t('inventory_establishment'), loc.t('inventory_establishment_hint'), establishment?.name ?? '—'),
-                  _headerCell(theme, greyBg, loc.t('inventory_employee'), loc.t('inventory_employee_hint'), employee?.fullName ?? '—'),
-                  _headerCell(
-                    theme,
-                    greyBg,
-                    loc.t('inventory_date'),
-                    loc.t('inventory_date_hint'),
-                    '${_date.day.toString().padLeft(2, '0')}.${_date.month.toString().padLeft(2, '0')}.${_date.year}',
-                    onTap: () => _pickDate(context),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          loc.t('inventory_time_fill'),
-                          style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.primary),
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    loc.t('inventory_time_start'),
-                                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                                  ),
-                                  Text(
-                                    _startTime != null
-                                        ? '${_startTime!.hour.toString().padLeft(2, '0')}:${_startTime!.minute.toString().padLeft(2, '0')}'
-                                        : '—',
-                                    style: theme.textTheme.bodyLarge,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    loc.t('inventory_time_end'),
-                                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                                  ),
-                                  Text(
-                                    _endTime != null
-                                        ? '${_endTime!.hour.toString().padLeft(2, '0')}:${_endTime!.minute.toString().padLeft(2, '0')}'
-                                        : '—',
-                                    style: theme.textTheme.bodyLarge,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+          SizedBox(width: 140, child: _headerBlock(theme, loc.t('inventory_establishment'), establishment?.name ?? '—')),
+          SizedBox(width: 140, child: _headerBlock(theme, loc.t('inventory_employee'), employee?.fullName ?? '—')),
+          InkWell(
+            onTap: () => _pickDate(context),
+            child: SizedBox(
+              width: 100,
+              child: _headerBlock(
+                theme,
+                loc.t('inventory_date'),
+                '${_date.day.toString().padLeft(2, '0')}.${_date.month.toString().padLeft(2, '0')}.${_date.year}',
               ),
-            ],
+            ),
+          ),
+          SizedBox(
+            width: 120,
+            child: _headerBlock(
+              theme,
+              loc.t('inventory_time_fill'),
+              '${_startTime?.hour.toString().padLeft(2, '0') ?? '—'}:${_startTime?.minute.toString().padLeft(2, '0') ?? '—'} — '
+              '${_endTime != null ? '${_endTime!.hour.toString().padLeft(2, '0')}:${_endTime!.minute.toString().padLeft(2, '0')}' : '...'}',
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _headerCell(ThemeData theme, Color bg, String label, String hint, String value, {VoidCallback? onTap}) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.primary)),
-            const SizedBox(height: 2),
-            Text(hint, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-            const SizedBox(height: 6),
-            Text(value, style: theme.textTheme.bodyLarge),
-          ],
-        ),
-      ),
+  Widget _headerBlock(ThemeData theme, String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.primary)),
+        const SizedBox(height: 2),
+        Text(value, style: theme.textTheme.bodyMedium, overflow: TextOverflow.ellipsis, maxLines: 2),
+      ],
     );
   }
 
-  static const double _colNoWidth = 40;
-  static const double _colNameWidth = 200;
-  static const double _colUnitWidth = 100;
-  static const double _colTotalWidth = 80;
-  static const double _colQtyWidth = 90;
+  static const double _colNoWidth = 32;
+  static const double _colNameWidth = 180;
+  static const double _colUnitWidth = 64;
+  static const double _colTotalWidth = 64;
+  static const double _colQtyWidth = 72;
   static const double _leftWidth = _colNoWidth + _colNameWidth + _colUnitWidth;
 
   Widget _buildTable(LocalizationService loc) {
@@ -488,7 +417,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: SizedBox(
-              width: _colTotalWidth + _quantityColumnCount * _colQtyWidth + 56,
+              width: _colTotalWidth + _maxQuantityColumns * _colQtyWidth + 48,
               child: ListView(
                 controller: _vScrollRight,
                 shrinkWrap: true,
@@ -508,7 +437,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
   Widget _buildLeftHeader(LocalizationService loc) {
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       color: theme.colorScheme.surfaceContainerHighest,
       child: Row(
         children: [
@@ -541,7 +470,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
         _removeRow(index);
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           border: Border(bottom: BorderSide(color: theme.dividerColor)),
           color: index.isEven ? null : theme.colorScheme.surfaceContainerLowest,
@@ -568,7 +497,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
   Widget _buildRightHeader(LocalizationService loc) {
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       color: theme.colorScheme.surfaceContainerHighest,
       child: Row(
         children: [
@@ -579,32 +508,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
               child: Text(loc.t('inventory_total'), style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold)),
             ),
           ),
-          ...List.generate(
-            _quantityColumnCount,
-            (i) => SizedBox(
-              width: _colQtyWidth,
-              child: Tooltip(
-                message: loc.t('inventory_quantity_hint'),
-                child: Text(
-                  '${loc.t('inventory_quantity')} ${i + 1}',
-                  style: theme.textTheme.labelSmall,
-                  overflow: TextOverflow.ellipsis,
-                ),
+          Expanded(
+            child: Text(
+              loc.t('inventory_quantity'),
+              style: theme.textTheme.labelMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
-          ),
-          SizedBox(
-            width: 52,
-            child: _completed
-                ? const SizedBox.shrink()
-                : Tooltip(
-                    message: loc.t('inventory_add_column_hint'),
-                    child: IconButton(
-                      icon: const Icon(Icons.add_circle, size: 28),
-                      onPressed: _addQuantityColumn,
-                      tooltip: loc.t('inventory_add_column'),
-                    ),
-                  ),
           ),
         ],
       ),
@@ -614,8 +525,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
   Widget _buildRightRow(LocalizationService loc, int rowIndex) {
     final theme = Theme.of(context);
     final row = _rows[rowIndex];
+    final maxCols = _maxQuantityColumns;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: theme.dividerColor)),
         color: rowIndex.isEven ? null : theme.colorScheme.surfaceContainerLowest,
@@ -630,18 +542,33 @@ class _InventoryScreenState extends State<InventoryScreen> {
             ),
           ),
           ...List.generate(
-            row.quantities.length,
+            maxCols,
             (colIndex) => SizedBox(
               width: _colQtyWidth,
-              child: _completed
-                  ? Text(_formatQty(row.quantities[colIndex]), style: theme.textTheme.bodyMedium)
-                  : _QtyCell(
-                      value: row.quantities[colIndex],
-                      onChanged: (v) => _setQuantity(rowIndex, colIndex, v),
-                    ),
+              child: colIndex < row.quantities.length
+                  ? (_completed
+                      ? Text(_formatQty(row.quantities[colIndex]), style: theme.textTheme.bodyMedium)
+                      : _QtyCell(
+                          value: row.quantities[colIndex],
+                          onChanged: (v) => _setQuantity(rowIndex, colIndex, v),
+                        ))
+                  : const SizedBox.shrink(),
             ),
           ),
-          const SizedBox(width: 52),
+          if (!_completed)
+            SizedBox(
+              width: 36,
+              child: IconButton(
+                icon: const Icon(Icons.add_circle_outline, size: 22),
+                onPressed: () => _addQuantityToRow(rowIndex),
+                tooltip: loc.t('inventory_add_column_hint'),
+                style: IconButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(32, 32),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -654,7 +581,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
   Widget _buildFooter(LocalizationService loc) {
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -751,10 +678,13 @@ class _QtyCellState extends State<_QtyCell> {
       controller: _controller,
       focusNode: _focus,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      decoration: const InputDecoration(
+      style: Theme.of(context).textTheme.bodyMedium,
+      decoration: InputDecoration(
         isDense: true,
-        contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-        border: OutlineInputBorder(),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+        border: const OutlineInputBorder(),
+        filled: true,
+        fillColor: Theme.of(context).colorScheme.surface,
       ),
       onChanged: (s) {
         final v = double.tryParse(s.replaceFirst(',', '.')) ?? 0;
