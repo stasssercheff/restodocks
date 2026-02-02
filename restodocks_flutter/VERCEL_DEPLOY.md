@@ -106,3 +106,18 @@ Vercel сам выпускает сертификат для вашего дом
 ## 6. После деплоя
 
 Проверьте основной URL и превью. Если видите «Ошибка конфигурации» — проверьте переменные и что выбран окружение **Production** / **Preview**.
+
+## 7. Если видите «Ошибка подключения» в тесте Supabase
+
+Это значит, что приложение не может подключиться к Supabase. Проверьте:
+
+1. **Vercel → Project → Settings → Environment Variables**
+   - `SUPABASE_URL` и `SUPABASE_ANON_KEY` должны быть заданы.
+   - Отметьте **Production** и **Preview**.
+   - Значения берутся из [Supabase Dashboard](https://supabase.com/dashboard) → ваш проект → **Settings** → **API** → Project URL и anon public key.
+
+2. **Пересоберите проект** — после добавления или изменения переменных нажмите **Redeploy** в Vercel → Deployments.
+
+3. **Supabase должен быть запущен** — проверьте в дашборде, что проект активен.
+
+4. **Таблицы созданы** — выполните SQL из `supabase_tables_safe.sql` и миграций в Supabase → SQL Editor.

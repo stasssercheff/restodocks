@@ -18,6 +18,16 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   bool _loading = true;
   String? _error;
 
+  String _categoryLabel(String c) {
+    const map = {
+      'vegetables': 'Овощи', 'fruits': 'Фрукты', 'meat': 'Мясо', 'seafood': 'Рыба',
+      'dairy': 'Молочное', 'grains': 'Крупы', 'bakery': 'Выпечка', 'pantry': 'Бакалея',
+      'spices': 'Специи', 'beverages': 'Напитки', 'eggs': 'Яйца', 'legumes': 'Бобовые',
+      'nuts': 'Орехи', 'misc': '—',
+    };
+    return map[c] ?? c;
+  }
+
   Future<void> _load() async {
     final acc = context.read<AccountManagerSupabase>();
     final est = acc.establishment;
@@ -100,24 +110,45 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         ),
       );
     }
+    final lang = loc.currentLanguageCode;
     return RefreshIndicator(
       onRefresh: _load,
-      child: ListView.builder(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-        itemCount: _list.length,
-        itemBuilder: (_, i) {
-          final tc = _list[i];
-          return Card(
-            margin: const EdgeInsets.only(bottom: 8),
-            child: ListTile(
-              leading: const Icon(Icons.restaurant_menu),
-              title: Text(tc.dishName),
-              subtitle: Text('${tc.ingredients.length} ингр. · ${tc.totalCalories.round()} ккал'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => context.push('/tech-cards/${tc.id}'),
-            ),
-          );
-        },
+        scrollDirection: Axis.vertical,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: DataTable(
+            headingRowColor: WidgetStateProperty.all(Theme.of(context).colorScheme.primaryContainer),
+            columns: const [
+              DataColumn(label: Text('#', style: TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(label: Text('Название', style: TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(label: Text('Категория', style: TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(label: Text('Ингр.', style: TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(label: Text('Ккал', style: TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(label: Text('Выход, г', style: TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(label: Text('', style: TextStyle(fontWeight: FontWeight.bold))),
+            ],
+            rows: List.generate(_list.length, (i) {
+              final tc = _list[i];
+              return DataRow(
+                cells: [
+                  DataCell(Text('${i + 1}')),
+                  DataCell(Text(tc.getLocalizedDishName(lang))),
+                  DataCell(Text(_categoryLabel(tc.category))),
+                  DataCell(Text('${tc.ingredients.length}')),
+                  DataCell(Text('${tc.totalCalories.round()}')),
+                  DataCell(Text(tc.yield.toStringAsFixed(0))),
+                  DataCell(IconButton(
+                    icon: const Icon(Icons.chevron_right),
+                    onPressed: () => context.push('/tech-cards/${tc.id}'),
+                  )),
+                ],
+                onSelectChanged: (_) => context.push('/tech-cards/${tc.id}'),
+              );
+            }),
+          ),
+        ),
       ),
     );
   }

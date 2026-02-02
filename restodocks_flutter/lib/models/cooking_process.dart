@@ -55,10 +55,12 @@ class CookingProcess extends Equatable {
     return localizedNames[languageCode] ?? name;
   }
 
-  /// Применить процесс к продукту
-  ProcessedProduct applyTo(Product product, double weight) {
+  /// Применить процесс к продукту.
+  /// [weightLossOverride] — ручная подстановка % ужарки (если null — используется среднее по способу).
+  ProcessedProduct applyTo(Product product, double weight, {double? weightLossOverride}) {
     final multiplier = weight / 100.0;
-    final finalWeight = weight * (1.0 - weightLossPercentage / 100.0);
+    final lossPct = weightLossOverride ?? weightLossPercentage;
+    final finalWeight = weight * (1.0 - lossPct / 100.0);
 
     return ProcessedProduct(
       originalProduct: product,
@@ -112,7 +114,7 @@ class CookingProcess extends Equatable {
       fatMultiplier: 0.90,
       carbsMultiplier: 0.98,
       weightLossPercentage: 25.0,
-      applicableCategories: ['vegetables', 'meat', 'fish', 'grains', 'pasta'],
+      applicableCategories: ['vegetables', 'meat', 'fish', 'grains', 'pasta', 'misc'],
     ),
 
     // Жарка на масле
@@ -131,7 +133,7 @@ class CookingProcess extends Equatable {
       fatMultiplier: 1.20,
       carbsMultiplier: 0.98,
       weightLossPercentage: 15.0,
-      applicableCategories: ['meat', 'fish', 'vegetables'],
+      applicableCategories: ['meat', 'fish', 'vegetables', 'misc'],
     ),
 
     // Запекание
@@ -302,7 +304,7 @@ class CookingProcess extends Equatable {
       fatMultiplier: 0.90,
       carbsMultiplier: 0.99,
       weightLossPercentage: 8.0,
-      applicableCategories: ['vegetables', 'fish', 'meat'],
+      applicableCategories: ['vegetables', 'fish', 'meat', 'misc'],
     ),
 
     // Консервирование

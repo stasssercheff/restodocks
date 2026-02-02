@@ -150,6 +150,58 @@ class ProductStoreSupabase {
     }
   }
 
+  /// Номенклатура заведения: ID продуктов в номенклатуре
+  Set<String> _nomenclatureIds = {};
+  Set<String> get nomenclatureProductIds => Set.from(_nomenclatureIds);
+
+  /// Загрузить номенклатуру заведения (ID продуктов)
+  Future<void> loadNomenclature(String establishmentId) async {
+    try {
+      final data = await _supabase.client
+          .from('establishment_products')
+          .select('product_id')
+          .eq('establishment_id', establishmentId);
+      _nomenclatureIds = (data as List)
+          .map((e) => (e as Map)['product_id'] as String)
+          .toSet();
+    } catch (e) {
+      print('Ошибка загрузки номенклатуры: $e');
+      _nomenclatureIds = {};
+    }
+  }
+
+  /// Добавить продукт в номенклатуру
+  Future<void> addToNomenclature(String establishmentId, String productId) async {
+    try {
+      await _supabase.client.from('establishment_products').upsert(
+        {'establishment_id': establishmentId, 'product_id': productId},
+        onConflict: 'establishment_id,product_id',
+      );
+      _nomenclatureIds.add(productId);
+    } catch (e) {
+      print('Ошибка добавления в номенклатуру: $e');
+      rethrow;
+    }
+  }
+
+  /// Удалить продукт из номенклатуры
+  Future<void> removeFromNomenclature(String establishmentId, String productId) async {
+    await _supabase.client
+        .from('establishment_products')
+        .delete()
+        .eq('establishment_id', establishmentId)
+        .eq('product_id', productId);
+    _nomenclatureIds.remove(productId);
+  }
+
+  /// Продукты в номенклатуре заведения
+  List<Product> getNomenclatureProducts(String establishmentId) {
+    return _allProducts.where((p) => _nomenclatureIds.contains(p.id)).toList();
+  }
+
+  /// В номенклатуре ли продукт
+  bool isInNomenclature(String productId) => _nomenclatureIds.contains(productId);
+
   /// Получить продукты для конкретного отдела
   Future<void> loadProductsForDepartment(String department) async {
     _isLoading = true;

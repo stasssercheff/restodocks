@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../services/services.dart';
 
-/// Тестовый экран для проверки работы Supabase
+/// Диагностика Supabase. Приложение использует свою аутентификацию (сотрудники), а Supabase — только для БД.
 class SupabaseTestScreen extends StatefulWidget {
   const SupabaseTestScreen({super.key});
 
@@ -15,6 +15,7 @@ class SupabaseTestScreen extends StatefulWidget {
 class _SupabaseTestScreenState extends State<SupabaseTestScreen> {
   String _status = 'Проверка подключения...';
   bool _isConnected = false;
+  String? _errorDetail;
   Map<String, dynamic>? _userInfo;
 
   @override
@@ -25,15 +26,23 @@ class _SupabaseTestScreenState extends State<SupabaseTestScreen> {
 
   Future<void> _checkConnection() async {
     final supabaseService = SupabaseService();
-    final isConnected = await supabaseService.isConnected();
-
+    bool isConnected = false;
+    String? errorDetail;
+    try {
+      isConnected = await supabaseService.isConnected();
+      if (!isConnected) errorDetail = 'Запрос к БД завершился с ошибкой.';
+    } catch (e) {
+      errorDetail = e.toString();
+    }
+    if (!mounted) return;
     setState(() {
       _isConnected = isConnected;
       _status = isConnected ? '✅ Подключено к Supabase' : '❌ Ошибка подключения';
+      _errorDetail = errorDetail;
       _userInfo = {
-        'authenticated': supabaseService.isAuthenticated,
-        'user_id': supabaseService.currentUser?.id,
-        'email': supabaseService.currentUser?.email,
+        'supabase_auth': supabaseService.isAuthenticated,
+        'supabase_user': supabaseService.currentUser?.email ?? '—',
+        'note': 'Приложение использует вход по PIN/email (сотрудники), не Supabase Auth.',
       };
     });
   }
@@ -88,8 +97,37 @@ class _SupabaseTestScreenState extends State<SupabaseTestScreen> {
 
             const SizedBox(height: 16),
 
-            // Информация о пользователе
+            if (!_isConnected && _errorDetail != null)
+              Card(
+                color: Theme.of(context).colorScheme.errorContainer.withOpacity(0.3),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Что проверить',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        '• В Vercel: Project Settings → Environment Variables — заданы SUPABASE_URL и SUPABASE_ANON_KEY для Production и Preview.\n'
+                        '• Пересоберите проект после добавления переменных (Redeploy).\n'
+                        '• Supabase Dashboard → Settings → API: скопируйте URL и anon key.',
+                        style: TextStyle(fontSize: 13),
+                      ),
+                      if (_errorDetail != null && _errorDetail!.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text('Ошибка: $_errorDetail', style: const TextStyle(fontSize: 12, color: Colors.red)),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
             if (_userInfo != null) ...[
+              const SizedBox(height: 16),
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -97,13 +135,13 @@ class _SupabaseTestScreenState extends State<SupabaseTestScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Информация о пользователе',
+                        'Справка',
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                       const SizedBox(height: 8),
-                      _buildInfoRow('Аутентифицирован:', _userInfo!['authenticated'].toString()),
-                      _buildInfoRow('User ID:', _userInfo!['user_id'] ?? 'Не указан'),
-                      _buildInfoRow('Email:', _userInfo!['email'] ?? 'Не указан'),
+                      _buildInfoRow('Supabase Auth:', _userInfo!['supabase_auth'].toString()),
+                      _buildInfoRow('Supabase User:', _userInfo!['supabase_user'].toString()),
+                      _buildInfoRow('', _userInfo!['note'].toString()),
                     ],
                   ),
                 ),
@@ -197,12 +235,16 @@ class _SupabaseTestScreenState extends State<SupabaseTestScreen> {
   Future<void> _testDatabase(BuildContext context) async {
     try {
       final supabaseService = SupabaseService();
-      // Пример запроса к тестовой таблице
-      final data = await supabaseService.getData('test_table');
+      final establishments = await supabaseService.getData('establishments');
+      final products = await supabaseService.getData('products');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Получено ${data.length} записей из базы данных')),
+          SnackBar(
+            content: Text(
+              'БД доступна: ${establishments.length} заведений, ${products.length} продуктов',
+            ),
+          ),
         );
       }
     } catch (e) {

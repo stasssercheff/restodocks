@@ -7,6 +7,9 @@ import 'supabase_service.dart';
 
 const _keyEmployeeId = 'restodocks_employee_id';
 const _keyEstablishmentId = 'restodocks_establishment_id';
+const _keyRememberPin = 'restodocks_remember_pin';
+const _keyRememberEmail = 'restodocks_remember_email';
+const _keyRememberPassword = 'restodocks_remember_password';
 
 /// Сервис управления аккаунтами с использованием Supabase
 class AccountManagerSupabase {
@@ -229,12 +232,39 @@ class AccountManagerSupabase {
   }
 
   /// Вход в систему
-  Future<void> login(Employee employee, Establishment establishment) async {
+  /// [rememberCredentials] — сохранить PIN, email и пароль для автозаполнения
+  Future<void> login(
+    Employee employee,
+    Establishment establishment, {
+    bool rememberCredentials = false,
+    String? pin,
+    String? email,
+    String? password,
+  }) async {
     _currentEmployee = employee;
     _establishment = establishment;
 
     await _secureStorage.set(_keyEmployeeId, employee.id);
     await _secureStorage.set(_keyEstablishmentId, establishment.id);
+
+    if (rememberCredentials && pin != null && email != null && password != null) {
+      await _secureStorage.set(_keyRememberPin, pin);
+      await _secureStorage.set(_keyRememberEmail, email);
+      await _secureStorage.set(_keyRememberPassword, password);
+    } else {
+      await _secureStorage.remove(_keyRememberPin);
+      await _secureStorage.remove(_keyRememberEmail);
+      await _secureStorage.remove(_keyRememberPassword);
+    }
+  }
+
+  /// Загрузить сохранённые учётные данные (для автозаполнения формы входа)
+  Future<({String? pin, String? email, String? password})> loadRememberedCredentials() async {
+    await _secureStorage.initialize();
+    final pin = await _secureStorage.get(_keyRememberPin);
+    final email = await _secureStorage.get(_keyRememberEmail);
+    final password = await _secureStorage.get(_keyRememberPassword);
+    return (pin: pin, email: email, password: password);
   }
 
   /// Выход из системы

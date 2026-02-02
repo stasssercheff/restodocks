@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -22,6 +23,23 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _isLoading = false;
   String? _errorMessage;
+  bool _rememberCredentials = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadRememberedCredentials());
+  }
+
+  Future<void> _loadRememberedCredentials() async {
+    final account = context.read<AccountManagerSupabase>();
+    final saved = await account.loadRememberedCredentials();
+    if (!mounted) return;
+    if (saved.pin != null && saved.pin!.isNotEmpty) _companyPinController.text = saved.pin!;
+    if (saved.email != null && saved.email!.isNotEmpty) _emailController.text = saved.email!;
+    if (saved.password != null && saved.password!.isNotEmpty) _passwordController.text = saved.password!;
+    setState(() {});
+  }
 
   @override
   void dispose() {
@@ -59,9 +77,10 @@ class _LoginScreenState extends State<LoginScreen> {
           padding: const EdgeInsets.all(24.0),
           child: Form(
             key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
+            child: AutofillGroup(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
                 // Заголовок
                 Text(
                   localization.t('welcome'),
@@ -79,6 +98,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 // Поле PIN компании
                 TextFormField(
                   controller: _companyPinController,
+                  autofillHints: const [AutofillHints.organizationName],
                   decoration: InputDecoration(
                     labelText: localization.t('company_pin'),
                     hintText: localization.t('enter_company_pin'),
@@ -108,6 +128,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 // Поле email
                 TextFormField(
                   controller: _emailController,
+                  autofillHints: const [AutofillHints.email],
                   decoration: InputDecoration(
                     labelText: localization.t('email'),
                     hintText: localization.t('enter_email'),
@@ -130,6 +151,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 // Поле пароля
                 TextFormField(
                   controller: _passwordController,
+                  autofillHints: const [AutofillHints.password],
                   decoration: InputDecoration(
                     labelText: localization.t('password'),
                     hintText: localization.t('enter_password'),
@@ -146,7 +168,18 @@ class _LoginScreenState extends State<LoginScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 8),
+                CheckboxListTile(
+                  value: _rememberCredentials,
+                  onChanged: (v) => setState(() => _rememberCredentials = v ?? true),
+                  title: Text(
+                    localization.t('remember_credentials'),
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                ),
+                const SizedBox(height: 16),
 
                 // Сообщение об ошибке
                 if (_errorMessage != null)
@@ -234,7 +267,14 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
-      await accountManager.login(employee, establishment);
+      await accountManager.login(
+        employee,
+        establishment,
+        rememberCredentials: _rememberCredentials,
+        pin: _companyPinController.text.trim(),
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
 
       if (mounted) {
         context.go('/home');

@@ -77,9 +77,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       textAlign: TextAlign.center,
                     ),
 
-                    // Роли и отдел (все роли: Владелец, Шеф-повар и т.д.)
+                    // Должность и отдел
                     Text(
-                      '${currentEmployee.rolesDisplayText} • ${currentEmployee.departmentDisplayName}',
+                      '${localization.t('role')}: ${currentEmployee.rolesDisplayText}',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Theme.of(context).colorScheme.primary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                      textAlign: TextAlign.center,
+                    ),
+                    Text(
+                      '${localization.t('department')}: ${currentEmployee.departmentDisplayName}',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: Colors.grey[600],
                           ),
@@ -233,7 +241,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ListTile(
               leading: const Icon(Icons.cloud, color: Colors.blue),
               title: Text(localization.t('supabase_test')),
-              subtitle: const Text('Проверить подключение'),
+              subtitle: Text(localization.t('supabase_test_subtitle')),
               onTap: () => context.push('/supabase-test'),
             ),
 

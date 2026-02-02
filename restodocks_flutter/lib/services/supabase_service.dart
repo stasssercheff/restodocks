@@ -9,10 +9,10 @@ class SupabaseService {
 
   SupabaseClient get client => Supabase.instance.client;
 
-  /// Проверка подключения к Supabase
+  /// Проверка подключения к Supabase (используем таблицу establishments — она есть в схеме)
   Future<bool> isConnected() async {
     try {
-      await client.from('test_connection').select().limit(1);
+      await client.from('establishments').select('id').limit(1);
       return true;
     } catch (e) {
       print('Supabase connection error: $e');

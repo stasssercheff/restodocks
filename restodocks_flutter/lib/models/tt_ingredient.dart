@@ -32,15 +32,28 @@ class TTIngredient extends Equatable {
   @JsonKey(name: 'cooking_process_name')
   final String? cookingProcessName;
 
-  // Вес: брутто (до обработки) и нетто (после обработки)
+  // Вес: брутто (до обработки) и нетто (после обработки). Внутренне храним в граммах.
   @JsonKey(name: 'gross_weight')
-  final double grossWeight; // брутто в граммах
+  final double grossWeight;
 
   @JsonKey(name: 'net_weight')
-  final double netWeight; // нетто в граммах
+  final double netWeight;
+
+  @JsonKey(name: 'unit')
+  final String unit; // г, кг, шт, lb, oz, мл, л и т.д.
+
+  @JsonKey(name: 'primary_waste_pct')
+  final double primaryWastePct; // процент отхода при первичной обработке
+
+  @JsonKey(name: 'grams_per_piece')
+  final double? gramsPerPiece; // для шт: грамм на штуку
+
+  /// Ручной % ужарки (если задан — используется вместо способа приготовления)
+  @JsonKey(name: 'cooking_loss_pct_override')
+  final double? cookingLossPctOverride;
 
   @JsonKey(name: 'is_net_weight_manual')
-  final bool isNetWeightManual; // ручной ввод нетто
+  final bool isNetWeightManual;
 
   // Итоговые питательные вещества
   @JsonKey(name: 'final_calories')
@@ -69,6 +82,10 @@ class TTIngredient extends Equatable {
     this.cookingProcessName,
     required this.grossWeight,
     required this.netWeight,
+    this.unit = 'g',
+    this.primaryWastePct = 0,
+    this.gramsPerPiece,
+    this.cookingLossPctOverride,
     this.isNetWeightManual = false,
     required this.finalCalories,
     required this.finalProtein,
@@ -88,6 +105,8 @@ class TTIngredient extends Equatable {
     required double totalCarbs,
     required double totalCost,
     required double grossWeight,
+    String unit = 'g',
+    double? gramsPerPiece,
   }) {
     final factor = totalNetWeight > 0 ? grossWeight / totalNetWeight : 0.0;
     return TTIngredient(
@@ -100,6 +119,9 @@ class TTIngredient extends Equatable {
       cookingProcessName: null,
       grossWeight: grossWeight,
       netWeight: grossWeight,
+      unit: unit,
+      primaryWastePct: 0,
+      gramsPerPiece: gramsPerPiece,
       isNetWeightManual: false,
       finalCalories: totalCalories * factor,
       finalProtein: totalProtein * factor,
@@ -109,50 +131,68 @@ class TTIngredient extends Equatable {
     );
   }
 
+  static const _undefined = Object();
+
   /// Создание копии с изменениями
   TTIngredient copyWith({
-    String? id,
-    String? productId,
-    String? productName,
-    String? sourceTechCardId,
-    String? sourceTechCardName,
-    String? cookingProcessId,
-    String? cookingProcessName,
-    double? grossWeight,
-    double? netWeight,
-    bool? isNetWeightManual,
-    double? finalCalories,
-    double? finalProtein,
-    double? finalFat,
-    double? finalCarbs,
-    double? cost,
+    Object? id = _undefined,
+    Object? productId = _undefined,
+    Object? productName = _undefined,
+    Object? sourceTechCardId = _undefined,
+    Object? sourceTechCardName = _undefined,
+    Object? cookingProcessId = _undefined,
+    Object? cookingProcessName = _undefined,
+    Object? grossWeight = _undefined,
+    Object? netWeight = _undefined,
+    Object? unit = _undefined,
+    Object? primaryWastePct = _undefined,
+    Object? gramsPerPiece = _undefined,
+    Object? cookingLossPctOverride = _undefined,
+    Object? isNetWeightManual = _undefined,
+    Object? finalCalories = _undefined,
+    Object? finalProtein = _undefined,
+    Object? finalFat = _undefined,
+    Object? finalCarbs = _undefined,
+    Object? cost = _undefined,
   }) {
     return TTIngredient(
-      id: id ?? this.id,
-      productId: productId ?? this.productId,
-      productName: productName ?? this.productName,
-      sourceTechCardId: sourceTechCardId ?? this.sourceTechCardId,
-      sourceTechCardName: sourceTechCardName ?? this.sourceTechCardName,
-      cookingProcessId: cookingProcessId ?? this.cookingProcessId,
-      cookingProcessName: cookingProcessName ?? this.cookingProcessName,
-      grossWeight: grossWeight ?? this.grossWeight,
-      netWeight: netWeight ?? this.netWeight,
-      isNetWeightManual: isNetWeightManual ?? this.isNetWeightManual,
-      finalCalories: finalCalories ?? this.finalCalories,
-      finalProtein: finalProtein ?? this.finalProtein,
-      finalFat: finalFat ?? this.finalFat,
-      finalCarbs: finalCarbs ?? this.finalCarbs,
-      cost: cost ?? this.cost,
+      id: id == _undefined ? this.id : id as String,
+      productId: productId == _undefined ? this.productId : productId as String?,
+      productName: productName == _undefined ? this.productName : productName as String,
+      sourceTechCardId: sourceTechCardId == _undefined ? this.sourceTechCardId : sourceTechCardId as String?,
+      sourceTechCardName: sourceTechCardName == _undefined ? this.sourceTechCardName : sourceTechCardName as String?,
+      cookingProcessId: cookingProcessId == _undefined ? this.cookingProcessId : cookingProcessId as String?,
+      cookingProcessName: cookingProcessName == _undefined ? this.cookingProcessName : cookingProcessName as String?,
+      grossWeight: grossWeight == _undefined ? this.grossWeight : grossWeight as double,
+      netWeight: netWeight == _undefined ? this.netWeight : netWeight as double,
+      unit: unit == _undefined ? this.unit : unit as String,
+      primaryWastePct: primaryWastePct == _undefined ? this.primaryWastePct : primaryWastePct as double,
+      gramsPerPiece: gramsPerPiece == _undefined ? this.gramsPerPiece : gramsPerPiece as double?,
+      cookingLossPctOverride: cookingLossPctOverride == _undefined ? this.cookingLossPctOverride : cookingLossPctOverride as double?,
+      isNetWeightManual: isNetWeightManual == _undefined ? this.isNetWeightManual : isNetWeightManual as bool,
+      finalCalories: finalCalories == _undefined ? this.finalCalories : finalCalories as double,
+      finalProtein: finalProtein == _undefined ? this.finalProtein : finalProtein as double,
+      finalFat: finalFat == _undefined ? this.finalFat : finalFat as double,
+      finalCarbs: finalCarbs == _undefined ? this.finalCarbs : finalCarbs as double,
+      cost: cost == _undefined ? this.cost : cost as double,
     );
   }
 
   /// Создание ингредиента из продукта
+  /// [primaryWastePct] — процент отхода при первичной обработке, 0–100
+  /// [unit] — единица измерения (г, кг, шт и т.д.)
+  /// [gramsPerPiece] — для unit=шт: грамм на штуку
   factory TTIngredient.fromProduct({
     required Product? product,
     CookingProcess? cookingProcess,
     required double grossWeight,
     double? netWeight,
+    double primaryWastePct = 0,
     required String defaultCurrency,
+    String languageCode = 'ru',
+    String unit = 'g',
+    double? gramsPerPiece,
+    double? cookingLossPctOverride,
   }) {
     if (product == null) {
       return TTIngredient(
@@ -163,6 +203,9 @@ class TTIngredient extends Equatable {
         cookingProcessName: null,
         grossWeight: grossWeight,
         netWeight: netWeight ?? grossWeight,
+        unit: unit,
+        primaryWastePct: primaryWastePct,
+        gramsPerPiece: gramsPerPiece,
         isNetWeightManual: netWeight != null,
         finalCalories: 0,
         finalProtein: 0,
@@ -172,15 +215,21 @@ class TTIngredient extends Equatable {
       );
     }
 
-    double finalNetWeight = netWeight ?? grossWeight;
+    // Конвертируем в граммы для расчётов
+    final grossG = CulinaryUnits.toGrams(grossWeight, unit, gramsPerPiece: gramsPerPiece);
+
+    // Эффективный вес после отхода (первичная обработка)
+    final waste = primaryWastePct.clamp(0.0, 99.9) / 100.0;
+    final effectiveGross = grossG * (1.0 - waste);
+
+    double finalNetWeight = netWeight ?? effectiveGross;
     double finalCalories = 0;
     double finalProtein = 0;
     double finalFat = 0;
     double finalCarbs = 0;
 
     if (cookingProcess != null) {
-      // Применяем технологический процесс
-      final processed = cookingProcess.applyTo(product, grossWeight);
+      final processed = cookingProcess.applyTo(product, effectiveGross);
       if (netWeight == null) {
         finalNetWeight = processed.finalWeight;
       }
@@ -189,7 +238,6 @@ class TTIngredient extends Equatable {
       finalFat = processed.totalFat;
       finalCarbs = processed.totalCarbs;
     } else {
-      // Сырой продукт
       final nutrition = product.getNutritionForWeight(finalNetWeight);
       finalCalories = nutrition.calories;
       finalProtein = nutrition.protein;
@@ -197,17 +245,27 @@ class TTIngredient extends Equatable {
       finalCarbs = nutrition.carbs;
     }
 
-    // Расчет стоимости
-    final cost = (product.basePrice ?? 0) * (grossWeight / 1000.0);
+    // Расчёт стоимости: при unit шт — цена за штуку, иначе — за кг
+    double cost;
+    if (unit == 'pcs' || unit == 'шт') {
+      final pieces = grossG / (gramsPerPiece ?? 50);
+      cost = (product.basePrice ?? 0) * pieces;
+    } else {
+      cost = (product.basePrice ?? 0) * (grossG / 1000.0);
+    }
 
     return TTIngredient(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       productId: product.id,
-      productName: product.getLocalizedName('ru'), // TODO: использовать текущий язык
+      productName: product.getLocalizedName(languageCode),
       cookingProcessId: cookingProcess?.id,
-      cookingProcessName: cookingProcess?.getLocalizedName('ru'),
-      grossWeight: grossWeight,
+      cookingProcessName: cookingProcess?.getLocalizedName(languageCode),
+      grossWeight: grossG,
       netWeight: finalNetWeight,
+      unit: unit,
+      primaryWastePct: primaryWastePct,
+      gramsPerPiece: gramsPerPiece,
+      cookingLossPctOverride: cookingLossPctOverride,
       isNetWeightManual: netWeight != null,
       finalCalories: finalCalories,
       finalProtein: finalProtein,
@@ -230,7 +288,9 @@ class TTIngredient extends Equatable {
     double newCarbs = 0;
 
     if (cookingProcess != null) {
-      final processed = cookingProcess.applyTo(product, newGrossWeight);
+      final effectiveGross = newGrossWeight * (1.0 - primaryWastePct / 100.0);
+      final lossPct = cookingLossPctOverride ?? cookingProcess.weightLossPercentage;
+      final processed = cookingProcess.applyTo(product, effectiveGross, weightLossOverride: lossPct);
       if (!isNetWeightManual) {
         newNetWeight = processed.finalWeight;
       }
@@ -283,11 +343,11 @@ class TTIngredient extends Equatable {
   }
 
   /// Обновить технологический процесс
-  TTIngredient updateCookingProcess(CookingProcess? newProcess, Product? product) {
+  TTIngredient updateCookingProcess(CookingProcess? newProcess, Product? product, {String languageCode = 'ru'}) {
     if (product == null) {
       return copyWith(
         cookingProcessId: newProcess?.id,
-        cookingProcessName: newProcess?.getLocalizedName('ru'),
+        cookingProcessName: newProcess?.getLocalizedName(languageCode),
       );
     }
 
@@ -298,7 +358,9 @@ class TTIngredient extends Equatable {
     double newCarbs = 0;
 
     if (newProcess != null) {
-      final processed = newProcess.applyTo(product, grossWeight);
+      final effectiveGross = grossWeight * (1.0 - primaryWastePct / 100.0);
+      final lossPct = cookingLossPctOverride ?? newProcess.weightLossPercentage;
+      final processed = newProcess.applyTo(product, effectiveGross, weightLossOverride: lossPct);
       if (!isNetWeightManual) {
         newNetWeight = processed.finalWeight;
       }
@@ -316,7 +378,7 @@ class TTIngredient extends Equatable {
 
     return copyWith(
       cookingProcessId: newProcess?.id,
-      cookingProcessName: newProcess?.getLocalizedName('ru'),
+      cookingProcessName: newProcess?.getLocalizedName(languageCode),
       netWeight: newNetWeight,
       finalCalories: newCalories,
       finalProtein: newProtein,
@@ -325,17 +387,50 @@ class TTIngredient extends Equatable {
     );
   }
 
-  /// Информация о весе
-  String get grossWeightInfo => '${grossWeight.toStringAsFixed(1)} г';
-  String get netWeightInfo => '${netWeight.toStringAsFixed(1)} г';
+  /// Значение брутто в исходных единицах (для отображения)
+  double get grossDisplayValue =>
+      CulinaryUnits.fromGrams(grossWeight, unit, gramsPerPiece: gramsPerPiece);
+
+  /// Форматированная строка брутто
+  String grossWeightDisplay(String lang) => _formatWithUnit(grossDisplayValue, unit, lang);
+  String netWeightDisplay(String lang) => '${netWeight.toStringAsFixed(0)} г';
+
+  String _formatWithUnit(double v, String u, String lang) {
+    final label = CulinaryUnits.displayName(u, lang);
+    if (u == 'pcs' || u == 'шт') return '${v.toStringAsFixed(v == v.truncateToDouble() ? 0 : 1)} $label';
+    if (u == 'g' || u == 'г') return '${v.toStringAsFixed(0)} $label';
+    if (u == 'kg' || u == 'кг') return '${v.toStringAsFixed(2)} $label';
+    return '${v.toStringAsFixed(1)} $label';
+  }
 
   /// Информация о стоимости
   String get costInfo => '${cost.toStringAsFixed(2)} ₽'; // TODO: использовать текущую валюту
 
-  /// Процент ужарки/упарки
+  /// Эффективный процент ужарки: ручная подстановка, иначе из способа, иначе вычисленный
   double get weightLossPercentage {
+    if (cookingLossPctOverride != null) return cookingLossPctOverride!;
     if (grossWeight <= 0) return 0;
     return ((grossWeight - netWeight) / grossWeight) * 100.0;
+  }
+
+  /// Обновить % ужарки вручную и пересчитать нетто/КБЖУ
+  TTIngredient updateCookingLossPct(double? newPct, Product? product, CookingProcess? cookingProcess, {String languageCode = 'ru'}) {
+    if (product == null || cookingProcess == null) {
+      return copyWith(cookingLossPctOverride: newPct);
+    }
+    final lossPct = (newPct ?? cookingProcess.weightLossPercentage).clamp(0.0, 99.9);
+    final effectiveGross = grossWeight * (1.0 - primaryWastePct / 100.0);
+    final newNetWeight = effectiveGross * (1.0 - lossPct / 100.0);
+    final processed = cookingProcess.applyTo(product, effectiveGross, weightLossOverride: lossPct);
+    return copyWith(
+      cookingLossPctOverride: newPct,
+      netWeight: newNetWeight,
+      isNetWeightManual: newPct != null,
+      finalCalories: processed.totalCalories,
+      finalProtein: processed.totalProtein,
+      finalFat: processed.totalFat,
+      finalCarbs: processed.totalCarbs,
+    );
   }
 
   /// JSON сериализация
@@ -355,6 +450,10 @@ class TTIngredient extends Equatable {
     cookingProcessName,
     grossWeight,
     netWeight,
+    unit,
+    primaryWastePct,
+    gramsPerPiece,
+    cookingLossPctOverride,
     isNetWeightManual,
     finalCalories,
     finalProtein,
