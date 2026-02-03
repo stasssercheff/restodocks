@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -402,7 +403,7 @@ class _ProfileEditSheet extends StatefulWidget {
   const _ProfileEditSheet({required this.employee, required this.onSaved});
 
   final Employee employee;
-  final void Function(Employee) onSaved;
+  final Future<void> Function(Employee) onSaved;
 
   @override
   State<_ProfileEditSheet> createState() => _ProfileEditSheetState();
@@ -458,7 +459,7 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
       final supabase = SupabaseService();
       const bucket = 'avatars';
       final fileName = '${widget.employee.id}.jpg';
-      await supabase.client.storage.from(bucket).uploadBinary(fileName, bytes, fileOptions: const FileOptions(upsert: true));
+      await supabase.client.storage.from(bucket).uploadBinary(fileName, bytes, fileOptions: FileOptions(upsert: true));
       final url = supabase.client.storage.from(bucket).getPublicUrl(fileName);
       if (mounted) setState(() => _avatarUrl = '$url?t=${DateTime.now().millisecondsSinceEpoch}');
     } catch (e) {
