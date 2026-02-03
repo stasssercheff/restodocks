@@ -486,7 +486,7 @@ class _InventoryPfScreenState extends State<InventoryPfScreen> {
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
           FilledButton.icon(
-            onPressed: _completed ? null : _complete,
+            onPressed: _completed ? null : () { _complete(context); },
             icon: const Icon(Icons.check_circle),
             label: Text(loc.t('inventory_complete')),
           ),
