@@ -344,50 +344,74 @@ class _InventoryScreenState extends State<InventoryScreen> {
     Employee? employee,
   ) {
     final theme = Theme.of(context);
+    final cardColor = theme.colorScheme.surface;
     return Container(
-      color: theme.colorScheme.surfaceContainerHighest,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      child: Wrap(
-        spacing: 20,
-        runSpacing: 8,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          SizedBox(width: 140, child: _headerBlock(theme, loc.t('inventory_establishment'), establishment?.name ?? '—')),
-          SizedBox(width: 140, child: _headerBlock(theme, loc.t('inventory_employee'), employee?.fullName ?? '—')),
-          InkWell(
-            onTap: () => _pickDate(context),
-            child: SizedBox(
-              width: 100,
-              child: _headerBlock(
-                theme,
-                loc.t('inventory_date'),
-                '${_date.day.toString().padLeft(2, '0')}.${_date.month.toString().padLeft(2, '0')}.${_date.year}',
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        border: Border(bottom: BorderSide(color: theme.dividerColor, width: 1)),
+      ),
+      child: Card(
+        margin: EdgeInsets.zero,
+        elevation: 0,
+        color: cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Wrap(
+            spacing: 24,
+            runSpacing: 12,
+            crossAxisAlignment: WrapCrossAlignment.start,
+            children: [
+              _headerChip(theme, Icons.store, loc.t('inventory_establishment'), establishment?.name ?? '—'),
+              _headerChip(theme, Icons.person, loc.t('inventory_employee'), employee?.fullName ?? '—'),
+              InkWell(
+                onTap: () => _pickDate(context),
+                borderRadius: BorderRadius.circular(8),
+                child: _headerChip(
+                  theme,
+                  Icons.calendar_today,
+                  loc.t('inventory_date'),
+                  '${_date.day.toString().padLeft(2, '0')}.${_date.month.toString().padLeft(2, '0')}.${_date.year}',
+                ),
               ),
-            ),
+              _headerChip(
+                theme,
+                Icons.access_time,
+                loc.t('inventory_time_fill'),
+                '${_startTime?.hour.toString().padLeft(2, '0') ?? '—'}:${_startTime?.minute.toString().padLeft(2, '0') ?? '—'} → '
+                '${_endTime != null ? '${_endTime!.hour.toString().padLeft(2, '0')}:${_endTime!.minute.toString().padLeft(2, '0')}' : '...'}',
+              ),
+            ],
           ),
-          SizedBox(
-            width: 120,
-            child: _headerBlock(
-              theme,
-              loc.t('inventory_time_fill'),
-              '${_startTime?.hour.toString().padLeft(2, '0') ?? '—'}:${_startTime?.minute.toString().padLeft(2, '0') ?? '—'} — '
-              '${_endTime != null ? '${_endTime!.hour.toString().padLeft(2, '0')}:${_endTime!.minute.toString().padLeft(2, '0')}' : '...'}',
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _headerBlock(ThemeData theme, String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.primary)),
-        const SizedBox(height: 2),
-        Text(value, style: theme.textTheme.bodyMedium, overflow: TextOverflow.ellipsis, maxLines: 2),
-      ],
+  Widget _headerChip(ThemeData theme, IconData icon, String label, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: theme.dividerColor.withOpacity(0.5)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: theme.colorScheme.primary),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(label, style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.primary)),
+              Text(value, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -399,6 +423,31 @@ class _InventoryScreenState extends State<InventoryScreen> {
   static const double _leftWidth = _colNoWidth + _colNameWidth + _colUnitWidth;
 
   Widget _buildTable(LocalizationService loc) {
+    if (_rows.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.inventory_2_outlined, size: 64, color: Theme.of(context).colorScheme.outline),
+              const SizedBox(height: 16),
+              Text(
+                loc.t('inventory_empty_hint'),
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              FilledButton.tonalIcon(
+                onPressed: () => _showProductPicker(context, loc),
+                icon: const Icon(Icons.add),
+                label: Text(loc.t('inventory_add_product')),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -437,25 +486,16 @@ class _InventoryScreenState extends State<InventoryScreen> {
   Widget _buildLeftHeader(LocalizationService loc) {
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      color: theme.colorScheme.surfaceContainerHighest,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primaryContainer.withOpacity(0.3),
+        border: Border(bottom: BorderSide(color: theme.colorScheme.outline.withOpacity(0.3))),
+      ),
       child: Row(
         children: [
-          SizedBox(width: _colNoWidth, child: Text('#', style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold))),
-          SizedBox(
-            width: _colNameWidth,
-            child: Tooltip(
-              message: loc.t('inventory_item_hint'),
-              child: Text(loc.t('inventory_item_name'), style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold)),
-            ),
-          ),
-          SizedBox(
-            width: _colUnitWidth,
-            child: Tooltip(
-              message: loc.t('inventory_unit_hint'),
-              child: Text(loc.t('inventory_unit'), style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold)),
-            ),
-          ),
+          SizedBox(width: _colNoWidth, child: Text('#', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface))),
+          SizedBox(width: _colNameWidth, child: Text(loc.t('inventory_item_name'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface))),
+          SizedBox(width: _colUnitWidth, child: Text(loc.t('inventory_unit'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface))),
         ],
       ),
     );
@@ -470,24 +510,23 @@ class _InventoryScreenState extends State<InventoryScreen> {
         _removeRow(index);
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: theme.dividerColor)),
-          color: index.isEven ? null : theme.colorScheme.surfaceContainerLowest,
+          border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
+          color: index.isEven ? theme.colorScheme.surface : theme.colorScheme.surfaceContainerLowest.withOpacity(0.5),
         ),
         child: Row(
           children: [
-            SizedBox(width: _colNoWidth, child: Text('${index + 1}', style: theme.textTheme.bodyMedium)),
+            SizedBox(width: _colNoWidth, child: Text('${index + 1}', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant))),
             SizedBox(
               width: _colNameWidth,
-              child: Text(
-                row.productName(loc.currentLanguageCode),
-                style: theme.textTheme.bodyMedium,
-                overflow: TextOverflow.ellipsis,
-                maxLines: 2,
-              ),
+              child: Text(row.productName(loc.currentLanguageCode), style: theme.textTheme.bodyMedium, overflow: TextOverflow.ellipsis, maxLines: 2),
             ),
-            SizedBox(width: _colUnitWidth, child: Text(row.unit, style: theme.textTheme.bodySmall)),
+            Container(
+              width: _colUnitWidth,
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Text(row.unit, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+            ),
           ],
         ),
       ),
@@ -497,26 +536,15 @@ class _InventoryScreenState extends State<InventoryScreen> {
   Widget _buildRightHeader(LocalizationService loc) {
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-      color: theme.colorScheme.surfaceContainerHighest,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primaryContainer.withOpacity(0.3),
+        border: Border(bottom: BorderSide(color: theme.colorScheme.outline.withOpacity(0.3))),
+      ),
       child: Row(
         children: [
-          SizedBox(
-            width: _colTotalWidth,
-            child: Tooltip(
-              message: loc.t('inventory_total_hint'),
-              child: Text(loc.t('inventory_total'), style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold)),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              loc.t('inventory_quantity'),
-              style: theme.textTheme.labelMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
+          SizedBox(width: _colTotalWidth, child: Text(loc.t('inventory_total'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface))),
+          Expanded(child: Text(loc.t('inventory_quantity'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface))),
         ],
       ),
     );
@@ -527,44 +555,45 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final row = _rows[rowIndex];
     final maxCols = _maxQuantityColumns;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: theme.dividerColor)),
-        color: rowIndex.isEven ? null : theme.colorScheme.surfaceContainerLowest,
+        border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
+        color: rowIndex.isEven ? theme.colorScheme.surface : theme.colorScheme.surfaceContainerLowest.withOpacity(0.5),
       ),
       child: Row(
         children: [
-          SizedBox(
+          Container(
             width: _colTotalWidth,
-            child: Text(
-              _formatQty(row.total),
-              style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(_formatQty(row.total), style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
           ),
           ...List.generate(
             maxCols,
-            (colIndex) => SizedBox(
-              width: _colQtyWidth,
-              child: colIndex < row.quantities.length
-                  ? (_completed
-                      ? Text(_formatQty(row.quantities[colIndex]), style: theme.textTheme.bodyMedium)
-                      : _QtyCell(
-                          value: row.quantities[colIndex],
-                          onChanged: (v) => _setQuantity(rowIndex, colIndex, v),
-                        ))
-                  : const SizedBox.shrink(),
+            (colIndex) => Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: SizedBox(
+                width: _colQtyWidth - 4,
+                child: colIndex < row.quantities.length
+                    ? (_completed
+                        ? Text(_formatQty(row.quantities[colIndex]), style: theme.textTheme.bodyMedium)
+                        : _QtyCell(
+                            value: row.quantities[colIndex],
+                            onChanged: (v) => _setQuantity(rowIndex, colIndex, v),
+                          ))
+                    : const SizedBox.shrink(),
+              ),
             ),
           ),
           if (!_completed)
             SizedBox(
-              width: 36,
-              child: IconButton(
-                icon: const Icon(Icons.add_circle_outline, size: 22),
+              width: 32,
+              child: IconButton.filledTonal(
+                icon: const Icon(Icons.add, size: 18),
                 onPressed: () => _addQuantityToRow(rowIndex),
                 tooltip: loc.t('inventory_add_column_hint'),
                 style: IconButton.styleFrom(
                   padding: EdgeInsets.zero,
-                  minimumSize: const Size(32, 32),
+                  minimumSize: const Size(28, 28),
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
               ),
@@ -580,24 +609,34 @@ class _InventoryScreenState extends State<InventoryScreen> {
   }
 
   Widget _buildFooter(LocalizationService loc) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (!_completed) ...[
-            OutlinedButton.icon(
-              onPressed: () => _showProductPicker(context, loc),
-              icon: const Icon(Icons.add),
-              label: Text(loc.t('inventory_add_product')),
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        border: Border(top: BorderSide(color: theme.dividerColor)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Row(
+          children: [
+            if (!_completed) ...[
+              OutlinedButton.icon(
+                onPressed: () => _showProductPicker(context, loc),
+                icon: const Icon(Icons.add, size: 20),
+                label: Text(loc.t('inventory_add_product')),
+              ),
+              const SizedBox(width: 12),
+            ],
+            Expanded(
+              child: FilledButton(
+                onPressed: _completed ? null : () => _complete(context),
+                style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+                child: Text(loc.t('inventory_complete')),
+              ),
             ),
-            const SizedBox(height: 12),
           ],
-          FilledButton(
-            onPressed: _completed ? null : () => _complete(context),
-            child: Text(loc.t('inventory_complete')),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -674,17 +713,19 @@ class _QtyCellState extends State<_QtyCell> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return TextField(
       controller: _controller,
       focusNode: _focus,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      style: Theme.of(context).textTheme.bodyMedium,
+      textAlign: TextAlign.center,
+      style: theme.textTheme.bodyMedium,
       decoration: InputDecoration(
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-        border: const OutlineInputBorder(),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
         filled: true,
-        fillColor: Theme.of(context).colorScheme.surface,
+        fillColor: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
       ),
       onChanged: (s) {
         final v = double.tryParse(s.replaceFirst(',', '.')) ?? 0;
