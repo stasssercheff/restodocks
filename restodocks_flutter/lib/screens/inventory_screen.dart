@@ -415,12 +415,18 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
-  static const double _colNoWidth = 32;
-  static const double _colNameWidth = 180;
-  static const double _colUnitWidth = 64;
-  static const double _colTotalWidth = 64;
-  static const double _colQtyWidth = 72;
-  static const double _leftWidth = _colNoWidth + _colNameWidth + _colUnitWidth;
+  static const double _colNoWidth = 28;
+  static const double _colUnitWidth = 48;
+  static const double _colTotalWidth = 56;
+  static const double _colQtyWidth = 64;
+
+  double _leftWidth(BuildContext context) {
+    final w = MediaQuery.of(context).size.width;
+    return (w * 0.42).clamp(140.0, 200.0);
+  }
+
+  double _colNameWidth(BuildContext context) =>
+      _leftWidth(context) - _colNoWidth - _colUnitWidth;
 
   Widget _buildTable(LocalizationService loc) {
     if (_rows.isEmpty) {
@@ -452,7 +458,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SizedBox(
-          width: _leftWidth,
+          width: _leftWidth(context),
           child: ListView(
             controller: _vScrollLeft,
             shrinkWrap: true,
@@ -485,8 +491,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
   Widget _buildLeftHeader(LocalizationService loc) {
     final theme = Theme.of(context);
+    final nameW = _colNameWidth(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
       decoration: BoxDecoration(
         color: theme.colorScheme.primaryContainer.withOpacity(0.3),
         border: Border(bottom: BorderSide(color: theme.colorScheme.outline.withOpacity(0.3))),
@@ -494,7 +501,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
       child: Row(
         children: [
           SizedBox(width: _colNoWidth, child: Text('#', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface))),
-          SizedBox(width: _colNameWidth, child: Text(loc.t('inventory_item_name'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface))),
+          SizedBox(width: nameW, child: Text(loc.t('inventory_item_name'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface), overflow: TextOverflow.ellipsis, maxLines: 1)),
           SizedBox(width: _colUnitWidth, child: Text(loc.t('inventory_unit'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface))),
         ],
       ),
@@ -504,29 +511,32 @@ class _InventoryScreenState extends State<InventoryScreen> {
   Widget _buildLeftRow(LocalizationService loc, int index) {
     final theme = Theme.of(context);
     final row = _rows[index];
+    final nameW = _colNameWidth(context);
     return InkWell(
       onLongPress: () {
         if (_completed) return;
         _removeRow(index);
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
         decoration: BoxDecoration(
           border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
           color: index.isEven ? theme.colorScheme.surface : theme.colorScheme.surfaceContainerLowest.withOpacity(0.5),
         ),
         child: Row(
           children: [
-            SizedBox(width: _colNoWidth, child: Text('${index + 1}', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant))),
+            SizedBox(width: _colNoWidth, child: Text('${index + 1}', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant))),
             SizedBox(
-              width: _colNameWidth,
-              child: Text(row.productName(loc.currentLanguageCode), style: theme.textTheme.bodyMedium, overflow: TextOverflow.ellipsis, maxLines: 2),
+              width: nameW,
+              child: Text(
+                row.productName(loc.currentLanguageCode),
+                style: theme.textTheme.bodyMedium,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                softWrap: true,
+              ),
             ),
-            Container(
-              width: _colUnitWidth,
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Text(row.unit, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-            ),
+            SizedBox(width: _colUnitWidth, child: Text(row.unit, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant), overflow: TextOverflow.ellipsis)),
           ],
         ),
       ),
@@ -555,7 +565,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final row = _rows[rowIndex];
     final maxCols = _maxQuantityColumns;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
         color: rowIndex.isEven ? theme.colorScheme.surface : theme.colorScheme.surfaceContainerLowest.withOpacity(0.5),
@@ -570,9 +580,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
           ...List.generate(
             maxCols,
             (colIndex) => Padding(
-              padding: const EdgeInsets.only(right: 4),
+              padding: const EdgeInsets.only(right: 2),
               child: SizedBox(
-                width: _colQtyWidth - 4,
+                width: _colQtyWidth - 2,
                 child: colIndex < row.quantities.length
                     ? (_completed
                         ? Text(_formatQty(row.quantities[colIndex]), style: theme.textTheme.bodyMedium)
@@ -586,7 +596,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           ),
           if (!_completed)
             SizedBox(
-              width: 32,
+              width: 28,
               child: IconButton.filledTonal(
                 icon: const Icon(Icons.add, size: 18),
                 onPressed: () => _addQuantityToRow(rowIndex),
