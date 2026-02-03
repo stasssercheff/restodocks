@@ -401,7 +401,7 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
           protein: null,
           fat: null,
           carbs: null,
-          unit: 'кг',
+          unit: 'g',
           basePrice: item.price,
           currency: item.price != null ? defCur : null,
         );
@@ -495,7 +495,15 @@ class _NomenclatureTab extends StatelessWidget {
 
   bool _needsTranslation(Product p) {
     final allLangs = LocalizationService.productLanguageCodes;
-    return allLangs.any((c) => (p.names?[c] ?? '').trim().isEmpty);
+    final n = p.names;
+    if (n == null || n.isEmpty) return true;
+    if (allLangs.any((c) => (n[c] ?? '').trim().isEmpty)) return true;
+    // Ручные продукты с одинаковым текстом во всех языках — не переведены
+    if (p.category == 'manual') {
+      final vals = allLangs.map((c) => (n[c] ?? '').trim()).where((s) => s.isNotEmpty).toSet();
+      if (vals.length <= 1) return true;
+    }
+    return false;
   }
 
   Future<void> _loadKbjuForAll(BuildContext context, List<Product> list) async {
@@ -1127,7 +1135,15 @@ class _CatalogTab extends StatelessWidget {
 
   bool _needsTranslation(Product p) {
     final allLangs = LocalizationService.productLanguageCodes;
-    return allLangs.any((c) => (p.names?[c] ?? '').trim().isEmpty);
+    final n = p.names;
+    if (n == null || n.isEmpty) return true;
+    if (allLangs.any((c) => (n[c] ?? '').trim().isEmpty)) return true;
+    // Ручные продукты с одинаковым текстом во всех языках — не переведены
+    if (p.category == 'manual') {
+      final vals = allLangs.map((c) => (n[c] ?? '').trim()).where((s) => s.isNotEmpty).toSet();
+      if (vals.length <= 1) return true;
+    }
+    return false;
   }
 
   Future<void> _loadTranslationsForAll(BuildContext context, List<Product> list) async {
@@ -1358,11 +1374,11 @@ class _CatalogTab extends StatelessWidget {
 
   Future<void> _fetchKbju(BuildContext context, Product p) async {
     final scaffold = ScaffoldMessenger.of(context);
-    scaffold.showSnackBar(const SnackBar(content: Text('Поиск КБЖУ...')));
+    scaffold.showSnackBar(SnackBar(content: Text(loc.t('kbju_searching'))));
     final result = await NutritionApiService.fetchNutrition(p.getLocalizedName(loc.currentLanguageCode));
     if (!context.mounted) return;
     if (result == null || !result.hasData) {
-      scaffold.showSnackBar(const SnackBar(content: Text('КБЖУ не найдены')));
+      scaffold.showSnackBar(SnackBar(content: Text(loc.t('kbju_not_found'))));
       return;
     }
     try {
@@ -1374,13 +1390,15 @@ class _CatalogTab extends StatelessWidget {
       );
       await store.updateProduct(updated);
       onRefresh();
-      scaffold.showSnackBar(SnackBar(
-        content: Text(
-          'КБЖУ: ${result.calories?.round() ?? 0} ккал, Б ${result.protein?.round() ?? 0} / Ж ${result.fat?.round() ?? 0} / У ${result.carbs?.round() ?? 0}',
-        ),
-      ));
+      var fmt = loc.t('kbju_result_format');
+      fmt = fmt.replaceFirst('%s', '${result.calories?.round() ?? 0}');
+      fmt = fmt.replaceFirst('%s', '${result.protein?.round() ?? 0}');
+      fmt = fmt.replaceFirst('%s', '${result.fat?.round() ?? 0}');
+      fmt = fmt.replaceFirst('%s', '${result.carbs?.round() ?? 0}');
+      final msg = fmt;
+      scaffold.showSnackBar(SnackBar(content: Text(msg)));
     } catch (e) {
-      scaffold.showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+      scaffold.showSnackBar(SnackBar(content: Text('${loc.t('error_short')}: $e')));
     }
   }
 }
@@ -1450,8 +1468,8 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
     _carbsController = TextEditingController(text: p.carbs?.toString() ?? '');
     _wastePctController = TextEditingController(text: p.primaryWastePct?.toStringAsFixed(1) ?? '0');
     final unitMap = {'кг': 'kg', 'г': 'g', 'шт': 'pcs', 'л': 'l', 'мл': 'ml'};
-    _unit = unitMap[p.unit] ?? p.unit ?? 'kg';
-    if (!CulinaryUnits.all.any((e) => e.id == _unit)) _unit = 'kg';
+    _unit = unitMap[p.unit] ?? p.unit ?? 'g';
+    if (!CulinaryUnits.all.any((e) => e.id == _unit)) _unit = 'g';
     _currency = p.currency ?? 'VND';
     _containsGluten = p.containsGluten ?? false;
     _containsLactose = p.containsLactose ?? false;

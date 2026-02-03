@@ -321,6 +321,26 @@ class TTIngredient extends Equatable {
     );
   }
 
+  /// Масштабировать ингредиент (для повара: пересчёт под новый выход)
+  TTIngredient scaleBy(double factor) {
+    if (factor <= 0 || factor == 1.0) return this;
+    return copyWith(
+      grossWeight: grossWeight * factor,
+      netWeight: netWeight * factor,
+      cost: cost * factor,
+      finalCalories: finalCalories * factor,
+      finalProtein: finalProtein * factor,
+      finalFat: finalFat * factor,
+      finalCarbs: finalCarbs * factor,
+    );
+  }
+
+  /// Изменить нетто вручную (повар) — пересчёт cost и КБЖУ пропорционально
+  TTIngredient updateNetWeightForCook(double newNetWeight) {
+    if (netWeight <= 0) return copyWith(netWeight: newNetWeight);
+    return scaleBy(newNetWeight / netWeight);
+  }
+
   /// Обновить нетто вес вручную
   TTIngredient updateNetWeight(double newNetWeight, Product? product) {
     if (product == null) {

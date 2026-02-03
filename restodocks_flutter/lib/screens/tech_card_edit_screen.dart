@@ -344,26 +344,39 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
               spacing: 16,
               runSpacing: 12,
               children: [
-                SizedBox(width: 180, child: TextField(controller: _nameController, readOnly: !canEdit, decoration: InputDecoration(labelText: loc.t('dish_name'), isDense: true))),
+                SizedBox(width: 180, child: TextField(controller: _nameController, readOnly: true, decoration: InputDecoration(labelText: loc.t('dish_name'), isDense: true))),
                 SizedBox(width: 100, child: TextField(controller: _categoryController, readOnly: !canEdit, decoration: const InputDecoration(labelText: 'Категория', isDense: true))),
-                SizedBox(width: 70, child: TextField(controller: _portionController, readOnly: !canEdit, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: loc.t('portion_weight'), isDense: true))),
-                SizedBox(width: 70, child: TextField(controller: _yieldController, readOnly: !canEdit, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: loc.t('yield_g'), isDense: true))),
-                if (canEdit) FilledButton.icon(onPressed: _showAddIngredient, icon: const Icon(Icons.add, size: 18), label: Text(loc.t('add_ingredient'))),
+                if (canEdit) ...[
+                  SizedBox(width: 70, child: TextField(controller: _portionController, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: loc.t('portion_weight'), isDense: true))),
+                  SizedBox(width: 70, child: TextField(controller: _yieldController, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: loc.t('yield_g'), isDense: true))),
+                  FilledButton.icon(onPressed: _showAddIngredient, icon: const Icon(Icons.add, size: 18), label: Text(loc.t('add_ingredient'))),
+                ],
               ],
             ),
             const SizedBox(height: 16),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-              child: _TtkTable(
-                loc: loc,
-                dishName: _nameController.text,
-                ingredients: _ingredients,
-                canEdit: canEdit,
-                onRemove: _removeIngredient,
-                onUpdate: (i, ing) => setState(() => _ingredients[i] = ing),
-                onAdd: _showAddIngredient,
-                productStore: context.read<ProductStoreSupabase>(),
-              ),
+              child: canEdit
+                  ? _TtkTable(
+                      loc: loc,
+                      dishName: _nameController.text,
+                      ingredients: _ingredients,
+                      canEdit: true,
+                      onRemove: _removeIngredient,
+                      onUpdate: (i, ing) => setState(() => _ingredients[i] = ing),
+                      onAdd: _showAddIngredient,
+                      productStore: context.read<ProductStoreSupabase>(),
+                    )
+                  : _TtkCookTable(
+                      loc: loc,
+                      dishName: _nameController.text,
+                      ingredients: _ingredients,
+                      technology: _technologyController.text,
+                      onIngredientsChanged: (list) => setState(() {
+                        _ingredients.clear();
+                        _ingredients.addAll(list);
+                      }),
+                    ),
             ),
             const SizedBox(height: 16),
             TextField(
@@ -550,6 +563,228 @@ class _TtkTable extends StatelessWidget {
         padding: _cellPad,
         child: Text(text, style: TextStyle(fontSize: 12, fontWeight: bold ? FontWeight.bold : null), overflow: TextOverflow.ellipsis, maxLines: 2),
       ),
+    );
+  }
+}
+
+/// Упрощённая таблица для повара: Блюдо, Продукт, Нетто (редакт.), Способ, Выход (редакт.), Технология
+class _TtkCookTable extends StatefulWidget {
+  const _TtkCookTable({
+    required this.loc,
+    required this.dishName,
+    required this.ingredients,
+    required this.technology,
+    required this.onIngredientsChanged,
+  });
+
+  final LocalizationService loc;
+  final String dishName;
+  final List<TTIngredient> ingredients;
+  final String technology;
+  final void Function(List<TTIngredient> list) onIngredientsChanged;
+
+  static const _cellPad = EdgeInsets.symmetric(horizontal: 6, vertical: 6);
+
+  @override
+  State<_TtkCookTable> createState() => _TtkCookTableState();
+}
+
+class _TtkCookTableState extends State<_TtkCookTable> {
+  late List<TTIngredient> _ingredients;
+  late double _totalOutput;
+
+  @override
+  void initState() {
+    super.initState();
+    _ingredients = List.from(widget.ingredients);
+    _totalOutput = _ingredients.fold<double>(0, (s, i) => s + i.netWeight);
+  }
+
+  @override
+  void didUpdateWidget(covariant _TtkCookTable oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.ingredients != widget.ingredients) {
+      _ingredients = List.from(widget.ingredients);
+      _totalOutput = _ingredients.fold<double>(0, (s, i) => s + i.netWeight);
+    }
+  }
+
+  void _scaleByOutput(double newOutput) {
+    if (newOutput <= 0 || _totalOutput <= 0) return;
+    final factor = newOutput / _totalOutput;
+    setState(() {
+      _totalOutput = newOutput;
+      _ingredients = _ingredients.map((i) => i.scaleBy(factor)).toList();
+      widget.onIngredientsChanged(_ingredients);
+    });
+  }
+
+  void _updateNetAt(int index, double newNet) {
+    if (index < 0 || index >= _ingredients.length) return;
+    setState(() {
+      _ingredients[index] = _ingredients[index].updateNetWeightForCook(newNet);
+      _totalOutput = _ingredients.fold<double>(0, (s, i) => s + i.netWeight);
+      widget.onIngredientsChanged(_ingredients);
+    });
+  }
+
+  Widget _cell(String text, {bool bold = false}) {
+    return TableCell(
+      child: Padding(
+        padding: _TtkCookTable._cellPad,
+        child: Text(text, style: TextStyle(fontSize: 12, fontWeight: bold ? FontWeight.bold : null), overflow: TextOverflow.ellipsis, maxLines: 2),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final lang = widget.loc.currentLanguageCode;
+    final totalCost = _ingredients.fold<double>(0, (s, i) => s + i.cost);
+    final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'RUB';
+    final sym = currency == 'RUB' ? '₽' : currency == 'VND' ? '₫' : currency == 'USD' ? '\$' : currency;
+
+    return Table(
+      border: TableBorder.all(width: 0.5, color: Colors.grey),
+      columnWidths: const {
+        0: FlexColumnWidth(1.2),
+        1: FlexColumnWidth(2),
+        2: FlexColumnWidth(0.9),
+        3: FlexColumnWidth(1.2),
+        4: FlexColumnWidth(0.9),
+      },
+      children: [
+        TableRow(
+          decoration: BoxDecoration(color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3)),
+          children: [
+            _cell(widget.loc.t('ttk_dish'), bold: true),
+            _cell(widget.loc.t('ttk_product'), bold: true),
+            _cell(widget.loc.t('ttk_net'), bold: true),
+            _cell(widget.loc.t('ttk_cooking_method'), bold: true),
+            _cell(widget.loc.t('ttk_output'), bold: true),
+          ],
+        ),
+        if (_ingredients.isEmpty)
+          TableRow(
+            children: List.filled(5, TableCell(child: Padding(padding: _TtkCookTable._cellPad, child: Text('—', style: const TextStyle(fontSize: 12))))),
+          )
+        else
+        ..._ingredients.asMap().entries.map((e) {
+          final i = e.key;
+          final ing = e.value;
+          return TableRow(
+            children: [
+              _cell(i == 0 ? widget.dishName : (ing.sourceTechCardName ?? '—')),
+              _cell(ing.productName),
+              TableCell(
+                child: Padding(
+                  padding: _TtkCookTable._cellPad,
+                  child: _EditableNetCell(
+                    value: ing.netWeight,
+                    onChanged: (v) => _updateNetAt(i, v ?? ing.netWeight),
+                  ),
+                ),
+              ),
+              _cell(ing.cookingProcessName ?? '—'),
+              _cell('${ing.netWeight.toStringAsFixed(0)} г'),
+            ],
+          );
+        }),
+        TableRow(
+          decoration: BoxDecoration(color: Colors.amber.shade100),
+          children: [
+            _cell(widget.loc.t('ttk_total'), bold: true),
+            _cell(''),
+            TableCell(
+              child: Padding(
+                padding: _TtkCookTable._cellPad,
+                child: Text('${_totalOutput.toStringAsFixed(0)} г', style: const TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ),
+            _cell(''),
+            TableCell(
+              child: Padding(
+                padding: _TtkCookTable._cellPad,
+                child: _EditableNetCell(
+                  value: _totalOutput,
+                  onChanged: (v) {
+                    if (v != null && v > 0) _scaleByOutput(v);
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _EditableNetCell extends StatefulWidget {
+  const _EditableNetCell({required this.value, required this.onChanged});
+
+  final double value;
+  final void Function(double? v) onChanged;
+
+  @override
+  State<_EditableNetCell> createState() => _EditableNetCellState();
+}
+
+class _EditableNetCellState extends State<_EditableNetCell> {
+  bool _editing = false;
+  late TextEditingController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: widget.value.toStringAsFixed(0));
+  }
+
+  @override
+  void didUpdateWidget(covariant _EditableNetCell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_editing && oldWidget.value != widget.value) {
+      _ctrl.text = widget.value.toStringAsFixed(0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final v = double.tryParse(_ctrl.text.replaceFirst(',', '.'));
+    setState(() => _editing = false);
+    widget.onChanged(v);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_editing) {
+      return SizedBox(
+        width: 72,
+        child: TextField(
+          controller: _ctrl,
+          keyboardType: TextInputType.numberWithOptions(decimal: true),
+          autofocus: true,
+          decoration: const InputDecoration(isDense: true, suffixText: 'г'),
+          style: const TextStyle(fontSize: 12),
+          onSubmitted: (_) => _submit(),
+          onTapOutside: (_) => _submit(),
+        ),
+      );
+    }
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _editing = true;
+          _ctrl.text = widget.value.toStringAsFixed(0);
+          _ctrl.selection = TextSelection(baseOffset: 0, extentOffset: _ctrl.text.length);
+        });
+      },
+      child: Text('${widget.value.toStringAsFixed(0)} г', style: const TextStyle(fontSize: 12)),
     );
   }
 }

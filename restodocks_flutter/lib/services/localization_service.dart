@@ -83,10 +83,11 @@ class LocalizationService extends ChangeNotifier {
     } catch (_) {}
   }
 
-  /// Получение перевода для текущей локали (fallback: en → key)
+  /// Получение перевода для текущей локали (fallback: en → ru → key)
   String translate(String key, {Map<String, String>? args}) {
     var translation = _translations[currentLanguageCode]?[key] ??
         _translations['en']?[key] ??
+        _translations['ru']?[key] ??
         key;
 
     // Замена аргументов в переводе

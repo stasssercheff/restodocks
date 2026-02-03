@@ -32,6 +32,7 @@ class ManagementHomeContent extends StatelessWidget {
           _Tile(icon: Icons.shopping_cart, title: loc.t('product_order'), onTap: () => context.push('/products')),
         if (isChef) ...[
           _Tile(icon: Icons.assignment, title: loc.t('inventory_blank'), onTap: () => context.push('/inventory')),
+          _Tile(icon: Icons.restaurant_menu, title: loc.t('inventory_pf_blank'), onTap: () => context.push('/inventory-pf')),
           _Tile(icon: Icons.inbox, title: loc.t('inventory_received'), onTap: () => context.push('/inventory-received')),
         ],
         if (isGeneral) ...[

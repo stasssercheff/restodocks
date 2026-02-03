@@ -15,7 +15,7 @@ class _InventoryRow {
   _InventoryRow({required this.product, required this.quantities});
 
   String productName(String lang) => product.getLocalizedName(lang);
-  String get unit => product.unit ?? 'kg';
+  String get unit => product.unit ?? 'g';
   String unitDisplay(String lang) => CulinaryUnits.displayName(unit.toLowerCase(), lang);
   double get total => quantities.fold(0.0, (a, b) => a + b);
 }
