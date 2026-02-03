@@ -149,6 +149,21 @@ class AccountManagerSupabase {
     }
   }
 
+  /// Проверка: занят ли email в данном заведении (чтобы исключить дубли)
+  Future<bool> isEmailTakenInEstablishment(String email, String establishmentId) async {
+    try {
+      final list = await _supabase.client
+          .from('employees')
+          .select('id')
+          .eq('email', email.trim())
+          .eq('establishment_id', establishmentId)
+          .limit(1);
+      return list != null && (list as List).isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Регистрация сотрудника в компании
   Future<Employee> createEmployeeForCompany({
     required Establishment company,
@@ -193,7 +208,48 @@ class AccountManagerSupabase {
     return createdEmployee;
   }
 
-  /// Поиск сотрудника по email и паролю
+  /// Поиск сотрудника по email и паролю (без PIN — по всем заведениям)
+  /// Возвращает (Employee, Establishment) при успехе
+  Future<({Employee employee, Establishment establishment})?> findEmployeeByEmailAndPasswordGlobal({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      final empList = await _supabase.client
+          .from('employees')
+          .select()
+          .eq('email', email.trim())
+          .eq('is_active', true);
+
+      if (empList == null || (empList as List).isEmpty) return null;
+
+      for (final empRaw in empList) {
+        final employeeData = Map<String, dynamic>.from(empRaw);
+        final hash = employeeData['password_hash'] as String?;
+        if (hash == null || hash.isEmpty) continue;
+        employeeData['password'] = hash;
+        final employee = Employee.fromJson(employeeData);
+        final ok = BCrypt.checkpw(password, hash) || (hash == password);
+        if (!ok) continue;
+
+        final estId = employee.establishmentId;
+        final estData = await _supabase.client
+            .from('establishments')
+            .select()
+            .eq('id', estId)
+            .limit(1)
+            .single();
+        final establishment = Establishment.fromJson(estData);
+        return (employee: employee, establishment: establishment);
+      }
+      return null;
+    } catch (e) {
+      print('Ошибка поиска сотрудника по email: $e');
+      return null;
+    }
+  }
+
+  /// Поиск сотрудника по email и паролю (в рамках заведения)
   Future<Employee?> findEmployeeByEmailAndPassword({
     required String email,
     required String password,
@@ -247,12 +303,10 @@ class AccountManagerSupabase {
     await _secureStorage.set(_keyEmployeeId, employee.id);
     await _secureStorage.set(_keyEstablishmentId, establishment.id);
 
-    if (rememberCredentials && pin != null && email != null && password != null) {
-      await _secureStorage.set(_keyRememberPin, pin);
+    if (rememberCredentials && email != null && password != null) {
       await _secureStorage.set(_keyRememberEmail, email);
       await _secureStorage.set(_keyRememberPassword, password);
     } else {
-      await _secureStorage.remove(_keyRememberPin);
       await _secureStorage.remove(_keyRememberEmail);
       await _secureStorage.remove(_keyRememberPassword);
     }

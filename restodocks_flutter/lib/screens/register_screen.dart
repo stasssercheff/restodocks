@@ -87,6 +87,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
         return;
       }
 
+      final email = _emailController.text.trim();
+      final emailTaken = await accountManager.isEmailTakenInEstablishment(email, establishment.id);
+      if (emailTaken) {
+        if (!mounted) return;
+        final loc = context.read<LocalizationService>();
+        setState(() => _errorMessage = loc.t('email_already_registered'));
+        return;
+      }
+
       final name = _nameController.text.trim();
       final surname = _surnameController.text.trim();
       final fullName = surname.isEmpty ? name : '$name $surname';
@@ -96,7 +105,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final employee = await accountManager.createEmployeeForCompany(
         company: establishment,
         fullName: fullName,
-        email: _emailController.text.trim(),
+        email: email,
         password: _passwordController.text,
         department: _department,
         section: section,

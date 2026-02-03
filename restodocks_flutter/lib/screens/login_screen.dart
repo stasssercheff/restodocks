@@ -18,7 +18,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _companyPinController = TextEditingController();
 
   bool _isLoading = false;
   String? _errorMessage;
@@ -38,9 +37,6 @@ class _LoginScreenState extends State<LoginScreen> {
     final account = context.read<AccountManagerSupabase>();
     final saved = await account.loadRememberedCredentials();
     if (!mounted) return;
-    if (saved.pin != null && saved.pin!.isNotEmpty) {
-      _companyPinController.text = saved.pin!.toUpperCase();
-    }
     if (saved.email != null && saved.email!.isNotEmpty) {
       _emailController.text = saved.email!;
     }
@@ -54,7 +50,6 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
-    _companyPinController.dispose();
     super.dispose();
   }
 
@@ -111,36 +106,6 @@ class _LoginScreenState extends State<LoginScreen> {
         textAlign: TextAlign.center,
       ),
       const SizedBox(height: 32),
-      TextFormField(
-        controller: _companyPinController,
-        autofillHints: const [AutofillHints.organizationName],
-        decoration: InputDecoration(
-          labelText: loc.t('company_pin'),
-          hintText: loc.t('enter_company_pin'),
-          prefixIcon: const Icon(Icons.business),
-          counterText: '',
-        ),
-        keyboardType: TextInputType.text,
-        textCapitalization: TextCapitalization.characters,
-        autocorrect: false,
-        enableSuggestions: false,
-        maxLength: 8,
-        validator: (value) {
-          if (value == null || value.isEmpty) return loc.t('company_pin_required');
-          if (value.length != 8) return loc.t('pin_must_be_8_chars');
-          return null;
-        },
-        onChanged: (v) {
-          final up = v.toUpperCase();
-          if (up != v) {
-            _companyPinController.value = TextEditingValue(
-              text: up,
-              selection: TextSelection.collapsed(offset: up.length),
-            );
-          }
-        },
-      ),
-      const SizedBox(height: 16),
       TextFormField(
         controller: _emailController,
         autofillHints: const [AutofillHints.email],
@@ -234,32 +199,20 @@ class _LoginScreenState extends State<LoginScreen> {
       final accountManager = context.read<AccountManagerSupabase>();
       final loc = context.read<LocalizationService>();
 
-      // Находим компанию по PIN
-      final establishment = await accountManager.findEstablishmentByPinCode(
-        _companyPinController.text.trim(),
-      );
-
-      if (establishment == null) {
-        if (mounted) setState(() => _errorMessage = loc.t('company_not_found'));
-        return;
-      }
-
-      final employee = await accountManager.findEmployeeByEmailAndPassword(
+      final result = await accountManager.findEmployeeByEmailAndPasswordGlobal(
         email: _emailController.text.trim(),
         password: _passwordController.text,
-        company: establishment,
       );
 
-      if (employee == null) {
+      if (result == null) {
         if (mounted) setState(() => _errorMessage = loc.t('invalid_email_or_password'));
         return;
       }
 
       await accountManager.login(
-        employee,
-        establishment,
+        result.employee,
+        result.establishment,
         rememberCredentials: _rememberCredentials,
-        pin: _companyPinController.text.trim(),
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
