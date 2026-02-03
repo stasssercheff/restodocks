@@ -89,6 +89,9 @@ class Employee extends Equatable {
   @JsonKey(name: 'personal_pin')
   final String? personalPin;
 
+  @JsonKey(name: 'avatar_url')
+  final String? avatarUrl;
+
   @JsonKey(name: 'is_active')
   final bool isActive;
 
@@ -108,6 +111,7 @@ class Employee extends Equatable {
     required this.roles,
     required this.establishmentId,
     this.personalPin,
+    this.avatarUrl,
     this.isActive = true,
     required this.createdAt,
     required this.updatedAt,
@@ -124,6 +128,7 @@ class Employee extends Equatable {
     List<String>? roles,
     String? establishmentId,
     String? personalPin,
+    String? avatarUrl,
     bool? isActive,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -138,6 +143,7 @@ class Employee extends Equatable {
       roles: roles ?? this.roles,
       establishmentId: establishmentId ?? this.establishmentId,
       personalPin: personalPin ?? this.personalPin,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -269,6 +275,7 @@ class Employee extends Equatable {
     roles,
     establishmentId,
     personalPin,
+    avatarUrl,
     isActive,
     createdAt,
     updatedAt,

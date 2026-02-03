@@ -29,8 +29,7 @@ class InventoryScreen extends StatefulWidget {
 }
 
 class _InventoryScreenState extends State<InventoryScreen> {
-  final ScrollController _vScrollLeft = ScrollController();
-  final ScrollController _vScrollRight = ScrollController();
+  final ScrollController _hScroll = ScrollController();
   final List<_InventoryRow> _rows = [];
   DateTime _date = DateTime.now();
   TimeOfDay? _startTime;
@@ -41,8 +40,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
   void initState() {
     super.initState();
     _startTime = TimeOfDay.now();
-    _vScrollLeft.addListener(_syncVLeftToRight);
-    _vScrollRight.addListener(_syncVRightToLeft);
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadNomenclature());
   }
 
@@ -66,23 +63,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
   @override
   void dispose() {
-    _vScrollLeft.removeListener(_syncVLeftToRight);
-    _vScrollRight.removeListener(_syncVRightToLeft);
-    _vScrollLeft.dispose();
-    _vScrollRight.dispose();
+    _hScroll.dispose();
     super.dispose();
-  }
-
-  void _syncVLeftToRight() {
-    if (!_vScrollLeft.hasClients || !_vScrollRight.hasClients) return;
-    if ((_vScrollLeft.offset - _vScrollRight.offset).abs() < 2) return;
-    _vScrollRight.jumpTo(_vScrollLeft.offset);
-  }
-
-  void _syncVRightToLeft() {
-    if (!_vScrollLeft.hasClients || !_vScrollRight.hasClients) return;
-    if ((_vScrollRight.offset - _vScrollLeft.offset).abs() < 2) return;
-    _vScrollLeft.jumpTo(_vScrollRight.offset);
   }
 
   int get _maxQuantityColumns =>
@@ -454,44 +436,31 @@ class _InventoryScreenState extends State<InventoryScreen> {
         ),
       );
     }
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SizedBox(
-          width: _leftWidth(context),
-          child: ListView(
-            controller: _vScrollLeft,
-            shrinkWrap: true,
+    final leftW = _leftWidth(context);
+    final rightW = _colTotalWidth + _maxQuantityColumns * _colQtyWidth + 40;
+    final totalW = leftW + rightW;
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      controller: _hScroll,
+      child: SingleChildScrollView(
+        child: SizedBox(
+          width: totalW,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildLeftHeader(loc),
-              ...List.generate(_rows.length, (i) => _buildLeftRow(loc, i)),
+              _buildHeaderRow(loc),
+              ...List.generate(_rows.length, (i) => _buildDataRow(loc, i)),
             ],
           ),
         ),
-        Expanded(
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: SizedBox(
-              width: _colTotalWidth + _maxQuantityColumns * _colQtyWidth + 48,
-              child: ListView(
-                controller: _vScrollRight,
-                shrinkWrap: true,
-                physics: const ClampingScrollPhysics(),
-                children: [
-                  _buildRightHeader(loc),
-                  ...List.generate(_rows.length, (i) => _buildRightRow(loc, i)),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 
-  Widget _buildLeftHeader(LocalizationService loc) {
+  Widget _buildHeaderRow(LocalizationService loc) {
     final theme = Theme.of(context);
     final nameW = _colNameWidth(context);
+    final qtyColsW = _maxQuantityColumns * _colQtyWidth + 28;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
       decoration: BoxDecoration(
@@ -503,15 +472,18 @@ class _InventoryScreenState extends State<InventoryScreen> {
           SizedBox(width: _colNoWidth, child: Text('#', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface))),
           SizedBox(width: nameW, child: Text(loc.t('inventory_item_name'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface), overflow: TextOverflow.ellipsis, maxLines: 1)),
           SizedBox(width: _colUnitWidth, child: Text(loc.t('inventory_unit'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface))),
+          SizedBox(width: _colTotalWidth, child: Text(loc.t('inventory_total'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface))),
+          SizedBox(width: qtyColsW, child: Text(loc.t('inventory_quantity'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface), overflow: TextOverflow.ellipsis)),
         ],
       ),
     );
   }
 
-  Widget _buildLeftRow(LocalizationService loc, int index) {
+  Widget _buildDataRow(LocalizationService loc, int index) {
     final theme = Theme.of(context);
     final row = _rows[index];
     final nameW = _colNameWidth(context);
+    final maxCols = _maxQuantityColumns;
     return InkWell(
       onLongPress: () {
         if (_completed) return;
@@ -524,6 +496,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           color: index.isEven ? theme.colorScheme.surface : theme.colorScheme.surfaceContainerLowest.withOpacity(0.5),
         ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             SizedBox(width: _colNoWidth, child: Text('${index + 1}', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant))),
             SizedBox(
@@ -531,84 +504,50 @@ class _InventoryScreenState extends State<InventoryScreen> {
               child: Text(
                 row.productName(loc.currentLanguageCode),
                 style: theme.textTheme.bodyMedium,
-                maxLines: 3,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 softWrap: true,
               ),
             ),
             SizedBox(width: _colUnitWidth, child: Text(row.unit, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant), overflow: TextOverflow.ellipsis)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRightHeader(LocalizationService loc) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.primaryContainer.withOpacity(0.3),
-        border: Border(bottom: BorderSide(color: theme.colorScheme.outline.withOpacity(0.3))),
-      ),
-      child: Row(
-        children: [
-          SizedBox(width: _colTotalWidth, child: Text(loc.t('inventory_total'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface))),
-          Expanded(child: Text(loc.t('inventory_quantity'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface))),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRightRow(LocalizationService loc, int rowIndex) {
-    final theme = Theme.of(context);
-    final row = _rows[rowIndex];
-    final maxCols = _maxQuantityColumns;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
-        color: rowIndex.isEven ? theme.colorScheme.surface : theme.colorScheme.surfaceContainerLowest.withOpacity(0.5),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: _colTotalWidth,
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Text(_formatQty(row.total), style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
-          ),
-          ...List.generate(
-            maxCols,
-            (colIndex) => Padding(
-              padding: const EdgeInsets.only(right: 2),
-              child: SizedBox(
-                width: _colQtyWidth - 2,
-                child: colIndex < row.quantities.length
-                    ? (_completed
-                        ? Text(_formatQty(row.quantities[colIndex]), style: theme.textTheme.bodyMedium)
-                        : _QtyCell(
-                            value: row.quantities[colIndex],
-                            onChanged: (v) => _setQuantity(rowIndex, colIndex, v),
-                          ))
-                    : const SizedBox.shrink(),
-              ),
+            Container(
+              width: _colTotalWidth,
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Text(_formatQty(row.total), style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
             ),
-          ),
-          if (!_completed)
-            SizedBox(
-              width: 28,
-              child: IconButton.filledTonal(
-                icon: const Icon(Icons.add, size: 18),
-                onPressed: () => _addQuantityToRow(rowIndex),
-                tooltip: loc.t('inventory_add_column_hint'),
-                style: IconButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  minimumSize: const Size(28, 28),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ...List.generate(
+              maxCols,
+              (colIndex) => Padding(
+                padding: const EdgeInsets.only(right: 2),
+                child: SizedBox(
+                  width: _colQtyWidth - 2,
+                  child: colIndex < row.quantities.length
+                      ? (_completed
+                          ? Text(_formatQty(row.quantities[colIndex]), style: theme.textTheme.bodyMedium)
+                          : _QtyCell(
+                              value: row.quantities[colIndex],
+                              onChanged: (v) => _setQuantity(index, colIndex, v),
+                            ))
+                      : const SizedBox.shrink(),
                 ),
               ),
             ),
-        ],
+            if (!_completed)
+              SizedBox(
+                width: 28,
+                child: IconButton.filledTonal(
+                  icon: const Icon(Icons.add, size: 18),
+                  onPressed: () => _addQuantityToRow(index),
+                  tooltip: loc.t('inventory_add_column_hint'),
+                  style: IconButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(28, 28),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

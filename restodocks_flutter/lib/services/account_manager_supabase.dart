@@ -385,6 +385,7 @@ class AccountManagerSupabase {
       }
     } catch (e) {
       print('Ошибка обновления сотрудника: $e');
+      rethrow;
     }
   }
 
