@@ -8,6 +8,7 @@ class TechCard extends Equatable {
   final String dishName;
   final Map<String, String>? dishNameLocalized;
   final String category;
+  final bool isSemiFinished; // true = ПФ (полуфабрикат), false = блюдо
   final double portionWeight; // вес порции в граммах
   final double yield; // выход готового блюда в граммах
   final Map<String, String>? technologyLocalized; // технология приготовления, многоязычно
@@ -22,6 +23,7 @@ class TechCard extends Equatable {
     required this.dishName,
     this.dishNameLocalized,
     required this.category,
+    this.isSemiFinished = true,
     required this.portionWeight,
     required this.yield,
     this.technologyLocalized,
@@ -41,6 +43,7 @@ class TechCard extends Equatable {
         (key, value) => MapEntry(key, value as String),
       ),
       category: json['category'] as String,
+      isSemiFinished: json['is_semi_finished'] as bool? ?? true,
       portionWeight: (json['portion_weight'] as num).toDouble(),
       yield: (json['yield'] as num).toDouble(),
       technologyLocalized: (json['technology_localized'] as Map<String, dynamic>?)?.map(
@@ -61,6 +64,7 @@ class TechCard extends Equatable {
       'dish_name': dishName,
       'dish_name_localized': dishNameLocalized,
       'category': category,
+      'is_semi_finished': isSemiFinished,
       'portion_weight': portionWeight,
       'yield': yield,
       'technology_localized': technologyLocalized,
@@ -77,6 +81,7 @@ class TechCard extends Equatable {
     String? dishName,
     Map<String, String>? dishNameLocalized,
     String? category,
+    bool? isSemiFinished,
     double? portionWeight,
     double? yield,
     Map<String, String>? technologyLocalized,
@@ -91,6 +96,7 @@ class TechCard extends Equatable {
       dishName: dishName ?? this.dishName,
       dishNameLocalized: dishNameLocalized ?? this.dishNameLocalized,
       category: category ?? this.category,
+      isSemiFinished: isSemiFinished ?? this.isSemiFinished,
       portionWeight: portionWeight ?? this.portionWeight,
       yield: yield ?? this.yield,
       technologyLocalized: technologyLocalized ?? this.technologyLocalized,
@@ -220,6 +226,7 @@ class TechCard extends Equatable {
     dishName,
     dishNameLocalized,
     category,
+    isSemiFinished,
     portionWeight,
     yield,
     technologyLocalized,
@@ -235,6 +242,7 @@ class TechCard extends Equatable {
     required String dishName,
     Map<String, String>? dishNameLocalized,
     required String category,
+    bool isSemiFinished = true,
     required String establishmentId,
     required String createdBy,
   }) {
@@ -244,6 +252,7 @@ class TechCard extends Equatable {
       dishName: dishName,
       dishNameLocalized: dishNameLocalized,
       category: category,
+      isSemiFinished: isSemiFinished,
       portionWeight: 100, // вес порции по умолчанию
       yield: 0,
       technologyLocalized: null,

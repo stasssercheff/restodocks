@@ -16,6 +16,7 @@ class TechCardServiceSupabase {
     required String dishName,
     Map<String, String>? dishNameLocalized,
     required String category,
+    bool isSemiFinished = true,
     required String establishmentId,
     required String createdBy,
   }) async {
@@ -23,6 +24,7 @@ class TechCardServiceSupabase {
       dishName: dishName,
       dishNameLocalized: dishNameLocalized,
       category: category,
+      isSemiFinished: isSemiFinished,
       establishmentId: establishmentId,
       createdBy: createdBy,
     );

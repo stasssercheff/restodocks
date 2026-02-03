@@ -138,6 +138,9 @@
     "chop_vegetables": "Порезать овощи",
     "marinate_meat": "Замариновать мясо",
     "create_tech_card": "Создать ТТК",
+    "tt_type_pf": "ПФ",
+    "tt_type_dish": "Блюдо",
+    "tt_type_hint": "В инвентаризацию ПФ попадают только полуфабрикаты",
     "settings": "Настройки",
     "language": "Язык",
     "currency": "Валюта",
@@ -487,6 +490,9 @@
     "chop_vegetables": "Chop vegetables",
     "marinate_meat": "Marinate meat",
     "create_tech_card": "Create tech card",
+    "tt_type_pf": "SF",
+    "tt_type_dish": "Dish",
+    "tt_type_hint": "Only semi-finished products go to PF inventory",
     "settings": "Settings",
     "language": "Language",
     "currency": "Currency",
@@ -754,7 +760,9 @@
     "save": "Guardar",
     "delete": "Eliminar",
     "add_ingredient": "Añadir ingrediente",
-    "back": "Atrás"
+    "back": "Atrás",
+    "tt_type_pf": "SF",
+    "tt_type_dish": "Plato"
   },
   "de": {
     "app_name": "Restodocks",
@@ -800,7 +808,9 @@
     "save": "Speichern",
     "delete": "Löschen",
     "add_ingredient": "Zutat hinzufügen",
-    "back": "Zurück"
+    "back": "Zurück",
+    "tt_type_pf": "HF",
+    "tt_type_dish": "Gericht"
   },
   "fr": {
     "app_name": "Restodocks",
@@ -846,6 +856,8 @@
     "save": "Enregistrer",
     "delete": "Supprimer",
     "add_ingredient": "Ajouter ingrédient",
-    "back": "Retour"
+    "back": "Retour",
+    "tt_type_pf": "SF",
+    "tt_type_dish": "Plat"
   }
 }

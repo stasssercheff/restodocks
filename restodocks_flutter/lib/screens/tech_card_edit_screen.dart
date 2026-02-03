@@ -74,6 +74,7 @@ TechCard _applyEdits(
   TechCard t, {
   String? dishName,
   String? category,
+  bool? isSemiFinished,
   double? portionWeight,
   double? yieldGrams,
   Map<String, String>? technologyLocalized,
@@ -82,6 +83,7 @@ TechCard _applyEdits(
   return t.copyWith(
     dishName: dishName,
     category: category,
+    isSemiFinished: isSemiFinished,
     portionWeight: portionWeight,
     yield: yieldGrams,
     technologyLocalized: technologyLocalized,
@@ -105,6 +107,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   String? _error;
   final _nameController = TextEditingController();
   final _categoryController = TextEditingController(text: 'misc');
+  bool _isSemiFinished = true; // ПФ или блюдо
   final _portionController = TextEditingController(text: '100');
   final _yieldController = TextEditingController(text: '0');
   final _technologyController = TextEditingController();
@@ -129,6 +132,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
         if (tc != null) {
           _nameController.text = tc.dishName;
           _categoryController.text = tc.category;
+          _isSemiFinished = tc.isSemiFinished;
           _portionController.text = tc.portionWeight.toStringAsFixed(0);
           _yieldController.text = tc.yield.toStringAsFixed(0);
           _technologyController.text = tc.getLocalizedTechnology(context.read<LocalizationService>().currentLanguageCode);
@@ -185,6 +189,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
         final created = await svc.createTechCard(
           dishName: name,
           category: category,
+          isSemiFinished: _isSemiFinished,
           establishmentId: est.id,
           createdBy: emp.id,
         );
@@ -195,7 +200,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           context.pushReplacement('/tech-cards/${created.id}');
         }
       } else {
-        final updated = _applyEdits(tc, dishName: name, category: category, portionWeight: portion, yieldGrams: yieldVal, technologyLocalized: techMap, ingredients: _ingredients);
+        final updated = _applyEdits(tc, dishName: name, category: category, isSemiFinished: _isSemiFinished, portionWeight: portion, yieldGrams: yieldVal, technologyLocalized: techMap, ingredients: _ingredients);
         await svc.saveTechCard(updated);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.read<LocalizationService>().t('save') + ' ✓')));
@@ -344,8 +349,26 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
               spacing: 16,
               runSpacing: 12,
               children: [
-                SizedBox(width: 180, child: TextField(controller: _nameController, readOnly: true, decoration: InputDecoration(labelText: loc.t('dish_name'), isDense: true))),
+                SizedBox(width: 180, child: TextField(controller: _nameController, readOnly: !canEdit, decoration: InputDecoration(labelText: loc.t('dish_name'), isDense: true))),
                 SizedBox(width: 100, child: TextField(controller: _categoryController, readOnly: !canEdit, decoration: const InputDecoration(labelText: 'Категория', isDense: true))),
+                if (canEdit)
+                  Tooltip(
+                    message: loc.t('tt_type_hint'),
+                    child: SegmentedButton<bool>(
+                      segments: [
+                        ButtonSegment(value: true, label: Text(loc.t('tt_type_pf')), icon: const Icon(Icons.inventory_2, size: 18)),
+                        ButtonSegment(value: false, label: Text(loc.t('tt_type_dish')), icon: const Icon(Icons.restaurant, size: 18)),
+                      ],
+                      selected: {_isSemiFinished},
+                      onSelectionChanged: (v) => setState(() => _isSemiFinished = v.first),
+                      showSelectedIcon: false,
+                    ),
+                  )
+                else
+                  Chip(
+                    avatar: Icon(_isSemiFinished ? Icons.inventory_2 : Icons.restaurant, size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    label: Text(_isSemiFinished ? loc.t('tt_type_pf') : loc.t('tt_type_dish')),
+                  ),
                 if (canEdit) ...[
                   SizedBox(width: 70, child: TextField(controller: _portionController, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: loc.t('portion_weight'), isDense: true))),
                   SizedBox(width: 70, child: TextField(controller: _yieldController, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: loc.t('yield_g'), isDense: true))),

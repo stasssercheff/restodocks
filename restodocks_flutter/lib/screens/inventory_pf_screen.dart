@@ -62,9 +62,10 @@ class _InventoryPfScreenState extends State<InventoryPfScreen> {
     if (estId == null) return;
     final list = await svc.getTechCardsForEstablishment(estId);
     if (!mounted) return;
+    final pfOnly = list.where((tc) => tc.isSemiFinished).toList();
     setState(() {
       _loading = false;
-      for (final tc in list) {
+      for (final tc in pfOnly) {
         if (_rows.any((r) => r.techCard.id == tc.id)) continue;
         _rows.add(_PfRow(techCard: tc, quantity: 0));
       }
