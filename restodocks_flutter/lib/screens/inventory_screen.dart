@@ -1,9 +1,10 @@
+import 'package:excel/excel.dart' hide Border;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../models/models.dart';
+import '../services/inventory_download.dart';
 import '../services/services.dart';
 
 /// Строка бланка инвентаризации: продукт из номенклатуры, единица, список количеств, итого.
@@ -14,7 +15,8 @@ class _InventoryRow {
   _InventoryRow({required this.product, required this.quantities});
 
   String productName(String lang) => product.getLocalizedName(lang);
-  String get unit => product.unit ?? 'кг';
+  String get unit => product.unit ?? 'kg';
+  String unitDisplay(String lang) => CulinaryUnits.displayName(unit.toLowerCase(), lang);
   double get total => quantities.fold(0.0, (a, b) => a + b);
 }
 
@@ -163,7 +165,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
       lang: loc.currentLanguageCode,
     );
     final docService = InventoryDocumentService();
-    final saved = await docService.save(
+    await docService.save(
       establishmentId: establishment.id,
       createdByEmployeeId: employee.id,
       recipientChefId: chef.id,
@@ -178,62 +180,78 @@ class _InventoryScreenState extends State<InventoryScreen> {
       });
     }
 
-    bool emailSent = false;
+    // Генерация Excel и скачивание без почтового клиента
     try {
-      final body = _buildEmailBody(payload);
-      final res = await SupabaseService().client.functions.invoke(
-        'send-inventory-email',
-        body: {
-          'to': chef.email,
-          'subject': loc.t('inventory_email_subject'),
-          'body': body,
-        },
-      );
-      if (res.status == 200 && saved != null) {
-        await docService.markEmailSent(saved['id'] as String);
-        emailSent = true;
-      }
-    } catch (_) {
-      /* Edge Function не настроена или ошибка — fallback на mailto */
-    }
-
-    if (!emailSent && mounted) {
-      final body = _buildEmailBody(payload);
-      final uri = Uri(
-        scheme: 'mailto',
-        path: chef.email,
-        query: _mailtoQuery(
-          subject: loc.t('inventory_email_subject'),
-          body: body,
-        ),
-      );
-      if (await canLaunchUrl(uri)) {
-        try {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-        } catch (_) {
-          await launchUrl(uri);
+      final bytes = _buildExcelBytes(payload, loc);
+      if (bytes != null && bytes.isNotEmpty && mounted) {
+        await _downloadExcel(bytes, payload, loc);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(loc.t('inventory_excel_downloaded'))),
+          );
         }
+      }
+    } catch (e) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '${loc.t('inventory_document_saved')} ${loc.t('inventory_open_mail_manual')}',
-            ),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('inventory_document_saved'))),
+          SnackBar(content: Text('${loc.t('inventory_document_saved')} (Excel: $e)')),
         );
       }
-    } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '${loc.t('inventory_document_saved')} ${loc.t('inventory_email_sent')}',
-          ),
-        ),
-      );
     }
+  }
+
+  /// Столбцы Excel: номер, наименование, мера, итоговое количество, данные при заполнении (1, 2, ...)
+  List<int>? _buildExcelBytes(Map<String, dynamic> payload, LocalizationService loc) {
+    final rows = payload['rows'] as List<dynamic>? ?? [];
+    final maxCols = _rows.isEmpty ? 1 : _rows.map((r) => (r.quantities).length).reduce((a, b) => a > b ? a : b);
+    try {
+      final excel = Excel.createExcel();
+      final sheet = excel[excel.getDefaultSheet()!];
+      final numLabel = loc.t('inventory_excel_number');
+      final nameLabel = loc.t('inventory_item_name');
+      final unitLabel = loc.t('inventory_unit');
+      final totalLabel = loc.t('inventory_excel_total');
+      final fillLabel = loc.t('inventory_excel_fill_data');
+      final headerCells = <CellValue>[
+        TextCellValue(numLabel),
+        TextCellValue(nameLabel),
+        TextCellValue(unitLabel),
+        TextCellValue(totalLabel),
+      ];
+      for (var c = 0; c < maxCols; c++) {
+        headerCells.add(TextCellValue('$fillLabel ${c + 1}'));
+      }
+      sheet.appendRow(headerCells);
+      for (var i = 0; i < rows.length; i++) {
+        final r = rows[i] as Map<String, dynamic>;
+        final name = r['productName'] as String? ?? '';
+        final unit = r['unit'] as String? ?? '';
+        final total = r['total'] as num? ?? 0;
+        final quantities = r['quantities'] as List<dynamic>? ?? [];
+        final rowCells = <CellValue>[
+          IntCellValue(i + 1),
+          TextCellValue(name),
+          TextCellValue(unit),
+          DoubleCellValue(total.toDouble()),
+        ];
+        for (var c = 0; c < maxCols; c++) {
+          final q = c < quantities.length ? (quantities[c] as num?)?.toDouble() ?? 0.0 : 0.0;
+          rowCells.add(DoubleCellValue(q));
+        }
+        sheet.appendRow(rowCells);
+      }
+      final out = excel.encode();
+      return out != null && out.isNotEmpty ? out : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _downloadExcel(List<int> bytes, Map<String, dynamic> payload, LocalizationService loc) async {
+    final header = payload['header'] as Map<String, dynamic>? ?? {};
+    final date = header['date'] as String? ?? DateTime.now().toIso8601String().split('T').first;
+    final fileName = 'inventory_$date.xlsx';
+    await saveFileBytes(fileName, bytes);
   }
 
   Map<String, dynamic> _buildPayload({
@@ -255,39 +273,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
       return {
         'productId': r.product.id,
         'productName': r.productName(lang),
-        'unit': r.unit,
+        'unit': r.unitDisplay(lang),
         'quantities': r.quantities,
         'total': r.total,
       };
     }).toList();
     return {'header': header, 'rows': rows};
-  }
-
-  String _buildEmailBody(Map<String, dynamic> payload) {
-    final header = payload['header'] as Map<String, dynamic>? ?? {};
-    final rows = payload['rows'] as List<dynamic>? ?? [];
-    final sb = StringBuffer();
-    sb.writeln('Бланк инвентаризации');
-    sb.writeln('Заведение: ${header['establishmentName'] ?? ''}');
-    sb.writeln('Сотрудник: ${header['employeeName'] ?? ''}');
-    sb.writeln('Дата: ${header['date'] ?? ''}');
-    sb.writeln('Время начала: ${header['timeStart'] ?? ''}');
-    sb.writeln('Время окончания: ${header['timeEnd'] ?? ''}');
-    sb.writeln('');
-    sb.writeln('# | Наименование | Мера | Итого | Количество');
-    for (var i = 0; i < rows.length; i++) {
-      final r = rows[i] as Map<String, dynamic>;
-      final name = r['productName'] ?? '';
-      final unit = r['unit'] ?? '';
-      final total = r['total'];
-      final qty = (r['quantities'] as List<dynamic>?)?.join(' | ') ?? '';
-      sb.writeln('${i + 1} | $name | $unit | $total | $qty');
-    }
-    return sb.toString();
-  }
-
-  String _mailtoQuery({required String subject, required String body}) {
-    return 'subject=${Uri.encodeComponent(subject)}&body=${Uri.encodeComponent(body)}';
   }
 
   @override
@@ -401,6 +392,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
   static const double _colUnitWidth = 48;
   static const double _colTotalWidth = 56;
   static const double _colQtyWidth = 64;
+  static const double _colGap = 10;
 
   double _leftWidth(BuildContext context) {
     final w = MediaQuery.of(context).size.width;
@@ -437,7 +429,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
       );
     }
     final leftW = _leftWidth(context);
-    final rightW = _colTotalWidth + _maxQuantityColumns * _colQtyWidth + 40;
+    final rightW = _colTotalWidth + _colGap + _maxQuantityColumns * (_colQtyWidth + _colGap) + 40;
     final totalW = leftW + rightW;
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -460,7 +452,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
   Widget _buildHeaderRow(LocalizationService loc) {
     final theme = Theme.of(context);
     final nameW = _colNameWidth(context);
-    final qtyColsW = _maxQuantityColumns * _colQtyWidth + 28;
+    final qtyColsW = _maxQuantityColumns * (_colQtyWidth + _colGap) + 28;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
       decoration: BoxDecoration(
@@ -470,9 +462,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
       child: Row(
         children: [
           SizedBox(width: _colNoWidth, child: Text('#', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface))),
+          const SizedBox(width: _colGap),
           SizedBox(width: nameW, child: Text(loc.t('inventory_item_name'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface), overflow: TextOverflow.ellipsis, maxLines: 1)),
+          const SizedBox(width: _colGap),
           SizedBox(width: _colUnitWidth, child: Text(loc.t('inventory_unit'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface))),
+          const SizedBox(width: _colGap),
           SizedBox(width: _colTotalWidth, child: Text(loc.t('inventory_total'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface))),
+          const SizedBox(width: _colGap),
           SizedBox(width: qtyColsW, child: Text(loc.t('inventory_quantity'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface), overflow: TextOverflow.ellipsis)),
         ],
       ),
@@ -499,6 +495,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             SizedBox(width: _colNoWidth, child: Text('${index + 1}', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant))),
+            SizedBox(width: _colGap),
             SizedBox(
               width: nameW,
               child: Text(
@@ -509,18 +506,21 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 softWrap: true,
               ),
             ),
-            SizedBox(width: _colUnitWidth, child: Text(row.unit, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant), overflow: TextOverflow.ellipsis)),
+            SizedBox(width: _colGap),
+            SizedBox(width: _colUnitWidth, child: Text(row.unitDisplay(loc.currentLanguageCode), style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant), overflow: TextOverflow.ellipsis)),
+            SizedBox(width: _colGap),
             Container(
               width: _colTotalWidth,
               padding: const EdgeInsets.symmetric(horizontal: 4),
               child: Text(_formatQty(row.total), style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
             ),
+            SizedBox(width: _colGap),
             ...List.generate(
               maxCols,
               (colIndex) => Padding(
-                padding: const EdgeInsets.only(right: 2),
+                padding: EdgeInsets.only(right: colIndex < maxCols - 1 ? _colGap : 0),
                 child: SizedBox(
-                  width: _colQtyWidth - 2,
+                  width: _colQtyWidth,
                   child: colIndex < row.quantities.length
                       ? (_completed
                           ? Text(_formatQty(row.quantities[colIndex]), style: theme.textTheme.bodyMedium)

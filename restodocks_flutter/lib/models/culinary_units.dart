@@ -69,6 +69,7 @@ class CulinaryUnits {
     (id: 'kg', ru: 'кг', en: 'kg'),
     (id: 'mg', ru: 'мг', en: 'mg'),
     (id: 'pcs', ru: 'шт', en: 'pcs'),
+    (id: 'шт', ru: 'шт', en: 'pcs'),
     (id: 'lb', ru: 'фунт', en: 'lb'),
     (id: 'oz', ru: 'унция', en: 'oz'),
     (id: 'ml', ru: 'мл', en: 'ml'),

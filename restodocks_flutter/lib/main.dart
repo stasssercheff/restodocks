@@ -78,6 +78,7 @@ void main() async {
 
     await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
     await LocalizationService.initialize();
+    await ThemeService().initialize();
 
     runApp(const RestodocksApp());
   } catch (e, stackTrace) {
@@ -128,13 +129,13 @@ class RestodocksApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: AppProviders.providers,
-      child: Consumer<LocalizationService>(
-        builder: (context, localization, child) {
+      child: Consumer2<LocalizationService, ThemeService>(
+        builder: (context, localization, themeService, child) {
           return MaterialApp.router(
             title: 'Restodocks',
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
-            themeMode: ThemeMode.system,
+            themeMode: themeService.themeMode,
             locale: localization.currentLocale,
             supportedLocales: LocalizationService.supportedLocales,
             localizationsDelegates: const [

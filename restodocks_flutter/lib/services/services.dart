@@ -12,3 +12,4 @@ export 'checklist_service_supabase.dart';
 export 'nutrition_api_service.dart';
 export 'supabase_service.dart';
 export 'secure_storage_service.dart';
+export 'theme_service.dart';

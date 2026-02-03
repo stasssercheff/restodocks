@@ -221,11 +221,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
               trailing: const Icon(Icons.chevron_right),
               onTap: () => _showLanguagePicker(context, localization),
             ),
-            ListTile(
-              leading: const Icon(Icons.palette),
-              title: Text(localization.t('appearance')),
-              subtitle: Text(localization.t('light_theme')),
-              trailing: const Icon(Icons.chevron_right),
+            Consumer<ThemeService>(
+              builder: (_, themeService, __) => SwitchListTile(
+                secondary: const Icon(Icons.palette),
+                title: Text(localization.t('appearance')),
+                subtitle: Text(themeService.isDark ? localization.t('dark_theme') : localization.t('light_theme')),
+                value: themeService.isDark,
+                onChanged: (dark) => themeService.setThemeMode(dark ? ThemeMode.dark : ThemeMode.light),
+              ),
             ),
             if (currentEmployee.canManageSchedule) ...[
               ListTile(

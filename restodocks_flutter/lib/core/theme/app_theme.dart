@@ -7,7 +7,7 @@ class AppTheme {
   static const Color accentColor = Color(0xFFAD292C);
   static const Color secondaryColor = Color(0xFF4CAF50);
 
-  // Светлая тема
+  // Светлая тема (те же цвета бренда, что и тёмная)
   static ThemeData lightTheme = ThemeData(
     useMaterial3: true,
     colorScheme: ColorScheme.fromSeed(
@@ -15,7 +15,7 @@ class AppTheme {
       brightness: Brightness.light,
     ),
     primaryColor: primaryColor,
-    scaffoldBackgroundColor: Colors.white,
+    scaffoldBackgroundColor: const Color(0xFFFAFAFA),
     appBarTheme: const AppBarTheme(
       backgroundColor: primaryColor,
       foregroundColor: Colors.white,

@@ -10,6 +10,9 @@ class AppProviders {
         ChangeNotifierProvider<LocalizationService>(
           create: (_) => LocalizationService(),
         ),
+        ChangeNotifierProvider<ThemeService>(
+          create: (_) => ThemeService(),
+        ),
         // Используем Supabase версии сервисов
         Provider<AccountManagerSupabase>(
           create: (_) => AccountManagerSupabase(),
