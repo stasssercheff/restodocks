@@ -188,13 +188,14 @@ class TTIngredient extends Equatable {
     CookingProcess? cookingProcess,
     required double grossWeight,
     double? netWeight,
-    double primaryWastePct = 0,
+    double? primaryWastePct,
     required String defaultCurrency,
     String languageCode = 'ru',
     String unit = 'g',
     double? gramsPerPiece,
     double? cookingLossPctOverride,
   }) {
+    final wastePct = primaryWastePct ?? product?.primaryWastePct ?? 0;
     if (product == null) {
       return TTIngredient(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -205,7 +206,7 @@ class TTIngredient extends Equatable {
         grossWeight: grossWeight,
         netWeight: netWeight ?? grossWeight,
         unit: unit,
-        primaryWastePct: primaryWastePct,
+        primaryWastePct: wastePct,
         gramsPerPiece: gramsPerPiece,
         isNetWeightManual: netWeight != null,
         finalCalories: 0,
@@ -220,7 +221,7 @@ class TTIngredient extends Equatable {
     final grossG = CulinaryUnits.toGrams(grossWeight, unit, gramsPerPiece: gramsPerPiece);
 
     // Эффективный вес после отхода (первичная обработка)
-    final waste = primaryWastePct.clamp(0.0, 99.9) / 100.0;
+    final waste = wastePct.clamp(0.0, 99.9) / 100.0;
     final effectiveGross = grossG * (1.0 - waste);
 
     double finalNetWeight = netWeight ?? effectiveGross;
@@ -264,7 +265,7 @@ class TTIngredient extends Equatable {
       grossWeight: grossG,
       netWeight: finalNetWeight,
       unit: unit,
-      primaryWastePct: primaryWastePct,
+      primaryWastePct: wastePct,
       gramsPerPiece: gramsPerPiece,
       cookingLossPctOverride: cookingLossPctOverride,
       isNetWeightManual: netWeight != null,

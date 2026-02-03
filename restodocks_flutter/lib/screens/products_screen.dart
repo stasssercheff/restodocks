@@ -1432,6 +1432,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
   late final TextEditingController _proteinController;
   late final TextEditingController _fatController;
   late final TextEditingController _carbsController;
+  late final TextEditingController _wastePctController;
   late String _unit;
   late String _currency;
   late bool _containsGluten;
@@ -1447,6 +1448,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
     _proteinController = TextEditingController(text: p.protein?.toString() ?? '');
     _fatController = TextEditingController(text: p.fat?.toString() ?? '');
     _carbsController = TextEditingController(text: p.carbs?.toString() ?? '');
+    _wastePctController = TextEditingController(text: p.primaryWastePct?.toStringAsFixed(1) ?? '0');
     final unitMap = {'кг': 'kg', 'г': 'g', 'шт': 'pcs', 'л': 'l', 'мл': 'ml'};
     _unit = unitMap[p.unit] ?? p.unit ?? 'kg';
     if (!CulinaryUnits.all.any((e) => e.id == _unit)) _unit = 'kg';
@@ -1463,6 +1465,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
     _proteinController.dispose();
     _fatController.dispose();
     _carbsController.dispose();
+    _wastePctController.dispose();
     super.dispose();
   }
 
@@ -1491,6 +1494,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
       basePrice: _parseNum(_priceController.text),
       currency: _currency,
       unit: _unit,
+      primaryWastePct: _parseNum(_wastePctController.text)?.clamp(0.0, 99.9),
       calories: _parseNum(_caloriesController.text),
       protein: _parseNum(_proteinController.text),
       fat: _parseNum(_fatController.text),
@@ -1542,6 +1546,17 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                   child: Text(lang == 'ru' ? e.ru : e.en),
                 )).toList(),
                 onChanged: (v) => setState(() => _unit = v ?? _unit),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _wastePctController,
+                decoration: InputDecoration(
+                  labelText: widget.loc.t('waste_pct'),
+                  hintText: '0',
+                  border: const OutlineInputBorder(),
+                  helperText: widget.loc.t('waste_pct_product_hint'),
+                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
               ),
               const SizedBox(height: 16),
               Row(

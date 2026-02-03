@@ -50,6 +50,10 @@ class Product extends Equatable {
   @JsonKey(name: 'unit')
   final String? unit;
 
+  /// Процент отхода при первичной обработке (0–100), для ТТК
+  @JsonKey(name: 'primary_waste_pct')
+  final double? primaryWastePct;
+
   // Поставщики
   @JsonKey(name: 'supplier_ids')
   final List<String>? supplierIds;
@@ -68,6 +72,7 @@ class Product extends Equatable {
     this.basePrice,
     this.currency,
     this.unit,
+    this.primaryWastePct,
     this.supplierIds,
   });
 
@@ -86,6 +91,7 @@ class Product extends Equatable {
     double? basePrice,
     String? currency,
     String? unit,
+    double? primaryWastePct,
     List<String>? supplierIds,
   }) {
     return Product(
@@ -102,6 +108,7 @@ class Product extends Equatable {
       basePrice: basePrice ?? this.basePrice,
       currency: currency ?? this.currency,
       unit: unit ?? this.unit,
+      primaryWastePct: primaryWastePct ?? this.primaryWastePct,
       supplierIds: supplierIds ?? this.supplierIds,
     );
   }
@@ -234,6 +241,7 @@ class Product extends Equatable {
     basePrice,
     currency,
     unit,
+    primaryWastePct,
     supplierIds,
   ];
 
@@ -267,6 +275,7 @@ class Product extends Equatable {
       basePrice: basePrice,
       currency: currency,
       unit: unit,
+      primaryWastePct: null,
       supplierIds: supplierIds,
     );
   }

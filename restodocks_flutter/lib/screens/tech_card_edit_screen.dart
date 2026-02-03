@@ -76,6 +76,7 @@ TechCard _applyEdits(
   String? category,
   double? portionWeight,
   double? yieldGrams,
+  Map<String, String>? technologyLocalized,
   List<TTIngredient>? ingredients,
 }) {
   return t.copyWith(
@@ -83,6 +84,7 @@ TechCard _applyEdits(
     category: category,
     portionWeight: portionWeight,
     yield: yieldGrams,
+    technologyLocalized: technologyLocalized,
     ingredients: ingredients,
   );
 }
@@ -105,6 +107,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   final _categoryController = TextEditingController(text: 'misc');
   final _portionController = TextEditingController(text: '100');
   final _yieldController = TextEditingController(text: '0');
+  final _technologyController = TextEditingController();
   final List<TTIngredient> _ingredients = [];
 
   bool get _isNew => widget.techCardId.isEmpty || widget.techCardId == 'new';
@@ -128,6 +131,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           _categoryController.text = tc.category;
           _portionController.text = tc.portionWeight.toStringAsFixed(0);
           _yieldController.text = tc.yield.toStringAsFixed(0);
+          _technologyController.text = tc.getLocalizedTechnology(context.read<LocalizationService>().currentLanguageCode);
           _ingredients
             ..clear()
             ..addAll(tc.ingredients);
@@ -150,6 +154,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     _categoryController.dispose();
     _portionController.dispose();
     _yieldController.dispose();
+    _technologyController.dispose();
     super.dispose();
   }
 
@@ -166,8 +171,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     final portion = double.tryParse(_portionController.text) ?? 100;
     final yieldVal = double.tryParse(_yieldController.text) ?? 0;
     final category = _categoryController.text.trim().isEmpty ? 'misc' : _categoryController.text.trim();
-
+    final curLang = context.read<LocalizationService>().currentLanguageCode;
     final tc = _techCard;
+    final techMap = Map<String, String>.from(tc?.technologyLocalized ?? {});
+    techMap[curLang] = _technologyController.text.trim();
+    for (final c in LocalizationService.productLanguageCodes) {
+      techMap.putIfAbsent(c, () => '');
+    }
     final svc = context.read<TechCardServiceSupabase>();
 
     try {
@@ -178,14 +188,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           establishmentId: est.id,
           createdBy: emp.id,
         );
-        var updated = _applyEdits(created, portionWeight: portion, yieldGrams: yieldVal, ingredients: _ingredients);
+        var updated = _applyEdits(created, portionWeight: portion, yieldGrams: yieldVal, technologyLocalized: techMap, ingredients: _ingredients);
         await svc.saveTechCard(updated);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ТТК создана')));
           context.pushReplacement('/tech-cards/${created.id}');
         }
       } else {
-        final updated = _applyEdits(tc, dishName: name, category: category, portionWeight: portion, yieldGrams: yieldVal, ingredients: _ingredients);
+        final updated = _applyEdits(tc, dishName: name, category: category, portionWeight: portion, yieldGrams: yieldVal, technologyLocalized: techMap, ingredients: _ingredients);
         await svc.saveTechCard(updated);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.read<LocalizationService>().t('save') + ' ✓')));
@@ -330,121 +340,215 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            TextField(
-              controller: _nameController,
-              readOnly: !canEdit,
-              decoration: InputDecoration(labelText: loc.t('dish_name')),
+            Wrap(
+              spacing: 16,
+              runSpacing: 12,
+              children: [
+                SizedBox(width: 180, child: TextField(controller: _nameController, readOnly: !canEdit, decoration: InputDecoration(labelText: loc.t('dish_name'), isDense: true))),
+                SizedBox(width: 100, child: TextField(controller: _categoryController, readOnly: !canEdit, decoration: const InputDecoration(labelText: 'Категория', isDense: true))),
+                SizedBox(width: 70, child: TextField(controller: _portionController, readOnly: !canEdit, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: loc.t('portion_weight'), isDense: true))),
+                SizedBox(width: 70, child: TextField(controller: _yieldController, readOnly: !canEdit, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: loc.t('yield_g'), isDense: true))),
+                if (canEdit) FilledButton.icon(onPressed: _showAddIngredient, icon: const Icon(Icons.add, size: 18), label: Text(loc.t('add_ingredient'))),
+              ],
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _categoryController,
-              readOnly: !canEdit,
-              decoration: const InputDecoration(labelText: 'Категория'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _portionController,
-              readOnly: !canEdit,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(labelText: loc.t('portion_weight')),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _yieldController,
-              readOnly: !canEdit,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(labelText: loc.t('yield_g')),
-            ),
-            if (canEdit) ...[
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(loc.t('add_ingredient'), style: Theme.of(context).textTheme.titleMedium),
-                  FilledButton.icon(
-                    onPressed: _showAddIngredient,
-                    icon: const Icon(Icons.add, size: 20),
-                    label: Text(loc.t('add_ingredient')),
-                  ),
-                ],
-              ),
-            ],
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-              child: DataTable(
-                headingRowColor: WidgetStateProperty.all(Theme.of(context).colorScheme.surfaceContainerHighest),
-                columns: [
-                  DataColumn(label: Text(loc.t('ttk_product'), style: const TextStyle(fontWeight: FontWeight.bold))),
-                  DataColumn(label: Text(loc.t('ttk_gross'), style: const TextStyle(fontWeight: FontWeight.bold))),
-                  DataColumn(label: Text(loc.t('ttk_waste_pct'), style: const TextStyle(fontWeight: FontWeight.bold))),
-                  DataColumn(label: Text(loc.t('ttk_net'), style: const TextStyle(fontWeight: FontWeight.bold))),
-                  DataColumn(label: Text(loc.t('ttk_process'), style: const TextStyle(fontWeight: FontWeight.bold))),
-                  DataColumn(label: Text(loc.t('ttk_cook_loss'), style: const TextStyle(fontWeight: FontWeight.bold))),
-                  DataColumn(label: Text(loc.t('ttk_output'), style: const TextStyle(fontWeight: FontWeight.bold))),
-                  DataColumn(label: Text(loc.t('ttk_price'), style: const TextStyle(fontWeight: FontWeight.bold))),
-                  if (canEdit) const DataColumn(label: Text('', style: TextStyle(fontWeight: FontWeight.bold))),
-                ],
-                rows: List.generate(_ingredients.length + 1, (i) {
-                  if (i == _ingredients.length) {
-                    final totalNet = _ingredients.fold<double>(0, (s, ing) => s + ing.netWeight);
-                    final totalCost = _ingredients.fold<double>(0, (s, ing) => s + ing.cost);
-                    final totalCal = _ingredients.fold<double>(0, (s, ing) => s + ing.finalCalories);
-                    return DataRow(
-                      color: WidgetStateProperty.all(Colors.amber.shade100),
-                      cells: [
-                        DataCell(Text(loc.t('ttk_total'), style: const TextStyle(fontWeight: FontWeight.bold))),
-                        const DataCell(Text('')),
-                        const DataCell(Text('')),
-                        DataCell(Text(totalNet.toStringAsFixed(0), style: const TextStyle(fontWeight: FontWeight.w600))),
-                        const DataCell(Text('')),
-                        const DataCell(Text('')),
-                        DataCell(Text(totalNet.toStringAsFixed(0), style: const TextStyle(fontWeight: FontWeight.w600))),
-                        DataCell(Text('${totalCost.toStringAsFixed(2)} ₽', style: const TextStyle(fontWeight: FontWeight.w600))),
-                        if (canEdit) const DataCell(Text('')),
-                      ],
-                    );
-                  }
-                  final ing = _ingredients[i];
-                  final product = ing.productId != null ? context.read<ProductStoreSupabase>().allProducts.where((p) => p.id == ing.productId).firstOrNull : null;
-                  final proc = ing.cookingProcessId != null ? CookingProcess.findById(ing.cookingProcessId!) : null;
-                  return DataRow(
-                    cells: [
-                      DataCell(Text(ing.productName)),
-                      DataCell(Text(ing.grossWeightDisplay(loc.currentLanguageCode))),
-                      DataCell(Text(ing.primaryWastePct == 0 ? '0' : ing.primaryWastePct.toStringAsFixed(1))),
-                      DataCell(Text('${ing.netWeight.toStringAsFixed(0)} г')),
-                      DataCell(Text(ing.cookingProcessName ?? '—')),
-                      DataCell(
-                        canEdit && ing.cookingProcessName != null && proc != null
-                            ? _EditableShrinkageCell(
-                                value: ing.weightLossPercentage,
-                                onChanged: (pct) {
-                                  final updated = ing.updateCookingLossPct(pct, product, proc, languageCode: loc.currentLanguageCode);
-                                  setState(() => _ingredients[i] = updated);
-                                },
-                              )
-                            : Text(ing.cookingProcessName != null ? '−${ing.weightLossPercentage.toStringAsFixed(0)}%' : '—'),
-                      ),
-                      DataCell(Text('${ing.netWeight.toStringAsFixed(0)} г')),
-                      DataCell(Text('${ing.cost.toStringAsFixed(2)} ₽')),
-                      if (canEdit)
-                        DataCell(IconButton(
-                          icon: const Icon(Icons.remove_circle_outline, size: 20),
-                          onPressed: () => _removeIngredient(i),
-                          tooltip: loc.t('delete'),
-                        )),
-                    ],
-                  );
-                }),
+              child: _TtkTable(
+                loc: loc,
+                dishName: _nameController.text,
+                ingredients: _ingredients,
+                canEdit: canEdit,
+                onRemove: _removeIngredient,
+                onUpdate: (i, ing) => setState(() => _ingredients[i] = ing),
+                onAdd: _showAddIngredient,
+                productStore: context.read<ProductStoreSupabase>(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _technologyController,
+              readOnly: !canEdit,
+              maxLines: 3,
+              decoration: InputDecoration(
+                labelText: loc.t('ttk_technology'),
+                alignLabelWithHint: true,
+                border: const OutlineInputBorder(),
+                hintText: loc.t('ttk_technology'),
               ),
             ),
             if (canEdit) ...[
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
               FilledButton(onPressed: _save, child: Text(loc.t('save'))),
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _TtkTable extends StatelessWidget {
+  const _TtkTable({
+    required this.loc,
+    required this.dishName,
+    required this.ingredients,
+    required this.canEdit,
+    required this.onRemove,
+    required this.onUpdate,
+    required this.onAdd,
+    required this.productStore,
+  });
+
+  final LocalizationService loc;
+  final String dishName;
+  final List<TTIngredient> ingredients;
+  final bool canEdit;
+  final void Function(int i) onRemove;
+  final void Function(int i, TTIngredient ing) onUpdate;
+  final VoidCallback onAdd;
+  final ProductStoreSupabase productStore;
+
+  static const _cellPad = EdgeInsets.symmetric(horizontal: 6, vertical: 6);
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final lang = loc.currentLanguageCode;
+    final totalNet = ingredients.fold<double>(0, (s, ing) => s + ing.netWeight);
+    final totalCost = ingredients.fold<double>(0, (s, ing) => s + ing.cost);
+    final pricePerKgDish = totalNet > 0 ? totalCost * 1000 / totalNet : 0.0;
+    final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'RUB';
+    final sym = currency == 'RUB' ? '₽' : currency == 'VND' ? '₫' : currency == 'USD' ? '\$' : currency;
+
+    return Table(
+      border: TableBorder.all(width: 0.5, color: Colors.grey),
+      columnWidths: {
+        0: const FlexColumnWidth(1.2),
+        1: const FlexColumnWidth(1.5),
+        2: const FlexColumnWidth(0.6),
+        3: const FlexColumnWidth(0.5),
+        4: const FlexColumnWidth(0.6),
+        5: const FlexColumnWidth(1.2),
+        6: const FlexColumnWidth(0.5),
+        7: const FlexColumnWidth(0.6),
+        8: const FlexColumnWidth(0.7),
+        9: const FlexColumnWidth(0.7),
+        10: const FlexColumnWidth(0.8),
+        if (canEdit) 11: const FlexColumnWidth(0.4),
+      },
+      defaultColumnWidth: const FlexColumnWidth(0.8),
+      children: [
+        TableRow(
+          decoration: BoxDecoration(color: theme.colorScheme.primaryContainer.withOpacity(0.3)),
+          children: [
+            _cell(loc.t('ttk_dish'), bold: true),
+            _cell(loc.t('ttk_product'), bold: true),
+            _cell(loc.t('ttk_gross'), bold: true),
+            _cell(loc.t('ttk_waste_pct'), bold: true),
+            _cell(loc.t('ttk_net'), bold: true),
+            _cell(loc.t('ttk_cooking_method'), bold: true),
+            _cell(loc.t('ttk_cook_loss'), bold: true),
+            _cell(loc.t('ttk_output'), bold: true),
+            _cell(loc.t('ttk_price_per_kg'), bold: true),
+            _cell(loc.t('ttk_cost'), bold: true),
+            _cell(loc.t('ttk_price_per_1kg_dish'), bold: true),
+            if (canEdit) _cell('', bold: true),
+          ],
+        ),
+        if (canEdit && ingredients.isEmpty)
+          TableRow(
+            children: [
+              TableCell(
+                child: InkWell(
+                  onTap: onAdd,
+                  child: Padding(
+                    padding: _cellPad,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.add, size: 20, color: theme.colorScheme.primary),
+                        const SizedBox(width: 8),
+                        Text(loc.t('add_ingredient'), style: TextStyle(color: theme.colorScheme.primary)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              ...List.generate(10, (_) => _cell('')),
+              if (canEdit) _cell(''),
+            ],
+          ),
+        ...ingredients.asMap().entries.map((e) {
+          final i = e.key;
+          final ing = e.value;
+          final product = ing.productId != null ? productStore.allProducts.where((p) => p.id == ing.productId).firstOrNull : null;
+          final proc = ing.cookingProcessId != null ? CookingProcess.findById(ing.cookingProcessId!) : null;
+          final pricePerUnit = product?.basePrice ?? 0.0;
+          return TableRow(
+            children: [
+              _cell(i == 0 && ing.sourceTechCardName == null ? dishName : (ing.sourceTechCardName ?? '—')),
+              _cell(ing.productName),
+              _cell(ing.grossWeightDisplay(lang)),
+              _cell(ing.primaryWastePct.toStringAsFixed(1)),
+              _cell('${ing.netWeight.toStringAsFixed(0)} г'),
+              _cell(ing.cookingProcessName ?? '—'),
+              canEdit && proc != null
+                  ? TableCell(
+                      child: Padding(
+                        padding: _cellPad,
+                        child: _EditableShrinkageCell(
+                        value: ing.weightLossPercentage,
+                        onChanged: (pct) => onUpdate(i, ing.updateCookingLossPct(pct, product, proc, languageCode: lang)),
+                        ),
+                      ),
+                    )
+                  : _cell(ing.cookingProcessName != null ? '−${ing.weightLossPercentage.toStringAsFixed(0)}%' : '—'),
+              _cell('${ing.netWeight.toStringAsFixed(0)} г'),
+              _cell('$pricePerUnit $sym'),
+              _cell('${ing.cost.toStringAsFixed(2)} $sym'),
+              _cell('—'),
+              if (canEdit)
+                TableCell(
+                  child: Padding(
+                    padding: _cellPad,
+                    child: IconButton(
+                    icon: const Icon(Icons.remove_circle_outline, size: 20),
+                    onPressed: () => onRemove(i),
+                    tooltip: loc.t('delete'),
+                    style: IconButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(32, 32)),
+                    ),
+                  ),
+                ),
+            ],
+          );
+        }),
+        TableRow(
+          decoration: BoxDecoration(color: Colors.amber.shade100),
+          children: [
+            _cell(loc.t('ttk_total'), bold: true),
+            _cell(''),
+            _cell(''),
+            _cell(''),
+            _cell('${totalNet.toStringAsFixed(0)} г', bold: true),
+            _cell(''),
+            _cell(''),
+            _cell('${totalNet.toStringAsFixed(0)} г', bold: true),
+            _cell(''),
+            _cell('${totalCost.toStringAsFixed(2)} $sym', bold: true),
+            _cell('${pricePerKgDish.toStringAsFixed(2)} $sym', bold: true),
+            if (canEdit) _cell(''),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _cell(String text, {bool bold = false}) {
+    return TableCell(
+      child: Padding(
+        padding: _cellPad,
+        child: Text(text, style: TextStyle(fontSize: 12, fontWeight: bold ? FontWeight.bold : null), overflow: TextOverflow.ellipsis, maxLines: 2),
       ),
     );
   }
@@ -502,7 +606,7 @@ class _ProductPickerState extends State<_ProductPicker> {
     final lang = loc.currentLanguageCode;
     String defaultUnit = _productUnitToCulinary(p.unit);
     final c = TextEditingController(text: defaultUnit == 'pcs' ? '1' : '100');
-    final wasteController = TextEditingController(text: '0');
+    final wasteController = TextEditingController(text: '${p.primaryWastePct?.toStringAsFixed(1) ?? '0'}');
     final gppController = TextEditingController(text: '50');
     final shrinkageController = TextEditingController();
     final processes = CookingProcess.forCategory(p.category);

@@ -10,6 +10,7 @@ class TechCard extends Equatable {
   final String category;
   final double portionWeight; // вес порции в граммах
   final double yield; // выход готового блюда в граммах
+  final Map<String, String>? technologyLocalized; // технология приготовления, многоязычно
   final List<TTIngredient> ingredients;
   final String establishmentId;
   final String createdBy; // ID сотрудника-создателя
@@ -23,6 +24,7 @@ class TechCard extends Equatable {
     required this.category,
     required this.portionWeight,
     required this.yield,
+    this.technologyLocalized,
     required this.ingredients,
     required this.establishmentId,
     required this.createdBy,
@@ -41,6 +43,9 @@ class TechCard extends Equatable {
       category: json['category'] as String,
       portionWeight: (json['portion_weight'] as num).toDouble(),
       yield: (json['yield'] as num).toDouble(),
+      technologyLocalized: (json['technology_localized'] as Map<String, dynamic>?)?.map(
+        (key, value) => MapEntry(key, value as String),
+      ),
       ingredients: [], // Загружается отдельно через сервис
       establishmentId: json['establishment_id'] as String,
       createdBy: json['created_by'] as String,
@@ -58,6 +63,7 @@ class TechCard extends Equatable {
       'category': category,
       'portion_weight': portionWeight,
       'yield': yield,
+      'technology_localized': technologyLocalized,
       'establishment_id': establishmentId,
       'created_by': createdBy,
       'created_at': createdAt.toIso8601String(),
@@ -73,6 +79,7 @@ class TechCard extends Equatable {
     String? category,
     double? portionWeight,
     double? yield,
+    Map<String, String>? technologyLocalized,
     List<TTIngredient>? ingredients,
     String? establishmentId,
     String? createdBy,
@@ -86,12 +93,22 @@ class TechCard extends Equatable {
       category: category ?? this.category,
       portionWeight: portionWeight ?? this.portionWeight,
       yield: yield ?? this.yield,
+      technologyLocalized: technologyLocalized ?? this.technologyLocalized,
       ingredients: ingredients ?? this.ingredients,
       establishmentId: establishmentId ?? this.establishmentId,
       createdBy: createdBy ?? this.createdBy,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
+  }
+
+  /// Локализованная технология приготовления
+  String getLocalizedTechnology(String languageCode) {
+    final t = technologyLocalized;
+    if (t == null || t.isEmpty) return '';
+    final v = t[languageCode];
+    if (v != null && v.trim().isNotEmpty) return v;
+    return t['ru'] ?? t['en'] ?? '';
   }
 
   /// Локализованное название блюда
@@ -205,6 +222,7 @@ class TechCard extends Equatable {
     category,
     portionWeight,
     yield,
+    technologyLocalized,
     ingredients,
     establishmentId,
     createdBy,
@@ -228,6 +246,7 @@ class TechCard extends Equatable {
       category: category,
       portionWeight: 100, // вес порции по умолчанию
       yield: 0,
+      technologyLocalized: null,
       ingredients: [],
       establishmentId: establishmentId,
       createdBy: createdBy,
