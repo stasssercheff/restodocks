@@ -79,6 +79,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
     });
   }
 
+  void _addColumnToAll() {
+    setState(() {
+      for (final r in _rows) {
+        r.quantities.add(0.0);
+      }
+    });
+  }
+
   void _addProduct(Product p) {
     setState(() {
       _rows.add(_InventoryRow(product: p, quantities: [0.0]));
@@ -429,20 +437,31 @@ class _InventoryScreenState extends State<InventoryScreen> {
       );
     }
     final leftW = _leftWidth(context);
-    final rightW = _colTotalWidth + _colGap + _maxQuantityColumns * (_colQtyWidth + _colGap) + 40;
-    final totalW = leftW + rightW;
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
+    final screenW = MediaQuery.of(context).size.width;
+    final rightW = _colTotalWidth + _colGap + _maxQuantityColumns * (_colQtyWidth + _colGap) + 48;
+    final totalW = (leftW + rightW).clamp(screenW, double.infinity);
+    return Scrollbar(
+      thumbVisibility: true,
       controller: _hScroll,
       child: SingleChildScrollView(
-        child: SizedBox(
-          width: totalW,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeaderRow(loc),
-              ...List.generate(_rows.length, (i) => _buildDataRow(loc, i)),
-            ],
+        scrollDirection: Axis.horizontal,
+        controller: _hScroll,
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: SingleChildScrollView(
+          physics: const ClampingScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minWidth: totalW),
+            child: SizedBox(
+              width: totalW,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildHeaderRow(loc),
+                  ...List.generate(_rows.length, (i) => _buildDataRow(loc, i)),
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -574,6 +593,15 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 onPressed: () => _showProductPicker(context, loc),
                 icon: const Icon(Icons.add, size: 20),
                 label: Text(loc.t('inventory_add_product')),
+              ),
+              const SizedBox(width: 8),
+              Tooltip(
+                message: loc.t('inventory_add_column_hint'),
+                child: OutlinedButton.icon(
+                  onPressed: _rows.isEmpty ? null : _addColumnToAll,
+                  icon: const Icon(Icons.add_chart, size: 20),
+                  label: Text(loc.t('inventory_add_column')),
+                ),
               ),
               const SizedBox(width: 12),
             ],

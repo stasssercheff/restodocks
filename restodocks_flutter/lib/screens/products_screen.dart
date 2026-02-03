@@ -8,7 +8,6 @@ import 'package:uuid/uuid.dart';
 
 import '../models/culinary_units.dart';
 import '../models/models.dart';
-import '../services/nutrition_api_service.dart';
 import '../services/services.dart';
 
 /// Экран с двумя вкладками: Номенклатура (продукты заведения) и Справочник (все продукты, добавление в номенклатуру).
@@ -384,13 +383,20 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
     var added = 0;
     var failed = 0;
     final defCur = account.establishment?.defaultCurrency ?? 'VND';
+    final sourceLang = loc.currentLanguageCode;
+    final allLangs = LocalizationService.productLanguageCodes;
     for (final item in items) {
       try {
+        var names = <String, String>{for (final c in allLangs) c: item.name};
+        if (items.length <= 5) {
+          final translated = await TranslationService.translateToAll(item.name, sourceLang, allLangs);
+          if (translated.isNotEmpty) names = translated;
+        }
         final product = Product(
           id: const Uuid().v4(),
           name: item.name,
           category: 'manual',
-          names: {'ru': item.name, 'en': item.name},
+          names: names,
           calories: null,
           protein: null,
           fat: null,
@@ -487,6 +493,11 @@ class _NomenclatureTab extends StatelessWidget {
   bool _needsKbju(Product p) =>
       (p.calories == null || p.calories == 0) && p.protein == null && p.fat == null && p.carbs == null;
 
+  bool _needsTranslation(Product p) {
+    final allLangs = LocalizationService.productLanguageCodes;
+    return allLangs.any((c) => (p.names?[c] ?? '').trim().isEmpty);
+  }
+
   Future<void> _loadKbjuForAll(BuildContext context, List<Product> list) async {
     if (!context.mounted) return;
     await showDialog<void>(
@@ -513,6 +524,32 @@ class _NomenclatureTab extends StatelessWidget {
     if (context.mounted) onRefresh();
   }
 
+  Future<void> _loadTranslationsForAll(BuildContext context, List<Product> list) async {
+    if (!context.mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => _LoadTranslationsProgressDialog(
+        list: list,
+        store: store,
+        loc: loc,
+        onComplete: () {
+          Navigator.of(ctx).pop();
+          onRefresh();
+          if (ctx.mounted) {
+            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(loc.t('translate_done'))));
+          }
+        },
+        onError: (e) {
+          if (ctx.mounted) {
+            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+          }
+        },
+      ),
+    );
+    if (context.mounted) onRefresh();
+  }
+
   @override
   Widget build(BuildContext context) {
     if (products.isEmpty) {
@@ -523,6 +560,7 @@ class _NomenclatureTab extends StatelessWidget {
     }
 
     final needsKbju = products.where((p) => p.category == 'manual' && _needsKbju(p)).toList();
+    final needsTranslation = products.where(_needsTranslation).toList();
     return Column(
       children: [
         Padding(
@@ -556,13 +594,26 @@ class _NomenclatureTab extends StatelessWidget {
             ],
           ),
         ),
-        if (needsKbju.isNotEmpty)
+        if (needsKbju.isNotEmpty || needsTranslation.isNotEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: FilledButton.tonalIcon(
-              onPressed: () => _loadKbjuForAll(context, needsKbju),
-              icon: const Icon(Icons.cloud_download, size: 20),
-              label: Text(loc.t('load_kbju_for_all').replaceAll('%s', '${needsKbju.length}')),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (needsKbju.isNotEmpty)
+                  FilledButton.tonalIcon(
+                    onPressed: () => _loadKbjuForAll(context, needsKbju),
+                    icon: const Icon(Icons.cloud_download, size: 20),
+                    label: Text(loc.t('load_kbju_for_all').replaceAll('%s', '${needsKbju.length}')),
+                  ),
+                if (needsTranslation.isNotEmpty)
+                  FilledButton.tonalIcon(
+                    onPressed: () => _loadTranslationsForAll(context, needsTranslation),
+                    icon: const Icon(Icons.translate, size: 20),
+                    label: Text(loc.t('translate_names_for_all').replaceAll('%s', '${needsTranslation.length}')),
+                  ),
+              ],
             ),
           ),
         Expanded(
@@ -872,6 +923,105 @@ class _LoadKbjuProgressDialogState extends State<_LoadKbjuProgressDialog> {
   }
 }
 
+class _LoadTranslationsProgressDialog extends StatefulWidget {
+  const _LoadTranslationsProgressDialog({
+    required this.list,
+    required this.store,
+    required this.loc,
+    required this.onComplete,
+    required this.onError,
+  });
+
+  final List<Product> list;
+  final ProductStoreSupabase store;
+  final LocalizationService loc;
+  final VoidCallback onComplete;
+  final void Function(Object) onError;
+
+  @override
+  State<_LoadTranslationsProgressDialog> createState() => _LoadTranslationsProgressDialogState();
+}
+
+class _LoadTranslationsProgressDialogState extends State<_LoadTranslationsProgressDialog> {
+  int _done = 0;
+  int _updated = 0;
+  bool _finished = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _run());
+  }
+
+  Future<void> _run() async {
+    final allLangs = LocalizationService.productLanguageCodes;
+    for (final p in widget.list) {
+      try {
+        final source = p.names?['ru'] ?? p.names?['en'] ?? p.name;
+        if (source.trim().isEmpty) {
+          setState(() => _done++);
+          continue;
+        }
+        final missing = allLangs.where((c) => (p.names?[c] ?? '').trim().isEmpty).toList();
+        if (missing.isEmpty) {
+          setState(() => _done++);
+          continue;
+        }
+        final sourceLang = p.names?['ru'] != null && (p.names!['ru'] ?? '').trim().isNotEmpty
+            ? 'ru'
+            : (p.names?['en'] != null && (p.names!['en'] ?? '').trim().isNotEmpty ? 'en' : 'ru');
+        final merged = Map<String, String>.from(p.names ?? {});
+        for (final target in missing) {
+          if (target == sourceLang) continue;
+          final tr = await TranslationService.translate(source, sourceLang, target);
+          if (tr != null && tr.trim().isNotEmpty) merged[target] = tr;
+          await Future<void>.delayed(const Duration(milliseconds: 150));
+        }
+        if (merged.length > (p.names?.length ?? 0)) {
+          final updated = p.copyWith(names: merged);
+          await widget.store.updateProduct(updated);
+          if (!mounted) return;
+          setState(() => _updated++);
+        }
+      } catch (e) {
+        widget.onError(e);
+      }
+      if (!mounted) return;
+      setState(() => _done++);
+    }
+    if (!mounted) return;
+    setState(() => _finished = true);
+    widget.onComplete();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final total = widget.list.length;
+    final progress = total > 0 ? (_done / total).clamp(0.0, 1.0) : 1.0;
+    return AlertDialog(
+      title: Text(widget.loc.t('translate_names_for_all').replaceAll('%s', '$total')),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          LinearProgressIndicator(
+            value: _finished ? 1.0 : progress,
+            minHeight: 8,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          const SizedBox(height: 12),
+          Text('$_done / $total', style: Theme.of(context).textTheme.bodyMedium, textAlign: TextAlign.center),
+          Text(
+            '${widget.loc.t('kbju_updated')}: $_updated',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _CatalogTab extends StatelessWidget {
   const _CatalogTab({
     required this.products,
@@ -975,10 +1125,42 @@ class _CatalogTab extends StatelessWidget {
   bool _needsKbju(Product p) =>
       (p.calories == null || p.calories == 0) && p.protein == null && p.fat == null && p.carbs == null;
 
+  bool _needsTranslation(Product p) {
+    final allLangs = LocalizationService.productLanguageCodes;
+    return allLangs.any((c) => (p.names?[c] ?? '').trim().isEmpty);
+  }
+
+  Future<void> _loadTranslationsForAll(BuildContext context, List<Product> list) async {
+    if (!context.mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => _LoadTranslationsProgressDialog(
+        list: list,
+        store: store,
+        loc: loc,
+        onComplete: () {
+          Navigator.of(ctx).pop();
+          onRefresh();
+          if (ctx.mounted) {
+            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(loc.t('translate_done'))));
+          }
+        },
+        onError: (e) {
+          if (ctx.mounted) {
+            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+          }
+        },
+      ),
+    );
+    if (context.mounted) onRefresh();
+  }
+
   @override
   Widget build(BuildContext context) {
     final notInNom = products.where((p) => !store.isInNomenclature(p.id)).toList();
     final needsKbju = store.allProducts.where((p) => p.category == 'manual' && _needsKbju(p)).toList();
+    final needsTranslation = store.allProducts.where(_needsTranslation).toList();
     return Column(
       children: [
         Padding(
@@ -1031,13 +1213,26 @@ class _CatalogTab extends StatelessWidget {
               label: Text(loc.t('add_all_to_nomenclature').replaceAll('%s', '${notInNom.length}')),
             ),
           ),
-        if (needsKbju.isNotEmpty)
+        if (needsKbju.isNotEmpty || needsTranslation.isNotEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: FilledButton.tonalIcon(
-              onPressed: () => _loadKbjuForAll(context, needsKbju),
-              icon: const Icon(Icons.cloud_download, size: 20),
-              label: Text(loc.t('load_kbju_for_all').replaceAll('%s', '${needsKbju.length}')),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (needsKbju.isNotEmpty)
+                  FilledButton.tonalIcon(
+                    onPressed: () => _loadKbjuForAll(context, needsKbju),
+                    icon: const Icon(Icons.cloud_download, size: 20),
+                    label: Text(loc.t('load_kbju_for_all').replaceAll('%s', '${needsKbju.length}')),
+                  ),
+                if (needsTranslation.isNotEmpty)
+                  FilledButton.tonalIcon(
+                    onPressed: () => _loadTranslationsForAll(context, needsTranslation),
+                    icon: const Icon(Icons.translate, size: 20),
+                    label: Text(loc.t('translate_names_for_all').replaceAll('%s', '${needsTranslation.length}')),
+                  ),
+              ],
             ),
           ),
         Expanded(
@@ -1283,9 +1478,16 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(widget.loc.t('product_name_required'))));
       return;
     }
+    final curLang = widget.loc.currentLanguageCode;
+    final allLangs = LocalizationService.productLanguageCodes;
+    final merged = Map<String, String>.from(widget.product.names ?? {});
+    merged[curLang] = name;
+    for (final c in allLangs) {
+      merged.putIfAbsent(c, () => name);
+    }
     final updated = widget.product.copyWith(
       name: name,
-      names: {'ru': name, 'en': name},
+      names: merged,
       basePrice: _parseNum(_priceController.text),
       currency: _currency,
       unit: _unit,

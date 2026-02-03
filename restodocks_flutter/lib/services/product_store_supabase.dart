@@ -78,9 +78,15 @@ class ProductStoreSupabase {
     if (searchText != null && searchText.isNotEmpty) {
       final searchLower = searchText.toLowerCase();
       filtered = filtered.where((product) {
-        return product.name.toLowerCase().contains(searchLower) ||
-               product.getLocalizedName('ru').toLowerCase().contains(searchLower) ||
-               product.category.toLowerCase().contains(searchLower);
+        if (product.name.toLowerCase().contains(searchLower)) return true;
+        if (product.category.toLowerCase().contains(searchLower)) return true;
+        final n = product.names;
+        if (n != null) {
+          for (final v in n.values) {
+            if (v.toLowerCase().contains(searchLower)) return true;
+          }
+        }
+        return false;
       }).toList();
     }
 

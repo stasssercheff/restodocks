@@ -106,12 +106,18 @@ class Product extends Equatable {
     );
   }
 
-  /// Локализованное название продукта
+  /// Локализованное название продукта (fallback: lang → ru → en → любой → name)
   String getLocalizedName(String languageCode) {
-    if (names != null && names!.containsKey(languageCode)) {
-      return names![languageCode]!;
-    }
-    return name;
+    final n = names;
+    if (n == null || n.isEmpty) return name;
+    final v = n[languageCode];
+    if (v != null && v.trim().isNotEmpty) return v;
+    final ru = n['ru'];
+    if (ru != null && ru.trim().isNotEmpty) return ru;
+    final en = n['en'];
+    if (en != null && en.trim().isNotEmpty) return en;
+    final any = n.values.where((s) => s.trim().isNotEmpty).firstOrNull;
+    return any ?? name;
   }
 
   /// Безглютеновый продукт
