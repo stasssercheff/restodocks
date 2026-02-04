@@ -142,14 +142,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       const SizedBox(height: 8),
-                      Text('PIN: ${establishment.pinCode}'),
+                      Text('${context.read<LocalizationService>().t('pin_label')}: ${establishment.pinCode}'),
                       if (establishment.phone != null) ...[
                         const SizedBox(height: 4),
-                        Text('Телефон: ${establishment.phone}'),
+                        Text('${context.read<LocalizationService>().t('phone_label')}: ${establishment.phone}'),
                       ],
                       if (establishment.email != null) ...[
                         const SizedBox(height: 4),
-                        Text('Email: ${establishment.email}'),
+                        Text('${context.read<LocalizationService>().t('email_label')}: ${establishment.email}'),
                       ],
                     ],
                   ),
@@ -174,7 +174,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ListTile(
                 leading: const Icon(Icons.numbers),
                 title: Text(localization.t('shift_count')),
-                subtitle: Text('0'),
+                subtitle: Text(context.read<LocalizationService>().t('zero')),
                 trailing: const Icon(Icons.chevron_right),
               ),
               const SizedBox(height: 24),

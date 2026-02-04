@@ -8,6 +8,8 @@ import 'package:uuid/uuid.dart';
 
 import '../models/culinary_units.dart';
 import '../models/models.dart';
+import '../services/ai_service.dart';
+import '../services/nutrition_api_service.dart';
 import '../services/services.dart';
 
 /// Экран с двумя вкладками: Номенклатура (продукты заведения) и Справочник (все продукты, добавление в номенклатуру).
@@ -207,6 +209,7 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
                   onRefresh: () => _ensureLoaded().then((_) => setState(() {})),
                   onUpload: () => _uploadFromTxt(loc),
                   onPaste: () => _showPasteDialog(loc),
+                  onAddProduct: () => _showAddProductDialog(loc),
                 ),
               ],
             ),
@@ -280,7 +283,7 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
                 controller: controller,
                 maxLines: 12,
                 decoration: const InputDecoration(
-                  hintText: 'Авокадо\t₫99,000\nАнчоус\t₫1,360,000\n...',
+                  hintText: loc.t('paste_hint_products'),
                   border: OutlineInputBorder(),
                   alignLabelWithHint: true,
                 ),
@@ -289,7 +292,7 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(null), child: const Text('Отмена')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(null), child: Text(loc.t('cancel'))),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(controller.text),
             child: Text(loc.t('save')),
@@ -299,6 +302,56 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
     );
     if (text == null || text.trim().isEmpty || !mounted) return;
     await _addProductsFromText(text, loc);
+  }
+
+  static const _addProductCategories = ['manual', 'vegetables', 'fruits', 'meat', 'seafood', 'dairy', 'grains', 'bakery', 'pantry', 'spices', 'beverages', 'eggs', 'legumes', 'nuts', 'misc'];
+  static const _addProductUnits = ['g', 'kg', 'pcs', 'шт', 'ml', 'L'];
+
+  Future<void> _showAddProductDialog(LocalizationService loc) async {
+    final account = context.read<AccountManagerSupabase>();
+    final estId = account.establishment?.id;
+    if (estId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('no_establishment'))));
+      return;
+    }
+    final result = await showDialog<({String name, String category, String unit})>(
+      context: context,
+      builder: (ctx) => _AddProductDialog(
+        loc: loc,
+        categories: _addProductCategories,
+        units: _addProductUnits,
+      ),
+    );
+    if (result == null || result.name.trim().isEmpty || !mounted) return;
+    final store = context.read<ProductStoreSupabase>();
+    final defCur = account.establishment?.defaultCurrency ?? 'VND';
+    final allLangs = LocalizationService.productLanguageCodes;
+    final names = <String, String>{for (final c in allLangs) c: result.name.trim()};
+    final product = Product(
+      id: const Uuid().v4(),
+      name: result.name.trim(),
+      category: result.category,
+      names: names,
+      calories: null,
+      protein: null,
+      fat: null,
+      carbs: null,
+      unit: result.unit,
+      basePrice: null,
+      currency: null,
+    );
+    try {
+      await store.addProduct(product);
+      await store.addToNomenclature(estId, product.id);
+      await store.loadProducts();
+      await store.loadNomenclature(estId);
+      if (mounted) setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('product_added'))));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))));
+      }
+    }
   }
 
   Future<void> _uploadFromTxt(LocalizationService loc) async {
@@ -312,7 +365,7 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
     final text = utf8.decode(bytes, allowMalformed: true);
     if (text.trim().isEmpty) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Файл пуст')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('file_empty'))));
       return;
     }
     await _addProductsFromText(text, loc);
@@ -323,7 +376,7 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
     final items = lines.map(_parseLine).where((r) => r.name.isNotEmpty).toList();
     if (items.isEmpty) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Нет строк для добавления')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('no_rows_to_add'))));
       return;
     }
     final confirmed = await showDialog<bool>(
@@ -348,7 +401,7 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Отмена')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(loc.t('cancel'))),
           FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(loc.t('save'))),
         ],
       ),
@@ -359,7 +412,7 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
     final account = context.read<AccountManagerSupabase>();
     final estId = account.establishment?.id;
     if (estId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Нет заведения')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('no_establishment'))));
       return;
     }
 
@@ -428,6 +481,120 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
           if (context.mounted) setState(() {});
         },
       ),
+    );
+  }
+}
+
+class _AddProductDialog extends StatefulWidget {
+  const _AddProductDialog({
+    required this.loc,
+    required this.categories,
+    required this.units,
+  });
+
+  final LocalizationService loc;
+  final List<String> categories;
+  final List<String> units;
+
+  @override
+  State<_AddProductDialog> createState() => _AddProductDialogState();
+}
+
+class _AddProductDialogState extends State<_AddProductDialog> {
+  late TextEditingController _nameController;
+  late String _category;
+  late String _unit;
+  bool _recognizing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController();
+    _category = 'manual';
+    _unit = 'g';
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _recognize() async {
+    final name = _nameController.text.trim();
+    if (name.isEmpty) return;
+    setState(() => _recognizing = true);
+    final ai = context.read<AiService>();
+    final result = await ai.recognizeProduct(name);
+    if (!mounted) {
+      setState(() => _recognizing = false);
+      return;
+    }
+    setState(() {
+      _recognizing = false;
+      if (result != null) {
+        _nameController.text = result.normalizedName;
+        if (result.suggestedCategory != null && widget.categories.contains(result.suggestedCategory)) {
+          _category = result.suggestedCategory!;
+        }
+        if (result.suggestedUnit != null && widget.units.contains(result.suggestedUnit)) {
+          _unit = result.suggestedUnit!;
+        }
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.loc.t('add_product')),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              controller: _nameController,
+              decoration: InputDecoration(
+                labelText: widget.loc.t('product_name'),
+                border: const OutlineInputBorder(),
+              ),
+              onSubmitted: (_) => _recognize(),
+            ),
+            const SizedBox(height: 8),
+            FilledButton.tonalIcon(
+              onPressed: _recognizing ? null : _recognize,
+              icon: _recognizing ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.auto_awesome, size: 20),
+              label: Text(widget.loc.t('ai_product_recognize')),
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _category,
+              decoration: InputDecoration(labelText: widget.loc.t('column_category'), border: const OutlineInputBorder()),
+              items: widget.categories.map((c) => DropdownMenuItem(value: c, child: Text(c == 'manual' ? widget.loc.t('category_manual') : c))).toList(),
+              onChanged: (v) => setState(() => _category = v ?? 'manual'),
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: _unit,
+              decoration: InputDecoration(labelText: widget.loc.t('unit'), border: const OutlineInputBorder()),
+              items: widget.units.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
+              onChanged: (v) => setState(() => _unit = v ?? 'g'),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(null), child: Text(widget.loc.t('cancel'))),
+        FilledButton(
+          onPressed: () {
+            final name = _nameController.text.trim();
+            if (name.isEmpty) return;
+            Navigator.of(context).pop((name: name, category: _category, unit: _unit));
+          },
+          child: Text(widget.loc.t('save')),
+        ),
+      ],
     );
   }
 }
@@ -507,7 +674,7 @@ class _NomenclatureTab extends StatelessWidget {
         },
         onError: (e) {
           if (ctx.mounted) {
-            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))));
           }
         },
       ),
@@ -533,7 +700,55 @@ class _NomenclatureTab extends StatelessWidget {
         },
         onError: (e) {
           if (ctx.mounted) {
-            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))));
+          }
+        },
+      ),
+    );
+    if (context.mounted) onRefresh();
+  }
+
+  Future<void> _verifyWithAi(BuildContext context, List<Product> list) async {
+    if (!context.mounted || list.isEmpty) return;
+    final ai = context.read<AiService>();
+    List<_VerifyProductItem> results = [];
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => _VerifyProductsProgressDialog(
+        list: list,
+        store: store,
+        aiService: ai,
+        loc: loc,
+        onComplete: (r) {
+          results = r;
+          Navigator.of(ctx).pop();
+        },
+        onError: (e) {
+          if (ctx.mounted) {
+            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))));
+          }
+        },
+      ),
+    );
+    if (!context.mounted) return;
+    final withSuggestions = results.where((e) => e.hasAnySuggestion).toList();
+    if (withSuggestions.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('verify_no_suggestions'))));
+      onRefresh();
+      return;
+    }
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => _VerifyProductsResultsDialog(
+        items: withSuggestions,
+        store: store,
+        loc: loc,
+        onApplied: () {
+          Navigator.of(ctx).pop();
+          onRefresh();
+          if (ctx.mounted) {
+            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(loc.t('verify_applied'))));
           }
         },
       ),
@@ -585,7 +800,7 @@ class _NomenclatureTab extends StatelessWidget {
             ],
           ),
         ),
-        if (needsKbju.isNotEmpty || needsTranslation.isNotEmpty)
+        if (needsKbju.isNotEmpty || needsTranslation.isNotEmpty || products.isNotEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: Wrap(
@@ -604,6 +819,11 @@ class _NomenclatureTab extends StatelessWidget {
                     icon: const Icon(Icons.translate, size: 20),
                     label: Text(loc.t('translate_names_for_all').replaceAll('%s', '${needsTranslation.length}')),
                   ),
+                FilledButton.tonalIcon(
+                  onPressed: () => _verifyWithAi(context, products),
+                  icon: const Icon(Icons.auto_awesome, size: 20),
+                  label: Text(loc.t('verify_with_ai').replaceAll('%s', '${products.length}')),
+                ),
               ],
             ),
           ),
@@ -679,7 +899,7 @@ class _NomenclatureTab extends StatelessWidget {
           loc.t('remove_from_nomenclature_confirm').replaceAll('%s', p.getLocalizedName(loc.currentLanguageCode)),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Отмена')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(loc.t('cancel'))),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.of(ctx).pop(true),
@@ -694,7 +914,7 @@ class _NomenclatureTab extends StatelessWidget {
       if (context.mounted) onRefresh();
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))));
       }
     }
   }
@@ -914,6 +1134,249 @@ class _LoadKbjuProgressDialogState extends State<_LoadKbjuProgressDialog> {
   }
 }
 
+/// Один результат верификации продукта ИИ для отображения в диалоге
+class _VerifyProductItem {
+  const _VerifyProductItem({required this.product, this.result});
+  final Product product;
+  final ProductVerificationResult? result;
+
+  bool get hasAnySuggestion =>
+      result != null &&
+      (result!.normalizedName != null ||
+          result!.suggestedPrice != null ||
+          result!.suggestedCalories != null ||
+          result!.suggestedProtein != null ||
+          result!.suggestedFat != null ||
+          result!.suggestedCarbs != null);
+}
+
+class _VerifyProductsProgressDialog extends StatefulWidget {
+  const _VerifyProductsProgressDialog({
+    required this.list,
+    required this.store,
+    required this.aiService,
+    required this.loc,
+    required this.onComplete,
+    required this.onError,
+  });
+
+  final List<Product> list;
+  final ProductStoreSupabase store;
+  final AiService aiService;
+  final LocalizationService loc;
+  final void Function(List<_VerifyProductItem>) onComplete;
+  final void Function(Object) onError;
+
+  @override
+  State<_VerifyProductsProgressDialog> createState() => _VerifyProductsProgressDialogState();
+}
+
+class _VerifyProductsProgressDialogState extends State<_VerifyProductsProgressDialog> {
+  int _done = 0;
+  final List<_VerifyProductItem> _results = [];
+  bool _finished = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _run());
+  }
+
+  Future<void> _run() async {
+    for (final p in widget.list) {
+      try {
+        final nutrition = (p.calories != null || p.protein != null || p.fat != null || p.carbs != null)
+            ? NutritionResult(
+                calories: p.calories,
+                protein: p.protein,
+                fat: p.fat,
+                carbs: p.carbs,
+              )
+            : null;
+        final result = await widget.aiService.verifyProduct(
+          p.getLocalizedName(widget.loc.currentLanguageCode),
+          currentPrice: p.basePrice,
+          currentNutrition: nutrition,
+        );
+        if (!mounted) return;
+        _results.add(_VerifyProductItem(product: p, result: result));
+      } catch (e) {
+        if (!mounted) return;
+        _results.add(_VerifyProductItem(product: p, result: null));
+        widget.onError(e);
+      }
+      if (!mounted) return;
+      setState(() => _done++);
+    }
+    if (!mounted) return;
+    setState(() => _finished = true);
+    widget.onComplete(List.from(_results));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final total = widget.list.length;
+    final progress = total > 0 ? (_done / total).clamp(0.0, 1.0) : 1.0;
+    return AlertDialog(
+      title: Text(widget.loc.t('verify_with_ai').replaceAll('%s', '$total')),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          LinearProgressIndicator(
+            value: _finished ? 1.0 : progress,
+            minHeight: 8,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '$_done / $total',
+            style: Theme.of(context).textTheme.bodyMedium,
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VerifyProductsResultsDialog extends StatelessWidget {
+  const _VerifyProductsResultsDialog({
+    required this.items,
+    required this.store,
+    required this.loc,
+    required this.onApplied,
+  });
+
+  final List<_VerifyProductItem> items;
+  final ProductStoreSupabase store;
+  final LocalizationService loc;
+  final VoidCallback onApplied;
+
+  Future<void> _applyOne(BuildContext context, _VerifyProductItem item) async {
+    final p = item.product;
+    final r = item.result!;
+    Product updated = p;
+    if (r.normalizedName != null && r.normalizedName!.trim().isNotEmpty) {
+      updated = updated.copyWith(name: r.normalizedName!.trim());
+    }
+    if (r.suggestedPrice != null) {
+      updated = updated.copyWith(basePrice: r.suggestedPrice);
+    }
+    if (r.suggestedCalories != null || r.suggestedProtein != null || r.suggestedFat != null || r.suggestedCarbs != null) {
+      updated = updated.copyWith(
+        calories: r.suggestedCalories ?? updated.calories,
+        protein: r.suggestedProtein ?? updated.protein,
+        fat: r.suggestedFat ?? updated.fat,
+        carbs: r.suggestedCarbs ?? updated.carbs,
+      );
+    }
+    await store.updateProduct(updated);
+    if (context.mounted) onApplied();
+  }
+
+  Future<void> _applyAll(BuildContext context) async {
+    for (final item in items) {
+      if (item.result == null || !item.hasAnySuggestion) continue;
+      final p = item.product;
+      final r = item.result!;
+      Product updated = p;
+      if (r.normalizedName != null && r.normalizedName!.trim().isNotEmpty) {
+        updated = updated.copyWith(name: r.normalizedName!.trim());
+      }
+      if (r.suggestedPrice != null) updated = updated.copyWith(basePrice: r.suggestedPrice);
+      if (r.suggestedCalories != null || r.suggestedProtein != null || r.suggestedFat != null || r.suggestedCarbs != null) {
+        updated = updated.copyWith(
+          calories: r.suggestedCalories ?? updated.calories,
+          protein: r.suggestedProtein ?? updated.protein,
+          fat: r.suggestedFat ?? updated.fat,
+          carbs: r.suggestedCarbs ?? updated.carbs,
+        );
+      }
+      await store.updateProduct(updated);
+    }
+    if (context.mounted) onApplied();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(loc.t('verify_results')),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              loc.t('verify_results_hint'),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: items.length > 5 ? 320 : null,
+              child: ListView.builder(
+                shrinkWrap: items.length <= 5,
+                itemCount: items.length,
+                itemBuilder: (_, i) {
+                  final item = items[i];
+                  final p = item.product;
+                  final r = item.result!;
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            p.getLocalizedName(loc.currentLanguageCode),
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
+                          if (r.normalizedName != null && r.normalizedName != p.name) ...[
+                            const SizedBox(height: 4),
+                            Text('${loc.t('name')}: ${p.name} → ${r.normalizedName}', style: Theme.of(context).textTheme.bodySmall),
+                          ],
+                          if (r.suggestedPrice != null && r.suggestedPrice != p.basePrice) ...[
+                            const SizedBox(height: 2),
+                            Text('${loc.t('price')}: ${p.basePrice?.toStringAsFixed(2) ?? '—'} → ${r.suggestedPrice!.toStringAsFixed(2)}', style: Theme.of(context).textTheme.bodySmall),
+                          ],
+                          if (r.suggestedCalories != null || r.suggestedProtein != null || r.suggestedFat != null || r.suggestedCarbs != null) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              'КБЖУ: ${p.calories?.round() ?? 0}/${p.protein?.round() ?? 0}/${p.fat?.round() ?? 0}/${p.carbs?.round() ?? 0} → ${r.suggestedCalories?.round() ?? 0}/${r.suggestedProtein?.round() ?? 0}/${r.suggestedFat?.round() ?? 0}/${r.suggestedCarbs?.round() ?? 0}',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                          const SizedBox(height: 8),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: FilledButton.tonal(
+                              onPressed: () => _applyOne(context, item),
+                              child: Text(loc.t('apply')),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(loc.t('close'))),
+        FilledButton(
+          onPressed: () => _applyAll(context),
+          child: Text(loc.t('apply_all')),
+        ),
+      ],
+    );
+  }
+}
+
 class _LoadTranslationsProgressDialog extends StatefulWidget {
   const _LoadTranslationsProgressDialog({
     required this.list,
@@ -1033,6 +1496,7 @@ class _CatalogTab extends StatelessWidget {
     required this.onRefresh,
     required this.onUpload,
     required this.onPaste,
+    required this.onAddProduct,
   });
 
   final List<Product> products;
@@ -1050,6 +1514,7 @@ class _CatalogTab extends StatelessWidget {
   final VoidCallback onRefresh;
   final VoidCallback onUpload;
   final VoidCallback onPaste;
+  final VoidCallback onAddProduct;
 
   String _categoryLabel(String c) {
     const map = {
@@ -1079,7 +1544,7 @@ class _CatalogTab extends StatelessWidget {
         },
         onError: (e) {
           if (ctx.mounted) {
-            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))));
           }
         },
       ),
@@ -1109,7 +1574,7 @@ class _CatalogTab extends StatelessWidget {
         onError: (e) {
           Navigator.of(ctx).pop();
           if (ctx.mounted) {
-            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))));
           }
         },
       ),
@@ -1150,7 +1615,7 @@ class _CatalogTab extends StatelessWidget {
         },
         onError: (e) {
           if (ctx.mounted) {
-            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))));
           }
         },
       ),
@@ -1181,6 +1646,11 @@ class _CatalogTab extends StatelessWidget {
                 icon: const Icon(Icons.upload_file),
                 onPressed: onUpload,
                 tooltip: loc.t('upload_list_tooltip'),
+              ),
+              IconButton(
+                icon: const Icon(Icons.add_circle_outline),
+                onPressed: onAddProduct,
+                tooltip: loc.t('add_product'),
               ),
               PopupMenuButton<_CatalogSort>(
                 icon: const Icon(Icons.sort),
@@ -1353,7 +1823,7 @@ class _CatalogTab extends StatelessWidget {
       if (context.mounted) onRefresh();
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))));
       }
     }
   }
@@ -1384,7 +1854,7 @@ class _CatalogTab extends StatelessWidget {
       final msg = fmt;
       scaffold.showSnackBar(SnackBar(content: Text(msg)));
     } catch (e) {
-      scaffold.showSnackBar(SnackBar(content: Text('${loc.t('error_short')}: $e')));
+      scaffold.showSnackBar(SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))));
     }
   }
 }
@@ -1514,7 +1984,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(widget.loc.t('product_saved'))));
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(widget.loc.t('error_with_message').replaceAll('%s', e.toString()))));
       }
     }
   }
@@ -1598,7 +2068,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                   Expanded(
                     child: TextFormField(
                       controller: _caloriesController,
-                      decoration: InputDecoration(labelText: 'ккал', border: const OutlineInputBorder(), isDense: true),
+                      decoration: InputDecoration(labelText: widget.loc.t('kcal'), border: const OutlineInputBorder(), isDense: true),
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     ),
                   ),
@@ -1606,7 +2076,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                   Expanded(
                     child: TextFormField(
                       controller: _proteinController,
-                      decoration: InputDecoration(labelText: 'Б', border: const OutlineInputBorder(), isDense: true),
+                      decoration: InputDecoration(labelText: widget.loc.t('protein_short'), border: const OutlineInputBorder(), isDense: true),
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     ),
                   ),
@@ -1614,7 +2084,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                   Expanded(
                     child: TextFormField(
                       controller: _fatController,
-                      decoration: InputDecoration(labelText: 'Ж', border: const OutlineInputBorder(), isDense: true),
+                      decoration: InputDecoration(labelText: widget.loc.t('fat_short'), border: const OutlineInputBorder(), isDense: true),
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     ),
                   ),
@@ -1622,7 +2092,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                   Expanded(
                     child: TextFormField(
                       controller: _carbsController,
-                      decoration: InputDecoration(labelText: 'У', border: const OutlineInputBorder(), isDense: true),
+                      decoration: InputDecoration(labelText: widget.loc.t('carbs_short'), border: const OutlineInputBorder(), isDense: true),
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     ),
                   ),
@@ -1744,7 +2214,7 @@ class _CurrencySettingsDialogState extends State<_CurrencySettingsDialog> {
                 controller: _customController,
                 decoration: InputDecoration(
                   labelText: widget.loc.t('currency_code'),
-                  hintText: 'UAH, KZT, THB...',
+                  hintText: widget.loc.t('currency_hint'),
                   border: const OutlineInputBorder(),
                 ),
                 textCapitalization: TextCapitalization.characters,

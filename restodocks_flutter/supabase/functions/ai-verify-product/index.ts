@@ -1,0 +1,127 @@
+// Supabase Edge Function: верификация продукта для сверки по списку (цена, КБЖУ, название)
+import "jsr:@supabase/functions-js/edge_runtime.d.ts";
+
+const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
+
+function corsHeaders(origin: string | null) {
+  return {
+    "Access-Control-Allow-Origin": origin || "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  };
+}
+
+Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders(req.headers.get("Origin")) });
+  }
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method not allowed" }), {
+      status: 405,
+      headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+    });
+  }
+
+  const apiKey = Deno.env.get("OPENAI_API_KEY");
+  if (!apiKey) {
+    return new Response(JSON.stringify({ error: "OPENAI_API_KEY not set" }), {
+      status: 500,
+      headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+    });
+  }
+
+  try {
+    const body = (await req.json()) as {
+      productName?: string;
+      currentPrice?: number;
+      currentCalories?: number;
+      currentProtein?: number;
+      currentFat?: number;
+      currentCarbs?: number;
+    };
+    const productName = body.productName?.trim();
+    if (!productName) {
+      return new Response(JSON.stringify({ error: "productName required" }), {
+        status: 400,
+        headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+      });
+    }
+
+    const systemPrompt = `You are a product data verifier for a restaurant. For each product you receive:
+1. normalizedName: correct/standard name (fix typos, unify spelling). Return null if the name is already correct.
+2. suggestedPrice: typical wholesale price per kg in USD (number). Return only if we need to suggest a price (e.g. when current price is missing or clearly wrong). Use null if unknown.
+3. suggestedCalories, suggestedProtein, suggestedFat, suggestedCarbs: per 100g. Suggest only if missing or if current values look wrong (e.g. calories 0 for meat, or unrealistic). Use null for unknown.
+Output ONLY valid JSON with keys: normalizedName, suggestedPrice, suggestedCalories, suggestedProtein, suggestedFat, suggestedCarbs. No markdown. Use null for any value you are not suggesting.`;
+
+    const current = [];
+    if (body.currentPrice != null) current.push(`price per kg: ${body.currentPrice}`);
+    if (body.currentCalories != null) current.push(`calories: ${body.currentCalories}`);
+    if (body.currentProtein != null) current.push(`protein: ${body.currentProtein}`);
+    if (body.currentFat != null) current.push(`fat: ${body.currentFat}`);
+    if (body.currentCarbs != null) current.push(`carbs: ${body.currentCarbs}`);
+    const userContent = current.length > 0
+      ? `Product: "${productName}". Current: ${current.join(", ")}. Verify and suggest corrections or fill missing (price in USD per kg, nutrition per 100g).`
+      : `Product: "${productName}". Suggest normalized name, typical price per kg (USD), and nutrition per 100g.`;
+
+    const res = await fetch(OPENAI_URL, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userContent },
+        ],
+        temperature: 0.2,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      return new Response(JSON.stringify({ error: `OpenAI: ${res.status} ${err}` }), {
+        status: 502,
+        headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+      });
+    }
+
+    const data = await res.json() as { choices?: { message?: { content?: string } }[] };
+    const content = data.choices?.[0]?.message?.content?.trim();
+    if (!content) {
+      return new Response(JSON.stringify({
+        normalizedName: null,
+        suggestedPrice: null,
+        suggestedCalories: null,
+        suggestedProtein: null,
+        suggestedFat: null,
+        suggestedCarbs: null,
+      }), {
+        status: 200,
+        headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+      });
+    }
+
+    const parsed = JSON.parse(content) as Record<string, unknown>;
+    const num = (v: unknown): number | null =>
+      typeof v === "number" && !Number.isNaN(v) ? v : (v != null ? Number(v) : null);
+    return new Response(JSON.stringify({
+      normalizedName: typeof parsed.normalizedName === "string" && parsed.normalizedName.trim() !== ""
+        ? parsed.normalizedName.trim()
+        : null,
+      suggestedPrice: num(parsed.suggestedPrice),
+      suggestedCalories: num(parsed.suggestedCalories),
+      suggestedProtein: num(parsed.suggestedProtein),
+      suggestedFat: num(parsed.suggestedFat),
+      suggestedCarbs: num(parsed.suggestedCarbs),
+    }), {
+      headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+    });
+  } catch (e) {
+    return new Response(JSON.stringify({ error: String(e) }), {
+      status: 500,
+      headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+    });
+  }
+});

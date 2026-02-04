@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../services/services.dart';
 
 /// Виджет ошибки
 class ErrorDisplayWidget extends StatelessWidget {
@@ -34,7 +37,7 @@ class ErrorDisplayWidget extends StatelessWidget {
               const SizedBox(height: 16),
               ElevatedButton(
                 onPressed: onRetry,
-                child: const Text('Повторить'),
+                child: Text(context.read<LocalizationService>().t('retry')),
               ),
             ],
           ],

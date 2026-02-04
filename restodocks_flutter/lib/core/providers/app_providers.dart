@@ -29,6 +29,9 @@ class AppProviders {
         Provider<ChecklistServiceSupabase>(
           create: (_) => ChecklistServiceSupabase(),
         ),
+        Provider<AiService>(
+          create: (_) => AiServiceSupabase(),
+        ),
 
         // Инициализация сервисов при запуске + загрузка продуктов после входа
         FutureProvider<void>(

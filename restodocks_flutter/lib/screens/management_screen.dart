@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../services/services.dart';
 
 /// Экран управления
 class ManagementScreen extends StatelessWidget {
@@ -8,10 +11,10 @@ class ManagementScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Управление'),
+        title: Text(context.read<LocalizationService>().t('management')),
       ),
-      body: const Center(
-        child: Text('Экран управления (в разработке)'),
+      body: Center(
+        child: Text(context.read<LocalizationService>().t('screen_in_dev')),
       ),
     );
   }

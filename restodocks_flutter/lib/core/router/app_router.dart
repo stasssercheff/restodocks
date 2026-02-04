@@ -15,6 +15,7 @@ import '../../screens/checklists_screen.dart';
 import '../../screens/checklist_edit_screen.dart';
 import '../../screens/tech_cards_list_screen.dart';
 import '../../screens/tech_card_edit_screen.dart';
+import '../../services/ai_service.dart';
 import '../../services/services.dart';
 
 const _publicPaths = ['/splash', '/login', '/register', '/register-company', '/register-owner', '/register-employee'];
@@ -138,7 +139,10 @@ class AppRouter {
       ),
       GoRoute(
         path: '/tech-cards/new',
-        builder: (context, state) => const TechCardEditScreen(techCardId: 'new'),
+        builder: (context, state) {
+          final initialFromAi = state.extra as TechCardRecognitionResult?;
+          return TechCardEditScreen(techCardId: 'new', initialFromAi: initialFromAi);
+        },
       ),
       GoRoute(
         path: '/tech-cards/:id',

@@ -120,7 +120,7 @@ class _SupabaseTestScreenState extends State<SupabaseTestScreen> {
                       ),
                       if (_errorDetail != null && _errorDetail!.isNotEmpty) ...[
                         const SizedBox(height: 8),
-                        Text('Ошибка: $_errorDetail', style: const TextStyle(fontSize: 12, color: Colors.red)),
+                        Text('${context.read<LocalizationService>().t('error_with_message').replaceAll('%s', _errorDetail ?? '')}', style: const TextStyle(fontSize: 12, color: Colors.red)),
                       ],
                     ],
                   ),
@@ -168,15 +168,15 @@ class _SupabaseTestScreenState extends State<SupabaseTestScreen> {
                       children: [
                         ElevatedButton(
                           onPressed: _checkConnection,
-                          child: const Text('Проверить подключение'),
+                          child: Text(context.read<LocalizationService>().t('test_connection')),
                         ),
                         ElevatedButton(
                           onPressed: () => _testDatabase(context),
-                          child: const Text('Тест базы данных'),
+                          child: Text(context.read<LocalizationService>().t('test_database')),
                         ),
                         ElevatedButton(
                           onPressed: () => _testStorage(context),
-                          child: const Text('Тест хранилища'),
+                          child: Text(context.read<LocalizationService>().t('test_storage')),
                         ),
                       ],
                     ),
@@ -250,7 +250,7 @@ class _SupabaseTestScreenState extends State<SupabaseTestScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка базы данных: $e')),
+          SnackBar(content: Text(context.read<LocalizationService>().t('error_with_message').replaceAll('%s', e.toString()))),
         );
       }
     }
@@ -270,7 +270,7 @@ class _SupabaseTestScreenState extends State<SupabaseTestScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка хранилища: $e')),
+          SnackBar(content: Text(context.read<LocalizationService>().t('error_with_message').replaceAll('%s', e.toString()))),
         );
       }
     }

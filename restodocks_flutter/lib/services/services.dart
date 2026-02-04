@@ -14,3 +14,5 @@ export 'supabase_service.dart';
 export 'secure_storage_service.dart';
 export 'theme_service.dart';
 export 'translation_service.dart';
+export 'ai_service.dart';
+export 'ai_service_supabase.dart';

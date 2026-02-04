@@ -4,27 +4,39 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../models/models.dart';
+import '../services/ai_service.dart';
+import '../services/image_service.dart';
 import '../services/inventory_download.dart';
 import '../services/services.dart';
 
-/// Строка бланка: продукт из номенклатуры или полуфабрикат (ТТК). Один список — все в одном месте.
+/// Строка бланка: продукт из номенклатуры, полуфабрикат (ТТК) или свободная строка (например, с чека).
 class _InventoryRow {
   final Product? product;
   final TechCard? techCard;
+  /// Свободная строка (распознанный чек): когда product и techCard оба null.
+  final String? freeName;
+  final String? freeUnit;
   final List<double> quantities;
 
-  _InventoryRow({this.product, this.techCard, required this.quantities})
-      : assert(product != null || techCard != null),
+  _InventoryRow({
+    this.product,
+    this.techCard,
+    this.freeName,
+    this.freeUnit,
+    required this.quantities,
+  })  : assert(product != null || techCard != null || (freeName != null && freeName.isNotEmpty)),
         assert(product == null || techCard == null);
 
   bool get isPf => techCard != null;
+  bool get isFree => product == null && techCard == null;
 
   String productName(String lang) {
     if (product != null) return product!.getLocalizedName(lang);
-    return '${techCard!.getLocalizedDishName(lang)} (ПФ)';
+    if (techCard != null) return '${techCard!.getLocalizedDishName(lang)} (ПФ)';
+    return freeName ?? '';
   }
 
-  String get unit => product?.unit ?? 'g';
+  String get unit => product?.unit ?? freeUnit ?? 'g';
   String unitDisplay(String lang) =>
       isPf ? 'порц.' : CulinaryUnits.displayName(unit.toLowerCase(), lang);
 
@@ -32,6 +44,9 @@ class _InventoryRow {
 }
 
 enum _InventorySort { alphabet, lastAdded }
+
+/// Фильтр по типу строк: все, только продукты, только ПФ.
+enum _InventoryBlockFilter { all, productsOnly, pfOnly }
 
 /// Бланк инвентаризации: продукты из номенклатуры и полуфабрикаты (ПФ) в одном документе.
 /// Шапка (заведение, сотрудник, дата, время), таблица (#, Наименование, Мера, Итого, Количество).
@@ -50,6 +65,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
   TimeOfDay? _endTime;
   bool _completed = false;
   _InventorySort _sortMode = _InventorySort.lastAdded;
+  _InventoryBlockFilter _blockFilter = _InventoryBlockFilter.all;
 
   @override
   void initState() {
@@ -58,7 +74,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadNomenclature());
   }
 
-  /// Индексы строк-продуктов (номенклатура), отсортированы по выбранному режиму.
+  /// Индексы строк-продуктов и свободных (номенклатура + с чека), отсортированы по выбранному режиму.
   List<int> get _productIndices {
     final indices = List.generate(_rows.length, (i) => i).where((i) => !_rows[i].isPf).toList();
     if (_sortMode == _InventorySort.alphabet) {
@@ -110,6 +126,46 @@ class _InventoryScreenState extends State<InventoryScreen> {
     });
   }
 
+  /// Добавить строки из распознанного чека (ИИ).
+  void _addReceiptLines(List<ReceiptLine> lines) {
+    setState(() {
+      for (final line in lines) {
+        if (line.productName.trim().isEmpty) continue;
+        final qty = line.quantity > 0 ? line.quantity : 1.0;
+        final unit = (line.unit ?? 'g').trim().isEmpty ? 'g' : (line.unit ?? 'g');
+        _rows.add(_InventoryRow(
+          product: null,
+          techCard: null,
+          freeName: line.productName.trim(),
+          freeUnit: unit,
+          quantities: [qty],
+        ));
+      }
+    });
+  }
+
+  Future<void> _scanReceipt(BuildContext context, LocalizationService loc) async {
+    if (_completed) return;
+    final imageService = ImageService();
+    final xFile = await imageService.pickImageFromGallery();
+    if (xFile == null || !mounted) return;
+    final bytes = await imageService.xFileToBytes(xFile);
+    if (bytes == null || bytes.isEmpty || !mounted) return;
+    final ai = context.read<AiService>();
+    final result = await ai.recognizeReceipt(bytes);
+    if (!mounted) return;
+    if (result == null || result.lines.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('inventory_receipt_scan_empty'))),
+      );
+      return;
+    }
+    _addReceiptLines(result.lines);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(loc.t('inventory_receipt_scan_added').replaceAll('%s', '${result.lines.length}'))),
+    );
+  }
+
   @override
   void dispose() {
     _hScroll.dispose();
@@ -123,7 +179,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
   void _addQuantityToRow(int rowIndex) {
     if (rowIndex < 0 || rowIndex >= _rows.length) return;
-    if (_rows[rowIndex].isPf) return;
+    if (_rows[rowIndex].isPf) return; // только продукты и свободные строки
     setState(() {
       _rows[rowIndex].quantities.add(0.0);
     });
@@ -252,7 +308,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${loc.t('inventory_document_saved')} (Excel: $e)')),
+          SnackBar(content: Text('${loc.t('inventory_document_saved')} (Excel: ${e.toString()})')),
         );
       }
     }
@@ -328,7 +384,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
       'timeEnd': '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}',
     };
     final rows = _rows.map((r) {
-      final id = r.product != null ? r.product!.id : 'pf_${r.techCard!.id}';
+      final id = r.product != null
+          ? r.product!.id
+          : r.techCard != null
+              ? 'pf_${r.techCard!.id}'
+              : 'free_${_rows.indexOf(r)}';
       return {
         'productId': id,
         'productName': r.productName(lang),
@@ -413,19 +473,40 @@ class _InventoryScreenState extends State<InventoryScreen> {
               style: theme.textTheme.bodySmall,
             ),
             if (!_completed && _rows.isNotEmpty) ...[
-              const SizedBox(width: 8),
-              SegmentedButton<_InventorySort>(
-                style: ButtonStyle(
-                  padding: WidgetStateProperty.all(const EdgeInsets.symmetric(horizontal: 6, vertical: 4)),
-                  visualDensity: VisualDensity.compact,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              const SizedBox(width: 6),
+              SizedBox(
+                width: 130,
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<_InventoryBlockFilter>(
+                    value: _blockFilter,
+                    isExpanded: true,
+                    isDense: true,
+                    icon: const Icon(Icons.filter_list, size: 18),
+                    items: [
+                      DropdownMenuItem(value: _InventoryBlockFilter.all, child: Text(loc.t('inventory_filter_all'), style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
+                      DropdownMenuItem(value: _InventoryBlockFilter.productsOnly, child: Text(loc.t('inventory_block_products'), style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
+                      DropdownMenuItem(value: _InventoryBlockFilter.pfOnly, child: Text(loc.t('inventory_block_pf'), style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
+                    ],
+                    onChanged: (v) => setState(() => _blockFilter = v ?? _InventoryBlockFilter.all),
+                  ),
                 ),
-                segments: [
-                  ButtonSegment(value: _InventorySort.alphabet, label: Text(loc.t('inventory_sort_alphabet'), style: const TextStyle(fontSize: 11)), icon: const Icon(Icons.sort_by_alpha, size: 14)),
-                  ButtonSegment(value: _InventorySort.lastAdded, label: Text(loc.t('inventory_sort_last_added'), style: const TextStyle(fontSize: 11)), icon: const Icon(Icons.update, size: 14)),
-                ],
-                selected: {_sortMode},
-                onSelectionChanged: (s) => setState(() => _sortMode = s.first),
+              ),
+              const SizedBox(width: 4),
+              SizedBox(
+                width: 120,
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<_InventorySort>(
+                    value: _sortMode,
+                    isExpanded: true,
+                    isDense: true,
+                    icon: const Icon(Icons.sort, size: 18),
+                    items: [
+                      DropdownMenuItem(value: _InventorySort.alphabet, child: Text(loc.t('inventory_sort_alphabet'), style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
+                      DropdownMenuItem(value: _InventorySort.lastAdded, child: Text(loc.t('inventory_sort_last_added'), style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
+                    ],
+                    onChanged: (v) => setState(() => _sortMode = v ?? _InventorySort.lastAdded),
+                  ),
+                ),
               ),
             ],
           ],
@@ -496,13 +577,16 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   _buildHeaderRow(loc),
-                  if (_productIndices.isNotEmpty) ...[
+                  if (_blockFilter != _InventoryBlockFilter.pfOnly && _productIndices.isNotEmpty) ...[
                     _buildSectionHeader(loc, loc.t('inventory_block_products')),
                     ..._productIndices.asMap().entries.map((e) => _buildDataRow(loc, e.value, e.key + 1)),
                   ],
-                  if (_pfIndices.isNotEmpty) ...[
+                  if (_blockFilter != _InventoryBlockFilter.productsOnly && _pfIndices.isNotEmpty) ...[
                     _buildSectionHeader(loc, loc.t('inventory_block_pf')),
-                    ..._pfIndices.asMap().entries.map((e) => _buildDataRow(loc, e.value, _productIndices.length + e.key + 1)),
+                    ..._pfIndices.asMap().entries.map((e) {
+                      final rowNum = _blockFilter == _InventoryBlockFilter.pfOnly ? e.key + 1 : _productIndices.length + e.key + 1;
+                      return _buildDataRow(loc, e.value, rowNum);
+                    }),
                   ],
                 ],
               ),
@@ -661,6 +745,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 style: IconButton.styleFrom(padding: const EdgeInsets.all(10), minimumSize: const Size(40, 40)),
               ),
               const SizedBox(width: 6),
+              IconButton.filledTonal(
+                onPressed: () => _scanReceipt(context, loc),
+                icon: const Icon(Icons.document_scanner_outlined, size: 20),
+                tooltip: loc.t('inventory_scan_receipt'),
+                style: IconButton.styleFrom(padding: const EdgeInsets.all(10), minimumSize: const Size(40, 40)),
+              ),
+              const SizedBox(width: 6),
               Tooltip(
                 message: loc.t('inventory_add_column_hint'),
                 child: IconButton.filledTonal(
@@ -693,7 +784,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final products = productStore.allProducts;
     if (products.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${loc.t('nomenclature')}: нет продуктов')),
+        SnackBar(content: Text('${loc.t('nomenclature')}: ${loc.t('no_products')}')),
       );
       return;
     }

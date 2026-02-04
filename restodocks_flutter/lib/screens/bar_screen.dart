@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../services/services.dart';
 
 /// Экран бара
 class BarScreen extends StatelessWidget {
@@ -6,12 +9,13 @@ class BarScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final loc = context.read<LocalizationService>();
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Бар'),
+        title: Text(loc.t('bar')),
       ),
-      body: const Center(
-        child: Text('Экран бара (в разработке)'),
+      body: Center(
+        child: Text(loc.t('screen_in_dev')),
       ),
     );
   }

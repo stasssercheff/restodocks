@@ -1,8 +1,13 @@
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../models/models.dart';
+import '../services/ai_service.dart';
+import '../services/image_service.dart';
 import '../services/services.dart';
 
 /// Список ТТК заведения. Создание и переход к редактированию.
@@ -51,6 +56,44 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
+  Future<void> _createFromPhoto(BuildContext context, LocalizationService loc) async {
+    final imageService = ImageService();
+    final xFile = await imageService.pickImageFromGallery();
+    if (xFile == null || !mounted) return;
+    final bytes = await imageService.xFileToBytes(xFile);
+    if (bytes == null || bytes.isEmpty || !mounted) return;
+    final ai = context.read<AiService>();
+    final result = await ai.recognizeTechCardFromImage(bytes);
+    if (!mounted) return;
+    if (result == null || (result.dishName == null && result.ingredients.isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('ai_tech_card_recognize_empty'))),
+      );
+      return;
+    }
+    context.push('/tech-cards/new', extra: result);
+  }
+
+  Future<void> _createFromExcel(BuildContext context, LocalizationService loc) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['xlsx', 'xls'],
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty || result.files.single.bytes == null || !mounted) return;
+    final bytes = result.files.single.bytes!;
+    final ai = context.read<AiService>();
+    final techResult = await ai.parseTechCardFromExcel(Uint8List.fromList(bytes));
+    if (!mounted) return;
+    if (techResult == null || (techResult.dishName == null && techResult.ingredients.isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('ai_tech_card_recognize_empty'))),
+      );
+      return;
+    }
+    context.push('/tech-cards/new', extra: techResult);
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
@@ -61,6 +104,26 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
         title: Text(loc.t('tech_cards')),
         actions: [
+          if (canEdit)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.add),
+              tooltip: loc.t('create_tech_card'),
+              onPressed: _loading ? null : () {},
+              onSelected: (value) async {
+                if (value == 'new') {
+                  context.push('/tech-cards/new');
+                } else if (value == 'photo') {
+                  await _createFromPhoto(context, loc);
+                } else if (value == 'excel') {
+                  await _createFromExcel(context, loc);
+                }
+              },
+              itemBuilder: (_) => [
+                PopupMenuItem(value: 'new', child: Text(loc.t('create_tech_card'))),
+                PopupMenuItem(value: 'photo', child: Text(loc.t('ai_tech_card_from_photo'))),
+                PopupMenuItem(value: 'excel', child: Text(loc.t('ai_tech_card_from_excel'))),
+              ],
+            ),
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loading ? null : _load, tooltip: loc.t('refresh')),
           IconButton(icon: const Icon(Icons.home), onPressed: () => context.go('/home'), tooltip: loc.t('home')),
         ],
@@ -104,7 +167,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
               const SizedBox(height: 16),
               Text(loc.t('tech_cards'), style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 8),
-              Text('Нет технологических карт. Создайте первую.', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]), textAlign: TextAlign.center),
+              Text(loc.t('tech_cards_empty'), style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]), textAlign: TextAlign.center),
             ],
           ),
         ),
@@ -120,13 +183,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           scrollDirection: Axis.horizontal,
           child: DataTable(
             headingRowColor: WidgetStateProperty.all(Theme.of(context).colorScheme.primaryContainer),
-            columns: const [
-              DataColumn(label: Text('#', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('Название', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('Категория', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('Ингр.', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('Ккал', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('Выход, г', style: TextStyle(fontWeight: FontWeight.bold))),
+            columns: [
+              const DataColumn(label: Text('#', style: TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(label: Text(loc.t('column_name'), style: const TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(label: Text(loc.t('column_category'), style: TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(label: Text(loc.t('ingredients_short'), style: TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(label: Text(loc.t('kcal'), style: TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(label: Text(loc.t('output_g'), style: TextStyle(fontWeight: FontWeight.bold))),
               DataColumn(label: Text('', style: TextStyle(fontWeight: FontWeight.bold))),
             ],
             rows: List.generate(_list.length, (i) {

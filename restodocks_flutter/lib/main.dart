@@ -132,7 +132,7 @@ class RestodocksApp extends StatelessWidget {
       child: Consumer2<LocalizationService, ThemeService>(
         builder: (context, localization, themeService, child) {
           return MaterialApp.router(
-            title: 'Restodocks',
+            title: localization.t('app_name'),
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
             themeMode: themeService.themeMode,

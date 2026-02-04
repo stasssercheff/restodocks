@@ -182,3 +182,26 @@ python3 scripts/seed_products_from_catalog.py
 Обновите страницу приложения (или перезапустите его).  
 В разделе продуктов, ТТК и инвентаризации должен появиться список.  
 Чеклисты и полуфабрикаты в ТТК тоже будут работать, как описано в приложении.
+
+---
+
+## ИИ (нейросети): Edge Functions и OPENAI_API_KEY
+
+Чтобы работали генерация чеклиста по запросу, распознавание чека по фото, ТТК из фото/Excel, распознавание продукта и уточнение КБЖУ:
+
+1. Установите [Supabase CLI](https://supabase.com/docs/guides/cli).
+2. Задайте секрет с ключом OpenAI:
+   ```bash
+   supabase secrets set OPENAI_API_KEY=sk-ваш-ключ-openai
+   ```
+   (выполнять из папки, где есть `supabase/`, т.е. из `restodocks_flutter` после `supabase link`.)
+3. Задеплойте функции (из папки с `supabase/`):
+   ```bash
+   supabase functions deploy ai-generate-checklist
+   supabase functions deploy ai-recognize-receipt
+   supabase functions deploy ai-recognize-tech-card
+   supabase functions deploy ai-recognize-product
+   supabase functions deploy ai-refine-nutrition
+   ```
+
+Подробнее: **restodocks_flutter/supabase/functions/README.md**.

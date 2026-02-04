@@ -69,7 +69,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen> {
     final name = _nameController.text.trim();
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Введите название чеклиста')),
+        SnackBar(content: Text(context.read<LocalizationService>().t('checklist_name_required'))),
       );
       return;
     }
@@ -96,7 +96,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e')),
+          SnackBar(content: Text(context.read<LocalizationService>().t('error_with_message').replaceAll('%s', e.toString()))),
         );
       }
     }
@@ -112,14 +112,14 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen> {
       final created = await svc.duplicateChecklist(c, emp.id);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Чеклист создан по аналогии')),
+          const SnackBar(content: Text(context.read<LocalizationService>().t('checklist_created_duplicate'))),
         );
         context.pushReplacement('/checklists/${created.id}');
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e')),
+          SnackBar(content: Text(context.read<LocalizationService>().t('error_with_message').replaceAll('%s', e.toString()))),
         );
       }
     }
@@ -131,7 +131,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(loc.t('delete')),
-        content: const Text('Удалить этот чеклист?'),
+        content: Text(context.read<LocalizationService>().t('checklist_delete_confirm')),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -153,7 +153,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e')),
+          SnackBar(content: Text(context.read<LocalizationService>().t('error_with_message').replaceAll('%s', e.toString()))),
         );
       }
     }
@@ -292,7 +292,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen> {
                       controller: _newItemController,
                       decoration: InputDecoration(
                         labelText: loc.t('add_item'),
-                        hintText: 'Пункт чеклиста',
+                        hintText: context.read<LocalizationService>().t('checklist_item_hint'),
                       ),
                       onSubmitted: (_) => _addItem(),
                     ),

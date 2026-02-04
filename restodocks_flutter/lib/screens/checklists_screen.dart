@@ -54,6 +54,80 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
+  Future<void> _generateByPrompt() async {
+    final loc = context.read<LocalizationService>();
+    final prompt = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        final c = TextEditingController();
+        return AlertDialog(
+          title: Text(loc.t('generate_checklist_by_prompt')),
+          content: TextField(
+            controller: c,
+            decoration: InputDecoration(
+              hintText: loc.t('generate_checklist_prompt_hint'),
+              border: const OutlineInputBorder(),
+            ),
+            maxLines: 2,
+            autofocus: true,
+            onSubmitted: (_) => Navigator.of(ctx).pop(c.text.trim()),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text(loc.t('cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(c.text.trim()),
+              child: Text(loc.t('save')),
+            ),
+          ],
+        );
+      },
+    );
+    if (prompt == null || prompt.isEmpty || !mounted) return;
+    final ai = context.read<AiService>();
+    final generated = await ai.generateChecklistFromPrompt(prompt);
+    if (!mounted) return;
+    if (generated == null || generated.itemTitles.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('ai_no_result'))),
+      );
+      return;
+    }
+    final acc = context.read<AccountManagerSupabase>();
+    final est = acc.establishment;
+    final emp = acc.currentEmployee;
+    if (est == null || emp == null) return;
+    try {
+      final svc = context.read<ChecklistServiceSupabase>();
+      final items = generated.itemTitles
+          .asMap()
+          .entries
+          .map((e) => ChecklistItem.template(title: e.value, sortOrder: e.key))
+          .toList();
+      final created = await svc.createChecklist(
+        establishmentId: est.id,
+        createdBy: emp.id,
+        name: generated.name,
+        items: items,
+      );
+      if (mounted) {
+        await _load();
+        context.push('/checklists/${created.id}');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${loc.t('generate_checklist_by_prompt')} ✓')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))),
+        );
+      }
+    }
+  }
+
   Future<void> _createNew() async {
     final loc = context.read<LocalizationService>();
     final name = await showDialog<String>(
@@ -102,7 +176,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e')),
+          SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))),
         );
       }
     }
@@ -159,6 +233,12 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
         ),
         title: Text(loc.t('checklists')),
         actions: [
+          if (canEdit)
+            IconButton(
+              icon: const Icon(Icons.auto_awesome),
+              onPressed: _loading ? null : _generateByPrompt,
+              tooltip: loc.t('generate_checklist_by_prompt'),
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loading ? null : _load,
@@ -243,7 +323,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
             child: ListTile(
               leading: const Icon(Icons.checklist),
               title: Text(c.name),
-              subtitle: Text('${c.items.length} пунктов'),
+              subtitle: Text('${c.items.length} ${loc.t('items_count')}'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.push('/checklists/${c.id}'),
             ),

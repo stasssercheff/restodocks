@@ -270,7 +270,7 @@ class _KitchenScreenState extends State<KitchenScreen> {
   void _navigateToReports(BuildContext context) {
     // TODO: Навигация к отчетам
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Отчеты (в разработке)')),
+      SnackBar(content: Text(localization.t('reports_in_dev'))),
     );
   }
 }
