@@ -56,6 +56,8 @@ class _EditableShrinkageCellState extends State<_EditableShrinkageCell> {
         suffixText: '%',
         border: InputBorder.none,
         contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        filled: true,
+        fillColor: Colors.transparent,
       ),
       style: const TextStyle(fontSize: 12),
       onSubmitted: (_) => _submit(),
@@ -113,6 +115,8 @@ class _EditableWasteCellState extends State<_EditableWasteCell> {
         suffixText: '%',
         border: InputBorder.none,
         contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        filled: true,
+        fillColor: Colors.transparent,
       ),
       style: const TextStyle(fontSize: 12),
       onSubmitted: (_) => _submit(),
@@ -170,6 +174,8 @@ class _EditableGrossCellState extends State<_EditableGrossCell> {
         suffixText: 'г',
         border: InputBorder.none,
         contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        filled: true,
+        fillColor: Colors.transparent,
       ),
       style: const TextStyle(fontSize: 12),
       onSubmitted: (_) => _submit(),
@@ -236,6 +242,8 @@ class _EditablePricePerKgCellState extends State<_EditablePricePerKgCell> {
         suffixText: widget.symbol,
         border: InputBorder.none,
         contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        filled: true,
+        fillColor: Colors.transparent,
       ),
       style: const TextStyle(fontSize: 12),
       onSubmitted: (_) => _submit(),
@@ -294,6 +302,8 @@ class _EditableCostCellState extends State<_EditableCostCell> {
         suffixText: widget.symbol,
         border: InputBorder.none,
         contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        filled: true,
+        fillColor: Colors.transparent,
       ),
       style: const TextStyle(fontSize: 12),
       onSubmitted: (_) => _submit(),
@@ -619,129 +629,145 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           IconButton(icon: const Icon(Icons.home), onPressed: () => context.go('/home'), tooltip: loc.t('home')),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Шапка: название, категория, тип (поле названия — всегда с рамкой и мин. высотой, чтобы тап давал фокус)
-            SingleChildScrollView(
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Шапка: название, категория, тип — компактно, не скроллится
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+            child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
-              children: [
-                SizedBox(
-                  width: 200,
-                  height: 56,
-                  child: TextField(
-                    controller: _nameController,
-                    readOnly: !canEdit,
-                    decoration: InputDecoration(
-                      labelText: loc.t('dish_name'),
-                      isDense: true,
-                      filled: true,
-                      border: const OutlineInputBorder(),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                children: [
+                  SizedBox(
+                    width: 200,
+                    height: 56,
+                    child: TextField(
+                      controller: _nameController,
+                      readOnly: !canEdit,
+                      decoration: InputDecoration(
+                        labelText: loc.t('dish_name'),
+                        isDense: true,
+                        filled: true,
+                        border: const OutlineInputBorder(),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                SizedBox(
-                  width: 140,
-                  child: canEdit
-                      ? DropdownButtonFormField<String>(
-                          value: _selectedCategory,
-                          decoration: InputDecoration(labelText: loc.t('category'), isDense: true, contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
-                          items: _categoryOptions.map((c) => DropdownMenuItem(value: c, child: Text(_categoryLabel(c, loc.currentLanguageCode)))).toList(),
-                          onChanged: (v) => setState(() => _selectedCategory = v ?? 'misc'),
-                        )
-                      : InputDecorator(
-                          decoration: InputDecoration(labelText: loc.t('category'), isDense: true),
-                          child: Text(_categoryLabel(_selectedCategory, loc.currentLanguageCode)),
-                        ),
-                ),
-                const SizedBox(width: 8),
-                if (canEdit)
-                  Tooltip(
-                    message: loc.t('tt_type_hint'),
-                    child: SegmentedButton<bool>(
-                      segments: [
-                        ButtonSegment(value: true, label: Text(loc.t('tt_type_pf')), icon: const Icon(Icons.inventory_2, size: 16)),
-                        ButtonSegment(value: false, label: Text(loc.t('tt_type_dish')), icon: const Icon(Icons.restaurant, size: 16)),
-                      ],
-                      selected: {_isSemiFinished},
-                      onSelectionChanged: (v) => setState(() => _isSemiFinished = v.first),
-                      showSelectedIcon: false,
-                    ),
-                  )
-                else
-                  Chip(
-                    avatar: Icon(_isSemiFinished ? Icons.inventory_2 : Icons.restaurant, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                    label: Text(_isSemiFinished ? loc.t('tt_type_pf') : loc.t('tt_type_dish'), style: const TextStyle(fontSize: 12)),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 140,
+                    child: canEdit
+                        ? DropdownButtonFormField<String>(
+                            value: _selectedCategory,
+                            decoration: InputDecoration(labelText: loc.t('category'), isDense: true, contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                            items: _categoryOptions.map((c) => DropdownMenuItem(value: c, child: Text(_categoryLabel(c, loc.currentLanguageCode)))).toList(),
+                            onChanged: (v) => setState(() => _selectedCategory = v ?? 'misc'),
+                          )
+                        : InputDecorator(
+                            decoration: InputDecoration(labelText: loc.t('category'), isDense: true),
+                            child: Text(_categoryLabel(_selectedCategory, loc.currentLanguageCode)),
+                          ),
                   ),
-              ],
-            ),
-            ),
-            const SizedBox(height: 16),
-            Text(loc.t('ttk_composition'), style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(minWidth: 1400),
-                child: canEdit
-                    ? _TtkTable(
-                      loc: loc,
-                      dishName: _nameController.text,
-                      isSemiFinished: _isSemiFinished,
-                      ingredients: _ingredients,
-                      canEdit: true,
-                      onRemove: _removeIngredient,
-                      onUpdate: (i, ing) => setState(() => _ingredients[i] = ing),
-                      onAdd: _showAddIngredient,
-                      onReplaceIngredient: (i) => _showAddIngredient(i),
-                      dishNameController: canEdit ? _nameController : null,
-                      productStore: context.read<ProductStoreSupabase>(),
-                      technologyField: TextField(
-                        controller: _technologyController,
-                        maxLines: 4,
-                        style: const TextStyle(fontSize: 12),
-                        decoration: InputDecoration(
-                          hintText: loc.t('ttk_technology'),
-                          isDense: true,
-                          contentPadding: const EdgeInsets.all(8),
-                          border: InputBorder.none,
-                        ),
+                  const SizedBox(width: 8),
+                  if (canEdit)
+                    Tooltip(
+                      message: loc.t('tt_type_hint'),
+                      child: SegmentedButton<bool>(
+                        segments: [
+                          ButtonSegment(value: true, label: Text(loc.t('tt_type_pf')), icon: const Icon(Icons.inventory_2, size: 16)),
+                          ButtonSegment(value: false, label: Text(loc.t('tt_type_dish')), icon: const Icon(Icons.restaurant, size: 16)),
+                        ],
+                        selected: {_isSemiFinished},
+                        onSelectionChanged: (v) => setState(() => _isSemiFinished = v.first),
+                        showSelectedIcon: false,
                       ),
                     )
-                  : _TtkCookTable(
-                      loc: loc,
-                      dishName: _nameController.text,
-                      ingredients: _ingredients,
-                      technology: _technologyController.text,
-                      onIngredientsChanged: (list) => setState(() {
-                        _ingredients.clear();
-                        _ingredients.addAll(list);
-                      }),
+                  else
+                    Chip(
+                      avatar: Icon(_isSemiFinished ? Icons.inventory_2 : Icons.restaurant, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                      label: Text(_isSemiFinished ? loc.t('tt_type_pf') : loc.t('tt_type_dish'), style: const TextStyle(fontSize: 12)),
                     ),
+                ],
               ),
             ),
-            if (!canEdit)
-              Padding(
-                padding: const EdgeInsets.only(top: 16),
-                child: TextField(
-                  controller: _technologyController,
-                  readOnly: true,
-                  maxLines: 3,
-                  decoration: InputDecoration(
-                    labelText: loc.t('ttk_technology'),
-                    alignLabelWithHint: true,
-                    border: const OutlineInputBorder(),
+          ),
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Text(loc.t('ttk_composition'), style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(height: 6),
+          // Таблица в Expanded: на телефоне работают и вертикальная, и горизонтальная прокрутка
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: SingleChildScrollView(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minWidth: 1400),
+                    child: canEdit
+                        ? _TtkTable(
+                            loc: loc,
+                            dishName: _nameController.text,
+                            isSemiFinished: _isSemiFinished,
+                            ingredients: _ingredients,
+                            canEdit: true,
+                            onRemove: _removeIngredient,
+                            onUpdate: (i, ing) => setState(() => _ingredients[i] = ing),
+                            onAdd: _showAddIngredient,
+                            onReplaceIngredient: (i) => _showAddIngredient(i),
+                            dishNameController: canEdit ? _nameController : null,
+                            productStore: context.read<ProductStoreSupabase>(),
+                            technologyField: TextField(
+                              controller: _technologyController,
+                              maxLines: 4,
+                              style: const TextStyle(fontSize: 12),
+                              decoration: InputDecoration(
+                                hintText: loc.t('ttk_technology'),
+                                isDense: true,
+                                contentPadding: const EdgeInsets.all(8),
+                                border: InputBorder.none,
+                                filled: true,
+                                fillColor: Colors.transparent,
+                              ),
+                            ),
+                          )
+                        : _TtkCookTable(
+                            loc: loc,
+                            dishName: _nameController.text,
+                            ingredients: _ingredients,
+                            technology: _technologyController.text,
+                            onIngredientsChanged: (list) => setState(() {
+                              _ingredients.clear();
+                              _ingredients.addAll(list);
+                            }),
+                          ),
                   ),
                 ),
               ),
-            if (canEdit) ...[
-              const SizedBox(height: 16),
-              Row(
+            ),
+          ),
+          if (!canEdit)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              child: TextField(
+                controller: _technologyController,
+                readOnly: true,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  labelText: loc.t('ttk_technology'),
+                  alignLabelWithHint: true,
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+            ),
+          if (canEdit) ...[
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: Row(
                 children: [
                   FilledButton(onPressed: _save, child: Text(loc.t('save'))),
                   if (!_isNew) ...[
@@ -754,9 +780,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                   ],
                 ],
               ),
-            ],
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -870,29 +896,35 @@ class _TtkTableState extends State<_TtkTable> {
             children: [
               widget.canEdit && widget.dishNameController != null
                   ? TableCell(
-                      child: Padding(
-                        padding: _cellPad,
-                        child: TextField(
-                          controller: widget.dishNameController,
-                          decoration: const InputDecoration(
-                            isDense: true,
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                      child: SizedBox.expand(
+                        child: Padding(
+                          padding: _cellPad,
+                          child: TextField(
+                            controller: widget.dishNameController,
+                            decoration: const InputDecoration(
+                              isDense: true,
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                              filled: true,
+                              fillColor: Colors.transparent,
+                            ),
+                            style: const TextStyle(fontSize: 12),
                           ),
-                          style: const TextStyle(fontSize: 12),
                         ),
                       ),
                     )
                   : _cell(widget.dishName),
-              ...List.generate(9, (_) => _cell('')),
+              ...List.generate(10, (_) => _cell('')),
               widget.technologyField != null
                   ? TableCell(
                       verticalAlignment: TableCellVerticalAlignment.fill,
-                      child: Container(
-                        constraints: const BoxConstraints(minHeight: 80),
-                        padding: _cellPad,
-                        alignment: Alignment.topLeft,
-                        child: widget.technologyField,
+                      child: SizedBox.expand(
+                        child: Container(
+                          constraints: const BoxConstraints(minHeight: 80),
+                          padding: _cellPad,
+                          alignment: Alignment.topLeft,
+                          child: widget.technologyField,
+                        ),
                       ),
                     )
                   : _cell(''),
@@ -912,16 +944,20 @@ class _TtkTableState extends State<_TtkTable> {
               // Наименование блюда — в первой строке редактируемое поле (или текст)
               widget.canEdit && isFirstRow && widget.dishNameController != null
                   ? TableCell(
-                      child: Padding(
-                        padding: _cellPad,
-                        child: TextField(
-                          controller: widget.dishNameController,
-                          decoration: const InputDecoration(
-                            isDense: true,
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                      child: SizedBox.expand(
+                        child: Padding(
+                          padding: _cellPad,
+                          child: TextField(
+                            controller: widget.dishNameController,
+                            decoration: const InputDecoration(
+                              isDense: true,
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                              filled: true,
+                              fillColor: Colors.transparent,
+                            ),
+                            style: const TextStyle(fontSize: 12),
                           ),
-                          style: const TextStyle(fontSize: 12),
                         ),
                       ),
                     )
@@ -943,34 +979,53 @@ class _TtkTableState extends State<_TtkTable> {
                   : _cell(ing.sourceTechCardName ?? ing.productName),
               widget.canEdit
                   ? TableCell(
-                      child: Padding(
-                        padding: _cellPad,
-                        child: _EditableGrossCell(
-                          grams: ing.grossWeight,
-                          onChanged: (g) {
-                            if (g != null && g > 0) widget.onUpdate(i, ing.updateGrossWeight(g, product, proc));
-                          },
+                      child: SizedBox.expand(
+                        child: Padding(
+                          padding: _cellPad,
+                          child: _EditableGrossCell(
+                            grams: ing.grossWeight,
+                            onChanged: (g) {
+                              if (g != null && g > 0) widget.onUpdate(i, ing.updateGrossWeight(g, product, proc));
+                            },
+                          ),
                         ),
                       ),
                     )
                   : _cell(ing.grossWeightDisplay(lang)),
               widget.canEdit && product != null
                   ? TableCell(
-                      child: Padding(
-                        padding: _cellPad,
-                        child: _EditableWasteCell(
-                          value: ing.primaryWastePct,
-                          onChanged: (v) => widget.onUpdate(i, ing.updatePrimaryWastePct(v ?? ing.primaryWastePct, product, proc)),
+                      child: SizedBox.expand(
+                        child: Padding(
+                          padding: _cellPad,
+                          child: _EditableWasteCell(
+                            value: ing.primaryWastePct,
+                            onChanged: (v) => widget.onUpdate(i, ing.updatePrimaryWastePct(v ?? ing.primaryWastePct, product, proc)),
+                          ),
                         ),
                       ),
                     )
                   : _cell(ing.primaryWastePct.toStringAsFixed(0)),
-              _cell('${nettoG.toStringAsFixed(0)}'),
               widget.canEdit && product != null
                   ? TableCell(
-                      child: Padding(
-                        padding: _cellPad,
-                        child: DropdownButtonHideUnderline(
+                      child: SizedBox.expand(
+                        child: Padding(
+                          padding: _cellPad,
+                          child: _EditableNetCell(
+                            value: ing.netWeight,
+                            onChanged: (v) {
+                              if (v != null && v >= 0) widget.onUpdate(i, ing.updateNetWeight(v, product));
+                            },
+                          ),
+                        ),
+                      ),
+                    )
+                  : _cell('${nettoG.toStringAsFixed(0)}'),
+              widget.canEdit && product != null
+                  ? TableCell(
+                      child: SizedBox.expand(
+                        child: Padding(
+                          padding: _cellPad,
+                          child: DropdownButtonHideUnderline(
                           child: DropdownButton<String?>(
                             value: ing.cookingProcessId,
                             isDense: true,
@@ -989,50 +1044,43 @@ class _TtkTableState extends State<_TtkTable> {
                           ),
                         ),
                       ),
+                      ),
                     )
                   : _cell(ing.cookingProcessName ?? '—'),
               widget.canEdit && proc != null
                   ? TableCell(
-                      child: Padding(
-                        padding: _cellPad,
-                        child: _EditableShrinkageCell(
-                          value: ing.weightLossPercentage,
-                          onChanged: (pct) => widget.onUpdate(i, ing.updateCookingLossPct(pct, product, proc, languageCode: lang)),
+                      child: SizedBox.expand(
+                        child: Padding(
+                          padding: _cellPad,
+                          child: _EditableShrinkageCell(
+                            value: ing.weightLossPercentage,
+                            onChanged: (pct) => widget.onUpdate(i, ing.updateCookingLossPct(pct, product, proc, languageCode: lang)),
+                          ),
                         ),
                       ),
                     )
                   : _cell(ing.cookingProcessName != null ? '−${ing.weightLossPercentage.toStringAsFixed(0)}%' : '—'),
               widget.canEdit
                   ? TableCell(
-                      child: Padding(
-                        padding: _cellPad,
-                        child: _EditableNetCell(
-                          value: ing.netWeight,
-                          onChanged: (v) {
-                            if (v != null && v >= 0) widget.onUpdate(i, ing.updateNetWeight(v, product));
-                          },
+                      child: SizedBox.expand(
+                        child: Padding(
+                          padding: _cellPad,
+                          child: _EditableNetCell(
+                            value: ing.netWeight,
+                            onChanged: (v) {
+                              if (v != null && v >= 0) widget.onUpdate(i, ing.updateNetWeight(v, product));
+                            },
+                          ),
                         ),
                       ),
                     )
                   : _cell('${ing.netWeight.toStringAsFixed(0)}'),
               widget.canEdit
                   ? TableCell(
-                      child: Padding(
-                        padding: _cellPad,
-                        child: _EditableNetCell(
-                          value: ing.netWeight,
-                          onChanged: (v) {
-                            if (v != null && v >= 0) widget.onUpdate(i, ing.updateNetWeight(v, product));
-                          },
-                        ),
-                      ),
-                    )
-                  : _cell('${ing.netWeight.toStringAsFixed(0)}'),
-              widget.canEdit
-                  ? TableCell(
-                      child: Padding(
-                        padding: _cellPad,
-                        child: _EditablePricePerKgCell(
+                      child: SizedBox.expand(
+                        child: Padding(
+                          padding: _cellPad,
+                          child: _EditablePricePerKgCell(
                           pricePerKg: pricePerUnit,
                           netWeight: ing.netWeight,
                           symbol: sym,
@@ -1041,19 +1089,22 @@ class _TtkTableState extends State<_TtkTable> {
                           },
                         ),
                       ),
+                      ),
                     )
                   : _cell('$pricePerUnit $sym'),
               widget.canEdit
                   ? TableCell(
-                      child: Padding(
-                        padding: _cellPad,
-                        child: _EditableCostCell(
+                      child: SizedBox.expand(
+                        child: Padding(
+                          padding: _cellPad,
+                          child: _EditableCostCell(
                           cost: ing.cost,
                           symbol: sym,
                           onChanged: (v) {
                             if (v != null && v >= 0) widget.onUpdate(i, ing.copyWith(cost: v));
                           },
                         ),
+                      ),
                       ),
                     )
                   : _cell('${ing.cost.toStringAsFixed(2)} $sym'),
@@ -1107,7 +1158,7 @@ class _TtkTableState extends State<_TtkTable> {
                     ),
                   ),
                 ),
-                ...List.generate(totalCols - 3, (_) => _cell('')),
+                ...List.generate(totalCols - 2, (_) => _cell('')),
                 if (hasDeleteCol) _cell(''),
               ],
             );
@@ -1346,6 +1397,8 @@ class _EditableNetCellState extends State<_EditableNetCell> {
         suffixText: 'г',
         border: InputBorder.none,
         contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        filled: true,
+        fillColor: Colors.transparent,
       ),
       style: const TextStyle(fontSize: 12),
       onSubmitted: (_) => _submit(),

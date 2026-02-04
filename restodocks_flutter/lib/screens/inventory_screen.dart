@@ -58,9 +58,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadNomenclature());
   }
 
-  /// Порядок отображения строк: по алфавиту или по последнему добавлению (сначала новые).
-  List<int> get _displayOrder {
-    final indices = List.generate(_rows.length, (i) => i);
+  /// Индексы строк-продуктов (номенклатура), отсортированы по выбранному режиму.
+  List<int> get _productIndices {
+    final indices = List.generate(_rows.length, (i) => i).where((i) => !_rows[i].isPf).toList();
     if (_sortMode == _InventorySort.alphabet) {
       final lang = context.read<LocalizationService>().currentLanguageCode;
       indices.sort((a, b) => _rows[a].productName(lang).toLowerCase().compareTo(_rows[b].productName(lang).toLowerCase()));
@@ -69,6 +69,21 @@ class _InventoryScreenState extends State<InventoryScreen> {
     }
     return indices;
   }
+
+  /// Индексы строк-ПФ (из ТТК), отсортированы по выбранному режиму.
+  List<int> get _pfIndices {
+    final indices = List.generate(_rows.length, (i) => i).where((i) => _rows[i].isPf).toList();
+    if (_sortMode == _InventorySort.alphabet) {
+      final lang = context.read<LocalizationService>().currentLanguageCode;
+      indices.sort((a, b) => _rows[a].productName(lang).toLowerCase().compareTo(_rows[b].productName(lang).toLowerCase()));
+    } else {
+      indices.sort((a, b) => b.compareTo(a));
+    }
+    return indices;
+  }
+
+  /// Порядок отображения: сначала продукты, потом ПФ (для обратной совместимости с нумерацией в Excel).
+  List<int> get _displayOrder => [..._productIndices, ..._pfIndices];
 
   /// Автоматическая подстановка: номенклатура заведения + полуфабрикаты (ТТК с типом ПФ).
   Future<void> _loadNomenclature() async {
@@ -355,88 +370,66 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
+  /// Компактная шапка: минимум места, максимум площади под таблицу.
   Widget _buildHeader(
     LocalizationService loc,
     Establishment? establishment,
     Employee? employee,
   ) {
     final theme = Theme.of(context);
-    final cardColor = theme.colorScheme.surface;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerLow,
         border: Border(bottom: BorderSide(color: theme.dividerColor, width: 1)),
       ),
-      child: Card(
-        margin: EdgeInsets.zero,
-        elevation: 0,
-        color: cardColor,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Wrap(
-            spacing: 24,
-            runSpacing: 12,
-            crossAxisAlignment: WrapCrossAlignment.start,
-            children: [
-              _headerChip(theme, Icons.store, loc.t('inventory_establishment'), establishment?.name ?? '—'),
-              _headerChip(theme, Icons.person, loc.t('inventory_employee'), employee?.fullName ?? '—'),
-              InkWell(
-                onTap: () => _pickDate(context),
-                borderRadius: BorderRadius.circular(8),
-                child: _headerChip(
-                  theme,
-                  Icons.calendar_today,
-                  loc.t('inventory_date'),
+      child: SafeArea(
+        top: true,
+        bottom: false,
+        child: Row(
+          children: [
+            Icon(Icons.store, size: 16, color: theme.colorScheme.primary),
+            const SizedBox(width: 4),
+            Expanded(
+              child: Text(
+                establishment?.name ?? '—',
+                style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            InkWell(
+              onTap: () => _pickDate(context),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                child: Text(
                   '${_date.day.toString().padLeft(2, '0')}.${_date.month.toString().padLeft(2, '0')}.${_date.year}',
+                  style: theme.textTheme.bodySmall,
                 ),
               ),
-              _headerChip(
-                theme,
-                Icons.access_time,
-                loc.t('inventory_time_fill'),
-                '${_startTime?.hour.toString().padLeft(2, '0') ?? '—'}:${_startTime?.minute.toString().padLeft(2, '0') ?? '—'} → '
-                '${_endTime != null ? '${_endTime!.hour.toString().padLeft(2, '0')}:${_endTime!.minute.toString().padLeft(2, '0')}' : '...'}',
-              ),
-              if (!_completed && _rows.isNotEmpty)
-                SegmentedButton<_InventorySort>(
-                  segments: [
-                    ButtonSegment(value: _InventorySort.alphabet, label: Text(loc.t('inventory_sort_alphabet')), icon: const Icon(Icons.sort_by_alpha, size: 18)),
-                    ButtonSegment(value: _InventorySort.lastAdded, label: Text(loc.t('inventory_sort_last_added')), icon: const Icon(Icons.update, size: 18)),
-                  ],
-                  selected: {_sortMode},
-                  onSelectionChanged: (s) => setState(() => _sortMode = s.first),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '${_startTime?.hour.toString().padLeft(2, '0') ?? '—'}:${_startTime?.minute.toString().padLeft(2, '0') ?? '—'}',
+              style: theme.textTheme.bodySmall,
+            ),
+            if (!_completed && _rows.isNotEmpty) ...[
+              const SizedBox(width: 8),
+              SegmentedButton<_InventorySort>(
+                style: ButtonStyle(
+                  padding: WidgetStateProperty.all(const EdgeInsets.symmetric(horizontal: 6, vertical: 4)),
+                  visualDensity: VisualDensity.compact,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
+                segments: [
+                  ButtonSegment(value: _InventorySort.alphabet, label: Text(loc.t('inventory_sort_alphabet'), style: const TextStyle(fontSize: 11)), icon: const Icon(Icons.sort_by_alpha, size: 14)),
+                  ButtonSegment(value: _InventorySort.lastAdded, label: Text(loc.t('inventory_sort_last_added'), style: const TextStyle(fontSize: 11)), icon: const Icon(Icons.update, size: 14)),
+                ],
+                selected: {_sortMode},
+                onSelectionChanged: (s) => setState(() => _sortMode = s.first),
+              ),
             ],
-          ),
+          ],
         ),
-      ),
-    );
-  }
-
-  Widget _headerChip(ThemeData theme, IconData icon, String label, String value) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: theme.dividerColor.withOpacity(0.5)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 18, color: theme.colorScheme.primary),
-          const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(label, style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.primary)),
-              Text(value, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis),
-            ],
-          ),
-        ],
       ),
     );
   }
@@ -503,11 +496,36 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   _buildHeaderRow(loc),
-                  ...List.generate(_displayOrder.length, (i) => _buildDataRow(loc, i)),
+                  if (_productIndices.isNotEmpty) ...[
+                    _buildSectionHeader(loc, loc.t('inventory_block_products')),
+                    ..._productIndices.asMap().entries.map((e) => _buildDataRow(loc, e.value, e.key + 1)),
+                  ],
+                  if (_pfIndices.isNotEmpty) ...[
+                    _buildSectionHeader(loc, loc.t('inventory_block_pf')),
+                    ..._pfIndices.asMap().entries.map((e) => _buildDataRow(loc, e.value, _productIndices.length + e.key + 1)),
+                  ],
                 ],
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(LocalizationService loc, String title) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primaryContainer.withOpacity(0.5),
+        border: Border(bottom: BorderSide(color: theme.colorScheme.outline.withOpacity(0.3))),
+      ),
+      child: Text(
+        title,
+        style: theme.textTheme.titleSmall?.copyWith(
+          fontWeight: FontWeight.bold,
+          color: theme.colorScheme.onSurface,
         ),
       ),
     );
@@ -539,9 +557,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
-  Widget _buildDataRow(LocalizationService loc, int displayIndex) {
+  Widget _buildDataRow(LocalizationService loc, int actualIndex, int rowNumber) {
     final theme = Theme.of(context);
-    final actualIndex = _displayOrder[displayIndex];
     final row = _rows[actualIndex];
     final nameW = _colNameWidth(context);
     final maxCols = _maxQuantityColumns;
@@ -555,12 +572,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
         decoration: BoxDecoration(
           border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
-          color: displayIndex.isEven ? theme.colorScheme.surface : theme.colorScheme.surfaceContainerLowest.withOpacity(0.5),
+          color: rowNumber.isEven ? theme.colorScheme.surface : theme.colorScheme.surfaceContainerLowest.withOpacity(0.5),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            SizedBox(width: _colNoWidth, child: Text('${displayIndex + 1}', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant))),
+            SizedBox(width: _colNoWidth, child: Text('$rowNumber', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant))),
             SizedBox(width: _colGap),
             SizedBox(
               width: nameW,
@@ -623,10 +640,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
     return q.toStringAsFixed(1);
   }
 
+  /// Компактный нижний блок: не перекрывает таблицу, минимум высоты.
   Widget _buildFooter(LocalizationService loc) {
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerLow,
         border: Border(top: BorderSide(color: theme.dividerColor)),
@@ -636,26 +654,28 @@ class _InventoryScreenState extends State<InventoryScreen> {
         child: Row(
           children: [
             if (!_completed) ...[
-              OutlinedButton.icon(
+              IconButton.filledTonal(
                 onPressed: () => _showProductPicker(context, loc),
                 icon: const Icon(Icons.add, size: 20),
-                label: Text(loc.t('inventory_add_product')),
+                tooltip: loc.t('inventory_add_product'),
+                style: IconButton.styleFrom(padding: const EdgeInsets.all(10), minimumSize: const Size(40, 40)),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Tooltip(
                 message: loc.t('inventory_add_column_hint'),
-                child: OutlinedButton.icon(
+                child: IconButton.filledTonal(
                   onPressed: _rows.isEmpty ? null : _addColumnToAll,
                   icon: const Icon(Icons.add_chart, size: 20),
-                  label: Text(loc.t('inventory_add_column')),
+                  tooltip: loc.t('inventory_add_column'),
+                  style: IconButton.styleFrom(padding: const EdgeInsets.all(10), minimumSize: const Size(40, 40)),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
             ],
             Expanded(
               child: FilledButton(
                 onPressed: _completed ? null : () => _complete(context),
-                style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+                style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 10)),
                 child: Text(loc.t('inventory_complete')),
               ),
             ),
