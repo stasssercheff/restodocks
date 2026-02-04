@@ -151,7 +151,7 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
               onChanged: (v) => setState(() => _query = v),
             ),
           ),
-          if (store.categories.isNotEmpty)
+          if (store.allProducts.any((p) => p.category == 'manual'))
             SizedBox(
               height: 44,
               child: ListView(
@@ -159,30 +159,13 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 children: [
                   _Chip(
-                    label: 'Все',
-                    selected: _category == null && !_filterManual,
+                    label: _categoryLabel('manual'),
+                    selected: _filterManual,
                     onTap: () => setState(() {
-                      _category = null;
-                      _filterManual = false;
+                      _filterManual = !_filterManual;
+                      if (_filterManual) _category = null;
                     }),
                   ),
-                  ...store.categories.where((c) => c != 'misc').map((c) => _Chip(
-                        label: _categoryLabel(c),
-                        selected: _category == c && !_filterManual,
-                        onTap: () => setState(() {
-                          _category = _category == c ? null : c;
-                          _filterManual = false;
-                        }),
-                      )),
-                  if (store.allProducts.any((p) => p.category == 'manual'))
-                    _Chip(
-                      label: _categoryLabel('manual'),
-                      selected: _filterManual,
-                      onTap: () => setState(() {
-                        _filterManual = !_filterManual;
-                        if (_filterManual) _category = null;
-                      }),
-                    ),
                 ],
               ),
             ),
@@ -999,6 +982,9 @@ class _LoadTranslationsProgressDialogState extends State<_LoadTranslationsProgre
     }
     if (!mounted) return;
     setState(() => _finished = true);
+    if (widget.list.isNotEmpty && _updated == 0) {
+      widget.onError(Exception('Ни один перевод не получен. Проверьте интернет или попробуйте позже.'));
+    }
     widget.onComplete();
   }
 
