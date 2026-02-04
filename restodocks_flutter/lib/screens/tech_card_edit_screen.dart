@@ -425,8 +425,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
             const SizedBox(height: 8),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-              child: canEdit
-                  ? _TtkTable(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 900),
+                child: canEdit
+                    ? _TtkTable(
                       loc: loc,
                       dishName: _nameController.text,
                       isSemiFinished: _isSemiFinished,
@@ -458,6 +460,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                         _ingredients.addAll(list);
                       }),
                     ),
+              ),
             ),
             if (!canEdit)
               Padding(
@@ -475,7 +478,19 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
               ),
             if (canEdit) ...[
               const SizedBox(height: 16),
-              FilledButton(onPressed: _save, child: Text(loc.t('save'))),
+              Row(
+                children: [
+                  FilledButton(onPressed: _save, child: Text(loc.t('save'))),
+                  if (!_isNew) ...[
+                    const SizedBox(width: 16),
+                    TextButton.icon(
+                      icon: Icon(Icons.delete_outline, size: 20, color: Theme.of(context).colorScheme.error),
+                      label: Text(loc.t('delete_tech_card'), style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                      onPressed: () => _confirmDelete(context, loc),
+                    ),
+                  ],
+                ],
+              ),
             ],
           ],
         ),
