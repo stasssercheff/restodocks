@@ -88,7 +88,7 @@ class AppRouter {
       ),
       GoRoute(
         path: '/inventory-pf',
-        builder: (context, state) => const InventoryPfScreen(),
+        builder: (context, state) => const InventoryScreen(),
       ),
       GoRoute(
         path: '/inventory-received',

@@ -28,8 +28,9 @@ class NutritionApiService {
   static const _baseUrl = 'https://world.openfoodfacts.org';
   static const _timeout = Duration(seconds: 8);
 
-  /// Макс. калории для «обычных» продуктов (исключаем сухофрукты, масло и т.п.)
-  static const _maxSaneKcal = 380.0;
+  /// Макс. калории на 100 г для «обычных» продуктов (исключаем масло ~880, сухофрукты и т.п.).
+  /// Авокадо ~160, масло авокадо ~880 — при совпадении по названию мог подтянуться не тот продукт.
+  static const _maxSaneKcal = 320.0;
   static const _minSaneKcal = 1.0;
 
   /// «Плохие» слова — пропускаем сухофрукты, чипсы, масло, порошки

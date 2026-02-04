@@ -8,7 +8,7 @@ import 'home/management_home_content.dart';
 import '../services/services.dart';
 import '../models/models.dart';
 
-/// Главный экран: 3 вкладки (Домой, График/Уведомления, Профиль), контент по роли.
+/// Главный экран: 3 вкладки (Домой, График/Уведомления, Личный кабинет), контент по роли.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -80,7 +80,7 @@ class _HomeScreenState extends State<HomeScreen> {
           NavigationDestination(
             icon: const Icon(Icons.person_outline),
             selectedIcon: const Icon(Icons.person),
-            label: loc.t('profile'),
+            label: loc.t('personal_cabinet'),
           ),
         ],
       ),
@@ -94,7 +94,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case 1:
         return isOwner ? loc.t('notifications') : loc.t('schedule');
       case 2:
-        return loc.t('profile');
+        return loc.t('personal_cabinet');
       default:
         return loc.t('app_name');
     }
@@ -207,6 +207,12 @@ class _ProfileTabContent extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.person),
             title: Text(loc.t('profile')),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/profile'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.settings),
+            title: Text(loc.t('settings')),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.push('/profile'),
           ),

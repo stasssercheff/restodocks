@@ -7,22 +7,34 @@ import '../models/models.dart';
 import '../services/inventory_download.dart';
 import '../services/services.dart';
 
-/// Строка бланка инвентаризации: продукт из номенклатуры, единица, список количеств, итого.
+/// Строка бланка: продукт из номенклатуры или полуфабрикат (ТТК). Один список — все в одном месте.
 class _InventoryRow {
-  final Product product;
+  final Product? product;
+  final TechCard? techCard;
   final List<double> quantities;
 
-  _InventoryRow({required this.product, required this.quantities});
+  _InventoryRow({this.product, this.techCard, required this.quantities})
+      : assert(product != null || techCard != null),
+        assert(product == null || techCard == null);
 
-  String productName(String lang) => product.getLocalizedName(lang);
-  String get unit => product.unit ?? 'g';
-  String unitDisplay(String lang) => CulinaryUnits.displayName(unit.toLowerCase(), lang);
+  bool get isPf => techCard != null;
+
+  String productName(String lang) {
+    if (product != null) return product!.getLocalizedName(lang);
+    return '${techCard!.getLocalizedDishName(lang)} (ПФ)';
+  }
+
+  String get unit => product?.unit ?? 'g';
+  String unitDisplay(String lang) =>
+      isPf ? 'порц.' : CulinaryUnits.displayName(unit.toLowerCase(), lang);
+
   double get total => quantities.fold(0.0, (a, b) => a + b);
 }
 
-/// Бланк инвентаризации: продукты автоматически подставляются из номенклатуры заведения.
-/// Шапка (заведение, сотрудник, дата, время), таблица со статичными (#, Наименование, Мера)
-/// и прокручиваемыми столбцами (Итого, Количество).
+enum _InventorySort { alphabet, lastAdded }
+
+/// Бланк инвентаризации: продукты из номенклатуры и полуфабрикаты (ПФ) в одном документе.
+/// Шапка (заведение, сотрудник, дата, время), таблица (#, Наименование, Мера, Итого, Количество).
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key});
 
@@ -37,6 +49,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
   TimeOfDay? _startTime;
   TimeOfDay? _endTime;
   bool _completed = false;
+  _InventorySort _sortMode = _InventorySort.lastAdded;
 
   @override
   void initState() {
@@ -45,20 +58,39 @@ class _InventoryScreenState extends State<InventoryScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadNomenclature());
   }
 
-  /// Автоматическая подстановка продуктов из номенклатуры заведения
+  /// Порядок отображения строк: по алфавиту или по последнему добавлению (сначала новые).
+  List<int> get _displayOrder {
+    final indices = List.generate(_rows.length, (i) => i);
+    if (_sortMode == _InventorySort.alphabet) {
+      final lang = context.read<LocalizationService>().currentLanguageCode;
+      indices.sort((a, b) => _rows[a].productName(lang).toLowerCase().compareTo(_rows[b].productName(lang).toLowerCase()));
+    } else {
+      indices.sort((a, b) => b.compareTo(a));
+    }
+    return indices;
+  }
+
+  /// Автоматическая подстановка: номенклатура заведения + полуфабрикаты (ТТК с типом ПФ).
   Future<void> _loadNomenclature() async {
     final store = context.read<ProductStoreSupabase>();
     final account = context.read<AccountManagerSupabase>();
+    final techCardSvc = context.read<TechCardServiceSupabase>();
     final estId = account.establishment?.id;
     if (estId == null) return;
     await store.loadProducts();
     await store.loadNomenclature(estId);
+    final techCards = await techCardSvc.getTechCardsForEstablishment(estId);
     if (!mounted) return;
     final products = store.getNomenclatureProducts(estId);
+    final pfOnly = techCards.where((tc) => tc.isSemiFinished).toList();
     setState(() {
       for (final p in products) {
-        if (_rows.any((r) => r.product.id == p.id)) continue;
-        _rows.add(_InventoryRow(product: p, quantities: [0.0]));
+        if (_rows.any((r) => r.product?.id == p.id)) continue;
+        _rows.add(_InventoryRow(product: p, techCard: null, quantities: [0.0]));
+      }
+      for (final tc in pfOnly) {
+        if (_rows.any((r) => r.techCard?.id == tc.id)) continue;
+        _rows.add(_InventoryRow(product: null, techCard: tc, quantities: [0.0]));
       }
     });
   }
@@ -69,11 +101,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
     super.dispose();
   }
 
-  int get _maxQuantityColumns =>
-      _rows.isEmpty ? 1 : _rows.map((r) => r.quantities.length).reduce((a, b) => a > b ? a : b);
+  int get _maxQuantityColumns {
+    if (_rows.isEmpty) return 1;
+    return _rows.map((r) => r.isPf ? 1 : r.quantities.length).reduce((a, b) => a > b ? a : b);
+  }
 
   void _addQuantityToRow(int rowIndex) {
     if (rowIndex < 0 || rowIndex >= _rows.length) return;
+    if (_rows[rowIndex].isPf) return;
     setState(() {
       _rows[rowIndex].quantities.add(0.0);
     });
@@ -82,14 +117,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
   void _addColumnToAll() {
     setState(() {
       for (final r in _rows) {
-        r.quantities.add(0.0);
+        if (!r.isPf) r.quantities.add(0.0);
       }
     });
   }
 
   void _addProduct(Product p) {
     setState(() {
-      _rows.add(_InventoryRow(product: p, quantities: [0.0]));
+      _rows.add(_InventoryRow(product: p, techCard: null, quantities: [0.0]));
     });
   }
 
@@ -211,7 +246,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
   /// Столбцы Excel: номер, наименование, мера, итоговое количество, данные при заполнении (1, 2, ...)
   List<int>? _buildExcelBytes(Map<String, dynamic> payload, LocalizationService loc) {
     final rows = payload['rows'] as List<dynamic>? ?? [];
-    final maxCols = _rows.isEmpty ? 1 : _rows.map((r) => (r.quantities).length).reduce((a, b) => a > b ? a : b);
+    final maxCols = _maxQuantityColumns;
     try {
       final excel = Excel.createExcel();
       final sheet = excel[excel.getDefaultSheet()!];
@@ -278,8 +313,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
       'timeEnd': '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}',
     };
     final rows = _rows.map((r) {
+      final id = r.product != null ? r.product!.id : 'pf_${r.techCard!.id}';
       return {
-        'productId': r.product.id,
+        'productId': id,
         'productName': r.productName(lang),
         'unit': r.unitDisplay(lang),
         'quantities': r.quantities,
@@ -363,6 +399,15 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 '${_startTime?.hour.toString().padLeft(2, '0') ?? '—'}:${_startTime?.minute.toString().padLeft(2, '0') ?? '—'} → '
                 '${_endTime != null ? '${_endTime!.hour.toString().padLeft(2, '0')}:${_endTime!.minute.toString().padLeft(2, '0')}' : '...'}',
               ),
+              if (!_completed && _rows.isNotEmpty)
+                SegmentedButton<_InventorySort>(
+                  segments: [
+                    ButtonSegment(value: _InventorySort.alphabet, label: Text(loc.t('inventory_sort_alphabet')), icon: const Icon(Icons.sort_by_alpha, size: 18)),
+                    ButtonSegment(value: _InventorySort.lastAdded, label: Text(loc.t('inventory_sort_last_added')), icon: const Icon(Icons.update, size: 18)),
+                  ],
+                  selected: {_sortMode},
+                  onSelectionChanged: (s) => setState(() => _sortMode = s.first),
+                ),
             ],
           ),
         ),
@@ -458,7 +503,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   _buildHeaderRow(loc),
-                  ...List.generate(_rows.length, (i) => _buildDataRow(loc, i)),
+                  ...List.generate(_displayOrder.length, (i) => _buildDataRow(loc, i)),
                 ],
               ),
             ),
@@ -494,26 +539,28 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
-  Widget _buildDataRow(LocalizationService loc, int index) {
+  Widget _buildDataRow(LocalizationService loc, int displayIndex) {
     final theme = Theme.of(context);
-    final row = _rows[index];
+    final actualIndex = _displayOrder[displayIndex];
+    final row = _rows[actualIndex];
     final nameW = _colNameWidth(context);
     final maxCols = _maxQuantityColumns;
+    final qtyCols = row.isPf ? 1 : row.quantities.length;
     return InkWell(
       onLongPress: () {
         if (_completed) return;
-        _removeRow(index);
+        _removeRow(actualIndex);
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
         decoration: BoxDecoration(
           border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
-          color: index.isEven ? theme.colorScheme.surface : theme.colorScheme.surfaceContainerLowest.withOpacity(0.5),
+          color: displayIndex.isEven ? theme.colorScheme.surface : theme.colorScheme.surfaceContainerLowest.withOpacity(0.5),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            SizedBox(width: _colNoWidth, child: Text('${index + 1}', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant))),
+            SizedBox(width: _colNoWidth, child: Text('${displayIndex + 1}', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant))),
             SizedBox(width: _colGap),
             SizedBox(
               width: nameW,
@@ -540,23 +587,23 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 padding: EdgeInsets.only(right: colIndex < maxCols - 1 ? _colGap : 0),
                 child: SizedBox(
                   width: _colQtyWidth,
-                  child: colIndex < row.quantities.length
+                  child: colIndex < qtyCols
                       ? (_completed
                           ? Text(_formatQty(row.quantities[colIndex]), style: theme.textTheme.bodyMedium)
                           : _QtyCell(
                               value: row.quantities[colIndex],
-                              onChanged: (v) => _setQuantity(index, colIndex, v),
+                              onChanged: (v) => _setQuantity(actualIndex, colIndex, v),
                             ))
                       : const SizedBox.shrink(),
                 ),
               ),
             ),
-            if (!_completed)
+            if (!_completed && !row.isPf)
               SizedBox(
                 width: 28,
                 child: IconButton.filledTonal(
                   icon: const Icon(Icons.add, size: 18),
-                  onPressed: () => _addQuantityToRow(index),
+                  onPressed: () => _addQuantityToRow(actualIndex),
                   tooltip: loc.t('inventory_add_column_hint'),
                   style: IconButton.styleFrom(
                     padding: EdgeInsets.zero,

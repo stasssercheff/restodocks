@@ -108,13 +108,24 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   final _nameController = TextEditingController();
   static const _categoryOptions = ['misc', 'vegetables', 'fruits', 'meat', 'seafood', 'dairy', 'grains', 'bakery', 'pantry', 'spices', 'beverages', 'eggs', 'legumes', 'nuts'];
   String _selectedCategory = 'misc';
-  bool _isSemiFinished = true; // ПФ или блюдо
-  final _portionController = TextEditingController(text: '100');
-  final _yieldController = TextEditingController(text: '0');
+  bool _isSemiFinished = true; // ПФ или блюдо (порция — в карточках блюд, отдельно)
   final _technologyController = TextEditingController();
   final List<TTIngredient> _ingredients = [];
 
   bool get _isNew => widget.techCardId.isEmpty || widget.techCardId == 'new';
+
+  String _categoryLabel(String c, String lang) {
+    if (lang == 'ru') {
+      const map = {
+        'vegetables': 'Овощи', 'fruits': 'Фрукты', 'meat': 'Мясо', 'seafood': 'Рыба',
+        'dairy': 'Молочное', 'grains': 'Крупы', 'bakery': 'Выпечка', 'pantry': 'Бакалея',
+        'spices': 'Специи', 'beverages': 'Напитки', 'eggs': 'Яйца', 'legumes': 'Бобовые',
+        'nuts': 'Орехи', 'misc': 'Разное',
+      };
+      return map[c] ?? c;
+    }
+    return c == 'misc' ? 'misc' : c;
+  }
 
   Future<void> _load() async {
     if (_isNew) {
@@ -134,8 +145,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           _nameController.text = tc.dishName;
           _selectedCategory = _categoryOptions.contains(tc.category) ? tc.category : 'misc';
           _isSemiFinished = tc.isSemiFinished;
-          _portionController.text = tc.portionWeight.toStringAsFixed(0);
-          _yieldController.text = tc.yield.toStringAsFixed(0);
           _technologyController.text = tc.getLocalizedTechnology(context.read<LocalizationService>().currentLanguageCode);
           _ingredients
             ..clear()
@@ -156,8 +165,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   @override
   void dispose() {
     _nameController.dispose();
-    _portionController.dispose();
-    _yieldController.dispose();
     _technologyController.dispose();
     super.dispose();
   }
@@ -172,8 +179,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Введите название блюда')));
       return;
     }
-    final portion = double.tryParse(_portionController.text) ?? 100;
-    final yieldVal = double.tryParse(_yieldController.text) ?? 0;
+    const portion = 100.0; // порция — в карточках блюд
+    final yieldVal = _ingredients.isEmpty ? 0.0 : _ingredients.fold(0.0, (s, i) => s + i.netWeight);
     final category = _selectedCategory;
     final curLang = context.read<LocalizationService>().currentLanguageCode;
     final tc = _techCard;
@@ -206,6 +213,30 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.read<LocalizationService>().t('save') + ' ✓')));
           _load();
         }
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+    }
+  }
+
+  Future<void> _confirmDelete(BuildContext context, LocalizationService loc) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('delete_tech_card')),
+        content: Text(loc.t('delete_tech_card_confirm')),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel)),
+          FilledButton(style: FilledButton.styleFrom(backgroundColor: Theme.of(ctx).colorScheme.error), onPressed: () => Navigator.of(ctx).pop(true), child: Text(loc.t('delete'))),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      await context.read<TechCardServiceSupabase>().deleteTechCard(widget.techCardId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('tech_card_deleted'))));
+        context.go('/tech-cards');
       }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
@@ -334,9 +365,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
-        title: Text(_isNew ? loc.t('create_tech_card') : loc.t('tech_cards')),
+        title: Text(_isNew ? loc.t('create_tech_card') : (_techCard?.getLocalizedDishName(loc.currentLanguageCode) ?? loc.t('tech_cards'))),
         actions: [
           if (canEdit) IconButton(icon: const Icon(Icons.save), onPressed: _save, tooltip: loc.t('save')),
+          if (canEdit && !_isNew) IconButton(icon: const Icon(Icons.delete_outline), onPressed: () => _confirmDelete(context, loc), tooltip: loc.t('delete_tech_card')),
           IconButton(icon: const Icon(Icons.home), onPressed: () => context.go('/home'), tooltip: loc.t('home')),
         ],
       ),
@@ -345,7 +377,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Шапка в одну строку: Блюдо | Категория | ПФ/Блюдо | Порции | Выход | [+]
+            // Шапка: название, категория, тип, порция, выход
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
@@ -357,13 +389,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                   child: canEdit
                       ? DropdownButtonFormField<String>(
                           value: _selectedCategory,
-                          decoration: const InputDecoration(labelText: 'Категория', isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
-                          items: _categoryOptions.map((c) => DropdownMenuItem(value: c, child: Text(c == 'misc' ? 'misc' : c))).toList(),
+                          decoration: InputDecoration(labelText: loc.t('category'), isDense: true, contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                          items: _categoryOptions.map((c) => DropdownMenuItem(value: c, child: Text(_categoryLabel(c, loc.currentLanguageCode)))).toList(),
                           onChanged: (v) => setState(() => _selectedCategory = v ?? 'misc'),
                         )
                       : InputDecorator(
-                          decoration: const InputDecoration(labelText: 'Категория', isDense: true),
-                          child: Text(_selectedCategory),
+                          decoration: InputDecoration(labelText: loc.t('category'), isDense: true),
+                          child: Text(_categoryLabel(_selectedCategory, loc.currentLanguageCode)),
                         ),
                 ),
                 const SizedBox(width: 8),
@@ -385,16 +417,12 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                     avatar: Icon(_isSemiFinished ? Icons.inventory_2 : Icons.restaurant, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
                     label: Text(_isSemiFinished ? loc.t('tt_type_pf') : loc.t('tt_type_dish'), style: const TextStyle(fontSize: 12)),
                   ),
-                const SizedBox(width: 8),
-                if (canEdit) ...[
-                  SizedBox(width: 58, child: TextField(controller: _portionController, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: loc.t('portion_weight'), isDense: true, contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10)))),
-                  const SizedBox(width: 4),
-                  SizedBox(width: 58, child: TextField(controller: _yieldController, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: loc.t('yield_g'), isDense: true, contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10)))),
-                ],
               ],
             ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
+            Text(loc.t('ttk_composition'), style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: canEdit

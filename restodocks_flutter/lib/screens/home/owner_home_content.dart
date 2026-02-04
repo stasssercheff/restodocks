@@ -25,7 +25,6 @@ class OwnerHomeContent extends StatelessWidget {
         _Tile(icon: Icons.description, title: loc.t('tech_cards'), onTap: () => context.push('/tech-cards')),
         _Tile(icon: Icons.inventory_2, title: loc.t('nomenclature'), onTap: () => context.push('/products')),
         _Tile(icon: Icons.assignment, title: loc.t('inventory_blank'), onTap: () => context.push('/inventory')),
-        _Tile(icon: Icons.restaurant_menu, title: loc.t('inventory_pf_blank'), onTap: () => context.push('/inventory-pf')),
         const SizedBox(height: 20),
         _SectionTitle(title: loc.t('kitchen')),
         _Tile(

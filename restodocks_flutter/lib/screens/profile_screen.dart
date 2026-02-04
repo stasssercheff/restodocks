@@ -254,15 +254,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
             const Divider(),
 
-            ListTile(
-              leading: const Icon(Icons.cloud, color: Colors.blue),
-              title: Text(localization.t('supabase_test')),
-              subtitle: Text(localization.t('supabase_test_subtitle')),
-              onTap: () => context.push('/supabase-test'),
-            ),
-
-            const Divider(),
-
             // Выход
             ListTile(
               leading: const Icon(Icons.logout, color: Colors.red),
