@@ -164,6 +164,7 @@ class _MiddleTabBody extends StatelessWidget {
   }
 }
 
+/// Личный кабинет — только меню: Профиль | Настройки | Выход. Без карточки с данными (они в «Профиль»).
 class _ProfileTabContent extends StatelessWidget {
   const _ProfileTabContent();
 
@@ -171,7 +172,6 @@ class _ProfileTabContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final accountManager = context.watch<AccountManagerSupabase>();
     final employee = accountManager.currentEmployee;
-    final establishment = accountManager.establishment;
     final loc = context.watch<LocalizationService>();
 
     if (employee == null) return const SizedBox();
@@ -181,29 +181,6 @@ class _ProfileTabContent extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).primaryColor.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.person, size: 40, color: Colors.grey),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(employee.fullName, style: Theme.of(context).textTheme.titleMedium),
-                  Text(employee.email, style: Theme.of(context).textTheme.bodySmall),
-                  if (establishment != null) Text(establishment.name, style: Theme.of(context).textTheme.bodySmall),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
           ListTile(
             leading: const Icon(Icons.person),
             title: Text(loc.t('profile')),
@@ -214,8 +191,9 @@ class _ProfileTabContent extends StatelessWidget {
             leading: const Icon(Icons.settings),
             title: Text(loc.t('settings')),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push('/profile'),
+            onTap: () => context.push('/settings'),
           ),
+          const Divider(),
           ListTile(
             leading: const Icon(Icons.logout, color: Colors.red),
             title: Text(loc.t('logout'), style: const TextStyle(color: Colors.red)),

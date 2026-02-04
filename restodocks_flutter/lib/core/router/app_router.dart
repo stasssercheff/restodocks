@@ -77,6 +77,11 @@ class AppRouter {
         path: '/profile',
         builder: (context, state) => const ProfileScreen(),
       ),
+      // Настройки (без данных профиля)
+      GoRoute(
+        path: '/settings',
+        builder: (context, state) => const SettingsScreen(),
+      ),
 
       GoRoute(
         path: '/schedule',

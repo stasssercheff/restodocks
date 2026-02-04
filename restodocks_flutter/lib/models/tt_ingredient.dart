@@ -321,6 +321,48 @@ class TTIngredient extends Equatable {
     );
   }
 
+  /// Обновить % отхода и пересчитать нетто, КБЖУ, стоимость
+  TTIngredient updatePrimaryWastePct(double newWastePct, Product? product, CookingProcess? cookingProcess) {
+    final waste = newWastePct.clamp(0.0, 99.9);
+    if (product == null) {
+      return copyWith(primaryWastePct: waste);
+    }
+    final effectiveGross = grossWeight * (1.0 - waste / 100.0);
+    double newNetWeight = effectiveGross;
+    double newCalories = 0;
+    double newProtein = 0;
+    double newFat = 0;
+    double newCarbs = 0;
+
+    if (cookingProcess != null) {
+      final lossPct = cookingLossPctOverride ?? cookingProcess.weightLossPercentage;
+      final processed = cookingProcess.applyTo(product, effectiveGross, weightLossOverride: lossPct);
+      if (!isNetWeightManual) newNetWeight = processed.finalWeight;
+      newCalories = processed.totalCalories;
+      newProtein = processed.totalProtein;
+      newFat = processed.totalFat;
+      newCarbs = processed.totalCarbs;
+    } else {
+      final nutrition = product.getNutritionForWeight(newNetWeight);
+      newCalories = nutrition.calories;
+      newProtein = nutrition.protein;
+      newFat = nutrition.fat;
+      newCarbs = nutrition.carbs;
+    }
+
+    final newCost = (product.basePrice ?? 0) * (grossWeight / 1000.0);
+
+    return copyWith(
+      primaryWastePct: waste,
+      netWeight: newNetWeight,
+      finalCalories: newCalories,
+      finalProtein: newProtein,
+      finalFat: newFat,
+      finalCarbs: newCarbs,
+      cost: newCost,
+    );
+  }
+
   /// Масштабировать ингредиент (для повара: пересчёт под новый выход)
   TTIngredient scaleBy(double factor) {
     if (factor <= 0 || factor == 1.0) return this;

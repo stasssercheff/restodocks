@@ -70,6 +70,132 @@ class _EditableShrinkageCellState extends State<_EditableShrinkageCell> {
   }
 }
 
+/// Редактируемая ячейка процента отхода
+class _EditableWasteCell extends StatefulWidget {
+  const _EditableWasteCell({required this.value, required this.onChanged});
+
+  final double value;
+  final void Function(double? pct) onChanged;
+
+  @override
+  State<_EditableWasteCell> createState() => _EditableWasteCellState();
+}
+
+class _EditableWasteCellState extends State<_EditableWasteCell> {
+  bool _editing = false;
+  late TextEditingController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: widget.value.toStringAsFixed(1));
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final v = double.tryParse(_ctrl.text.replaceFirst(',', '.'));
+    setState(() => _editing = false);
+    widget.onChanged(v != null ? v.clamp(0.0, 99.9) : null);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_editing) {
+      return SizedBox(
+        width: 56,
+        child: TextField(
+          controller: _ctrl,
+          keyboardType: TextInputType.numberWithOptions(decimal: true),
+          autofocus: true,
+          decoration: const InputDecoration(isDense: true, suffixText: '%'),
+          style: const TextStyle(fontSize: 13),
+          onSubmitted: (_) => _submit(),
+          onTapOutside: (_) => _submit(),
+        ),
+      );
+    }
+    return InkWell(
+      onTap: () => setState(() {
+        _editing = true;
+        _ctrl.text = widget.value.toStringAsFixed(1);
+        _ctrl.selection = TextSelection(baseOffset: 0, extentOffset: _ctrl.text.length);
+      }),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Text('${widget.value.toStringAsFixed(0)}%'),
+      ),
+    );
+  }
+}
+
+/// Редактируемая ячейка брутто (граммы)
+class _EditableGrossCell extends StatefulWidget {
+  const _EditableGrossCell({required this.grams, required this.onChanged});
+
+  final double grams;
+  final void Function(double? g) onChanged;
+
+  @override
+  State<_EditableGrossCell> createState() => _EditableGrossCellState();
+}
+
+class _EditableGrossCellState extends State<_EditableGrossCell> {
+  bool _editing = false;
+  late TextEditingController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: widget.grams.toStringAsFixed(0));
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final v = double.tryParse(_ctrl.text.replaceFirst(',', '.'));
+    setState(() => _editing = false);
+    widget.onChanged(v != null && v >= 0 ? v : null);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_editing) {
+      return SizedBox(
+        width: 72,
+        child: TextField(
+          controller: _ctrl,
+          keyboardType: TextInputType.numberWithOptions(decimal: true),
+          autofocus: true,
+          decoration: const InputDecoration(isDense: true, suffixText: 'г'),
+          style: const TextStyle(fontSize: 12),
+          onSubmitted: (_) => _submit(),
+          onTapOutside: (_) => _submit(),
+        ),
+      );
+    }
+    return InkWell(
+      onTap: () => setState(() {
+        _editing = true;
+        _ctrl.text = widget.grams.toStringAsFixed(0);
+        _ctrl.selection = TextSelection(baseOffset: 0, extentOffset: _ctrl.text.length);
+      }),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Text('${widget.grams.toStringAsFixed(0)} г', style: const TextStyle(fontSize: 12)),
+      ),
+    );
+  }
+}
+
 TechCard _applyEdits(
   TechCard t, {
   String? dishName,
@@ -111,6 +237,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   bool _isSemiFinished = true; // ПФ или блюдо (порция — в карточках блюд, отдельно)
   final _technologyController = TextEditingController();
   final List<TTIngredient> _ingredients = [];
+  List<TechCard> _pickerTechCards = [];
 
   bool get _isNew => widget.techCardId.isEmpty || widget.techCardId == 'new';
 
@@ -128,13 +255,20 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   }
 
   Future<void> _load() async {
-    if (_isNew) {
-      setState(() { _loading = false; });
-      return;
-    }
     setState(() { _loading = true; _error = null; });
     try {
       await context.read<ProductStoreSupabase>().loadProducts();
+      final est = context.read<AccountManagerSupabase>().establishment;
+      if (est != null) {
+        final tcs = await context.read<TechCardServiceSupabase>().getTechCardsForEstablishment(est.id);
+        if (mounted) {
+          _pickerTechCards = _isNew ? tcs : tcs.where((t) => t.id != widget.techCardId).toList();
+        }
+      }
+      if (_isNew) {
+        if (mounted) setState(() { _loading = false; });
+        return;
+      }
       final svc = context.read<TechCardServiceSupabase>();
       final tc = await svc.getTechCardById(widget.techCardId);
       if (!mounted) return;
@@ -243,16 +377,11 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     }
   }
 
-  Future<void> _showAddIngredient() async {
+  /// [replaceIndex] — если задан, заменяем строку вместо добавления (тап по ячейке «Продукт»).
+  Future<void> _showAddIngredient([int? replaceIndex]) async {
     final loc = context.read<LocalizationService>();
     final productStore = context.read<ProductStoreSupabase>();
-    final techCardSvc = context.read<TechCardServiceSupabase>();
-    final est = context.read<AccountManagerSupabase>().establishment;
-    if (est == null) return;
     await productStore.loadProducts();
-    final techCards = await techCardSvc.getTechCardsForEstablishment(est.id);
-    final excludeId = _isNew ? null : widget.techCardId;
-    final tcs = excludeId == null ? techCards : techCards.where((t) => t.id != excludeId).toList();
 
     if (!mounted) return;
     showModalBottomSheet<void>(
@@ -267,7 +396,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           length: 2,
           child: Scaffold(
             appBar: AppBar(
-              title: Text(loc.t('add_ingredient')),
+              title: Text(replaceIndex != null ? loc.t('change_ingredient') : loc.t('add_ingredient')),
               bottom: TabBar(
                 tabs: [
                   Tab(text: loc.t('ingredient_from_product')),
@@ -279,9 +408,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
               children: [
                 _ProductPicker(
                   products: productStore.allProducts,
-                  onPick: (p, w, proc, waste, unit, gpp, {cookingLossPctOverride}) => _addProductIngredient(p, w, proc, waste, unit, gpp, cookingLossPctOverride: cookingLossPctOverride),
+                  onPick: (p, w, proc, waste, unit, gpp, {cookingLossPctOverride}) => _addProductIngredient(p, w, proc, waste, unit, gpp, replaceIndex: replaceIndex, cookingLossPctOverride: cookingLossPctOverride),
                 ),
-                _TechCardPicker(techCards: tcs, onPick: (t, w, unit, gpp) => _addTechCardIngredient(t, w, unit, gpp)),
+                _TechCardPicker(techCards: _pickerTechCards, onPick: (t, w, unit, gpp) => _addTechCardIngredient(t, w, unit, gpp, replaceIndex: replaceIndex)),
               ],
             ),
           ),
@@ -290,7 +419,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     );
   }
 
-  void _addProductIngredient(Product p, double value, CookingProcess? cookingProcess, double primaryWastePct, String unit, double? gramsPerPiece, {double? cookingLossPctOverride}) {
+  void _addProductIngredient(Product p, double value, CookingProcess? cookingProcess, double primaryWastePct, String unit, double? gramsPerPiece, {int? replaceIndex, double? cookingLossPctOverride}) {
     Navigator.of(context).pop();
     final loc = context.read<LocalizationService>();
     final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'RUB';
@@ -306,10 +435,16 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
       gramsPerPiece: gramsPerPiece,
       cookingLossPctOverride: cookingLossPctOverride,
     );
-    setState(() => _ingredients.add(ing));
+    setState(() {
+      if (replaceIndex != null && replaceIndex >= 0 && replaceIndex < _ingredients.length) {
+        _ingredients[replaceIndex] = ing;
+      } else {
+        _ingredients.add(ing);
+      }
+    });
   }
 
-  void _addTechCardIngredient(TechCard t, double weightG, String unit, double? gramsPerPiece) {
+  void _addTechCardIngredient(TechCard t, double weightG, String unit, double? gramsPerPiece, {int? replaceIndex}) {
     Navigator.of(context).pop();
     final totalNet = t.totalNetWeight;
     if (totalNet <= 0) return;
@@ -328,7 +463,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
       unit: unit,
       gramsPerPiece: gramsPerPiece,
     );
-    setState(() => _ingredients.add(ing));
+    setState(() {
+      if (replaceIndex != null && replaceIndex >= 0 && replaceIndex < _ingredients.length) {
+        _ingredients[replaceIndex] = ing;
+      } else {
+        _ingredients.add(ing);
+      }
+    });
   }
 
   void _removeIngredient(int i) {
@@ -426,7 +567,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: ConstrainedBox(
-                constraints: const BoxConstraints(minWidth: 900),
+                constraints: const BoxConstraints(minWidth: 1400),
                 child: canEdit
                     ? _TtkTable(
                       loc: loc,
@@ -437,6 +578,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                       onRemove: _removeIngredient,
                       onUpdate: (i, ing) => setState(() => _ingredients[i] = ing),
                       onAdd: _showAddIngredient,
+                      onReplaceIngredient: (i) => _showAddIngredient(i),
                       productStore: context.read<ProductStoreSupabase>(),
                       technologyField: TextField(
                         controller: _technologyController,
@@ -499,7 +641,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   }
 }
 
-class _TtkTable extends StatelessWidget {
+class _TtkTable extends StatefulWidget {
   const _TtkTable({
     required this.loc,
     required this.dishName,
@@ -511,6 +653,7 @@ class _TtkTable extends StatelessWidget {
     required this.onAdd,
     required this.productStore,
     this.technologyField,
+    this.onReplaceIngredient,
   });
 
   final LocalizationService loc;
@@ -523,39 +666,58 @@ class _TtkTable extends StatelessWidget {
   final VoidCallback onAdd;
   final ProductStoreSupabase productStore;
   final Widget? technologyField;
+  /// Тап по ячейке «Продукт» — замена ингредиента (поиск + выбор продукта/ПФ).
+  final void Function(int i)? onReplaceIngredient;
+
+  @override
+  State<_TtkTable> createState() => _TtkTableState();
+}
+
+class _TtkTableState extends State<_TtkTable> {
+  /// Пустых строк в конце: при начале заполнения последней добавляется ещё одна
+  int _emptyRowCount = 1;
+
+  @override
+  void didUpdateWidget(covariant _TtkTable oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.ingredients.length > oldWidget.ingredients.length) {
+      setState(() => _emptyRowCount = 1);
+    }
+  }
 
   static const _cellPad = EdgeInsets.symmetric(horizontal: 6, vertical: 6);
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final loc = widget.loc;
     final lang = loc.currentLanguageCode;
+    final ingredients = widget.ingredients;
     final totalNet = ingredients.fold<double>(0, (s, ing) => s + ing.netWeight);
     final totalCost = ingredients.fold<double>(0, (s, ing) => s + ing.cost);
     final pricePerKgDish = totalNet > 0 ? totalCost * 1000 / totalNet : 0.0;
     final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'RUB';
     final sym = currency == 'RUB' ? '₽' : currency == 'VND' ? '₫' : currency == 'USD' ? '\$' : currency;
 
-    // Документ-стиль: 12 колонок как в ТТК (Наименование блюда, Продукт, Брутто… Технология), без колонки «Тип ТТК»
     const colCount = 12;
-    final hasDeleteCol = canEdit;
+    final hasDeleteCol = widget.canEdit;
     final totalCols = hasDeleteCol ? colCount + 1 : colCount;
     return Table(
       border: TableBorder.all(width: 0.5, color: Colors.grey),
       columnWidths: {
-        0: const FlexColumnWidth(1.2),   // Наименование блюда (объединённая)
-        1: const FlexColumnWidth(1.4),   // Продукт
-        2: const FlexColumnWidth(0.6),   // Брутто гр/шт
-        3: const FlexColumnWidth(0.45),  // Отход %
-        4: const FlexColumnWidth(0.6),   // Нетто гр/шт
-        5: const FlexColumnWidth(1.0),   // Способ приготовления
-        6: const FlexColumnWidth(0.45),  // Ужарка %
-        7: const FlexColumnWidth(0.6),   // Выход гр/шт
-        8: const FlexColumnWidth(0.7),   // Цена за кг/шт
-        9: const FlexColumnWidth(0.65),  // Стоимость
-        10: const FlexColumnWidth(0.8),  // Цена за 1 кг/шт блюда
-        11: const FlexColumnWidth(1.5),  // Технология (объединённая)
-        if (hasDeleteCol) 12: const FlexColumnWidth(0.35),
+        0: const FlexColumnWidth(1.4),   // Наименование блюда
+        1: const FlexColumnWidth(2.2),   // Продукт (поиск + список)
+        2: const FlexColumnWidth(0.9),   // Брутто гр/шт
+        3: const FlexColumnWidth(0.6),   // Отход %
+        4: const FlexColumnWidth(0.9),   // Нетто гр/шт
+        5: const FlexColumnWidth(1.4),   // Способ приготовления
+        6: const FlexColumnWidth(0.6),   // Ужарка %
+        7: const FlexColumnWidth(0.9),   // Выход гр/шт
+        8: const FlexColumnWidth(1.0),   // Цена за кг/шт
+        9: const FlexColumnWidth(0.9),   // Стоимость
+        10: const FlexColumnWidth(1.0),  // Цена за 1 кг/шт блюда
+        11: const FlexColumnWidth(2.0),  // Технология
+        if (hasDeleteCol) 12: const FlexColumnWidth(0.4),
       },
       defaultColumnWidth: const FlexColumnWidth(0.6),
       children: [
@@ -579,19 +741,19 @@ class _TtkTable extends StatelessWidget {
           ],
         ),
         // Если ингредиентов нет — одна строка с названием блюда и технологией (как в документе)
-        if (ingredients.isEmpty && (dishName.isNotEmpty || technologyField != null))
+        if (ingredients.isEmpty && (widget.dishName.isNotEmpty || widget.technologyField != null))
           TableRow(
             children: [
-              _cell(dishName),
+              _cell(widget.dishName),
               ...List.generate(9, (_) => _cell('')),
-              technologyField != null
+              widget.technologyField != null
                   ? TableCell(
                       verticalAlignment: TableCellVerticalAlignment.fill,
                       child: Container(
                         constraints: const BoxConstraints(minHeight: 80),
                         padding: _cellPad,
                         alignment: Alignment.topLeft,
-                        child: technologyField,
+                        child: widget.technologyField,
                       ),
                     )
                   : _cell(''),
@@ -601,27 +763,87 @@ class _TtkTable extends StatelessWidget {
         ...ingredients.asMap().entries.map((e) {
           final i = e.key;
           final ing = e.value;
-          final product = ing.productId != null ? productStore.allProducts.where((p) => p.id == ing.productId).firstOrNull : null;
+          final product = ing.productId != null ? widget.productStore.allProducts.where((p) => p.id == ing.productId).firstOrNull : null;
           final proc = ing.cookingProcessId != null ? CookingProcess.findById(ing.cookingProcessId!) : null;
-          final pricePerUnit = product?.basePrice ?? 0.0;
+          final pricePerUnit = product?.basePrice ?? (ing.netWeight > 0 ? ing.cost * 1000 / ing.netWeight : 0.0);
           final nettoG = ing.effectiveGrossWeight;
           final isFirstRow = i == 0;
           return TableRow(
             children: [
               // Наименование блюда — только в первой строке (объединённый вид)
-              _cell(isFirstRow ? dishName : ''),
-              _cell(ing.sourceTechCardName ?? ing.productName),
-              _cell(ing.grossWeightDisplay(lang)),
-              _cell(ing.primaryWastePct.toStringAsFixed(0)),
+              _cell(isFirstRow ? widget.dishName : ''),
+              widget.canEdit && widget.onReplaceIngredient != null
+                  ? TableCell(
+                      child: InkWell(
+                        onTap: () => widget.onReplaceIngredient!(i),
+                        child: Padding(
+                          padding: _cellPad,
+                          child: Text(
+                            ing.sourceTechCardName ?? ing.productName,
+                            style: const TextStyle(fontSize: 12),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                    )
+                  : _cell(ing.sourceTechCardName ?? ing.productName),
+              widget.canEdit
+                  ? TableCell(
+                      child: Padding(
+                        padding: _cellPad,
+                        child: _EditableGrossCell(
+                          grams: ing.grossWeight,
+                          onChanged: (g) {
+                            if (g != null && g > 0) widget.onUpdate(i, ing.updateGrossWeight(g, product, proc));
+                          },
+                        ),
+                      ),
+                    )
+                  : _cell(ing.grossWeightDisplay(lang)),
+              widget.canEdit && product != null
+                  ? TableCell(
+                      child: Padding(
+                        padding: _cellPad,
+                        child: _EditableWasteCell(
+                          value: ing.primaryWastePct,
+                          onChanged: (v) => widget.onUpdate(i, ing.updatePrimaryWastePct(v ?? ing.primaryWastePct, product, proc)),
+                        ),
+                      ),
+                    )
+                  : _cell(ing.primaryWastePct.toStringAsFixed(0)),
               _cell('${nettoG.toStringAsFixed(0)}'),
-              _cell(ing.cookingProcessName ?? '—'),
-              canEdit && proc != null
+              widget.canEdit && product != null
+                  ? TableCell(
+                      child: Padding(
+                        padding: _cellPad,
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String?>(
+                            value: ing.cookingProcessId,
+                            isDense: true,
+                            isExpanded: true,
+                            items: [
+                              const DropdownMenuItem(value: null, child: Text('—')),
+                              ...CookingProcess.forCategory(product!.category).map((p) => DropdownMenuItem(
+                                    value: p.id,
+                                    child: Text(p.getLocalizedName(lang), overflow: TextOverflow.ellipsis),
+                                  )),
+                            ],
+                            onChanged: (id) {
+                              final p = id != null ? CookingProcess.findById(id) : null;
+                              widget.onUpdate(i, ing.updateCookingProcess(p, product, languageCode: lang));
+                            },
+                          ),
+                        ),
+                      ),
+                    )
+                  : _cell(ing.cookingProcessName ?? '—'),
+              widget.canEdit && proc != null
                   ? TableCell(
                       child: Padding(
                         padding: _cellPad,
                         child: _EditableShrinkageCell(
                           value: ing.weightLossPercentage,
-                          onChanged: (pct) => onUpdate(i, ing.updateCookingLossPct(pct, product, proc, languageCode: lang)),
+                          onChanged: (pct) => widget.onUpdate(i, ing.updateCookingLossPct(pct, product, proc, languageCode: lang)),
                         ),
                       ),
                     )
@@ -631,14 +853,14 @@ class _TtkTable extends StatelessWidget {
               _cell('${ing.cost.toStringAsFixed(2)} $sym'),
               _cell(pricePerKgDish.toStringAsFixed(2) + ' $sym'),
               // Технология — только в первой строке, высокая ячейка
-              isFirstRow && technologyField != null
+              isFirstRow && widget.technologyField != null
                   ? TableCell(
                       verticalAlignment: TableCellVerticalAlignment.fill,
                       child: Container(
                         constraints: const BoxConstraints(minHeight: 80),
                         padding: _cellPad,
                         alignment: Alignment.topLeft,
-                        child: technologyField,
+                        child: widget.technologyField,
                       ),
                     )
                   : _cell(''),
@@ -648,7 +870,7 @@ class _TtkTable extends StatelessWidget {
                     padding: _cellPad,
                     child: IconButton(
                       icon: const Icon(Icons.remove_circle_outline, size: 20),
-                      onPressed: () => onRemove(i),
+                      onPressed: () => widget.onRemove(i),
                       tooltip: loc.t('delete'),
                       style: IconButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(32, 32)),
                     ),
@@ -657,30 +879,33 @@ class _TtkTable extends StatelessWidget {
             ],
           );
         }),
-        if (canEdit)
-          TableRow(
-            children: [
-              TableCell(
-                child: InkWell(
-                  onTap: onAdd,
-                  child: Padding(
-                    padding: _cellPad,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.add_circle_outline, size: 22, color: theme.colorScheme.primary),
-                        const SizedBox(width: 8),
-                        Text(loc.t('add_ingredient'), style: TextStyle(color: theme.colorScheme.primary, fontSize: 13)),
-                        const SizedBox(width: 12),
-                        Text(loc.t('ttk_add_hint'), style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant)),
-                      ],
+        // Пустые строки: при начале заполнения последней появляется ещё одна (без кнопки «+»)
+        if (widget.canEdit)
+          ...List.generate(_emptyRowCount, (int k) {
+            final isLastEmpty = k == _emptyRowCount - 1;
+            return TableRow(
+              children: [
+                _cell(''),
+                TableCell(
+                  child: InkWell(
+                    onTap: () {
+                      if (isLastEmpty) setState(() => _emptyRowCount++);
+                      widget.onAdd();
+                    },
+                    child: Padding(
+                      padding: _cellPad,
+                      child: Text(
+                        loc.t('ttk_add_hint'),
+                        style: TextStyle(fontSize: 12, color: theme.colorScheme.primary),
+                      ),
                     ),
                   ),
                 ),
-              ),
-              ...List.generate(totalCols - 1, (_) => _cell('')),
-            ],
-          ),
+                ...List.generate(totalCols - 3, (_) => _cell('')),
+                if (hasDeleteCol) _cell(''),
+              ],
+            );
+          }),
         // Итого — жёлтая строка как в документе
         TableRow(
           decoration: BoxDecoration(color: Colors.amber.shade100),

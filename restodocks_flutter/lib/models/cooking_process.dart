@@ -325,6 +325,25 @@ class CookingProcess extends Equatable {
       weightLossPercentage: 5.0,
       applicableCategories: ['vegetables', 'fish', 'meat'],
     ),
+
+    // Разделка (обвалка, нарезка — без потерь веса или минимальные)
+    CookingProcess(
+      id: 'cutting',
+      name: 'Cutting',
+      localizedNames: {
+        'ru': 'Разделка',
+        'en': 'Cutting',
+        'es': 'Corte',
+        'de': 'Zerteilen',
+        'fr': 'Découpe',
+      },
+      calorieMultiplier: 1.0,
+      proteinMultiplier: 1.0,
+      fatMultiplier: 1.0,
+      carbsMultiplier: 1.0,
+      weightLossPercentage: 0.0,
+      applicableCategories: ['all'],
+    ),
   ];
 
   /// Найти процесс по ID
