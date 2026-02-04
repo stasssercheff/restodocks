@@ -1,5 +1,6 @@
-// Supabase Edge Function: распознавание ТТК по фото карточки (OpenAI Vision)
+// Supabase Edge Function: распознавание ТТК по фото карточки (vision) или по таблице (текст)
 import "jsr:@supabase/functions-js/edge_runtime.d.ts";
+import { chatText } from "../_shared/ai_provider.ts";
 
 const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
 
@@ -22,20 +23,21 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  const apiKey = Deno.env.get("OPENAI_API_KEY");
-  if (!apiKey) {
-    return new Response(JSON.stringify({ error: "OPENAI_API_KEY not set" }), {
-      status: 500,
-      headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
-    });
-  }
-
   try {
     const body = (await req.json()) as { imageBase64?: string; rows?: string[][] };
     const imageBase64 = body.imageBase64;
     const rows = body.rows;
 
+    const apiKey = Deno.env.get("OPENAI_API_KEY");
+    const hasTextProvider = Deno.env.get("GIGACHAT_AUTH_KEY")?.trim() || apiKey;
+
     if (imageBase64 && typeof imageBase64 === "string") {
+      if (!apiKey) {
+        return new Response(JSON.stringify({ error: "OPENAI_API_KEY required for image recognition" }), {
+          status: 500,
+          headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+        });
+      }
       const imageUrl = imageBase64.startsWith("data:") ? imageBase64 : `data:image/jpeg;base64,${imageBase64}`;
       const systemPrompt = `You are a tech card (recipe card) parser. The app table has EXACT columns in this order:
 1) Dish name | 2) Product/ingredient name | 3) Gross (g) | 4) Waste % | 5) Net (g) | 6) Cooking method | 7) Cooking loss % | 8) Output | 9) Price per kg | 10) Cost | 11) Technology
@@ -119,39 +121,27 @@ If a number is missing in the image use null. Use exact numbers from the image.`
     }
 
     if (rows && Array.isArray(rows)) {
+      if (!hasTextProvider) {
+        return new Response(JSON.stringify({ error: "GIGACHAT_AUTH_KEY or OPENAI_API_KEY required" }), {
+          status: 500,
+          headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+        });
+      }
       const systemPrompt = `You are a tech card parser. The app table columns are: 1=Dish name, 2=Product, 3=Gross (g), 4=Waste %, 5=Net (g), 6=Cooking method, 7=Cooking loss %, 8=Output, 9=Price/kg, 10=Cost, 11=Technology.
 Given table rows (each row = array of cell strings), map each cell to the correct field. Return ONLY valid JSON:
 - dishName, technologyText, isSemiFinished
 - ingredients: array of { productName, grossGrams?, primaryWastePct?, netGrams?, cookingMethod?, cookingLossPct?, unit? }
 No markdown.`;
 
-      const res = await fetch(OPENAI_URL, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "gpt-4o-mini",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: `Table:\n${JSON.stringify(rows)}` },
-          ],
-          max_tokens: 2048,
-        }),
+      const content = await chatText({
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `Table:\n${JSON.stringify(rows)}` },
+        ],
+        maxTokens: 2048,
       });
 
-      if (!res.ok) {
-        const err = await res.text();
-        return new Response(JSON.stringify({ error: `OpenAI: ${res.status} ${err}` }), {
-          status: 502,
-          headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
-        });
-      }
-
-      const data = await res.json() as { choices?: { message?: { content?: string } }[] };
-      const content = data.choices?.[0]?.message?.content?.trim();
-      if (!content) {
+      if (!content?.trim()) {
         return new Response(JSON.stringify({ dishName: null, technologyText: null, ingredients: [], isSemiFinished: undefined }), {
           status: 200,
           headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
