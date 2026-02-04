@@ -521,31 +521,34 @@ class _TtkTable extends StatelessWidget {
     final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'RUB';
     final sym = currency == 'RUB' ? '₽' : currency == 'VND' ? '₫' : currency == 'USD' ? '\$' : currency;
 
-    final colCount = canEdit ? 13 : 12;
+    // Документ-стиль: 12 колонок как в ТТК (Наименование блюда, Продукт, Брутто… Технология), без колонки «Тип ТТК»
+    const colCount = 12;
+    final hasDeleteCol = canEdit;
+    final totalCols = hasDeleteCol ? colCount + 1 : colCount;
     return Table(
       border: TableBorder.all(width: 0.5, color: Colors.grey),
       columnWidths: {
-        0: const FlexColumnWidth(0.6),   // Тип ТТК
-        1: const FlexColumnWidth(1.2),   // Наименование
-        2: const FlexColumnWidth(1.4),   // Продукт
-        3: const FlexColumnWidth(0.6),   // Брутто гр/шт
-        4: const FlexColumnWidth(0.45),  // Отход %
-        5: const FlexColumnWidth(0.6),   // Нетто гр/шт
-        6: const FlexColumnWidth(1.0),   // Способ приготовления
-        7: const FlexColumnWidth(0.45),  // Ужарка %
-        8: const FlexColumnWidth(0.6),   // Выход гр/шт
-        9: const FlexColumnWidth(0.7),   // Цена за кг/шт
-        10: const FlexColumnWidth(0.65), // Стоимость
-        11: const FlexColumnWidth(0.8),  // Цена за 1 кг/шт блюда
-        if (canEdit) 12: const FlexColumnWidth(0.35),
+        0: const FlexColumnWidth(1.2),   // Наименование блюда (объединённая)
+        1: const FlexColumnWidth(1.4),   // Продукт
+        2: const FlexColumnWidth(0.6),   // Брутто гр/шт
+        3: const FlexColumnWidth(0.45),  // Отход %
+        4: const FlexColumnWidth(0.6),   // Нетто гр/шт
+        5: const FlexColumnWidth(1.0),   // Способ приготовления
+        6: const FlexColumnWidth(0.45),  // Ужарка %
+        7: const FlexColumnWidth(0.6),   // Выход гр/шт
+        8: const FlexColumnWidth(0.7),   // Цена за кг/шт
+        9: const FlexColumnWidth(0.65),  // Стоимость
+        10: const FlexColumnWidth(0.8),  // Цена за 1 кг/шт блюда
+        11: const FlexColumnWidth(1.5),  // Технология (объединённая)
+        if (hasDeleteCol) 12: const FlexColumnWidth(0.35),
       },
       defaultColumnWidth: const FlexColumnWidth(0.6),
       children: [
+        // Серая шапка как в документе
         TableRow(
-          decoration: BoxDecoration(color: theme.colorScheme.primaryContainer.withOpacity(0.3)),
+          decoration: BoxDecoration(color: Colors.grey.shade300),
           children: [
-            _cell(loc.t('ttk_type'), bold: true),
-            _cell(loc.t('ttk_name'), bold: true),
+            _cell(loc.t('ttk_dish_name_col'), bold: true),
             _cell(loc.t('ttk_product'), bold: true),
             _cell(loc.t('ttk_gross_gr'), bold: true),
             _cell(loc.t('ttk_waste_pct'), bold: true),
@@ -556,9 +559,30 @@ class _TtkTable extends StatelessWidget {
             _cell(loc.t('ttk_price_per_kg'), bold: true),
             _cell(loc.t('ttk_cost'), bold: true),
             _cell(loc.t('ttk_price_per_1kg_dish_full'), bold: true),
-            if (canEdit) _cell('', bold: true),
+            _cell(loc.t('ttk_technology'), bold: true),
+            if (hasDeleteCol) _cell('', bold: true),
           ],
         ),
+        // Если ингредиентов нет — одна строка с названием блюда и технологией (как в документе)
+        if (ingredients.isEmpty && (dishName.isNotEmpty || technologyField != null))
+          TableRow(
+            children: [
+              _cell(dishName),
+              ...List.generate(9, (_) => _cell('')),
+              technologyField != null
+                  ? TableCell(
+                      verticalAlignment: TableCellVerticalAlignment.fill,
+                      child: Container(
+                        constraints: const BoxConstraints(minHeight: 80),
+                        padding: _cellPad,
+                        alignment: Alignment.topLeft,
+                        child: technologyField,
+                      ),
+                    )
+                  : _cell(''),
+              if (hasDeleteCol) _cell(''),
+            ],
+          ),
         ...ingredients.asMap().entries.map((e) {
           final i = e.key;
           final ing = e.value;
@@ -566,11 +590,12 @@ class _TtkTable extends StatelessWidget {
           final proc = ing.cookingProcessId != null ? CookingProcess.findById(ing.cookingProcessId!) : null;
           final pricePerUnit = product?.basePrice ?? 0.0;
           final nettoG = ing.effectiveGrossWeight;
+          final isFirstRow = i == 0;
           return TableRow(
             children: [
-              _cell(i == 0 ? (isSemiFinished ? loc.t('tt_type_pf') : loc.t('tt_type_dish')) : ''),
-              _cell(i == 0 && ing.sourceTechCardName == null ? dishName : (ing.sourceTechCardName ?? '')),
-              _cell(ing.productName),
+              // Наименование блюда — только в первой строке (объединённый вид)
+              _cell(isFirstRow ? dishName : ''),
+              _cell(ing.sourceTechCardName ?? ing.productName),
               _cell(ing.grossWeightDisplay(lang)),
               _cell(ing.primaryWastePct.toStringAsFixed(0)),
               _cell('${nettoG.toStringAsFixed(0)}'),
@@ -589,8 +614,20 @@ class _TtkTable extends StatelessWidget {
               _cell('${ing.netWeight.toStringAsFixed(0)}'),
               _cell('$pricePerUnit $sym'),
               _cell('${ing.cost.toStringAsFixed(2)} $sym'),
-              _cell('—'),
-              if (canEdit)
+              _cell(pricePerKgDish.toStringAsFixed(2) + ' $sym'),
+              // Технология — только в первой строке, высокая ячейка
+              isFirstRow && technologyField != null
+                  ? TableCell(
+                      verticalAlignment: TableCellVerticalAlignment.fill,
+                      child: Container(
+                        constraints: const BoxConstraints(minHeight: 80),
+                        padding: _cellPad,
+                        alignment: Alignment.topLeft,
+                        child: technologyField,
+                      ),
+                    )
+                  : _cell(''),
+              if (hasDeleteCol)
                 TableCell(
                   child: Padding(
                     padding: _cellPad,
@@ -626,13 +663,13 @@ class _TtkTable extends StatelessWidget {
                   ),
                 ),
               ),
-              ...List.generate(colCount - 1, (_) => _cell('')),
+              ...List.generate(totalCols - 1, (_) => _cell('')),
             ],
           ),
+        // Итого — жёлтая строка как в документе
         TableRow(
-          decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest),
+          decoration: BoxDecoration(color: Colors.amber.shade100),
           children: [
-            _cell('', bold: true),
             _cell('', bold: true),
             _cell(loc.t('ttk_total'), bold: true),
             _cell('', bold: true),
@@ -644,32 +681,10 @@ class _TtkTable extends StatelessWidget {
             _cell('', bold: true),
             _cell('${totalCost.toStringAsFixed(2)} $sym', bold: true),
             _cell('${pricePerKgDish.toStringAsFixed(2)} $sym', bold: true),
-            if (canEdit) _cell('', bold: true),
+            _cell('', bold: true),
+            if (hasDeleteCol) _cell('', bold: true),
           ],
         ),
-        if (technologyField != null)
-          TableRow(
-            children: [
-              ...List.generate(colCount - 1, (_) => TableCell(
-                child: Container(
-                  padding: _cellPad,
-                  decoration: BoxDecoration(border: Border(right: BorderSide(width: 0.5, color: Colors.grey))),
-                  child: const SizedBox.shrink(),
-                ),
-              )),
-              TableCell(
-                verticalAlignment: TableCellVerticalAlignment.fill,
-                child: Container(
-                  constraints: const BoxConstraints(minHeight: 80),
-                  padding: _cellPad,
-                  child: Align(
-                    alignment: Alignment.topLeft,
-                    child: technologyField,
-                  ),
-                ),
-              ),
-            ],
-          ),
       ],
     );
   }
