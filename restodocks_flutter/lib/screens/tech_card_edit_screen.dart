@@ -106,7 +106,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   bool _loading = true;
   String? _error;
   final _nameController = TextEditingController();
-  final _categoryController = TextEditingController(text: 'misc');
+  static const _categoryOptions = ['misc', 'vegetables', 'fruits', 'meat', 'seafood', 'dairy', 'grains', 'bakery', 'pantry', 'spices', 'beverages', 'eggs', 'legumes', 'nuts'];
+  String _selectedCategory = 'misc';
   bool _isSemiFinished = true; // ПФ или блюдо
   final _portionController = TextEditingController(text: '100');
   final _yieldController = TextEditingController(text: '0');
@@ -131,7 +132,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
         _loading = false;
         if (tc != null) {
           _nameController.text = tc.dishName;
-          _categoryController.text = tc.category;
+          _selectedCategory = _categoryOptions.contains(tc.category) ? tc.category : 'misc';
           _isSemiFinished = tc.isSemiFinished;
           _portionController.text = tc.portionWeight.toStringAsFixed(0);
           _yieldController.text = tc.yield.toStringAsFixed(0);
@@ -155,7 +156,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   @override
   void dispose() {
     _nameController.dispose();
-    _categoryController.dispose();
     _portionController.dispose();
     _yieldController.dispose();
     _technologyController.dispose();
@@ -174,7 +174,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     }
     final portion = double.tryParse(_portionController.text) ?? 100;
     final yieldVal = double.tryParse(_yieldController.text) ?? 0;
-    final category = _categoryController.text.trim().isEmpty ? 'misc' : _categoryController.text.trim();
+    final category = _selectedCategory;
     final curLang = context.read<LocalizationService>().currentLanguageCode;
     final tc = _techCard;
     final techMap = Map<String, String>.from(tc?.technologyLocalized ?? {});
@@ -352,7 +352,20 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
               children: [
                 SizedBox(width: 160, child: TextField(controller: _nameController, readOnly: !canEdit, decoration: InputDecoration(labelText: loc.t('dish_name'), isDense: true, contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10)))),
                 const SizedBox(width: 8),
-                SizedBox(width: 90, child: TextField(controller: _categoryController, readOnly: !canEdit, decoration: const InputDecoration(labelText: 'Категория', isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10)))),
+                SizedBox(
+                  width: 140,
+                  child: canEdit
+                      ? DropdownButtonFormField<String>(
+                          value: _selectedCategory,
+                          decoration: const InputDecoration(labelText: 'Категория', isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                          items: _categoryOptions.map((c) => DropdownMenuItem(value: c, child: Text(c == 'misc' ? 'misc' : c))).toList(),
+                          onChanged: (v) => setState(() => _selectedCategory = v ?? 'misc'),
+                        )
+                      : InputDecorator(
+                          decoration: const InputDecoration(labelText: 'Категория', isDense: true),
+                          child: Text(_selectedCategory),
+                        ),
+                ),
                 const SizedBox(width: 8),
                 if (canEdit)
                   Tooltip(
@@ -377,8 +390,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                   SizedBox(width: 58, child: TextField(controller: _portionController, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: loc.t('portion_weight'), isDense: true, contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10)))),
                   const SizedBox(width: 4),
                   SizedBox(width: 58, child: TextField(controller: _yieldController, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: loc.t('yield_g'), isDense: true, contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10)))),
-                  const SizedBox(width: 8),
-                  FilledButton.icon(onPressed: _showAddIngredient, icon: const Icon(Icons.add, size: 18), label: Text(loc.t('add_ingredient'))),
                 ],
               ],
             ),
@@ -591,7 +602,7 @@ class _TtkTable extends StatelessWidget {
             ],
           ),
         TableRow(
-          decoration: BoxDecoration(color: Colors.amber.shade100),
+          decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest),
           children: [
             _cell('', bold: true),
             _cell('', bold: true),
@@ -769,7 +780,7 @@ class _TtkCookTableState extends State<_TtkCookTable> {
           );
         }),
         TableRow(
-          decoration: BoxDecoration(color: Colors.amber.shade100),
+          decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest),
           children: [
             _cell(widget.loc.t('ttk_total'), bold: true),
             _cell(''),

@@ -11,6 +11,15 @@ class TechCardServiceSupabase {
 
   final SupabaseService _supabase = SupabaseService();
 
+  /// Payload для вставки в tt_ingredients: без id. Поле cooking_loss_pct_override
+  /// не передаём, чтобы не ломать БД без миграции supabase_migration_ttk_units.sql.
+  static Map<String, dynamic> _ingredientPayloadForDb(TTIngredient ingredient) {
+    final data = Map<String, dynamic>.from(ingredient.toJson());
+    data.remove('id');
+    data.remove('cooking_loss_pct_override');
+    return data;
+  }
+
   /// Создание новой технологической карты
   Future<TechCard> createTechCard({
     required String dishName,
@@ -35,8 +44,7 @@ class TechCardServiceSupabase {
     final createdTechCard = TechCard.fromJson(response);
 
     for (final ingredient in techCard.ingredients) {
-      final ingredientData = Map<String, dynamic>.from(ingredient.toJson());
-      ingredientData.remove('id');
+      final ingredientData = _ingredientPayloadForDb(ingredient);
       ingredientData['tech_card_id'] = createdTechCard.id;
       await _supabase.insertData('tt_ingredients', ingredientData);
     }
@@ -160,8 +168,7 @@ class TechCardServiceSupabase {
           .eq('tech_card_id', techCard.id);
 
       for (final ingredient in techCard.ingredients) {
-        final ingredientData = Map<String, dynamic>.from(ingredient.toJson());
-        ingredientData.remove('id');
+        final ingredientData = _ingredientPayloadForDb(ingredient);
         ingredientData['tech_card_id'] = techCard.id;
         await _supabase.insertData('tt_ingredients', ingredientData);
       }
