@@ -629,13 +629,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           IconButton(icon: const Icon(Icons.home), onPressed: () => context.go('/home'), tooltip: loc.t('home')),
         ],
       ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Шапка: название, категория, тип — компактно, не скроллится
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-            child: SingleChildScrollView(
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Шапка: название, категория, тип
+            SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
@@ -691,17 +691,12 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                 ],
               ),
             ),
-          ),
-          const SizedBox(height: 12),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Text(loc.t('ttk_composition'), style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-          ),
-          const SizedBox(height: 6),
-          // Таблица в Expanded: на телефоне работают и вертикальная, и горизонтальная прокрутка
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+            const SizedBox(height: 16),
+            Text(loc.t('ttk_composition'), style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            // Таблица: фиксированная мин. высота, чтобы всегда была видна; внутри — горизонтальная и вертикальная прокрутка
+            SizedBox(
+              height: 400,
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: SingleChildScrollView(
@@ -748,26 +743,23 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                 ),
               ),
             ),
-          ),
-          if (!canEdit)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-              child: TextField(
-                controller: _technologyController,
-                readOnly: true,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  labelText: loc.t('ttk_technology'),
-                  alignLabelWithHint: true,
-                  border: const OutlineInputBorder(),
+            if (!canEdit)
+              Padding(
+                padding: const EdgeInsets.only(top: 16),
+                child: TextField(
+                  controller: _technologyController,
+                  readOnly: true,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    labelText: loc.t('ttk_technology'),
+                    alignLabelWithHint: true,
+                    border: const OutlineInputBorder(),
+                  ),
                 ),
               ),
-            ),
-          if (canEdit) ...[
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-              child: Row(
+            if (canEdit) ...[
+              const SizedBox(height: 16),
+              Row(
                 children: [
                   FilledButton(onPressed: _save, child: Text(loc.t('save'))),
                   if (!_isNew) ...[
@@ -780,9 +772,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                   ],
                 ],
               ),
-            ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
