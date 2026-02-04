@@ -341,23 +341,26 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Wrap(
-              spacing: 16,
-              runSpacing: 12,
+            // Шапка в одну строку: Блюдо | Категория | ПФ/Блюдо | Порции | Выход | [+]
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
               children: [
-                SizedBox(width: 180, child: TextField(controller: _nameController, readOnly: !canEdit, decoration: InputDecoration(labelText: loc.t('dish_name'), isDense: true))),
-                SizedBox(width: 100, child: TextField(controller: _categoryController, readOnly: !canEdit, decoration: const InputDecoration(labelText: 'Категория', isDense: true))),
+                SizedBox(width: 160, child: TextField(controller: _nameController, readOnly: !canEdit, decoration: InputDecoration(labelText: loc.t('dish_name'), isDense: true, contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10)))),
+                const SizedBox(width: 8),
+                SizedBox(width: 90, child: TextField(controller: _categoryController, readOnly: !canEdit, decoration: const InputDecoration(labelText: 'Категория', isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10)))),
+                const SizedBox(width: 8),
                 if (canEdit)
                   Tooltip(
                     message: loc.t('tt_type_hint'),
                     child: SegmentedButton<bool>(
                       segments: [
-                        ButtonSegment(value: true, label: Text(loc.t('tt_type_pf')), icon: const Icon(Icons.inventory_2, size: 18)),
-                        ButtonSegment(value: false, label: Text(loc.t('tt_type_dish')), icon: const Icon(Icons.restaurant, size: 18)),
+                        ButtonSegment(value: true, label: Text(loc.t('tt_type_pf')), icon: const Icon(Icons.inventory_2, size: 16)),
+                        ButtonSegment(value: false, label: Text(loc.t('tt_type_dish')), icon: const Icon(Icons.restaurant, size: 16)),
                       ],
                       selected: {_isSemiFinished},
                       onSelectionChanged: (v) => setState(() => _isSemiFinished = v.first),
@@ -366,29 +369,45 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                   )
                 else
                   Chip(
-                    avatar: Icon(_isSemiFinished ? Icons.inventory_2 : Icons.restaurant, size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                    label: Text(_isSemiFinished ? loc.t('tt_type_pf') : loc.t('tt_type_dish')),
+                    avatar: Icon(_isSemiFinished ? Icons.inventory_2 : Icons.restaurant, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    label: Text(_isSemiFinished ? loc.t('tt_type_pf') : loc.t('tt_type_dish'), style: const TextStyle(fontSize: 12)),
                   ),
+                const SizedBox(width: 8),
                 if (canEdit) ...[
-                  SizedBox(width: 70, child: TextField(controller: _portionController, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: loc.t('portion_weight'), isDense: true))),
-                  SizedBox(width: 70, child: TextField(controller: _yieldController, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: loc.t('yield_g'), isDense: true))),
+                  SizedBox(width: 58, child: TextField(controller: _portionController, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: loc.t('portion_weight'), isDense: true, contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10)))),
+                  const SizedBox(width: 4),
+                  SizedBox(width: 58, child: TextField(controller: _yieldController, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: loc.t('yield_g'), isDense: true, contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10)))),
+                  const SizedBox(width: 8),
                   FilledButton.icon(onPressed: _showAddIngredient, icon: const Icon(Icons.add, size: 18), label: Text(loc.t('add_ingredient'))),
                 ],
               ],
             ),
-            const SizedBox(height: 16),
+            ),
+            const SizedBox(height: 12),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: canEdit
                   ? _TtkTable(
                       loc: loc,
                       dishName: _nameController.text,
+                      isSemiFinished: _isSemiFinished,
                       ingredients: _ingredients,
                       canEdit: true,
                       onRemove: _removeIngredient,
                       onUpdate: (i, ing) => setState(() => _ingredients[i] = ing),
                       onAdd: _showAddIngredient,
                       productStore: context.read<ProductStoreSupabase>(),
+                      technologyField: TextField(
+                        controller: _technologyController,
+                        maxLines: 4,
+                        style: const TextStyle(fontSize: 12),
+                        decoration: InputDecoration(
+                          hintText: loc.t('ttk_technology'),
+                          isDense: true,
+                          contentPadding: const EdgeInsets.all(8),
+                          border: InputBorder.none,
+                        ),
+                      ),
                     )
                   : _TtkCookTable(
                       loc: loc,
@@ -401,18 +420,20 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                       }),
                     ),
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _technologyController,
-              readOnly: !canEdit,
-              maxLines: 3,
-              decoration: InputDecoration(
-                labelText: loc.t('ttk_technology'),
-                alignLabelWithHint: true,
-                border: const OutlineInputBorder(),
-                hintText: loc.t('ttk_technology'),
+            if (!canEdit)
+              Padding(
+                padding: const EdgeInsets.only(top: 16),
+                child: TextField(
+                  controller: _technologyController,
+                  readOnly: true,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    labelText: loc.t('ttk_technology'),
+                    alignLabelWithHint: true,
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
               ),
-            ),
             if (canEdit) ...[
               const SizedBox(height: 16),
               FilledButton(onPressed: _save, child: Text(loc.t('save'))),
@@ -428,22 +449,26 @@ class _TtkTable extends StatelessWidget {
   const _TtkTable({
     required this.loc,
     required this.dishName,
+    required this.isSemiFinished,
     required this.ingredients,
     required this.canEdit,
     required this.onRemove,
     required this.onUpdate,
     required this.onAdd,
     required this.productStore,
+    this.technologyField,
   });
 
   final LocalizationService loc;
   final String dishName;
+  final bool isSemiFinished;
   final List<TTIngredient> ingredients;
   final bool canEdit;
   final void Function(int i) onRemove;
   final void Function(int i, TTIngredient ing) onUpdate;
   final VoidCallback onAdd;
   final ProductStoreSupabase productStore;
+  final Widget? technologyField;
 
   static const _cellPad = EdgeInsets.symmetric(horizontal: 6, vertical: 6);
 
@@ -457,42 +482,91 @@ class _TtkTable extends StatelessWidget {
     final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'RUB';
     final sym = currency == 'RUB' ? '₽' : currency == 'VND' ? '₫' : currency == 'USD' ? '\$' : currency;
 
+    final colCount = canEdit ? 13 : 12;
     return Table(
       border: TableBorder.all(width: 0.5, color: Colors.grey),
       columnWidths: {
-        0: const FlexColumnWidth(1.2),
-        1: const FlexColumnWidth(1.5),
-        2: const FlexColumnWidth(0.6),
-        3: const FlexColumnWidth(0.5),
-        4: const FlexColumnWidth(0.6),
-        5: const FlexColumnWidth(1.2),
-        6: const FlexColumnWidth(0.5),
-        7: const FlexColumnWidth(0.6),
-        8: const FlexColumnWidth(0.7),
-        9: const FlexColumnWidth(0.7),
-        10: const FlexColumnWidth(0.8),
-        if (canEdit) 11: const FlexColumnWidth(0.4),
+        0: const FlexColumnWidth(0.6),   // Тип ТТК
+        1: const FlexColumnWidth(1.2),   // Наименование
+        2: const FlexColumnWidth(1.4),   // Продукт
+        3: const FlexColumnWidth(0.6),   // Брутто гр/шт
+        4: const FlexColumnWidth(0.45),  // Отход %
+        5: const FlexColumnWidth(0.6),   // Нетто гр/шт
+        6: const FlexColumnWidth(1.0),   // Способ приготовления
+        7: const FlexColumnWidth(0.45),  // Ужарка %
+        8: const FlexColumnWidth(0.6),   // Выход гр/шт
+        9: const FlexColumnWidth(0.7),   // Цена за кг/шт
+        10: const FlexColumnWidth(0.65), // Стоимость
+        11: const FlexColumnWidth(0.8),  // Цена за 1 кг/шт блюда
+        if (canEdit) 12: const FlexColumnWidth(0.35),
       },
-      defaultColumnWidth: const FlexColumnWidth(0.8),
+      defaultColumnWidth: const FlexColumnWidth(0.6),
       children: [
         TableRow(
           decoration: BoxDecoration(color: theme.colorScheme.primaryContainer.withOpacity(0.3)),
           children: [
-            _cell(loc.t('ttk_dish'), bold: true),
+            _cell(loc.t('ttk_type'), bold: true),
+            _cell(loc.t('ttk_name'), bold: true),
             _cell(loc.t('ttk_product'), bold: true),
-            _cell(loc.t('ttk_gross'), bold: true),
+            _cell(loc.t('ttk_gross_gr'), bold: true),
             _cell(loc.t('ttk_waste_pct'), bold: true),
-            _cell(loc.t('ttk_net'), bold: true),
+            _cell(loc.t('ttk_net_gr'), bold: true),
             _cell(loc.t('ttk_cooking_method'), bold: true),
             _cell(loc.t('ttk_cook_loss'), bold: true),
-            _cell(loc.t('ttk_output'), bold: true),
+            _cell(loc.t('ttk_output_gr'), bold: true),
             _cell(loc.t('ttk_price_per_kg'), bold: true),
             _cell(loc.t('ttk_cost'), bold: true),
-            _cell(loc.t('ttk_price_per_1kg_dish'), bold: true),
+            _cell(loc.t('ttk_price_per_1kg_dish_full'), bold: true),
             if (canEdit) _cell('', bold: true),
           ],
         ),
-        if (canEdit && ingredients.isEmpty)
+        ...ingredients.asMap().entries.map((e) {
+          final i = e.key;
+          final ing = e.value;
+          final product = ing.productId != null ? productStore.allProducts.where((p) => p.id == ing.productId).firstOrNull : null;
+          final proc = ing.cookingProcessId != null ? CookingProcess.findById(ing.cookingProcessId!) : null;
+          final pricePerUnit = product?.basePrice ?? 0.0;
+          final nettoG = ing.effectiveGrossWeight;
+          return TableRow(
+            children: [
+              _cell(i == 0 ? (isSemiFinished ? loc.t('tt_type_pf') : loc.t('tt_type_dish')) : ''),
+              _cell(i == 0 && ing.sourceTechCardName == null ? dishName : (ing.sourceTechCardName ?? '')),
+              _cell(ing.productName),
+              _cell(ing.grossWeightDisplay(lang)),
+              _cell(ing.primaryWastePct.toStringAsFixed(0)),
+              _cell('${nettoG.toStringAsFixed(0)}'),
+              _cell(ing.cookingProcessName ?? '—'),
+              canEdit && proc != null
+                  ? TableCell(
+                      child: Padding(
+                        padding: _cellPad,
+                        child: _EditableShrinkageCell(
+                          value: ing.weightLossPercentage,
+                          onChanged: (pct) => onUpdate(i, ing.updateCookingLossPct(pct, product, proc, languageCode: lang)),
+                        ),
+                      ),
+                    )
+                  : _cell(ing.cookingProcessName != null ? '−${ing.weightLossPercentage.toStringAsFixed(0)}%' : '—'),
+              _cell('${ing.netWeight.toStringAsFixed(0)}'),
+              _cell('$pricePerUnit $sym'),
+              _cell('${ing.cost.toStringAsFixed(2)} $sym'),
+              _cell('—'),
+              if (canEdit)
+                TableCell(
+                  child: Padding(
+                    padding: _cellPad,
+                    child: IconButton(
+                      icon: const Icon(Icons.remove_circle_outline, size: 20),
+                      onPressed: () => onRemove(i),
+                      tooltip: loc.t('delete'),
+                      style: IconButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(32, 32)),
+                    ),
+                  ),
+                ),
+            ],
+          );
+        }),
+        if (canEdit)
           TableRow(
             children: [
               TableCell(
@@ -503,79 +577,60 @@ class _TtkTable extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.add, size: 20, color: theme.colorScheme.primary),
+                        Icon(Icons.add_circle_outline, size: 22, color: theme.colorScheme.primary),
                         const SizedBox(width: 8),
-                        Text(loc.t('add_ingredient'), style: TextStyle(color: theme.colorScheme.primary)),
+                        Text(loc.t('add_ingredient'), style: TextStyle(color: theme.colorScheme.primary, fontSize: 13)),
+                        const SizedBox(width: 12),
+                        Text(loc.t('ttk_add_hint'), style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant)),
                       ],
                     ),
                   ),
                 ),
               ),
-              ...List.generate(10, (_) => _cell('')),
-              if (canEdit) _cell(''),
+              ...List.generate(colCount - 1, (_) => _cell('')),
             ],
           ),
-        ...ingredients.asMap().entries.map((e) {
-          final i = e.key;
-          final ing = e.value;
-          final product = ing.productId != null ? productStore.allProducts.where((p) => p.id == ing.productId).firstOrNull : null;
-          final proc = ing.cookingProcessId != null ? CookingProcess.findById(ing.cookingProcessId!) : null;
-          final pricePerUnit = product?.basePrice ?? 0.0;
-          return TableRow(
-            children: [
-              _cell(i == 0 && ing.sourceTechCardName == null ? dishName : (ing.sourceTechCardName ?? '—')),
-              _cell(ing.productName),
-              _cell(ing.grossWeightDisplay(lang)),
-              _cell(ing.primaryWastePct.toStringAsFixed(1)),
-              _cell('${ing.netWeight.toStringAsFixed(0)} г'),
-              _cell(ing.cookingProcessName ?? '—'),
-              canEdit && proc != null
-                  ? TableCell(
-                      child: Padding(
-                        padding: _cellPad,
-                        child: _EditableShrinkageCell(
-                        value: ing.weightLossPercentage,
-                        onChanged: (pct) => onUpdate(i, ing.updateCookingLossPct(pct, product, proc, languageCode: lang)),
-                        ),
-                      ),
-                    )
-                  : _cell(ing.cookingProcessName != null ? '−${ing.weightLossPercentage.toStringAsFixed(0)}%' : '—'),
-              _cell('${ing.netWeight.toStringAsFixed(0)} г'),
-              _cell('$pricePerUnit $sym'),
-              _cell('${ing.cost.toStringAsFixed(2)} $sym'),
-              _cell('—'),
-              if (canEdit)
-                TableCell(
-                  child: Padding(
-                    padding: _cellPad,
-                    child: IconButton(
-                    icon: const Icon(Icons.remove_circle_outline, size: 20),
-                    onPressed: () => onRemove(i),
-                    tooltip: loc.t('delete'),
-                    style: IconButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(32, 32)),
-                    ),
-                  ),
-                ),
-            ],
-          );
-        }),
         TableRow(
           decoration: BoxDecoration(color: Colors.amber.shade100),
           children: [
+            _cell('', bold: true),
+            _cell('', bold: true),
             _cell(loc.t('ttk_total'), bold: true),
-            _cell(''),
-            _cell(''),
-            _cell(''),
-            _cell('${totalNet.toStringAsFixed(0)} г', bold: true),
-            _cell(''),
-            _cell(''),
-            _cell('${totalNet.toStringAsFixed(0)} г', bold: true),
-            _cell(''),
+            _cell('', bold: true),
+            _cell('', bold: true),
+            _cell('${ingredients.fold<double>(0, (s, ing) => s + ing.effectiveGrossWeight).toStringAsFixed(0)}', bold: true),
+            _cell('', bold: true),
+            _cell('', bold: true),
+            _cell('${totalNet.toStringAsFixed(0)}', bold: true),
+            _cell('', bold: true),
             _cell('${totalCost.toStringAsFixed(2)} $sym', bold: true),
             _cell('${pricePerKgDish.toStringAsFixed(2)} $sym', bold: true),
-            if (canEdit) _cell(''),
+            if (canEdit) _cell('', bold: true),
           ],
         ),
+        if (technologyField != null)
+          TableRow(
+            children: [
+              ...List.generate(colCount - 1, (_) => TableCell(
+                child: Container(
+                  padding: _cellPad,
+                  decoration: BoxDecoration(border: Border(right: BorderSide(width: 0.5, color: Colors.grey))),
+                  child: const SizedBox.shrink(),
+                ),
+              )),
+              TableCell(
+                verticalAlignment: TableCellVerticalAlignment.fill,
+                child: Container(
+                  constraints: const BoxConstraints(minHeight: 80),
+                  padding: _cellPad,
+                  child: Align(
+                    alignment: Alignment.topLeft,
+                    child: technologyField,
+                  ),
+                ),
+              ),
+            ],
+          ),
       ],
     );
   }
