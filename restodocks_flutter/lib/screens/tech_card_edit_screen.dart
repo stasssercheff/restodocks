@@ -19,13 +19,20 @@ class _EditableShrinkageCell extends StatefulWidget {
 }
 
 class _EditableShrinkageCellState extends State<_EditableShrinkageCell> {
-  bool _editing = false;
   late TextEditingController _ctrl;
 
   @override
   void initState() {
     super.initState();
     _ctrl = TextEditingController(text: widget.value.toStringAsFixed(1));
+  }
+
+  @override
+  void didUpdateWidget(covariant _EditableShrinkageCell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.value != widget.value && _ctrl.text != widget.value.toStringAsFixed(1)) {
+      _ctrl.text = widget.value.toStringAsFixed(1);
+    }
   }
 
   @override
@@ -36,36 +43,23 @@ class _EditableShrinkageCellState extends State<_EditableShrinkageCell> {
 
   void _submit() {
     final v = double.tryParse(_ctrl.text.replaceFirst(',', '.'));
-    setState(() => _editing = false);
     widget.onChanged(v != null ? v.clamp(0.0, 99.9) : null);
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_editing) {
-      return SizedBox(
-        width: 56,
-        child: TextField(
-          controller: _ctrl,
-          keyboardType: TextInputType.numberWithOptions(decimal: true),
-          autofocus: true,
-          decoration: const InputDecoration(isDense: true, suffixText: '%'),
-          style: const TextStyle(fontSize: 13),
-          onSubmitted: (_) => _submit(),
-          onTapOutside: (_) => _submit(),
-        ),
-      );
-    }
-    return InkWell(
-      onTap: () => setState(() {
-        _editing = true;
-        _ctrl.text = widget.value.toStringAsFixed(1);
-        _ctrl.selection = TextSelection(baseOffset: 0, extentOffset: _ctrl.text.length);
-      }),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Text('−${widget.value.toStringAsFixed(0)}%'),
+    return TextField(
+      controller: _ctrl,
+      keyboardType: TextInputType.numberWithOptions(decimal: true),
+      decoration: const InputDecoration(
+        isDense: true,
+        suffixText: '%',
+        border: InputBorder.none,
+        contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
       ),
+      style: const TextStyle(fontSize: 12),
+      onSubmitted: (_) => _submit(),
+      onTapOutside: (_) => _submit(),
     );
   }
 }
@@ -82,13 +76,20 @@ class _EditableWasteCell extends StatefulWidget {
 }
 
 class _EditableWasteCellState extends State<_EditableWasteCell> {
-  bool _editing = false;
   late TextEditingController _ctrl;
 
   @override
   void initState() {
     super.initState();
     _ctrl = TextEditingController(text: widget.value.toStringAsFixed(1));
+  }
+
+  @override
+  void didUpdateWidget(covariant _EditableWasteCell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.value != widget.value && _ctrl.text != widget.value.toStringAsFixed(1)) {
+      _ctrl.text = widget.value.toStringAsFixed(1);
+    }
   }
 
   @override
@@ -99,36 +100,23 @@ class _EditableWasteCellState extends State<_EditableWasteCell> {
 
   void _submit() {
     final v = double.tryParse(_ctrl.text.replaceFirst(',', '.'));
-    setState(() => _editing = false);
     widget.onChanged(v != null ? v.clamp(0.0, 99.9) : null);
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_editing) {
-      return SizedBox(
-        width: 56,
-        child: TextField(
-          controller: _ctrl,
-          keyboardType: TextInputType.numberWithOptions(decimal: true),
-          autofocus: true,
-          decoration: const InputDecoration(isDense: true, suffixText: '%'),
-          style: const TextStyle(fontSize: 13),
-          onSubmitted: (_) => _submit(),
-          onTapOutside: (_) => _submit(),
-        ),
-      );
-    }
-    return InkWell(
-      onTap: () => setState(() {
-        _editing = true;
-        _ctrl.text = widget.value.toStringAsFixed(1);
-        _ctrl.selection = TextSelection(baseOffset: 0, extentOffset: _ctrl.text.length);
-      }),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Text('${widget.value.toStringAsFixed(0)}%'),
+    return TextField(
+      controller: _ctrl,
+      keyboardType: TextInputType.numberWithOptions(decimal: true),
+      decoration: const InputDecoration(
+        isDense: true,
+        suffixText: '%',
+        border: InputBorder.none,
+        contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
       ),
+      style: const TextStyle(fontSize: 12),
+      onSubmitted: (_) => _submit(),
+      onTapOutside: (_) => _submit(),
     );
   }
 }
@@ -145,13 +133,20 @@ class _EditableGrossCell extends StatefulWidget {
 }
 
 class _EditableGrossCellState extends State<_EditableGrossCell> {
-  bool _editing = false;
   late TextEditingController _ctrl;
 
   @override
   void initState() {
     super.initState();
     _ctrl = TextEditingController(text: widget.grams.toStringAsFixed(0));
+  }
+
+  @override
+  void didUpdateWidget(covariant _EditableGrossCell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.grams != widget.grams && _ctrl.text != widget.grams.toStringAsFixed(0)) {
+      _ctrl.text = widget.grams.toStringAsFixed(0);
+    }
   }
 
   @override
@@ -162,36 +157,147 @@ class _EditableGrossCellState extends State<_EditableGrossCell> {
 
   void _submit() {
     final v = double.tryParse(_ctrl.text.replaceFirst(',', '.'));
-    setState(() => _editing = false);
     widget.onChanged(v != null && v >= 0 ? v : null);
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_editing) {
-      return SizedBox(
-        width: 72,
-        child: TextField(
-          controller: _ctrl,
-          keyboardType: TextInputType.numberWithOptions(decimal: true),
-          autofocus: true,
-          decoration: const InputDecoration(isDense: true, suffixText: 'г'),
-          style: const TextStyle(fontSize: 12),
-          onSubmitted: (_) => _submit(),
-          onTapOutside: (_) => _submit(),
-        ),
-      );
-    }
-    return InkWell(
-      onTap: () => setState(() {
-        _editing = true;
-        _ctrl.text = widget.grams.toStringAsFixed(0);
-        _ctrl.selection = TextSelection(baseOffset: 0, extentOffset: _ctrl.text.length);
-      }),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Text('${widget.grams.toStringAsFixed(0)} г', style: const TextStyle(fontSize: 12)),
+    return TextField(
+      controller: _ctrl,
+      keyboardType: TextInputType.numberWithOptions(decimal: true),
+      decoration: const InputDecoration(
+        isDense: true,
+        suffixText: 'г',
+        border: InputBorder.none,
+        contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
       ),
+      style: const TextStyle(fontSize: 12),
+      onSubmitted: (_) => _submit(),
+      onTapOutside: (_) => _submit(),
+    );
+  }
+}
+
+/// Редактируемая ячейка «Цена за кг» (пересчёт стоимости из цены и нетто)
+class _EditablePricePerKgCell extends StatefulWidget {
+  const _EditablePricePerKgCell({
+    required this.pricePerKg,
+    required this.netWeight,
+    required this.symbol,
+    required this.onChanged,
+  });
+
+  final double pricePerKg;
+  final double netWeight;
+  final String symbol;
+  final void Function(double? cost) onChanged;
+
+  @override
+  State<_EditablePricePerKgCell> createState() => _EditablePricePerKgCellState();
+}
+
+class _EditablePricePerKgCellState extends State<_EditablePricePerKgCell> {
+  late TextEditingController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: widget.pricePerKg.toStringAsFixed(2));
+  }
+
+  @override
+  void didUpdateWidget(covariant _EditablePricePerKgCell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.pricePerKg != widget.pricePerKg && _ctrl.text != widget.pricePerKg.toStringAsFixed(2)) {
+      _ctrl.text = widget.pricePerKg.toStringAsFixed(2);
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final v = double.tryParse(_ctrl.text.replaceFirst(',', '.'));
+    if (v != null && v >= 0 && widget.netWeight > 0) {
+      widget.onChanged(v * widget.netWeight / 1000);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: _ctrl,
+      keyboardType: TextInputType.numberWithOptions(decimal: true),
+      decoration: InputDecoration(
+        isDense: true,
+        suffixText: widget.symbol,
+        border: InputBorder.none,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+      ),
+      style: const TextStyle(fontSize: 12),
+      onSubmitted: (_) => _submit(),
+      onTapOutside: (_) => _submit(),
+    );
+  }
+}
+
+/// Редактируемая ячейка стоимости
+class _EditableCostCell extends StatefulWidget {
+  const _EditableCostCell({required this.cost, required this.symbol, required this.onChanged});
+
+  final double cost;
+  final String symbol;
+  final void Function(double? v) onChanged;
+
+  @override
+  State<_EditableCostCell> createState() => _EditableCostCellState();
+}
+
+class _EditableCostCellState extends State<_EditableCostCell> {
+  late TextEditingController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: widget.cost.toStringAsFixed(2));
+  }
+
+  @override
+  void didUpdateWidget(covariant _EditableCostCell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.cost != widget.cost && _ctrl.text != widget.cost.toStringAsFixed(2)) {
+      _ctrl.text = widget.cost.toStringAsFixed(2);
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final v = double.tryParse(_ctrl.text.replaceFirst(',', '.'));
+    widget.onChanged(v != null && v >= 0 ? v : null);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: _ctrl,
+      keyboardType: TextInputType.numberWithOptions(decimal: true),
+      decoration: InputDecoration(
+        isDense: true,
+        suffixText: widget.symbol,
+        border: InputBorder.none,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+      ),
+      style: const TextStyle(fontSize: 12),
+      onSubmitted: (_) => _submit(),
+      onTapOutside: (_) => _submit(),
     );
   }
 }
@@ -518,12 +624,26 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Шапка: название, категория, тип, порция, выход
+            // Шапка: название, категория, тип (поле названия — всегда с рамкой и мин. высотой, чтобы тап давал фокус)
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
               children: [
-                SizedBox(width: 160, child: TextField(controller: _nameController, readOnly: !canEdit, decoration: InputDecoration(labelText: loc.t('dish_name'), isDense: true, contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10)))),
+                SizedBox(
+                  width: 200,
+                  height: 56,
+                  child: TextField(
+                    controller: _nameController,
+                    readOnly: !canEdit,
+                    decoration: InputDecoration(
+                      labelText: loc.t('dish_name'),
+                      isDense: true,
+                      filled: true,
+                      border: const OutlineInputBorder(),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                    ),
+                  ),
+                ),
                 const SizedBox(width: 8),
                 SizedBox(
                   width: 140,
@@ -579,6 +699,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                       onUpdate: (i, ing) => setState(() => _ingredients[i] = ing),
                       onAdd: _showAddIngredient,
                       onReplaceIngredient: (i) => _showAddIngredient(i),
+                      dishNameController: canEdit ? _nameController : null,
                       productStore: context.read<ProductStoreSupabase>(),
                       technologyField: TextField(
                         controller: _technologyController,
@@ -654,6 +775,7 @@ class _TtkTable extends StatefulWidget {
     required this.productStore,
     this.technologyField,
     this.onReplaceIngredient,
+    this.dishNameController,
   });
 
   final LocalizationService loc;
@@ -668,6 +790,8 @@ class _TtkTable extends StatefulWidget {
   final Widget? technologyField;
   /// Тап по ячейке «Продукт» — замена ингредиента (поиск + выбор продукта/ПФ).
   final void Function(int i)? onReplaceIngredient;
+  /// Контроллер названия блюда — первая ячейка первой строки редактируется по нему.
+  final TextEditingController? dishNameController;
 
   @override
   State<_TtkTable> createState() => _TtkTableState();
@@ -744,7 +868,22 @@ class _TtkTableState extends State<_TtkTable> {
         if (ingredients.isEmpty && (widget.dishName.isNotEmpty || widget.technologyField != null))
           TableRow(
             children: [
-              _cell(widget.dishName),
+              widget.canEdit && widget.dishNameController != null
+                  ? TableCell(
+                      child: Padding(
+                        padding: _cellPad,
+                        child: TextField(
+                          controller: widget.dishNameController,
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                          ),
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ),
+                    )
+                  : _cell(widget.dishName),
               ...List.generate(9, (_) => _cell('')),
               widget.technologyField != null
                   ? TableCell(
@@ -770,8 +909,23 @@ class _TtkTableState extends State<_TtkTable> {
           final isFirstRow = i == 0;
           return TableRow(
             children: [
-              // Наименование блюда — только в первой строке (объединённый вид)
-              _cell(isFirstRow ? widget.dishName : ''),
+              // Наименование блюда — в первой строке редактируемое поле (или текст)
+              widget.canEdit && isFirstRow && widget.dishNameController != null
+                  ? TableCell(
+                      child: Padding(
+                        padding: _cellPad,
+                        child: TextField(
+                          controller: widget.dishNameController,
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                          ),
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ),
+                    )
+                  : _cell(isFirstRow ? widget.dishName : ''),
               widget.canEdit && widget.onReplaceIngredient != null
                   ? TableCell(
                       child: InkWell(
@@ -848,9 +1002,61 @@ class _TtkTableState extends State<_TtkTable> {
                       ),
                     )
                   : _cell(ing.cookingProcessName != null ? '−${ing.weightLossPercentage.toStringAsFixed(0)}%' : '—'),
-              _cell('${ing.netWeight.toStringAsFixed(0)}'),
-              _cell('$pricePerUnit $sym'),
-              _cell('${ing.cost.toStringAsFixed(2)} $sym'),
+              widget.canEdit
+                  ? TableCell(
+                      child: Padding(
+                        padding: _cellPad,
+                        child: _EditableNetCell(
+                          value: ing.netWeight,
+                          onChanged: (v) {
+                            if (v != null && v >= 0) widget.onUpdate(i, ing.updateNetWeight(v, product));
+                          },
+                        ),
+                      ),
+                    )
+                  : _cell('${ing.netWeight.toStringAsFixed(0)}'),
+              widget.canEdit
+                  ? TableCell(
+                      child: Padding(
+                        padding: _cellPad,
+                        child: _EditableNetCell(
+                          value: ing.netWeight,
+                          onChanged: (v) {
+                            if (v != null && v >= 0) widget.onUpdate(i, ing.updateNetWeight(v, product));
+                          },
+                        ),
+                      ),
+                    )
+                  : _cell('${ing.netWeight.toStringAsFixed(0)}'),
+              widget.canEdit
+                  ? TableCell(
+                      child: Padding(
+                        padding: _cellPad,
+                        child: _EditablePricePerKgCell(
+                          pricePerKg: pricePerUnit,
+                          netWeight: ing.netWeight,
+                          symbol: sym,
+                          onChanged: (cost) {
+                            if (cost != null && cost >= 0) widget.onUpdate(i, ing.copyWith(cost: cost));
+                          },
+                        ),
+                      ),
+                    )
+                  : _cell('$pricePerUnit $sym'),
+              widget.canEdit
+                  ? TableCell(
+                      child: Padding(
+                        padding: _cellPad,
+                        child: _EditableCostCell(
+                          cost: ing.cost,
+                          symbol: sym,
+                          onChanged: (v) {
+                            if (v != null && v >= 0) widget.onUpdate(i, ing.copyWith(cost: v));
+                          },
+                        ),
+                      ),
+                    )
+                  : _cell('${ing.cost.toStringAsFixed(2)} $sym'),
               _cell(pricePerKgDish.toStringAsFixed(2) + ' $sym'),
               // Технология — только в первой строке, высокая ячейка
               isFirstRow && widget.technologyField != null
@@ -1103,7 +1309,6 @@ class _EditableNetCell extends StatefulWidget {
 }
 
 class _EditableNetCellState extends State<_EditableNetCell> {
-  bool _editing = false;
   late TextEditingController _ctrl;
 
   @override
@@ -1115,7 +1320,7 @@ class _EditableNetCellState extends State<_EditableNetCell> {
   @override
   void didUpdateWidget(covariant _EditableNetCell oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!_editing && oldWidget.value != widget.value) {
+    if (oldWidget.value != widget.value && _ctrl.text != widget.value.toStringAsFixed(0)) {
       _ctrl.text = widget.value.toStringAsFixed(0);
     }
   }
@@ -1128,35 +1333,23 @@ class _EditableNetCellState extends State<_EditableNetCell> {
 
   void _submit() {
     final v = double.tryParse(_ctrl.text.replaceFirst(',', '.'));
-    setState(() => _editing = false);
-    widget.onChanged(v);
+    widget.onChanged(v != null && v >= 0 ? v : null);
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_editing) {
-      return SizedBox(
-        width: 72,
-        child: TextField(
-          controller: _ctrl,
-          keyboardType: TextInputType.numberWithOptions(decimal: true),
-          autofocus: true,
-          decoration: const InputDecoration(isDense: true, suffixText: 'г'),
-          style: const TextStyle(fontSize: 12),
-          onSubmitted: (_) => _submit(),
-          onTapOutside: (_) => _submit(),
-        ),
-      );
-    }
-    return InkWell(
-      onTap: () {
-        setState(() {
-          _editing = true;
-          _ctrl.text = widget.value.toStringAsFixed(0);
-          _ctrl.selection = TextSelection(baseOffset: 0, extentOffset: _ctrl.text.length);
-        });
-      },
-      child: Text('${widget.value.toStringAsFixed(0)} г', style: const TextStyle(fontSize: 12)),
+    return TextField(
+      controller: _ctrl,
+      keyboardType: TextInputType.numberWithOptions(decimal: true),
+      decoration: const InputDecoration(
+        isDense: true,
+        suffixText: 'г',
+        border: InputBorder.none,
+        contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+      ),
+      style: const TextStyle(fontSize: 12),
+      onSubmitted: (_) => _submit(),
+      onTapOutside: (_) => _submit(),
     );
   }
 }
