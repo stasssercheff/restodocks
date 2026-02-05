@@ -83,15 +83,19 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     if (result == null || result.files.isEmpty || result.files.single.bytes == null || !mounted) return;
     final bytes = result.files.single.bytes!;
     final ai = context.read<AiService>();
-    final techResult = await ai.parseTechCardFromExcel(Uint8List.fromList(bytes));
+    final list = await ai.parseTechCardsFromExcel(Uint8List.fromList(bytes));
     if (!mounted) return;
-    if (techResult == null || (techResult.dishName == null && techResult.ingredients.isEmpty)) {
+    if (list.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(loc.t('ai_tech_card_recognize_empty'))),
       );
       return;
     }
-    context.push('/tech-cards/new', extra: techResult);
+    if (list.length == 1) {
+      context.push('/tech-cards/new', extra: list.single);
+    } else {
+      context.push('/tech-cards/import-review', extra: list);
+    }
   }
 
   @override
@@ -105,24 +109,26 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         title: Text(loc.t('tech_cards')),
         actions: [
           if (canEdit)
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.add),
-              tooltip: loc.t('create_tech_card'),
-              onPressed: _loading ? null : () {},
-              onSelected: (value) async {
-                if (value == 'new') {
-                  context.push('/tech-cards/new');
-                } else if (value == 'photo') {
-                  await _createFromPhoto(context, loc);
-                } else if (value == 'excel') {
-                  await _createFromExcel(context, loc);
-                }
-              },
-              itemBuilder: (_) => [
-                PopupMenuItem(value: 'new', child: Text(loc.t('create_tech_card'))),
-                PopupMenuItem(value: 'photo', child: Text(loc.t('ai_tech_card_from_photo'))),
-                PopupMenuItem(value: 'excel', child: Text(loc.t('ai_tech_card_from_excel'))),
-              ],
+            AbsorbPointer(
+              absorbing: _loading,
+              child: PopupMenuButton<String>(
+                icon: Icon(Icons.add, color: _loading ? Theme.of(context).disabledColor : null),
+                tooltip: loc.t('create_tech_card'),
+                onSelected: (value) async {
+                  if (value == 'new') {
+                    context.push('/tech-cards/new');
+                  } else if (value == 'photo') {
+                    await _createFromPhoto(context, loc);
+                  } else if (value == 'excel') {
+                    await _createFromExcel(context, loc);
+                  }
+                },
+                itemBuilder: (_) => [
+                  PopupMenuItem(value: 'new', child: Text(loc.t('create_tech_card'))),
+                  PopupMenuItem(value: 'photo', child: Text(loc.t('ai_tech_card_from_photo'))),
+                  PopupMenuItem(value: 'excel', child: Text(loc.t('ai_tech_card_from_excel'))),
+                ],
+              ),
             ),
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loading ? null : _load, tooltip: loc.t('refresh')),
           IconButton(icon: const Icon(Icons.home), onPressed: () => context.go('/home'), tooltip: loc.t('home')),

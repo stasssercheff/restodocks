@@ -145,6 +145,14 @@ class AppRouter {
         },
       ),
       GoRoute(
+        path: '/tech-cards/import-review',
+        builder: (context, state) {
+          final list = state.extra as List?;
+          final cards = list != null ? list.map((e) => e as TechCardRecognitionResult).toList() : <TechCardRecognitionResult>[];
+          return TechCardsImportReviewScreen(cards: cards);
+        },
+      ),
+      GoRoute(
         path: '/tech-cards/:id',
         builder: (context, state) {
           final id = state.pathParameters['id'] ?? '';

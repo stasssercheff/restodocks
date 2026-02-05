@@ -165,7 +165,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             controller: customController,
                             decoration: InputDecoration(
                               labelText: loc.t('currency_code'),
-                              hintText: localization.t('currency_hint'),
+                              hintText: loc.t('currency_hint'),
                               border: const OutlineInputBorder(),
                             ),
                             textCapitalization: TextCapitalization.characters,

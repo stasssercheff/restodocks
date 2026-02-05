@@ -112,7 +112,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen> {
       final created = await svc.duplicateChecklist(c, emp.id);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text(context.read<LocalizationService>().t('checklist_created_duplicate'))),
+          SnackBar(content: Text(context.read<LocalizationService>().t('checklist_created_duplicate'))),
         );
         context.pushReplacement('/checklists/${created.id}');
       }

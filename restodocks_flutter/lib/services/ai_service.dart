@@ -133,8 +133,11 @@ abstract class AiService {
   /// Распознавание ТТК по фото карточки (OCR + извлечение полей).
   Future<TechCardRecognitionResult?> recognizeTechCardFromImage(Uint8List imageBytes);
 
-  /// Парсинг ТТК из Excel (байты .xlsx).
+  /// Парсинг ТТК из Excel (байты .xlsx) — одна карточка.
   Future<TechCardRecognitionResult?> parseTechCardFromExcel(Uint8List xlsxBytes);
+
+  /// Парсинг всех ТТК из одного документа Excel (несколько карточек в одном файле).
+  Future<List<TechCardRecognitionResult>> parseTechCardsFromExcel(Uint8List xlsxBytes);
 
   /// Распознавание продукта по введённому тексту (нормализация, категория, единица).
   Future<ProductRecognitionResult?> recognizeProduct(String userInput);
@@ -168,6 +171,10 @@ class AiServiceStub implements AiService {
   @override
   Future<TechCardRecognitionResult?> parseTechCardFromExcel(Uint8List xlsxBytes) async =>
       null;
+
+  @override
+  Future<List<TechCardRecognitionResult>> parseTechCardsFromExcel(Uint8List xlsxBytes) async =>
+      [];
 
   @override
   Future<ProductRecognitionResult?> recognizeProduct(String userInput) async =>

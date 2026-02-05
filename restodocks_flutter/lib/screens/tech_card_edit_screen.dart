@@ -9,6 +9,10 @@ import '../services/ai_service.dart';
 import '../services/services.dart';
 
 /// Создание или редактирование ТТК. Ингредиенты — из номенклатуры или из других ТТК (ПФ).
+///
+/// Составление/редактирование карточек остаётся как реализовано (таблица, ингредиенты, технология).
+/// Отображение для сотрудников (режим просмотра, !canEdit) должно соответствовать референсу:
+/// https://github.com/stasssercheff/shbb326 — kitchen/kitchen/ttk/Preps (ТТК ПФ), dish (карточки блюд), sv (су-вид).
 
 class _EditableShrinkageCell extends StatefulWidget {
   const _EditableShrinkageCell({required this.value, required this.onChanged});
@@ -457,6 +461,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
       if (_isNew) {
         if (mounted) {
           final ai = widget.initialFromAi;
+          final canEdit = context.read<AccountManagerSupabase>().currentEmployee?.canEditChecklistsAndTechCards ?? false;
           if (ai != null) {
             _nameController.text = ai.dishName?.trim() ?? '';
             _technologyController.text = ai.technologyText?.trim() ?? '';
@@ -489,6 +494,11 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                 cost: 0,
               ));
             }
+            if (canEdit && (_ingredients.isEmpty || !_ingredients.last.isPlaceholder)) {
+              _ingredients.add(TTIngredient.emptyPlaceholder());
+            }
+          } else if (canEdit && _ingredients.isEmpty) {
+            _ingredients.add(TTIngredient.emptyPlaceholder());
           }
           setState(() { _loading = false; });
         }
@@ -497,6 +507,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
       final svc = context.read<TechCardServiceSupabase>();
       final tc = await svc.getTechCardById(widget.techCardId);
       if (!mounted) return;
+      final canEdit = context.read<AccountManagerSupabase>().currentEmployee?.canEditChecklistsAndTechCards ?? false;
       setState(() {
         _techCard = tc;
         _loading = false;
@@ -508,6 +519,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           _ingredients
             ..clear()
             ..addAll(tc.ingredients);
+          if (canEdit && (_ingredients.isEmpty || !_ingredients.last.isPlaceholder)) {
+            _ingredients.add(TTIngredient.emptyPlaceholder());
+          }
         }
       });
     } catch (e) {
@@ -529,6 +543,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   }
 
   Future<void> _save() async {
+    final loc = context.read<LocalizationService>();
     final acc = context.read<AccountManagerSupabase>();
     final est = acc.establishment;
     final emp = acc.currentEmployee;
@@ -539,7 +554,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
       return;
     }
     const portion = 100.0; // порция — в карточках блюд
-    final yieldVal = _ingredients.isEmpty ? 0.0 : _ingredients.fold(0.0, (s, i) => s + i.netWeight);
+    final toSaveIngredients = _ingredients.where((i) => !i.isPlaceholder).toList();
+    final yieldVal = toSaveIngredients.isEmpty ? 0.0 : toSaveIngredients.fold(0.0, (s, i) => s + i.netWeight);
     final category = _selectedCategory;
     final curLang = context.read<LocalizationService>().currentLanguageCode;
     final tc = _techCard;
@@ -559,14 +575,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           establishmentId: est.id,
           createdBy: emp.id,
         );
-        var updated = _applyEdits(created, portionWeight: portion, yieldGrams: yieldVal, technologyLocalized: techMap, ingredients: _ingredients);
+        var updated = _applyEdits(created, portionWeight: portion, yieldGrams: yieldVal, technologyLocalized: techMap, ingredients: toSaveIngredients);
         await svc.saveTechCard(updated);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('tech_card_created'))));
           context.pushReplacement('/tech-cards/${created.id}');
         }
       } else {
-        final updated = _applyEdits(tc, dishName: name, category: category, isSemiFinished: _isSemiFinished, portionWeight: portion, yieldGrams: yieldVal, technologyLocalized: techMap, ingredients: _ingredients);
+        final updated = _applyEdits(tc, dishName: name, category: category, isSemiFinished: _isSemiFinished, portionWeight: portion, yieldGrams: yieldVal, technologyLocalized: techMap, ingredients: toSaveIngredients);
         await svc.saveTechCard(updated);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.read<LocalizationService>().t('save') + ' ✓')));
@@ -711,7 +727,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   }
 
   void _removeIngredient(int i) {
-    setState(() => _ingredients.removeAt(i));
+    setState(() {
+      _ingredients.removeAt(i);
+      final canEdit = context.read<AccountManagerSupabase>().currentEmployee?.canEditChecklistsAndTechCards ?? false;
+      if (canEdit && _ingredients.isEmpty) {
+        _ingredients.add(TTIngredient.emptyPlaceholder());
+      }
+    });
   }
 
   /// Подсказка ИИ: процент отхода по названию продукта (для ручной строки).
@@ -912,28 +934,37 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
             LayoutBuilder(
               builder: (context, c) {
                 final screenH = MediaQuery.of(context).size.height;
-                final rowCount = 1 + (_ingredients.isEmpty ? 1 : _ingredients.length) + 1 + 1;
+                final rowCount = 1 + (_ingredients.isEmpty ? 1 : _ingredients.length) + 1;
                 const rowHeight = 44.0;
                 final maxH = (screenH * 0.7).clamp(300.0, 900.0);
                 final desiredH = (rowCount * rowHeight).clamp(220.0, maxH);
                 return SizedBox(
                   height: desiredH,
                   child: Scrollbar(
-                thumbVisibility: true,
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: SingleChildScrollView(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(minWidth: 1450),
-                      child: canEdit
-                        ? _TtkTable(
+                    thumbVisibility: true,
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: SingleChildScrollView(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(minWidth: 1450),
+                          child: canEdit
+                            ? _TtkTable(
                             loc: loc,
                             dishName: _nameController.text,
                             isSemiFinished: _isSemiFinished,
                             ingredients: _ingredients,
                             canEdit: true,
                             onRemove: _removeIngredient,
-                            onUpdate: (i, ing) => setState(() => _ingredients[i] = ing),
+                            onUpdate: (i, ing) {
+                              setState(() {
+                                if (i >= _ingredients.length) return;
+                                _ingredients[i] = ing;
+                                if (ing.isPlaceholder && ing.hasData) {
+                                  _ingredients[i] = ing.withRealId();
+                                  _ingredients.add(TTIngredient.emptyPlaceholder());
+                                }
+                              });
+                            },
                             onAdd: _showAddIngredient,
                             onReplaceIngredient: (i) => _showAddIngredient(i),
                             dishNameController: canEdit ? _nameController : null,
@@ -953,21 +984,22 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                               ),
                             ),
                           )
-                        : _TtkCookTable(
-                            loc: loc,
-                            dishName: _nameController.text,
-                            ingredients: _ingredients,
-                            technology: _technologyController.text,
-                            onIngredientsChanged: (list) => setState(() {
-                              _ingredients.clear();
-                              _ingredients.addAll(list);
-                            }),
-                          ),
+                            : _TtkCookTable(
+                                loc: loc,
+                                dishName: _nameController.text,
+                                ingredients: _ingredients,
+                                technology: _technologyController.text,
+                                onIngredientsChanged: (list) => setState(() {
+                                  _ingredients.clear();
+                                  _ingredients.addAll(list);
+                                }),
+                              ),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            );
-          },
+                );
+              },
             ),
             if (!canEdit)
               Padding(
@@ -1046,17 +1078,6 @@ class _TtkTable extends StatefulWidget {
 }
 
 class _TtkTableState extends State<_TtkTable> {
-  /// Пустых строк в конце: при начале заполнения последней добавляется ещё одна
-  int _emptyRowCount = 1;
-
-  @override
-  void didUpdateWidget(covariant _TtkTable oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.ingredients.length > oldWidget.ingredients.length) {
-      setState(() => _emptyRowCount = 1);
-    }
-  }
-
   static const _cellPad = EdgeInsets.symmetric(horizontal: 6, vertical: 6);
 
   @override
@@ -1495,33 +1516,6 @@ class _TtkTableState extends State<_TtkTable> {
             ],
           );
         }),
-        // Пустые строки: при начале заполнения последней появляется ещё одна (без кнопки «+»)
-        if (widget.canEdit)
-          ...List.generate(_emptyRowCount, (int k) {
-            final isLastEmpty = k == _emptyRowCount - 1;
-            return TableRow(
-              children: [
-                _cell(''),
-                TableCell(
-                  child: InkWell(
-                    onTap: () {
-                      if (isLastEmpty) setState(() => _emptyRowCount++);
-                      widget.onAdd();
-                    },
-                    child: Padding(
-                      padding: _cellPad,
-                      child: Text(
-                        loc.t('ttk_add_hint'),
-                        style: TextStyle(fontSize: 12, color: theme.colorScheme.primary),
-                      ),
-                    ),
-                  ),
-                ),
-                ...List.generate(totalCols - 2, (_) => _cell('')),
-                if (hasDeleteCol) _cell(''),
-              ],
-            );
-          }),
         // Итого — жёлтая строка как в документе
         TableRow(
           decoration: BoxDecoration(color: Colors.amber.shade100),
@@ -1555,7 +1549,8 @@ class _TtkTableState extends State<_TtkTable> {
   }
 }
 
-/// Упрощённая таблица для повара: Блюдо, Продукт, Нетто (редакт.), Способ, Выход (редакт.), Технология
+/// Упрощённая таблица для повара (режим просмотра для сотрудников): Блюдо, Продукт, Нетто, Способ, Выход.
+/// Внешний вид и структура — по референсу GitHub (Preps / dish / sv).
 class _TtkCookTable extends StatefulWidget {
   const _TtkCookTable({
     required this.loc,

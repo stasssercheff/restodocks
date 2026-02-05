@@ -73,12 +73,33 @@ class AiServiceSupabase implements AiService {
   @override
   Future<TechCardRecognitionResult?> parseTechCardFromExcel(Uint8List xlsxBytes) async {
     try {
-      final rows = _xlsxToRows(xlsxBytes);
-      if (rows.isEmpty) return null;
-      final data = await _invoke('ai-recognize-tech-card', {'rows': rows});
-      return _parseTechCardResult(data);
+      final list = await parseTechCardsFromExcel(xlsxBytes);
+      return list.isEmpty ? null : list.first;
     } catch (_) {
       return null;
+    }
+  }
+
+  @override
+  Future<List<TechCardRecognitionResult>> parseTechCardsFromExcel(Uint8List xlsxBytes) async {
+    try {
+      final rows = _xlsxToRows(xlsxBytes);
+      if (rows.isEmpty) return [];
+      final data = await _invoke('ai-recognize-tech-cards-batch', {'rows': rows});
+      if (data == null) return [];
+      final raw = data['cards'];
+      if (raw is! List) return [];
+      final list = <TechCardRecognitionResult>[];
+      for (final e in raw) {
+        if (e is! Map) continue;
+        final card = _parseTechCardResult(Map<String, dynamic>.from(e as Map));
+        if (card != null && (card.dishName != null && card.dishName!.isNotEmpty || card.ingredients.isNotEmpty)) {
+          list.add(card);
+        }
+      }
+      return list;
+    } catch (_) {
+      return [];
     }
   }
 
@@ -106,7 +127,16 @@ class AiServiceSupabase implements AiService {
 
   static String _cellValueToString(CellValue? v) {
     if (v == null) return '';
-    if (v is TextCellValue) return v.value;
+    if (v is TextCellValue) {
+      final val = v.value;
+      if (val is String) return val;
+      // excel 4.x: value can be TextSpan (from package:excel)
+      try {
+        final t = (val as dynamic).text;
+        if (t != null) return t is String ? t : t.toString();
+      } catch (_) {}
+      return val.toString();
+    }
     if (v is IntCellValue) return v.value.toString();
     if (v is DoubleCellValue) return v.value.toString();
     return v.toString();

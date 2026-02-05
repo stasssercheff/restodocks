@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/models.dart';
+import 'ai_service.dart';
 import 'supabase_service.dart';
 
 /// Сервис управления технологическими картами с использованием Supabase
@@ -309,6 +310,57 @@ class TechCardServiceSupabase {
       print('Ошибка получения ТТК по создателю: $e');
       return [];
     }
+  }
+
+  /// Создание ТТК из результата распознавания ИИ (пакетный импорт).
+  Future<TechCard> createTechCardFromRecognitionResult({
+    required String establishmentId,
+    required String createdBy,
+    required TechCardRecognitionResult result,
+    required String category,
+    String languageCode = 'ru',
+  }) async {
+    final name = result.dishName?.trim().isNotEmpty == true ? result.dishName!.trim() : 'Без названия';
+    final created = await createTechCard(
+      dishName: name,
+      category: category,
+      isSemiFinished: result.isSemiFinished ?? true,
+      establishmentId: establishmentId,
+      createdBy: createdBy,
+    );
+    final ingredients = <TTIngredient>[];
+    for (final line in result.ingredients) {
+      if (line.productName.trim().isEmpty) continue;
+      final gross = line.grossGrams ?? 0.0;
+      final net = line.netGrams ?? line.grossGrams ?? gross;
+      final unit = line.unit?.trim().isNotEmpty == true ? line.unit! : 'g';
+      final wastePct = (line.primaryWastePct ?? 0).clamp(0.0, 99.9);
+      ingredients.add(TTIngredient(
+        id: '${DateTime.now().millisecondsSinceEpoch}_${ingredients.length}',
+        productId: null,
+        productName: line.productName.trim(),
+        grossWeight: gross > 0 ? gross : 100,
+        netWeight: net > 0 ? net : (gross > 0 ? gross : 100),
+        unit: unit,
+        primaryWastePct: wastePct,
+        cookingLossPctOverride: line.cookingLossPct != null ? line.cookingLossPct!.clamp(0.0, 99.9) : null,
+        isNetWeightManual: line.netGrams != null,
+        finalCalories: 0,
+        finalProtein: 0,
+        finalFat: 0,
+        finalCarbs: 0,
+        cost: 0,
+      ));
+    }
+    final yieldVal = ingredients.fold<double>(0.0, (s, i) => s + i.netWeight);
+    final techMap = <String, String>{languageCode: result.technologyText?.trim() ?? ''};
+    final updated = created.copyWith(
+      ingredients: ingredients,
+      technologyLocalized: techMap,
+      yield: yieldVal > 0 ? yieldVal : 100,
+    );
+    await saveTechCard(updated);
+    return updated;
   }
 
   /// Клонирование ТТК

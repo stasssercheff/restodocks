@@ -179,6 +179,37 @@ class TTIngredient extends Equatable {
     );
   }
 
+  /// Префикс id для пустой строки-заполнителя (не сохраняется в ТТК).
+  static const String _placeholderIdPrefix = '_placeholder_';
+
+  bool get isPlaceholder => id.startsWith(_placeholderIdPrefix);
+
+  /// Есть ли хотя бы одно заполненное поле (название или брутто).
+  bool get hasData => productName.trim().isNotEmpty || grossWeight > 0;
+
+  /// Заменить placeholder-id на реальный (после ввода данных пользователем).
+  TTIngredient withRealId() =>
+      copyWith(id: '${DateTime.now().millisecondsSinceEpoch}_${id.hashCode.abs()}');
+
+  /// Пустая строка для ввода в таблице ТТК; при заполнении подменяется на реальный id и добавляется новая пустая.
+  factory TTIngredient.emptyPlaceholder() {
+    return TTIngredient(
+      id: '${_placeholderIdPrefix}${DateTime.now().millisecondsSinceEpoch}',
+      productId: null,
+      productName: '',
+      grossWeight: 0,
+      netWeight: 0,
+      unit: 'g',
+      primaryWastePct: 0,
+      isNetWeightManual: false,
+      finalCalories: 0,
+      finalProtein: 0,
+      finalFat: 0,
+      finalCarbs: 0,
+      cost: 0,
+    );
+  }
+
   /// Создание ингредиента из продукта
   /// [primaryWastePct] — процент отхода при первичной обработке, 0–100
   /// [unit] — единица измерения (г, кг, шт и т.д.)

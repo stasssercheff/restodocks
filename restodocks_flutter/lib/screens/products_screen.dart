@@ -282,7 +282,7 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
               TextField(
                 controller: controller,
                 maxLines: 12,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   hintText: loc.t('paste_hint_products'),
                   border: OutlineInputBorder(),
                   alignLabelWithHint: true,
