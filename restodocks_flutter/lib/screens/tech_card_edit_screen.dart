@@ -1,3 +1,4 @@
+import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -533,6 +534,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+    // Чтобы таблица не пропадала: при пустом списке в режиме редактирования добавляем placeholder после первого кадра
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final canEdit = context.read<AccountManagerSupabase>().currentEmployee?.canEditChecklistsAndTechCards ?? false;
+      if (canEdit && _ingredients.isEmpty) {
+        setState(() => _ingredients.add(TTIngredient.emptyPlaceholder()));
+      }
+    });
   }
 
   @override
@@ -679,6 +688,33 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     setState(() {
       if (replaceIndex != null && replaceIndex >= 0 && replaceIndex < _ingredients.length) {
         _ingredients[replaceIndex] = ing;
+      } else {
+        _ingredients.add(ing);
+      }
+    });
+  }
+
+  /// Подстановка продукта из поиска по номенклатуре в строку [replaceIndex] (или добавление новой).
+  void _addProductIngredientAt(int replaceIndex, Product p, {double? grossGrams}) {
+    final loc = context.read<LocalizationService>();
+    final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'RUB';
+    final ing = TTIngredient.fromProduct(
+      product: p,
+      cookingProcess: null,
+      grossWeight: grossGrams ?? 100,
+      netWeight: null,
+      primaryWastePct: p.primaryWastePct ?? 0,
+      defaultCurrency: currency,
+      languageCode: loc.currentLanguageCode,
+      unit: p.unit ?? 'g',
+    );
+    setState(() {
+      if (replaceIndex >= 0 && replaceIndex < _ingredients.length) {
+        _ingredients[replaceIndex] = ing;
+        final canEdit = context.read<AccountManagerSupabase>().currentEmployee?.canEditChecklistsAndTechCards ?? false;
+        if (canEdit && (_ingredients.isEmpty || !_ingredients.last.isPlaceholder)) {
+          _ingredients.add(TTIngredient.emptyPlaceholder());
+        }
       } else {
         _ingredients.add(ing);
       }
@@ -946,7 +982,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                       scrollDirection: Axis.horizontal,
                       child: SingleChildScrollView(
                         child: ConstrainedBox(
-                          constraints: const BoxConstraints(minWidth: 1450),
+                          constraints: const BoxConstraints(minWidth: 1180),
                           child: canEdit
                             ? _TtkTable(
                             loc: loc,
@@ -970,19 +1006,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                             dishNameController: canEdit ? _nameController : null,
                             onSuggestWaste: _suggestWasteForRow,
                             productStore: context.read<ProductStoreSupabase>(),
-                            technologyField: TextField(
-                              controller: _technologyController,
-                              maxLines: 4,
-                              style: const TextStyle(fontSize: 12),
-                              decoration: InputDecoration(
-                                hintText: loc.t('ttk_technology'),
-                                isDense: true,
-                                contentPadding: const EdgeInsets.all(8),
-                                border: InputBorder.none,
-                                filled: true,
-                                fillColor: Colors.transparent,
-                              ),
-                            ),
+                            onPickProductFromSearch: _addProductIngredientAt,
                           )
                             : _TtkCookTable(
                                 loc: loc,
@@ -1001,20 +1025,22 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                 );
               },
             ),
-            if (!canEdit)
-              Padding(
-                padding: const EdgeInsets.only(top: 16),
-                child: TextField(
-                  controller: _technologyController,
-                  readOnly: true,
-                  maxLines: 3,
-                  decoration: InputDecoration(
-                    labelText: loc.t('ttk_technology'),
-                    alignLabelWithHint: true,
-                    border: const OutlineInputBorder(),
-                  ),
-                ),
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(loc.t('ttk_technology'), style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+            ),
+            TextField(
+              controller: _technologyController,
+              readOnly: !canEdit,
+              maxLines: 4,
+              decoration: InputDecoration(
+                hintText: loc.t('ttk_technology'),
+                alignLabelWithHint: true,
+                border: const OutlineInputBorder(),
+                filled: true,
               ),
+            ),
             if (canEdit) ...[
               const SizedBox(height: 16),
               Row(
@@ -1051,7 +1077,7 @@ class _TtkTable extends StatefulWidget {
     required this.onUpdate,
     required this.onAdd,
     required this.productStore,
-    this.technologyField,
+    this.onPickProductFromSearch,
     this.onReplaceIngredient,
     this.dishNameController,
     this.onSuggestWaste,
@@ -1066,7 +1092,8 @@ class _TtkTable extends StatefulWidget {
   final void Function(int i, TTIngredient ing) onUpdate;
   final VoidCallback onAdd;
   final ProductStoreSupabase productStore;
-  final Widget? technologyField;
+  /// Выбор продукта из номенклатуры по поиску (подстановка в строку, цена из карточки).
+  final void Function(int index, Product product, {double? grossGrams})? onPickProductFromSearch;
   /// Тап по ячейке «Продукт» — замена ингредиента (поиск + выбор продукта/ПФ).
   final void Function(int i)? onReplaceIngredient;
   /// Контроллер названия блюда — первая ячейка первой строки редактируется по нему.
@@ -1093,23 +1120,20 @@ class _TtkTableState extends State<_TtkTable> {
     final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'RUB';
     final sym = currency == 'RUB' ? '₽' : currency == 'VND' ? '₫' : currency == 'USD' ? '\$' : currency;
 
-    const colCount = 12;
     final hasDeleteCol = widget.canEdit;
-    // Фиксированные ширины колонок, чтобы ввод был удобен во всех ячейках (как в Excel)
+    // Цена из карточки продукта — колонки «Цена за 1000 гр» нет. Технология — одно поле на всю карточку под таблицей.
     final columnWidths = <int, TableColumnWidth>{
       0: const FixedColumnWidth(130),   // Наименование блюда
-      1: const FixedColumnWidth(200),   // Продукт
+      1: const FixedColumnWidth(200),   // Продукт (поиск по номенклатуре)
       2: const FixedColumnWidth(80),    // Брутто гр/шт
       3: const FixedColumnWidth(64),    // Отход %
       4: const FixedColumnWidth(80),    // Нетто гр/шт
       5: const FixedColumnWidth(140),   // Способ приготовления
       6: const FixedColumnWidth(64),    // Ужарка %
       7: const FixedColumnWidth(80),    // Выход гр/шт
-      8: const FixedColumnWidth(95),    // Цена за 1000 гр/шт
-      9: const FixedColumnWidth(90),    // Стоимость
-      10: const FixedColumnWidth(100),  // За 1000 гр готового
-      11: const FixedColumnWidth(260),  // Технология
-      if (hasDeleteCol) 12: const FixedColumnWidth(48),
+      8: const FixedColumnWidth(90),    // Стоимость
+      9: const FixedColumnWidth(100),   // За 1000 гр готового
+      if (hasDeleteCol) 10: const FixedColumnWidth(48),
     };
     return Table(
       border: TableBorder.all(width: 0.5, color: Colors.grey),
@@ -1128,10 +1152,8 @@ class _TtkTableState extends State<_TtkTable> {
             _cell(loc.t('ttk_cooking_method'), bold: true),
             _cell(loc.t('ttk_cook_loss'), bold: true),
             _cell(loc.t('ttk_output_gr'), bold: true),
-            _cell(loc.t('ttk_price_per_kg'), bold: true),
             _cell(loc.t('ttk_cost'), bold: true),
             _cell(loc.t('ttk_cost_per_1kg_ready'), bold: true),
-            _cell(loc.t('ttk_technology'), bold: true),
             if (hasDeleteCol) _cell('', bold: true),
           ],
         ),
@@ -1199,30 +1221,13 @@ class _TtkTableState extends State<_TtkTable> {
                       ),
                     )
                   : TableCell(child: Padding(padding: _cellPad, child: Text('', style: const TextStyle(fontSize: 12)))),
-              ...List.generate(9, (_) => TableCell(
+              ...List.generate(8, (_) => TableCell(
                 child: Container(
                   constraints: const BoxConstraints(minHeight: 56),
                   padding: _cellPad,
                   child: const Text('', style: TextStyle(fontSize: 12)),
                 ),
               )),
-              widget.technologyField != null
-                  ? TableCell(
-                      verticalAlignment: TableCellVerticalAlignment.fill,
-                      child: Container(
-                        constraints: const BoxConstraints(minHeight: 100),
-                        padding: _cellPad,
-                        alignment: Alignment.topLeft,
-                        child: widget.technologyField,
-                      ),
-                    )
-                  : TableCell(
-                      child: Container(
-                        constraints: const BoxConstraints(minHeight: 56),
-                        padding: _cellPad,
-                        child: const Text('', style: TextStyle(fontSize: 12)),
-                      ),
-                    ),
               if (hasDeleteCol)
                 TableCell(
                   child: Container(
@@ -1264,19 +1269,42 @@ class _TtkTableState extends State<_TtkTable> {
                       ),
                     )
                   : _cell(isFirstRow ? widget.dishName : ''),
-              widget.canEdit && product == null
+              widget.canEdit && product == null && widget.onPickProductFromSearch != null
                   ? TableCell(
                       child: SizedBox.expand(
                         child: Padding(
                           padding: _cellPad,
-                          child: _EditableProductNameCell(
-                            value: ing.productName,
-                            onChanged: (s) => widget.onUpdate(i, ing.copyWith(productName: s)),
+                          child: DropdownSearch<Product>(
+                            items: widget.productStore.allProducts,
+                            filterFn: (p, f) => (p.getLocalizedName(lang) ?? p.name).toLowerCase().contains((f ?? '').toLowerCase()),
+                            itemAsString: (p) => p.getLocalizedName(lang) ?? p.name,
+                            selectedItem: null,
+                            onChanged: (p) {
+                              if (p != null) widget.onPickProductFromSearch!(i, p);
+                            },
+                            dropdownBuilder: (context, selectedItem) => Text(
+                              selectedItem != null ? (selectedItem.getLocalizedName(lang) ?? selectedItem.name) : (ing.productName.isEmpty ? '—' : ing.productName),
+                              style: const TextStyle(fontSize: 12),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            popupProps: PopupProps.menu(showSearchBox: true, fit: FlexFit.loose),
                           ),
                         ),
                       ),
                     )
-                  : widget.canEdit && widget.onReplaceIngredient != null
+                  : widget.canEdit && product == null
+                      ? TableCell(
+                          child: SizedBox.expand(
+                            child: Padding(
+                              padding: _cellPad,
+                              child: _EditableProductNameCell(
+                                value: ing.productName,
+                                onChanged: (s) => widget.onUpdate(i, ing.copyWith(productName: s)),
+                              ),
+                            ),
+                          ),
+                        )
+                      : widget.canEdit && widget.onReplaceIngredient != null
                       ? TableCell(
                           child: InkWell(
                             onTap: () => widget.onReplaceIngredient!(i),
@@ -1459,23 +1487,6 @@ class _TtkTableState extends State<_TtkTable> {
                       child: SizedBox.expand(
                         child: Padding(
                           padding: _cellPad,
-                          child: _EditablePricePerKgCell(
-                          pricePerKg: pricePerUnit,
-                          grossWeight: ing.grossWeight,
-                          symbol: sym,
-                          onChanged: (cost) {
-                            if (cost != null && cost >= 0) widget.onUpdate(i, ing.copyWith(cost: cost));
-                          },
-                        ),
-                      ),
-                      ),
-                    )
-                  : _cell('$pricePerUnit $sym'),
-              widget.canEdit
-                  ? TableCell(
-                      child: SizedBox.expand(
-                        child: Padding(
-                          padding: _cellPad,
                           child: _EditableCostCell(
                           cost: ing.cost,
                           symbol: sym,
@@ -1488,18 +1499,6 @@ class _TtkTableState extends State<_TtkTable> {
                     )
                   : _cell('${ing.cost.toStringAsFixed(2)} $sym'),
               _cell(ing.netWeight > 0 ? '${(ing.cost * 1000 / ing.netWeight).toStringAsFixed(2)} $sym' : '—'),
-              // Технология — только в первой строке, высокая ячейка
-              isFirstRow && widget.technologyField != null
-                  ? TableCell(
-                      verticalAlignment: TableCellVerticalAlignment.fill,
-                      child: Container(
-                        constraints: const BoxConstraints(minHeight: 80),
-                        padding: _cellPad,
-                        alignment: Alignment.topLeft,
-                        child: widget.technologyField,
-                      ),
-                    )
-                  : _cell(''),
               if (hasDeleteCol)
                 TableCell(
                   child: Padding(
@@ -1527,10 +1526,8 @@ class _TtkTableState extends State<_TtkTable> {
             _cell('', bold: true),
             _cell('', bold: true),
             _cell('${totalNet.toStringAsFixed(0)}', bold: true),
-            _cell('', bold: true),
             _cell('${totalCost.toStringAsFixed(2)} $sym', bold: true),
             _cell('${pricePerKgDish.toStringAsFixed(2)} $sym', bold: true),
-            _cell('', bold: true),
             if (hasDeleteCol) _cell('', bold: true),
           ],
         ),

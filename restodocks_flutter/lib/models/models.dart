@@ -7,3 +7,4 @@ export 'culinary_units.dart';
 export 'tt_ingredient.dart';
 export 'tech_card.dart';
 export 'checklist.dart';
+export 'schedule_model.dart';
