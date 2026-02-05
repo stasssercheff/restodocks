@@ -499,7 +499,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
         final t = (val as dynamic).text;
         if (t != null) return t is String ? t : t.toString();
       } catch (_) {}
-      return val is String ? val : (val ?? '').toString();
+      final String s = val is String ? val as String : (val ?? '').toString();
+      return s;
     }
     if (v is IntCellValue) return v.value.toString();
     if (v is DoubleCellValue) return v.value.toString();
@@ -633,8 +634,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
         _completed = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('inventory_loaded').replaceAll('%s', '${newRows.length}')));
+        final msg = loc.t('inventory_loaded').replaceAll('%s', '${newRows.length}');
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
       }
     } catch (e) {
       if (mounted) {
