@@ -93,6 +93,10 @@ class AppRouter {
         builder: (context, state) => const EmployeesScreen(),
       ),
       GoRoute(
+        path: '/shift-confirmation',
+        builder: (context, state) => const ShiftConfirmationScreen(),
+      ),
+      GoRoute(
         path: '/inventory',
         builder: (context, state) => const InventoryScreen(),
       ),

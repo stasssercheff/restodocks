@@ -40,6 +40,26 @@ class NutritionApiService {
     'dehydrat', 'roasted', 'жарен', 'toasted',
   ];
 
+  /// Ограничить/подставить калории от ИИ по названию: авокадо не 655, грудка не 0.
+  static double? saneCaloriesForProduct(String productName, double? rawCalories) {
+    final lower = productName.trim().toLowerCase();
+    // Куриная грудка/филе: ИИ часто возвращает 0 — подставляем ~165 ккал/100г
+    if ((lower.contains('грудка') || lower.contains('филе') || lower.contains('chicken') || lower.contains('куриц') || lower.contains('кура ')) &&
+        (rawCalories == null || rawCalories < 50)) return 165.0;
+    if (rawCalories == null) return null;
+    // Высококалорийные: масло, орехи, сухофрукты, шоколад — не режем
+    if (lower.contains('масло') || lower.contains('oil') || lower.contains('орех') || lower.contains('nut') ||
+        lower.contains('сухофрукт') || lower.contains('dried') || lower.contains('шоколад') || lower.contains('chocolate') ||
+        lower.contains('сливоч') || lower.contains('butter') || lower.contains('сало') || lower.contains('lard')) {
+      return rawCalories;
+    }
+    // Авокадо (фрукт): не 655, а ~160 ккал/100г
+    if ((lower.contains('авокадо') || lower.contains('avocado')) && rawCalories > 220) return 160.0;
+    // Обычные продукты: макс 320 ккал/100г
+    if (rawCalories > _maxSaneKcal) return _maxSaneKcal;
+    return rawCalories;
+  }
+
   /// Поиск КБЖУ по названию продукта (с проверкой адекватности)
   static Future<NutritionResult?> fetchNutrition(String productName) async {
     if (productName.trim().isEmpty) return null;

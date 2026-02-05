@@ -87,13 +87,13 @@ class ProductStore {
       filtered = filtered.where((product) => product.category == category).toList();
     }
 
-    // Фильтр по аллергенам
+    // Фильтр по аллергенам: показываем продукты, не помеченные как содержащие (null не исключаем)
     if (glutenFree == true) {
-      filtered = filtered.where((product) => product.isGlutenFree).toList();
+      filtered = filtered.where((product) => product.suitableForGlutenFreeFilter).toList();
     }
 
     if (lactoseFree == true) {
-      filtered = filtered.where((product) => product.isLactoseFree).toList();
+      filtered = filtered.where((product) => product.suitableForLactoseFreeFilter).toList();
     }
 
     // Поиск по тексту

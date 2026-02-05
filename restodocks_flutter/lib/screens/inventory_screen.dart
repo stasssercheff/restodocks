@@ -1,4 +1,7 @@
+import 'dart:typed_data';
+
 import 'package:excel/excel.dart' hide Border;
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -9,6 +12,10 @@ import '../services/image_service.dart';
 import '../services/inventory_download.dart';
 import '../services/services.dart';
 
+/// Единица для ПФ в бланке: вес (г) или штуки/порции.
+const String _pfUnitGrams = 'g';
+const String _pfUnitPcs = 'pcs';
+
 /// Строка бланка: продукт из номенклатуры, полуфабрикат (ТТК) или свободная строка (например, с чека).
 class _InventoryRow {
   final Product? product;
@@ -17,6 +24,8 @@ class _InventoryRow {
   final String? freeName;
   final String? freeUnit;
   final List<double> quantities;
+  /// Для ПФ: единица в бланке — 'g' (граммы) или 'pcs' (порции/штуки). По умолчанию 'pcs'.
+  final String? pfUnit;
 
   _InventoryRow({
     this.product,
@@ -24,6 +33,7 @@ class _InventoryRow {
     this.freeName,
     this.freeUnit,
     required this.quantities,
+    this.pfUnit,
   })  : assert(product != null || techCard != null || (freeName != null && freeName.isNotEmpty)),
         assert(product == null || techCard == null);
 
@@ -37,8 +47,14 @@ class _InventoryRow {
   }
 
   String get unit => product?.unit ?? freeUnit ?? 'g';
-  String unitDisplay(String lang) =>
-      isPf ? 'порц.' : CulinaryUnits.displayName(unit.toLowerCase(), lang);
+  /// Для ПФ используем pfUnit: g → гр/g, иначе порц./pcs.
+  String unitDisplay(String lang) {
+    if (isPf) {
+      final u = pfUnit ?? _pfUnitPcs;
+      return u == _pfUnitGrams ? (lang == 'ru' ? 'гр' : 'g') : (lang == 'ru' ? 'порц.' : 'pcs');
+    }
+    return CulinaryUnits.displayName(unit.toLowerCase(), lang);
+  }
 
   /// В бланке инвентаризации вес показываем в граммах, не в кг.
   bool get isWeightInKg =>
@@ -50,6 +66,15 @@ class _InventoryRow {
   double get totalDisplay => isWeightInKg ? total * 1000 : total;
 
   double get total => quantities.fold(0.0, (a, b) => a + b);
+
+  _InventoryRow copyWith({String? pfUnit}) => _InventoryRow(
+        product: product,
+        techCard: techCard,
+        freeName: freeName,
+        freeUnit: freeUnit,
+        quantities: quantities,
+        pfUnit: pfUnit ?? this.pfUnit,
+      );
 }
 
 enum _InventorySort { alphabet, lastAdded }
@@ -69,6 +94,8 @@ class InventoryScreen extends StatefulWidget {
 class _InventoryScreenState extends State<InventoryScreen> {
   final ScrollController _hScroll = ScrollController();
   final List<_InventoryRow> _rows = [];
+  /// Продукты, перерасчитанные из ПФ (третья секция); заполняется при загрузке файла.
+  List<Map<String, dynamic>>? _aggregatedFromFile;
   DateTime _date = DateTime.now();
   TimeOfDay? _startTime;
   TimeOfDay? _endTime;
@@ -130,7 +157,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
       }
       for (final tc in pfOnly) {
         if (_rows.any((r) => r.techCard?.id == tc.id)) continue;
-        _rows.add(_InventoryRow(product: null, techCard: tc, quantities: [0.0]));
+        _rows.add(_InventoryRow(product: null, techCard: tc, quantities: [0.0], pfUnit: _pfUnitPcs));
       }
     });
   }
@@ -192,6 +219,68 @@ class _InventoryScreenState extends State<InventoryScreen> {
     setState(() {
       _rows[rowIndex].quantities.add(0.0);
     });
+  }
+
+  void _setPfUnit(int rowIndex, String unit) {
+    if (rowIndex < 0 || rowIndex >= _rows.length || !_rows[rowIndex].isPf) return;
+    setState(() {
+      _rows[rowIndex] = _rows[rowIndex].copyWith(pfUnit: unit);
+    });
+  }
+
+  /// Перерасчёт ПФ в исходные продукты по ТТК (для третьей секции бланка).
+  List<Map<String, dynamic>> _aggregateProductsFromPf(String lang) {
+    final tcById = <String, TechCard>{};
+    for (final r in _rows) {
+      if (r.techCard != null) tcById[r.techCard!.id] = r.techCard!;
+    }
+    final result = <String, Map<String, dynamic>>{};
+
+    void addIngredients(List<TTIngredient> ingredients, double factor) {
+      for (final ing in ingredients) {
+        if (ing.productId != null && ing.productName.isNotEmpty) {
+          final key = ing.productId!;
+          final gross = ing.grossWeight * factor;
+          final net = ing.netWeight * factor;
+          if (result.containsKey(key)) {
+            result[key]!['grossGrams'] = (result[key]!['grossGrams'] as double) + gross;
+            result[key]!['netGrams'] = (result[key]!['netGrams'] as double) + net;
+          } else {
+            result[key] = {
+              'productId': key,
+              'productName': ing.productName,
+              'grossGrams': gross,
+              'netGrams': net,
+            };
+          }
+        } else if (ing.sourceTechCardId != null) {
+          final nested = tcById[ing.sourceTechCardId!];
+          if (nested != null) {
+            final nestedYield = nested.yield > 0 ? nested.yield : nested.totalNetWeight;
+            if (nestedYield > 0) {
+              final nestedFactor = (ing.netWeight * factor) / nestedYield;
+              addIngredients(nested.ingredients, nestedFactor);
+            }
+          }
+        }
+      }
+    }
+
+    for (final r in _rows) {
+      if (!r.isPf || r.techCard == null || r.quantities.isEmpty || r.quantities[0] <= 0) continue;
+      final tc = r.techCard!;
+      if (tc.ingredients.isEmpty) continue;
+      final yieldVal = tc.yield > 0 ? tc.yield : tc.totalNetWeight;
+      if (yieldVal <= 0) continue;
+      final qty = r.quantities[0];
+      final pfU = r.pfUnit ?? _pfUnitPcs;
+      final factor = pfU == _pfUnitGrams ? qty / yieldVal : (qty * tc.portionWeight) / yieldVal;
+      addIngredients(tc.ingredients, factor);
+    }
+
+    final list = result.values.toList();
+    list.sort((a, b) => (a['productName'] as String).compareTo(b['productName'] as String));
+    return list;
   }
 
   void _addColumnToAll() {
@@ -281,11 +370,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
     final chef = chefs.first;
     final endTime = TimeOfDay.now();
+    final aggregatedProducts = _aggregateProductsFromPf(loc.currentLanguageCode);
     final payload = _buildPayload(
       establishment: establishment,
       employee: employee,
       endTime: endTime,
       lang: loc.currentLanguageCode,
+      aggregatedProducts: aggregatedProducts,
     );
     final docService = InventoryDocumentService();
     await docService.save(
@@ -363,6 +454,29 @@ class _InventoryScreenState extends State<InventoryScreen> {
         }
         sheet.appendRow(rowCells);
       }
+
+      // Третья секция: продукты, перерасчитанные из ПФ по ТТК
+      final aggregated = payload['aggregatedProducts'] as List<dynamic>? ?? [];
+      if (aggregated.isNotEmpty) {
+        sheet.appendRow([]);
+        sheet.appendRow([TextCellValue(loc.t('inventory_pf_products_title'))]);
+        sheet.appendRow([
+          TextCellValue(loc.t('inventory_excel_number')),
+          TextCellValue(loc.t('inventory_item_name')),
+          TextCellValue(loc.t('inventory_pf_gross_g')),
+          TextCellValue(loc.t('inventory_pf_net_g')),
+        ]);
+        for (var i = 0; i < aggregated.length; i++) {
+          final p = aggregated[i] as Map<String, dynamic>;
+          sheet.appendRow([
+            IntCellValue(i + 1),
+            TextCellValue((p['productName'] as String? ?? '').toString()),
+            IntCellValue(((p['grossGrams'] as num?)?.toDouble() ?? 0).round()),
+            IntCellValue(((p['netGrams'] as num?)?.toDouble() ?? 0).round()),
+          ]);
+        }
+      }
+
       final out = excel.encode();
       return out != null && out.isNotEmpty ? out : null;
     } catch (_) {
@@ -377,11 +491,167 @@ class _InventoryScreenState extends State<InventoryScreen> {
     await saveFileBytes(fileName, bytes);
   }
 
+  static String _cellStr(CellValue? v) {
+    if (v == null) return '';
+    if (v is TextCellValue) {
+      final val = v.value;
+      if (val is String) return val;
+      try {
+        final t = (val as dynamic).text;
+        if (t != null) return t is String ? t : t.toString();
+      } catch (_) {}
+      return val.toString();
+    }
+    if (v is IntCellValue) return v.value.toString();
+    if (v is DoubleCellValue) return v.value.toString();
+    return v.toString();
+  }
+
+  static double _cellNum(CellValue? v) {
+    if (v == null) return 0;
+    if (v is IntCellValue) return v.value.toDouble();
+    if (v is DoubleCellValue) return v.value;
+    final s = _cellStr(v).replaceFirst(',', '.');
+    return double.tryParse(s) ?? 0;
+  }
+
+  /// Загрузка заполненного бланка: первая таблица → _rows, третья секция → _aggregatedFromFile.
+  Future<void> _loadFilledFile(BuildContext context, LocalizationService loc) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['xlsx'],
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty || result.files.single.bytes == null) return;
+    final bytes = Uint8List.fromList(result.files.single.bytes!);
+    final store = context.read<ProductStoreSupabase>();
+    final account = context.read<AccountManagerSupabase>();
+    final techCardSvc = context.read<TechCardServiceSupabase>();
+    final estId = account.establishment?.id;
+    if (estId == null) return;
+    await store.loadProducts();
+    await store.loadNomenclature(estId);
+    final techCards = await techCardSvc.getTechCardsForEstablishment(estId);
+    final pfOnly = techCards.where((tc) => tc.isSemiFinished).toList();
+    final products = store.getNomenclatureProducts(estId);
+    final lang = loc.currentLanguageCode;
+
+    try {
+      final excel = Excel.decodeBytes(bytes);
+      final sheetName = excel.tables.keys.isNotEmpty ? excel.tables.keys.first : null;
+      if (sheetName == null) throw Exception('No sheet');
+      final sheet = excel.tables[sheetName]!;
+      final newRows = <_InventoryRow>[];
+      List<Map<String, dynamic>>? aggregated = [];
+      var r = 1;
+      final maxRows = sheet.maxRows;
+      final maxCols = sheet.maxColumns;
+
+      while (r < maxRows) {
+        final nameCell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: r));
+        final name = _cellStr(nameCell.value).trim();
+        if (name.isEmpty) {
+          r++;
+          continue;
+        }
+        if (name.toLowerCase().contains('продукт') && (name.toLowerCase().contains('пф') || name.toLowerCase().contains('перерасч'))) {
+          r++;
+          break;
+        }
+        final unitStr = _cellStr(sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: r)).value).trim().toLowerCase();
+        final total = _cellNum(sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: r)).value);
+        final quantities = <double>[];
+        for (var c = 4; c < maxCols; c++) {
+          final q = _cellNum(sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r)).value);
+          if (c == 4 || q != 0 || quantities.isNotEmpty) quantities.add(q);
+        }
+        if (quantities.isEmpty) quantities.add(total);
+
+        Product? product;
+        TechCard? techCard;
+        String? freeName;
+        String? freeUnit;
+        String? pfUnit;
+        if (name.endsWith(' (ПФ)')) {
+          final dishName = name.substring(0, name.length - 5).trim();
+          techCard = pfOnly.cast<TechCard?>().firstWhere((t) => t?.getLocalizedDishName(lang) == dishName, orElse: () => null);
+          if (techCard == null) {
+            freeName = name;
+            freeUnit = unitStr.contains('гр') || unitStr == 'g' ? 'g' : 'pcs';
+          } else {
+            pfUnit = (unitStr.contains('гр') || unitStr == 'g') ? _pfUnitGrams : _pfUnitPcs;
+          }
+        } else {
+          product = products.cast<Product?>().firstWhere((p) => p?.getLocalizedName(lang) == name, orElse: () => null);
+          if (product == null) {
+            freeName = name;
+            freeUnit = unitStr.contains('гр') || unitStr == 'g' ? 'g' : (unitStr.contains('порц') || unitStr == 'pcs' ? 'pcs' : unitStr);
+          } else if (product.unit.toLowerCase() == 'kg' || product.unit == 'кг') {
+            for (var i = 0; i < quantities.length; i++) quantities[i] = quantities[i] / 1000;
+          }
+        }
+
+        newRows.add(_InventoryRow(
+          product: product,
+          techCard: techCard,
+          freeName: freeName,
+          freeUnit: freeUnit,
+          quantities: quantities,
+          pfUnit: pfUnit,
+        ));
+        r++;
+      }
+
+      while (r < maxRows) {
+        final a1 = _cellStr(sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: r)).value).trim();
+        if (a1.isEmpty) {
+          r++;
+          continue;
+        }
+        final a2 = _cellStr(sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: r)).value).toLowerCase();
+        if (a2.contains('брутто') || a2.contains('gross')) {
+          r++;
+          break;
+        }
+        r++;
+      }
+
+      while (r < maxRows) {
+        final name = _cellStr(sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: r)).value).trim();
+        if (name.isEmpty) break;
+        final gross = _cellNum(sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: r)).value);
+        final net = _cellNum(sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: r)).value);
+        aggregated!.add({'productName': name, 'grossGrams': gross, 'netGrams': net});
+        r++;
+      }
+      if (aggregated != null && aggregated.isEmpty) aggregated = null;
+
+      if (!mounted) return;
+      setState(() {
+        _rows.clear();
+        _rows.addAll(newRows);
+        _aggregatedFromFile = aggregated;
+        _completed = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.t('inventory_loaded').replaceAll('%s', '${newRows.length}')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${loc.t('error_with_message').replaceAll('%s', e.toString())}')),
+        );
+      }
+    }
+  }
+
   Map<String, dynamic> _buildPayload({
     required Establishment establishment,
     required Employee employee,
     required TimeOfDay endTime,
     required String lang,
+    List<Map<String, dynamic>>? aggregatedProducts,
   }) {
     final header = {
       'establishmentName': establishment.name,
@@ -399,15 +669,21 @@ class _InventoryScreenState extends State<InventoryScreen> {
               ? 'pf_${r.techCard!.id}'
               : 'free_${_rows.indexOf(r)}';
       final useGrams = r.isWeightInKg;
-      return {
+      final map = <String, dynamic>{
         'productId': id,
         'productName': r.productName(lang),
         'unit': r.unitDisplayForBlank(lang),
         'quantities': useGrams ? r.quantities.map((q) => q * 1000).toList() : r.quantities,
         'total': useGrams ? r.total * 1000 : r.total,
       };
+      if (r.isPf) map['pfUnit'] = r.pfUnit ?? _pfUnitPcs;
+      return map;
     }).toList();
-    return {'header': header, 'rows': rows};
+    return {
+      'header': header,
+      'rows': rows,
+      'aggregatedProducts': aggregatedProducts ?? [],
+    };
   }
 
   @override
@@ -708,11 +984,64 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       return _buildDataRow(loc, e.value, rowNum);
                     }),
                   ],
+                  if (_aggregatedFromFile != null && _aggregatedFromFile!.isNotEmpty) ...[
+                    const Divider(height: 24),
+                    _buildSectionHeader(loc, loc.t('inventory_pf_products_title')),
+                    _buildAggregatedHeaderRow(loc),
+                    ..._aggregatedFromFile!.asMap().entries.map((e) => _buildAggregatedDataRow(loc, e.value, e.key + 1)),
+                  ],
                 ],
               ),
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildAggregatedHeaderRow(LocalizationService loc) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: theme.dividerColor)),
+        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+      ),
+      child: Row(
+        children: [
+          SizedBox(width: _colNoWidth, child: Text(loc.t('inventory_excel_number'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+          SizedBox(width: _colGap),
+          Expanded(child: Text(loc.t('inventory_item_name'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+          SizedBox(width: _colGap),
+          SizedBox(width: 72, child: Text(loc.t('inventory_pf_gross_g'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+          SizedBox(width: _colGap),
+          SizedBox(width: 72, child: Text(loc.t('inventory_pf_net_g'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAggregatedDataRow(LocalizationService loc, Map<String, dynamic> p, int rowNumber) {
+    final theme = Theme.of(context);
+    final name = p['productName'] as String? ?? '';
+    final gross = ((p['grossGrams'] as num?)?.toDouble() ?? 0).round();
+    final net = ((p['netGrams'] as num?)?.toDouble() ?? 0).round();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
+        color: theme.colorScheme.surface,
+      ),
+      child: Row(
+        children: [
+          SizedBox(width: _colNoWidth, child: Text('$rowNumber', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant))),
+          SizedBox(width: _colGap),
+          Expanded(child: Text(name, style: theme.textTheme.bodyMedium, overflow: TextOverflow.ellipsis)),
+          SizedBox(width: _colGap),
+          SizedBox(width: 72, child: Text('$gross', style: theme.textTheme.bodyMedium)),
+          SizedBox(width: _colGap),
+          SizedBox(width: 72, child: Text('$net', style: theme.textTheme.bodyMedium)),
+        ],
       ),
     );
   }
@@ -794,7 +1123,23 @@ class _InventoryScreenState extends State<InventoryScreen> {
               ),
             ),
             SizedBox(width: _colGap),
-            SizedBox(width: _colUnitWidth, child: Text(row.unitDisplayForBlank(loc.currentLanguageCode), style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant), overflow: TextOverflow.ellipsis)),
+            SizedBox(
+              width: _colUnitWidth,
+              child: row.isPf && !_completed
+                  ? DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: row.pfUnit ?? _pfUnitPcs,
+                        isDense: true,
+                        isExpanded: true,
+                        items: [
+                          DropdownMenuItem(value: _pfUnitPcs, child: Text(loc.currentLanguageCode == 'ru' ? 'порц.' : 'pcs', style: theme.textTheme.bodyMedium, overflow: TextOverflow.ellipsis)),
+                          DropdownMenuItem(value: _pfUnitGrams, child: Text(loc.currentLanguageCode == 'ru' ? 'гр' : 'g', style: theme.textTheme.bodyMedium, overflow: TextOverflow.ellipsis)),
+                        ],
+                        onChanged: (v) => v != null ? _setPfUnit(actualIndex, v) : null,
+                      ),
+                    )
+                  : Text(row.unitDisplayForBlank(loc.currentLanguageCode), style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant), overflow: TextOverflow.ellipsis),
+            ),
             SizedBox(width: _colGap),
             Container(
               width: _colTotalWidth,
@@ -867,6 +1212,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
               ),
               const SizedBox(width: 6),
               IconButton.filledTonal(
+                onPressed: () => _loadFilledFile(context, loc),
+                icon: const Icon(Icons.upload_file, size: 20),
+                tooltip: loc.t('inventory_load_blank'),
+                style: IconButton.styleFrom(padding: const EdgeInsets.all(10), minimumSize: const Size(40, 40)),
+              ),
+              const SizedBox(width: 6),
+              IconButton.filledTonal(
                 onPressed: () => _scanReceipt(context, loc),
                 icon: const Icon(Icons.document_scanner_outlined, size: 20),
                 tooltip: '${loc.t('inventory_scan_receipt')} (${loc.t('ai_badge')})',
@@ -899,10 +1251,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
   Future<void> _showProductPicker(BuildContext context, LocalizationService loc) async {
     final productStore = context.read<ProductStoreSupabase>();
+    final account = context.read<AccountManagerSupabase>();
+    final estId = account.establishment?.id;
+    if (estId == null) return;
     await productStore.loadProducts();
+    await productStore.loadNomenclature(estId);
     if (!mounted) return;
 
-    final products = productStore.allProducts;
+    final products = productStore.getNomenclatureProducts(estId);
     if (products.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${loc.t('nomenclature')}: ${loc.t('no_products')}')),
@@ -1052,7 +1408,7 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
                 final p = _filtered[i];
                 return ListTile(
                   title: Text(p.getLocalizedName(widget.loc.currentLanguageCode)),
-                  subtitle: Text('${p.category} · ${p.unit ?? '—'}'),
+                  subtitle: Text('${p.category} · ${CulinaryUnits.displayName((p.unit ?? 'g').trim().toLowerCase(), loc.currentLanguageCode)}'),
                   onTap: () => widget.onSelect(p),
                 );
               },

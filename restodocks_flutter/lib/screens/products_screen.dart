@@ -22,6 +22,11 @@ class ProductsScreen extends StatefulWidget {
 
 enum _CatalogSort { nameAz, nameZa, priceAsc, priceDesc }
 
+/// Единица измерения для отображения в номенклатуре: кг, шт, г, л и т.д. (не сырой "pcs"/"kg" из БД).
+String _unitDisplay(String? unit, String lang) {
+  return CulinaryUnits.displayName((unit ?? 'kg').trim().toLowerCase(), lang);
+}
+
 class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   String _query = '';
@@ -819,10 +824,13 @@ class _NomenclatureTab extends StatelessWidget {
                     icon: const Icon(Icons.translate, size: 20),
                     label: Text(loc.t('translate_names_for_all').replaceAll('%s', '${needsTranslation.length}')),
                   ),
-                FilledButton.tonalIcon(
-                  onPressed: () => _verifyWithAi(context, products),
-                  icon: const Icon(Icons.auto_awesome, size: 20),
-                  label: Text(loc.t('verify_with_ai').replaceAll('%s', '${products.length}')),
+                Tooltip(
+                  message: loc.t('verify_with_ai_tooltip'),
+                  child: FilledButton.tonalIcon(
+                    onPressed: () => _verifyWithAi(context, products),
+                    icon: const Icon(Icons.auto_awesome, size: 20),
+                    label: Text(loc.t('verify_with_ai').replaceAll('%s', '${products.length}')),
+                  ),
                 ),
               ],
             ),
@@ -849,8 +857,8 @@ class _NomenclatureTab extends StatelessWidget {
                   title: Text(p.getLocalizedName(loc.currentLanguageCode)),
                   subtitle: Text(
                     (p.category == 'misc' || p.category == 'manual')
-                        ? '${p.calories?.round() ?? 0} ккал · ${p.unit ?? 'кг'}'
-                        : '${_categoryLabel(p.category)} · ${p.calories?.round() ?? 0} ккал · ${p.unit ?? 'кг'}',
+                        ? '${p.calories?.round() ?? 0} ккал · ${_unitDisplay(p.unit, loc.currentLanguageCode)}'
+                        : '${_categoryLabel(p.category)} · ${p.calories?.round() ?? 0} ккал · ${_unitDisplay(p.unit, loc.currentLanguageCode)}',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   trailing: Row(
@@ -1264,8 +1272,12 @@ class _VerifyProductsResultsDialog extends StatelessWidget {
       updated = updated.copyWith(basePrice: r.suggestedPrice);
     }
     if (r.suggestedCalories != null || r.suggestedProtein != null || r.suggestedFat != null || r.suggestedCarbs != null) {
+      final saneCal = NutritionApiService.saneCaloriesForProduct(
+        p.getLocalizedName(loc.currentLanguageCode),
+        r.suggestedCalories,
+      );
       updated = updated.copyWith(
-        calories: r.suggestedCalories ?? updated.calories,
+        calories: saneCal ?? updated.calories,
         protein: r.suggestedProtein ?? updated.protein,
         fat: r.suggestedFat ?? updated.fat,
         carbs: r.suggestedCarbs ?? updated.carbs,
@@ -1286,8 +1298,12 @@ class _VerifyProductsResultsDialog extends StatelessWidget {
       }
       if (r.suggestedPrice != null) updated = updated.copyWith(basePrice: r.suggestedPrice);
       if (r.suggestedCalories != null || r.suggestedProtein != null || r.suggestedFat != null || r.suggestedCarbs != null) {
+        final saneCal = NutritionApiService.saneCaloriesForProduct(
+          p.getLocalizedName(loc.currentLanguageCode),
+          r.suggestedCalories,
+        );
         updated = updated.copyWith(
-          calories: r.suggestedCalories ?? updated.calories,
+          calories: saneCal ?? updated.calories,
           protein: r.suggestedProtein ?? updated.protein,
           fat: r.suggestedFat ?? updated.fat,
           carbs: r.suggestedCarbs ?? updated.carbs,
@@ -1344,7 +1360,7 @@ class _VerifyProductsResultsDialog extends StatelessWidget {
                           if (r.suggestedCalories != null || r.suggestedProtein != null || r.suggestedFat != null || r.suggestedCarbs != null) ...[
                             const SizedBox(height: 2),
                             Text(
-                              'КБЖУ: ${p.calories?.round() ?? 0}/${p.protein?.round() ?? 0}/${p.fat?.round() ?? 0}/${p.carbs?.round() ?? 0} → ${r.suggestedCalories?.round() ?? 0}/${r.suggestedProtein?.round() ?? 0}/${r.suggestedFat?.round() ?? 0}/${r.suggestedCarbs?.round() ?? 0}',
+                              'КБЖУ: ${p.calories?.round() ?? 0}/${p.protein?.round() ?? 0}/${p.fat?.round() ?? 0}/${p.carbs?.round() ?? 0} → ${(NutritionApiService.saneCaloriesForProduct(p.getLocalizedName(loc.currentLanguageCode), r.suggestedCalories) ?? r.suggestedCalories)?.round() ?? 0}/${r.suggestedProtein?.round() ?? 0}/${r.suggestedFat?.round() ?? 0}/${r.suggestedCarbs?.round() ?? 0}',
                               style: Theme.of(context).textTheme.bodySmall,
                             ),
                           ],
@@ -1766,8 +1782,8 @@ class _CatalogTab extends StatelessWidget {
                             title: Text(p.getLocalizedName(loc.currentLanguageCode)),
                             subtitle: Text(
                               p.category == 'misc'
-                                  ? '${p.calories?.round() ?? 0} ккал · ${p.unit ?? 'кг'}'
-                                  : '${_categoryLabel(p.category)} · ${p.calories?.round() ?? 0} ккал · ${p.unit ?? 'кг'}',
+                                  ? '${p.calories?.round() ?? 0} ккал · ${_unitDisplay(p.unit, loc.currentLanguageCode)}'
+                                  : '${_categoryLabel(p.category)} · ${p.calories?.round() ?? 0} ккал · ${_unitDisplay(p.unit, loc.currentLanguageCode)}',
                               style: Theme.of(context).textTheme.bodySmall,
                             ),
                             trailing: Row(
@@ -1918,7 +1934,10 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
     final p = widget.product;
     _nameController = TextEditingController(text: p.name);
     _priceController = TextEditingController(text: p.basePrice?.toString() ?? '');
-    _caloriesController = TextEditingController(text: p.calories?.toString() ?? '');
+    // Подставить адекватные калории при открытии карточки (грудка 0 → 165, авокадо 655 → 160)
+    final saneCal = NutritionApiService.saneCaloriesForProduct(p.name, p.calories);
+    final initialCal = saneCal ?? p.calories;
+    _caloriesController = TextEditingController(text: initialCal?.toString() ?? '');
     _proteinController = TextEditingController(text: p.protein?.toString() ?? '');
     _fatController = TextEditingController(text: p.fat?.toString() ?? '');
     _carbsController = TextEditingController(text: p.carbs?.toString() ?? '');

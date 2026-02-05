@@ -189,8 +189,10 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
     final emp = acc.currentEmployee;
     final canEdit = emp?.canEditChecklistsAndTechCards ?? false;
     final isKitchen = emp?.department == 'kitchen' ?? false;
+    // Шеф и су-шеф могут открывать и создавать чеклисты даже с отделом «Управление»
+    final canAccessChecklists = isKitchen || canEdit;
 
-    if (emp != null && !isKitchen) {
+    if (emp != null && !canAccessChecklists) {
       return Scaffold(
         appBar: AppBar(
           leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),

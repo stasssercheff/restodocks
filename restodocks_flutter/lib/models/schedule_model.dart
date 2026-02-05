@@ -59,6 +59,8 @@ class ScheduleModel {
   final Map<String, String> assignments;
   /// Время смены: ключ "slotId_date", значение "HH:mm|HH:mm" (начало|конец), например "09:00|21:00".
   final Map<String, String> assignmentTimeRanges;
+  /// Подтверждение присутствия: ключ "slotId_date", значение "1" (присутствовал) или "0" (не вышел). Заполняет шеф/су-шеф после смены.
+  final Map<String, String> shiftConfirmations;
 
   const ScheduleModel({
     this.sections = const [],
@@ -67,6 +69,7 @@ class ScheduleModel {
     this.numWeeks = 12,
     this.assignments = const {},
     this.assignmentTimeRanges = const {},
+    this.shiftConfirmations = const {},
   });
 
   /// Цеха по умолчанию (если в сохранённых данных нет).
@@ -120,6 +123,21 @@ class ScheduleModel {
     return copyWith(assignmentTimeRanges: next);
   }
 
+  /// Подтверждение присутствия на смене: "1" — был, "0" — не вышел.
+  String? getConfirmation(String slotId, DateTime date) =>
+      shiftConfirmations[assignmentKey(slotId, date)];
+
+  ScheduleModel setConfirmation(String slotId, DateTime date, String? value) {
+    final key = assignmentKey(slotId, date);
+    final next = Map<String, String>.from(shiftConfirmations);
+    if (value == null || value.isEmpty) {
+      next.remove(key);
+    } else {
+      next[key] = value;
+    }
+    return copyWith(shiftConfirmations: next);
+  }
+
   ScheduleModel copyWith({
     List<ScheduleSection>? sections,
     List<ScheduleSlot>? slots,
@@ -127,6 +145,7 @@ class ScheduleModel {
     int? numWeeks,
     Map<String, String>? assignments,
     Map<String, String>? assignmentTimeRanges,
+    Map<String, String>? shiftConfirmations,
   }) {
     return ScheduleModel(
       sections: sections ?? this.sections,
@@ -135,6 +154,7 @@ class ScheduleModel {
       numWeeks: numWeeks ?? this.numWeeks,
       assignments: assignments ?? this.assignments,
       assignmentTimeRanges: assignmentTimeRanges ?? this.assignmentTimeRanges,
+      shiftConfirmations: shiftConfirmations ?? this.shiftConfirmations,
     );
   }
 
@@ -172,6 +192,7 @@ class ScheduleModel {
       'numWeeks': numWeeks,
       'assignments': assignments,
       'assignmentTimeRanges': assignmentTimeRanges,
+      'shiftConfirmations': shiftConfirmations,
     };
   }
 
@@ -209,6 +230,10 @@ class ScheduleModel {
     final timeRanges = timeRaw != null
         ? timeRaw.map((k, v) => MapEntry(k as String, v as String))
         : <String, String>{};
+    final confRaw = json['shiftConfirmations'] as Map<String, dynamic>?;
+    final confirmations = confRaw != null
+        ? confRaw.map((k, v) => MapEntry(k as String, v as String))
+        : <String, String>{};
     return ScheduleModel(
       sections: sections,
       slots: slots,
@@ -216,6 +241,7 @@ class ScheduleModel {
       numWeeks: json['numWeeks'] as int? ?? 12,
       assignments: assign,
       assignmentTimeRanges: timeRanges,
+      shiftConfirmations: confirmations,
     );
   }
 }

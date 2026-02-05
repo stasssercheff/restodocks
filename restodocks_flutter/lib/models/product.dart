@@ -127,11 +127,17 @@ class Product extends Equatable {
     return any ?? name;
   }
 
-  /// Безглютеновый продукт
+  /// Безглютеновый продукт (явно помечен как без глютена)
   bool get isGlutenFree => containsGluten == false;
 
-  /// Безлактозный продукт
+  /// Безлактозный продукт (явно помечен как без лактозы)
   bool get isLactoseFree => containsLactose == false;
+
+  /// Подходит под фильтр «без глютена»: не помечен как содержащий глютен (null = не исключаем).
+  bool get suitableForGlutenFreeFilter => containsGluten != true;
+
+  /// Подходит под фильтр «без лактозы»: не помечен как содержащий лактозу (null = не исключаем).
+  bool get suitableForLactoseFreeFilter => containsLactose != true;
 
   /// Информация о питательной ценности
   String get nutritionInfo {

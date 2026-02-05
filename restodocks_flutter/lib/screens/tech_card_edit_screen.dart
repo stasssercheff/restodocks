@@ -1,4 +1,6 @@
-import 'package:dropdown_search/dropdown_search.dart';
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -7,6 +9,7 @@ import '../models/models.dart';
 import '../models/culinary_units.dart';
 import '../models/tt_ingredient.dart';
 import '../services/ai_service.dart';
+import '../services/image_service.dart';
 import '../services/services.dart';
 
 /// Создание или редактирование ТТК. Ингредиенты — из номенклатуры или из других ТТК (ПФ).
@@ -407,6 +410,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   TechCard? _techCard;
   bool _loading = true;
   String? _error;
+  bool _recognizing = false; // ИИ: распознавание по фото/Excel
   final _nameController = TextEditingController();
   static const _categoryOptions = ['misc', 'vegetables', 'fruits', 'meat', 'seafood', 'dairy', 'grains', 'bakery', 'pantry', 'spices', 'beverages', 'eggs', 'legumes', 'nuts'];
   String _selectedCategory = 'misc';
@@ -627,13 +631,147 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     }
   }
 
+  /// Применить результат распознавания ИИ к форме (название, технология, ингредиенты).
+  void _applyAiResult(TechCardRecognitionResult ai) {
+    if (ai.dishName != null && ai.dishName!.trim().isNotEmpty) {
+      _nameController.text = ai.dishName!.trim();
+      final cat = _inferCategory(ai.dishName!);
+      if (_categoryOptions.contains(cat)) _selectedCategory = cat;
+    }
+    if (ai.technologyText != null && ai.technologyText!.trim().isNotEmpty) {
+      _technologyController.text = ai.technologyText!.trim();
+    }
+    if (ai.isSemiFinished != null) _isSemiFinished = ai.isSemiFinished!;
+    final canEdit = context.read<AccountManagerSupabase>().currentEmployee?.canEditChecklistsAndTechCards ?? false;
+    final hadPlaceholder = _ingredients.isNotEmpty && _ingredients.last.isPlaceholder;
+    if (ai.ingredients.isNotEmpty) {
+      _ingredients.removeWhere((e) => e.isPlaceholder);
+      for (final line in ai.ingredients) {
+        if (line.productName.trim().isEmpty) continue;
+        final gross = line.grossGrams ?? 0.0;
+        final net = line.netGrams ?? line.grossGrams ?? gross;
+        final unit = line.unit?.trim().isNotEmpty == true ? line.unit! : 'g';
+        final wastePct = (line.primaryWastePct ?? 0).clamp(0.0, 99.9);
+        _ingredients.add(TTIngredient(
+          id: DateTime.now().millisecondsSinceEpoch.toString() + _ingredients.length.toString(),
+          productId: null,
+          productName: line.productName.trim(),
+          grossWeight: gross > 0 ? gross : 100,
+          netWeight: net > 0 ? net : (gross > 0 ? gross : 100),
+          unit: unit,
+          primaryWastePct: wastePct,
+          cookingLossPctOverride: line.cookingLossPct != null ? line.cookingLossPct!.clamp(0.0, 99.9) : null,
+          isNetWeightManual: line.netGrams != null,
+          finalCalories: 0,
+          finalProtein: 0,
+          finalFat: 0,
+          finalCarbs: 0,
+          cost: 0,
+        ));
+      }
+      if (canEdit && (_ingredients.isEmpty || !_ingredients.last.isPlaceholder)) {
+        _ingredients.add(TTIngredient.emptyPlaceholder());
+      }
+    } else if (hadPlaceholder && _ingredients.isNotEmpty) {
+      // сохраняем плейсхолдер
+    } else if (canEdit && _ingredients.isEmpty) {
+      _ingredients.add(TTIngredient.emptyPlaceholder());
+    }
+  }
+
+  /// Распознать ТТК по фото и заполнить форму (только при создании новой карточки).
+  Future<void> _fillFromPhoto() async {
+    if (!_isNew || _recognizing) return;
+    final loc = context.read<LocalizationService>();
+    setState(() => _recognizing = true);
+    try {
+      final xFile = await ImageService().pickImageFromGallery();
+      if (xFile == null || !mounted) {
+        if (mounted) setState(() => _recognizing = false);
+        return;
+      }
+      final bytes = await ImageService().xFileToBytes(xFile);
+      if (bytes == null || bytes.isEmpty || !mounted) {
+        if (mounted) setState(() => _recognizing = false);
+        return;
+      }
+      final result = await context.read<AiService>().recognizeTechCardFromImage(bytes);
+      if (!mounted) {
+        setState(() => _recognizing = false);
+        return;
+      }
+      if (result == null || (result.dishName == null && result.ingredients.isEmpty)) {
+        setState(() => _recognizing = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('ai_tech_card_recognize_empty'))));
+      } else {
+        setState(() {
+          _applyAiResult(result);
+          _recognizing = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('ai_tech_card_filled'))));
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _recognizing = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))));
+      }
+    }
+  }
+
+  /// Заполнить форму из Excel (одна или первая из нескольких карточек).
+  Future<void> _fillFromExcel() async {
+    if (!_isNew || _recognizing) return;
+    final loc = context.read<LocalizationService>();
+    setState(() => _recognizing = true);
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['xlsx', 'xls'],
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty || result.files.single.bytes == null || !mounted) {
+        if (mounted) setState(() => _recognizing = false);
+        return;
+      }
+      final bytes = Uint8List.fromList(result.files.single.bytes!);
+      final list = await context.read<AiService>().parseTechCardsFromExcel(bytes);
+      if (!mounted) {
+        setState(() => _recognizing = false);
+        return;
+      }
+      if (list.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('ai_tech_card_recognize_empty'))));
+        setState(() => _recognizing = false);
+        return;
+      }
+      setState(() {
+        _applyAiResult(list.first);
+        _recognizing = false;
+      });
+      if (list.length > 1) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('ai_tech_card_filled_from_excel_many').replaceAll('%s', '${list.length}'))));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('ai_tech_card_filled'))));
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _recognizing = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))));
+      }
+    }
+  }
+
   /// [replaceIndex] — если задан, заменяем строку вместо добавления (тап по ячейке «Продукт»).
   Future<void> _showAddIngredient([int? replaceIndex]) async {
     final loc = context.read<LocalizationService>();
     final productStore = context.read<ProductStoreSupabase>();
+    final est = context.read<AccountManagerSupabase>().establishment;
+    if (est == null) return;
     await productStore.loadProducts();
+    await productStore.loadNomenclature(est.id);
 
     if (!mounted) return;
+    final nomenclatureProducts = productStore.getNomenclatureProducts(est.id);
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -657,7 +795,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
             body: TabBarView(
               children: [
                 _ProductPicker(
-                  products: productStore.allProducts,
+                  products: nomenclatureProducts,
                   onPick: (p, w, proc, waste, unit, gpp, {cookingLossPctOverride}) => _addProductIngredient(p, w, proc, waste, unit, gpp, replaceIndex: replaceIndex, cookingLossPctOverride: cookingLossPctOverride),
                 ),
                 _TechCardPicker(techCards: _pickerTechCards, onPick: (t, w, unit, gpp) => _addTechCardIngredient(t, w, unit, gpp, replaceIndex: replaceIndex)),
@@ -955,6 +1093,31 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                 ],
               ],
             ),
+            // Кнопки распознавания ИИ — только при создании новой ТТК
+            if (canEdit && _isNew) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  FilledButton.tonalIcon(
+                    onPressed: _recognizing ? null : _fillFromPhoto,
+                    icon: _recognizing ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.document_scanner, size: 20),
+                    label: Text(loc.t('ai_tech_card_from_photo')),
+                  ),
+                  FilledButton.tonalIcon(
+                    onPressed: _recognizing ? null : _fillFromExcel,
+                    icon: _recognizing ? const SizedBox.shrink() : const Icon(Icons.table_chart, size: 20),
+                    label: Text(loc.t('ai_tech_card_from_excel')),
+                  ),
+                  if (_recognizing) Padding(
+                    padding: const EdgeInsets.only(left: 8),
+                    child: Text(loc.t('loading') ?? 'Загрузка…', style: Theme.of(context).textTheme.bodySmall),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 8),
             if (constraints.maxWidth < 600)
               Padding(
@@ -1008,6 +1171,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                             onAdd: _showAddIngredient,
                             onReplaceIngredient: (i) => _showAddIngredient(i),
                             dishNameController: canEdit ? _nameController : null,
+                            technologyController: canEdit ? _technologyController : null,
                             onSuggestWaste: _suggestWasteForRow,
                             productStore: context.read<ProductStoreSupabase>(),
                             onPickProductFromSearch: _addProductIngredientAt,
@@ -1028,22 +1192,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                   ),
                 );
               },
-            ),
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text(loc.t('ttk_technology'), style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-            ),
-            TextField(
-              controller: _technologyController,
-              readOnly: !canEdit,
-              maxLines: 4,
-              decoration: InputDecoration(
-                hintText: loc.t('ttk_technology'),
-                alignLabelWithHint: true,
-                border: const OutlineInputBorder(),
-                filled: true,
-              ),
             ),
             if (canEdit) ...[
               const SizedBox(height: 16),
@@ -1084,6 +1232,7 @@ class _TtkTable extends StatefulWidget {
     this.onPickProductFromSearch,
     this.onReplaceIngredient,
     this.dishNameController,
+    this.technologyController,
     this.onSuggestWaste,
   });
 
@@ -1098,10 +1247,12 @@ class _TtkTable extends StatefulWidget {
   final ProductStoreSupabase productStore;
   /// Выбор продукта из номенклатуры по поиску (подстановка в строку, цена из карточки).
   final void Function(int index, Product product, {double? grossGrams})? onPickProductFromSearch;
-  /// Тап по ячейке «Продукт» — замена ингредиента (поиск + выбор продукта/ПФ).
+  /// Тап по ячейке «Продукт» — замена ингредиента (bottom sheet). In-cell выбор вместо DropdownSearch.
   final void Function(int i)? onReplaceIngredient;
   /// Контроллер названия блюда — первая ячейка первой строки редактируется по нему.
   final TextEditingController? dishNameController;
+  /// Контроллер поля «Технология» — колонка справа в таблице.
+  final TextEditingController? technologyController;
   /// Для ручной строки (без продукта): подсказка ИИ по проценту отхода.
   final void Function(int i)? onSuggestWaste;
 
@@ -1125,10 +1276,10 @@ class _TtkTableState extends State<_TtkTable> {
     final sym = currency == 'RUB' ? '₽' : currency == 'VND' ? '₫' : currency == 'USD' ? '\$' : currency;
 
     final hasDeleteCol = widget.canEdit;
-    // Цена из карточки продукта — колонки «Цена за 1000 гр» нет. Технология — одно поле на всю карточку под таблицей.
+    // Технология — колонка справа в таблице (rowSpan по всем строкам).
     final columnWidths = <int, TableColumnWidth>{
       0: const FixedColumnWidth(130),   // Наименование блюда
-      1: const FixedColumnWidth(200),   // Продукт (поиск по номенклатуре)
+      1: const FixedColumnWidth(200),   // Продукт (тап — bottom sheet выбора)
       2: const FixedColumnWidth(80),    // Брутто гр/шт
       3: const FixedColumnWidth(64),    // Отход %
       4: const FixedColumnWidth(80),    // Нетто гр/шт
@@ -1137,7 +1288,8 @@ class _TtkTableState extends State<_TtkTable> {
       7: const FixedColumnWidth(80),    // Выход гр/шт
       8: const FixedColumnWidth(90),    // Стоимость
       9: const FixedColumnWidth(100),   // За 1000 гр готового
-      if (hasDeleteCol) 10: const FixedColumnWidth(48),
+      10: const FlexColumnWidth(1.2),   // Технология (широкая)
+      if (hasDeleteCol) 11: const FixedColumnWidth(48),
     };
     final borderColor = theme.colorScheme.outline.withOpacity(0.8);
     return Table(
@@ -1162,10 +1314,11 @@ class _TtkTableState extends State<_TtkTable> {
             _cell(loc.t('ttk_output_gr'), bold: true),
             _cell(loc.t('ttk_cost'), bold: true),
             _cell(loc.t('ttk_cost_per_1kg_ready'), bold: true),
+            _cell(loc.t('ttk_technology'), bold: true),
             if (hasDeleteCol) _cell('', bold: true),
           ],
         ),
-        // Если ингредиентов нет — одна строка с названием блюда, подсказкой «Добавить» и технологией (всегда видимая)
+        // Если ингредиентов нет — одна строка с названием блюда, подсказкой «Добавить» и технологией справа
         if (ingredients.isEmpty)
           TableRow(
             decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerLow.withOpacity(0.6)),
@@ -1236,6 +1389,30 @@ class _TtkTableState extends State<_TtkTable> {
                   child: const Text('', style: TextStyle(fontSize: 12)),
                 ),
               )),
+              // Колонка «Технология» — в пустой таблице одна ячейка с полем
+              TableCell(
+                child: Container(
+                  constraints: const BoxConstraints(minHeight: 80),
+                  padding: _cellPad,
+                  alignment: Alignment.topLeft,
+                  child: widget.technologyController != null
+                      ? TextField(
+                          controller: widget.technologyController,
+                          readOnly: !widget.canEdit,
+                          maxLines: 4,
+                          style: const TextStyle(fontSize: 12),
+                          decoration: InputDecoration(
+                            isDense: true,
+                            hintText: loc.t('ttk_technology'),
+                            border: const OutlineInputBorder(),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                            filled: true,
+                            fillColor: theme.colorScheme.surface,
+                          ),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ),
               if (hasDeleteCol)
                 TableCell(
                   child: Container(
@@ -1277,29 +1454,19 @@ class _TtkTableState extends State<_TtkTable> {
                       ),
                     )
                   : _cell(isFirstRow ? widget.dishName : ''),
-              widget.canEdit && product == null && widget.onPickProductFromSearch != null
+              // In-cell выбор продукта: тап открывает bottom sheet (onReplaceIngredient), без выпадающего списка по всей странице
+              widget.canEdit && widget.onReplaceIngredient != null
                   ? TableCell(
-                      child: SizedBox.expand(
+                      child: InkWell(
+                        onTap: () => widget.onReplaceIngredient!(i),
                         child: Padding(
                           padding: _cellPad,
-                          child: DropdownSearch<Product>(
-                            items: (String filter, dynamic loadProps) {
-                              final all = widget.productStore.allProducts;
-                              if (filter.trim().isEmpty) return all;
-                              final f = filter.trim().toLowerCase();
-                              return all.where((p) => (p.getLocalizedName(lang) ?? p.name).toLowerCase().contains(f)).toList();
-                            },
-                            itemAsString: (p) => p.getLocalizedName(lang) ?? p.name,
-                            selectedItem: null,
-                            onChanged: (p) {
-                              if (p != null) widget.onPickProductFromSearch!(i, p);
-                            },
-                            dropdownBuilder: (context, selectedItem) => Text(
-                              selectedItem != null ? (selectedItem.getLocalizedName(lang) ?? selectedItem.name) : (ing.productName.isEmpty ? '—' : ing.productName),
-                              style: const TextStyle(fontSize: 12),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            popupProps: PopupProps.menu(showSearchBox: true, fit: FlexFit.loose),
+                          child: Text(
+                            ing.productName.isEmpty
+                                ? loc.t('ttk_choose_product')
+                                : (ing.sourceTechCardName ?? ing.productName),
+                            style: TextStyle(fontSize: 12, color: ing.productName.isEmpty ? theme.colorScheme.primary : null),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ),
@@ -1312,20 +1479,6 @@ class _TtkTableState extends State<_TtkTable> {
                               child: _EditableProductNameCell(
                                 value: ing.productName,
                                 onChanged: (s) => widget.onUpdate(i, ing.copyWith(productName: s)),
-                              ),
-                            ),
-                          ),
-                        )
-                      : widget.canEdit && widget.onReplaceIngredient != null
-                      ? TableCell(
-                          child: InkWell(
-                            onTap: () => widget.onReplaceIngredient!(i),
-                            child: Padding(
-                              padding: _cellPad,
-                              child: Text(
-                                ing.sourceTechCardName ?? ing.productName,
-                                style: const TextStyle(fontSize: 12),
-                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ),
@@ -1511,6 +1664,31 @@ class _TtkTableState extends State<_TtkTable> {
                     )
                   : _cell('${ing.cost.toStringAsFixed(2)} $sym'),
               _cell(ing.netWeight > 0 ? '${(ing.cost * 1000 / ing.netWeight).toStringAsFixed(2)} $sym' : '—'),
+              // Колонка «Технология» — только в первой строке, rowSpan на все строки + итого
+              if (isFirstRow && widget.technologyController != null)
+                TableCell(
+                  rowSpan: ingredients.length + 1,
+                  verticalAlignment: TableCellVerticalAlignment.fill,
+                  child: Container(
+                    constraints: const BoxConstraints(minHeight: 120),
+                    padding: _cellPad,
+                    alignment: Alignment.topLeft,
+                    child: TextField(
+                      controller: widget.technologyController,
+                      readOnly: !widget.canEdit,
+                      maxLines: 8,
+                      style: const TextStyle(fontSize: 12),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        hintText: loc.t('ttk_technology'),
+                        border: const OutlineInputBorder(),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                        filled: true,
+                        fillColor: theme.colorScheme.surfaceContainerLow.withOpacity(0.5),
+                      ),
+                    ),
+                  ),
+                ),
               if (hasDeleteCol)
                 TableCell(
                   child: Padding(
@@ -1526,7 +1704,7 @@ class _TtkTableState extends State<_TtkTable> {
             ],
           );
         }),
-        // Итого — жёлтая строка как в документе
+        // Итого — жёлтая строка (колонка «Технология» занята rowSpan)
         TableRow(
           decoration: BoxDecoration(color: Colors.amber.shade100),
           children: [
@@ -1807,7 +1985,7 @@ class _ProductPickerState extends State<_ProductPicker> {
               final p = list[i];
               return ListTile(
                 title: Text(p.getLocalizedName(lang)),
-                subtitle: Text('${p.calories?.round() ?? 0} ${loc.t('kcal')} · ${p.unit ?? loc.t('kg')}'),
+                subtitle: Text('${p.calories?.round() ?? 0} ${loc.t('kcal')} · ${CulinaryUnits.displayName((p.unit ?? 'kg').trim().toLowerCase(), loc.currentLanguageCode)}'),
                 onTap: () => _askWeight(p, loc),
               );
             },

@@ -25,8 +25,12 @@ class ManagementHomeContent extends StatelessWidget {
         _Tile(icon: Icons.calendar_month, title: loc.t('schedule'), onTap: () => context.push('/schedule')),
         _Tile(icon: Icons.notifications, title: loc.t('notifications'), onTap: () => context.push('/notifications')),
         _Tile(icon: Icons.people, title: loc.t('employees'), onTap: () => context.push('/employees')),
+        if (isChef || roles.contains('sous_chef'))
+          _Tile(icon: Icons.how_to_reg, title: loc.t('shift_confirmation'), onTap: () => context.push('/shift-confirmation')),
+        if (isChef) _Tile(icon: Icons.shopping_bag, title: loc.t('products'), onTap: () => context.push('/products')),
         _AiFeaturesCard(loc: loc),
-        if (employee.department == 'kitchen')
+        // Чеклисты: кухня или шеф/су-шеф (у шефа часто отдел «Управление» — иначе плитки нет)
+        if (employee.department == 'kitchen' || isChef || roles.contains('sous_chef'))
           _Tile(icon: Icons.checklist, title: loc.t('checklists'), onTap: () => context.push('/checklists')),
         _Tile(icon: Icons.description, title: isBarManager ? loc.t('ttk_bar') : loc.t('ttk_kitchen'), onTap: () => context.push('/tech-cards')),
         _Tile(icon: Icons.inventory_2, title: loc.t('nomenclature'), onTap: () => context.push('/products')),
