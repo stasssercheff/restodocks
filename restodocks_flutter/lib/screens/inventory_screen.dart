@@ -430,13 +430,45 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
-  /// Компактная шапка: минимум места, максимум площади под таблицу.
+  /// Компактная шапка: на узком экране (телефон) фильтры выносятся во вторую строку, чтобы не обрезались.
   Widget _buildHeader(
     LocalizationService loc,
     Establishment? establishment,
     Employee? employee,
   ) {
     final theme = Theme.of(context);
+    final narrow = MediaQuery.sizeOf(context).width < 420;
+    final filterDropdown = !_completed && _rows.isNotEmpty
+        ? DropdownButtonHideUnderline(
+            child: DropdownButton<_InventoryBlockFilter>(
+              value: _blockFilter,
+              isExpanded: narrow,
+              isDense: true,
+              icon: const Icon(Icons.filter_list, size: 18),
+              items: [
+                DropdownMenuItem(value: _InventoryBlockFilter.all, child: Text(loc.t('inventory_filter_all'), style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
+                DropdownMenuItem(value: _InventoryBlockFilter.productsOnly, child: Text(loc.t('inventory_block_products'), style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
+                DropdownMenuItem(value: _InventoryBlockFilter.pfOnly, child: Text(loc.t('inventory_block_pf'), style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
+              ],
+              onChanged: (v) => setState(() => _blockFilter = v ?? _InventoryBlockFilter.all),
+            ),
+          )
+        : null;
+    final sortDropdown = !_completed && _rows.isNotEmpty
+        ? DropdownButtonHideUnderline(
+            child: DropdownButton<_InventorySort>(
+              value: _sortMode,
+              isExpanded: narrow,
+              isDense: true,
+              icon: const Icon(Icons.sort, size: 18),
+              items: [
+                DropdownMenuItem(value: _InventorySort.alphabet, child: Text(loc.t('inventory_sort_alphabet'), style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
+                DropdownMenuItem(value: _InventorySort.lastAdded, child: Text(loc.t('inventory_sort_last_added'), style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
+              ],
+              onChanged: (v) => setState(() => _sortMode = v ?? _InventorySort.lastAdded),
+            ),
+          )
+        : null;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
@@ -446,72 +478,150 @@ class _InventoryScreenState extends State<InventoryScreen> {
       child: SafeArea(
         top: true,
         bottom: false,
-        child: Row(
-          children: [
-            Icon(Icons.store, size: 16, color: theme.colorScheme.primary),
-            const SizedBox(width: 4),
-            Expanded(
-              child: Text(
-                establishment?.name ?? '—',
-                style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            InkWell(
-              onTap: () => _pickDate(context),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                child: Text(
-                  '${_date.day.toString().padLeft(2, '0')}.${_date.month.toString().padLeft(2, '0')}.${_date.year}',
-                  style: theme.textTheme.bodySmall,
-                ),
-              ),
-            ),
-            const SizedBox(width: 4),
-            Text(
-              '${_startTime?.hour.toString().padLeft(2, '0') ?? '—'}:${_startTime?.minute.toString().padLeft(2, '0') ?? '—'}',
-              style: theme.textTheme.bodySmall,
-            ),
-            if (!_completed && _rows.isNotEmpty) ...[
-              const SizedBox(width: 6),
-              SizedBox(
-                width: 130,
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<_InventoryBlockFilter>(
-                    value: _blockFilter,
-                    isExpanded: true,
-                    isDense: true,
-                    icon: const Icon(Icons.filter_list, size: 18),
-                    items: [
-                      DropdownMenuItem(value: _InventoryBlockFilter.all, child: Text(loc.t('inventory_filter_all'), style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
-                      DropdownMenuItem(value: _InventoryBlockFilter.productsOnly, child: Text(loc.t('inventory_block_products'), style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
-                      DropdownMenuItem(value: _InventoryBlockFilter.pfOnly, child: Text(loc.t('inventory_block_pf'), style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
+        child: narrow
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.store, size: 16, color: theme.colorScheme.primary),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          establishment?.name ?? '—',
+                          style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      InkWell(
+                        onTap: () => _pickDate(context),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                          child: Text(
+                            '${_date.day.toString().padLeft(2, '0')}.${_date.month.toString().padLeft(2, '0')}.${_date.year}',
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${_startTime?.hour.toString().padLeft(2, '0') ?? '—'}:${_startTime?.minute.toString().padLeft(2, '0') ?? '—'}',
+                        style: theme.textTheme.bodySmall,
+                      ),
                     ],
-                    onChanged: (v) => setState(() => _blockFilter = v ?? _InventoryBlockFilter.all),
                   ),
-                ),
-              ),
-              const SizedBox(width: 4),
-              SizedBox(
-                width: 120,
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<_InventorySort>(
-                    value: _sortMode,
-                    isExpanded: true,
-                    isDense: true,
-                    icon: const Icon(Icons.sort, size: 18),
-                    items: [
-                      DropdownMenuItem(value: _InventorySort.alphabet, child: Text(loc.t('inventory_sort_alphabet'), style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
-                      DropdownMenuItem(value: _InventorySort.lastAdded, child: Text(loc.t('inventory_sort_last_added'), style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
-                    ],
-                    onChanged: (v) => setState(() => _sortMode = v ?? _InventorySort.lastAdded),
+                  if (filterDropdown != null && sortDropdown != null) ...[
+                    const SizedBox(height: 6),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () => _showFiltersSortSheet(context, loc),
+                        icon: const Icon(Icons.filter_list, size: 18),
+                        label: Text(loc.t('inventory_filters_sort'), style: const TextStyle(fontSize: 13)),
+                      ),
+                    ),
+                  ],
+                ],
+              )
+            : Row(
+                children: [
+                  Icon(Icons.store, size: 16, color: theme.colorScheme.primary),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      establishment?.name ?? '—',
+                      style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                ),
+                  InkWell(
+                    onTap: () => _pickDate(context),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                      child: Text(
+                        '${_date.day.toString().padLeft(2, '0')}.${_date.month.toString().padLeft(2, '0')}.${_date.year}',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${_startTime?.hour.toString().padLeft(2, '0') ?? '—'}:${_startTime?.minute.toString().padLeft(2, '0') ?? '—'}',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  if (filterDropdown != null) ...[
+                    const SizedBox(width: 6),
+                    SizedBox(width: 130, child: filterDropdown),
+                    const SizedBox(width: 4),
+                    SizedBox(width: 120, child: sortDropdown),
+                  ],
+                ],
               ),
-            ],
-          ],
-        ),
       ),
+    );
+  }
+
+  void _showFiltersSortSheet(BuildContext context, LocalizationService loc) {
+    final theme = Theme.of(context);
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(loc.t('inventory_filters_sort'), style: theme.textTheme.titleMedium),
+                const SizedBox(height: 12),
+                Text(loc.t('inventory_filter_label'), style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary)),
+                ..._InventoryBlockFilter.values.map((v) {
+                  final label = v == _InventoryBlockFilter.all
+                      ? loc.t('inventory_filter_all')
+                      : v == _InventoryBlockFilter.productsOnly
+                          ? loc.t('inventory_block_products')
+                          : loc.t('inventory_block_pf');
+                  return ListTile(
+                    dense: true,
+                    title: Text(label, style: const TextStyle(fontSize: 14)),
+                    leading: Radio<_InventoryBlockFilter>(
+                      value: v,
+                      groupValue: _blockFilter,
+                      onChanged: (val) => setState(() => _blockFilter = val ?? _blockFilter),
+                    ),
+                    onTap: () => setState(() => _blockFilter = v),
+                  );
+                }),
+                const SizedBox(height: 8),
+                Text(loc.t('inventory_sort_label'), style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary)),
+                ..._InventorySort.values.map((v) {
+                  final label = v == _InventorySort.alphabet ? loc.t('inventory_sort_alphabet') : loc.t('inventory_sort_last_added');
+                  return ListTile(
+                    dense: true,
+                    title: Text(label, style: const TextStyle(fontSize: 14)),
+                    leading: Radio<_InventorySort>(
+                      value: v,
+                      groupValue: _sortMode,
+                      onChanged: (val) => setState(() => _sortMode = val ?? _sortMode),
+                    ),
+                    onTap: () => setState(() => _sortMode = v),
+                  );
+                }),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    child: Text(loc.t('close')),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

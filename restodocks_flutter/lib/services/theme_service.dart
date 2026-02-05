@@ -9,7 +9,8 @@ class ThemeService extends ChangeNotifier {
   factory ThemeService() => _instance;
   ThemeService._internal();
 
-  ThemeMode _themeMode = ThemeMode.dark;
+  /// По умолчанию светлая тема (до загрузки из prefs и при отсутствии сохранённого выбора).
+  ThemeMode _themeMode = ThemeMode.light;
 
   ThemeMode get themeMode => _themeMode;
 
@@ -20,10 +21,10 @@ class ThemeService extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       final value = prefs.getString(_keyThemeMode);
-      if (value == 'light') {
-        _themeMode = ThemeMode.light;
-      } else if (value == 'dark') {
+      if (value == 'dark') {
         _themeMode = ThemeMode.dark;
+      } else {
+        _themeMode = ThemeMode.light;
       }
     } catch (_) {}
   }
