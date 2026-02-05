@@ -695,29 +695,33 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   }
 
   /// Подстановка продукта из поиска по номенклатуре в строку [replaceIndex] (или добавление новой).
+  /// Отложенный кадр, чтобы закрытие попапа DropdownSearch не приводило к Navigator.pop экрана редактирования.
   void _addProductIngredientAt(int replaceIndex, Product p, {double? grossGrams}) {
-    final loc = context.read<LocalizationService>();
-    final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'RUB';
-    final ing = TTIngredient.fromProduct(
-      product: p,
-      cookingProcess: null,
-      grossWeight: grossGrams ?? 100,
-      netWeight: null,
-      primaryWastePct: p.primaryWastePct ?? 0,
-      defaultCurrency: currency,
-      languageCode: loc.currentLanguageCode,
-      unit: p.unit ?? 'g',
-    );
-    setState(() {
-      if (replaceIndex >= 0 && replaceIndex < _ingredients.length) {
-        _ingredients[replaceIndex] = ing;
-        final canEdit = context.read<AccountManagerSupabase>().currentEmployee?.canEditChecklistsAndTechCards ?? false;
-        if (canEdit && (_ingredients.isEmpty || !_ingredients.last.isPlaceholder)) {
-          _ingredients.add(TTIngredient.emptyPlaceholder());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final loc = context.read<LocalizationService>();
+      final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'RUB';
+      final ing = TTIngredient.fromProduct(
+        product: p,
+        cookingProcess: null,
+        grossWeight: grossGrams ?? 100,
+        netWeight: null,
+        primaryWastePct: p.primaryWastePct ?? 0,
+        defaultCurrency: currency,
+        languageCode: loc.currentLanguageCode,
+        unit: p.unit ?? 'g',
+      );
+      setState(() {
+        if (replaceIndex >= 0 && replaceIndex < _ingredients.length) {
+          _ingredients[replaceIndex] = ing;
+          final canEdit = context.read<AccountManagerSupabase>().currentEmployee?.canEditChecklistsAndTechCards ?? false;
+          if (canEdit && (_ingredients.isEmpty || !_ingredients.last.isPlaceholder)) {
+            _ingredients.add(TTIngredient.emptyPlaceholder());
+          }
+        } else {
+          _ingredients.add(ing);
         }
-      } else {
-        _ingredients.add(ing);
-      }
+      });
     });
   }
 
@@ -1135,8 +1139,12 @@ class _TtkTableState extends State<_TtkTable> {
       9: const FixedColumnWidth(100),   // За 1000 гр готового
       if (hasDeleteCol) 10: const FixedColumnWidth(48),
     };
+    final borderColor = theme.colorScheme.outline.withOpacity(0.8);
     return Table(
-      border: TableBorder.all(width: 0.5, color: Colors.grey),
+      border: TableBorder.symmetric(
+        inside: BorderSide(width: 1, color: borderColor),
+        outside: BorderSide(width: 1.5, color: borderColor),
+      ),
       columnWidths: columnWidths,
       defaultColumnWidth: const FixedColumnWidth(80),
       children: [

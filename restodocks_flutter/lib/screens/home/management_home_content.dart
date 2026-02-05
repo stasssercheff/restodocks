@@ -24,6 +24,8 @@ class ManagementHomeContent extends StatelessWidget {
       children: [
         _Tile(icon: Icons.calendar_month, title: loc.t('schedule'), onTap: () => context.push('/schedule')),
         _Tile(icon: Icons.notifications, title: loc.t('notifications'), onTap: () => context.push('/notifications')),
+        _Tile(icon: Icons.people, title: loc.t('employees'), onTap: () => context.push('/employees')),
+        _AiFeaturesCard(loc: loc),
         if (employee.department == 'kitchen')
           _Tile(icon: Icons.checklist, title: loc.t('checklists'), onTap: () => context.push('/checklists')),
         _Tile(icon: Icons.description, title: isBarManager ? loc.t('ttk_bar') : loc.t('ttk_kitchen'), onTap: () => context.push('/tech-cards')),
@@ -42,11 +44,43 @@ class ManagementHomeContent extends StatelessWidget {
   }
 }
 
+/// Карточка «Умные возможности (нейросети)» — чтобы пользователь видел, что в приложении есть ИИ.
+class _AiFeaturesCard extends StatelessWidget {
+  const _AiFeaturesCard({required this.loc});
+
+  final LocalizationService loc;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.4),
+      child: ListTile(
+        leading: Icon(Icons.auto_awesome, color: Theme.of(context).colorScheme.primary),
+        title: Text(
+          loc.t('ai_features_section'),
+          style: TextStyle(fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.onSurface),
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(
+            loc.t('ai_features_hint'),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+          ),
+        ),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => context.push('/tech-cards'),
+      ),
+    );
+  }
+}
+
 class _Tile extends StatelessWidget {
-  const _Tile({required this.icon, required this.title, required this.onTap});
+  const _Tile({required this.icon, required this.title, this.subtitle, required this.onTap});
 
   final IconData icon;
   final String title;
+  final String? subtitle;
   final VoidCallback onTap;
 
   @override
@@ -56,6 +90,7 @@ class _Tile extends StatelessWidget {
       child: ListTile(
         leading: Icon(icon),
         title: Text(title),
+        subtitle: subtitle != null ? Text(subtitle!) : null,
         trailing: const Icon(Icons.chevron_right),
         onTap: onTap,
       ),

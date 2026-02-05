@@ -89,6 +89,10 @@ class AppRouter {
         builder: (context, state) => const ScheduleScreen(),
       ),
       GoRoute(
+        path: '/employees',
+        builder: (context, state) => const EmployeesScreen(),
+      ),
+      GoRoute(
         path: '/inventory',
         builder: (context, state) => const InventoryScreen(),
       ),

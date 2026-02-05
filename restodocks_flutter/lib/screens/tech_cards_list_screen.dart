@@ -125,8 +125,28 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                 },
                 itemBuilder: (_) => [
                   PopupMenuItem(value: 'new', child: Text(loc.t('create_tech_card'))),
-                  PopupMenuItem(value: 'photo', child: Text(loc.t('ai_tech_card_from_photo'))),
-                  PopupMenuItem(value: 'excel', child: Text(loc.t('ai_tech_card_from_excel'))),
+                  PopupMenuItem(
+                    value: 'photo',
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(loc.t('ai_tech_card_from_photo')),
+                        const SizedBox(width: 8),
+                        Chip(label: Text(loc.t('ai_badge'), style: const TextStyle(fontSize: 10)), padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0), materialTapTargetSize: MaterialTapTargetSize.shrinkWrap, visualDensity: VisualDensity.compact),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'excel',
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(loc.t('ai_tech_card_from_excel')),
+                        const SizedBox(width: 8),
+                        Chip(label: Text(loc.t('ai_badge'), style: const TextStyle(fontSize: 10)), padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0), materialTapTargetSize: MaterialTapTargetSize.shrinkWrap, visualDensity: VisualDensity.compact),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),

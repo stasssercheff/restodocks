@@ -92,6 +92,18 @@ class Employee extends Equatable {
   @JsonKey(name: 'avatar_url')
   final String? avatarUrl;
 
+  /// Тип оплаты: 'per_shift' — за смену, 'hourly' — почасовая.
+  @JsonKey(name: 'payment_type')
+  final String? paymentType;
+
+  /// Стоимость ставки (за смену), если payment_type == 'per_shift'.
+  @JsonKey(name: 'rate_per_shift')
+  final double? ratePerShift;
+
+  /// Стоимость часа, если payment_type == 'hourly'.
+  @JsonKey(name: 'hourly_rate')
+  final double? hourlyRate;
+
   @JsonKey(name: 'is_active')
   final bool isActive;
 
@@ -112,6 +124,9 @@ class Employee extends Equatable {
     required this.establishmentId,
     this.personalPin,
     this.avatarUrl,
+    this.paymentType,
+    this.ratePerShift,
+    this.hourlyRate,
     this.isActive = true,
     required this.createdAt,
     required this.updatedAt,
@@ -129,6 +144,9 @@ class Employee extends Equatable {
     String? establishmentId,
     String? personalPin,
     String? avatarUrl,
+    String? paymentType,
+    double? ratePerShift,
+    double? hourlyRate,
     bool? isActive,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -144,6 +162,9 @@ class Employee extends Equatable {
       establishmentId: establishmentId ?? this.establishmentId,
       personalPin: personalPin ?? this.personalPin,
       avatarUrl: avatarUrl ?? this.avatarUrl,
+      paymentType: paymentType ?? this.paymentType,
+      ratePerShift: ratePerShift ?? this.ratePerShift,
+      hourlyRate: hourlyRate ?? this.hourlyRate,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -276,6 +297,9 @@ class Employee extends Equatable {
     establishmentId,
     personalPin,
     avatarUrl,
+    paymentType,
+    ratePerShift,
+    hourlyRate,
     isActive,
     createdAt,
     updatedAt,

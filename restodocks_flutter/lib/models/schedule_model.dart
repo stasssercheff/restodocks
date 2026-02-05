@@ -55,8 +55,10 @@ class ScheduleModel {
   final DateTime startDate;
   /// Количество недель (для отображения и прокрутки).
   final int numWeeks;
-  /// Назначения: ключ "slotId_date" (date = yyyy-MM-dd), значение — имя или должность.
+  /// Назначения: ключ "slotId_date" (date = yyyy-MM-dd), значение "1" (смена) или "0" (выходной).
   final Map<String, String> assignments;
+  /// Время смены: ключ "slotId_date", значение "HH:mm|HH:mm" (начало|конец), например "09:00|21:00".
+  final Map<String, String> assignmentTimeRanges;
 
   const ScheduleModel({
     this.sections = const [],
@@ -64,6 +66,7 @@ class ScheduleModel {
     required this.startDate,
     this.numWeeks = 12,
     this.assignments = const {},
+    this.assignmentTimeRanges = const {},
   });
 
   /// Цеха по умолчанию (если в сохранённых данных нет).
@@ -90,6 +93,11 @@ class ScheduleModel {
     return assignments[assignmentKey(slotId, date)];
   }
 
+  /// Время смены "09:00|21:00" → (start, end) или null.
+  String? getTimeRange(String slotId, DateTime date) {
+    return assignmentTimeRanges[assignmentKey(slotId, date)];
+  }
+
   ScheduleModel setAssignment(String slotId, DateTime date, String? value) {
     final key = assignmentKey(slotId, date);
     final next = Map<String, String>.from(assignments);
@@ -101,12 +109,24 @@ class ScheduleModel {
     return copyWith(assignments: next);
   }
 
+  ScheduleModel setTimeRange(String slotId, DateTime date, String? start, String? end) {
+    final key = assignmentKey(slotId, date);
+    final next = Map<String, String>.from(assignmentTimeRanges);
+    if (start != null && start.isNotEmpty && end != null && end.isNotEmpty) {
+      next[key] = '$start|$end';
+    } else {
+      next.remove(key);
+    }
+    return copyWith(assignmentTimeRanges: next);
+  }
+
   ScheduleModel copyWith({
     List<ScheduleSection>? sections,
     List<ScheduleSlot>? slots,
     DateTime? startDate,
     int? numWeeks,
     Map<String, String>? assignments,
+    Map<String, String>? assignmentTimeRanges,
   }) {
     return ScheduleModel(
       sections: sections ?? this.sections,
@@ -114,6 +134,7 @@ class ScheduleModel {
       startDate: startDate ?? this.startDate,
       numWeeks: numWeeks ?? this.numWeeks,
       assignments: assignments ?? this.assignments,
+      assignmentTimeRanges: assignmentTimeRanges ?? this.assignmentTimeRanges,
     );
   }
 
@@ -150,6 +171,7 @@ class ScheduleModel {
       'startDate': _dateKey(startDate),
       'numWeeks': numWeeks,
       'assignments': assignments,
+      'assignmentTimeRanges': assignmentTimeRanges,
     };
   }
 
@@ -183,12 +205,17 @@ class ScheduleModel {
     final assign = assignRaw != null
         ? assignRaw.map((k, v) => MapEntry(k as String, v as String))
         : <String, String>{};
+    final timeRaw = json['assignmentTimeRanges'] as Map<String, dynamic>?;
+    final timeRanges = timeRaw != null
+        ? timeRaw.map((k, v) => MapEntry(k as String, v as String))
+        : <String, String>{};
     return ScheduleModel(
       sections: sections,
       slots: slots,
       startDate: start,
       numWeeks: json['numWeeks'] as int? ?? 12,
       assignments: assign,
+      assignmentTimeRanges: timeRanges,
     );
   }
 }

@@ -22,6 +22,7 @@ class OwnerHomeContent extends StatelessWidget {
           subtitle: loc.t('manage_schedule'),
           onTap: () => context.push('/schedule'),
         ),
+        _AiFeaturesCard(loc: loc),
         _Tile(icon: Icons.description, title: loc.t('tech_cards'), onTap: () => context.push('/tech-cards')),
         _Tile(icon: Icons.inventory_2, title: loc.t('nomenclature'), onTap: () => context.push('/products')),
         _Tile(icon: Icons.assignment, title: loc.t('inventory_blank'), onTap: () => context.push('/inventory')),
@@ -102,6 +103,37 @@ class _SectionTitle extends StatelessWidget {
               fontWeight: FontWeight.w600,
               color: Theme.of(context).colorScheme.primary,
             ),
+      ),
+    );
+  }
+}
+
+/// Карточка «Умные возможности (нейросети)» — видно, что в приложении есть ИИ.
+class _AiFeaturesCard extends StatelessWidget {
+  const _AiFeaturesCard({required this.loc});
+
+  final LocalizationService loc;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.4),
+      child: ListTile(
+        leading: Icon(Icons.auto_awesome, color: Theme.of(context).colorScheme.primary),
+        title: Text(
+          loc.t('ai_features_section'),
+          style: TextStyle(fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.onSurface),
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(
+            loc.t('ai_features_hint'),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+          ),
+        ),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => context.push('/tech-cards'),
       ),
     );
   }

@@ -16,5 +16,6 @@ export 'checklists_screen.dart';
 export 'checklist_edit_screen.dart';
 export 'tech_cards_list_screen.dart';
 export 'tech_card_edit_screen.dart';
+export 'employees_screen.dart';
 export 'tech_cards_import_review_screen.dart';
 export 'supabase_test_screen.dart';

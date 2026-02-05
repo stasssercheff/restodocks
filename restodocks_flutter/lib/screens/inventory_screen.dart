@@ -40,6 +40,15 @@ class _InventoryRow {
   String unitDisplay(String lang) =>
       isPf ? 'порц.' : CulinaryUnits.displayName(unit.toLowerCase(), lang);
 
+  /// В бланке инвентаризации вес показываем в граммах, не в кг.
+  bool get isWeightInKg =>
+      !isPf && (unit.toLowerCase() == 'kg' || unit == 'кг');
+  String unitDisplayForBlank(String lang) =>
+      isWeightInKg ? (lang == 'ru' ? 'гр' : 'g') : unitDisplay(lang);
+  double quantityDisplayAt(int i) =>
+      isWeightInKg ? quantities[i] * 1000 : quantities[i];
+  double get totalDisplay => isWeightInKg ? total * 1000 : total;
+
   double get total => quantities.fold(0.0, (a, b) => a + b);
 }
 
@@ -389,12 +398,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
           : r.techCard != null
               ? 'pf_${r.techCard!.id}'
               : 'free_${_rows.indexOf(r)}';
+      final useGrams = r.isWeightInKg;
       return {
         'productId': id,
         'productName': r.productName(lang),
-        'unit': r.unitDisplay(lang),
-        'quantities': r.quantities,
-        'total': r.total,
+        'unit': r.unitDisplayForBlank(lang),
+        'quantities': useGrams ? r.quantities.map((q) => q * 1000).toList() : r.quantities,
+        'total': useGrams ? r.total * 1000 : r.total,
       };
     }).toList();
     return {'header': header, 'rows': rows};
@@ -784,12 +794,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
               ),
             ),
             SizedBox(width: _colGap),
-            SizedBox(width: _colUnitWidth, child: Text(row.unitDisplay(loc.currentLanguageCode), style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant), overflow: TextOverflow.ellipsis)),
+            SizedBox(width: _colUnitWidth, child: Text(row.unitDisplayForBlank(loc.currentLanguageCode), style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant), overflow: TextOverflow.ellipsis)),
             SizedBox(width: _colGap),
             Container(
               width: _colTotalWidth,
               padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Text(_formatQty(row.total), style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+              child: Text(_formatQty(row.totalDisplay), style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
             ),
             SizedBox(width: _colGap),
             ...List.generate(
@@ -800,9 +810,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   width: _colQtyWidth,
                   child: colIndex < qtyCols
                       ? (_completed
-                          ? Text(_formatQty(row.quantities[colIndex]), style: theme.textTheme.bodyMedium)
+                          ? Text(_formatQty(row.quantityDisplayAt(colIndex)), style: theme.textTheme.bodyMedium)
                           : _QtyCell(
                               value: row.quantities[colIndex],
+                              useGrams: row.isWeightInKg,
                               onChanged: (v) => _setQuantity(actualIndex, colIndex, v),
                             ))
                       : const SizedBox.shrink(),
@@ -858,7 +869,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
               IconButton.filledTonal(
                 onPressed: () => _scanReceipt(context, loc),
                 icon: const Icon(Icons.document_scanner_outlined, size: 20),
-                tooltip: loc.t('inventory_scan_receipt'),
+                tooltip: '${loc.t('inventory_scan_receipt')} (${loc.t('ai_badge')})',
                 style: IconButton.styleFrom(padding: const EdgeInsets.all(10), minimumSize: const Size(40, 40)),
               ),
               const SizedBox(width: 6),
@@ -917,9 +928,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
 class _QtyCell extends StatefulWidget {
   final double value;
+  /// true: отображать и вводить в граммах (значение хранится в кг, показываем value*1000).
+  final bool useGrams;
   final void Function(double) onChanged;
 
-  const _QtyCell({required this.value, required this.onChanged});
+  const _QtyCell({required this.value, this.useGrams = false, required this.onChanged});
 
   @override
   State<_QtyCell> createState() => _QtyCellState();
@@ -929,24 +942,26 @@ class _QtyCellState extends State<_QtyCell> {
   late TextEditingController _controller;
   final FocusNode _focus = FocusNode();
 
+  double get _displayValueRaw => widget.useGrams ? widget.value * 1000 : widget.value;
+
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: _displayValue(widget.value));
+    _controller = TextEditingController(text: _displayValue(_displayValueRaw));
   }
 
   @override
   void didUpdateWidget(_QtyCell old) {
     super.didUpdateWidget(old);
-    if (old.value != widget.value && !_focus.hasFocus) {
-      _controller.text = _displayValue(widget.value);
+    if ((old.value != widget.value || old.useGrams != widget.useGrams) && !_focus.hasFocus) {
+      _controller.text = _displayValue(widget.useGrams ? widget.value * 1000 : widget.value);
     }
   }
 
   String _displayValue(double v) {
     if (v == 0) return '';
     if (v == v.truncateToDouble()) return v.toInt().toString();
-    return v.toStringAsFixed(1);
+    return v.toStringAsFixed(widget.useGrams ? 0 : 1);
   }
 
   @override
@@ -974,7 +989,7 @@ class _QtyCellState extends State<_QtyCell> {
       ),
       onChanged: (s) {
         final v = double.tryParse(s.replaceFirst(',', '.')) ?? 0;
-        widget.onChanged(v);
+        widget.onChanged(widget.useGrams ? v / 1000 : v);
       },
     );
   }
