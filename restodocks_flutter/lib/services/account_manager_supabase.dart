@@ -191,6 +191,7 @@ class AccountManagerSupabase {
     employeeData.remove('id');
     employeeData.remove('created_at');
     employeeData.remove('updated_at');
+    employeeData.remove('avatar_url'); // колонка может отсутствовать в схеме — не передаём
 
     final response = await _supabase.insertData('employees', employeeData);
     final createdEmployee = Employee.fromJson(response);
@@ -371,7 +372,8 @@ class AccountManagerSupabase {
     try {
       final employeeData = employee.toJson()
         ..remove('password')
-        ..remove('password_hash');
+        ..remove('password_hash')
+        ..remove('avatar_url'); // колонка может отсутствовать в схеме
 
       await _supabase.updateData(
         'employees',
