@@ -1275,8 +1275,12 @@ class _TtkTableState extends State<_TtkTable> {
                         child: Padding(
                           padding: _cellPad,
                           child: DropdownSearch<Product>(
-                            items: widget.productStore.allProducts,
-                            filterFn: (p, f) => (p.getLocalizedName(lang) ?? p.name).toLowerCase().contains((f ?? '').toLowerCase()),
+                            items: (String filter, dynamic loadProps) {
+                              final all = widget.productStore.allProducts;
+                              if (filter.trim().isEmpty) return all;
+                              final f = filter.trim().toLowerCase();
+                              return all.where((p) => (p.getLocalizedName(lang) ?? p.name).toLowerCase().contains(f)).toList();
+                            },
                             itemAsString: (p) => p.getLocalizedName(lang) ?? p.name,
                             selectedItem: null,
                             onChanged: (p) {
