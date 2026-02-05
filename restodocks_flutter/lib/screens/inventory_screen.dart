@@ -495,12 +495,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
     if (v == null) return '';
     if (v is TextCellValue) {
       final val = v.value;
-      if (val is String) return val;
       try {
         final t = (val as dynamic).text;
         if (t != null) return t is String ? t : t.toString();
       } catch (_) {}
-      return val.toString();
+      return val is String ? val : (val ?? '').toString();
     }
     if (v is IntCellValue) return v.value.toString();
     if (v is DoubleCellValue) return v.value.toString();
@@ -586,7 +585,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           if (product == null) {
             freeName = name;
             freeUnit = unitStr.contains('гр') || unitStr == 'g' ? 'g' : (unitStr.contains('порц') || unitStr == 'pcs' ? 'pcs' : unitStr);
-          } else if (product.unit.toLowerCase() == 'kg' || product.unit == 'кг') {
+          } else if ((product.unit ?? '').toLowerCase() == 'kg' || product.unit == 'кг') {
             for (var i = 0; i < quantities.length; i++) quantities[i] = quantities[i] / 1000;
           }
         }
@@ -639,9 +638,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${loc.t('error_with_message').replaceAll('%s', e.toString())}')),
-        );
+        final errMsg = loc.t('error_with_message').replaceAll('%s', e.toString());
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errMsg)));
       }
     }
   }
@@ -1408,7 +1406,7 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
                 final p = _filtered[i];
                 return ListTile(
                   title: Text(p.getLocalizedName(widget.loc.currentLanguageCode)),
-                  subtitle: Text('${p.category} · ${CulinaryUnits.displayName((p.unit ?? 'g').trim().toLowerCase(), loc.currentLanguageCode)}'),
+                  subtitle: Text('${p.category} · ${CulinaryUnits.displayName((p.unit ?? 'g').trim().toLowerCase(), widget.loc.currentLanguageCode)}'),
                   onTap: () => widget.onSelect(p),
                 );
               },

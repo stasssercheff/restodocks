@@ -1667,7 +1667,6 @@ class _TtkTableState extends State<_TtkTable> {
               // Колонка «Технология» — только в первой строке, rowSpan на все строки + итого
               if (isFirstRow && widget.technologyController != null)
                 TableCell(
-                  rowSpan: ingredients.length + 1,
                   verticalAlignment: TableCellVerticalAlignment.fill,
                   child: Container(
                     constraints: const BoxConstraints(minHeight: 120),
