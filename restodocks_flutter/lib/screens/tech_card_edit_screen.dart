@@ -894,6 +894,20 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
               ],
             ),
             const SizedBox(height: 8),
+            if (constraints.maxWidth < 600)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  children: [
+                    Icon(Icons.swipe, size: 18, color: Theme.of(context).colorScheme.primary),
+                    const SizedBox(width: 6),
+                    Text(
+                      loc.t('ttk_scroll_hint'),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.primary),
+                    ),
+                  ],
+                ),
+              ),
             // Таблица: высота растёт с числом строк (шапка + строки + итого), но не больше ~70% экрана; при 20+ ингредиентах прокрутка внутри
             LayoutBuilder(
               builder: (context, c) {
@@ -910,7 +924,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                   scrollDirection: Axis.horizontal,
                   child: SingleChildScrollView(
                     child: ConstrainedBox(
-                      constraints: const BoxConstraints(minWidth: 1400),
+                      constraints: const BoxConstraints(minWidth: 1450),
                       child: canEdit
                         ? _TtkTable(
                             loc: loc,
@@ -1059,25 +1073,26 @@ class _TtkTableState extends State<_TtkTable> {
 
     const colCount = 12;
     final hasDeleteCol = widget.canEdit;
-    final totalCols = hasDeleteCol ? colCount + 1 : colCount;
+    // Фиксированные ширины колонок, чтобы ввод был удобен во всех ячейках (как в Excel)
+    final columnWidths = <int, TableColumnWidth>{
+      0: const FixedColumnWidth(130),   // Наименование блюда
+      1: const FixedColumnWidth(200),   // Продукт
+      2: const FixedColumnWidth(80),    // Брутто гр/шт
+      3: const FixedColumnWidth(64),    // Отход %
+      4: const FixedColumnWidth(80),    // Нетто гр/шт
+      5: const FixedColumnWidth(140),   // Способ приготовления
+      6: const FixedColumnWidth(64),    // Ужарка %
+      7: const FixedColumnWidth(80),    // Выход гр/шт
+      8: const FixedColumnWidth(95),    // Цена за кг/шт
+      9: const FixedColumnWidth(90),    // Стоимость
+      10: const FixedColumnWidth(100),  // Цена за 1 кг/шт блюда
+      11: const FixedColumnWidth(260),  // Технология
+      if (hasDeleteCol) 12: const FixedColumnWidth(48),
+    };
     return Table(
       border: TableBorder.all(width: 0.5, color: Colors.grey),
-      columnWidths: {
-        0: const FlexColumnWidth(1.4),   // Наименование блюда
-        1: const FlexColumnWidth(2.2),   // Продукт (поиск + список)
-        2: const FlexColumnWidth(0.9),   // Брутто гр/шт
-        3: const FlexColumnWidth(0.6),   // Отход %
-        4: const FlexColumnWidth(0.9),   // Нетто гр/шт
-        5: const FlexColumnWidth(1.4),   // Способ приготовления
-        6: const FlexColumnWidth(0.6),   // Ужарка %
-        7: const FlexColumnWidth(0.9),   // Выход гр/шт
-        8: const FlexColumnWidth(1.0),   // Цена за кг/шт
-        9: const FlexColumnWidth(0.9),   // Стоимость
-        10: const FlexColumnWidth(1.0),  // Цена за 1 кг/шт блюда
-        11: const FlexColumnWidth(2.0),  // Технология
-        if (hasDeleteCol) 12: const FlexColumnWidth(0.4),
-      },
-      defaultColumnWidth: const FlexColumnWidth(0.6),
+      columnWidths: columnWidths,
+      defaultColumnWidth: const FixedColumnWidth(80),
       children: [
         // Серая шапка как в документе
         TableRow(
@@ -1098,45 +1113,102 @@ class _TtkTableState extends State<_TtkTable> {
             if (hasDeleteCol) _cell('', bold: true),
           ],
         ),
-        // Если ингредиентов нет — одна строка с названием блюда и технологией (всегда показываем при пустом составе)
+        // Если ингредиентов нет — одна строка с названием блюда, подсказкой «Добавить» и технологией (всегда видимая)
         if (ingredients.isEmpty)
           TableRow(
+            decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerLow.withOpacity(0.6)),
             children: [
               widget.canEdit && widget.dishNameController != null
                   ? TableCell(
-                      child: SizedBox.expand(
+                      child: Container(
+                        constraints: const BoxConstraints(minHeight: 56),
                         child: Padding(
                           padding: _cellPad,
                           child: TextField(
                             controller: widget.dishNameController,
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               isDense: true,
-                              border: InputBorder.none,
-                              contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                              border: const OutlineInputBorder(),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
                               filled: true,
-                              fillColor: Colors.transparent,
+                              fillColor: theme.colorScheme.surface,
+                              hintText: loc.t('dish_name'),
                             ),
                             style: const TextStyle(fontSize: 12),
                           ),
                         ),
                       ),
                     )
-                  : _cell(widget.dishName),
-              ...List.generate(10, (_) => _cell('')),
-              widget.technologyField != null
+                  : TableCell(
+                      child: Container(
+                        constraints: const BoxConstraints(minHeight: 56),
+                        padding: _cellPad,
+                        alignment: Alignment.centerLeft,
+                        child: Text(widget.dishName, style: const TextStyle(fontSize: 12)),
+                      ),
+                    ),
+              // Ячейка «Продукт» — явная кнопка «Добавить ингредиент», чтобы было видно, куда вводить
+              widget.canEdit
                   ? TableCell(
-                      verticalAlignment: TableCellVerticalAlignment.fill,
-                      child: SizedBox.expand(
-                        child: Container(
-                          constraints: const BoxConstraints(minHeight: 80),
-                          padding: _cellPad,
-                          alignment: Alignment.topLeft,
-                          child: widget.technologyField,
+                      child: Container(
+                        constraints: const BoxConstraints(minHeight: 56),
+                        child: InkWell(
+                          onTap: widget.onAdd,
+                          child: Padding(
+                            padding: _cellPad,
+                            child: Center(
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.add_circle_outline, size: 20, color: theme.colorScheme.primary),
+                                  const SizedBox(width: 8),
+                                  Flexible(
+                                    child: Text(
+                                      loc.t('ttk_add_ingredient_hint'),
+                                      style: TextStyle(fontSize: 12, color: theme.colorScheme.primary),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     )
-                  : _cell(''),
-              if (hasDeleteCol) _cell(''),
+                  : TableCell(child: Padding(padding: _cellPad, child: Text('', style: const TextStyle(fontSize: 12)))),
+              ...List.generate(9, (_) => TableCell(
+                child: Container(
+                  constraints: const BoxConstraints(minHeight: 56),
+                  padding: _cellPad,
+                  child: const Text('', style: TextStyle(fontSize: 12)),
+                ),
+              )),
+              widget.technologyField != null
+                  ? TableCell(
+                      verticalAlignment: TableCellVerticalAlignment.fill,
+                      child: Container(
+                        constraints: const BoxConstraints(minHeight: 100),
+                        padding: _cellPad,
+                        alignment: Alignment.topLeft,
+                        child: widget.technologyField,
+                      ),
+                    )
+                  : TableCell(
+                      child: Container(
+                        constraints: const BoxConstraints(minHeight: 56),
+                        padding: _cellPad,
+                        child: const Text('', style: TextStyle(fontSize: 12)),
+                      ),
+                    ),
+              if (hasDeleteCol)
+                TableCell(
+                  child: Container(
+                    constraints: const BoxConstraints(minHeight: 56),
+                    padding: _cellPad,
+                    child: const Text('', style: TextStyle(fontSize: 12)),
+                  ),
+                ),
             ],
           ),
         ...ingredients.asMap().entries.map((e) {
@@ -1563,11 +1635,11 @@ class _TtkCookTableState extends State<_TtkCookTable> {
     return Table(
       border: TableBorder.all(width: 0.5, color: Colors.grey),
       columnWidths: const {
-        0: FlexColumnWidth(1.2),
-        1: FlexColumnWidth(2),
-        2: FlexColumnWidth(0.9),
-        3: FlexColumnWidth(1.2),
-        4: FlexColumnWidth(0.9),
+        0: FixedColumnWidth(150),
+        1: FixedColumnWidth(220),
+        2: FixedColumnWidth(90),
+        3: FixedColumnWidth(140),
+        4: FixedColumnWidth(90),
       },
       children: [
         TableRow(
