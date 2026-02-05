@@ -1,5 +1,5 @@
 // Supabase Edge Function: распознавание продукта по вводу (нормализация, категория, единица)
-import "jsr:@supabase/functions-js/edge_runtime.d.ts";
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { chatText } from "../_shared/ai_provider.ts";
 
 function corsHeaders(origin: string | null) {

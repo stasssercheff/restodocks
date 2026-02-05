@@ -1,5 +1,5 @@
 // Supabase Edge Function: распознавание чека по фото (OpenAI Vision)
-import "jsr:@supabase/functions-js/edge_runtime.d.ts";
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
 

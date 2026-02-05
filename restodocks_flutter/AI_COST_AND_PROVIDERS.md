@@ -2,12 +2,17 @@
 
 ## Платно ли?
 
-**На старте можно обойтись без оплаты.** В Edge Functions включён выбор провайдера:
+**На старте можно обойтись без оплаты.** В Edge Functions включён выбор провайдера для **текста** (чеклист, продукт, КБЖУ, верификация, ТТК из Excel). Для **фото** (чек, ТТК из фото) пока только OpenAI.
 
-- **GigaChat (приоритет):** при заданном `GIGACHAT_AUTH_KEY` все **текстовые** задачи (чеклист, продукт, КБЖУ, верификация, ТТК из Excel) идут в GigaChat. Для физлиц — **1 000 000 токенов в год бесплатно**.
-- **OpenAI:** нужен для задач с **картинками** (чек из фото, ТТК из фото). Если задан только `OPENAI_API_KEY` — и текст, и картинки идут в OpenAI (оплата по факту за токены и изображения).
+| Провайдер | Бесплатно на старте? | Секрет в Supabase |
+|-----------|----------------------|-------------------|
+| **GigaChat** | Да, 1 млн токенов/год (физлица) | `GIGACHAT_AUTH_KEY` (Base64 от ClientID:ClientSecret) |
+| **Google Gemini** | Да, лимиты бесплатного tier, ключ без карты | `GEMINI_API_KEY` (ключ из [aistudio.google.com](https://aistudio.google.com)) |
+| **OpenAI** | Нет, оплата по факту | `OPENAI_API_KEY` |
+| **Claude (Anthropic)** | Нет, API платный | `ANTHROPIC_API_KEY` |
+| **Yandex GPT** | Гранты/триал в Yandex Cloud | Пока не подключён (можно добавить по аналогии) |
 
-Приложение само по себе не списывает деньги — платит владелец ключа (GigaChat и/или OpenAI).
+Приоритет текстовых задач: если задан `AI_PROVIDER` — используется он; иначе GigaChat → Gemini → Claude → OpenAI (по первому заданному ключу). Фото — только OpenAI.
 
 ---
 
@@ -28,7 +33,7 @@
 - **GPT-4o** — мультимодальная (текст + изображения), нужна для «фото → структурированные данные».
 - **GPT-4o-mini** — быстрая и дешевая модель для чисто текстовых задач.
 
-Альтернативы на будущее: те же сценарии можно перевести на **Claude** (Anthropic), **Gemini** (Google), **GigaChat**, **Yandex GPT** или **Azure OpenAI** — для этого нужно будет заменить вызовы в Edge Functions и, при необходимости, формат запросов/ответов.
+**Уже подключены в общем слое** (`_shared/ai_provider.ts`): GigaChat, OpenAI, **Google Gemini**, **Anthropic Claude**. Текстовые Edge Functions автоматически используют выбранный провайдер. Yandex GPT можно добавить по той же схеме (IAM-токен или API-ключ в Yandex Cloud).
 
 ---
 
@@ -71,15 +76,25 @@
 
 Чтобы использовать в Restodocks: добавить в Edge Functions вызовы API Yandex Cloud (IAM-токен или API-ключ), адаптировать формат под текущий контракт приложения (JSON на вход/выход).
 
+### Google Gemini (уже в коде)
+
+- **Бесплатный tier:** лимиты по запросам/токенам в день, ключ из [Google AI Studio](https://aistudio.google.com), карта не нужна.
+- В Supabase задать секрет `GEMINI_API_KEY` — текстовые задачи пойдут в Gemini (если не задан GigaChat или не указан `AI_PROVIDER=gigachat`).
+
+### Claude (Anthropic) (уже в коде)
+
+- **API платный**, бесплатного tier для API нет. Ключ в [console.anthropic.com](https://console.anthropic.com).
+- Секрет `ANTHROPIC_API_KEY` — можно выставить `AI_PROVIDER=claude`, чтобы текст шёл в Claude.
+
 ### Итог
 
 | Вариант | Условия | Подходит для |
 |--------|--------|----------------|
-| **OpenAI** (текущий) | Платно, $ за токены | Любой регион, максимум возможностей |
-| **GigaChat** | 1 млн токенов/год бесплатно (физлица), потом пакеты в ₽ | РФ, экономия, в т.ч. «фото → данные» |
-| **Yandex GPT** | Платно в ₽, часто дешевле OpenAI, гранты | РФ/СНГ, интеграция с Yandex Cloud |
-
-Код сейчас рассчитан только на OpenAI; добавление GigaChat или Yandex GPT — это отдельная реализация вызовов в каждой Edge Function (или общий слой «провайдер ИИ» с разными бэкендами).
+| **GigaChat** | 1 млн токенов/год бесплатно (физлица) | РФ, бесплатный старт |
+| **Gemini** | Бесплатный tier, ключ без карты | Любой регион, бесплатный старт |
+| **OpenAI** | Платно, $ за токены | Фото + текст, максимум возможностей |
+| **Claude** | Платно | Альтернатива OpenAI по тексту |
+| **Yandex GPT** | Платно в ₽, гранты | РФ/СНГ (пока не в коде) |
 
 ---
 
@@ -97,7 +112,12 @@
 
 ## Где хранить ключи
 
-- **OPENAI_API_KEY** задаётся в Supabase (секреты Edge Functions), не в приложении.
-- Инструкция: `restodocks_flutter/supabase/functions/README.md` и `SETUP_SUPABASE.md`.
+Все ключи задаются в **Supabase → Project Settings → Edge Functions → Secrets** (или через `supabase secrets set`). В приложении ключей нет.
 
-Так ключ не попадает в клиент и не светится в репозитории.
+- `GIGACHAT_AUTH_KEY` — GigaChat (Base64)
+- `GEMINI_API_KEY` — Google AI Studio
+- `OPENAI_API_KEY` — OpenAI (обязателен для фото)
+- `ANTHROPIC_API_KEY` — Claude
+- `AI_PROVIDER` — опционально: `gigachat` | `openai` | `gemini` | `claude`
+
+Подробнее: `restodocks_flutter/supabase/functions/README.md` и `SETUP_SUPABASE.md`.

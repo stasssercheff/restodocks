@@ -1,5 +1,5 @@
 // Supabase Edge Function: верификация продукта для сверки по списку (цена, КБЖУ, название)
-import "jsr:@supabase/functions-js/edge_runtime.d.ts";
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { chatText } from "../_shared/ai_provider.ts";
 
 function corsHeaders(origin: string | null) {

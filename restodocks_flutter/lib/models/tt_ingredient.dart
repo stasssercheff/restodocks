@@ -386,6 +386,7 @@ class TTIngredient extends Equatable {
     return copyWith(
       primaryWastePct: waste,
       netWeight: newNetWeight,
+      isNetWeightManual: false,
       finalCalories: newCalories,
       finalProtein: newProtein,
       finalFat: newFat,
@@ -414,7 +415,7 @@ class TTIngredient extends Equatable {
     return scaleBy(newNetWeight / netWeight);
   }
 
-  /// Обновить нетто вес вручную
+  /// Обновить нетто вес вручную (просто подстановка нетто без пересчёта отхода/ужарки)
   TTIngredient updateNetWeight(double newNetWeight, Product? product) {
     if (product == null) {
       return copyWith(netWeight: newNetWeight, isNetWeightManual: true);
@@ -435,6 +436,33 @@ class TTIngredient extends Equatable {
       finalFat: baseFat * ratio,
       finalCarbs: baseCarbs * ratio,
     );
+  }
+
+  /// Пользователь ввёл «нетто» (вес после отхода, до приготовления) → пересчёт % отхода и выхода.
+  /// Нетто = брутто × (1 − отход/100). Отсюда отход = (1 − нетто/брутто)×100.
+  TTIngredient updateEffectiveGross(double newEffectiveGross, Product? product, CookingProcess? cookingProcess, {String languageCode = 'ru'}) {
+    if (grossWeight <= 0) return this;
+    final eff = newEffectiveGross.clamp(0.0, grossWeight);
+    final wastePct = (1.0 - eff / grossWeight) * 100.0;
+    final waste = wastePct.clamp(0.0, 99.9);
+    if (product == null) {
+      return copyWith(primaryWastePct: waste, netWeight: eff, isNetWeightManual: false);
+    }
+    return updatePrimaryWastePct(waste, product, cookingProcess);
+  }
+
+  /// Пользователь ввёл «выход» (вес после приготовления) → пересчёт % ужарки.
+  /// Выход = нетто_после_отхода × (1 − ужарка/100). Отсюда ужарка = (1 − выход/effectiveGross)×100.
+  TTIngredient updateOutputWeight(double newOutput, Product? product, CookingProcess? cookingProcess, {String languageCode = 'ru'}) {
+    if (product == null || cookingProcess == null) {
+      return copyWith(netWeight: newOutput.clamp(0.0, double.infinity), isNetWeightManual: true);
+    }
+    final effectiveGross = effectiveGrossWeight;
+    if (effectiveGross <= 0) return copyWith(netWeight: newOutput.clamp(0.0, double.infinity), isNetWeightManual: true);
+    final out = newOutput.clamp(0.0, effectiveGross);
+    final lossPct = (1.0 - out / effectiveGross) * 100.0;
+    final loss = lossPct.clamp(0.0, 99.9);
+    return updateCookingLossPct(loss, product, cookingProcess, languageCode: languageCode);
   }
 
   /// Обновить технологический процесс

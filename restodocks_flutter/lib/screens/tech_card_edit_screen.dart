@@ -241,17 +241,17 @@ class _EditableGrossCellState extends State<_EditableGrossCell> {
   }
 }
 
-/// Редактируемая ячейка «Цена за кг» (пересчёт стоимости из цены и нетто)
+/// Редактируемая ячейка «Цена за 1000 гр» (стоимость = цена × брутто/1000)
 class _EditablePricePerKgCell extends StatefulWidget {
   const _EditablePricePerKgCell({
     required this.pricePerKg,
-    required this.netWeight,
+    required this.grossWeight,
     required this.symbol,
     required this.onChanged,
   });
 
   final double pricePerKg;
-  final double netWeight;
+  final double grossWeight;
   final String symbol;
   final void Function(double? cost) onChanged;
 
@@ -284,8 +284,8 @@ class _EditablePricePerKgCellState extends State<_EditablePricePerKgCell> {
 
   void _submit() {
     final v = double.tryParse(_ctrl.text.replaceFirst(',', '.'));
-    if (v != null && v >= 0 && widget.netWeight > 0) {
-      widget.onChanged(v * widget.netWeight / 1000);
+    if (v != null && v >= 0 && widget.grossWeight > 0) {
+      widget.onChanged(v * widget.grossWeight / 1000);
     }
   }
 
@@ -1105,9 +1105,9 @@ class _TtkTableState extends State<_TtkTable> {
       5: const FixedColumnWidth(140),   // Способ приготовления
       6: const FixedColumnWidth(64),    // Ужарка %
       7: const FixedColumnWidth(80),    // Выход гр/шт
-      8: const FixedColumnWidth(95),    // Цена за кг/шт
+      8: const FixedColumnWidth(95),    // Цена за 1000 гр/шт
       9: const FixedColumnWidth(90),    // Стоимость
-      10: const FixedColumnWidth(100),  // Цена за 1 кг/шт блюда
+      10: const FixedColumnWidth(100),  // За 1000 гр готового
       11: const FixedColumnWidth(260),  // Технология
       if (hasDeleteCol) 12: const FixedColumnWidth(48),
     };
@@ -1130,7 +1130,7 @@ class _TtkTableState extends State<_TtkTable> {
             _cell(loc.t('ttk_output_gr'), bold: true),
             _cell(loc.t('ttk_price_per_kg'), bold: true),
             _cell(loc.t('ttk_cost'), bold: true),
-            _cell(loc.t('ttk_price_per_1kg_dish_full'), bold: true),
+            _cell(loc.t('ttk_cost_per_1kg_ready'), bold: true),
             _cell(loc.t('ttk_technology'), bold: true),
             if (hasDeleteCol) _cell('', bold: true),
           ],
@@ -1354,21 +1354,17 @@ class _TtkTableState extends State<_TtkTable> {
                         child: Padding(
                           padding: _cellPad,
                           child: _EditableNetCell(
-                            value: ing.netWeight,
+                            value: ing.effectiveGrossWeight,
                             onChanged: (v) {
                               if (v != null && v >= 0) {
-                                if (product != null) {
-                                  widget.onUpdate(i, ing.updateNetWeight(v, product));
-                                } else {
-                                  widget.onUpdate(i, ing.copyWith(netWeight: v, isNetWeightManual: true));
-                                }
+                                widget.onUpdate(i, ing.updateEffectiveGross(v, product, proc, languageCode: lang));
                               }
                             },
                           ),
                         ),
                       ),
                     )
-                  : _cell('${nettoG.toStringAsFixed(0)}'),
+                  : _cell('${ing.effectiveGrossWeight.toStringAsFixed(0)}'),
               widget.canEdit
                   ? TableCell(
                       child: SizedBox.expand(
@@ -1449,7 +1445,9 @@ class _TtkTableState extends State<_TtkTable> {
                           child: _EditableNetCell(
                             value: ing.netWeight,
                             onChanged: (v) {
-                              if (v != null && v >= 0) widget.onUpdate(i, ing.updateNetWeight(v, product));
+                              if (v != null && v >= 0) {
+                                widget.onUpdate(i, ing.updateOutputWeight(v, product, proc, languageCode: lang));
+                              }
                             },
                           ),
                         ),
@@ -1463,7 +1461,7 @@ class _TtkTableState extends State<_TtkTable> {
                           padding: _cellPad,
                           child: _EditablePricePerKgCell(
                           pricePerKg: pricePerUnit,
-                          netWeight: ing.netWeight,
+                          grossWeight: ing.grossWeight,
                           symbol: sym,
                           onChanged: (cost) {
                             if (cost != null && cost >= 0) widget.onUpdate(i, ing.copyWith(cost: cost));
@@ -1489,7 +1487,7 @@ class _TtkTableState extends State<_TtkTable> {
                       ),
                     )
                   : _cell('${ing.cost.toStringAsFixed(2)} $sym'),
-              _cell(pricePerKgDish.toStringAsFixed(2) + ' $sym'),
+              _cell(ing.netWeight > 0 ? '${(ing.cost * 1000 / ing.netWeight).toStringAsFixed(2)} $sym' : '—'),
               // Технология — только в первой строке, высокая ячейка
               isFirstRow && widget.technologyField != null
                   ? TableCell(

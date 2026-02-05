@@ -1,5 +1,5 @@
 // Supabase Edge Function: распознавание ТТК по фото карточки (vision) или по таблице (текст)
-import "jsr:@supabase/functions-js/edge_runtime.d.ts";
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { chatText } from "../_shared/ai_provider.ts";
 
 const OPENAI_URL = "https://api.openai.com/v1/chat/completions";

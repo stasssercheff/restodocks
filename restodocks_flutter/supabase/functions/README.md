@@ -17,11 +17,24 @@
   ```
   Нужен для: распознавание чека по фото, ТТК по фото. Если задан только OpenAI — текстовые задачи тоже пойдут в OpenAI (платно).
 
+- **Google Gemini (бесплатный tier, ключ без карты):**
+  Ключ в [aistudio.google.com](https://aistudio.google.com) → Get API key. Затем:
+  ```bash
+  supabase secrets set GEMINI_API_KEY=ваш-ключ-gemini
+  ```
+  Текстовые задачи пойдут в Gemini, если не задан GigaChat (или задан `AI_PROVIDER=gemini`).
+
+- **Claude (Anthropic, платно):**
+  ```bash
+  supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+  supabase secrets set AI_PROVIDER=claude
+  ```
+
 - **Принудительно выбрать провайдера:**
   ```bash
-  supabase secrets set AI_PROVIDER=gigachat   # или openai
+  supabase secrets set AI_PROVIDER=gigachat   # или openai, gemini, claude
   ```
-  По умолчанию: если задан `GIGACHAT_AUTH_KEY` — используется GigaChat, иначе OpenAI.
+  По умолчанию приоритет: GigaChat → Gemini → Claude → OpenAI (по первому заданному ключу).
 
 ## Деплой
 
@@ -40,6 +53,7 @@
    supabase functions deploy ai-generate-checklist
    supabase functions deploy ai-recognize-receipt
    supabase functions deploy ai-recognize-tech-card
+   supabase functions deploy ai-recognize-tech-cards-batch
    supabase functions deploy ai-recognize-product
    supabase functions deploy ai-refine-nutrition
    supabase functions deploy ai-verify-product
@@ -56,7 +70,8 @@
 |--------|------------|------------------------|
 | `ai-generate-checklist` | Генерация чеклиста по запросу | GigaChat / OpenAI (текст) |
 | `ai-recognize-receipt` | Распознавание чека по фото | только OpenAI (vision) |
-| `ai-recognize-tech-card` | ТТК по фото или по таблице (Excel) | Фото: OpenAI; таблица: GigaChat/OpenAI |
+| `ai-recognize-tech-card` | ТТК по фото или по таблице (Excel), одна карточка | Фото: OpenAI; таблица: GigaChat/OpenAI |
+| `ai-recognize-tech-cards-batch` | ТТК из одного документа Excel — все карточки разом | GigaChat / OpenAI (текст) |
 | `ai-recognize-product` | Нормализация названия, категория, единица | GigaChat / OpenAI |
 | `ai-refine-nutrition` | КБЖУ по названию продукта | GigaChat / OpenAI |
 | `ai-verify-product` | Верификация продукта (цена, КБЖУ, название) | GigaChat / OpenAI |
