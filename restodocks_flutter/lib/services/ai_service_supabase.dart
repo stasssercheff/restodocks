@@ -129,8 +129,8 @@ class AiServiceSupabase implements AiService {
     if (v == null) return '';
     if (v is TextCellValue) {
       final val = v.value;
-      if (val is String) return val;
-      // excel 4.x: value can be TextSpan (from package:excel)
+      // excel 4.x: value can be String or TextSpan
+      if (val is String) return val as String;
       try {
         final t = (val as dynamic).text;
         if (t != null) return t is String ? t : t.toString();

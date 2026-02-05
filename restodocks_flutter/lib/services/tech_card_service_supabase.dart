@@ -354,11 +354,11 @@ class TechCardServiceSupabase {
     }
     final yieldVal = ingredients.fold<double>(0.0, (s, i) => s + i.netWeight);
     final techMap = <String, String>{languageCode: result.technologyText?.trim() ?? ''};
-    final updated = created.copyWith(
+    final withIngredients = created.copyWith(
       ingredients: ingredients,
       technologyLocalized: techMap,
-      yield: yieldVal > 0 ? yieldVal : 100,
     );
+    final updated = TechCard.withYieldValue(withIngredients, yieldVal > 0 ? yieldVal : 100);
     await saveTechCard(updated);
     return updated;
   }

@@ -75,6 +75,9 @@ class TechCard extends Equatable {
     };
   }
 
+  /// Копия с новым значением выхода (обход зарезервированного слова yield в async).
+  static TechCard withYieldValue(TechCard t, double y) => t.copyWith(yield: y);
+
   /// Создание копии с изменениями
   TechCard copyWith({
     String? id,

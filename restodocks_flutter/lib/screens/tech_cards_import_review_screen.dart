@@ -120,7 +120,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
           ),
           Expanded(
             child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16, bottom: 24),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
               itemCount: _items.length,
               itemBuilder: (context, index) {
                 final item = _items[index];
