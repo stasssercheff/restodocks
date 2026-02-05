@@ -295,7 +295,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onChanged: (dark) => themeService.setThemeMode(dark ? ThemeMode.dark : ThemeMode.light),
               ),
             ),
-            if (currentEmployee.canManageSchedule) ...[
+            // Валюта заведения — только у владельца и шеф-повара в настройках
+            if (currentEmployee.hasRole('owner') || currentEmployee.hasRole('executive_chef')) ...[
               ListTile(
                 leading: const Icon(Icons.currency_exchange),
                 title: Text(localization.t('currency')),
