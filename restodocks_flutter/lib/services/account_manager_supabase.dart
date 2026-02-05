@@ -22,6 +22,12 @@ class AccountManagerSupabase {
   Establishment? _establishment;
   Employee? _currentEmployee;
 
+  /// Убираем avatar_url из payload — колонки может не быть в схеме employees (PGRST204).
+  static void _stripAvatarFromPayload(Map<String, dynamic> data) {
+    data.remove('avatar_url');
+    data.remove('avatarUrl');
+  }
+
   // Геттеры
   Establishment? get establishment => _establishment;
   Employee? get currentEmployee => _currentEmployee;
@@ -191,7 +197,7 @@ class AccountManagerSupabase {
     employeeData.remove('id');
     employeeData.remove('created_at');
     employeeData.remove('updated_at');
-    employeeData.remove('avatar_url'); // колонка может отсутствовать в схеме — не передаём
+    _stripAvatarFromPayload(employeeData);
 
     final response = await _supabase.insertData('employees', employeeData);
     final createdEmployee = Employee.fromJson(response);
@@ -372,8 +378,8 @@ class AccountManagerSupabase {
     try {
       final employeeData = employee.toJson()
         ..remove('password')
-        ..remove('password_hash')
-        ..remove('avatar_url'); // колонка может отсутствовать в схеме
+        ..remove('password_hash');
+      _stripAvatarFromPayload(employeeData);
 
       await _supabase.updateData(
         'employees',
