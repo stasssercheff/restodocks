@@ -145,12 +145,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     if (v == null) return '';
     if (v is TextCellValue) {
       final val = v.value;
-      if (val is String) return val;
       try {
         final t = (val as dynamic).text;
         if (t != null) return t is String ? t : t.toString();
       } catch (_) {}
-      return val.toString();
+      final String s = val is String ? val as String : (val ?? '').toString();
+      return s;
     }
     if (v is IntCellValue) return v.value.toString();
     if (v is DoubleCellValue) return v.value.toString();
