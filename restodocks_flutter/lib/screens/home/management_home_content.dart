@@ -28,7 +28,6 @@ class ManagementHomeContent extends StatelessWidget {
         if (isChef || roles.contains('sous_chef'))
           _Tile(icon: Icons.how_to_reg, title: loc.t('shift_confirmation'), onTap: () => context.push('/shift-confirmation')),
         if (isChef) _Tile(icon: Icons.shopping_bag, title: loc.t('products'), onTap: () => context.push('/products')),
-        _AiFeaturesCard(loc: loc),
         // Чеклисты: кухня или шеф/су-шеф (у шефа часто отдел «Управление» — иначе плитки нет)
         if (employee.department == 'kitchen' || isChef || roles.contains('sous_chef'))
           _Tile(icon: Icons.checklist, title: loc.t('checklists'), onTap: () => context.push('/checklists')),
@@ -44,37 +43,6 @@ class ManagementHomeContent extends StatelessWidget {
           _Tile(icon: Icons.savings, title: '${loc.t('expenses')} (${loc.t('pro')})', onTap: () => context.push('/expenses')),
         ],
       ],
-    );
-  }
-}
-
-/// Карточка «Умные возможности (нейросети)» — чтобы пользователь видел, что в приложении есть ИИ.
-class _AiFeaturesCard extends StatelessWidget {
-  const _AiFeaturesCard({required this.loc});
-
-  final LocalizationService loc;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.4),
-      child: ListTile(
-        leading: Icon(Icons.auto_awesome, color: Theme.of(context).colorScheme.primary),
-        title: Text(
-          loc.t('ai_features_section'),
-          style: TextStyle(fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.onSurface),
-        ),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: Text(
-            loc.t('ai_features_hint'),
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
-          ),
-        ),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () => context.push('/tech-cards'),
-      ),
     );
   }
 }

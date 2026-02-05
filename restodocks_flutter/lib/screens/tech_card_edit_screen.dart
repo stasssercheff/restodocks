@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:excel/excel.dart' hide Border;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -410,7 +411,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   TechCard? _techCard;
   bool _loading = true;
   String? _error;
-  bool _recognizing = false; // ИИ: распознавание по фото/Excel
+  /// 'photo' | 'excel' — какая кнопка сейчас загружает (чтобы показывать правильный текст).
+  String? _recognizingSource;
   final _nameController = TextEditingController();
   static const _categoryOptions = ['misc', 'vegetables', 'fruits', 'meat', 'seafood', 'dairy', 'grains', 'bakery', 'pantry', 'spices', 'beverages', 'eggs', 'legumes', 'nuts'];
   String _selectedCategory = 'misc';
@@ -681,72 +683,143 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
 
   /// Распознать ТТК по фото и заполнить форму (только при создании новой карточки).
   Future<void> _fillFromPhoto() async {
-    if (!_isNew || _recognizing) return;
+    if (!_isNew || _recognizingSource != null) return;
     final loc = context.read<LocalizationService>();
-    setState(() => _recognizing = true);
+    setState(() => _recognizingSource = 'photo');
     try {
       final xFile = await ImageService().pickImageFromGallery();
       if (xFile == null || !mounted) {
-        if (mounted) setState(() => _recognizing = false);
+        if (mounted) setState(() => _recognizingSource = null);
         return;
       }
       final bytes = await ImageService().xFileToBytes(xFile);
       if (bytes == null || bytes.isEmpty || !mounted) {
-        if (mounted) setState(() => _recognizing = false);
+        if (mounted) setState(() => _recognizingSource = null);
         return;
       }
       final result = await context.read<AiService>().recognizeTechCardFromImage(bytes);
       if (!mounted) {
-        setState(() => _recognizing = false);
+        setState(() => _recognizingSource = null);
         return;
       }
       if (result == null || (result.dishName == null && result.ingredients.isEmpty)) {
-        setState(() => _recognizing = false);
+        setState(() => _recognizingSource = null);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('ai_tech_card_recognize_empty'))));
       } else {
         setState(() {
           _applyAiResult(result);
-          _recognizing = false;
+          _recognizingSource = null;
         });
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('ai_tech_card_filled'))));
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _recognizing = false);
+        setState(() => _recognizingSource = null);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))));
       }
     }
   }
 
+  /// Парсинг Excel как простой список: столбец A или B — названия (ПФ/блюд).
+  static List<TechCardRecognitionResult> _parseSimpleExcelNames(Uint8List bytes) {
+    try {
+      final excel = Excel.decodeBytes(bytes.toList());
+      final sheetName = excel.tables.keys.isNotEmpty ? excel.tables.keys.first : null;
+      if (sheetName == null) return [];
+      final sheet = excel.tables[sheetName]!;
+      final list = <TechCardRecognitionResult>[];
+      for (var r = 0; r < sheet.maxRows; r++) {
+        String name = _excelCellToStr(sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: r)).value).trim();
+        if (name.isEmpty && sheet.maxColumns > 1) {
+          name = _excelCellToStr(sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: r)).value).trim();
+        }
+        if (name.isEmpty) continue;
+        list.add(TechCardRecognitionResult(
+          dishName: name,
+          ingredients: [],
+          isSemiFinished: true,
+        ));
+      }
+      return list;
+    } catch (_) {
+      return [];
+    }
+  }
+
+  static String _excelCellToStr(CellValue? v) {
+    if (v == null) return '';
+    if (v is TextCellValue) {
+      final val = v.value;
+      if (val is String) return val;
+      try {
+        final t = (val as dynamic).text;
+        if (t != null) return t is String ? t : t.toString();
+      } catch (_) {}
+      return val.toString();
+    }
+    if (v is IntCellValue) return v.value.toString();
+    if (v is DoubleCellValue) return v.value.toString();
+    return v.toString();
+  }
+
   /// Заполнить форму из Excel (одна или первая из нескольких карточек).
   Future<void> _fillFromExcel() async {
-    if (!_isNew || _recognizing) return;
+    if (!_isNew || _recognizingSource != null) return;
     final loc = context.read<LocalizationService>();
-    setState(() => _recognizing = true);
+    setState(() => _recognizingSource = 'excel');
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['xlsx', 'xls'],
         withData: true,
       );
-      if (result == null || result.files.isEmpty || result.files.single.bytes == null || !mounted) {
-        if (mounted) setState(() => _recognizing = false);
+      if (!mounted) {
+        setState(() => _recognizingSource = null);
         return;
       }
-      final bytes = Uint8List.fromList(result.files.single.bytes!);
-      final list = await context.read<AiService>().parseTechCardsFromExcel(bytes);
+      if (result == null || result.files.isEmpty) {
+        setState(() => _recognizingSource = null);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('file_not_selected'))));
+        return;
+      }
+      final bytes = result.files.single.bytes;
+      if (bytes == null || bytes.isEmpty) {
+        setState(() => _recognizingSource = null);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('file_read_failed'))));
+        return;
+      }
+      final uBytes = Uint8List.fromList(bytes);
+      // Сначала быстрый разбор по первому столбцу (без сети) — чтобы не зависеть от ИИ.
+      var list = _parseSimpleExcelNames(uBytes);
+      if (list.isNotEmpty) {
+        setState(() {
+          _applyAiResult(list.first);
+          _recognizingSource = null;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.t('ai_tech_card_loaded_names').replaceAll('%s', '${list.length}'))),
+        );
+        if (list.length > 1) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('ai_tech_card_filled_from_excel_many').replaceAll('%s', '${list.length}'))));
+        }
+        return;
+      }
+      // ИИ (может долго ждать ответа)
+      list = await context.read<AiService>().parseTechCardsFromExcel(uBytes);
       if (!mounted) {
-        setState(() => _recognizing = false);
+        setState(() => _recognizingSource = null);
         return;
       }
       if (list.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('ai_tech_card_recognize_empty'))));
-        setState(() => _recognizing = false);
+        setState(() => _recognizingSource = null);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.t('ai_tech_card_excel_format_hint'))),
+        );
         return;
       }
       setState(() {
         _applyAiResult(list.first);
-        _recognizing = false;
+        _recognizingSource = null;
       });
       if (list.length > 1) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('ai_tech_card_filled_from_excel_many').replaceAll('%s', '${list.length}'))));
@@ -755,7 +828,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _recognizing = false);
+        setState(() => _recognizingSource = null);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))));
       }
     }
@@ -1102,18 +1175,22 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   FilledButton.tonalIcon(
-                    onPressed: _recognizing ? null : _fillFromPhoto,
-                    icon: _recognizing ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.document_scanner, size: 20),
+                    onPressed: _recognizingSource != null ? null : _fillFromPhoto,
+                    icon: _recognizingSource == 'photo' ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.document_scanner, size: 20),
                     label: Text(loc.t('ai_tech_card_from_photo')),
                   ),
                   FilledButton.tonalIcon(
-                    onPressed: _recognizing ? null : _fillFromExcel,
-                    icon: _recognizing ? const SizedBox.shrink() : const Icon(Icons.table_chart, size: 20),
+                    onPressed: _recognizingSource != null ? null : _fillFromExcel,
+                    icon: _recognizingSource == 'excel' ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.table_chart, size: 20),
                     label: Text(loc.t('ai_tech_card_from_excel')),
                   ),
-                  if (_recognizing) Padding(
+                  if (_recognizingSource == 'photo') Padding(
                     padding: const EdgeInsets.only(left: 8),
-                    child: Text(loc.t('loading') ?? 'Загрузка…', style: Theme.of(context).textTheme.bodySmall),
+                    child: Text(loc.t('loading_excel_photo'), style: Theme.of(context).textTheme.bodySmall),
+                  ),
+                  if (_recognizingSource == 'excel') Padding(
+                    padding: const EdgeInsets.only(left: 8),
+                    child: Text(loc.t('loading_excel'), style: Theme.of(context).textTheme.bodySmall),
                   ),
                 ],
               ),
@@ -1271,12 +1348,11 @@ class _TtkTableState extends State<_TtkTable> {
     final ingredients = widget.ingredients;
     final totalNet = ingredients.fold<double>(0, (s, ing) => s + ing.netWeight);
     final totalCost = ingredients.fold<double>(0, (s, ing) => s + ing.cost);
-    final pricePerKgDish = totalNet > 0 ? totalCost * 1000 / totalNet : 0.0;
     final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'RUB';
     final sym = currency == 'RUB' ? '₽' : currency == 'VND' ? '₫' : currency == 'USD' ? '\$' : currency;
 
     final hasDeleteCol = widget.canEdit;
-    // Технология — колонка справа в таблице (rowSpan по всем строкам).
+    // Технология — колонка справа в таблице.
     final columnWidths = <int, TableColumnWidth>{
       0: const FixedColumnWidth(130),   // Наименование блюда
       1: const FixedColumnWidth(200),   // Продукт (тап — bottom sheet выбора)
@@ -1287,9 +1363,8 @@ class _TtkTableState extends State<_TtkTable> {
       6: const FixedColumnWidth(64),    // Ужарка %
       7: const FixedColumnWidth(80),    // Выход гр/шт
       8: const FixedColumnWidth(90),    // Стоимость
-      9: const FixedColumnWidth(100),   // За 1000 гр готового
-      10: const FlexColumnWidth(1.2),   // Технология (широкая)
-      if (hasDeleteCol) 11: const FixedColumnWidth(48),
+      9: const FlexColumnWidth(1.2),    // Технология (широкая)
+      if (hasDeleteCol) 10: const FixedColumnWidth(48),
     };
     final borderColor = theme.colorScheme.outline.withOpacity(0.8);
     return Table(
@@ -1313,7 +1388,6 @@ class _TtkTableState extends State<_TtkTable> {
             _cell(loc.t('ttk_cook_loss'), bold: true),
             _cell(loc.t('ttk_output_gr'), bold: true),
             _cell(loc.t('ttk_cost'), bold: true),
-            _cell(loc.t('ttk_cost_per_1kg_ready'), bold: true),
             _cell(loc.t('ttk_technology'), bold: true),
             if (hasDeleteCol) _cell('', bold: true),
           ],
@@ -1382,14 +1456,14 @@ class _TtkTableState extends State<_TtkTable> {
                       ),
                     )
                   : TableCell(child: Padding(padding: _cellPad, child: Text('', style: const TextStyle(fontSize: 12)))),
-              ...List.generate(8, (_) => TableCell(
+              ...List.generate(7, (_) => TableCell(
                 child: Container(
                   constraints: const BoxConstraints(minHeight: 56),
                   padding: _cellPad,
                   child: const Text('', style: TextStyle(fontSize: 12)),
                 ),
               )),
-              // Колонка «Технология» — в пустой таблице одна ячейка с полем
+              // Колонка «Технология»
               TableCell(
                 child: Container(
                   constraints: const BoxConstraints(minHeight: 80),
@@ -1663,8 +1737,7 @@ class _TtkTableState extends State<_TtkTable> {
                       ),
                     )
                   : _cell('${ing.cost.toStringAsFixed(2)} $sym'),
-              _cell(ing.netWeight > 0 ? '${(ing.cost * 1000 / ing.netWeight).toStringAsFixed(2)} $sym' : '—'),
-              // Колонка «Технология» — только в первой строке, rowSpan на все строки + итого
+              // Колонка «Технология»
               if (isFirstRow && widget.technologyController != null)
                 TableCell(
                   verticalAlignment: TableCellVerticalAlignment.fill,
@@ -1716,7 +1789,6 @@ class _TtkTableState extends State<_TtkTable> {
             _cell('', bold: true),
             _cell('${totalNet.toStringAsFixed(0)}', bold: true),
             _cell('${totalCost.toStringAsFixed(2)} $sym', bold: true),
-            _cell('${pricePerKgDish.toStringAsFixed(2)} $sym', bold: true),
             if (hasDeleteCol) _cell('', bold: true),
           ],
         ),

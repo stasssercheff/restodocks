@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:excel/excel.dart' hide Border;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -80,22 +81,80 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       allowedExtensions: ['xlsx', 'xls'],
       withData: true,
     );
-    if (result == null || result.files.isEmpty || result.files.single.bytes == null || !mounted) return;
-    final bytes = result.files.single.bytes!;
-    final ai = context.read<AiService>();
-    final list = await ai.parseTechCardsFromExcel(Uint8List.fromList(bytes));
+    if (!mounted) return;
+    if (result == null || result.files.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('file_not_selected'))));
+      return;
+    }
+    final bytes = result.files.single.bytes;
+    if (bytes == null || bytes.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('file_read_failed'))));
+      return;
+    }
+    final uBytes = Uint8List.fromList(bytes);
+    var list = _parseSimpleExcelNames(uBytes);
+    if (list.isEmpty) {
+      list = await context.read<AiService>().parseTechCardsFromExcel(uBytes);
+    }
     if (!mounted) return;
     if (list.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.t('ai_tech_card_recognize_empty'))),
+        SnackBar(content: Text(loc.t('ai_tech_card_excel_format_hint'))),
       );
       return;
+    }
+    if (list.length == 1 && list.first.ingredients.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('ai_tech_card_loaded_names').replaceAll('%s', '${list.length}'))),
+      );
     }
     if (list.length == 1) {
       context.push('/tech-cards/new', extra: list.single);
     } else {
       context.push('/tech-cards/import-review', extra: list);
     }
+  }
+
+  /// Простой разбор Excel: столбец A или B — названия ПФ/блюд.
+  static List<TechCardRecognitionResult> _parseSimpleExcelNames(Uint8List bytes) {
+    try {
+      final excel = Excel.decodeBytes(bytes.toList());
+      final sheetName = excel.tables.keys.isNotEmpty ? excel.tables.keys.first : null;
+      if (sheetName == null) return [];
+      final sheet = excel.tables[sheetName]!;
+      final list = <TechCardRecognitionResult>[];
+      for (var r = 0; r < sheet.maxRows; r++) {
+        String name = _excelCellToStr(sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: r)).value).trim();
+        if (name.isEmpty && sheet.maxColumns > 1) {
+          name = _excelCellToStr(sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: r)).value).trim();
+        }
+        if (name.isEmpty) continue;
+        list.add(TechCardRecognitionResult(
+          dishName: name,
+          ingredients: [],
+          isSemiFinished: true,
+        ));
+      }
+      return list;
+    } catch (_) {
+      return [];
+    }
+  }
+
+  static String _excelCellToStr(CellValue? v) {
+    if (v == null) return '';
+    if (v is TextCellValue) {
+      final val = v.value;
+      if (val is String) return val;
+      try {
+        final t = (val as dynamic).text;
+        if (t != null) return t is String ? t : t.toString();
+      } catch (_) {}
+      return val.toString();
+    }
+    if (v is IntCellValue) return v.value.toString();
+    if (v is DoubleCellValue) return v.value.toString();
+    return v.toString();
   }
 
   @override
