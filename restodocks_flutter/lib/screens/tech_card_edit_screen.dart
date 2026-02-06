@@ -31,6 +31,7 @@ class _EditableShrinkageCell extends StatefulWidget {
 
 class _EditableShrinkageCellState extends State<_EditableShrinkageCell> {
   late TextEditingController _ctrl;
+  final FocusNode _focusNode = FocusNode();
 
   @override
   void initState() {
@@ -48,6 +49,7 @@ class _EditableShrinkageCellState extends State<_EditableShrinkageCell> {
 
   @override
   void dispose() {
+    _focusNode.dispose();
     _ctrl.dispose();
     super.dispose();
   }
@@ -59,20 +61,25 @@ class _EditableShrinkageCellState extends State<_EditableShrinkageCell> {
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
-      controller: _ctrl,
-      keyboardType: TextInputType.numberWithOptions(decimal: true),
-      decoration: const InputDecoration(
-        isDense: true,
-        suffixText: '%',
-        border: InputBorder.none,
-        contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-        filled: true,
-        fillColor: Colors.transparent,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _focusNode.requestFocus(),
+      child: TextField(
+        focusNode: _focusNode,
+        controller: _ctrl,
+        keyboardType: TextInputType.numberWithOptions(decimal: true),
+        decoration: const InputDecoration(
+          isDense: true,
+          suffixText: '%',
+          border: InputBorder.none,
+          contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          filled: true,
+          fillColor: Colors.transparent,
+        ),
+        style: const TextStyle(fontSize: 12),
+        onSubmitted: (_) => _submit(),
+        onTapOutside: (_) => _submit(),
       ),
-      style: const TextStyle(fontSize: 12),
-      onSubmitted: (_) => _submit(),
-      onTapOutside: (_) => _submit(),
     );
   }
 }
@@ -90,6 +97,7 @@ class _EditableWasteCell extends StatefulWidget {
 
 class _EditableWasteCellState extends State<_EditableWasteCell> {
   late TextEditingController _ctrl;
+  final FocusNode _focusNode = FocusNode();
 
   @override
   void initState() {
@@ -107,6 +115,7 @@ class _EditableWasteCellState extends State<_EditableWasteCell> {
 
   @override
   void dispose() {
+    _focusNode.dispose();
     _ctrl.dispose();
     super.dispose();
   }
@@ -118,20 +127,25 @@ class _EditableWasteCellState extends State<_EditableWasteCell> {
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
-      controller: _ctrl,
-      keyboardType: TextInputType.numberWithOptions(decimal: true),
-      decoration: const InputDecoration(
-        isDense: true,
-        suffixText: '%',
-        border: InputBorder.none,
-        contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-        filled: true,
-        fillColor: Colors.transparent,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _focusNode.requestFocus(),
+      child: TextField(
+        focusNode: _focusNode,
+        controller: _ctrl,
+        keyboardType: TextInputType.numberWithOptions(decimal: true),
+        decoration: const InputDecoration(
+          isDense: true,
+          suffixText: '%',
+          border: InputBorder.none,
+          contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          filled: true,
+          fillColor: Colors.transparent,
+        ),
+        style: const TextStyle(fontSize: 12),
+        onSubmitted: (_) => _submit(),
+        onTapOutside: (_) => _submit(),
       ),
-      style: const TextStyle(fontSize: 12),
-      onSubmitted: (_) => _submit(),
-      onTapOutside: (_) => _submit(),
     );
   }
 }
@@ -187,7 +201,7 @@ class _EditableProductNameCellState extends State<_EditableProductNameCell> {
   }
 }
 
-/// Редактируемая ячейка брутто (граммы)
+/// Редактируемая ячейка брутто (граммы). Тап по ячейке даёт фокус полю ввода.
 class _EditableGrossCell extends StatefulWidget {
   const _EditableGrossCell({required this.grams, required this.onChanged});
 
@@ -200,6 +214,7 @@ class _EditableGrossCell extends StatefulWidget {
 
 class _EditableGrossCellState extends State<_EditableGrossCell> {
   late TextEditingController _ctrl;
+  final FocusNode _focusNode = FocusNode();
 
   @override
   void initState() {
@@ -217,6 +232,7 @@ class _EditableGrossCellState extends State<_EditableGrossCell> {
 
   @override
   void dispose() {
+    _focusNode.dispose();
     _ctrl.dispose();
     super.dispose();
   }
@@ -228,20 +244,25 @@ class _EditableGrossCellState extends State<_EditableGrossCell> {
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
-      controller: _ctrl,
-      keyboardType: TextInputType.numberWithOptions(decimal: true),
-      decoration: const InputDecoration(
-        isDense: true,
-        suffixText: 'г',
-        border: InputBorder.none,
-        contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-        filled: true,
-        fillColor: Colors.transparent,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _focusNode.requestFocus(),
+      child: TextField(
+        focusNode: _focusNode,
+        controller: _ctrl,
+        keyboardType: TextInputType.numberWithOptions(decimal: true),
+        decoration: const InputDecoration(
+          isDense: true,
+          suffixText: 'г',
+          border: InputBorder.none,
+          contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          filled: true,
+          fillColor: Colors.transparent,
+        ),
+        style: const TextStyle(fontSize: 12),
+        onSubmitted: (_) => _submit(),
+        onTapOutside: (_) => _submit(),
       ),
-      style: const TextStyle(fontSize: 12),
-      onSubmitted: (_) => _submit(),
-      onTapOutside: (_) => _submit(),
     );
   }
 }
@@ -328,6 +349,7 @@ class _EditableCostCell extends StatefulWidget {
 
 class _EditableCostCellState extends State<_EditableCostCell> {
   late TextEditingController _ctrl;
+  final FocusNode _focusNode = FocusNode();
 
   @override
   void initState() {
@@ -345,6 +367,7 @@ class _EditableCostCellState extends State<_EditableCostCell> {
 
   @override
   void dispose() {
+    _focusNode.dispose();
     _ctrl.dispose();
     super.dispose();
   }
@@ -356,20 +379,25 @@ class _EditableCostCellState extends State<_EditableCostCell> {
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
-      controller: _ctrl,
-      keyboardType: TextInputType.numberWithOptions(decimal: true),
-      decoration: InputDecoration(
-        isDense: true,
-        suffixText: widget.symbol,
-        border: InputBorder.none,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-        filled: true,
-        fillColor: Colors.transparent,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _focusNode.requestFocus(),
+      child: TextField(
+        focusNode: _focusNode,
+        controller: _ctrl,
+        keyboardType: TextInputType.numberWithOptions(decimal: true),
+        decoration: InputDecoration(
+          isDense: true,
+          suffixText: widget.symbol,
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          filled: true,
+          fillColor: Colors.transparent,
+        ),
+        style: const TextStyle(fontSize: 12),
+        onSubmitted: (_) => _submit(),
+        onTapOutside: (_) => _submit(),
       ),
-      style: const TextStyle(fontSize: 12),
-      onSubmitted: (_) => _submit(),
-      onTapOutside: (_) => _submit(),
     );
   }
 }
@@ -1366,11 +1394,17 @@ class _TtkTableState extends State<_TtkTable> {
       9: const FlexColumnWidth(1.2),    // Технология (широкая)
       if (hasDeleteCol) 10: const FixedColumnWidth(48),
     };
-    final borderColor = theme.colorScheme.outline.withOpacity(0.8);
+    final borderColor = theme.colorScheme.onSurface.withOpacity(0.35);
+    final borderSide = BorderSide(width: 1, color: borderColor);
+    final borderSideOuter = BorderSide(width: 1.5, color: theme.colorScheme.onSurface.withOpacity(0.5));
     return Table(
-      border: TableBorder.symmetric(
-        inside: BorderSide(width: 1, color: borderColor),
-        outside: BorderSide(width: 1.5, color: borderColor),
+      border: TableBorder(
+        left: borderSideOuter,
+        top: borderSideOuter,
+        right: borderSideOuter,
+        bottom: borderSideOuter,
+        horizontalInside: borderSide,
+        verticalInside: borderSide,
       ),
       columnWidths: columnWidths,
       defaultColumnWidth: const FixedColumnWidth(80),
@@ -1426,29 +1460,33 @@ class _TtkTableState extends State<_TtkTable> {
                         child: Text(widget.dishName, style: const TextStyle(fontSize: 12)),
                       ),
                     ),
-              // Ячейка «Продукт» — явная кнопка «Добавить ингредиент», чтобы было видно, куда вводить
+              // Ячейка «Продукт» — кнопка «Добавить ингредиент» (тап/клик по всей области)
               widget.canEdit
                   ? TableCell(
                       child: Container(
                         constraints: const BoxConstraints(minHeight: 56),
-                        child: InkWell(
-                          onTap: widget.onAdd,
-                          child: Padding(
-                            padding: _cellPad,
-                            child: Center(
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.add_circle_outline, size: 20, color: theme.colorScheme.primary),
-                                  const SizedBox(width: 8),
-                                  Flexible(
-                                    child: Text(
-                                      loc.t('ttk_add_ingredient_hint'),
-                                      style: TextStyle(fontSize: 12, color: theme.colorScheme.primary),
-                                      overflow: TextOverflow.ellipsis,
+                        child: Material(
+                          color: Colors.transparent,
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: widget.onAdd,
+                            child: Padding(
+                              padding: _cellPad,
+                              child: Center(
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.add_circle_outline, size: 20, color: theme.colorScheme.primary),
+                                    const SizedBox(width: 8),
+                                    Flexible(
+                                      child: Text(
+                                        loc.t('ttk_add_ingredient_hint'),
+                                        style: TextStyle(fontSize: 12, color: theme.colorScheme.primary),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                           ),
@@ -1696,7 +1734,10 @@ class _TtkTableState extends State<_TtkTable> {
                               if (product != null && proc != null) {
                                 widget.onUpdate(i, ing.updateCookingLossPct(pct, product, proc, languageCode: lang));
                               } else {
-                                widget.onUpdate(i, ing.copyWith(cookingLossPctOverride: pct));
+                                // Без продукта: выход = нетто × (1 − ужарка/100); при ужарке 0 выход = нетто
+                                final loss = (pct ?? 0).clamp(0.0, 99.9);
+                                final out = ing.effectiveGrossWeight * (1.0 - loss / 100.0);
+                                widget.onUpdate(i, ing.copyWith(cookingLossPctOverride: pct, netWeight: out));
                               }
                             },
                           ),
@@ -1972,6 +2013,7 @@ class _EditableNetCell extends StatefulWidget {
 
 class _EditableNetCellState extends State<_EditableNetCell> {
   late TextEditingController _ctrl;
+  final FocusNode _focusNode = FocusNode();
 
   @override
   void initState() {
@@ -1989,6 +2031,7 @@ class _EditableNetCellState extends State<_EditableNetCell> {
 
   @override
   void dispose() {
+    _focusNode.dispose();
     _ctrl.dispose();
     super.dispose();
   }
@@ -2000,20 +2043,25 @@ class _EditableNetCellState extends State<_EditableNetCell> {
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
-      controller: _ctrl,
-      keyboardType: TextInputType.numberWithOptions(decimal: true),
-      decoration: const InputDecoration(
-        isDense: true,
-        suffixText: 'г',
-        border: InputBorder.none,
-        contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-        filled: true,
-        fillColor: Colors.transparent,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _focusNode.requestFocus(),
+      child: TextField(
+        focusNode: _focusNode,
+        controller: _ctrl,
+        keyboardType: TextInputType.numberWithOptions(decimal: true),
+        decoration: const InputDecoration(
+          isDense: true,
+          suffixText: 'г',
+          border: InputBorder.none,
+          contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          filled: true,
+          fillColor: Colors.transparent,
+        ),
+        style: const TextStyle(fontSize: 12),
+        onSubmitted: (_) => _submit(),
+        onTapOutside: (_) => _submit(),
       ),
-      style: const TextStyle(fontSize: 12),
-      onSubmitted: (_) => _submit(),
-      onTapOutside: (_) => _submit(),
     );
   }
 }

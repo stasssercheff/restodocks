@@ -37,6 +37,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     _load();
   }
 
+  /// Убираем дубликаты сотрудников по id (один человек — один слот в графике).
+  static List<Employee> _dedupeEmployeesById(List<Employee> list) {
+    final seen = <String>{};
+    return list.where((e) => seen.add(e.id)).toList();
+  }
+
   Future<void> _load() async {
     final acc = context.read<AccountManagerSupabase>();
     final est = acc.establishment;
@@ -50,13 +56,14 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       final model = await loadSchedule(est.id);
       if (mounted) {
         setState(() {
-          _employees = employees ?? [];
+          final raw = employees ?? [];
+          _employees = _dedupeEmployeesById(raw);
           _model = model;
           if (_model.sections.isEmpty) {
             _model = _model.copyWith(sections: ScheduleModel.defaultSections);
           }
+          final firstSectionId = _model.sections.isNotEmpty ? _model.sections.first.id : '';
           if (_model.slots.isEmpty && _model.sections.isNotEmpty) {
-            final firstSectionId = _model.sections.first.id;
             final slots = _employees.isNotEmpty
                 ? _employees.map((e) => ScheduleSlot(
                       id: const Uuid().v4(),
@@ -72,6 +79,23 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                   ];
             _model = _model.copyWith(slots: slots);
             saveSchedule(est.id, _model);
+          } else if (_model.sections.isNotEmpty && _employees.isNotEmpty) {
+            final existingNames = _model.slots.map((s) => s.name.trim().toLowerCase()).toSet();
+            final toAdd = _employees
+                .where((e) {
+                  final name = e.fullName.trim().isEmpty ? 'Повар' : e.fullName.trim();
+                  return !existingNames.contains(name.toLowerCase());
+                })
+                .map((e) => ScheduleSlot(
+                      id: const Uuid().v4(),
+                      name: e.fullName.trim().isEmpty ? 'Повар' : e.fullName.trim(),
+                      sectionId: firstSectionId,
+                    ))
+                .toList();
+            if (toAdd.isNotEmpty) {
+              _model = _model.copyWith(slots: [..._model.slots, ...toAdd]);
+              saveSchedule(est.id, _model);
+            }
           }
           _loading = false;
         });
@@ -274,6 +298,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
     final theme = Theme.of(context);
+    final acc = context.watch<AccountManagerSupabase>();
+    final canEdit = acc.currentEmployee?.canEditSchedule ?? false;
     final locale = loc.currentLocale;
     final localeStr = '${locale.languageCode}_${locale.countryCode ?? ''}';
     final weekdays = List.generate(7, (i) {
@@ -289,9 +315,141 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     }
 
     final dates = _model.dates;
-    final totalWidth = _slotColumnWidth + dates.length * _dayCellWidth;
     final headerBg = theme.colorScheme.primary;
     final headerFg = theme.colorScheme.onPrimary;
+    final borderColor = theme.dividerColor;
+
+    // Строки таблицы: левая колонка (имена) и правая часть (даты) — чтобы при горизонтальной прокрутке левая колонка оставалась на месте
+    final leftCells = <Widget>[];
+    final rightRows = <Widget>[];
+
+    Widget leftCell(Widget child, {double? height, BoxDecoration? decoration}) {
+      return Container(
+        height: height ?? _rowHeight,
+        decoration: decoration != null ? BoxDecoration(border: Border(right: BorderSide(color: borderColor))) : null,
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+        alignment: Alignment.centerLeft,
+        child: child,
+      );
+    }
+
+    Widget rightCell(Widget child, {Color? bg}) {
+      return Container(
+        width: _dayCellWidth,
+        height: _rowHeight,
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: bg,
+          border: Border(right: BorderSide(color: borderColor), bottom: BorderSide(color: borderColor)),
+        ),
+        child: child,
+      );
+    }
+
+    // Строка 1: заголовок «Дата» + даты
+    leftCells.add(leftCell(
+      Text(loc.t('schedule_date'), style: TextStyle(fontWeight: FontWeight.w600, color: headerFg, fontSize: 12)),
+      height: _rowHeight,
+      decoration: BoxDecoration(color: headerBg, border: Border(right: BorderSide(color: borderColor))),
+    ));
+    rightRows.add(Container(
+      height: _rowHeight,
+      decoration: BoxDecoration(color: headerBg),
+      child: Row(
+        children: dates.map((d) => rightCell(
+          Text(DateFormat('dd.MM', localeStr).format(d), textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: headerFg)),
+          bg: headerBg,
+        )),
+      ),
+    ));
+
+    // Строка 2: «День» + Пн, Вт, ...
+    leftCells.add(leftCell(
+      Text(loc.t('schedule_day'), style: TextStyle(fontWeight: FontWeight.w600, color: headerFg, fontSize: 11)),
+      height: _rowHeight,
+      decoration: BoxDecoration(color: headerBg, border: Border(right: BorderSide(color: borderColor))),
+    ));
+    rightRows.add(Container(
+      height: _rowHeight,
+      decoration: BoxDecoration(color: headerBg),
+      child: Row(
+        children: dates.map((d) => rightCell(
+          Text(weekdays[d.weekday - 1], textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: headerFg)),
+          bg: headerBg,
+        )),
+      ),
+    ));
+
+    for (final section in _model.sections) {
+      final sectionSlots = _model.slotsBySection[section.id] ?? [];
+      if (sectionSlots.isEmpty) continue;
+      final sectionName = loc.translate(section.nameKey);
+      final sectionLabel = sectionName == section.nameKey ? section.id : sectionName;
+      final sectionBg = theme.colorScheme.secondaryContainer.withOpacity(0.6);
+      final sectionFg = theme.colorScheme.onSecondaryContainer;
+
+      leftCells.add(leftCell(
+        Text(sectionLabel, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: sectionFg), overflow: TextOverflow.ellipsis),
+        height: _rowHeight,
+        decoration: BoxDecoration(color: sectionBg, border: Border(right: BorderSide(color: borderColor))),
+      ));
+      rightRows.add(Container(
+        height: _rowHeight,
+        color: sectionBg,
+        child: Row(children: List.generate(dates.length, (_) => rightCell(const SizedBox.shrink(), bg: sectionBg))),
+      ));
+
+      for (final slot in sectionSlots) {
+        leftCells.add(leftCell(
+          GestureDetector(
+            onTap: canEdit ? () => _editSlot(slot) : null,
+            child: Row(
+              children: [
+                Expanded(child: Text(slot.name, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
+                if (canEdit) Icon(Icons.edit, size: 14, color: theme.colorScheme.primary),
+              ],
+            ),
+          ),
+          decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3), border: Border(right: BorderSide(color: borderColor))),
+        ));
+        rightRows.add(Container(
+          height: _rowHeight,
+          child: Row(
+            children: dates.map((date) {
+              final val = _cellValue(slot.id, date);
+              final isShift = val == '1';
+              final isDayOff = val == '0';
+              final timeRange = isShift ? _model.getTimeRange(slot.id, date) : null;
+              String timeDisplay = '';
+              if (timeRange != null) {
+                final parts = timeRange.split('|');
+                if (parts.length >= 2) timeDisplay = '${parts[0]}–${parts[1]}';
+              }
+              final bg = isShift ? Colors.green.shade100 : isDayOff ? Colors.amber.shade100 : null;
+              final content = Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(val ?? '—', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: val != null ? theme.colorScheme.onSurface : theme.colorScheme.onSurfaceVariant), textAlign: TextAlign.center),
+                  if (timeDisplay.isNotEmpty) Text(timeDisplay, style: TextStyle(fontSize: 9, color: theme.colorScheme.onSurface.withOpacity(0.8)), textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis),
+                ],
+              );
+              return rightCell(
+                canEdit
+                    ? GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => _onCellTap(slot.id, date),
+                        child: content,
+                      )
+                    : content,
+                bg: bg,
+              );
+            }).toList(),
+          ),
+        ));
+      }
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -306,188 +464,42 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Text(
-              loc.t('schedule_tap_hint'),
-              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-            ),
+            child: canEdit
+                ? Text(loc.t('schedule_tap_hint'), style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant))
+                : Text(loc.t('schedule_view_only_hint') ?? 'Редактирование графика доступно шеф-повару и су-шефу.', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
           ),
           Expanded(
             child: SingleChildScrollView(
               scrollDirection: Axis.vertical,
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: SizedBox(
-                  width: totalWidth,
-                  child: Table(
-                    border: TableBorder.all(color: theme.dividerColor),
-                    columnWidths: {
-                      for (var i = 0; i < 1 + dates.length; i++)
-                        i: i == 0 ? FixedColumnWidth(_slotColumnWidth) : const FixedColumnWidth(_dayCellWidth),
-                    },
-                    defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-                    children: [
-                      // Строка «Дата»: пустая ячейка + даты DD.MM
-                      TableRow(
-                        decoration: BoxDecoration(color: headerBg),
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-                            child: Text(
-                              loc.t('schedule_date'),
-                              style: TextStyle(fontWeight: FontWeight.w600, color: headerFg, fontSize: 12),
-                            ),
-                          ),
-                          ...dates.map((d) {
-                            return Container(
-                              width: _dayCellWidth,
-                              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-                              child: Text(
-                                DateFormat('dd.MM', localeStr).format(d),
-                                textAlign: TextAlign.center,
-                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: headerFg),
-                              ),
-                            );
-                          }),
-                        ],
-                      ),
-                      // Строка «День»: День + Пн, Вт, ...
-                      TableRow(
-                        decoration: BoxDecoration(color: headerBg),
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                            child: Text(
-                              loc.t('schedule_day'),
-                              style: TextStyle(fontWeight: FontWeight.w600, color: headerFg, fontSize: 11),
-                            ),
-                          ),
-                          ...dates.map((d) => Container(
-                                width: _dayCellWidth,
-                                padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 2),
-                                child: Text(
-                                  weekdays[d.weekday - 1],
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(fontSize: 10, color: headerFg),
-                                ),
-                              )),
-                        ],
-                      ),
-                      // По цехам: разделительная строка с названием цеха, затем строки сотрудников
-                      ..._model.sections.expand((section) {
-                        final sectionSlots = _model.slotsBySection[section.id] ?? [];
-                        if (sectionSlots.isEmpty) return <TableRow>[];
-                        final sectionName = loc.translate(section.nameKey);
-                        final sectionLabel = sectionName == section.nameKey ? section.id : sectionName;
-                        final sectionBg = theme.colorScheme.secondaryContainer.withOpacity(0.6);
-                        final sectionFg = theme.colorScheme.onSecondaryContainer;
-                        return [
-                          // Разделитель: одна строка с названием цеха (отделяет группы сотрудников)
-                          TableRow(
-                            decoration: BoxDecoration(color: sectionBg),
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                                child: Text(
-                                  sectionLabel,
-                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: sectionFg),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              ...dates.map((_) => Container(color: sectionBg)),
-                            ],
-                          ),
-                          // Строки сотрудников этого цеха
-                          ...sectionSlots.map((slot) {
-                            return TableRow(
-                              children: [
-                                GestureDetector(
-                                  onTap: () => _editSlot(slot),
-                                  child: Container(
-                                    height: _rowHeight,
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    alignment: Alignment.centerLeft,
-                                    color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
-                                    child: Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            slot.name,
-                                            style: const TextStyle(fontSize: 12),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                        Icon(Icons.edit, size: 14, color: theme.colorScheme.primary),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                ...dates.map((date) {
-                                  final val = _cellValue(slot.id, date);
-                                  final isShift = val == '1';
-                                  final isDayOff = val == '0';
-                                  final timeRange = isShift ? _model.getTimeRange(slot.id, date) : null;
-                                  String timeDisplay = '';
-                                  if (timeRange != null) {
-                                    final parts = timeRange.split('|');
-                                    if (parts.length >= 2) timeDisplay = '${parts[0]}–${parts[1]}';
-                                  }
-                                  final bg = isShift
-                                      ? Colors.green.shade100
-                                      : isDayOff
-                                          ? Colors.amber.shade100
-                                          : null;
-                                  return GestureDetector(
-                                    onTap: () => _onCellTap(slot.id, date),
-                                    child: Container(
-                                      height: _rowHeight,
-                                      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
-                                      alignment: Alignment.center,
-                                      color: bg,
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Text(
-                                            val ?? '—',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w600,
-                                              color: val != null ? theme.colorScheme.onSurface : theme.colorScheme.onSurfaceVariant,
-                                            ),
-                                            textAlign: TextAlign.center,
-                                          ),
-                                          if (timeDisplay.isNotEmpty)
-                                            Text(
-                                              timeDisplay,
-                                              style: TextStyle(fontSize: 9, color: theme.colorScheme.onSurface.withOpacity(0.8)),
-                                              textAlign: TextAlign.center,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                }),
-                              ],
-                            );
-                          }),
-                        ];
-                      }),
-                    ],
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: _slotColumnWidth,
+                    child: Column(mainAxisSize: MainAxisSize.min, children: leftCells),
                   ),
-                ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: rightRows,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: FilledButton.icon(
-              onPressed: _addSlot,
-              icon: const Icon(Icons.add, size: 20),
-              label: Text(loc.t('schedule_add_slot')),
+          if (canEdit)
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: FilledButton.icon(
+                onPressed: _addSlot,
+                icon: const Icon(Icons.add, size: 20),
+                label: Text(loc.t('schedule_add_slot')),
+              ),
             ),
-          ),
         ],
       ),
     );

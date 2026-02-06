@@ -308,20 +308,22 @@ class TTIngredient extends Equatable {
     );
   }
 
-  /// Обновить брутто вес и пересчитать значения
+  /// Обновить брутто вес и пересчитать значения.
+  /// Нетто = брутто × (1 − отход/100). При отсутствии способа приготовления выход = нетто.
   TTIngredient updateGrossWeight(double newGrossWeight, Product? product, CookingProcess? cookingProcess) {
     if (product == null) {
-      return copyWith(grossWeight: newGrossWeight);
+      final net = newGrossWeight * (1.0 - primaryWastePct.clamp(0.0, 99.9) / 100.0);
+      return copyWith(grossWeight: newGrossWeight, netWeight: net, isNetWeightManual: false);
     }
 
-    double newNetWeight = isNetWeightManual ? netWeight : newGrossWeight;
+    final effectiveGross = newGrossWeight * (1.0 - primaryWastePct / 100.0);
+    double newNetWeight = isNetWeightManual ? netWeight : effectiveGross;
     double newCalories = 0;
     double newProtein = 0;
     double newFat = 0;
     double newCarbs = 0;
 
     if (cookingProcess != null) {
-      final effectiveGross = newGrossWeight * (1.0 - primaryWastePct / 100.0);
       final lossPct = cookingLossPctOverride ?? cookingProcess.weightLossPercentage;
       final processed = cookingProcess.applyTo(product, effectiveGross, weightLossOverride: lossPct);
       if (!isNetWeightManual) {
@@ -352,11 +354,13 @@ class TTIngredient extends Equatable {
     );
   }
 
-  /// Обновить % отхода и пересчитать нетто, КБЖУ, стоимость
+  /// Обновить % отхода и пересчитать нетто, КБЖУ, стоимость.
+  /// Нетто = брутто × (1 − отход/100).
   TTIngredient updatePrimaryWastePct(double newWastePct, Product? product, CookingProcess? cookingProcess) {
     final waste = newWastePct.clamp(0.0, 99.9);
     if (product == null) {
-      return copyWith(primaryWastePct: waste);
+      final net = grossWeight * (1.0 - waste / 100.0);
+      return copyWith(primaryWastePct: waste, netWeight: net, isNetWeightManual: false);
     }
     final effectiveGross = grossWeight * (1.0 - waste / 100.0);
     double newNetWeight = effectiveGross;
