@@ -20,8 +20,11 @@ class ScheduleScreen extends StatefulWidget {
 class _ScheduleScreenState extends State<ScheduleScreen> {
   static const int _defaultWeeks = 12;
   static const double _slotColumnWidth = 120;
-  static const double _dayCellWidth = 44;
+  /// Ширина ячейки дня: 7 дней влезают на экран телефона (7 × 36 ≈ 252px).
+  static const double _dayCellWidth = 36;
   static const double _rowHeight = 44;
+
+  final ScrollController _horizontalScrollController = ScrollController();
 
   ScheduleModel _model = ScheduleModel(
     startDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day),
@@ -35,6 +38,32 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _horizontalScrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollToCenterToday() {
+    if (!_horizontalScrollController.hasClients) return;
+    final dates = _model.dates;
+    final today = DateTime.now();
+    final todayDate = DateTime(today.year, today.month, today.day);
+    int? todayIndex;
+    for (var i = 0; i < dates.length; i++) {
+      final d = dates[i];
+      if (d.year == todayDate.year && d.month == todayDate.month && d.day == todayDate.day) {
+        todayIndex = i;
+        break;
+      }
+    }
+    if (todayIndex == null) return;
+    final viewportWidth = _horizontalScrollController.position.viewportDimension;
+    final scrollOffset = (todayIndex * _dayCellWidth) - (viewportWidth / 2) + (_dayCellWidth / 2);
+    final maxScroll = _horizontalScrollController.position.maxScrollExtent;
+    _horizontalScrollController.jumpTo(scrollOffset.clamp(0.0, maxScroll));
   }
 
   /// Убираем дубликаты сотрудников по id (один человек — один слот в графике).
@@ -98,6 +127,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             }
           }
           _loading = false;
+        });
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _scrollToCenterToday();
         });
       }
     } catch (_) {
@@ -315,9 +347,16 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     }
 
     final dates = _model.dates;
+    final todayDate = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
     final headerBg = theme.colorScheme.primary;
     final headerFg = theme.colorScheme.onPrimary;
+    final weekendHeaderBg = theme.colorScheme.secondaryContainer;
+    final weekendHeaderFg = theme.colorScheme.onSecondaryContainer;
+    final todayHighlightBg = theme.colorScheme.primary.withOpacity(0.15);
     final borderColor = theme.dividerColor;
+
+    bool isWeekend(DateTime d) => d.weekday == 6 || d.weekday == 7;
+    bool isToday(DateTime d) => d.year == todayDate.year && d.month == todayDate.month && d.day == todayDate.day;
 
     // Строки таблицы: левая колонка (имена) и правая часть (даты) — чтобы при горизонтальной прокрутке левая колонка оставалась на месте
     final leftCells = <Widget>[];
@@ -357,10 +396,16 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       height: _rowHeight,
       decoration: BoxDecoration(color: headerBg),
       child: Row(
-        children: dates.map((d) => rightCell(
-          Text(DateFormat('dd.MM', localeStr).format(d), textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: headerFg)),
-          bg: headerBg,
-        )).toList(),
+        children: dates.map((d) {
+          final weekend = isWeekend(d);
+          final dayIsToday = isToday(d);
+          final bg = dayIsToday ? todayHighlightBg : (weekend ? weekendHeaderBg : headerBg);
+          final fg = weekend ? weekendHeaderFg : headerFg;
+          return rightCell(
+            Text(DateFormat('dd.MM', localeStr).format(d), textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: fg)),
+            bg: bg,
+          );
+        }).toList(),
       ),
     ));
 
@@ -374,10 +419,16 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       height: _rowHeight,
       decoration: BoxDecoration(color: headerBg),
       child: Row(
-        children: dates.map((d) => rightCell(
-          Text(weekdays[d.weekday - 1], textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: headerFg)),
-          bg: headerBg,
-        )).toList(),
+        children: dates.map((d) {
+          final weekend = isWeekend(d);
+          final dayIsToday = isToday(d);
+          final bg = dayIsToday ? todayHighlightBg : (weekend ? weekendHeaderBg : headerBg);
+          final fg = weekend ? weekendHeaderFg : headerFg;
+          return rightCell(
+            Text(weekdays[d.weekday - 1], textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: fg)),
+            bg: bg,
+          );
+        }).toList(),
       ),
     ));
 
@@ -397,7 +448,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       rightRows.add(Container(
         height: _rowHeight,
         color: sectionBg,
-        child: Row(children: List.generate(dates.length, (_) => rightCell(const SizedBox.shrink(), bg: sectionBg))),
+        child: Row(
+          children: dates.map((date) {
+            final bg = isToday(date) ? Color.lerp(sectionBg, todayHighlightBg, 0.5) ?? sectionBg : sectionBg;
+            return rightCell(const SizedBox.shrink(), bg: bg);
+          }).toList(),
+        ),
       ));
 
       for (final slot in sectionSlots) {
@@ -426,7 +482,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                 final parts = timeRange.split('|');
                 if (parts.length >= 2) timeDisplay = '${parts[0]}–${parts[1]}';
               }
-              final bg = isShift ? Colors.green.shade100 : isDayOff ? Colors.amber.shade100 : null;
+              var bg = isShift ? Colors.green.shade100 : isDayOff ? Colors.amber.shade100 : null;
+              if (isToday(date)) {
+                final base = bg ?? theme.colorScheme.surface;
+                bg = Color.lerp(base, todayHighlightBg, 0.6) ?? base;
+              }
               final content = Column(
                 mainAxisSize: MainAxisSize.min,
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -480,6 +540,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                   ),
                   Expanded(
                     child: SingleChildScrollView(
+                      controller: _horizontalScrollController,
                       scrollDirection: Axis.horizontal,
                       child: Column(
                         mainAxisSize: MainAxisSize.min,

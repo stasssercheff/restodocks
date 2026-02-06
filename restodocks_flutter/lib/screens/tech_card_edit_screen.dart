@@ -1191,21 +1191,26 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Text(loc.t('ttk_composition'), style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                if (canEdit) ...[
-                  FilledButton.tonalIcon(
-                    onPressed: _addEmptyIngredientRow,
-                    icon: const Icon(Icons.edit_note, size: 20),
-                    label: Text(loc.t('ttk_add_row_manual')),
-                    style: FilledButton.styleFrom(minimumSize: const Size(64, 48), padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12)),
+                if (canEdit)
+                  Builder(
+                    builder: (ctx) {
+                      final narrow = MediaQuery.sizeOf(ctx).width < 500;
+                      if (narrow) {
+                        return IconButton.filled(
+                          onPressed: _addEmptyIngredientRow,
+                          icon: const Icon(Icons.edit_note, size: 22),
+                          tooltip: loc.t('ttk_add_row_manual'),
+                          style: IconButton.styleFrom(minimumSize: const Size(44, 44)),
+                        );
+                      }
+                      return FilledButton.tonalIcon(
+                        onPressed: _addEmptyIngredientRow,
+                        icon: const Icon(Icons.edit_note, size: 20),
+                        label: Text(loc.t('ttk_add_row_manual')),
+                        style: FilledButton.styleFrom(minimumSize: const Size(64, 48), padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12)),
+                      );
+                    },
                   ),
-                  const SizedBox(width: 8),
-                  FilledButton.tonalIcon(
-                    onPressed: _showAddIngredient,
-                    icon: const Icon(Icons.add, size: 20),
-                    label: Text(loc.t('add_ingredient')),
-                    style: FilledButton.styleFrom(minimumSize: const Size(64, 48), padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12)),
-                  ),
-                ],
               ],
             ),
             if (canEdit)
@@ -1216,35 +1221,65 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
                 ),
               ),
-            // Кнопки распознавания ИИ — только при создании новой ТТК
+            // Кнопки распознавания ИИ — только при создании новой ТТК; на узком экране компактно (иконки)
             if (canEdit && _isNew) ...[
               const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 6,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  FilledButton.tonalIcon(
-                    onPressed: _recognizingSource != null ? null : _fillFromPhoto,
-                    icon: _recognizingSource == 'photo' ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.document_scanner, size: 20),
-                    label: Text(loc.t('ai_tech_card_from_photo')),
-                    style: FilledButton.styleFrom(minimumSize: const Size(64, 48)),
-                  ),
-                  FilledButton.tonalIcon(
-                    onPressed: _recognizingSource != null ? null : _fillFromExcel,
-                    icon: _recognizingSource == 'excel' ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.table_chart, size: 20),
-                    label: Text(loc.t('ai_tech_card_from_excel')),
-                    style: FilledButton.styleFrom(minimumSize: const Size(64, 48)),
-                  ),
-                  if (_recognizingSource == 'photo') Padding(
-                    padding: const EdgeInsets.only(left: 8),
-                    child: Text(loc.t('loading_excel_photo'), style: Theme.of(context).textTheme.bodySmall),
-                  ),
-                  if (_recognizingSource == 'excel') Padding(
-                    padding: const EdgeInsets.only(left: 8),
-                    child: Text(loc.t('loading_excel'), style: Theme.of(context).textTheme.bodySmall),
-                  ),
-                ],
+              Builder(
+                builder: (context) {
+                  final narrow = constraints.maxWidth < 500;
+                  if (narrow) {
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton.filled(
+                          onPressed: _recognizingSource != null ? null : _fillFromPhoto,
+                          icon: _recognizingSource == 'photo' ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.document_scanner, size: 22),
+                          tooltip: loc.t('ai_tech_card_from_photo'),
+                          style: IconButton.styleFrom(minimumSize: const Size(44, 44)),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton.filled(
+                          onPressed: _recognizingSource != null ? null : _fillFromExcel,
+                          icon: _recognizingSource == 'excel' ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.table_chart, size: 22),
+                          tooltip: loc.t('ai_tech_card_from_excel'),
+                          style: IconButton.styleFrom(minimumSize: const Size(44, 44)),
+                        ),
+                        if (_recognizingSource == 'photo' || _recognizingSource == 'excel')
+                          Padding(
+                            padding: const EdgeInsets.only(left: 8),
+                            child: Text(_recognizingSource == 'photo' ? loc.t('loading_excel_photo') : loc.t('loading_excel'), style: Theme.of(context).textTheme.bodySmall),
+                          ),
+                      ],
+                    );
+                  }
+                  return Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      FilledButton.tonalIcon(
+                        onPressed: _recognizingSource != null ? null : _fillFromPhoto,
+                        icon: _recognizingSource == 'photo' ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.document_scanner, size: 20),
+                        label: Text(loc.t('ai_tech_card_from_photo')),
+                        style: FilledButton.styleFrom(minimumSize: const Size(64, 48)),
+                      ),
+                      FilledButton.tonalIcon(
+                        onPressed: _recognizingSource != null ? null : _fillFromExcel,
+                        icon: _recognizingSource == 'excel' ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.table_chart, size: 20),
+                        label: Text(loc.t('ai_tech_card_from_excel')),
+                        style: FilledButton.styleFrom(minimumSize: const Size(64, 48)),
+                      ),
+                      if (_recognizingSource == 'photo') Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: Text(loc.t('loading_excel_photo'), style: Theme.of(context).textTheme.bodySmall),
+                      ),
+                      if (_recognizingSource == 'excel') Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: Text(loc.t('loading_excel'), style: Theme.of(context).textTheme.bodySmall),
+                      ),
+                    ],
+                  );
+                },
               ),
             ],
             const SizedBox(height: 8),
@@ -1308,7 +1343,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                             : _TtkCookTable(
                                 loc: loc,
                                 dishName: _nameController.text,
-                                ingredients: _ingredients,
+                                ingredients: _ingredients.where((i) => !i.isPlaceholder || i.hasData).toList(),
                                 technology: _technologyController.text,
                                 onIngredientsChanged: (list) {
                                   WidgetsBinding.instance.addPostFrameCallback((_) {
