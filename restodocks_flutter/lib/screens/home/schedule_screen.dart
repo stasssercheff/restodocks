@@ -360,7 +360,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         children: dates.map((d) => rightCell(
           Text(DateFormat('dd.MM', localeStr).format(d), textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: headerFg)),
           bg: headerBg,
-        )),
+        )).toList(),
       ),
     ));
 
@@ -377,7 +377,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         children: dates.map((d) => rightCell(
           Text(weekdays[d.weekday - 1], textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: headerFg)),
           bg: headerBg,
-        )),
+        )).toList(),
       ),
     ));
 
