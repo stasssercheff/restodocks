@@ -475,6 +475,14 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
                           filled: true,
                         ),
                       ),
+                      if (_paymentType == 'per_shift')
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Text(
+                            loc.t('payment_per_shift_hint') ?? 'Время смены задаётся в графике по дням.',
+                            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                          ),
+                        ),
                       const SizedBox(height: 12),
                       SwitchListTile(
                         title: Text(loc.t('active') ?? 'Активен'),

@@ -1194,6 +1194,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                 ],
               ],
             ),
+            if (canEdit)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  loc.t('ttk_formula_hint') ?? 'Нетто = брутто × (1 − отход%). Выход = нетто × (1 − ужарка%).',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                ),
+              ),
             // Кнопки распознавания ИИ — только при создании новой ТТК
             if (canEdit && _isNew) ...[
               const SizedBox(height: 8),
@@ -1609,7 +1617,9 @@ class _TtkTableState extends State<_TtkTable> {
                                   widget.onUpdate(i, ing.updateGrossWeight(g, product, proc));
                                 } else {
                                   final net = g * (1.0 - ing.primaryWastePct.clamp(0.0, 99.9) / 100.0);
-                                  widget.onUpdate(i, ing.copyWith(grossWeight: g, netWeight: net));
+                                  final loss = (ing.cookingLossPctOverride ?? 0).clamp(0.0, 99.9) / 100.0;
+                                  final out = net * (1.0 - loss);
+                                  widget.onUpdate(i, ing.copyWith(grossWeight: g, netWeight: out));
                                 }
                               }
                             },
@@ -1635,7 +1645,9 @@ class _TtkTableState extends State<_TtkTable> {
                                       widget.onUpdate(i, ing.updatePrimaryWastePct(waste, product, proc));
                                     } else {
                                       final net = ing.grossWeight * (1.0 - waste / 100.0);
-                                      widget.onUpdate(i, ing.copyWith(primaryWastePct: waste, netWeight: net, isNetWeightManual: false));
+                                      final loss = (ing.cookingLossPctOverride ?? 0).clamp(0.0, 99.9) / 100.0;
+                                      final out = net * (1.0 - loss);
+                                      widget.onUpdate(i, ing.copyWith(primaryWastePct: waste, netWeight: out, isNetWeightManual: false));
                                     }
                                   },
                                 ),

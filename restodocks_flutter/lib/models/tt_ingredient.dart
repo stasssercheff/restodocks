@@ -309,11 +309,13 @@ class TTIngredient extends Equatable {
   }
 
   /// Обновить брутто вес и пересчитать значения.
-  /// Нетто = брутто × (1 − отход/100). При отсутствии способа приготовления выход = нетто.
+  /// Нетто = брутто × (1 − отход/100). Выход = нетто × (1 − ужарка/100); при ужарке 0 выход = нетто.
   TTIngredient updateGrossWeight(double newGrossWeight, Product? product, CookingProcess? cookingProcess) {
     if (product == null) {
       final net = newGrossWeight * (1.0 - primaryWastePct.clamp(0.0, 99.9) / 100.0);
-      return copyWith(grossWeight: newGrossWeight, netWeight: net, isNetWeightManual: false);
+      final loss = (cookingLossPctOverride ?? 0).clamp(0.0, 99.9) / 100.0;
+      final out = net * (1.0 - loss);
+      return copyWith(grossWeight: newGrossWeight, netWeight: out, isNetWeightManual: false);
     }
 
     final effectiveGross = newGrossWeight * (1.0 - primaryWastePct / 100.0);
@@ -355,12 +357,14 @@ class TTIngredient extends Equatable {
   }
 
   /// Обновить % отхода и пересчитать нетто, КБЖУ, стоимость.
-  /// Нетто = брутто × (1 − отход/100).
+  /// Нетто = брутто × (1 − отход/100). Выход = нетто × (1 − ужарка/100).
   TTIngredient updatePrimaryWastePct(double newWastePct, Product? product, CookingProcess? cookingProcess) {
     final waste = newWastePct.clamp(0.0, 99.9);
     if (product == null) {
       final net = grossWeight * (1.0 - waste / 100.0);
-      return copyWith(primaryWastePct: waste, netWeight: net, isNetWeightManual: false);
+      final loss = (cookingLossPctOverride ?? 0).clamp(0.0, 99.9) / 100.0;
+      final out = net * (1.0 - loss);
+      return copyWith(primaryWastePct: waste, netWeight: out, isNetWeightManual: false);
     }
     final effectiveGross = grossWeight * (1.0 - waste / 100.0);
     double newNetWeight = effectiveGross;
