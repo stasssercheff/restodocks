@@ -157,10 +157,8 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
   }
 
   void _openEditEmployee(BuildContext context, Employee employee) {
-    showModalBottomSheet<void>(
+    showDialog<void>(
       context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
       builder: (ctx) => _EmployeeEditSheet(
         employee: employee,
         onSaved: () {
@@ -176,10 +174,8 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     final acc = context.read<AccountManagerSupabase>();
     final est = acc.establishment;
     if (est == null) return;
-    showModalBottomSheet<void>(
+    showDialog<void>(
       context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
       builder: (ctx) => _EmployeeAddSheet(
         establishment: est,
         onSaved: () {
@@ -346,6 +342,7 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
   }
 
   Future<void> _save() async {
+    final loc = context.read<LocalizationService>();
     final name = _nameController.text.trim();
     if (name.isEmpty) {
       setState(() => _error = 'Введите имя');
@@ -371,7 +368,16 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
       await context.read<AccountManagerSupabase>().updateEmployee(updated);
       if (mounted) widget.onSaved();
     } catch (e) {
-      if (mounted) setState(() { _error = e.toString(); _saving = false; });
+      if (mounted) {
+        final msg = e.toString();
+        final isSchemaError = msg.contains('hourly_rate') || msg.contains('PGRST204');
+        setState(() {
+          _error = isSchemaError
+              ? (loc.t('employee_save_error_schema') ?? 'Не удалось сохранить. Выполните в Supabase SQL миграцию: supabase_migration_employee_payment.sql')
+              : msg;
+          _saving = false;
+        });
+      }
     }
   }
 
@@ -379,108 +385,117 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
     final theme = Theme.of(context);
+    final media = MediaQuery.of(context);
 
-    return DraggableScrollableSheet(
-      initialChildSize: 0.7,
-      minChildSize: 0.4,
-      maxChildSize: 0.95,
-      expand: false,
-      builder: (_, scroll) => Padding(
-        padding: const EdgeInsets.all(16),
-        child: ListView(
-          controller: scroll,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(loc.t('edit_employee') ?? 'Редактировать сотрудника', style: theme.textTheme.titleLarge),
-                TextButton(onPressed: widget.onCancel, child: Text(MaterialLocalizations.of(context).cancelButtonLabel)),
-              ],
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _nameController,
-              decoration: InputDecoration(
-                labelText: loc.t('full_name') ?? 'ФИО',
-                border: const OutlineInputBorder(),
-                filled: true,
-              ),
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              value: _department,
-              decoration: InputDecoration(labelText: loc.t('department') ?? 'Отдел', border: const OutlineInputBorder(), filled: true),
-              items: _departmentKeys.map((k) => DropdownMenuItem(value: k, child: Text(_departmentLabels[k] ?? k))).toList(),
-              onChanged: (v) => setState(() {
-                _department = v ?? _department;
-                if (_department != 'kitchen') _section = null;
-              }),
-            ),
-            if (_department == 'kitchen') ...[
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String?>(
-                value: _section,
-                decoration: InputDecoration(labelText: loc.t('section') ?? 'Цех', border: const OutlineInputBorder(), filled: true),
-                items: [
-                  const DropdownMenuItem(value: null, child: Text('—')),
-                  ...RolesConfig.kitchenSections().map((s) => DropdownMenuItem(value: s, child: Text(s))),
+    return Dialog(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: 420, maxHeight: media.size.height * 0.85),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(loc.t('edit_employee') ?? 'Редактировать сотрудника', style: theme.textTheme.titleLarge),
+                  TextButton(onPressed: widget.onCancel, child: Text(MaterialLocalizations.of(context).cancelButtonLabel)),
                 ],
-                onChanged: (v) => setState(() => _section = v),
+              ),
+              const SizedBox(height: 16),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      TextField(
+                        controller: _nameController,
+                        decoration: InputDecoration(
+                          labelText: loc.t('full_name') ?? 'ФИО',
+                          border: const OutlineInputBorder(),
+                          filled: true,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        value: _department,
+                        decoration: InputDecoration(labelText: loc.t('department') ?? 'Отдел', border: const OutlineInputBorder(), filled: true),
+                        items: _departmentKeys.map((k) => DropdownMenuItem(value: k, child: Text(_departmentLabels[k] ?? k))).toList(),
+                        onChanged: (v) => setState(() {
+                          _department = v ?? _department;
+                          if (_department != 'kitchen') _section = null;
+                        }),
+                      ),
+                      if (_department == 'kitchen') ...[
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String?>(
+                          value: _section,
+                          decoration: InputDecoration(labelText: loc.t('section') ?? 'Цех', border: const OutlineInputBorder(), filled: true),
+                          items: [
+                            const DropdownMenuItem(value: null, child: Text('—')),
+                            ...RolesConfig.kitchenSections().map((s) => DropdownMenuItem(value: s, child: Text(s))),
+                          ],
+                          onChanged: (v) => setState(() => _section = v),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      Text(loc.t('roles') ?? 'Роли', style: theme.textTheme.titleSmall),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: _roleOptions.map((code) {
+                          final selected = _roles.contains(code);
+                          return FilterChip(
+                            label: Text(_roleLabels[code] ?? code),
+                            selected: selected,
+                            onSelected: (v) => setState(() {
+                              if (v) _roles.add(code); else _roles.remove(code);
+                            }),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 16),
+                      DropdownButtonFormField<String>(
+                        value: _paymentType,
+                        decoration: InputDecoration(labelText: loc.t('payment_type') ?? 'Тип оплаты', border: const OutlineInputBorder(), filled: true),
+                        items: [
+                          DropdownMenuItem(value: 'hourly', child: Text(loc.t('payment_hourly') ?? 'Почасовая')),
+                          DropdownMenuItem(value: 'per_shift', child: Text(loc.t('payment_per_shift') ?? 'За смену')),
+                        ],
+                        onChanged: (v) => setState(() => _paymentType = v ?? 'hourly'),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _rateController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: InputDecoration(
+                          labelText: _paymentType == 'per_shift' ? (loc.t('rate_per_shift') ?? 'Ставка за смену') : (loc.t('hourly_rate') ?? 'Ставка в час'),
+                          border: const OutlineInputBorder(),
+                          filled: true,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SwitchListTile(
+                        title: Text(loc.t('active') ?? 'Активен'),
+                        value: _isActive,
+                        onChanged: (v) => setState(() => _isActive = v),
+                      ),
+                      if (_error != null) ...[
+                        const SizedBox(height: 8),
+                        Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
+                      ],
+                      const SizedBox(height: 24),
+                      FilledButton(
+                        onPressed: _saving ? null : _save,
+                        child: _saving ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2)) : Text(loc.t('save')),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
-            const SizedBox(height: 12),
-            Text(loc.t('roles') ?? 'Роли', style: theme.textTheme.titleSmall),
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: _roleOptions.map((code) {
-                final selected = _roles.contains(code);
-                return FilterChip(
-                  label: Text(_roleLabels[code] ?? code),
-                  selected: selected,
-                  onSelected: (v) => setState(() {
-                    if (v) _roles.add(code); else _roles.remove(code);
-                  }),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              value: _paymentType,
-              decoration: InputDecoration(labelText: loc.t('payment_type') ?? 'Оплата', border: const OutlineInputBorder(), filled: true),
-              items: [
-                const DropdownMenuItem(value: 'hourly', child: Text('Почасовая')),
-                const DropdownMenuItem(value: 'per_shift', child: Text('За смену')),
-              ],
-              onChanged: (v) => setState(() => _paymentType = v ?? 'hourly'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _rateController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: InputDecoration(
-                labelText: _paymentType == 'per_shift' ? (loc.t('rate_per_shift') ?? 'Ставка за смену') : (loc.t('hourly_rate') ?? 'Ставка в час'),
-                border: const OutlineInputBorder(),
-                filled: true,
-              ),
-            ),
-            const SizedBox(height: 12),
-            SwitchListTile(
-              title: Text(loc.t('active') ?? 'Активен'),
-              value: _isActive,
-              onChanged: (v) => setState(() => _isActive = v),
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 8),
-              Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
-            ],
-            const SizedBox(height: 24),
-            FilledButton(
-              onPressed: _saving ? null : _save,
-              child: _saving ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2)) : Text(loc.t('save')),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -566,102 +581,112 @@ class _EmployeeAddSheetState extends State<_EmployeeAddSheet> {
     final loc = context.watch<LocalizationService>();
     final theme = Theme.of(context);
 
-    return DraggableScrollableSheet(
-      initialChildSize: 0.75,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
-      expand: false,
-      builder: (_, scroll) => Padding(
-        padding: const EdgeInsets.all(16),
-        child: ListView(
-          controller: scroll,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(loc.t('add_employee') ?? 'Добавить сотрудника', style: theme.textTheme.titleLarge),
-                TextButton(onPressed: widget.onCancel, child: Text(MaterialLocalizations.of(context).cancelButtonLabel)),
-              ],
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _nameController,
-              decoration: InputDecoration(
-                labelText: loc.t('full_name') ?? 'ФИО',
-                border: const OutlineInputBorder(),
-                filled: true,
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _emailController,
-              keyboardType: TextInputType.emailAddress,
-              decoration: InputDecoration(
-                labelText: 'Email',
-                border: const OutlineInputBorder(),
-                filled: true,
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _passwordController,
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText: loc.t('password'),
-                hintText: loc.t('password_too_short') ?? 'мин. 6 символов',
-                border: const OutlineInputBorder(),
-                filled: true,
-              ),
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              value: _department,
-              decoration: InputDecoration(labelText: loc.t('department') ?? 'Отдел', border: const OutlineInputBorder(), filled: true),
-              items: _departmentKeys.map((k) => DropdownMenuItem(value: k, child: Text(_departmentLabels[k] ?? k))).toList(),
-              onChanged: (v) => setState(() {
-                _department = v ?? _department;
-                if (_department != 'kitchen') _section = null; else _section = 'hot_kitchen';
-              }),
-            ),
-            if (_department == 'kitchen') ...[
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String?>(
-                value: _section,
-                decoration: InputDecoration(labelText: loc.t('section') ?? 'Цех', border: const OutlineInputBorder(), filled: true),
-                items: [
-                  const DropdownMenuItem(value: null, child: Text('—')),
-                  ...RolesConfig.kitchenSections().map((s) => DropdownMenuItem(value: s, child: Text(s))),
+    final media = MediaQuery.of(context);
+    return Dialog(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: 420, maxHeight: media.size.height * 0.85),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(loc.t('add_employee') ?? 'Добавить сотрудника', style: theme.textTheme.titleLarge),
+                  TextButton(onPressed: widget.onCancel, child: Text(MaterialLocalizations.of(context).cancelButtonLabel)),
                 ],
-                onChanged: (v) => setState(() => _section = v),
+              ),
+              const SizedBox(height: 16),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: _nameController,
+                        decoration: InputDecoration(
+                          labelText: loc.t('full_name') ?? 'ФИО',
+                          border: const OutlineInputBorder(),
+                          filled: true,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: InputDecoration(
+                          labelText: loc.t('email') ?? 'Email',
+                          border: const OutlineInputBorder(),
+                          filled: true,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _passwordController,
+                        obscureText: true,
+                        decoration: InputDecoration(
+                          labelText: loc.t('password'),
+                          hintText: loc.t('password_too_short') ?? 'мин. 6 символов',
+                          border: const OutlineInputBorder(),
+                          filled: true,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        value: _department,
+                        decoration: InputDecoration(labelText: loc.t('department') ?? 'Отдел', border: const OutlineInputBorder(), filled: true),
+                        items: _departmentKeys.map((k) => DropdownMenuItem(value: k, child: Text(_departmentLabels[k] ?? k))).toList(),
+                        onChanged: (v) => setState(() {
+                          _department = v ?? _department;
+                          if (_department != 'kitchen') _section = null; else _section = 'hot_kitchen';
+                        }),
+                      ),
+                      if (_department == 'kitchen') ...[
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String?>(
+                          value: _section,
+                          decoration: InputDecoration(labelText: loc.t('section') ?? 'Цех', border: const OutlineInputBorder(), filled: true),
+                          items: [
+                            const DropdownMenuItem(value: null, child: Text('—')),
+                            ...RolesConfig.kitchenSections().map((s) => DropdownMenuItem(value: s, child: Text(s))),
+                          ],
+                          onChanged: (v) => setState(() => _section = v),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      Text(loc.t('roles') ?? 'Роли', style: theme.textTheme.titleSmall),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: _roleOptions.map((code) {
+                          final selected = _roles.contains(code);
+                          return FilterChip(
+                            label: Text(_roleLabels[code] ?? code),
+                            selected: selected,
+                            onSelected: (v) => setState(() {
+                              if (v) _roles.add(code); else _roles.remove(code);
+                            }),
+                          );
+                        }).toList(),
+                      ),
+                      if (_error != null) ...[
+                        const SizedBox(height: 12),
+                        Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
+                      ],
+                      const SizedBox(height: 24),
+                      FilledButton(
+                        onPressed: _saving ? null : _create,
+                        child: _saving ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2)) : Text(loc.t('save')),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
-            const SizedBox(height: 12),
-            Text(loc.t('roles') ?? 'Роли', style: theme.textTheme.titleSmall),
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: _roleOptions.map((code) {
-                final selected = _roles.contains(code);
-                return FilterChip(
-                  label: Text(_roleLabels[code] ?? code),
-                  selected: selected,
-                  onSelected: (v) => setState(() {
-                    if (v) _roles.add(code); else _roles.remove(code);
-                  }),
-                );
-              }).toList(),
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 12),
-              Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
-            ],
-            const SizedBox(height: 24),
-            FilledButton(
-              onPressed: _saving ? null : _create,
-              child: _saving ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2)) : Text(loc.t('save')),
-            ),
-          ],
+          ),
         ),
       ),
     );
