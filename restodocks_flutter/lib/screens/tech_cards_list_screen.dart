@@ -22,6 +22,7 @@ class TechCardsListScreen extends StatefulWidget {
 class _TechCardsListScreenState extends State<TechCardsListScreen> {
   List<TechCard> _list = [];
   bool _loading = true;
+  bool _loadingExcel = false;
   String? _error;
 
   String _categoryLabel(String c) {
@@ -92,26 +93,32 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       return;
     }
     final uBytes = Uint8List.fromList(bytes);
-    var list = _parseSimpleExcelNames(uBytes);
-    if (list.isEmpty) {
-      list = await context.read<AiService>().parseTechCardsFromExcel(uBytes);
-    }
-    if (!mounted) return;
-    if (list.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.t('ai_tech_card_excel_format_hint'))),
-      );
-      return;
-    }
-    if (list.length == 1 && list.first.ingredients.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.t('ai_tech_card_loaded_names').replaceAll('%s', '${list.length}'))),
-      );
-    }
-    if (list.length == 1) {
-      context.push('/tech-cards/new', extra: list.single);
-    } else {
-      context.push('/tech-cards/import-review', extra: list);
+    setState(() => _loadingExcel = true);
+    try {
+      // Сначала ИИ: понимает таблицы с десятками/сотнями ТТК, русские столбцы, разный порядок колонок.
+      var list = await context.read<AiService>().parseTechCardsFromExcel(uBytes);
+      if (list.isEmpty) {
+        list = _parseSimpleExcelNames(uBytes);
+      }
+      if (!mounted) return;
+      if (list.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.t('ai_tech_card_excel_format_hint'))),
+        );
+        return;
+      }
+      if (list.length == 1 && list.first.ingredients.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.t('ai_tech_card_loaded_names').replaceAll('%s', '${list.length}'))),
+        );
+      }
+      if (list.length == 1) {
+        context.push('/tech-cards/new', extra: list.single);
+      } else {
+        context.push('/tech-cards/import-review', extra: list);
+      }
+    } finally {
+      if (mounted) setState(() => _loadingExcel = false);
     }
   }
 
@@ -213,7 +220,30 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           IconButton(icon: const Icon(Icons.home), onPressed: () => context.go('/home'), tooltip: loc.t('home')),
         ],
       ),
-      body: _buildBody(loc),
+      body: Stack(
+        children: [
+          _buildBody(loc),
+          if (_loadingExcel)
+            ColoredBox(
+              color: Theme.of(context).colorScheme.surface.withOpacity(0.7),
+              child: Center(
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2)),
+                        const SizedBox(height: 16),
+                        Text(loc.t('loading_excel')),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
       floatingActionButton: canEdit
           ? FloatingActionButton(
               onPressed: _loading ? null : () => context.push('/tech-cards/new'),

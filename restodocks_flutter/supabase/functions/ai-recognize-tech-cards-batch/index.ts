@@ -40,24 +40,32 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const systemPrompt = `You are a tech card (recipe card) parser. The document may contain MULTIPLE tech cards. Each card has:
-- A dish/semi-finished name (often in a header row or first column)
-- A table with columns: 1=Dish name, 2=Product, 3=Gross (g), 4=Waste %, 5=Net (g), 6=Cooking method, 7=Cooking loss %, 8=Output, 9=Price/kg, 10=Cost, 11=Technology
-- Technology text (column 11 or a separate block)
+    const systemPrompt = `You are a tech card (recipe/semi-finished) parser. The document often contains MANY tech cards (50–200+). Your task is to extract ALL of them.
 
-Split the table rows by blocks: when you see a new dish name or a clear separator (empty row, new header), start a new card.
+Structure in the table (columns may be in different order or have different names):
+- Recipe/dish name: "Наименование" or first column; often bold or in a header row; can be "ПФ ..." (semi-finished) or a dish name.
+- Ingredient name: "Продукт" or product column.
+- Quantities: "Брутто" (gross, g), "Нетто" (net, g), "Выход" (output, g).
+- Percentages: "Процент отхода" / "отход" (waste %), "Уварка" / "ужаривание" (shrinkage/cooking loss %).
+- Technology: "Технология" — multi-line cooking instructions; often in a merged cell on the right for the whole block.
 
-Return ONLY valid JSON with this exact structure (no markdown):
+IGNORE these columns (do not use, do not require): "Цена за 1 кг/л", "Кг", "Стоимость", "Цена за 1", price, cost. The system calculates cost itself.
+
+How to split cards: each card is a block — one dish name row (or name in first column), then ingredient rows, then usually an "Итого" (total) row. When you see a new dish name or "Наименование" again or a clear separator, start a new card. Technology text belongs to the card it is next to (merged cell).
+
+If column order or names vary (different languages, extra columns), infer from context. Extract: dishName, ingredients (productName, grossGrams, netGrams, primaryWastePct, cookingLossPct; unit default "g"), technologyText. Do not return empty just because the format is non-standard — parse as much as you can.
+
+Return ONLY valid JSON, no markdown:
 { "cards": [ { "dishName": string, "technologyText": string | null, "isSemiFinished": boolean | null, "ingredients": [ { "productName": string, "grossGrams": number | null, "netGrams": number | null, "primaryWastePct": number | null, "cookingMethod": string | null, "cookingLossPct": number | null, "unit": string | null } ] }, ... ] }
 
-If the document has only one card, return { "cards": [ { ... } ] }. If no cards found, return { "cards": [] }.`;
+Return ALL cards found (up to hundreds). If no cards, return { "cards": [] }.`;
 
     const content = await chatText({
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: `Document table rows:\n${JSON.stringify(rows)}` },
       ],
-      maxTokens: 8192,
+      maxTokens: 16384,
     });
 
     if (!content?.trim()) {

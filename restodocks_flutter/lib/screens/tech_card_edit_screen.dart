@@ -163,6 +163,7 @@ class _EditableProductNameCell extends StatefulWidget {
 
 class _EditableProductNameCellState extends State<_EditableProductNameCell> {
   late TextEditingController _ctrl;
+  final FocusNode _focusNode = FocusNode();
 
   @override
   void initState() {
@@ -180,23 +181,29 @@ class _EditableProductNameCellState extends State<_EditableProductNameCell> {
 
   @override
   void dispose() {
+    _focusNode.dispose();
     _ctrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
-      controller: _ctrl,
-      style: const TextStyle(fontSize: 12),
-      decoration: const InputDecoration(
-        isDense: true,
-        border: InputBorder.none,
-        contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-        filled: true,
-        fillColor: Colors.transparent,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _focusNode.requestFocus(),
+      child: TextField(
+        focusNode: _focusNode,
+        controller: _ctrl,
+        style: const TextStyle(fontSize: 12),
+        decoration: const InputDecoration(
+          isDense: true,
+          border: InputBorder.none,
+          contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          filled: true,
+          fillColor: Colors.transparent,
+        ),
+        onChanged: widget.onChanged,
       ),
-      onChanged: widget.onChanged,
     );
   }
 }
@@ -543,21 +550,25 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
       final tc = await svc.getTechCardById(widget.techCardId);
       if (!mounted) return;
       final canEdit = context.read<AccountManagerSupabase>().currentEmployee?.canEditChecklistsAndTechCards ?? false;
-      setState(() {
-        _techCard = tc;
-        _loading = false;
-        if (tc != null) {
-          _nameController.text = tc.dishName;
-          _selectedCategory = _categoryOptions.contains(tc.category) ? tc.category : 'misc';
-          _isSemiFinished = tc.isSemiFinished;
-          _technologyController.text = tc.getLocalizedTechnology(context.read<LocalizationService>().currentLanguageCode);
-          _ingredients
-            ..clear()
-            ..addAll(tc.ingredients);
-          if (canEdit && (_ingredients.isEmpty || !_ingredients.last.isPlaceholder)) {
-            _ingredients.add(TTIngredient.emptyPlaceholder());
+      // Откладываем тяжёлый setState на следующий кадр, чтобы не блокировать UI при большом числе ингредиентов
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() {
+          _techCard = tc;
+          _loading = false;
+          if (tc != null) {
+            _nameController.text = tc.dishName;
+            _selectedCategory = _categoryOptions.contains(tc.category) ? tc.category : 'misc';
+            _isSemiFinished = tc.isSemiFinished;
+            _technologyController.text = tc.getLocalizedTechnology(context.read<LocalizationService>().currentLanguageCode);
+            _ingredients
+              ..clear()
+              ..addAll(tc.ingredients);
+            if (canEdit && (_ingredients.isEmpty || !_ingredients.last.isPlaceholder)) {
+              _ingredients.add(TTIngredient.emptyPlaceholder());
+            }
           }
-        }
+        });
       });
     } catch (e) {
       if (mounted) setState(() { _error = e.toString(); _loading = false; });
@@ -1059,12 +1070,12 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop(), style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
         title: Text(_isNew ? loc.t('create_tech_card') : (_techCard?.getLocalizedDishName(loc.currentLanguageCode) ?? loc.t('tech_cards'))),
         actions: [
-          if (canEdit) IconButton(icon: const Icon(Icons.save), onPressed: _save, tooltip: loc.t('save')),
-          if (canEdit && !_isNew) IconButton(icon: const Icon(Icons.delete_outline), onPressed: () => _confirmDelete(context, loc), tooltip: loc.t('delete_tech_card')),
-          IconButton(icon: const Icon(Icons.home), onPressed: () => context.go('/home'), tooltip: loc.t('home')),
+          if (canEdit) IconButton(icon: const Icon(Icons.save), onPressed: _save, tooltip: loc.t('save'), style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
+          if (canEdit && !_isNew) IconButton(icon: const Icon(Icons.delete_outline), onPressed: () => _confirmDelete(context, loc), tooltip: loc.t('delete_tech_card'), style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
+          IconButton(icon: const Icon(Icons.home), onPressed: () => context.go('/home'), tooltip: loc.t('home'), style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
         ],
       ),
       body: LayoutBuilder(
@@ -1072,6 +1083,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           final narrow = constraints.maxWidth < 500;
           return SingleChildScrollView(
             padding: const EdgeInsets.all(12),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -1184,12 +1196,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                     onPressed: _addEmptyIngredientRow,
                     icon: const Icon(Icons.edit_note, size: 20),
                     label: Text(loc.t('ttk_add_row_manual')),
+                    style: FilledButton.styleFrom(minimumSize: const Size(64, 48), padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12)),
                   ),
                   const SizedBox(width: 8),
                   FilledButton.tonalIcon(
                     onPressed: _showAddIngredient,
                     icon: const Icon(Icons.add, size: 20),
                     label: Text(loc.t('add_ingredient')),
+                    style: FilledButton.styleFrom(minimumSize: const Size(64, 48), padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12)),
                   ),
                 ],
               ],
@@ -1214,11 +1228,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                     onPressed: _recognizingSource != null ? null : _fillFromPhoto,
                     icon: _recognizingSource == 'photo' ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.document_scanner, size: 20),
                     label: Text(loc.t('ai_tech_card_from_photo')),
+                    style: FilledButton.styleFrom(minimumSize: const Size(64, 48)),
                   ),
                   FilledButton.tonalIcon(
                     onPressed: _recognizingSource != null ? null : _fillFromExcel,
                     icon: _recognizingSource == 'excel' ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.table_chart, size: 20),
                     label: Text(loc.t('ai_tech_card_from_excel')),
+                    style: FilledButton.styleFrom(minimumSize: const Size(64, 48)),
                   ),
                   if (_recognizingSource == 'photo') Padding(
                     padding: const EdgeInsets.only(left: 8),
@@ -1294,10 +1310,15 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                                 dishName: _nameController.text,
                                 ingredients: _ingredients,
                                 technology: _technologyController.text,
-                                onIngredientsChanged: (list) => setState(() {
-                                  _ingredients.clear();
-                                  _ingredients.addAll(list);
-                                }),
+                                onIngredientsChanged: (list) {
+                                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                                    if (!mounted) return;
+                                    setState(() {
+                                      _ingredients.clear();
+                                      _ingredients.addAll(list);
+                                    });
+                                  });
+                                },
                               ),
                         ),
                       ),
@@ -1310,13 +1331,18 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
               const SizedBox(height: 16),
               Row(
                 children: [
-                  FilledButton(onPressed: _save, child: Text(loc.t('save'))),
+                  FilledButton(
+                    onPressed: _save,
+                    child: Text(loc.t('save')),
+                    style: FilledButton.styleFrom(minimumSize: const Size(120, 48), padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14)),
+                  ),
                   if (!_isNew) ...[
                     const SizedBox(width: 16),
                     TextButton.icon(
                       icon: Icon(Icons.delete_outline, size: 20, color: Theme.of(context).colorScheme.error),
                       label: Text(loc.t('delete_tech_card'), style: TextStyle(color: Theme.of(context).colorScheme.error)),
                       onPressed: () => _confirmDelete(context, loc),
+                      style: TextButton.styleFrom(minimumSize: const Size(120, 48), padding: const EdgeInsets.symmetric(horizontal: 16)),
                     ),
                   ],
                 ],
@@ -1402,9 +1428,10 @@ class _TtkTableState extends State<_TtkTable> {
       9: const FlexColumnWidth(1.2),    // Технология (широкая)
       if (hasDeleteCol) 10: const FixedColumnWidth(48),
     };
-    final borderColor = theme.colorScheme.onSurface.withOpacity(0.35);
+    final borderColor = theme.colorScheme.onSurface.withOpacity(0.5);
     final borderSide = BorderSide(width: 1, color: borderColor);
-    final borderSideOuter = BorderSide(width: 1.5, color: theme.colorScheme.onSurface.withOpacity(0.5));
+    final borderSideOuter = BorderSide(width: 1.5, color: theme.colorScheme.onSurface.withOpacity(0.6));
+    final cellBg = theme.colorScheme.surfaceContainerLow.withOpacity(0.25);
     return Table(
       border: TableBorder(
         left: borderSideOuter,
@@ -1475,8 +1502,7 @@ class _TtkTableState extends State<_TtkTable> {
                         constraints: const BoxConstraints(minHeight: 56),
                         child: Material(
                           color: Colors.transparent,
-                          child: GestureDetector(
-                            behavior: HitTestBehavior.opaque,
+                          child: InkWell(
                             onTap: widget.onAdd,
                             child: Padding(
                               padding: _cellPad,
@@ -1552,6 +1578,7 @@ class _TtkTableState extends State<_TtkTable> {
           final nettoG = ing.effectiveGrossWeight;
           final isFirstRow = i == 0;
           return TableRow(
+            decoration: BoxDecoration(color: cellBg),
             children: [
               // Наименование блюда — в первой строке редактируемое поле (или текст)
               widget.canEdit && isFirstRow && widget.dishNameController != null
@@ -1633,31 +1660,46 @@ class _TtkTableState extends State<_TtkTable> {
                       child: SizedBox.expand(
                         child: Padding(
                           padding: _cellPad,
-                          child: Row(
+                          child: Column(
                             mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              Expanded(
-                                child: _EditableWasteCell(
-                                  value: ing.primaryWastePct,
-                                  onChanged: (v) {
-                                    final waste = (v ?? ing.primaryWastePct).clamp(0.0, 99.9);
-                                    if (product != null) {
-                                      widget.onUpdate(i, ing.updatePrimaryWastePct(waste, product, proc));
-                                    } else {
-                                      final net = ing.grossWeight * (1.0 - waste / 100.0);
-                                      final loss = (ing.cookingLossPctOverride ?? 0).clamp(0.0, 99.9) / 100.0;
-                                      final out = net * (1.0 - loss);
-                                      widget.onUpdate(i, ing.copyWith(primaryWastePct: waste, netWeight: out, isNetWeightManual: false));
-                                    }
-                                  },
-                                ),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Expanded(
+                                    child: _EditableWasteCell(
+                                      value: ing.primaryWastePct,
+                                      onChanged: (v) {
+                                        final waste = (v ?? ing.primaryWastePct).clamp(0.0, 99.9);
+                                        if (product != null) {
+                                          widget.onUpdate(i, ing.updatePrimaryWastePct(waste, product, proc));
+                                        } else {
+                                          final net = ing.grossWeight * (1.0 - waste / 100.0);
+                                          final loss = (ing.cookingLossPctOverride ?? 0).clamp(0.0, 99.9) / 100.0;
+                                          final out = net * (1.0 - loss);
+                                          widget.onUpdate(i, ing.copyWith(primaryWastePct: waste, netWeight: out, isNetWeightManual: false));
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                  if (product == null && ing.productName.trim().isNotEmpty && widget.onSuggestWaste != null)
+                                    IconButton(
+                                      icon: const Icon(Icons.auto_awesome, size: 18),
+                                      tooltip: loc.t('ttk_suggest_waste'),
+                                      onPressed: () => widget.onSuggestWaste!(i),
+                                      style: IconButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(28, 28)),
+                                    ),
+                                ],
                               ),
-                              if (product == null && ing.productName.trim().isNotEmpty && widget.onSuggestWaste != null)
-                                IconButton(
-                                  icon: const Icon(Icons.auto_awesome, size: 18),
-                                  tooltip: loc.t('ttk_suggest_waste'),
-                                  onPressed: () => widget.onSuggestWaste!(i),
-                                  style: IconButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(28, 28)),
+                              if (ing.grossWeight > 0 && ing.effectiveGrossWeight < ing.grossWeight)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 2),
+                                  child: Text(
+                                    '−${(ing.grossWeight - ing.effectiveGrossWeight).toStringAsFixed(0)} г',
+                                    style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant),
+                                  ),
                                 ),
                             ],
                           ),
@@ -1740,18 +1782,31 @@ class _TtkTableState extends State<_TtkTable> {
                       child: SizedBox.expand(
                         child: Padding(
                           padding: _cellPad,
-                          child: _EditableShrinkageCell(
-                            value: product != null ? ing.weightLossPercentage : (ing.cookingLossPctOverride ?? 0),
-                            onChanged: (pct) {
-                              if (product != null && proc != null) {
-                                widget.onUpdate(i, ing.updateCookingLossPct(pct, product, proc, languageCode: lang));
-                              } else {
-                                // Без продукта: выход = нетто × (1 − ужарка/100); при ужарке 0 выход = нетто
-                                final loss = (pct ?? 0).clamp(0.0, 99.9);
-                                final out = ing.effectiveGrossWeight * (1.0 - loss / 100.0);
-                                widget.onUpdate(i, ing.copyWith(cookingLossPctOverride: pct, netWeight: out));
-                              }
-                            },
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _EditableShrinkageCell(
+                                value: product != null ? ing.weightLossPercentage : (ing.cookingLossPctOverride ?? 0),
+                                onChanged: (pct) {
+                                  if (product != null && proc != null) {
+                                    widget.onUpdate(i, ing.updateCookingLossPct(pct, product, proc, languageCode: lang));
+                                  } else {
+                                    final loss = (pct ?? 0).clamp(0.0, 99.9);
+                                    final out = ing.effectiveGrossWeight * (1.0 - loss / 100.0);
+                                    widget.onUpdate(i, ing.copyWith(cookingLossPctOverride: pct, netWeight: out));
+                                  }
+                                },
+                              ),
+                              if (ing.effectiveGrossWeight > 0 && ing.netWeight < ing.effectiveGrossWeight)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 2),
+                                  child: Text(
+                                    '−${(ing.effectiveGrossWeight - ing.netWeight).toStringAsFixed(0)} г',
+                                    style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant),
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
                       ),
@@ -1905,20 +1960,16 @@ class _TtkCookTableState extends State<_TtkCookTable> {
   void _scaleByOutput(double newOutput) {
     if (newOutput <= 0 || _totalOutput <= 0) return;
     final factor = newOutput / _totalOutput;
-    setState(() {
-      _totalOutput = newOutput;
-      _ingredients = _ingredients.map((i) => i.scaleBy(factor)).toList();
-      widget.onIngredientsChanged(_ingredients);
-    });
+    _totalOutput = newOutput;
+    _ingredients = _ingredients.map((i) => i.scaleBy(factor)).toList();
+    widget.onIngredientsChanged(_ingredients);
   }
 
   void _updateNetAt(int index, double newNet) {
     if (index < 0 || index >= _ingredients.length) return;
-    setState(() {
-      _ingredients[index] = _ingredients[index].updateNetWeightForCook(newNet);
-      _totalOutput = _ingredients.fold<double>(0, (s, i) => s + i.netWeight);
-      widget.onIngredientsChanged(_ingredients);
-    });
+    _ingredients[index] = _ingredients[index].updateNetWeightForCook(newNet);
+    _totalOutput = _ingredients.fold<double>(0, (s, i) => s + i.netWeight);
+    widget.onIngredientsChanged(_ingredients);
   }
 
   Widget _cell(String text, {bool bold = false}) {
