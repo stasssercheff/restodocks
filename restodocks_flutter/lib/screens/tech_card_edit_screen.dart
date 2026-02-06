@@ -1463,10 +1463,10 @@ class _TtkTableState extends State<_TtkTable> {
       9: const FlexColumnWidth(1.2),    // Технология (широкая)
       if (hasDeleteCol) 10: const FixedColumnWidth(48),
     };
-    final borderColor = theme.colorScheme.onSurface.withOpacity(0.5);
+    final borderColor = theme.colorScheme.outline.withOpacity(0.7);
     final borderSide = BorderSide(width: 1, color: borderColor);
-    final borderSideOuter = BorderSide(width: 1.5, color: theme.colorScheme.onSurface.withOpacity(0.6));
-    final cellBg = theme.colorScheme.surfaceContainerLow.withOpacity(0.25);
+    final borderSideOuter = BorderSide(width: 1.5, color: theme.colorScheme.outline);
+    final cellBg = theme.colorScheme.surfaceContainerLow.withOpacity(0.35);
     return Table(
       border: TableBorder(
         left: borderSideOuter,
@@ -1479,9 +1479,9 @@ class _TtkTableState extends State<_TtkTable> {
       columnWidths: columnWidths,
       defaultColumnWidth: const FixedColumnWidth(80),
       children: [
-        // Серая шапка как в документе
+        // Шапка таблицы
         TableRow(
-          decoration: BoxDecoration(color: Colors.grey.shade300),
+          decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest),
           children: [
             _cell(loc.t('ttk_dish_name_col'), bold: true),
             _cell(loc.t('ttk_product'), bold: true),
@@ -1880,30 +1880,37 @@ class _TtkTableState extends State<_TtkTable> {
                       ),
                     )
                   : _cell('${ing.cost.toStringAsFixed(2)} $sym'),
-              // Колонка «Технология»
-              if (isFirstRow && widget.technologyController != null)
-                TableCell(
-                  verticalAlignment: TableCellVerticalAlignment.fill,
-                  child: Container(
-                    constraints: const BoxConstraints(minHeight: 120),
-                    padding: _cellPad,
-                    alignment: Alignment.topLeft,
-                    child: TextField(
-                      controller: widget.technologyController,
-                      readOnly: !widget.canEdit,
-                      maxLines: 8,
-                      style: const TextStyle(fontSize: 12),
-                      decoration: InputDecoration(
-                        isDense: true,
-                        hintText: loc.t('ttk_technology'),
-                        border: const OutlineInputBorder(),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                        filled: true,
-                        fillColor: theme.colorScheme.surfaceContainerLow.withOpacity(0.5),
+              // Колонка «Технология» — только в первой строке контент, в остальных пустая ячейка
+              isFirstRow && widget.technologyController != null
+                  ? TableCell(
+                      verticalAlignment: TableCellVerticalAlignment.fill,
+                      child: Container(
+                        constraints: const BoxConstraints(minHeight: 120),
+                        padding: _cellPad,
+                        alignment: Alignment.topLeft,
+                        child: TextField(
+                          controller: widget.technologyController,
+                          readOnly: !widget.canEdit,
+                          maxLines: 8,
+                          style: const TextStyle(fontSize: 12),
+                          decoration: InputDecoration(
+                            isDense: true,
+                            hintText: loc.t('ttk_technology'),
+                            border: const OutlineInputBorder(),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                            filled: true,
+                            fillColor: theme.colorScheme.surfaceContainerLow.withOpacity(0.5),
+                          ),
+                        ),
+                      ),
+                    )
+                  : TableCell(
+                      child: Container(
+                        constraints: const BoxConstraints(minHeight: 48),
+                        padding: _cellPad,
+                        child: const SizedBox.shrink(),
                       ),
                     ),
-                  ),
-                ),
               if (hasDeleteCol)
                 TableCell(
                   child: Padding(
@@ -1919,9 +1926,9 @@ class _TtkTableState extends State<_TtkTable> {
             ],
           );
         }),
-        // Итого — жёлтая строка (колонка «Технология» занята rowSpan)
+        // Итого
         TableRow(
-          decoration: BoxDecoration(color: Colors.amber.shade100),
+          decoration: BoxDecoration(color: theme.colorScheme.tertiaryContainer.withOpacity(0.8)),
           children: [
             _cell('', bold: true),
             _cell(loc.t('ttk_total'), bold: true),
@@ -1941,8 +1948,10 @@ class _TtkTableState extends State<_TtkTable> {
 
   Widget _cell(String text, {bool bold = false}) {
     return TableCell(
-      child: Padding(
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 44),
         padding: _cellPad,
+        alignment: Alignment.centerLeft,
         child: Text(text, style: TextStyle(fontSize: 12, fontWeight: bold ? FontWeight.bold : null), overflow: TextOverflow.ellipsis, maxLines: 2),
       ),
     );
