@@ -1463,9 +1463,10 @@ class _TtkTableState extends State<_TtkTable> {
       9: const FlexColumnWidth(1.2),    // Технология (широкая)
       if (hasDeleteCol) 10: const FixedColumnWidth(48),
     };
-    final borderColor = theme.colorScheme.outline.withOpacity(0.7);
+    // Чёткие границы между ячейками
+    final borderColor = theme.colorScheme.outline;
     final borderSide = BorderSide(width: 1, color: borderColor);
-    final borderSideOuter = BorderSide(width: 1.5, color: theme.colorScheme.outline);
+    final borderSideOuter = BorderSide(width: 1.5, color: borderColor);
     final cellBg = theme.colorScheme.surfaceContainerLow.withOpacity(0.35);
     return Table(
       border: TableBorder(
