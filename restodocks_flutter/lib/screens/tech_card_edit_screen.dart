@@ -1558,7 +1558,7 @@ class _TtkTableState extends State<_TtkTable> {
                             ),
                           ),
                         ),
-                      ),
+                      )),
                     )
                   : TableCell(child: wrapCell(Padding(padding: _cellPad, child: Text('', style: const TextStyle(fontSize: 12))))),
               ...List.generate(7, (_) => TableCell(
@@ -1868,14 +1868,14 @@ class _TtkTableState extends State<_TtkTable> {
                         child: Padding(
                           padding: _cellPad,
                           child: _EditableCostCell(
-                          cost: ing.cost,
-                          symbol: sym,
-                          onChanged: (v) {
-                            if (v != null && v >= 0) widget.onUpdate(i, ing.copyWith(cost: v));
-                          },
+                            cost: ing.cost,
+                            symbol: sym,
+                            onChanged: (v) {
+                              if (v != null && v >= 0) widget.onUpdate(i, ing.copyWith(cost: v));
+                            },
+                          ),
                         ),
-                      ),
-                      ),
+                      )),
                     )
                   : _cell('${ing.cost.toStringAsFixed(2)} $sym'),
               // Колонка «Технология» — только в первой строке контент, в остальных пустая ячейка
@@ -1901,7 +1901,8 @@ class _TtkTableState extends State<_TtkTable> {
                           ),
                         ),
                       ),
-                    )),
+                    ),
+                  )
                   : TableCell(
                       child: wrapCell(Container(
                         constraints: const BoxConstraints(minHeight: 48),
