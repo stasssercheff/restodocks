@@ -56,6 +56,10 @@ class TTIngredient extends Equatable {
   @JsonKey(name: 'is_net_weight_manual')
   final bool isNetWeightManual;
 
+  /// Ручное «нетто» (после отхода, до ужарки). Когда задано — показываем и редактируем его без формул.
+  @JsonKey(name: 'manual_effective_gross')
+  final double? manualEffectiveGross;
+
   // Итоговые питательные вещества
   @JsonKey(name: 'final_calories')
   final double finalCalories;
@@ -88,6 +92,7 @@ class TTIngredient extends Equatable {
     this.gramsPerPiece,
     this.cookingLossPctOverride,
     this.isNetWeightManual = false,
+    this.manualEffectiveGross,
     required this.finalCalories,
     required this.finalProtein,
     required this.finalFat,
@@ -150,6 +155,7 @@ class TTIngredient extends Equatable {
     Object? gramsPerPiece = _undefined,
     Object? cookingLossPctOverride = _undefined,
     Object? isNetWeightManual = _undefined,
+    Object? manualEffectiveGross = _undefined,
     Object? finalCalories = _undefined,
     Object? finalProtein = _undefined,
     Object? finalFat = _undefined,
@@ -171,6 +177,7 @@ class TTIngredient extends Equatable {
       gramsPerPiece: gramsPerPiece == _undefined ? this.gramsPerPiece : gramsPerPiece as double?,
       cookingLossPctOverride: cookingLossPctOverride == _undefined ? this.cookingLossPctOverride : cookingLossPctOverride as double?,
       isNetWeightManual: isNetWeightManual == _undefined ? this.isNetWeightManual : isNetWeightManual as bool,
+      manualEffectiveGross: manualEffectiveGross == _undefined ? this.manualEffectiveGross : manualEffectiveGross as double?,
       finalCalories: finalCalories == _undefined ? this.finalCalories : finalCalories as double,
       finalProtein: finalProtein == _undefined ? this.finalProtein : finalProtein as double,
       finalFat: finalFat == _undefined ? this.finalFat : finalFat as double,
@@ -537,8 +544,8 @@ class TTIngredient extends Equatable {
   /// Информация о стоимости
   String get costInfo => '${cost.toStringAsFixed(2)} ₽'; // TODO: использовать текущую валюту
 
-  /// Вес после первичной обработки (нетто до ужарки): брутто × (1 − отход/100)
-  double get effectiveGrossWeight => grossWeight * (1.0 - (primaryWastePct.clamp(0.0, 99.9) / 100.0));
+  /// Вес после первичной обработки (нетто до ужарки). При ручном вводе — manualEffectiveGross, иначе формула.
+  double get effectiveGrossWeight => manualEffectiveGross ?? (grossWeight * (1.0 - (primaryWastePct.clamp(0.0, 99.9) / 100.0)));
 
   /// Эффективный процент ужарки: ручная подстановка, иначе из способа, иначе вычисленный
   double get weightLossPercentage {
@@ -589,6 +596,7 @@ class TTIngredient extends Equatable {
     gramsPerPiece,
     cookingLossPctOverride,
     isNetWeightManual,
+    manualEffectiveGross,
     finalCalories,
     finalProtein,
     finalFat,

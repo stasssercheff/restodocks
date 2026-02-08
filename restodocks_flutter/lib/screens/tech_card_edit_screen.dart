@@ -1481,7 +1481,7 @@ class _TtkTableState extends State<_TtkTable> {
 
     Widget wrapCell(Widget child) => Container(
       decoration: BoxDecoration(border: Border.all(width: 1, color: borderColor)),
-      clipBehavior: Clip.rect,
+      clipBehavior: Clip.hardEdge,
       child: SizedBox(width: double.infinity, child: child),
     );
 
@@ -1554,21 +1554,32 @@ class _TtkTableState extends State<_TtkTable> {
                             onTap: widget.onAdd,
                             child: Padding(
                               padding: _cellPad,
-                              child: Center(
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.add_circle_outline, size: 20, color: theme.colorScheme.primary),
-                                    const SizedBox(width: 8),
-                                    Flexible(
-                                      child: Text(
-                                        loc.t('ttk_add_ingredient_hint'),
-                                        style: TextStyle(fontSize: 12, color: theme.colorScheme.primary),
-                                        overflow: TextOverflow.ellipsis,
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    loc.t('ttk_add_hint'),
+                                    style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.add_circle_outline, size: 18, color: theme.colorScheme.primary),
+                                      const SizedBox(width: 6),
+                                      Flexible(
+                                        child: Text(
+                                          loc.t('ttk_add_ingredient_hint'),
+                                          style: TextStyle(fontSize: 12, color: theme.colorScheme.primary),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
                                       ),
-                                    ),
-                                  ],
-                                ),
+                                    ],
+                                  ),
+                                ],
                               ),
                             ),
                           ),
@@ -1623,7 +1634,6 @@ class _TtkTableState extends State<_TtkTable> {
           final product = ing.productId != null ? widget.productStore.allProducts.where((p) => p.id == ing.productId).firstOrNull : null;
           final proc = ing.cookingProcessId != null ? CookingProcess.findById(ing.cookingProcessId!) : null;
           final pricePerUnit = product?.basePrice ?? (ing.netWeight > 0 ? ing.cost * 1000 / ing.netWeight : 0.0);
-          final nettoG = ing.effectiveGrossWeight;
           final isFirstRow = i == 0;
           return TableRow(
             decoration: BoxDecoration(color: cellBg),
@@ -1687,16 +1697,7 @@ class _TtkTableState extends State<_TtkTable> {
                           child: _EditableGrossCell(
                             grams: ing.grossWeight,
                             onChanged: (g) {
-                              if (g != null && g >= 0) {
-                                if (product != null) {
-                                  widget.onUpdate(i, ing.updateGrossWeight(g, product, proc));
-                                } else {
-                                  final net = g * (1.0 - ing.primaryWastePct.clamp(0.0, 99.9) / 100.0);
-                                  final loss = (ing.cookingLossPctOverride ?? 0).clamp(0.0, 99.9) / 100.0;
-                                  final out = net * (1.0 - loss);
-                                  widget.onUpdate(i, ing.copyWith(grossWeight: g, netWeight: out));
-                                }
-                              }
+                              if (g != null && g >= 0) widget.onUpdate(i, ing.copyWith(grossWeight: g));
                             },
                           ),
                         ),
@@ -1720,15 +1721,7 @@ class _TtkTableState extends State<_TtkTable> {
                                     child: _EditableWasteCell(
                                       value: ing.primaryWastePct,
                                       onChanged: (v) {
-                                        final waste = (v ?? ing.primaryWastePct).clamp(0.0, 99.9);
-                                        if (product != null) {
-                                          widget.onUpdate(i, ing.updatePrimaryWastePct(waste, product, proc));
-                                        } else {
-                                          final net = ing.grossWeight * (1.0 - waste / 100.0);
-                                          final loss = (ing.cookingLossPctOverride ?? 0).clamp(0.0, 99.9) / 100.0;
-                                          final out = net * (1.0 - loss);
-                                          widget.onUpdate(i, ing.copyWith(primaryWastePct: waste, netWeight: out, isNetWeightManual: false));
-                                        }
+                                        if (v != null) widget.onUpdate(i, ing.copyWith(primaryWastePct: v.clamp(0.0, 99.9)));
                                       },
                                     ),
                                   ),
@@ -1741,14 +1734,6 @@ class _TtkTableState extends State<_TtkTable> {
                                     ),
                                 ],
                               ),
-                              if (ing.grossWeight > 0 && ing.effectiveGrossWeight < ing.grossWeight)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 2),
-                                  child: Text(
-                                    '−${(ing.grossWeight - ing.effectiveGrossWeight).toStringAsFixed(0)} г',
-                                    style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant),
-                                  ),
-                                ),
                             ],
                           ),
                         ),
@@ -1763,9 +1748,7 @@ class _TtkTableState extends State<_TtkTable> {
                           child: _EditableNetCell(
                             value: ing.effectiveGrossWeight,
                             onChanged: (v) {
-                              if (v != null && v >= 0) {
-                                widget.onUpdate(i, ing.updateEffectiveGross(v, product, proc, languageCode: lang));
-                              }
+                              if (v != null && v >= 0) widget.onUpdate(i, ing.copyWith(manualEffectiveGross: v));
                             },
                           ),
                         ),
@@ -1799,23 +1782,17 @@ class _TtkTableState extends State<_TtkTable> {
                                       DropdownMenuItem(value: 'custom', child: Text(loc.t('cooking_custom'), overflow: TextOverflow.ellipsis)),
                                     ],
                               onChanged: (id) {
-                                if (product != null) {
-                                  final p = id != null && id != 'custom' ? CookingProcess.findById(id) : null;
-                                  widget.onUpdate(i, ing.updateCookingProcess(p, product, languageCode: lang));
+                                if (id == null) {
+                                  widget.onUpdate(i, ing.copyWith(cookingProcessId: null, cookingProcessName: null));
+                                } else if (id == 'custom') {
+                                  widget.onUpdate(i, ing.copyWith(cookingProcessId: 'custom', cookingProcessName: loc.t('cooking_custom')));
                                 } else {
-                                  if (id == null) {
-                                    widget.onUpdate(i, ing.copyWith(cookingProcessId: null, cookingProcessName: null, cookingLossPctOverride: null));
-                                  } else if (id == 'custom') {
-                                    widget.onUpdate(i, ing.copyWith(cookingProcessId: 'custom', cookingProcessName: loc.t('cooking_custom'), cookingLossPctOverride: ing.cookingLossPctOverride));
-                                  } else {
-                                    final p = CookingProcess.findById(id);
-                                    if (p != null) {
-                                      widget.onUpdate(i, ing.copyWith(
-                                        cookingProcessId: p.id,
-                                        cookingProcessName: p.getLocalizedName(lang),
-                                        cookingLossPctOverride: p.weightLossPercentage,
-                                      ));
-                                    }
+                                  final p = CookingProcess.findById(id);
+                                  if (p != null) {
+                                    widget.onUpdate(i, ing.copyWith(
+                                      cookingProcessId: p.id,
+                                      cookingProcessName: p.getLocalizedName(lang),
+                                    ));
                                   }
                                 }
                               },
@@ -1837,23 +1814,9 @@ class _TtkTableState extends State<_TtkTable> {
                               _EditableShrinkageCell(
                                 value: product != null ? ing.weightLossPercentage : (ing.cookingLossPctOverride ?? 0),
                                 onChanged: (pct) {
-                                  if (product != null && proc != null) {
-                                    widget.onUpdate(i, ing.updateCookingLossPct(pct, product, proc, languageCode: lang));
-                                  } else {
-                                    final loss = (pct ?? 0).clamp(0.0, 99.9);
-                                    final out = ing.effectiveGrossWeight * (1.0 - loss / 100.0);
-                                    widget.onUpdate(i, ing.copyWith(cookingLossPctOverride: pct, netWeight: out));
-                                  }
+                                  if (pct != null) widget.onUpdate(i, ing.copyWith(cookingLossPctOverride: pct.clamp(0.0, 99.9)));
                                 },
                               ),
-                              if (ing.effectiveGrossWeight > 0 && ing.netWeight < ing.effectiveGrossWeight)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 2),
-                                  child: Text(
-                                    '−${(ing.effectiveGrossWeight - ing.netWeight).toStringAsFixed(0)} г',
-                                    style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant),
-                                  ),
-                                ),
                             ],
                           ),
                         ),
@@ -1868,9 +1831,7 @@ class _TtkTableState extends State<_TtkTable> {
                           child: _EditableNetCell(
                             value: ing.netWeight,
                             onChanged: (v) {
-                              if (v != null && v >= 0) {
-                                widget.onUpdate(i, ing.updateOutputWeight(v, product, proc, languageCode: lang));
-                              }
+                              if (v != null && v >= 0) widget.onUpdate(i, ing.copyWith(netWeight: v));
                             },
                           ),
                         ),
@@ -1940,9 +1901,9 @@ class _TtkTableState extends State<_TtkTable> {
             ],
           );
         }),
-        // Итого
+        // Итого — жёлтая строка как в образце
         TableRow(
-          decoration: BoxDecoration(color: theme.colorScheme.tertiaryContainer.withOpacity(0.8)),
+          decoration: BoxDecoration(color: Colors.amber.shade100),
           children: [
             _cell('', bold: true),
             _cell(loc.t('ttk_total'), bold: true),
