@@ -1313,7 +1313,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                       scrollDirection: Axis.horizontal,
                       child: SingleChildScrollView(
                         child: ConstrainedBox(
-                          constraints: const BoxConstraints(minWidth: 1180),
+                          constraints: const BoxConstraints(minWidth: 1224),
                           child: canEdit
                             ? _TtkTable(
                             loc: loc,
@@ -1449,33 +1449,48 @@ class _TtkTableState extends State<_TtkTable> {
     final sym = currency == 'RUB' ? '₽' : currency == 'VND' ? '₫' : currency == 'USD' ? '\$' : currency;
 
     final hasDeleteCol = widget.canEdit;
-    // Технология — колонка справа в таблице.
+    // Все колонки фиксированы, чтобы на вебе не слипались ячейки и не пропадали столбцы.
+    const col0 = 130.0;
+    const col1 = 200.0;
+    const col2 = 80.0;
+    const col3 = 64.0;
+    const col4 = 80.0;
+    const col5 = 140.0;
+    const col6 = 64.0;
+    const col7 = 80.0;
+    const col8 = 90.0;
+    const col9 = 220.0; // Технология
+    const col10 = 48.0;
     final columnWidths = <int, TableColumnWidth>{
-      0: const FixedColumnWidth(130),   // Наименование блюда
-      1: const FixedColumnWidth(200),   // Продукт (тап — bottom sheet выбора)
-      2: const FixedColumnWidth(80),    // Брутто гр/шт
-      3: const FixedColumnWidth(64),    // Отход %
-      4: const FixedColumnWidth(80),    // Нетто гр/шт
-      5: const FixedColumnWidth(140),   // Способ приготовления
-      6: const FixedColumnWidth(64),    // Ужарка %
-      7: const FixedColumnWidth(80),    // Выход гр/шт
-      8: const FixedColumnWidth(90),    // Стоимость
-      9: const FlexColumnWidth(1.2),    // Технология (широкая)
-      if (hasDeleteCol) 10: const FixedColumnWidth(48),
+      0: const FixedColumnWidth(col0),
+      1: const FixedColumnWidth(col1),
+      2: const FixedColumnWidth(col2),
+      3: const FixedColumnWidth(col3),
+      4: const FixedColumnWidth(col4),
+      5: const FixedColumnWidth(col5),
+      6: const FixedColumnWidth(col6),
+      7: const FixedColumnWidth(col7),
+      8: const FixedColumnWidth(col8),
+      9: const FixedColumnWidth(col9),
+      if (hasDeleteCol) 10: const FixedColumnWidth(col10),
     };
-    // Явная разметка: граница у каждой ячейки (на вебе Table border может не рисоваться)
+    final tableWidth = col0 + col1 + col2 + col3 + col4 + col5 + col6 + col7 + col8 + col9 + (hasDeleteCol ? col10 : 0.0);
+
     final borderColor = theme.colorScheme.outline;
     final cellBg = theme.colorScheme.surfaceContainerLow.withOpacity(0.35);
 
     Widget wrapCell(Widget child) => Container(
       decoration: BoxDecoration(border: Border.all(width: 1, color: borderColor)),
-      child: child,
+      clipBehavior: Clip.rect,
+      child: SizedBox(width: double.infinity, child: child),
     );
 
-    return Table(
-      border: TableBorder.all(width: 1, color: borderColor),
-      columnWidths: columnWidths,
-      defaultColumnWidth: const FixedColumnWidth(80),
+    return SizedBox(
+      width: tableWidth,
+      child: Table(
+        border: TableBorder.all(width: 1, color: borderColor),
+        columnWidths: columnWidths,
+        defaultColumnWidth: const FixedColumnWidth(80),
       children: [
         // Шапка таблицы
         TableRow(
@@ -1942,6 +1957,7 @@ class _TtkTableState extends State<_TtkTable> {
           ],
         ),
       ],
+    ),
     );
   }
 
