@@ -1463,20 +1463,17 @@ class _TtkTableState extends State<_TtkTable> {
       9: const FlexColumnWidth(1.2),    // Технология (широкая)
       if (hasDeleteCol) 10: const FixedColumnWidth(48),
     };
-    // Чёткие границы между ячейками
+    // Явная разметка: граница у каждой ячейки (на вебе Table border может не рисоваться)
     final borderColor = theme.colorScheme.outline;
-    final borderSide = BorderSide(width: 1, color: borderColor);
-    final borderSideOuter = BorderSide(width: 1.5, color: borderColor);
     final cellBg = theme.colorScheme.surfaceContainerLow.withOpacity(0.35);
+
+    Widget wrapCell(Widget child) => Container(
+      decoration: BoxDecoration(border: Border.all(width: 1, color: borderColor)),
+      child: child,
+    );
+
     return Table(
-      border: TableBorder(
-        left: borderSideOuter,
-        top: borderSideOuter,
-        right: borderSideOuter,
-        bottom: borderSideOuter,
-        horizontalInside: borderSide,
-        verticalInside: borderSide,
-      ),
+      border: TableBorder.all(width: 1, color: borderColor),
       columnWidths: columnWidths,
       defaultColumnWidth: const FixedColumnWidth(80),
       children: [
@@ -1504,7 +1501,7 @@ class _TtkTableState extends State<_TtkTable> {
             children: [
               widget.canEdit && widget.dishNameController != null
                   ? TableCell(
-                      child: Container(
+                      child: wrapCell(Container(
                         constraints: const BoxConstraints(minHeight: 56),
                         child: Padding(
                           padding: _cellPad,
@@ -1518,23 +1515,23 @@ class _TtkTableState extends State<_TtkTable> {
                               fillColor: theme.colorScheme.surface,
                               hintText: loc.t('dish_name'),
                             ),
-                            style: const TextStyle(fontSize: 12),
+                            style: const TextStyle(fontSize: 12                            ),
                           ),
                         ),
-                      ),
+                      )),
                     )
                   : TableCell(
-                      child: Container(
+                      child: wrapCell(Container(
                         constraints: const BoxConstraints(minHeight: 56),
                         padding: _cellPad,
                         alignment: Alignment.centerLeft,
                         child: Text(widget.dishName, style: const TextStyle(fontSize: 12)),
-                      ),
+                      )),
                     ),
               // Ячейка «Продукт» — кнопка «Добавить ингредиент» (тап/клик по всей области)
               widget.canEdit
                   ? TableCell(
-                      child: Container(
+                      child: wrapCell(Container(
                         constraints: const BoxConstraints(minHeight: 56),
                         child: Material(
                           color: Colors.transparent,
@@ -1563,17 +1560,17 @@ class _TtkTableState extends State<_TtkTable> {
                         ),
                       ),
                     )
-                  : TableCell(child: Padding(padding: _cellPad, child: Text('', style: const TextStyle(fontSize: 12)))),
+                  : TableCell(child: wrapCell(Padding(padding: _cellPad, child: Text('', style: const TextStyle(fontSize: 12))))),
               ...List.generate(7, (_) => TableCell(
-                child: Container(
+                child: wrapCell(Container(
                   constraints: const BoxConstraints(minHeight: 56),
                   padding: _cellPad,
                   child: const Text('', style: TextStyle(fontSize: 12)),
-                ),
+                )),
               )),
               // Колонка «Технология»
               TableCell(
-                child: Container(
+                child: wrapCell(Container(
                   constraints: const BoxConstraints(minHeight: 80),
                   padding: _cellPad,
                   alignment: Alignment.topLeft,
@@ -1593,15 +1590,15 @@ class _TtkTableState extends State<_TtkTable> {
                           ),
                         )
                       : const SizedBox.shrink(),
-                ),
+                )),
               ),
               if (hasDeleteCol)
                 TableCell(
-                  child: Container(
+                  child: wrapCell(Container(
                     constraints: const BoxConstraints(minHeight: 56),
                     padding: _cellPad,
                     child: const Text('', style: TextStyle(fontSize: 12)),
-                  ),
+                  )),
                 ),
             ],
           ),
@@ -1619,7 +1616,7 @@ class _TtkTableState extends State<_TtkTable> {
               // Наименование блюда — в первой строке редактируемое поле (или текст)
               widget.canEdit && isFirstRow && widget.dishNameController != null
                   ? TableCell(
-                      child: SizedBox.expand(
+                      child: wrapCell(SizedBox.expand(
                         child: Padding(
                           padding: _cellPad,
                           child: TextField(
@@ -1634,13 +1631,13 @@ class _TtkTableState extends State<_TtkTable> {
                             style: const TextStyle(fontSize: 12),
                           ),
                         ),
-                      ),
+                      )),
                     )
                   : _cell(isFirstRow ? widget.dishName : ''),
               // In-cell выбор продукта: тап открывает bottom sheet (onReplaceIngredient), без выпадающего списка по всей странице
               widget.canEdit && widget.onReplaceIngredient != null
                   ? TableCell(
-                      child: InkWell(
+                      child: wrapCell(InkWell(
                         onTap: () => widget.onReplaceIngredient!(i),
                         child: Padding(
                           padding: _cellPad,
@@ -1652,11 +1649,11 @@ class _TtkTableState extends State<_TtkTable> {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                      ),
+                      )),
                     )
                   : widget.canEdit && product == null
                       ? TableCell(
-                          child: SizedBox.expand(
+                          child: wrapCell(SizedBox.expand(
                             child: Padding(
                               padding: _cellPad,
                               child: _EditableProductNameCell(
@@ -1665,11 +1662,11 @@ class _TtkTableState extends State<_TtkTable> {
                               ),
                             ),
                           ),
-                        )
+                        ))
                       : _cell(ing.sourceTechCardName ?? ing.productName),
               widget.canEdit
                   ? TableCell(
-                      child: SizedBox.expand(
+                      child: wrapCell(SizedBox.expand(
                         child: Padding(
                           padding: _cellPad,
                           child: _EditableGrossCell(
@@ -1688,12 +1685,12 @@ class _TtkTableState extends State<_TtkTable> {
                             },
                           ),
                         ),
-                      ),
+                      )),
                     )
                   : _cell(ing.grossWeightDisplay(lang)),
               widget.canEdit
                   ? TableCell(
-                      child: SizedBox.expand(
+                      child: wrapCell(SizedBox.expand(
                         child: Padding(
                           padding: _cellPad,
                           child: Column(
@@ -1740,12 +1737,12 @@ class _TtkTableState extends State<_TtkTable> {
                             ],
                           ),
                         ),
-                      ),
+                      )),
                     )
                   : _cell(ing.primaryWastePct.toStringAsFixed(0)),
               widget.canEdit
                   ? TableCell(
-                      child: SizedBox.expand(
+                      child: wrapCell(SizedBox.expand(
                         child: Padding(
                           padding: _cellPad,
                           child: _EditableNetCell(
@@ -1757,12 +1754,12 @@ class _TtkTableState extends State<_TtkTable> {
                             },
                           ),
                         ),
-                      ),
+                      )),
                     )
                   : _cell('${ing.effectiveGrossWeight.toStringAsFixed(0)}'),
               widget.canEdit
                   ? TableCell(
-                      child: SizedBox.expand(
+                      child: wrapCell(SizedBox.expand(
                         child: Padding(
                           padding: _cellPad,
                           child: DropdownButtonHideUnderline(
@@ -1810,12 +1807,12 @@ class _TtkTableState extends State<_TtkTable> {
                             ),
                           ),
                         ),
-                      ),
+                      )),
                     )
                   : _cell(ing.cookingProcessName ?? loc.t('dash')),
               widget.canEdit
                   ? TableCell(
-                      child: SizedBox.expand(
+                      child: wrapCell(SizedBox.expand(
                         child: Padding(
                           padding: _cellPad,
                           child: Column(
@@ -1845,12 +1842,12 @@ class _TtkTableState extends State<_TtkTable> {
                             ],
                           ),
                         ),
-                      ),
+                      )),
                     )
                   : _cell(ing.cookingProcessName != null ? '−${ing.weightLossPercentage.toStringAsFixed(0)}%' : loc.t('dash')),
               widget.canEdit
                   ? TableCell(
-                      child: SizedBox.expand(
+                      child: wrapCell(SizedBox.expand(
                         child: Padding(
                           padding: _cellPad,
                           child: _EditableNetCell(
@@ -1862,12 +1859,12 @@ class _TtkTableState extends State<_TtkTable> {
                             },
                           ),
                         ),
-                      ),
+                      )),
                     )
                   : _cell('${ing.netWeight.toStringAsFixed(0)}'),
               widget.canEdit
                   ? TableCell(
-                      child: SizedBox.expand(
+                      child: wrapCell(SizedBox.expand(
                         child: Padding(
                           padding: _cellPad,
                           child: _EditableCostCell(
@@ -1885,7 +1882,7 @@ class _TtkTableState extends State<_TtkTable> {
               isFirstRow && widget.technologyController != null
                   ? TableCell(
                       verticalAlignment: TableCellVerticalAlignment.fill,
-                      child: Container(
+                      child: wrapCell(Container(
                         constraints: const BoxConstraints(minHeight: 120),
                         padding: _cellPad,
                         alignment: Alignment.topLeft,
@@ -1904,17 +1901,17 @@ class _TtkTableState extends State<_TtkTable> {
                           ),
                         ),
                       ),
-                    )
+                    )),
                   : TableCell(
-                      child: Container(
+                      child: wrapCell(Container(
                         constraints: const BoxConstraints(minHeight: 48),
                         padding: _cellPad,
                         child: const SizedBox.shrink(),
-                      ),
+                      )),
                     ),
               if (hasDeleteCol)
                 TableCell(
-                  child: Padding(
+                  child: wrapCell(Padding(
                     padding: _cellPad,
                     child: IconButton(
                       icon: const Icon(Icons.remove_circle_outline, size: 20),
@@ -1922,7 +1919,7 @@ class _TtkTableState extends State<_TtkTable> {
                       tooltip: loc.t('delete'),
                       style: IconButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(32, 32)),
                     ),
-                  ),
+                  )),
                 ),
             ],
           );
@@ -1948,12 +1945,17 @@ class _TtkTableState extends State<_TtkTable> {
   }
 
   Widget _cell(String text, {bool bold = false}) {
+    final borderSide = BorderSide(width: 1, color: Theme.of(context).colorScheme.outline);
+    final inner = Container(
+      constraints: const BoxConstraints(minHeight: 44),
+      padding: _cellPad,
+      alignment: Alignment.centerLeft,
+      child: Text(text, style: TextStyle(fontSize: 12, fontWeight: bold ? FontWeight.bold : null), overflow: TextOverflow.ellipsis, maxLines: 2),
+    );
     return TableCell(
       child: Container(
-        constraints: const BoxConstraints(minHeight: 44),
-        padding: _cellPad,
-        alignment: Alignment.centerLeft,
-        child: Text(text, style: TextStyle(fontSize: 12, fontWeight: bold ? FontWeight.bold : null), overflow: TextOverflow.ellipsis, maxLines: 2),
+        decoration: BoxDecoration(border: Border.all(color: borderSide.color, width: borderSide.width)),
+        child: inner,
       ),
     );
   }
