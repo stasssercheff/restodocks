@@ -874,6 +874,17 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     }
   }
 
+  /// Загрузить номенклатуру и вернуть список продуктов (для выпадающего списка в ячейке).
+  Future<List<Product>> _getProductsForDropdown() async {
+    final est = context.read<AccountManagerSupabase>().establishment;
+    if (est == null) return [];
+    final productStore = context.read<ProductStoreSupabase>();
+    await productStore.loadProducts();
+    await productStore.loadNomenclature(est.id);
+    if (!mounted) return [];
+    return productStore.getNomenclatureProducts(est.id);
+  }
+
   /// [replaceIndex] — если задан, заменяем строку вместо добавления (тап по ячейке «Продукт»).
   Future<void> _showAddIngredient([int? replaceIndex]) async {
     final loc = context.read<LocalizationService>();
@@ -920,8 +931,139 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     );
   }
 
-  void _addProductIngredient(Product p, double value, CookingProcess? cookingProcess, double primaryWastePct, String unit, double? gramsPerPiece, {int? replaceIndex, double? cookingLossPctOverride}) {
-    Navigator.of(context).pop();
+  /// Показать диалог количества/единицы/способ для выбранного продукта (при выборе из выпадающего списка в ячейке).
+  Future<void> _showWeightDialogForProduct(Product p, int? replaceIndex) async {
+    final loc = context.read<LocalizationService>();
+    final lang = loc.currentLanguageCode;
+    const defaultUnit = 'g';
+    final c = TextEditingController(text: '100');
+    final gppController = TextEditingController(text: '50');
+    final shrinkageController = TextEditingController();
+    final processes = CookingProcess.forCategory(p.category);
+    CookingProcess? selectedProcess;
+    String selectedUnit = defaultUnit;
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx2, setStateDlg) {
+          return AlertDialog(
+            title: Text(p.getLocalizedName(lang)),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: TextField(
+                          controller: c,
+                          keyboardType: TextInputType.numberWithOptions(decimal: true),
+                          decoration: InputDecoration(labelText: loc.t('quantity_label')),
+                          autofocus: true,
+                          onSubmitted: (_) {
+                            final v = double.tryParse(c.text.replaceFirst(',', '.')) ?? 0;
+                            final waste = (p.primaryWastePct ?? 0).clamp(0.0, 99.9);
+                            double? gpp = CulinaryUnits.isCountable(selectedUnit) ? (double.tryParse(gppController.text) ?? 50) : null;
+                            if (gpp != null && gpp <= 0) gpp = 50;
+                            double? cookLossOverride;
+                            if (selectedProcess != null) {
+                              final entered = double.tryParse(shrinkageController.text.replaceFirst(',', '.'));
+                              if (entered != null && (entered - selectedProcess!.weightLossPercentage).abs() > 0.01) {
+                                cookLossOverride = entered.clamp(0.0, 99.9);
+                              }
+                            }
+                            Navigator.of(ctx).pop();
+                            if (v > 0) _addProductIngredient(p, v, selectedProcess, waste, selectedUnit, gpp, replaceIndex: replaceIndex, cookingLossPctOverride: cookLossOverride, popNavigator: false);
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: selectedUnit,
+                          decoration: InputDecoration(isDense: true, labelText: loc.t('unit_short')),
+                          items: CulinaryUnits.all.map((u) => DropdownMenuItem(value: u.id, child: Text(CulinaryUnits.displayName(u.id, lang)))).toList(),
+                          onChanged: (v) => setStateDlg(() => selectedUnit = v ?? 'g'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (CulinaryUnits.isCountable(selectedUnit)) ...[
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: gppController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(labelText: loc.t('g_pc'), hintText: loc.t('hint_50')),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  Text(loc.t('cooking_process'), style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 4),
+                  DropdownButtonFormField<CookingProcess?>(
+                    value: selectedProcess,
+                    decoration: const InputDecoration(isDense: true),
+                    items: [
+                      DropdownMenuItem(value: null, child: Text(loc.t('no_process'))),
+                      ...processes.map((proc) => DropdownMenuItem(
+                            value: proc,
+                            child: Text('${proc.getLocalizedName(lang)} (−${proc.weightLossPercentage.toStringAsFixed(0)}%)'),
+                          )),
+                    ],
+                    onChanged: (v) => setStateDlg(() {
+                      selectedProcess = v;
+                      if (v != null) shrinkageController.text = v.weightLossPercentage.toStringAsFixed(1);
+                      else shrinkageController.text = '';
+                    }),
+                  ),
+                  if (selectedProcess != null) ...[
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: shrinkageController,
+                      keyboardType: TextInputType.numberWithOptions(decimal: true),
+                      decoration: InputDecoration(
+                        labelText: loc.t('ttk_cook_loss'),
+                        hintText: selectedProcess?.weightLossPercentage.toStringAsFixed(1),
+                        helperText: loc.t('ttk_cook_loss_override_hint'),
+                      ),
+                      onChanged: (_) => setStateDlg(() {}),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(loc.t('back'))),
+              FilledButton(
+                onPressed: () {
+                  final v = double.tryParse(c.text.replaceFirst(',', '.')) ?? 0;
+                  final waste = (p.primaryWastePct ?? 0).clamp(0.0, 99.9);
+                  double? gpp = CulinaryUnits.isCountable(selectedUnit) ? (double.tryParse(gppController.text) ?? 50) : null;
+                  if (gpp != null && gpp <= 0) gpp = 50;
+                  double? cookLossOverride;
+                  if (selectedProcess != null) {
+                    final entered = double.tryParse(shrinkageController.text.replaceFirst(',', '.'));
+                    if (entered != null && (entered - selectedProcess!.weightLossPercentage).abs() > 0.01) {
+                      cookLossOverride = entered.clamp(0.0, 99.9);
+                    }
+                  }
+                  Navigator.of(ctx).pop();
+                  if (v > 0) _addProductIngredient(p, v, selectedProcess, waste, selectedUnit, gpp, replaceIndex: replaceIndex, cookingLossPctOverride: cookLossOverride, popNavigator: false);
+                },
+                child: Text(loc.t('save')),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  void _addProductIngredient(Product p, double value, CookingProcess? cookingProcess, double primaryWastePct, String unit, double? gramsPerPiece, {int? replaceIndex, double? cookingLossPctOverride, bool popNavigator = true}) {
+    if (popNavigator) Navigator.of(context).pop();
     final loc = context.read<LocalizationService>();
     final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'RUB';
     final ing = TTIngredient.fromProduct(
@@ -1256,22 +1398,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
               ),
             ],
             const SizedBox(height: 8),
-            // Подсказка о горизонтальной прокрутке: таблица широкая, справа ещё колонки (Брутто, Отход %, Нетто … и Итого)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Row(
-                children: [
-                  Icon(Icons.swipe_right, size: 18, color: Theme.of(context).colorScheme.primary),
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: Text(
-                      loc.t('ttk_scroll_hint'),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.primary),
-                    ),
-                  ),
-                ],
-              ),
-            ),
             // Таблица: высота растёт с числом строк (шапка + строки + итого), но не больше ~70% экрана; прокрутите вправо для колонок Брутто, Отход %, Нетто, …, Итого
             LayoutBuilder(
               builder: (context, c) {
@@ -1317,7 +1443,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                             },
                             onAdd: _showAddIngredient,
                             onAddFromText: _addIngredientFromName,
-                            onReplaceIngredient: (i) => _showAddIngredient(i),
+                            getProductsForDropdown: _getProductsForDropdown,
+                            onProductSelectedFromDropdown: (i, p) => _showWeightDialogForProduct(p, i),
                             dishNameController: canEdit ? _nameController : null,
                             technologyController: canEdit ? _technologyController : null,
                             onSuggestWaste: _suggestWasteForRow,
@@ -1389,7 +1516,8 @@ class _TtkTable extends StatefulWidget {
     this.onAddFromText,
     required this.productStore,
     this.onPickProductFromSearch,
-    this.onReplaceIngredient,
+    this.getProductsForDropdown,
+    this.onProductSelectedFromDropdown,
     this.dishNameController,
     this.technologyController,
     this.onSuggestWaste,
@@ -1407,8 +1535,10 @@ class _TtkTable extends StatefulWidget {
   final void Function(String productName)? onAddFromText;
   final ProductStoreSupabase productStore;
   final void Function(int index, Product product, {double? grossGrams})? onPickProductFromSearch;
-  /// Тап «из списка» в ячейке Продукт — выбор из номенклатуры (bottom sheet).
-  final void Function(int i)? onReplaceIngredient;
+  /// Загрузка списка продуктов для выпадающего списка из ячейки.
+  final Future<List<Product>> Function()? getProductsForDropdown;
+  /// Выбран продукт из выпадающего списка в ячейке — показать диалог количества и добавить.
+  final void Function(int index, Product product)? onProductSelectedFromDropdown;
   /// Контроллер названия блюда — первая ячейка первой строки редактируется по нему.
   final TextEditingController? dishNameController;
   /// Контроллер поля «Технология» — колонка справа в таблице.
@@ -1497,13 +1627,13 @@ class _TtkTableState extends State<_TtkTable> {
     final headerTextColor = Colors.white;
     final firstColsBg = Colors.grey.shade200;
 
-    /// Пустая ячейка в зоне заполнения — явная высота и видимые границы, чтобы сетка не пропадала
+    /// Пустая ячейка в зоне заполнения — явная высота и границы (не схлопывается при пустом содержимом)
     Widget emptyDataCell({double minHeight = 56}) => wrapCell(
       Container(
-        constraints: BoxConstraints(minHeight: minHeight),
+        constraints: BoxConstraints(minHeight: minHeight, minWidth: 1),
         padding: _cellPad,
         alignment: Alignment.centerLeft,
-        child: const SizedBox.shrink(),
+        child: const SizedBox(width: 1, height: 1),
       ),
       dataCell: true,
     );
@@ -1590,7 +1720,7 @@ class _TtkTableState extends State<_TtkTable> {
                       ), fillColor: firstColsBg, dataCell: true),
                     )
                   : TableCell(child: wrapCell(Container(color: firstColsBg, constraints: const BoxConstraints(minHeight: 44), padding: _cellPad, alignment: Alignment.centerLeft, child: Text(isFirstRow ? widget.dishName : '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500))), fillColor: firstColsBg, dataCell: true)),
-              // Продукт: пустая строка = та же табличная строка с ячейками, но без данных (поле ввода + «Выбрать продукт»)
+              // Продукт: выпадающий список из ячейки (не снизу экрана). Пустая строка = кнопка «Выбрать продукт».
               widget.canEdit && (ing.productName.isEmpty && !ing.hasData)
                   ? TableCell(
                       child: wrapCell(
@@ -1599,62 +1729,48 @@ class _TtkTableState extends State<_TtkTable> {
                           constraints: const BoxConstraints(minHeight: 44),
                           padding: _cellPad,
                           alignment: Alignment.centerLeft,
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: _EditableProductNameCell(
-                                  value: ing.productName,
-                                  onChanged: (s) => widget.onUpdate(i, ing.copyWith(productName: s)),
-                                  hintText: loc.t('ttk_product_hint'),
-                                ),
-                              ),
-                              if (widget.onReplaceIngredient != null) ...[
-                                const SizedBox(width: 6),
-                                TextButton.icon(
-                                  onPressed: () => widget.onReplaceIngredient!(i),
-                                  icon: const Icon(Icons.list, size: 18),
-                                  label: Text(loc.t('ttk_choose_product'), style: const TextStyle(fontSize: 12)),
-                                  style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), minimumSize: const Size(0, 36)),
-                                ),
-                              ],
-                            ],
-                          ),
+                          child: (widget.getProductsForDropdown != null && widget.onProductSelectedFromDropdown != null)
+                              ? _ProductDropdownInCell(
+                                  index: i,
+                                  label: loc.t('ttk_choose_product'),
+                                  getProducts: widget.getProductsForDropdown!,
+                                  onSelected: widget.onProductSelectedFromDropdown!,
+                                  lang: lang,
+                                )
+                              : const SizedBox.shrink(),
                         ),
                         fillColor: firstColsBg,
                       ),
                     )
                   : widget.canEdit && product == null
                       ? TableCell(
-                          child: wrapCell(ConstrainedBox(
-                            constraints: const BoxConstraints(minHeight: 44),
-                            child: SizedBox.expand(
-                              child: Container(
-                                color: firstColsBg,
-                                padding: _cellPad,
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: _EditableProductNameCell(
-                                        value: ing.productName,
-                                        onChanged: (s) => widget.onUpdate(i, ing.copyWith(productName: s)),
-                                        hintText: loc.t('ttk_product_hint'),
-                                      ),
+                          child: wrapCell(
+                            Container(
+                              color: firstColsBg,
+                              constraints: const BoxConstraints(minHeight: 44),
+                              padding: _cellPad,
+                              alignment: Alignment.centerLeft,
+                              child: Row(
+                                children: [
+                                  Expanded(child: Text(ing.productName, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
+                                  if (widget.getProductsForDropdown != null && widget.onProductSelectedFromDropdown != null) ...[
+                                    const SizedBox(width: 6),
+                                    _ProductDropdownInCell(
+                                      index: i,
+                                      label: loc.t('ttk_choose_product'),
+                                      getProducts: widget.getProductsForDropdown!,
+                                      onSelected: widget.onProductSelectedFromDropdown!,
+                                      lang: lang,
                                     ),
-                                    if (widget.onReplaceIngredient != null) ...[
-                                      const SizedBox(width: 6),
-                                      TextButton.icon(
-                                        onPressed: () => widget.onReplaceIngredient!(i),
-                                        icon: const Icon(Icons.list, size: 18),
-                                        label: Text(loc.t('ttk_choose_product'), style: const TextStyle(fontSize: 12)),
-                                        style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), minimumSize: const Size(0, 36)),
-                                      ),
-                                    ],
                                   ],
-                                ),
+                                ],
                               ),
                             ),
-                          ), fillColor: firstColsBg, dataCell: true))
-                      : TableCell(child: wrapCell(Container(color: firstColsBg, constraints: const BoxConstraints(minHeight: 44), padding: _cellPad, alignment: Alignment.centerLeft, child: Text(ing.sourceTechCardName ?? ing.productName, style: const TextStyle(fontSize: 12))), fillColor: firstColsBg, dataCell: true)),
+                            fillColor: firstColsBg,
+                            dataCell: true,
+                          ),
+                        )
+                      : TableCell(child: wrapCell(Container(color: firstColsBg, constraints: const BoxConstraints(minHeight: 44), padding: _cellPad, alignment: Alignment.centerLeft, child: Text(ing.sourceTechCardName ?? ing.productName, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)), fillColor: firstColsBg, dataCell: true)),
               widget.canEdit
                   ? TableCell(
                       child: wrapCell(ConstrainedBox(
@@ -1852,9 +1968,9 @@ class _TtkTableState extends State<_TtkTable> {
                   )
                   : TableCell(
                       child: wrapCell(Container(
-                        constraints: const BoxConstraints(minHeight: 48),
+                        constraints: const BoxConstraints(minHeight: 48, minWidth: 1),
                         padding: _cellPad,
-                        child: const SizedBox.shrink(),
+                        child: const SizedBox(width: 1, height: 1),
                       )),
                     ),
               if (hasDeleteCol)
@@ -1897,7 +2013,7 @@ class _TtkTableState extends State<_TtkTable> {
     );
   }
 
-  /// Ячейка данных: тот же wrapCell, что и у шапки (те же границы, мин. высота), только фон и контент другие.
+  /// Ячейка данных: тот же wrapCell (границы, мин. высота). Пустая строка — невидимый символ, чтобы ячейка не схлопывалась.
   Widget _cell(String text, {bool bold = false}) {
     return TableCell(
       child: wrapCell(
@@ -1906,7 +2022,7 @@ class _TtkTableState extends State<_TtkTable> {
           child: Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              text,
+              text.isEmpty ? '\u00A0' : text,
               style: TextStyle(fontSize: 12, fontWeight: bold ? FontWeight.bold : null),
               overflow: TextOverflow.ellipsis,
               maxLines: 2,
@@ -1918,7 +2034,7 @@ class _TtkTableState extends State<_TtkTable> {
     );
   }
 
-  /// Строка «Итого»: тот же wrapCell (те же границы, мин. высота), фон жёлтый.
+  /// Строка «Итого»: тот же wrapCell (те же границы, мин. высота), фон жёлтый. Пустая строка — не схлопывается.
   Widget _totalCell(String text) {
     return TableCell(
       child: wrapCell(
@@ -1927,7 +2043,7 @@ class _TtkTableState extends State<_TtkTable> {
           child: Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              text,
+              text.isEmpty ? '\u00A0' : text,
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
               overflow: TextOverflow.ellipsis,
               maxLines: 2,
@@ -2150,6 +2266,61 @@ class _EditableNetCellState extends State<_EditableNetCell> {
         style: const TextStyle(fontSize: 12),
         onSubmitted: (_) => _submit(),
         onTapOutside: (_) => _submit(),
+      ),
+    );
+  }
+}
+
+/// Кнопка в ячейке таблицы: по нажатию открывается выпадающий список продуктов (showMenu), не снизу экрана.
+class _ProductDropdownInCell extends StatelessWidget {
+  const _ProductDropdownInCell({
+    required this.index,
+    required this.label,
+    required this.getProducts,
+    required this.onSelected,
+    required this.lang,
+  });
+
+  final int index;
+  final String label;
+  final Future<List<Product>> Function() getProducts;
+  final void Function(int index, Product product) onSelected;
+  final String lang;
+
+  @override
+  Widget build(BuildContext context) {
+    return Builder(
+      builder: (ctx) => TextButton.icon(
+        onPressed: () async {
+          final products = await getProducts();
+          if (!context.mounted || products.isEmpty) return;
+          final box = ctx.findRenderObject() as RenderBox?;
+          if (box == null || !context.mounted) return;
+          final pos = box.localToGlobal(Offset.zero);
+          final size = box.size;
+          final screen = MediaQuery.sizeOf(context);
+          final rect = RelativeRect.fromLTRB(
+            pos.dx,
+            pos.dy + size.height,
+            screen.width - pos.dx - size.width,
+            0,
+          );
+          final selected = await showMenu<Product>(
+            context: context,
+            position: rect,
+            constraints: const BoxConstraints(maxWidth: 320, maxHeight: 320),
+            items: products
+                .map((p) => PopupMenuItem<Product>(
+                      value: p,
+                      child: Text(p.getLocalizedName(lang), overflow: TextOverflow.ellipsis, maxLines: 1),
+                    ))
+                .toList(),
+          );
+          if (selected != null && context.mounted) onSelected(index, selected);
+        },
+        icon: const Icon(Icons.arrow_drop_down, size: 20),
+        label: Text(label, style: const TextStyle(fontSize: 12)),
+        style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), minimumSize: const Size(0, 36)),
       ),
     );
   }
