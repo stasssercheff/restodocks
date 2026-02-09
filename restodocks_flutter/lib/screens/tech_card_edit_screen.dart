@@ -1563,12 +1563,13 @@ class _TtkTable extends StatefulWidget {
 class _TtkTableState extends State<_TtkTable> {
   static const _cellPad = EdgeInsets.symmetric(horizontal: 6, vertical: 6);
 
-  /// Ячейка по шаблону: граница, фон, мин. высота. Вынесен в метод класса, чтобы _cell/_totalCell могли вызывать.
+  /// Ячейка по шаблону: граница, фон, мин. высота и мин. ширина (чтобы ячейки данных и «Итого» не схлопывались).
   Widget wrapCell(Widget child, {Color? fillColor, bool dataCell = true}) {
     final theme = Theme.of(context);
     final cellBg = theme.colorScheme.surface;
     final borderColor = Colors.black87;
     return Container(
+      constraints: const BoxConstraints(minWidth: 36, minHeight: 44),
       decoration: BoxDecoration(
         color: fillColor ?? cellBg,
         border: Border.all(width: 1, color: borderColor),
@@ -2279,7 +2280,86 @@ class _EditableNetCellState extends State<_EditableNetCell> {
   }
 }
 
-/// Кнопка в ячейке таблицы: по нажатию открывается выпадающий список продуктов (showMenu), не снизу экрана.
+/// Диалог выбора продукта: поле ручного поиска по названию + скроллируемый список.
+class _ProductSelectDialog extends StatefulWidget {
+  const _ProductSelectDialog({required this.products, required this.lang});
+
+  final List<Product> products;
+  final String lang;
+
+  @override
+  State<_ProductSelectDialog> createState() => _ProductSelectDialogState();
+}
+
+class _ProductSelectDialogState extends State<_ProductSelectDialog> {
+  String _query = '';
+  final _searchFocus = FocusNode();
+  final _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchFocus.dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = context.read<LocalizationService>();
+    final q = _query.trim().toLowerCase();
+    final filtered = q.isEmpty
+        ? widget.products
+        : widget.products
+            .where((p) =>
+                p.name.toLowerCase().contains(q) ||
+                p.getLocalizedName(widget.lang).toLowerCase().contains(q))
+            .toList();
+    return AlertDialog(
+      title: Text(loc.t('ttk_choose_product')),
+      content: SizedBox(
+        width: 420,
+        height: 420,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _searchController,
+              focusNode: _searchFocus,
+              decoration: InputDecoration(
+                hintText: loc.t('search'),
+                prefixIcon: const Icon(Icons.search, size: 20),
+                isDense: true,
+                border: const OutlineInputBorder(),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+              onChanged: (v) => setState(() => _query = v),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: ListView.builder(
+                itemCount: filtered.length,
+                itemBuilder: (_, i) {
+                  final p = filtered[i];
+                  return ListTile(
+                    title: Text(
+                      p.getLocalizedName(widget.lang),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                    onTap: () => Navigator.of(context).pop(p),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Кнопка в ячейке таблицы: по нажатию открывается диалог выбора продукта (поиск вручную + скролл списка).
 class _ProductDropdownInCell extends StatelessWidget {
   const _ProductDropdownInCell({
     required this.index,
@@ -2297,39 +2377,19 @@ class _ProductDropdownInCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Builder(
-      builder: (ctx) => TextButton.icon(
-        onPressed: () async {
-          final products = await getProducts();
-          if (!context.mounted || products.isEmpty) return;
-          final box = ctx.findRenderObject() as RenderBox?;
-          if (box == null || !context.mounted) return;
-          final pos = box.localToGlobal(Offset.zero);
-          final size = box.size;
-          final screen = MediaQuery.sizeOf(context);
-          final rect = RelativeRect.fromLTRB(
-            pos.dx,
-            pos.dy + size.height,
-            screen.width - pos.dx - size.width,
-            0,
-          );
-          final selected = await showMenu<Product>(
-            context: context,
-            position: rect,
-            constraints: const BoxConstraints(maxWidth: 320, maxHeight: 320),
-            items: products
-                .map((p) => PopupMenuItem<Product>(
-                      value: p,
-                      child: Text(p.getLocalizedName(lang), overflow: TextOverflow.ellipsis, maxLines: 1),
-                    ))
-                .toList(),
-          );
-          if (selected != null && context.mounted) onSelected(index, selected);
-        },
-        icon: const Icon(Icons.arrow_drop_down, size: 20),
-        label: Text(label, style: const TextStyle(fontSize: 12)),
-        style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), minimumSize: const Size(0, 36)),
-      ),
+    return TextButton.icon(
+      onPressed: () async {
+        final products = await getProducts();
+        if (!context.mounted || products.isEmpty) return;
+        final selected = await showDialog<Product>(
+          context: context,
+          builder: (ctx) => _ProductSelectDialog(products: products, lang: lang),
+        );
+        if (selected != null && context.mounted) onSelected(index, selected);
+      },
+      icon: const Icon(Icons.arrow_drop_down, size: 20),
+      label: Text(label, style: const TextStyle(fontSize: 12)),
+      style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), minimumSize: const Size(0, 36)),
     );
   }
 }
