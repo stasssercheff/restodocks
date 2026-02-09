@@ -1003,17 +1003,15 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     });
   }
 
-  /// Добавить пустую строку ингредиента (ввод вручную: название, брутто, отход %, нетто, способ приготовления, стоимость).
-  void _addEmptyIngredientRow() {
-    final ing = TTIngredient.fromProduct(
-      product: null,
-      grossWeight: 0,
-      netWeight: 0,
-      primaryWastePct: 0,
-      defaultCurrency: 'RUB',
-      unit: 'g',
-    );
-    setState(() => _ingredients.add(ing));
+  /// Добавить первый ингредиент по введённому названию (пустая строка при ingredients.isEmpty) и новую пустую строку.
+  void _addIngredientFromName(String productName) {
+    final name = productName.trim();
+    if (name.isEmpty) return;
+    final ing = TTIngredient.emptyPlaceholder().copyWith(productName: name).withRealId();
+    setState(() {
+      _ingredients.add(ing);
+      _ingredients.add(TTIngredient.emptyPlaceholder());
+    });
   }
 
   void _removeIngredient(int i) {
@@ -1287,7 +1285,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                       scrollDirection: Axis.horizontal,
                       child: SingleChildScrollView(
                         child: ConstrainedBox(
-                          constraints: const BoxConstraints(minWidth: 1224),
+                          constraints: const BoxConstraints(minWidth: 1300),
                           child: canEdit
                             ? _TtkTable(
                             loc: loc,
@@ -1307,6 +1305,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                               });
                             },
                             onAdd: _showAddIngredient,
+                            onAddFromText: _addIngredientFromName,
                             onReplaceIngredient: (i) => _showAddIngredient(i),
                             dishNameController: canEdit ? _nameController : null,
                             technologyController: canEdit ? _technologyController : null,
@@ -1376,6 +1375,7 @@ class _TtkTable extends StatefulWidget {
     required this.onRemove,
     required this.onUpdate,
     required this.onAdd,
+    this.onAddFromText,
     required this.productStore,
     this.onPickProductFromSearch,
     this.onReplaceIngredient,
@@ -1392,10 +1392,11 @@ class _TtkTable extends StatefulWidget {
   final void Function(int i) onRemove;
   final void Function(int i, TTIngredient ing) onUpdate;
   final VoidCallback onAdd;
+  /// Когда в пустой строке (при ingredients.isEmpty) вводят название продукта — добавить ингредиент и новую пустую строку.
+  final void Function(String productName)? onAddFromText;
   final ProductStoreSupabase productStore;
-  /// Выбор продукта из номенклатуры по поиску (подстановка в строку, цена из карточки).
   final void Function(int index, Product product, {double? grossGrams})? onPickProductFromSearch;
-  /// Тап по ячейке «Продукт» — замена ингредиента (bottom sheet). In-cell выбор вместо DropdownSearch.
+  /// Тап «из списка» в ячейке Продукт — выбор из номенклатуры (bottom sheet).
   final void Function(int i)? onReplaceIngredient;
   /// Контроллер названия блюда — первая ячейка первой строки редактируется по нему.
   final TextEditingController? dishNameController;
@@ -1423,48 +1424,70 @@ class _TtkTableState extends State<_TtkTable> {
     final sym = currency == 'RUB' ? '₽' : currency == 'VND' ? '₫' : currency == 'USD' ? '\$' : currency;
 
     final hasDeleteCol = widget.canEdit;
-    // Все колонки фиксированы, чтобы на вебе не слипались ячейки и не пропадали столбцы.
-    const col0 = 130.0;
-    const col1 = 200.0;
-    const col2 = 80.0;
-    const col3 = 64.0;
-    const col4 = 80.0;
-    const col5 = 140.0;
-    const col6 = 64.0;
-    const col7 = 80.0;
-    const col8 = 90.0;
-    const col9 = 220.0; // Технология
-    const col10 = 48.0;
+    // Порядок колонок как в образце: Тип ТТК | Наименование | Продукт | Брутто | Отход % | Нетто | Способ | Ужарка | Выход | Стоимость | Цена за 1 кг/шт | Технология
+    const colType = 72.0;   // Тип ТТК
+    const colName = 120.0;  // Наименование
+    const colProduct = 140.0;
+    const colGross = 80.0;
+    const colWaste = 64.0;
+    const colNet = 80.0;
+    const colMethod = 140.0;
+    const colShrink = 64.0;
+    const colOutput = 80.0;
+    const colCost = 90.0;
+    const colPriceKg = 100.0; // Цена за 1 кг/шт блюда
+    const colTech = 220.0;
+    const colDel = 48.0;
     final columnWidths = <int, TableColumnWidth>{
-      0: const FixedColumnWidth(col0),
-      1: const FixedColumnWidth(col1),
-      2: const FixedColumnWidth(col2),
-      3: const FixedColumnWidth(col3),
-      4: const FixedColumnWidth(col4),
-      5: const FixedColumnWidth(col5),
-      6: const FixedColumnWidth(col6),
-      7: const FixedColumnWidth(col7),
-      8: const FixedColumnWidth(col8),
-      9: const FixedColumnWidth(col9),
-      if (hasDeleteCol) 10: const FixedColumnWidth(col10),
+      0: const FixedColumnWidth(colType),
+      1: const FixedColumnWidth(colName),
+      2: const FixedColumnWidth(colProduct),
+      3: const FixedColumnWidth(colGross),
+      4: const FixedColumnWidth(colWaste),
+      5: const FixedColumnWidth(colNet),
+      6: const FixedColumnWidth(colMethod),
+      7: const FixedColumnWidth(colShrink),
+      8: const FixedColumnWidth(colOutput),
+      9: const FixedColumnWidth(colCost),
+      10: const FixedColumnWidth(colPriceKg),
+      11: const FixedColumnWidth(colTech),
+      if (hasDeleteCol) 12: const FixedColumnWidth(colDel),
     };
-    final tableWidth = col0 + col1 + col2 + col3 + col4 + col5 + col6 + col7 + col8 + col9 + (hasDeleteCol ? col10 : 0.0);
+    final tableWidth = colType + colName + colProduct + colGross + colWaste + colNet + colMethod + colShrink + colOutput + colCost + colPriceKg + colTech + (hasDeleteCol ? colDel : 0.0);
 
     final borderColor = theme.colorScheme.outline;
-    final cellBg = theme.colorScheme.surfaceContainerLow.withOpacity(0.35);
-    // Явно серый фон шапки и первых колонок, как в образце ТТК
-    final headerBg = Colors.grey.shade300;
+    final cellBg = theme.colorScheme.surface;
+    // Чёткая граница ячеек зоны заполнения, чтобы сетка была видна
+    final dataBorderColor = Colors.grey.shade400;
+    // Как в образце: тёмно-серая шапка с белым текстом, светло-серые первые колонки
+    final headerBg = Colors.grey.shade800;
+    final headerTextColor = Colors.white;
     final firstColsBg = Colors.grey.shade200;
 
-    Widget wrapCell(Widget child, {Color? fillColor}) => Container(
+    /// [dataCell] true = зона заполнения (чёткая серая граница), false = шапка
+    Widget wrapCell(Widget child, {Color? fillColor, bool dataCell = true}) => Container(
       decoration: BoxDecoration(
         color: fillColor ?? cellBg,
-        border: Border.all(width: 1, color: borderColor),
+        border: Border.all(width: 1, color: dataCell ? dataBorderColor : borderColor),
       ),
       clipBehavior: Clip.hardEdge,
       child: SizedBox(width: double.infinity, child: child),
     );
 
+    /// Пустая ячейка в зоне заполнения — явная высота и видимые границы, чтобы сетка не пропадала
+    Widget emptyDataCell({double minHeight = 56}) => wrapCell(
+      Container(
+        constraints: BoxConstraints(minHeight: minHeight),
+        padding: _cellPad,
+        alignment: Alignment.centerLeft,
+        child: const SizedBox.shrink(),
+      ),
+      dataCell: true,
+    );
+
+    // ТТК — таблица. Шапка = одна строка (обозначения колонок). Данные = строки: текст (продукт, название блюда, технология), числа (гр/кг), проценты (0–100).
+    // При редактировании последние 2 строки всегда: предпоследняя — пустая (при заполнении автоматически появляется ещё одна внизу), последняя — Итого (выход и стоимость).
+    // Никаких кнопок «добавить строку» — добавление только через заполнение пустой строки.
     return SizedBox(
       width: tableWidth,
       child: Table(
@@ -1472,28 +1495,33 @@ class _TtkTableState extends State<_TtkTable> {
         columnWidths: columnWidths,
         defaultColumnWidth: const FixedColumnWidth(80),
       children: [
-        // Шапка таблицы — явно серый фон как в образце
+        // Строка 0: шапка
         TableRow(
           decoration: BoxDecoration(color: headerBg),
           children: [
-            TableCell(child: wrapCell(Padding(padding: _cellPad, child: Center(child: Text(loc.t('ttk_dish_name_col'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)))), fillColor: headerBg)),
-            TableCell(child: wrapCell(Padding(padding: _cellPad, child: Center(child: Text(loc.t('ttk_product'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)))), fillColor: headerBg)),
-            TableCell(child: wrapCell(Padding(padding: _cellPad, child: Center(child: Text(loc.t('ttk_gross_gr'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)))), fillColor: headerBg)),
-            TableCell(child: wrapCell(Padding(padding: _cellPad, child: Center(child: Text(loc.t('ttk_waste_pct'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)))), fillColor: headerBg)),
-            TableCell(child: wrapCell(Padding(padding: _cellPad, child: Center(child: Text(loc.t('ttk_net_gr'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)))), fillColor: headerBg)),
-            TableCell(child: wrapCell(Padding(padding: _cellPad, child: Center(child: Text(loc.t('ttk_cooking_method'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)))), fillColor: headerBg)),
-            TableCell(child: wrapCell(Padding(padding: _cellPad, child: Center(child: Text(loc.t('ttk_cook_loss'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)))), fillColor: headerBg)),
-            TableCell(child: wrapCell(Padding(padding: _cellPad, child: Center(child: Text(loc.t('ttk_output_gr'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)))), fillColor: headerBg)),
-            TableCell(child: wrapCell(Padding(padding: _cellPad, child: Center(child: Text(loc.t('ttk_cost'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)))), fillColor: headerBg)),
-            TableCell(child: wrapCell(Padding(padding: _cellPad, child: Center(child: Text(loc.t('ttk_technology'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)))), fillColor: headerBg)),
-            if (hasDeleteCol) TableCell(child: wrapCell(Padding(padding: _cellPad, child: const SizedBox.shrink()), fillColor: headerBg)),
+            _headerCell(loc.t('ttk_type')),
+            _headerCell(loc.t('ttk_name')),
+            _headerCell(loc.t('ttk_product')),
+            _headerCell(loc.t('ttk_gross_gr')),
+            _headerCell('Отход %'),
+            _headerCell(loc.t('ttk_net_gr')),
+            _headerCell(loc.t('ttk_cooking_method')),
+            _headerCell('Ужарка %'),
+            _headerCell(loc.t('ttk_output_gr')),
+            _headerCell(loc.t('ttk_cost')),
+            _headerCell(loc.t('ttk_price_per_1kg_dish')),
+            _headerCell(loc.t('ttk_technology')),
+            if (hasDeleteCol) TableCell(child: wrapCell(Padding(padding: _cellPad, child: const SizedBox.shrink()), fillColor: headerBg, dataCell: false)),
           ],
         ),
-        // Если ингредиентов нет — одна строка с названием блюда, подсказкой «Добавить» и технологией справа
+        // Если ингредиентов нет — одна строка как в образце: Тип ТТК | Наименование | Продукт (подсказка) | пустые | Технология
         if (ingredients.isEmpty)
           TableRow(
             decoration: BoxDecoration(color: cellBg),
             children: [
+              // Тип ТТК — ПФ или Блюдо (явная ячейка с границей)
+              TableCell(child: wrapCell(Container(color: firstColsBg, constraints: const BoxConstraints(minHeight: 56), padding: _cellPad, alignment: Alignment.center, child: Text(widget.isSemiFinished ? 'ПФ' : loc.t('ttk_dish'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))), fillColor: firstColsBg, dataCell: true)),
+              // Наименование — название блюда
               widget.canEdit && widget.dishNameController != null
                   ? TableCell(
                       child: wrapCell(Container(
@@ -1505,110 +1533,101 @@ class _TtkTableState extends State<_TtkTable> {
                             controller: widget.dishNameController,
                             decoration: InputDecoration(
                               isDense: true,
-                              border: const OutlineInputBorder(),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.zero,
                               filled: true,
-                              fillColor: theme.colorScheme.surface,
+                              fillColor: Colors.transparent,
                               hintText: loc.t('dish_name'),
                             ),
-                            style: const TextStyle(fontSize: 12                            ),
+                            style: const TextStyle(fontSize: 12),
                           ),
                         ),
-                      )),
+                      ), fillColor: firstColsBg, dataCell: true),
                     )
-                  : TableCell(
-                      child: wrapCell(Container(
-                        color: firstColsBg,
-                        constraints: const BoxConstraints(minHeight: 56),
-                        padding: _cellPad,
-                        alignment: Alignment.centerLeft,
-                        child: Text(widget.dishName, style: const TextStyle(fontSize: 12)),
-                      )),
-                    ),
-              // Ячейка «Продукт» — подсказка и добавление ингредиента (тап по области)
+                  : TableCell(child: wrapCell(Container(color: firstColsBg, constraints: const BoxConstraints(minHeight: 56), padding: _cellPad, alignment: Alignment.centerLeft, child: Text(widget.dishName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))), fillColor: firstColsBg, dataCell: true)),
+              // Продукт в пустой строке: подсказка + поле ввода (без кнопки; при заполнении появится новая строка)
               widget.canEdit
                   ? TableCell(
                       child: wrapCell(Container(
                         color: firstColsBg,
                         constraints: const BoxConstraints(minHeight: 56),
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            onTap: widget.onAdd,
-                            child: Padding(
-                              padding: _cellPad,
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                        child: Padding(
+                          padding: _cellPad,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                loc.t('ttk_add_hint'),
+                                style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
                                 children: [
-                                  Text(
-                                    loc.t('ttk_add_hint'),
-                                    style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.add_circle_outline, size: 18, color: theme.colorScheme.primary),
-                                      const SizedBox(width: 6),
-                                      Flexible(
-                                        child: Text(
-                                          loc.t('ttk_add_ingredient_hint'),
-                                          style: TextStyle(fontSize: 12, color: theme.colorScheme.primary),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
+                                  Expanded(
+                                    child: TextField(
+                                      onSubmitted: (v) {
+                                        if (v.trim().isNotEmpty) widget.onAddFromText?.call(v.trim());
+                                      },
+                                      decoration: InputDecoration(
+                                        isDense: true,
+                                        hintText: loc.t('ttk_product'),
+                                        border: InputBorder.none,
+                                        contentPadding: EdgeInsets.zero,
+                                        filled: true,
+                                        fillColor: theme.colorScheme.surface,
                                       ),
-                                    ],
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  InkWell(
+                                    onTap: widget.onAdd,
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                      child: Text(loc.t('ttk_choose_product'), style: TextStyle(fontSize: 11, color: theme.colorScheme.primary)),
+                                    ),
                                   ),
                                 ],
                               ),
-                            ),
+                            ],
                           ),
                         ),
-                      )),
+                      ), fillColor: firstColsBg, dataCell: true),
                     )
-                  : TableCell(child: wrapCell(Padding(padding: _cellPad, child: Text('', style: const TextStyle(fontSize: 12))))),
-              ...List.generate(7, (_) => TableCell(
-                child: wrapCell(Container(
-                  constraints: const BoxConstraints(minHeight: 56),
-                  padding: _cellPad,
-                  child: const Text('', style: TextStyle(fontSize: 12)),
-                )),
-              )),
-              // Колонка «Технология» — крупный блок текста как в образце
+                  : TableCell(child: wrapCell(Container(color: firstColsBg, constraints: const BoxConstraints(minHeight: 56), padding: _cellPad, child: const Text('', style: TextStyle(fontSize: 12))), fillColor: firstColsBg, dataCell: true)),
+              // Ячейки Брутто, Отход %, Нетто, Способ, Ужарка, Выход, Стоимость, Цена за 1 кг — явно видимые пустые ячейки
+              ...List.generate(8, (_) => TableCell(child: emptyDataCell())),
+              // Технология — большая ячейка с полем ввода
               TableCell(
-                child: wrapCell(Container(
-                  constraints: const BoxConstraints(minHeight: 120),
-                  padding: _cellPad,
-                  alignment: Alignment.topLeft,
-                  child: widget.technologyController != null
-                      ? TextField(
-                          controller: widget.technologyController,
-                          readOnly: !widget.canEdit,
-                          maxLines: 8,
-                          style: const TextStyle(fontSize: 12),
-                          decoration: InputDecoration(
-                            isDense: true,
-                            hintText: loc.t('ttk_technology'),
-                            border: const OutlineInputBorder(),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                            filled: true,
-                            fillColor: theme.colorScheme.surface,
-                          ),
-                        )
-                      : const SizedBox.shrink(),
-                )),
-              ),
-              if (hasDeleteCol)
-                TableCell(
-                  child: wrapCell(Container(
-                    constraints: const BoxConstraints(minHeight: 56),
+                child: wrapCell(
+                  Container(
+                    constraints: const BoxConstraints(minHeight: 120),
                     padding: _cellPad,
-                    child: const Text('', style: TextStyle(fontSize: 12)),
-                  )),
+                    alignment: Alignment.topLeft,
+                    child: widget.technologyController != null
+                        ? TextField(
+                            controller: widget.technologyController,
+                            readOnly: !widget.canEdit,
+                            maxLines: 8,
+                            style: const TextStyle(fontSize: 12),
+                            decoration: InputDecoration(
+                              isDense: true,
+                              hintText: loc.t('ttk_technology'),
+                              border: const OutlineInputBorder(),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                              filled: true,
+                              fillColor: theme.colorScheme.surface,
+                            ),
+                          )
+                        : const SizedBox.shrink(),
+                  ),
+                  dataCell: true,
                 ),
+              ),
+              if (hasDeleteCol) TableCell(child: emptyDataCell()),
             ],
           ),
         ...ingredients.asMap().entries.map((e) {
@@ -1621,7 +1640,9 @@ class _TtkTableState extends State<_TtkTable> {
           return TableRow(
             decoration: BoxDecoration(color: cellBg),
             children: [
-              // Наименование блюда — в первой строке редактируемое поле (или текст); первые колонки — серые
+              // Тип ТТК — ПФ или Блюдо (светло-серый как в образце)
+              TableCell(child: wrapCell(Container(color: firstColsBg, constraints: const BoxConstraints(minHeight: 44), padding: _cellPad, alignment: Alignment.center, child: Text(widget.isSemiFinished ? 'ПФ' : loc.t('ttk_dish'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))), fillColor: firstColsBg, dataCell: true)),
+              // Наименование — название блюда (только в первой строке заполнено)
               widget.canEdit && isFirstRow && widget.dishNameController != null
                   ? TableCell(
                       child: wrapCell(SizedBox.expand(
@@ -1640,53 +1661,49 @@ class _TtkTableState extends State<_TtkTable> {
                             style: const TextStyle(fontSize: 12),
                           ),
                         ),
-                      ), fillColor: firstColsBg),
+                      ), fillColor: firstColsBg, dataCell: true),
                     )
-                  : TableCell(child: wrapCell(Container(color: firstColsBg, constraints: const BoxConstraints(minHeight: 44), padding: _cellPad, alignment: Alignment.centerLeft, child: Text(isFirstRow ? widget.dishName : '', style: const TextStyle(fontSize: 12))), fillColor: firstColsBg)),
-              // Продукт: для пустой строки — подсказка «Если эта строка заполняется…» + «Выбрать продукт»
-              widget.canEdit && widget.onReplaceIngredient != null
+                  : TableCell(child: wrapCell(Container(color: firstColsBg, constraints: const BoxConstraints(minHeight: 44), padding: _cellPad, alignment: Alignment.centerLeft, child: Text(isFirstRow ? widget.dishName : '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500))), fillColor: firstColsBg, dataCell: true)),
+              // Продукт: в пустой (предпоследней) строке — подсказка + поле ввода + «из списка»
+              widget.canEdit && (ing.productName.isEmpty && !ing.hasData)
                   ? TableCell(
                       child: wrapCell(
-                        InkWell(
-                          onTap: () => widget.onReplaceIngredient!(i),
-                          child: Container(
-                            color: firstColsBg,
-                            padding: _cellPad,
-                            alignment: Alignment.centerLeft,
-                            child: (ing.productName.isEmpty && !ing.hasData)
-                                ? Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        loc.t('ttk_add_hint'),
-                                        style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(Icons.add_circle_outline, size: 18, color: theme.colorScheme.primary),
-                                          const SizedBox(width: 6),
-                                          Flexible(
-                                            child: Text(
-                                              loc.t('ttk_choose_product'),
-                                              style: TextStyle(fontSize: 12, color: theme.colorScheme.primary),
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  )
-                                : Text(
-                                    ing.sourceTechCardName ?? ing.productName,
-                                    style: const TextStyle(fontSize: 12),
-                                    overflow: TextOverflow.ellipsis,
+                        Container(
+                          color: firstColsBg,
+                          padding: _cellPad,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                loc.t('ttk_add_hint'),
+                                style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _EditableProductNameCell(
+                                      value: ing.productName,
+                                      onChanged: (s) => widget.onUpdate(i, ing.copyWith(productName: s)),
+                                    ),
                                   ),
+                                  if (widget.onReplaceIngredient != null) ...[
+                                    const SizedBox(width: 6),
+                                    InkWell(
+                                      onTap: () => widget.onReplaceIngredient!(i),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                        child: Text(loc.t('ttk_choose_product'), style: TextStyle(fontSize: 11, color: theme.colorScheme.primary)),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ],
                           ),
                         ),
                         fillColor: firstColsBg,
@@ -1703,8 +1720,8 @@ class _TtkTableState extends State<_TtkTable> {
                                 onChanged: (s) => widget.onUpdate(i, ing.copyWith(productName: s)),
                               ),
                             ),
-                          ), fillColor: firstColsBg))
-                      : TableCell(child: wrapCell(Container(color: firstColsBg, constraints: const BoxConstraints(minHeight: 44), padding: _cellPad, alignment: Alignment.centerLeft, child: Text(ing.sourceTechCardName ?? ing.productName, style: const TextStyle(fontSize: 12))), fillColor: firstColsBg)),
+                          ), fillColor: firstColsBg, dataCell: true))
+                      : TableCell(child: wrapCell(Container(color: firstColsBg, constraints: const BoxConstraints(minHeight: 44), padding: _cellPad, alignment: Alignment.centerLeft, child: Text(ing.sourceTechCardName ?? ing.productName, style: const TextStyle(fontSize: 12))), fillColor: firstColsBg, dataCell: true)),
               widget.canEdit
                   ? TableCell(
                       child: wrapCell(SizedBox.expand(
@@ -1870,6 +1887,8 @@ class _TtkTableState extends State<_TtkTable> {
                       )),
                     )
                   : _cell('${ing.cost.toStringAsFixed(2)} $sym'),
+              // Цена за 1 кг/шт блюда (по ингредиенту: стоимость за кг при выходе)
+              _cell(ing.netWeight > 0 ? '${(ing.cost * 1000 / ing.netWeight).toStringAsFixed(2)} $sym' : ''),
               // Колонка «Технология» — только в первой строке контент, в остальных пустая ячейка
               isFirstRow && widget.technologyController != null
                   ? TableCell(
@@ -1917,9 +1936,10 @@ class _TtkTableState extends State<_TtkTable> {
             ],
           );
         }),
-        // Итого — жёлтая строка как в образце, каждая ячейка с границей
+        // Итого — жёлтая строка как в образце: Тип пусто, Наименование пусто, Продукт «Итого», суммы, Технология пусто
         TableRow(
           children: [
+            _totalCell(''),
             _totalCell(''),
             _totalCell(loc.t('ttk_total')),
             _totalCell(''),
@@ -1929,7 +1949,8 @@ class _TtkTableState extends State<_TtkTable> {
             _totalCell(''),
             _totalCell(totalNet.toStringAsFixed(0)),
             _totalCell('${totalCost.toStringAsFixed(2)} $sym'),
-            _totalCell(''), // колонка «Технология»
+            _totalCell(totalNet > 0 ? '${(totalCost * 1000 / totalNet).toStringAsFixed(2)} $sym' : ''),
+            _totalCell(''),
             if (hasDeleteCol) _totalCell(''),
           ],
         ),
@@ -1938,8 +1959,30 @@ class _TtkTableState extends State<_TtkTable> {
     );
   }
 
+  Widget _headerCell(String text) {
+    return TableCell(
+      child: wrapCell(
+        Padding(
+          padding: _cellPad,
+          child: Center(
+            child: Text(
+              text,
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: headerTextColor),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ),
+        fillColor: headerBg,
+        dataCell: false,
+      ),
+    );
+  }
+
   Widget _cell(String text, {bool bold = false}) {
-    final borderSide = BorderSide(width: 1, color: Theme.of(context).colorScheme.outline);
+    final borderColor = Colors.grey.shade400;
+    final bg = Theme.of(context).colorScheme.surface;
     final inner = Container(
       constraints: const BoxConstraints(minHeight: 44),
       padding: _cellPad,
@@ -1948,7 +1991,10 @@ class _TtkTableState extends State<_TtkTable> {
     );
     return TableCell(
       child: Container(
-        decoration: BoxDecoration(border: Border.all(color: borderSide.color, width: borderSide.width)),
+        decoration: BoxDecoration(
+          color: bg,
+          border: Border.all(width: 1, color: borderColor),
+        ),
         child: inner,
       ),
     );
