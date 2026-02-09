@@ -24,7 +24,7 @@ enum _CatalogSort { nameAz, nameZa, priceAsc, priceDesc }
 
 /// Единица измерения для отображения в номенклатуре: кг, шт, г, л и т.д. (не сырой "pcs"/"kg" из БД).
 String _unitDisplay(String? unit, String lang) {
-  return CulinaryUnits.displayName((unit ?? 'kg').trim().toLowerCase(), lang);
+  return CulinaryUnits.displayName((unit ?? 'g').trim().toLowerCase(), lang);
 }
 
 class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProviderStateMixin {

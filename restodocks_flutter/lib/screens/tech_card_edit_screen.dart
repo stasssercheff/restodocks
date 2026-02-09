@@ -61,6 +61,7 @@ class _EditableShrinkageCellState extends State<_EditableShrinkageCell> {
 
   @override
   Widget build(BuildContext context) {
+    final fill = Theme.of(context).colorScheme.surfaceContainerLow.withOpacity(0.7);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => _focusNode.requestFocus(),
@@ -68,13 +69,13 @@ class _EditableShrinkageCellState extends State<_EditableShrinkageCell> {
         focusNode: _focusNode,
         controller: _ctrl,
         keyboardType: TextInputType.numberWithOptions(decimal: true),
-        decoration: const InputDecoration(
+        decoration: InputDecoration(
           isDense: true,
           suffixText: '%',
           border: InputBorder.none,
-          contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
           filled: true,
-          fillColor: Colors.transparent,
+          fillColor: fill,
         ),
         style: const TextStyle(fontSize: 12),
         onSubmitted: (_) => _submit(),
@@ -127,6 +128,7 @@ class _EditableWasteCellState extends State<_EditableWasteCell> {
 
   @override
   Widget build(BuildContext context) {
+    final fill = Theme.of(context).colorScheme.surfaceContainerLow.withOpacity(0.7);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => _focusNode.requestFocus(),
@@ -134,13 +136,13 @@ class _EditableWasteCellState extends State<_EditableWasteCell> {
         focusNode: _focusNode,
         controller: _ctrl,
         keyboardType: TextInputType.numberWithOptions(decimal: true),
-        decoration: const InputDecoration(
+        decoration: InputDecoration(
           isDense: true,
           suffixText: '%',
           border: InputBorder.none,
-          contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
           filled: true,
-          fillColor: Colors.transparent,
+          fillColor: fill,
         ),
         style: const TextStyle(fontSize: 12),
         onSubmitted: (_) => _submit(),
@@ -195,12 +197,12 @@ class _EditableProductNameCellState extends State<_EditableProductNameCell> {
         focusNode: _focusNode,
         controller: _ctrl,
         style: const TextStyle(fontSize: 12),
-        decoration: const InputDecoration(
+        decoration: InputDecoration(
           isDense: true,
           border: InputBorder.none,
-          contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
           filled: true,
-          fillColor: Colors.transparent,
+          fillColor: Theme.of(context).colorScheme.surfaceContainerLow.withOpacity(0.7),
         ),
         onChanged: widget.onChanged,
       ),
@@ -251,6 +253,7 @@ class _EditableGrossCellState extends State<_EditableGrossCell> {
 
   @override
   Widget build(BuildContext context) {
+    final fill = Theme.of(context).colorScheme.surfaceContainerLow.withOpacity(0.7);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => _focusNode.requestFocus(),
@@ -258,13 +261,13 @@ class _EditableGrossCellState extends State<_EditableGrossCell> {
         focusNode: _focusNode,
         controller: _ctrl,
         keyboardType: TextInputType.numberWithOptions(decimal: true),
-        decoration: const InputDecoration(
+        decoration: InputDecoration(
           isDense: true,
           suffixText: 'г',
           border: InputBorder.none,
-          contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
           filled: true,
-          fillColor: Colors.transparent,
+          fillColor: fill,
         ),
         style: const TextStyle(fontSize: 12),
         onSubmitted: (_) => _submit(),
@@ -324,6 +327,7 @@ class _EditablePricePerKgCellState extends State<_EditablePricePerKgCell> {
 
   @override
   Widget build(BuildContext context) {
+    final fill = Theme.of(context).colorScheme.surfaceContainerLow.withOpacity(0.7);
     return TextField(
       controller: _ctrl,
       keyboardType: TextInputType.numberWithOptions(decimal: true),
@@ -333,7 +337,7 @@ class _EditablePricePerKgCellState extends State<_EditablePricePerKgCell> {
         border: InputBorder.none,
         contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
         filled: true,
-        fillColor: Colors.transparent,
+        fillColor: fill,
       ),
       style: const TextStyle(fontSize: 12),
       onSubmitted: (_) => _submit(),
@@ -399,7 +403,7 @@ class _EditableCostCellState extends State<_EditableCostCell> {
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
           filled: true,
-          fillColor: Colors.transparent,
+          fillColor: Theme.of(context).colorScheme.surfaceContainerLow.withOpacity(0.7),
         ),
         style: const TextStyle(fontSize: 12),
         onSubmitted: (_) => _submit(),
@@ -1263,21 +1267,23 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
               ),
             ],
             const SizedBox(height: 8),
-            if (constraints.maxWidth < 600)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Row(
-                  children: [
-                    Icon(Icons.swipe, size: 18, color: Theme.of(context).colorScheme.primary),
-                    const SizedBox(width: 6),
-                    Text(
+            // Подсказка о горизонтальной прокрутке: таблица широкая, справа ещё колонки (Брутто, Отход %, Нетто … и Итого)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                children: [
+                  Icon(Icons.swipe_right, size: 18, color: Theme.of(context).colorScheme.primary),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
                       loc.t('ttk_scroll_hint'),
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.primary),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            // Таблица: высота растёт с числом строк (шапка + строки + итого), но не больше ~70% экрана; при 20+ ингредиентах прокрутка внутри
+            ),
+            // Таблица: высота растёт с числом строк (шапка + строки + итого), но не больше ~70% экрана; прокрутите вправо для колонок Брутто, Отход %, Нетто, …, Итого
             LayoutBuilder(
               builder: (context, c) {
                 final screenH = MediaQuery.of(context).size.height;
@@ -1292,8 +1298,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                     child: SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: SingleChildScrollView(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(minWidth: 1300),
+                        child: SizedBox(
+                          width: 1150,
                           child: canEdit
                             ? _TtkTable(
                             loc: loc,
@@ -1440,20 +1446,20 @@ class _TtkTableState extends State<_TtkTable> {
     final sym = currency == 'RUB' ? '₽' : currency == 'VND' ? '₫' : currency == 'USD' ? '\$' : currency;
 
     final hasDeleteCol = widget.canEdit;
-    // Порядок колонок как в образце: Тип ТТК | Наименование | Продукт | Брутто | Отход % | Нетто | Способ | Ужарка | Выход | Стоимость | Цена за 1 кг/шт | Технология
-    const colType = 72.0;   // Тип ТТК
-    const colName = 120.0;  // Наименование
-    const colProduct = 140.0;
-    const colGross = 80.0;
-    const colWaste = 72.0;  // Отход % — в одну строку
-    const colNet = 80.0;
-    const colMethod = 140.0;
-    const colShrink = 72.0; // Ужарка % — в одну строку
-    const colOutput = 80.0;
-    const colCost = 90.0;
-    const colPriceKg = 100.0; // Цена за 1 кг/шт блюда
-    const colTech = 220.0;
-    const colDel = 48.0;
+    // Порядок колонок как в образце. Ширины подобраны так, чтобы вся строка с полями ввода помещалась на экране без горизонтальной прокрутки.
+    const colType = 64.0;   // Тип ТТК
+    const colName = 100.0;  // Наименование
+    const colProduct = 120.0;
+    const colGross = 70.0;  // Брутто г
+    const colWaste = 64.0;  // Отход %
+    const colNet = 70.0;    // Нетто г
+    const colMethod = 100.0;// Способ
+    const colShrink = 64.0; // Ужарка %
+    const colOutput = 70.0; // Выход г
+    const colCost = 82.0;   // Стоимость
+    const colPriceKg = 88.0;// Цена за 1 кг/шт
+    const colTech = 180.0;  // Технология
+    const colDel = 44.0;
     final columnWidths = <int, TableColumnWidth>{
       0: const FixedColumnWidth(colType),
       1: const FixedColumnWidth(colName),
@@ -1471,23 +1477,29 @@ class _TtkTableState extends State<_TtkTable> {
     };
     final tableWidth = colType + colName + colProduct + colGross + colWaste + colNet + colMethod + colShrink + colOutput + colCost + colPriceKg + colTech + (hasDeleteCol ? colDel : 0.0);
 
+    // ——— ШАБЛОН ТАБЛИЦЫ ТТК (отрисовка строго по нему) ———
+    // 1) Одна строка шапки: тёмно-серая (headerBg), белый текст, границы.
+    // 2) Строки данных: у каждой строки 13 колонок в порядке: Тип | Наименование | Продукт | Брутто | Отход % | Нетто | Способ | Ужарка % | Выход | Стоимость | Цена за 1 кг/шт | Технология | [Удаление].
+    //    Первые три ячейки (Тип, Наименование, Продукт) — светло-серые (firstColsBg). Остальные — белые/фон поверхности, у всех границы и мин. высота 44.
+    // 3) Последняя строка: «Итого» — жёлтая (amber.shade100), в колонке «Продукт» текст «Итого», в остальных — суммы или пусто.
     final borderColor = theme.colorScheme.outline;
     final cellBg = theme.colorScheme.surface;
-    // Чёткая граница ячеек зоны заполнения, чтобы сетка была видна
     final dataBorderColor = Colors.grey.shade400;
-    // Как в образце: тёмно-серая шапка с белым текстом, светло-серые первые колонки
     final headerBg = Colors.grey.shade800;
     final headerTextColor = Colors.white;
     final firstColsBg = Colors.grey.shade200;
 
-    /// [dataCell] true = зона заполнения (чёткая серая граница), false = шапка
+    /// Ячейка по шаблону: граница, фон, минимальная высота у данных. [dataCell] true = ячейка данных (серая граница, minHeight 44).
     Widget wrapCell(Widget child, {Color? fillColor, bool dataCell = true}) => Container(
       decoration: BoxDecoration(
         color: fillColor ?? cellBg,
         border: Border.all(width: 1, color: dataCell ? dataBorderColor : borderColor),
       ),
       clipBehavior: Clip.hardEdge,
-      child: SizedBox(width: double.infinity, child: child),
+      child: SizedBox(
+        width: double.infinity,
+        child: dataCell ? ConstrainedBox(constraints: const BoxConstraints(minHeight: 44), child: child) : child,
+      ),
     );
 
     /// Пустая ячейка в зоне заполнения — явная высота и видимые границы, чтобы сетка не пропадала
@@ -1521,9 +1533,7 @@ class _TtkTableState extends State<_TtkTable> {
       ),
     );
 
-    // ТТК — таблица. Шапка = одна строка (обозначения колонок). Данные = строки: текст (продукт, название блюда, технология), числа (гр/кг), проценты (0–100).
-    // При редактировании последние 2 строки всегда: предпоследняя — пустая (при заполнении автоматически появляется ещё одна внизу), последняя — Итого (выход и стоимость).
-    // Никаких кнопок «добавить строку» — добавление только через заполнение пустой строки.
+    // Отрисовка по шаблону: шапка → N строк данных (у каждой полный набор ячеек) → строка «Итого».
     return SizedBox(
       width: tableWidth,
       child: Table(
@@ -1531,7 +1541,7 @@ class _TtkTableState extends State<_TtkTable> {
         columnWidths: columnWidths,
         defaultColumnWidth: const FixedColumnWidth(80),
       children: [
-        // Строка 0: шапка
+        // 1. Шапка (одна строка)
         TableRow(
           decoration: BoxDecoration(color: headerBg),
           children: [
@@ -1550,7 +1560,7 @@ class _TtkTableState extends State<_TtkTable> {
             if (hasDeleteCol) TableCell(child: wrapCell(Padding(padding: _cellPad, child: const SizedBox.shrink()), fillColor: headerBg, dataCell: false)),
           ],
         ),
-        // Строки данных. Пустая строка — это полная табличная строка с ячейками (как у заполненных), но без данных; все ячейки редактируемые.
+        // 2. Строки данных (каждая строка = те же 13 колонок по шаблону; пустая строка — те же ячейки, без данных)
         ...ingredients.asMap().entries.map((e) {
           final i = e.key;
           final ing = e.value;
@@ -1572,12 +1582,12 @@ class _TtkTableState extends State<_TtkTable> {
                           padding: _cellPad,
                           child: TextField(
                             controller: widget.dishNameController,
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               isDense: true,
                               border: InputBorder.none,
-                              contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                               filled: true,
-                              fillColor: Colors.transparent,
+                              fillColor: Theme.of(context).colorScheme.surfaceContainerLow.withOpacity(0.7),
                             ),
                             style: const TextStyle(fontSize: 12),
                           ),
@@ -1620,27 +1630,33 @@ class _TtkTableState extends State<_TtkTable> {
                     )
                   : widget.canEdit && product == null
                       ? TableCell(
-                          child: wrapCell(SizedBox.expand(
-                            child: Container(
-                              color: firstColsBg,
-                              padding: _cellPad,
-                              child: _EditableProductNameCell(
-                                value: ing.productName,
-                                onChanged: (s) => widget.onUpdate(i, ing.copyWith(productName: s)),
+                          child: wrapCell(ConstrainedBox(
+                            constraints: const BoxConstraints(minHeight: 44),
+                            child: SizedBox.expand(
+                              child: Container(
+                                color: firstColsBg,
+                                padding: _cellPad,
+                                child: _EditableProductNameCell(
+                                  value: ing.productName,
+                                  onChanged: (s) => widget.onUpdate(i, ing.copyWith(productName: s)),
+                                ),
                               ),
                             ),
                           ), fillColor: firstColsBg, dataCell: true))
                       : TableCell(child: wrapCell(Container(color: firstColsBg, constraints: const BoxConstraints(minHeight: 44), padding: _cellPad, alignment: Alignment.centerLeft, child: Text(ing.sourceTechCardName ?? ing.productName, style: const TextStyle(fontSize: 12))), fillColor: firstColsBg, dataCell: true)),
               widget.canEdit
                   ? TableCell(
-                      child: wrapCell(SizedBox.expand(
-                        child: Padding(
-                          padding: _cellPad,
-                          child: _EditableGrossCell(
-                            grams: ing.grossWeight,
-                            onChanged: (g) {
-                              if (g != null && g >= 0) widget.onUpdate(i, ing.copyWith(grossWeight: g));
-                            },
+                      child: wrapCell(ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: 44),
+                        child: SizedBox.expand(
+                          child: Padding(
+                            padding: _cellPad,
+                            child: _EditableGrossCell(
+                              grams: ing.grossWeight,
+                              onChanged: (g) {
+                                if (g != null && g >= 0) widget.onUpdate(i, ing.copyWith(grossWeight: g));
+                              },
+                            ),
                           ),
                         ),
                       )),
@@ -1847,7 +1863,7 @@ class _TtkTableState extends State<_TtkTable> {
             ],
           );
         }),
-        // Итого — жёлтая строка как в образце: Тип пусто, Наименование пусто, Продукт «Итого», суммы, Технология пусто
+        // 3. Строка «Итого» (по шаблону — жёлтая)
         TableRow(
           children: [
             _totalCell(''),
@@ -1870,40 +1886,45 @@ class _TtkTableState extends State<_TtkTable> {
     );
   }
 
+  /// Ячейка данных: тот же wrapCell, что и у шапки (те же границы, мин. высота), только фон и контент другие.
   Widget _cell(String text, {bool bold = false}) {
-    final borderColor = Colors.grey.shade400;
-    final bg = Theme.of(context).colorScheme.surface;
-    final inner = Container(
-      constraints: const BoxConstraints(minHeight: 44),
-      padding: _cellPad,
-      alignment: Alignment.centerLeft,
-      child: Text(text, style: TextStyle(fontSize: 12, fontWeight: bold ? FontWeight.bold : null), overflow: TextOverflow.ellipsis, maxLines: 2),
-    );
     return TableCell(
-      child: Container(
-        decoration: BoxDecoration(
-          color: bg,
-          border: Border.all(width: 1, color: borderColor),
+      child: wrapCell(
+        Padding(
+          padding: _cellPad,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              text,
+              style: TextStyle(fontSize: 12, fontWeight: bold ? FontWeight.bold : null),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
+            ),
+          ),
         ),
-        child: inner,
+        dataCell: true,
       ),
     );
   }
 
+  /// Строка «Итого»: тот же wrapCell (те же границы, мин. высота), фон жёлтый.
   Widget _totalCell(String text) {
-    final borderColor = Theme.of(context).colorScheme.outline;
     return TableCell(
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.amber.shade100,
-          border: Border.all(width: 1, color: borderColor),
-        ),
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 44),
+      child: wrapCell(
+        Padding(
           padding: _cellPad,
-          alignment: Alignment.centerLeft,
-          child: Text(text, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis, maxLines: 2),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              text,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
+            ),
+          ),
         ),
+        fillColor: Colors.amber.shade100,
+        dataCell: true,
       ),
     );
   }
@@ -2108,13 +2129,13 @@ class _EditableNetCellState extends State<_EditableNetCell> {
         focusNode: _focusNode,
         controller: _ctrl,
         keyboardType: TextInputType.numberWithOptions(decimal: true),
-        decoration: const InputDecoration(
+        decoration: InputDecoration(
           isDense: true,
           suffixText: 'г',
           border: InputBorder.none,
-          contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
           filled: true,
-          fillColor: Colors.transparent,
+          fillColor: Theme.of(context).colorScheme.surfaceContainerLow.withOpacity(0.7),
         ),
         style: const TextStyle(fontSize: 12),
         onSubmitted: (_) => _submit(),
@@ -2162,7 +2183,7 @@ class _ProductPickerState extends State<_ProductPicker> {
               final p = list[i];
               return ListTile(
                 title: Text(p.getLocalizedName(lang)),
-                subtitle: Text('${p.calories?.round() ?? 0} ${loc.t('kcal')} · ${CulinaryUnits.displayName((p.unit ?? 'kg').trim().toLowerCase(), loc.currentLanguageCode)}'),
+                subtitle: Text('${p.calories?.round() ?? 0} ${loc.t('kcal')} · ${CulinaryUnits.displayName((p.unit ?? 'g').trim().toLowerCase(), loc.currentLanguageCode)}'),
                 onTap: () => _askWeight(p, loc),
               );
             },
@@ -2174,9 +2195,9 @@ class _ProductPickerState extends State<_ProductPicker> {
 
   void _askWeight(Product p, LocalizationService loc) {
     final lang = loc.currentLanguageCode;
-    String defaultUnit = _productUnitToCulinary(p.unit);
+    // По умолчанию на сайте везде граммы, не кг
+    const defaultUnit = 'g';
     final c = TextEditingController(text: defaultUnit == 'pcs' ? '1' : '100');
-    final wasteController = TextEditingController(text: '${p.primaryWastePct?.toStringAsFixed(1) ?? '0'}');
     final gppController = TextEditingController(text: '50');
     final shrinkageController = TextEditingController();
     final processes = CookingProcess.forCategory(p.category);
@@ -2203,7 +2224,7 @@ class _ProductPickerState extends State<_ProductPicker> {
                           keyboardType: TextInputType.numberWithOptions(decimal: true),
                           decoration: InputDecoration(labelText: loc.t('quantity_label')),
                           autofocus: true,
-                          onSubmitted: (_) => _submit(p, c.text, wasteController.text, gppController.text, selectedProcess, selectedUnit, ctx, shrinkageController),
+                          onSubmitted: (_) => _submit(p, c.text, gppController.text, selectedProcess, selectedUnit, ctx, shrinkageController),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -2231,12 +2252,6 @@ class _ProductPickerState extends State<_ProductPicker> {
                       ),
                     ),
                   ],
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: wasteController,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(labelText: loc.t('waste_pct'), hintText: '0'),
-                  ),
                   const SizedBox(height: 16),
                   Text(loc.t('cooking_process'), style: Theme.of(context).textTheme.titleSmall),
                   const SizedBox(height: 4),
@@ -2275,7 +2290,7 @@ class _ProductPickerState extends State<_ProductPicker> {
             actions: [
               TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(loc.t('back'))),
               FilledButton(
-                onPressed: () => _submit(p, c.text, wasteController.text, gppController.text, selectedProcess, selectedUnit, ctx, shrinkageController),
+                onPressed: () => _submit(p, c.text, gppController.text, selectedProcess, selectedUnit, ctx, shrinkageController),
                 child: Text(loc.t('save')),
               ),
             ],
@@ -2295,9 +2310,10 @@ class _ProductPickerState extends State<_ProductPicker> {
     return 'g';
   }
 
-  void _submit(Product p, String val, String wasteStr, String gppStr, CookingProcess? proc, String unit, BuildContext ctx, TextEditingController shrinkageController) {
+  void _submit(Product p, String val, String gppStr, CookingProcess? proc, String unit, BuildContext ctx, TextEditingController shrinkageController) {
     final v = double.tryParse(val.replaceFirst(',', '.')) ?? 0;
-    final waste = (double.tryParse(wasteStr) ?? 0).clamp(0.0, 99.9);
+    // Процент отхода не спрашиваем при добавлении — вносится в таблице в колонке «Отход %». Подставляем значение по умолчанию из продукта или 0.
+    final waste = (p.primaryWastePct ?? 0).clamp(0.0, 99.9);
     double? gpp;
     if (CulinaryUnits.isCountable(unit)) {
       gpp = double.tryParse(gppStr) ?? 50;
