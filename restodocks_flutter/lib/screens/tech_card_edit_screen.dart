@@ -1130,7 +1130,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     final weightConv = CulinaryUnits.toGrams(weightG, unit, gramsPerPiece: gramsPerPiece);
     final ing = TTIngredient.fromTechCardData(
       techCardId: t.id,
-      techCardName: t.getLocalizedDishName(loc.currentLanguageCode),
+      techCardName: t.getDisplayNameInLists(loc.currentLanguageCode),
       totalNetWeight: totalNet,
       totalCalories: t.totalCalories,
       totalProtein: t.totalProtein,
@@ -1220,7 +1220,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop(), style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
-        title: Text(_isNew ? loc.t('create_tech_card') : (_techCard?.getLocalizedDishName(loc.currentLanguageCode) ?? loc.t('tech_cards'))),
+        title: Text(_isNew ? loc.t('create_tech_card') : (_techCard?.getDisplayNameInLists(loc.currentLanguageCode) ?? loc.t('tech_cards'))),
         actions: [
           if (canEdit) IconButton(icon: const Icon(Icons.save), onPressed: _save, tooltip: loc.t('save'), style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
           if (canEdit && !_isNew) IconButton(icon: const Icon(Icons.delete_outline), onPressed: () => _confirmDelete(context, loc), tooltip: loc.t('delete_tech_card'), style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
@@ -1245,7 +1245,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                     controller: _nameController,
                     readOnly: !canEdit,
                     decoration: InputDecoration(
-                      labelText: loc.t('dish_name'),
+                      labelText: loc.t('ttk_name'),
                       isDense: true,
                       filled: true,
                       border: const OutlineInputBorder(),
@@ -1292,7 +1292,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                             controller: _nameController,
                             readOnly: !canEdit,
                             decoration: InputDecoration(
-                              labelText: loc.t('dish_name'),
+                              labelText: loc.t('ttk_name'),
                               isDense: true,
                               filled: true,
                               border: const OutlineInputBorder(),
@@ -1667,13 +1667,25 @@ class _TtkTableState extends State<_TtkTable> {
       ),
     );
 
-    // Отрисовка по шаблону: шапка → N строк данных (у каждой полный набор ячеек) → строка «Итого».
+    // Высота объединённой ячейки «Название»: первая строка с колонкой «Технология» выше (120), остальные по 44.
+    const dataRowHeight = 44.0;
+    const firstRowTechHeight = 120.0;
+    double mergedNameHeight(int rowCount) {
+      if (rowCount <= 0) return dataRowHeight;
+      return firstRowTechHeight + (rowCount - 1) * dataRowHeight;
+    }
+
+    // Отрисовка по шаблону: шапка → N строк данных (у каждой полный набор ячеек) → строка «Итого». Колонка «Название» — одна объединённая ячейка поверх (Stack).
     return SizedBox(
       width: tableWidth,
-      child: Table(
-        border: TableBorder.all(width: 1, color: Colors.black87),
-        columnWidths: columnWidths,
-        defaultColumnWidth: const FixedColumnWidth(80),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Table(
+            border: TableBorder.all(width: 1, color: Colors.black87),
+            columnWidths: columnWidths,
+            defaultColumnWidth: const FixedColumnWidth(80),
+            defaultVerticalAlignment: TableCellVerticalAlignment.middle,
       children: [
         // 1. Шапка (одна строка)
         TableRow(
@@ -1707,28 +1719,14 @@ class _TtkTableState extends State<_TtkTable> {
             children: [
               // Тип ТТК — ПФ или Блюдо (светло-серый как в образце)
               TableCell(child: wrapCell(Container(color: firstColsBg, constraints: const BoxConstraints(minHeight: 44), padding: _cellPad, alignment: Alignment.center, child: Text(widget.isSemiFinished ? 'ПФ' : loc.t('ttk_dish'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))), fillColor: firstColsBg, dataCell: true)),
-              // Наименование — название блюда (только в первой строке заполнено)
-              widget.canEdit && isFirstRow && widget.dishNameController != null
-                  ? TableCell(
-                      child: wrapCell(SizedBox.expand(
-                        child: Container(
-                          color: firstColsBg,
-                          padding: _cellPad,
-                          child: TextField(
-                            controller: widget.dishNameController,
-                            decoration: InputDecoration(
-                              isDense: true,
-                              border: InputBorder.none,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                              filled: true,
-                              fillColor: Theme.of(context).colorScheme.surfaceContainerLow.withOpacity(0.7),
-                            ),
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                        ),
-                      ), fillColor: firstColsBg, dataCell: true),
-                    )
-                  : TableCell(child: wrapCell(Container(color: firstColsBg, constraints: const BoxConstraints(minHeight: 44), padding: _cellPad, alignment: Alignment.centerLeft, child: Text(isFirstRow ? widget.dishName : '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500))), fillColor: firstColsBg, dataCell: true)),
+              // Название — одна объединённая ячейка поверх всех строк (рисуется в Stack ниже); здесь — пустая ячейка без границы
+              TableCell(
+                verticalAlignment: TableCellVerticalAlignment.fill,
+                child: Container(
+                  color: firstColsBg,
+                  constraints: const BoxConstraints(minHeight: 44),
+                ),
+              ),
               // Продукт: выпадающий список из ячейки (не снизу экрана). Пустая строка = кнопка «Выбрать продукт».
               widget.canEdit && (ing.productName.isEmpty && !ing.hasData)
                   ? TableCell(
@@ -2019,6 +2017,41 @@ class _TtkTableState extends State<_TtkTable> {
         ),
       ],
     ),
+          // Объединённая ячейка «Название» поверх всех строк данных (название задаётся при создании и дублируется сюда)
+          Positioned(
+            left: colType + 1,
+            top: 44 + 1,
+            width: colName,
+            height: mergedNameHeight(ingredients.length),
+            child: Container(
+              decoration: BoxDecoration(
+                color: firstColsBg,
+                border: Border.all(width: 1, color: borderColor),
+              ),
+              padding: _cellPad,
+              alignment: Alignment.topLeft,
+              child: widget.canEdit && widget.dishNameController != null
+                  ? TextField(
+                      controller: widget.dishNameController,
+                      decoration: InputDecoration(
+                        isDense: true,
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                        filled: true,
+                        fillColor: Theme.of(context).colorScheme.surfaceContainerLow.withOpacity(0.7),
+                      ),
+                      style: const TextStyle(fontSize: 12),
+                    )
+                  : Text(
+                      widget.dishName,
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 10,
+                    ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -2297,6 +2330,14 @@ class _ProductSelectDialogState extends State<_ProductSelectDialog> {
   final _searchController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _searchFocus.requestFocus();
+    });
+  }
+
+  @override
   void dispose() {
     _searchFocus.dispose();
     _searchController.dispose();
@@ -2323,17 +2364,23 @@ class _ProductSelectDialogState extends State<_ProductSelectDialog> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(
-              controller: _searchController,
-              focusNode: _searchFocus,
-              decoration: InputDecoration(
-                hintText: loc.t('search'),
-                prefixIcon: const Icon(Icons.search, size: 20),
-                isDense: true,
-                border: const OutlineInputBorder(),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            // Строка для ручного ввода — поиск по названию, чтобы не скроллить список
+            ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 56),
+              child: TextField(
+                controller: _searchController,
+                focusNode: _searchFocus,
+                decoration: InputDecoration(
+                  labelText: loc.t('search'),
+                  hintText: loc.t('search'),
+                  prefixIcon: const Icon(Icons.search, size: 22),
+                  isDense: true,
+                  border: const OutlineInputBorder(),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                  filled: true,
+                ),
+                onChanged: (v) => setState(() => _query = v),
               ),
-              onChanged: (v) => setState(() => _query = v),
             ),
             const SizedBox(height: 12),
             Expanded(
@@ -2598,7 +2645,7 @@ class _TechCardPicker extends StatelessWidget {
       itemBuilder: (_, i) {
         final t = techCards[i];
         return ListTile(
-          title: Text(t.getLocalizedDishName(lang)),
+          title: Text(t.getDisplayNameInLists(lang)),
           subtitle: Text('${t.ingredients.length} ${loc.t('ingredients_short')} · ${t.totalCalories.round()} ${loc.t('kcal')}'),
           onTap: () => _askWeight(context, t),
         );
@@ -2616,7 +2663,7 @@ class _TechCardPicker extends StatelessWidget {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx2, setStateDlg) => AlertDialog(
-          title: Text(t.getLocalizedDishName(lang)),
+          title: Text(t.getDisplayNameInLists(lang)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,

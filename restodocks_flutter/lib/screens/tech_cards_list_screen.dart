@@ -312,7 +312,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
               return DataRow(
                 cells: [
                   DataCell(Text('${i + 1}')),
-                  DataCell(Text(tc.getLocalizedDishName(lang))),
+                  DataCell(Text(tc.getDisplayNameInLists(lang))),
                   DataCell(Text(_categoryLabel(tc.category))),
                   DataCell(Text('${tc.ingredients.length}')),
                   DataCell(Text('${tc.totalCalories.round()}')),

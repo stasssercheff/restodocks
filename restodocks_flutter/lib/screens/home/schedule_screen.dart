@@ -440,19 +440,18 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       final sectionBg = theme.colorScheme.secondaryContainer.withOpacity(0.6);
       final sectionFg = theme.colorScheme.onSecondaryContainer;
 
+      // Разделитель цеха: одна единая ячейка (слева — название, справа — одна полоса на все даты, без кучи пустых ячеек)
       leftCells.add(leftCell(
         Text(sectionLabel, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: sectionFg), overflow: TextOverflow.ellipsis),
         height: _rowHeight,
         decoration: BoxDecoration(color: sectionBg, border: Border(right: BorderSide(color: borderColor))),
       ));
       rightRows.add(Container(
+        width: dates.length * _dayCellWidth,
         height: _rowHeight,
-        color: sectionBg,
-        child: Row(
-          children: dates.map((date) {
-            final bg = isToday(date) ? Color.lerp(sectionBg, todayHighlightBg, 0.5) ?? sectionBg : sectionBg;
-            return rightCell(const SizedBox.shrink(), bg: bg);
-          }).toList(),
+        decoration: BoxDecoration(
+          color: sectionBg,
+          border: Border(right: BorderSide(color: borderColor), bottom: BorderSide(color: borderColor)),
         ),
       ));
 

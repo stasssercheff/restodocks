@@ -1,0 +1,147 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:uuid/uuid.dart';
+
+import '../models/models.dart';
+import '../services/services.dart';
+
+/// Заказ продуктов: при нажатии не список продуктов, а «Создать» и список созданных списков заказов.
+class OrderListsScreen extends StatefulWidget {
+  const OrderListsScreen({super.key});
+
+  @override
+  State<OrderListsScreen> createState() => _OrderListsScreenState();
+}
+
+class _OrderListsScreenState extends State<OrderListsScreen> {
+  List<OrderList> _lists = [];
+  bool _loading = true;
+  String? _establishmentId;
+
+  Future<void> _load() async {
+    final acc = context.read<AccountManagerSupabase>();
+    final est = acc.establishment;
+    if (est == null) {
+      setState(() {
+        _loading = false;
+        _lists = [];
+      });
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _establishmentId = est.id;
+    });
+    try {
+      final list = await loadOrderLists(est.id);
+      if (mounted) {
+        setState(() {
+          _lists = list;
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() {
+        _lists = [];
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = context.watch<LocalizationService>();
+    return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        title: Text(loc.t('product_order')),
+        actions: [
+          IconButton(icon: const Icon(Icons.home), onPressed: () => context.go('/home'), tooltip: loc.t('home')),
+        ],
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _lists.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.list_alt, size: 64, color: Theme.of(context).colorScheme.outline),
+                        const SizedBox(height: 16),
+                        Text(
+                          loc.t('order_list_empty'),
+                          style: Theme.of(context).textTheme.titleMedium,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          loc.t('order_list_empty_hint'),
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _load,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                    itemCount: _lists.length,
+                    itemBuilder: (_, i) {
+                      final list = _lists[i];
+                      final dateStr = list.savedAt != null
+                          ? DateFormat('dd.MM.yyyy').format(list.savedAt!)
+                          : null;
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: list.isSavedWithQuantities
+                                ? Colors.amber.shade100
+                                : Theme.of(context).colorScheme.primaryContainer,
+                            child: Icon(
+                              list.isSavedWithQuantities ? Icons.check_circle : Icons.shopping_cart,
+                              color: list.isSavedWithQuantities ? Colors.amber.shade800 : Theme.of(context).colorScheme.onPrimaryContainer,
+                            ),
+                          ),
+                          title: Text(
+                            list.name,
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: Text(
+                            list.supplierName + (dateStr != null ? ' · $dateStr' : ''),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () async {
+                            await context.push('/product-order/${list.id}');
+                            if (mounted) _load();
+                          },
+                        ),
+                      );
+                    },
+                  ),
+                ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          await context.push('/product-order/new');
+          if (mounted) _load();
+        },
+        icon: const Icon(Icons.add),
+        label: Text(loc.t('order_list_create')),
+      ),
+    );
+  }
+}

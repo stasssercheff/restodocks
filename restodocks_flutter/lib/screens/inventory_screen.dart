@@ -42,7 +42,7 @@ class _InventoryRow {
 
   String productName(String lang) {
     if (product != null) return product!.getLocalizedName(lang);
-    if (techCard != null) return '${techCard!.getLocalizedDishName(lang)} (ПФ)';
+    if (techCard != null) return techCard!.getDisplayNameInLists(lang);
     return freeName ?? '';
   }
 
@@ -572,16 +572,21 @@ class _InventoryScreenState extends State<InventoryScreen> {
         String? freeName;
         String? freeUnit;
         String? pfUnit;
-        if (name.endsWith(' (ПФ)')) {
-          final dishName = name.substring(0, name.length - 5).trim();
-          techCard = pfOnly.cast<TechCard?>().firstWhere((t) => t?.getLocalizedDishName(lang) == dishName, orElse: () => null);
+        String? dishNameForPf;
+        if (name.startsWith('ПФ ')) {
+          dishNameForPf = name.substring(3).trim();
+        } else if (name.endsWith(' (ПФ)')) {
+          dishNameForPf = name.substring(0, name.length - 5).trim();
+        }
+        if (dishNameForPf != null) {
+          techCard = pfOnly.cast<TechCard?>().firstWhere((t) => t?.getLocalizedDishName(lang) == dishNameForPf, orElse: () => null);
           if (techCard == null) {
             freeName = name;
             freeUnit = unitStr.contains('гр') || unitStr == 'g' ? 'g' : 'pcs';
           } else {
             pfUnit = (unitStr.contains('гр') || unitStr == 'g') ? _pfUnitGrams : _pfUnitPcs;
           }
-        } else {
+        } else if (dishNameForPf == null) {
           product = products.cast<Product?>().firstWhere((p) => p?.getLocalizedName(lang) == name, orElse: () => null);
           if (product == null) {
             freeName = name;

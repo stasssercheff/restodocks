@@ -227,7 +227,7 @@ class _InventoryPfScreenState extends State<InventoryPfScreen> {
       'timeEnd': '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}',
     };
     final pfList = _rows.where((r) => r.quantity > 0).map((r) => {
-      'dishName': r.techCard.getLocalizedDishName(lang),
+      'dishName': r.techCard.getDisplayNameInLists(lang),
       'quantity': r.quantity,
     }).toList();
     final agg = _aggregateProducts(lang).values.toList();
@@ -449,7 +449,7 @@ class _InventoryPfScreenState extends State<InventoryPfScreen> {
               return TableRow(
                 children: [
                   _cell('${i + 1}'),
-                  _cell(r.techCard.getLocalizedDishName(lang)),
+                  _cell(r.techCard.getDisplayNameInLists(lang)),
                   TableCell(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),

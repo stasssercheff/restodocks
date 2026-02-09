@@ -15,6 +15,11 @@ import '../../screens/checklists_screen.dart';
 import '../../screens/checklist_edit_screen.dart';
 import '../../screens/tech_cards_list_screen.dart';
 import '../../screens/tech_card_edit_screen.dart';
+import '../../screens/order_lists_screen.dart';
+import '../../screens/order_list_create_screen.dart';
+import '../../screens/order_list_products_screen.dart';
+import '../../screens/order_list_detail_screen.dart';
+import '../../models/order_list.dart';
 import '../../services/ai_service.dart';
 import '../../services/services.dart';
 
@@ -130,6 +135,30 @@ class AppRouter {
       ),
 
       GoRoute(
+        path: '/product-order',
+        builder: (context, state) => const OrderListsScreen(),
+      ),
+      GoRoute(
+        path: '/product-order/new',
+        builder: (context, state) => const OrderListCreateScreen(),
+      ),
+      GoRoute(
+        path: '/product-order/new/products',
+        builder: (context, state) {
+          final draft = state.extra as OrderList?;
+          if (draft == null) return const _RedirectToProductOrder();
+          return OrderListProductsScreen(draft: draft);
+        },
+      ),
+      GoRoute(
+        path: '/product-order/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id'] ?? '';
+          return OrderListDetailScreen(listId: id);
+        },
+      ),
+
+      GoRoute(
         path: '/checklists',
         builder: (context, state) => const ChecklistsScreen(),
       ),
@@ -239,6 +268,30 @@ class _RedirectToLoginState extends State<_RedirectToLogin> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) context.go('/login');
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(child: CircularProgressIndicator()),
+    );
+  }
+}
+
+class _RedirectToProductOrder extends StatefulWidget {
+  const _RedirectToProductOrder();
+
+  @override
+  State<_RedirectToProductOrder> createState() => _RedirectToProductOrderState();
+}
+
+class _RedirectToProductOrderState extends State<_RedirectToProductOrder> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.go('/product-order');
     });
   }
 
