@@ -1479,8 +1479,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           ],
         ),
       ),
-              if (canEdit)
-                SafeArea(
+            ),
+            if (canEdit)
+              SafeArea(
                   top: false,
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
