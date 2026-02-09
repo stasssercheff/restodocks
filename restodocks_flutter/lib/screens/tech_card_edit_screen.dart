@@ -71,7 +71,6 @@ class _EditableShrinkageCellState extends State<_EditableShrinkageCell> {
         keyboardType: TextInputType.numberWithOptions(decimal: true),
         decoration: InputDecoration(
           isDense: true,
-          suffixText: '%',
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
           filled: true,
@@ -138,7 +137,6 @@ class _EditableWasteCellState extends State<_EditableWasteCell> {
         keyboardType: TextInputType.numberWithOptions(decimal: true),
         decoration: InputDecoration(
           isDense: true,
-          suffixText: '%',
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
           filled: true,
@@ -152,12 +150,13 @@ class _EditableWasteCellState extends State<_EditableWasteCell> {
   }
 }
 
-/// Редактируемая ячейка названия продукта (для ручной строки без продукта из справочника).
+/// Редактируемая ячейка названия продукта: ввод вручную и/или выбор из списка.
 class _EditableProductNameCell extends StatefulWidget {
-  const _EditableProductNameCell({required this.value, required this.onChanged});
+  const _EditableProductNameCell({required this.value, required this.onChanged, this.hintText});
 
   final String value;
   final void Function(String) onChanged;
+  final String? hintText;
 
   @override
   State<_EditableProductNameCell> createState() => _EditableProductNameCellState();
@@ -199,6 +198,7 @@ class _EditableProductNameCellState extends State<_EditableProductNameCell> {
         style: const TextStyle(fontSize: 12),
         decoration: InputDecoration(
           isDense: true,
+          hintText: widget.hintText,
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
           filled: true,
@@ -263,7 +263,6 @@ class _EditableGrossCellState extends State<_EditableGrossCell> {
         keyboardType: TextInputType.numberWithOptions(decimal: true),
         decoration: InputDecoration(
           isDense: true,
-          suffixText: 'г',
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
           filled: true,
@@ -333,7 +332,6 @@ class _EditablePricePerKgCellState extends State<_EditablePricePerKgCell> {
       keyboardType: TextInputType.numberWithOptions(decimal: true),
       decoration: InputDecoration(
         isDense: true,
-        suffixText: widget.symbol,
         border: InputBorder.none,
         contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
         filled: true,
@@ -399,7 +397,6 @@ class _EditableCostCellState extends State<_EditableCostCell> {
         keyboardType: TextInputType.numberWithOptions(decimal: true),
         decoration: InputDecoration(
           isDense: true,
-          suffixText: widget.symbol,
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
           filled: true,
@@ -1197,14 +1194,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                   ),
             const SizedBox(height: 16),
             Text(loc.t('ttk_composition'), style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-            if (canEdit)
-              Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Text(
-                  loc.t('ttk_formula_hint') ?? 'Нетто = брутто × (1 − отход%). Выход = нетто × (1 − ужарка%).',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
-                ),
-              ),
             // Кнопки распознавания ИИ — только при создании новой ТТК; на узком экране компактно (иконки)
             if (canEdit && _isNew) ...[
               const SizedBox(height: 8),
@@ -1439,7 +1428,7 @@ class _TtkTableState extends State<_TtkTable> {
     final theme = Theme.of(context);
     final borderColor = theme.colorScheme.outline;
     final cellBg = theme.colorScheme.surface;
-    final dataBorderColor = Colors.grey.shade400;
+    final dataBorderColor = Colors.grey.shade600;
     return Container(
       decoration: BoxDecoration(
         color: fillColor ?? cellBg,
@@ -1503,7 +1492,7 @@ class _TtkTableState extends State<_TtkTable> {
     // 3) Последняя строка: «Итого» — жёлтая (amber.shade100), в колонке «Продукт» текст «Итого», в остальных — суммы или пусто.
     final borderColor = theme.colorScheme.outline;
     final cellBg = theme.colorScheme.surface;
-    final dataBorderColor = Colors.grey.shade400;
+    final dataBorderColor = Colors.grey.shade600;
     final headerBg = Colors.grey.shade800;
     final headerTextColor = Colors.white;
     final firstColsBg = Colors.grey.shade200;
@@ -1616,16 +1605,16 @@ class _TtkTableState extends State<_TtkTable> {
                                 child: _EditableProductNameCell(
                                   value: ing.productName,
                                   onChanged: (s) => widget.onUpdate(i, ing.copyWith(productName: s)),
+                                  hintText: loc.t('ttk_product_hint'),
                                 ),
                               ),
                               if (widget.onReplaceIngredient != null) ...[
                                 const SizedBox(width: 6),
-                                InkWell(
-                                  onTap: () => widget.onReplaceIngredient!(i),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                    child: Text(loc.t('ttk_choose_product'), style: TextStyle(fontSize: 11, color: theme.colorScheme.primary)),
-                                  ),
+                                TextButton.icon(
+                                  onPressed: () => widget.onReplaceIngredient!(i),
+                                  icon: const Icon(Icons.list, size: 18),
+                                  label: Text(loc.t('ttk_choose_product'), style: const TextStyle(fontSize: 12)),
+                                  style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), minimumSize: const Size(0, 36)),
                                 ),
                               ],
                             ],
@@ -1642,9 +1631,25 @@ class _TtkTableState extends State<_TtkTable> {
                               child: Container(
                                 color: firstColsBg,
                                 padding: _cellPad,
-                                child: _EditableProductNameCell(
-                                  value: ing.productName,
-                                  onChanged: (s) => widget.onUpdate(i, ing.copyWith(productName: s)),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: _EditableProductNameCell(
+                                        value: ing.productName,
+                                        onChanged: (s) => widget.onUpdate(i, ing.copyWith(productName: s)),
+                                        hintText: loc.t('ttk_product_hint'),
+                                      ),
+                                    ),
+                                    if (widget.onReplaceIngredient != null) ...[
+                                      const SizedBox(width: 6),
+                                      TextButton.icon(
+                                        onPressed: () => widget.onReplaceIngredient!(i),
+                                        icon: const Icon(Icons.list, size: 18),
+                                        label: Text(loc.t('ttk_choose_product'), style: const TextStyle(fontSize: 12)),
+                                        style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), minimumSize: const Size(0, 36)),
+                                      ),
+                                    ],
+                                  ],
                                 ),
                               ),
                             ),
@@ -1667,7 +1672,7 @@ class _TtkTableState extends State<_TtkTable> {
                         ),
                       )),
                     )
-                  : _cell(ing.grossWeightDisplay(lang)),
+                  : _cell(ing.grossWeight.toStringAsFixed(0)),
               widget.canEdit
                   ? TableCell(
                       child: wrapCell(SizedBox.expand(
@@ -1786,7 +1791,7 @@ class _TtkTableState extends State<_TtkTable> {
                         ),
                       )),
                     )
-                  : _cell(ing.cookingProcessName != null ? '−${ing.weightLossPercentage.toStringAsFixed(0)}%' : loc.t('dash')),
+                  : _cell(ing.cookingProcessName != null ? ing.weightLossPercentage.toStringAsFixed(0) : loc.t('dash')),
               widget.canEdit
                   ? TableCell(
                       child: wrapCell(SizedBox.expand(
@@ -1817,9 +1822,9 @@ class _TtkTableState extends State<_TtkTable> {
                         ),
                       )),
                     )
-                  : _cell('${ing.cost.toStringAsFixed(2)} $sym'),
+                  : _cell(ing.cost.toStringAsFixed(2)),
               // Цена за 1 кг/шт блюда (по ингредиенту: стоимость за кг при выходе)
-              _cell(ing.netWeight > 0 ? '${(ing.cost * 1000 / ing.netWeight).toStringAsFixed(2)} $sym' : ''),
+              _cell(ing.netWeight > 0 ? (ing.cost * 1000 / ing.netWeight).toStringAsFixed(2) : ''),
               // Колонка «Технология» — только в первой строке контент, в остальных пустая ячейка
               isFirstRow && widget.technologyController != null
                   ? TableCell(
@@ -1881,8 +1886,8 @@ class _TtkTableState extends State<_TtkTable> {
             _totalCell(''),
             _totalCell(''),
             _totalCell(totalNet.toStringAsFixed(0)),
-            _totalCell('${totalCost.toStringAsFixed(2)} $sym'),
-            _totalCell(totalNet > 0 ? '${(totalCost * 1000 / totalNet).toStringAsFixed(2)} $sym' : ''),
+            _totalCell(totalCost.toStringAsFixed(2)),
+            _totalCell(totalNet > 0 ? (totalCost * 1000 / totalNet).toStringAsFixed(2) : ''),
             _totalCell(''),
             if (hasDeleteCol) _totalCell(''),
           ],
@@ -2052,7 +2057,7 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                 ),
               ),
               _cell(ing.cookingProcessName ?? widget.loc.t('dash')),
-              _cell('${ing.netWeight.toStringAsFixed(0)} г'),
+              _cell(ing.netWeight.toStringAsFixed(0)),
             ],
           );
         }),
@@ -2137,7 +2142,6 @@ class _EditableNetCellState extends State<_EditableNetCell> {
         keyboardType: TextInputType.numberWithOptions(decimal: true),
         decoration: InputDecoration(
           isDense: true,
-          suffixText: 'г',
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
           filled: true,
