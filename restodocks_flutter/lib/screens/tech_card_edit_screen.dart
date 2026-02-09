@@ -1434,6 +1434,25 @@ class _TtkTable extends StatefulWidget {
 class _TtkTableState extends State<_TtkTable> {
   static const _cellPad = EdgeInsets.symmetric(horizontal: 6, vertical: 6);
 
+  /// Ячейка по шаблону: граница, фон, мин. высота. Вынесен в метод класса, чтобы _cell/_totalCell могли вызывать.
+  Widget wrapCell(Widget child, {Color? fillColor, bool dataCell = true}) {
+    final theme = Theme.of(context);
+    final borderColor = theme.colorScheme.outline;
+    final cellBg = theme.colorScheme.surface;
+    final dataBorderColor = Colors.grey.shade400;
+    return Container(
+      decoration: BoxDecoration(
+        color: fillColor ?? cellBg,
+        border: Border.all(width: 1, color: dataCell ? dataBorderColor : borderColor),
+      ),
+      clipBehavior: Clip.hardEdge,
+      child: SizedBox(
+        width: double.infinity,
+        child: dataCell ? ConstrainedBox(constraints: const BoxConstraints(minHeight: 44), child: child) : child,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -1488,19 +1507,6 @@ class _TtkTableState extends State<_TtkTable> {
     final headerBg = Colors.grey.shade800;
     final headerTextColor = Colors.white;
     final firstColsBg = Colors.grey.shade200;
-
-    /// Ячейка по шаблону: граница, фон, минимальная высота у данных. [dataCell] true = ячейка данных (серая граница, minHeight 44).
-    Widget wrapCell(Widget child, {Color? fillColor, bool dataCell = true}) => Container(
-      decoration: BoxDecoration(
-        color: fillColor ?? cellBg,
-        border: Border.all(width: 1, color: dataCell ? dataBorderColor : borderColor),
-      ),
-      clipBehavior: Clip.hardEdge,
-      child: SizedBox(
-        width: double.infinity,
-        child: dataCell ? ConstrainedBox(constraints: const BoxConstraints(minHeight: 44), child: child) : child,
-      ),
-    );
 
     /// Пустая ячейка в зоне заполнения — явная высота и видимые границы, чтобы сетка не пропадала
     Widget emptyDataCell({double minHeight = 56}) => wrapCell(
