@@ -1230,10 +1230,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
       body: LayoutBuilder(
         builder: (context, constraints) {
           final narrow = constraints.maxWidth < 500;
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(12),
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            child: Column(
+          return Column(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                  child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // Шапка: название, категория, тип — на узком экране колонкой, на широком строкой
@@ -1473,32 +1476,38 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                 );
               },
             ),
-            if (canEdit) ...[
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  FilledButton(
-                    onPressed: _save,
-                    child: Text(loc.t('save')),
-                    style: FilledButton.styleFrom(minimumSize: const Size(120, 48), padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14)),
-                  ),
-                  if (!_isNew) ...[
-                    const SizedBox(width: 16),
-                    TextButton.icon(
-                      icon: Icon(Icons.delete_outline, size: 20, color: Theme.of(context).colorScheme.error),
-                      label: Text(loc.t('delete_tech_card'), style: TextStyle(color: Theme.of(context).colorScheme.error)),
-                      onPressed: () => _confirmDelete(context, loc),
-                      style: TextButton.styleFrom(minimumSize: const Size(120, 48), padding: const EdgeInsets.symmetric(horizontal: 16)),
-                    ),
-                  ],
-                ],
-              ),
-            ],
           ],
         ),
-      );
-    },
-  ),
+      ),
+              if (canEdit)
+                SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                    child: Row(
+                      children: [
+                        FilledButton(
+                          onPressed: _save,
+                          child: Text(loc.t('save')),
+                          style: FilledButton.styleFrom(minimumSize: const Size(120, 48), padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14)),
+                        ),
+                        if (!_isNew) ...[
+                          const SizedBox(width: 16),
+                          TextButton.icon(
+                            icon: Icon(Icons.delete_outline, size: 20, color: Theme.of(context).colorScheme.error),
+                            label: Text(loc.t('delete_tech_card'), style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                            onPressed: () => _confirmDelete(context, loc),
+                            style: TextButton.styleFrom(minimumSize: const Size(120, 48), padding: const EdgeInsets.symmetric(horizontal: 16)),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
   );
   }
 }
@@ -1556,13 +1565,12 @@ class _TtkTableState extends State<_TtkTable> {
   /// Ячейка по шаблону: граница, фон, мин. высота. Вынесен в метод класса, чтобы _cell/_totalCell могли вызывать.
   Widget wrapCell(Widget child, {Color? fillColor, bool dataCell = true}) {
     final theme = Theme.of(context);
-    final borderColor = theme.colorScheme.outline;
     final cellBg = theme.colorScheme.surface;
-    final dataBorderColor = Colors.grey.shade600;
+    final borderColor = Colors.black87;
     return Container(
       decoration: BoxDecoration(
         color: fillColor ?? cellBg,
-        border: Border.all(width: 1, color: dataCell ? dataBorderColor : borderColor),
+        border: Border.all(width: 1, color: borderColor),
       ),
       clipBehavior: Clip.hardEdge,
       child: SizedBox(
@@ -1620,9 +1628,8 @@ class _TtkTableState extends State<_TtkTable> {
     // 2) Строки данных: у каждой строки 13 колонок в порядке: Тип | Наименование | Продукт | Брутто | Отход % | Нетто | Способ | Ужарка % | Выход | Стоимость | Цена за 1 кг/шт | Технология | [Удаление].
     //    Первые три ячейки (Тип, Наименование, Продукт) — светло-серые (firstColsBg). Остальные — белые/фон поверхности, у всех границы и мин. высота 44.
     // 3) Последняя строка: «Итого» — жёлтая (amber.shade100), в колонке «Продукт» текст «Итого», в остальных — суммы или пусто.
-    final borderColor = theme.colorScheme.outline;
+    final borderColor = Colors.black87;
     final cellBg = theme.colorScheme.surface;
-    final dataBorderColor = Colors.grey.shade600;
     final headerBg = Colors.grey.shade800;
     final headerTextColor = Colors.white;
     final firstColsBg = Colors.grey.shade200;
@@ -1662,7 +1669,7 @@ class _TtkTableState extends State<_TtkTable> {
     return SizedBox(
       width: tableWidth,
       child: Table(
-        border: TableBorder.all(width: 1, color: borderColor),
+        border: TableBorder.all(width: 1, color: Colors.black87),
         columnWidths: columnWidths,
         defaultColumnWidth: const FixedColumnWidth(80),
       children: [
@@ -1990,12 +1997,12 @@ class _TtkTableState extends State<_TtkTable> {
             ],
           );
         }),
-        // 3. Строка «Итого» (по шаблону — жёлтая)
+        // 3. Строка «Итого»: в первой колонке (Тип ТТК) — «Итого», как на образце
         TableRow(
           children: [
-            _totalCell(''),
-            _totalCell(''),
             _totalCell(loc.t('ttk_total')),
+            _totalCell(''),
+            _totalCell(''),
             _totalCell(''),
             _totalCell(''),
             _totalCell(ingredients.fold<double>(0, (s, ing) => s + ing.effectiveGrossWeight).toStringAsFixed(0)),
