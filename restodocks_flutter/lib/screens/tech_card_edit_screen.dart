@@ -1485,6 +1485,25 @@ class _TtkTableState extends State<_TtkTable> {
       dataCell: true,
     );
 
+    TableCell headerCell(String text) => TableCell(
+      child: wrapCell(
+        Padding(
+          padding: _cellPad,
+          child: Center(
+            child: Text(
+              text,
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: headerTextColor),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ),
+        fillColor: headerBg,
+        dataCell: false,
+      ),
+    );
+
     // ТТК — таблица. Шапка = одна строка (обозначения колонок). Данные = строки: текст (продукт, название блюда, технология), числа (гр/кг), проценты (0–100).
     // При редактировании последние 2 строки всегда: предпоследняя — пустая (при заполнении автоматически появляется ещё одна внизу), последняя — Итого (выход и стоимость).
     // Никаких кнопок «добавить строку» — добавление только через заполнение пустой строки.
@@ -1499,18 +1518,18 @@ class _TtkTableState extends State<_TtkTable> {
         TableRow(
           decoration: BoxDecoration(color: headerBg),
           children: [
-            _headerCell(loc.t('ttk_type')),
-            _headerCell(loc.t('ttk_name')),
-            _headerCell(loc.t('ttk_product')),
-            _headerCell(loc.t('ttk_gross_gr')),
-            _headerCell('Отход %'),
-            _headerCell(loc.t('ttk_net_gr')),
-            _headerCell(loc.t('ttk_cooking_method')),
-            _headerCell('Ужарка %'),
-            _headerCell(loc.t('ttk_output_gr')),
-            _headerCell(loc.t('ttk_cost')),
-            _headerCell(loc.t('ttk_price_per_1kg_dish')),
-            _headerCell(loc.t('ttk_technology')),
+            headerCell(loc.t('ttk_type')),
+            headerCell(loc.t('ttk_name')),
+            headerCell(loc.t('ttk_product')),
+            headerCell(loc.t('ttk_gross_gr')),
+            headerCell('Отход %'),
+            headerCell(loc.t('ttk_net_gr')),
+            headerCell(loc.t('ttk_cooking_method')),
+            headerCell('Ужарка %'),
+            headerCell(loc.t('ttk_output_gr')),
+            headerCell(loc.t('ttk_cost')),
+            headerCell(loc.t('ttk_price_per_1kg_dish')),
+            headerCell(loc.t('ttk_technology')),
             if (hasDeleteCol) TableCell(child: wrapCell(Padding(padding: _cellPad, child: const SizedBox.shrink()), fillColor: headerBg, dataCell: false)),
           ],
         ),
@@ -1956,27 +1975,6 @@ class _TtkTableState extends State<_TtkTable> {
         ),
       ],
     ),
-    );
-  }
-
-  Widget _headerCell(String text) {
-    return TableCell(
-      child: wrapCell(
-        Padding(
-          padding: _cellPad,
-          child: Center(
-            child: Text(
-              text,
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: headerTextColor),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ),
-        fillColor: headerBg,
-        dataCell: false,
-      ),
     );
   }
 
