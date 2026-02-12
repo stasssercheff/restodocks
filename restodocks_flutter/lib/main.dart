@@ -15,6 +15,29 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   print('DEBUG: main() started');
 
+  // DEBUG: Показываем временный экран загрузки
+  runApp(
+    MaterialApp(
+      home: Scaffold(
+        body: Container(
+          color: Colors.yellow.withOpacity(0.3),
+          child: const Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 20),
+                Text('DEBUG: Loading app...', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                SizedBox(height: 10),
+                Text('Check Safari console for debug logs', style: TextStyle(fontSize: 14)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+
   String supabaseUrl = '';
   String supabaseAnonKey = '';
 
