@@ -12,6 +12,7 @@ import '../models/tt_ingredient.dart';
 import '../services/ai_service.dart';
 import '../services/image_service.dart';
 import '../services/services.dart';
+import 'excel_style_ttk_table.dart';
 
 /// Создание или редактирование ТТК. Ингредиенты — из номенклатуры или из других ТТК (ПФ).
 ///
@@ -1410,33 +1411,27 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
               ),
             ],
             const SizedBox(height: 8),
-            // Таблица: высота растёт с числом строк (шапка + строки + итого), но не больше ~70% экрана; прокрутите вправо для колонок Брутто, Отход %, Нетто, …, Итого
-            LayoutBuilder(
-              builder: (context, c) {
-                final screenH = MediaQuery.of(context).size.height;
-                final rowCount = 1 + (_ingredients.isEmpty ? 1 : _ingredients.length) + 1;
-                const rowHeight = 44.0;
-                final maxH = (screenH * 0.7).clamp(300.0, 900.0);
-                final desiredH = (rowCount * rowHeight).clamp(220.0, maxH);
-                return SizedBox(
-                  height: desiredH,
-                  child: Scrollbar(
-                    thumbVisibility: true,
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.vertical,
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(minWidth: 1150),
-                          child: SizedBox(
-                            width: 1150,
-                            child: canEdit
-                            ? _TtkTable(
+            // Таблица на весь экран без ограничений
+            Expanded(
+              child: Scrollbar(
+                thumbVisibility: true,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.vertical,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(minWidth: MediaQuery.of(context).size.width),
+                      child: canEdit
+                            ? ExcelStyleTtkTable(
                             loc: loc,
                             dishName: _nameController.text,
                             isSemiFinished: _isSemiFinished,
                             ingredients: _ingredients,
                             canEdit: true,
+                            dishNameController: _nameController,
+                            technologyController: _technologyController,
+                            productStore: context.read<ProductStore>(),
+                            onAdd: _showAddIngredient,
                             onRemove: _removeIngredient,
                             onUpdate: (i, ing) {
                               setState(() {
@@ -1456,15 +1451,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                                 }
                               });
                             },
-                            onAdd: _showAddIngredient,
-                            onAddFromText: _addIngredientFromName,
-                            getProductsForDropdown: _getProductsForDropdown,
-                            onProductSelectedFromDropdown: (i, p) => _showWeightDialogForProduct(p, i),
-                            dishNameController: canEdit ? _nameController : null,
-                            technologyController: canEdit ? _technologyController : null,
                             onSuggestWaste: _suggestWasteForRow,
-                            productStore: context.read<ProductStoreSupabase>(),
-                            onPickProductFromSearch: _addProductIngredientAt,
                           )
                             : _TtkCookTable(
                                 loc: loc,
@@ -1481,13 +1468,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                                   });
                                 },
                               ),
-                        ),
-                        ),
-                      ),
                     ),
                   ),
-                );
-              },
+                ),
+              ),
             ),
           ],
         ),
