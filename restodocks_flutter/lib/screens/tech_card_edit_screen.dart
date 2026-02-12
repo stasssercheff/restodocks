@@ -1219,6 +1219,28 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
         actions: [
           if (canEdit) IconButton(icon: const Icon(Icons.save), onPressed: () { print('DEBUG: Save button pressed'); _save(); }, tooltip: loc.t('save'), style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
           if (canEdit && !_isNew) IconButton(icon: const Icon(Icons.delete_outline), onPressed: () => _confirmDelete(context, loc), tooltip: loc.t('delete_tech_card'), style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
+          // Кнопка экспорта текущей ТТК
+          if (!_isNew && _techCard != null) IconButton(
+            icon: const Icon(Icons.download),
+            onPressed: () async {
+              try {
+                await ExcelExportService().exportSingleTechCard(_techCard!);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('ТТК "${_techCard!.dishName}" успешно экспортирована')),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Ошибка экспорта: $e')),
+                  );
+                }
+              }
+            },
+            tooltip: 'Экспорт в Excel',
+            style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
+          ),
           IconButton(icon: const Icon(Icons.home), onPressed: () { print('DEBUG: Home button pressed'); context.go('/home'); }, tooltip: loc.t('home'), style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
         ],
       ),

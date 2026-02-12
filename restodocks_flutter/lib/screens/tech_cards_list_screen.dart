@@ -10,6 +10,7 @@ import '../models/models.dart';
 import '../services/ai_service.dart';
 import '../services/image_service.dart';
 import '../services/services.dart';
+import '../services/excel_export_service.dart';
 
 /// Список ТТК заведения. Создание и переход к редактированию.
 class TechCardsListScreen extends StatefulWidget {
@@ -24,6 +25,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   bool _loading = true;
   bool _loadingExcel = false;
   String? _error;
+  Set<String> _selectedTechCards = {}; // ID выбранных карточек
+  bool _selectionMode = false;
 
   String _categoryLabel(String c) {
     const map = {
@@ -50,6 +53,100 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     } catch (e) {
       if (mounted) setState(() { _error = e.toString(); _loading = false; });
     }
+  }
+
+  /// Экспорт одной ТТК
+  Future<void> _exportSingleTechCard(TechCard techCard) async {
+    try {
+      await ExcelExportService().exportSingleTechCard(techCard);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('ТТК "${techCard.dishName}" успешно экспортирована')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка экспорта: $e')),
+        );
+      }
+    }
+  }
+
+  /// Экспорт выбранных ТТК
+  Future<void> _exportSelectedTechCards() async {
+    final selectedCards = _list.where((card) => _selectedTechCards.contains(card.id)).toList();
+    if (selectedCards.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Выберите хотя бы одну ТТК')),
+      );
+      return;
+    }
+
+    try {
+      await ExcelExportService().exportSelectedTechCards(selectedCards);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Выбранные ТТК (${selectedCards.length} шт.) успешно экспортированы')),
+        );
+        setState(() {
+          _selectedTechCards.clear();
+          _selectionMode = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка экспорта: $e')),
+        );
+      }
+    }
+  }
+
+  /// Экспорт всех ТТК
+  Future<void> _exportAllTechCards() async {
+    if (_list.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Нет ТТК для экспорта')),
+      );
+      return;
+    }
+
+    try {
+      await ExcelExportService().exportAllTechCards(_list);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Все ТТК (${_list.length} шт.) успешно экспортированы')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка экспорта: $e')),
+        );
+      }
+    }
+  }
+
+  /// Переключение режима выбора
+  void _toggleSelectionMode() {
+    setState(() {
+      _selectionMode = !_selectionMode;
+      if (!_selectionMode) {
+        _selectedTechCards.clear();
+      }
+    });
+  }
+
+  /// Выбор/снятие выбора ТТК
+  void _toggleTechCardSelection(String techCardId) {
+    setState(() {
+      if (_selectedTechCards.contains(techCardId)) {
+        _selectedTechCards.remove(techCardId);
+      } else {
+        _selectedTechCards.add(techCardId);
+      }
+    });
   }
 
   @override
@@ -171,8 +268,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
-        title: Text(loc.t('tech_cards')),
+        leading: _selectionMode
+            ? IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: _toggleSelectionMode,
+                tooltip: 'Отмена выбора',
+              )
+            : IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        title: Text(_selectionMode ? 'Выберите ТТК (${_selectedTechCards.length})' : loc.t('tech_cards')),
         actions: [
           if (canEdit)
             AbsorbPointer(
@@ -216,6 +319,72 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                 ],
               ),
             ),
+          // Кнопка экспорта
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.download),
+            tooltip: 'Экспорт в Excel',
+            onSelected: (value) async {
+              switch (value) {
+                case 'single':
+                  // Показать диалог выбора ТТК для экспорта одной
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Выберите ТТК для экспорта'),
+                      content: SizedBox(
+                        width: double.maxFinite,
+                        height: 300,
+                        child: ListView.builder(
+                          itemCount: _list.length,
+                          itemBuilder: (context, index) {
+                            final techCard = _list[index];
+                            return ListTile(
+                              title: Text(techCard.dishName),
+                              subtitle: Text(techCard.isSemiFinished ? 'Полуфабрикат' : 'Блюдо'),
+                              onTap: () {
+                                Navigator.of(context).pop();
+                                _exportSingleTechCard(techCard);
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text('Отмена'),
+                        ),
+                      ],
+                    ),
+                  );
+                  break;
+                case 'selected':
+                  if (_selectionMode) {
+                    await _exportSelectedTechCards();
+                  } else {
+                    _toggleSelectionMode();
+                  }
+                  break;
+                case 'all':
+                  await _exportAllTechCards();
+                  break;
+              }
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(
+                value: 'single',
+                child: Text('Экспорт одной ТТК'),
+              ),
+              PopupMenuItem(
+                value: 'selected',
+                child: Text(_selectionMode ? 'Экспорт выбранных (${_selectedTechCards.length})' : 'Экспорт выбранных'),
+              ),
+              const PopupMenuItem(
+                value: 'all',
+                child: Text('Экспорт всех ТТК'),
+              ),
+            ],
+          ),
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loading ? null : _load, tooltip: loc.t('refresh')),
           IconButton(icon: const Icon(Icons.home), onPressed: () => context.go('/home'), tooltip: loc.t('home')),
         ],
@@ -299,7 +468,24 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           child: DataTable(
             headingRowColor: WidgetStateProperty.all(Theme.of(context).colorScheme.primaryContainer),
             columns: [
-              const DataColumn(label: Text('#', style: TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(
+                label: _selectionMode
+                    ? Checkbox(
+                        value: _selectedTechCards.length == _list.length && _list.isNotEmpty,
+                        onChanged: (value) {
+                          if (value == true) {
+                            setState(() {
+                              _selectedTechCards.addAll(_list.map((tc) => tc.id));
+                            });
+                          } else {
+                            setState(() {
+                              _selectedTechCards.clear();
+                            });
+                          }
+                        },
+                      )
+                    : const Text('#', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
               DataColumn(label: Text(loc.t('column_name'), style: const TextStyle(fontWeight: FontWeight.bold))),
               DataColumn(label: Text(loc.t('column_category'), style: TextStyle(fontWeight: FontWeight.bold))),
               DataColumn(label: Text(loc.t('ingredients_short'), style: TextStyle(fontWeight: FontWeight.bold))),
@@ -310,8 +496,16 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
             rows: List.generate(_list.length, (i) {
               final tc = _list[i];
               return DataRow(
+                selected: _selectedTechCards.contains(tc.id),
                 cells: [
-                  DataCell(Text('${i + 1}')),
+                  DataCell(
+                    _selectionMode
+                        ? Checkbox(
+                            value: _selectedTechCards.contains(tc.id),
+                            onChanged: (value) => _toggleTechCardSelection(tc.id),
+                          )
+                        : Text('${i + 1}'),
+                  ),
                   DataCell(Text(tc.getDisplayNameInLists(lang))),
                   DataCell(Text(_categoryLabel(tc.category))),
                   DataCell(Text('${tc.ingredients.length}')),
@@ -322,7 +516,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                     onPressed: () => context.push('/tech-cards/${tc.id}'),
                   )),
                 ],
-                onSelectChanged: (_) => context.push('/tech-cards/${tc.id}'),
+                onSelectChanged: _selectionMode ? null : (_) => context.push('/tech-cards/${tc.id}'),
               );
             }),
           ),
