@@ -50,6 +50,8 @@ class CulinaryUnits {
     'dash': 1,
     'банка': 400, // условно
     'can': 400,
+    'коробка': 1000, // условно
+    'box': 1000,
     'упаковка': 500,
     'pack': 500,
     'package': 500,
@@ -85,6 +87,7 @@ class CulinaryUnits {
     (id: 'slice', ru: 'долька', en: 'slice'),
     (id: 'pack', ru: 'упак.', en: 'pack'),
     (id: 'can', ru: 'банка', en: 'can'),
+    (id: 'box', ru: 'коробка', en: 'box'),
   ];
 
   /// Конвертировать значение в граммы

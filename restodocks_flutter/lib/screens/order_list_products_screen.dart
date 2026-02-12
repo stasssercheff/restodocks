@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../models/culinary_units.dart';
 import '../models/models.dart';
 import '../services/services.dart';
 
@@ -25,10 +24,8 @@ class _OrderListProductsScreenState extends State<OrderListProductsScreen> {
     _list = widget.draft;
   }
 
-  static String _unitLabel(String unitId, String lang) {
-    if (unitId == 'box') return lang == 'ru' ? 'коробка' : 'box';
-    return CulinaryUnits.displayName(unitId, lang);
-  }
+  static String _unitLabel(String unitId, String lang) =>
+      CulinaryUnits.displayName(unitId, lang);
 
   static List<String> get _unitIds => [
         'g', 'kg', 'ml', 'l', 'pcs', 'шт', 'pack', 'can', 'box',

@@ -6,7 +6,6 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
-import '../models/culinary_units.dart';
 import '../models/models.dart';
 import '../services/inventory_download.dart';
 import '../services/services.dart';
@@ -28,10 +27,8 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
   final _commentCtrl = TextEditingController();
   List<TextEditingController> _qtyControllers = [];
 
-  static String _unitLabel(String unitId, String lang) {
-    if (unitId == 'box') return lang == 'ru' ? 'коробка' : 'box';
-    return CulinaryUnits.displayName(unitId, lang);
-  }
+  static String _unitLabel(String unitId, String lang) =>
+      CulinaryUnits.displayName(unitId, lang);
 
   static const _unitIds = ['g', 'kg', 'ml', 'l', 'pcs', 'шт', 'pack', 'can', 'box'];
 
@@ -131,22 +128,31 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
       ),
     );
     if (lang == null || !mounted) return;
+
+    // Загружаем продукты для перевода названий (если есть productId)
+    final store = context.read<ProductStoreSupabase>();
+    if (store.allProducts.isEmpty) await store.loadProducts();
+
     final lines = <String>[];
-    lines.add('${_list!.name}');
-    lines.add('${loc.t('order_list_supplier_name')}: ${_list!.supplierName}');
+    lines.add(_list!.name);
+    lines.add('${loc.tForLanguage(lang, 'order_list_supplier_name')}: ${_list!.supplierName}');
     lines.add('');
-    lines.add('${loc.t('order_list_quantity')}\t${loc.t('order_list_unit')}\t${loc.t('inventory_item_name')}');
+    lines.add('${loc.tForLanguage(lang, 'order_list_quantity')}\t${loc.tForLanguage(lang, 'order_list_unit')}\t${loc.tForLanguage(lang, 'inventory_item_name')}');
     for (var idx = 0; idx < _list!.items.length; idx++) {
       final item = _list!.items[idx];
       final q = idx < _qtyControllers.length
           ? (double.tryParse(_qtyControllers[idx].text.replaceFirst(',', '.')) ?? item.quantity)
           : item.quantity;
-      lines.add('$q\t${_unitLabel(item.unit, lang)}\t${item.productName}');
+      final productName = (item.productId != null
+              ? store.findProductById(item.productId!)?.getLocalizedName(lang)
+              : null) ??
+          item.productName;
+      lines.add('$q\t${_unitLabel(item.unit, lang)}\t$productName');
     }
     final commentText = _commentCtrl.text.trim();
     if (commentText.isNotEmpty) {
       lines.add('');
-      lines.add('${loc.t('order_list_comment')}: $commentText');
+      lines.add('${loc.tForLanguage(lang, 'order_list_comment')}: $commentText');
     }
     final content = lines.join('\n');
     final bytes = utf8.encode(content);

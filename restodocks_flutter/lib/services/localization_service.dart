@@ -105,6 +105,22 @@ class LocalizationService extends ChangeNotifier {
     return translate(key, args: args);
   }
 
+  /// Получение перевода для указанного языка (для экспорта списка заказа на выбранном языке)
+  String tForLanguage(String languageCode, String key, {Map<String, String>? args}) {
+    var translation = _translations[languageCode]?[key] ??
+        _translations['en']?[key] ??
+        _translations['ru']?[key] ??
+        key;
+
+    if (args != null) {
+      args.forEach((argKey, argValue) {
+        translation = translation.replaceAll('{$argKey}', argValue);
+      });
+    }
+
+    return translation;
+  }
+
   /// Проверка, выбран ли язык
   bool get isLanguageSelected => true; // Пока всегда true
 

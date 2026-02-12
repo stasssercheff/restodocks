@@ -75,12 +75,13 @@ class _OrderListsScreenState extends State<OrderListsScreen> {
                     padding: const EdgeInsets.all(24),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.list_alt, size: 64, color: Theme.of(context).colorScheme.outline),
-                        const SizedBox(height: 16),
+                        Icon(Icons.add_shopping_cart, size: 80, color: Theme.of(context).colorScheme.primary),
+                        const SizedBox(height: 24),
                         Text(
                           loc.t('order_list_empty'),
-                          style: Theme.of(context).textTheme.titleMedium,
+                          style: Theme.of(context).textTheme.titleLarge,
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 8),
@@ -88,6 +89,18 @@ class _OrderListsScreenState extends State<OrderListsScreen> {
                           loc.t('order_list_empty_hint'),
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
                           textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 32),
+                        FilledButton.icon(
+                          onPressed: () async {
+                            await context.push('/product-order/new');
+                            if (mounted) _load();
+                          },
+                          icon: const Icon(Icons.add, size: 24),
+                          label: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            child: Text(loc.t('order_list_create'), style: const TextStyle(fontSize: 18)),
+                          ),
                         ),
                       ],
                     ),
