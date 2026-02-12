@@ -579,15 +579,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   @override
   void initState() {
     super.initState();
+    // Добавляем placeholder сразу, чтобы таблица отображалась
+    _ingredients.add(TTIngredient.emptyPlaceholder());
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
-    // Чтобы таблица не пропадала: при пустом списке в режиме редактирования добавляем placeholder после первого кадра
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final canEdit = context.read<AccountManagerSupabase>().currentEmployee?.canEditChecklistsAndTechCards ?? false;
-      if (canEdit && _ingredients.isEmpty) {
-        setState(() => _ingredients.add(TTIngredient.emptyPlaceholder()));
-      }
-    });
   }
 
   @override
@@ -1426,7 +1420,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                             loc: loc,
                             dishName: _nameController.text,
                             isSemiFinished: _isSemiFinished,
-                            ingredients: (_ingredients.isEmpty) ? [TTIngredient.emptyPlaceholder()] : _ingredients,
+                            ingredients: _ingredients,
                             canEdit: true,
                             onRemove: _removeIngredient,
                             onUpdate: (i, ing) {
