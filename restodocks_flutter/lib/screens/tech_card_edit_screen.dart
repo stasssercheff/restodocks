@@ -503,6 +503,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
       }
       if (_isNew) {
         if (mounted) {
+          setState(() { _loading = false; });
           final ai = widget.initialFromAi;
           final canEdit = context.read<AccountManagerSupabase>().currentEmployee?.canEditChecklistsAndTechCards ?? false;
           if (ai != null) {
@@ -543,7 +544,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           } else if (canEdit && _ingredients.isEmpty) {
             _ingredients.add(TTIngredient.emptyPlaceholder());
           }
-          setState(() { _loading = false; });
         }
         return;
       }
@@ -1198,15 +1198,15 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
         body: const Center(child: CircularProgressIndicator()),
       );
     }
-    if (_loading && !_isNew) {
+    if (_loading) {
       return Scaffold(
-        appBar: AppBar(leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()), title: Text(loc.t('tech_cards'))),
+        appBar: AppBar(leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()), title: Text(_isNew ? loc.t('create_tech_card') : loc.t('tech_cards'))),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
-    if (_error != null && !_isNew) {
+    if (_error != null) {
       return Scaffold(
-        appBar: AppBar(leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()), title: Text(loc.t('tech_cards'))),
+        appBar: AppBar(leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()), title: Text(_isNew ? loc.t('create_tech_card') : loc.t('tech_cards'))),
         body: Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Text(_error!), const SizedBox(height: 16), FilledButton(onPressed: () => context.pop(), child: Text(loc.t('back')))]))),
       );
     }
