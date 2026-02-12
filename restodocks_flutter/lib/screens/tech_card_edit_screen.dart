@@ -2096,7 +2096,7 @@ class _TtkTableState extends State<_TtkTable> {
             ),
           ),
         ),
-        fillColor: Colors.amber.shade100,
+        fillColor: Theme.of(context).colorScheme.errorContainer.withOpacity(0.3),
         dataCell: true,
       ),
     );
