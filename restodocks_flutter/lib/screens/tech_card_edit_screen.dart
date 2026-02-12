@@ -1213,12 +1213,12 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop(), style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
+        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () { print('DEBUG: Back button pressed'); Navigator.of(context).pop(); }, style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
         title: Text(_isNew ? loc.t('create_tech_card') : (_techCard?.getDisplayNameInLists(loc.currentLanguageCode) ?? loc.t('tech_cards'))),
         actions: [
-          if (canEdit) IconButton(icon: const Icon(Icons.save), onPressed: _save, tooltip: loc.t('save'), style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
+          if (canEdit) IconButton(icon: const Icon(Icons.save), onPressed: () { print('DEBUG: Save button pressed'); _save(); }, tooltip: loc.t('save'), style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
           if (canEdit && !_isNew) IconButton(icon: const Icon(Icons.delete_outline), onPressed: () => _confirmDelete(context, loc), tooltip: loc.t('delete_tech_card'), style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
-          IconButton(icon: const Icon(Icons.home), onPressed: () => context.go('/home'), tooltip: loc.t('home'), style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
+          IconButton(icon: const Icon(Icons.home), onPressed: () { print('DEBUG: Home button pressed'); context.go('/home'); }, tooltip: loc.t('home'), style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
         ],
       ),
       body: LayoutBuilder(
