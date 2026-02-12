@@ -1416,9 +1416,12 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                     child: SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: SingleChildScrollView(
-                        child: SizedBox(
-                          width: 1150,
-                          child: canEdit
+                        scrollDirection: Axis.vertical,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(minWidth: 1150),
+                          child: SizedBox(
+                            width: 1150,
+                            child: canEdit
                             ? _TtkTable(
                             loc: loc,
                             dishName: _nameController.text,
@@ -1469,6 +1472,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                                   });
                                 },
                               ),
+                        ),
                         ),
                       ),
                     ),
