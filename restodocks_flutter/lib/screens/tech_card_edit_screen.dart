@@ -503,7 +503,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
       }
       if (_isNew) {
         if (mounted) {
-          setState(() { _loading = false; });
           final ai = widget.initialFromAi;
           final canEdit = context.read<AccountManagerSupabase>().currentEmployee?.canEditChecklistsAndTechCards ?? false;
           if (ai != null) {
@@ -544,6 +543,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           } else if (canEdit && _ingredients.isEmpty) {
             _ingredients.add(TTIngredient.emptyPlaceholder());
           }
+          setState(() { _loading = false; });
         }
         return;
       }
