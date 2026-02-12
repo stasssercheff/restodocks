@@ -23,12 +23,12 @@ import '../../models/order_list.dart';
 import '../../services/ai_service.dart';
 import '../../services/services.dart';
 
-const _publicPaths = ['/splash', '/login', '/register', '/register-company', '/register-owner', '/register-employee'];
+const _publicPaths = ['/', '/splash', '/login', '/register', '/register-company', '/register-owner', '/register-employee'];
 
 /// Настройка маршрутизации приложения
 class AppRouter {
   static final GoRouter router = GoRouter(
-    initialLocation: '/splash',
+    initialLocation: '/',
     redirect: (context, state) async {
       final loc = state.matchedLocation;
       if (_publicPaths.any((p) => loc.startsWith(p))) return null;
@@ -38,6 +38,12 @@ class AppRouter {
       return null;
     },
     routes: [
+      // Корневой маршрут - перенаправляет на splash
+      GoRoute(
+        path: '/',
+        redirect: (context, state) => '/splash',
+      ),
+
       // Стартовый экран (проверка авторизации)
       GoRoute(
         path: '/splash',
@@ -229,9 +235,16 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _checkAuthStatus() async {
+    // Убираем ручное перенаправление - оно должно происходить через redirect функцию GoRouter
     final accountManager = context.read<AccountManagerSupabase>();
     await accountManager.initialize();
     if (!mounted) return;
+
+    // Даем время на инициализацию и позволяем GoRouter redirect обработать маршрутизацию
+    await Future.delayed(const Duration(milliseconds: 100));
+    if (!mounted) return;
+
+    // Принудительно вызываем refresh маршрутизации
     if (accountManager.isLoggedInSync) {
       context.go('/home');
     } else {
