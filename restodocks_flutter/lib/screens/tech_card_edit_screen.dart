@@ -1233,6 +1233,21 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                   child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // DEBUG: Показать состояние загрузки и ингредиентов
+                Container(
+                  color: Colors.blue.withOpacity(0.1),
+                  padding: const EdgeInsets.all(8),
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    'DEBUG: Создание ТТК\n'
+                    'Loading: $_loading\n'
+                    'Error: $_error\n'
+                    'Ingredients: ${_ingredients.length}\n'
+                    'CanEdit: $canEdit\n'
+                    'IsNew: $_isNew',
+                    style: const TextStyle(color: Colors.red, fontSize: 12),
+                  ),
+                ),
                 // Шапка: название, категория, тип — на узком экране колонкой, на широком строкой
                 if (narrow) ...[
                   TextField(
