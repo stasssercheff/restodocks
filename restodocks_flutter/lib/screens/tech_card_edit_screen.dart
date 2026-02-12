@@ -1795,15 +1795,13 @@ class _TtkTableState extends State<_TtkTable> {
                   ? TableCell(
                       child: wrapCell(ConstrainedBox(
                         constraints: const BoxConstraints(minHeight: 44),
-                        child: SizedBox.expand(
-                          child: Padding(
-                            padding: _cellPad,
-                            child: _EditableGrossCell(
-                              grams: ing.grossWeight,
-                              onChanged: (g) {
-                                if (g != null && g >= 0) widget.onUpdate(i, ing.copyWith(grossWeight: g));
-                              },
-                            ),
+                        child: Padding(
+                          padding: _cellPad,
+                          child: _EditableGrossCell(
+                            grams: ing.grossWeight,
+                            onChanged: (g) {
+                              if (g != null && g >= 0) widget.onUpdate(i, ing.copyWith(grossWeight: g));
+                            },
                           ),
                         ),
                       )),
@@ -1811,7 +1809,8 @@ class _TtkTableState extends State<_TtkTable> {
                   : _cell(ing.grossWeight.toStringAsFixed(0)),
               widget.canEdit
                   ? TableCell(
-                      child: wrapCell(SizedBox.expand(
+                      child: wrapCell(ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: 44),
                         child: Padding(
                           padding: _cellPad,
                           child: Column(
@@ -1847,7 +1846,8 @@ class _TtkTableState extends State<_TtkTable> {
                   : _cell(ing.primaryWastePct.toStringAsFixed(0)),
               widget.canEdit
                   ? TableCell(
-                      child: wrapCell(SizedBox.expand(
+                      child: wrapCell(ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: 44),
                         child: Padding(
                           padding: _cellPad,
                           child: _EditableNetCell(
@@ -1862,7 +1862,8 @@ class _TtkTableState extends State<_TtkTable> {
                   : _cell('${ing.effectiveGrossWeight.toStringAsFixed(0)}'),
               widget.canEdit
                   ? TableCell(
-                      child: wrapCell(SizedBox.expand(
+                      child: wrapCell(ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: 44),
                         child: Padding(
                           padding: _cellPad,
                           child: DropdownButtonHideUnderline(
@@ -1909,7 +1910,8 @@ class _TtkTableState extends State<_TtkTable> {
                   : _cell(ing.cookingProcessName ?? loc.t('dash')),
               widget.canEdit
                   ? TableCell(
-                      child: wrapCell(SizedBox.expand(
+                      child: wrapCell(ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: 44),
                         child: Padding(
                           padding: _cellPad,
                           child: Column(
@@ -1930,7 +1932,8 @@ class _TtkTableState extends State<_TtkTable> {
                   : _cell(ing.cookingProcessName != null ? ing.weightLossPercentage.toStringAsFixed(0) : loc.t('dash')),
               widget.canEdit
                   ? TableCell(
-                      child: wrapCell(SizedBox.expand(
+                      child: wrapCell(ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: 44),
                         child: Padding(
                           padding: _cellPad,
                           child: _EditableNetCell(
@@ -1945,7 +1948,8 @@ class _TtkTableState extends State<_TtkTable> {
                   : _cell('${ing.netWeight.toStringAsFixed(0)}'),
               widget.canEdit
                   ? TableCell(
-                      child: wrapCell(SizedBox.expand(
+                      child: wrapCell(ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: 44),
                         child: Padding(
                           padding: _cellPad,
                           child: _EditableCostCell(
