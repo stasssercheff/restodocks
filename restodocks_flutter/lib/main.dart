@@ -13,30 +13,41 @@ import 'screens/screens.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  print('DEBUG: main() started');
 
   String supabaseUrl = '';
   String supabaseAnonKey = '';
 
   // 1. Пробуем config.json (Vercel подставляет при сборке)
   try {
+    print('DEBUG: Loading config.json');
     final json = await rootBundle.loadString('assets/config.json');
     final map = jsonDecode(json) as Map<String, dynamic>;
     supabaseUrl = (map['SUPABASE_URL'] as String?) ?? '';
     supabaseAnonKey = (map['SUPABASE_ANON_KEY'] as String?) ?? '';
-  } catch (_) {}
+    print('DEBUG: config.json loaded - URL: ${supabaseUrl.isNotEmpty}, Key: ${supabaseAnonKey.isNotEmpty}');
+  } catch (e) {
+    print('DEBUG: config.json error: $e');
+  }
 
   // 2. Локальная разработка: .env
   if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
     try {
+      print('DEBUG: Loading .env');
       await dotenv.load(fileName: ".env");
       supabaseUrl = dotenv.env['SUPABASE_URL'] ?? '';
       supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'] ?? '';
-    } catch (_) {}
+      print('DEBUG: .env loaded - URL: ${supabaseUrl.isNotEmpty}, Key: ${supabaseAnonKey.isNotEmpty}');
+    } catch (e) {
+      print('DEBUG: .env error: $e');
+    }
   }
 
   // Обработка ошибок инициализации
+  print('DEBUG: Final config - URL: ${supabaseUrl.isNotEmpty}, Key: ${supabaseAnonKey.isNotEmpty}');
   try {
     if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
+      print('DEBUG: Config missing, showing error screen');
       runApp(
         MaterialApp(
           home: Scaffold(
@@ -76,12 +87,23 @@ void main() async {
       return;
     }
 
+    print('DEBUG: Initializing Supabase...');
     await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
-    await LocalizationService.initialize();
-    await ThemeService().initialize();
+    print('DEBUG: Supabase initialized');
 
+    print('DEBUG: Initializing LocalizationService...');
+    await LocalizationService.initialize();
+    print('DEBUG: LocalizationService initialized');
+
+    print('DEBUG: Initializing ThemeService...');
+    await ThemeService().initialize();
+    print('DEBUG: ThemeService initialized');
+
+    print('DEBUG: Starting RestodocksApp...');
     runApp(const RestodocksApp());
   } catch (e, stackTrace) {
+    print('DEBUG: Initialization error: $e');
+    print('DEBUG: Stack trace: $stackTrace');
     // Показываем ошибку пользователю вместо белого экрана
     runApp(
       MaterialApp(
@@ -127,6 +149,7 @@ class RestodocksApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    print('DEBUG: RestodocksApp.build() called');
     return MultiProvider(
       providers: AppProviders.providers,
       child: Consumer2<LocalizationService, ThemeService>(
