@@ -106,7 +106,6 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
               9: FixedColumnWidth(70),   // Стоимость - уменьшено
               10: FixedColumnWidth(70),  // Цена за кг - уменьшено
               11: FixedColumnWidth(100), // Технология - уменьшено
-              12: FixedColumnWidth(40),  // Удаление - уменьшено
             },
             children: [
               // Шапка
@@ -125,7 +124,6 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   _buildHeaderCell('Стоимость'),
                   _buildHeaderCell('Цена за кг'),
                   _buildHeaderCell('Технология'),
-                  _buildHeaderCell(''), // Столбец для удаления
                 ],
               ),
               // Строки с данными
@@ -153,7 +151,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     }, 'gross_$rowIndex'),
 
                     // % отхода
-                    _buildNumericCell(ingredient.primaryWastePct.toStringAsFixed(1), (value) {
+                    _buildNumericCell(ingredient.primaryWastePct == 0 ? '' : ingredient.primaryWastePct.toStringAsFixed(1), (value) {
                       final waste = double.tryParse(value) ?? 0;
                       final clampedWaste = waste.clamp(0, 99.9);
                       // При изменении % отхода автоматически пересчитываем нетто
@@ -181,7 +179,11 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     _buildCookingMethodCell(ingredient, rowIndex),
 
                     // % ужарки
-                    _buildNumericCell((ingredient.cookingLossPctOverride ?? 0).toStringAsFixed(1), (value) {
+                    _buildNumericCell(
+                      (ingredient.cookingProcessId == null && ingredient.cookingProcessName != 'Свой вариант')
+                        ? '0'
+                        : ((ingredient.cookingLossPctOverride ?? 0) == 0 ? '' : (ingredient.cookingLossPctOverride ?? 0).toStringAsFixed(1)),
+                      (value) {
                       final loss = double.tryParse(value) ?? 0;
                       final clampedLoss = loss.clamp(0, 99.9);
                       // При изменении % ужарки автоматически пересчитываем выход
@@ -214,9 +216,6 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     // Технология - обычная ячейка, которая может растягиваться
                     _buildTechnologyCell(rowIndex),
 
-                    // Кнопка удаления (только для строк с данными, не для пустой строки)
-                    ingredient.productName.isNotEmpty ? _buildDeleteButton(rowIndex) :
-                    const SizedBox.shrink(), // Пустая ячейка для пустой строки
                   ],
                 );
               }),
@@ -236,7 +235,6 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   _buildTotalCell('${totalCost.toStringAsFixed(0)}₽'), // Стоимость
                   _buildTotalCell('${costPerKg.toStringAsFixed(0)}₽/кг'), // Цена за кг
                   const SizedBox.shrink(), // Технология
-                  const SizedBox.shrink(), // Удаление
                 ],
               ),
             ],
@@ -511,23 +509,6 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   }
 
 
-  Widget _buildDeleteButton(int rowIndex) {
-    return Container(
-      padding: const EdgeInsets.all(2),
-      child: Center(
-        child: IconButton(
-          icon: const Icon(Icons.delete, color: Colors.red, size: 18),
-          onPressed: () => _removeIngredient(rowIndex),
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(),
-        ),
-      ),
-    );
-  }
-
-  void _removeIngredient(int index) {
-    widget.onRemove(index);
-  }
 }
 
 class _ProductSearchDropdown extends StatefulWidget {
@@ -545,6 +526,7 @@ class _ProductSearchDropdown extends StatefulWidget {
 
 class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
   bool _isDropdownOpen = false;
   List<Product> _filteredProducts = [];
 
@@ -558,6 +540,7 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
   @override
   void dispose() {
     _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -585,6 +568,12 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
             onTap: () {
               setState(() {
                 _isDropdownOpen = !_isDropdownOpen;
+                if (_isDropdownOpen) {
+                  // Автоматически фокусируемся на поле поиска при открытии
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    _searchFocusNode.requestFocus();
+                  });
+                }
               });
             },
             child: Padding(
@@ -625,6 +614,7 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
                     ),
                     child: TextField(
                       controller: _searchController,
+                      focusNode: _searchFocusNode,
                       style: const TextStyle(fontSize: 12),
                       decoration: const InputDecoration(
                         hintText: 'Поиск продукта...',
