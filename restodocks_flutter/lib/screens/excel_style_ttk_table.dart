@@ -360,7 +360,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     final product = ingredient.productId != null
         ? widget.productStore.allProducts.where((p) => p.id == ingredient.productId).firstOrNull
         : null;
-    final cost = product != null ? product.basePrice * ingredient.grossWeight / 1000 : 0;
+    final cost = product != null && product.basePrice != null ? product.basePrice! * ingredient.grossWeight / 1000 : 0.0;
 
     return Container(
       padding: _cellPad,
@@ -377,12 +377,12 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     final product = ingredient.productId != null
         ? widget.productStore.allProducts.where((p) => p.id == ingredient.productId).firstOrNull
         : null;
-    if (product == null) return Container(padding: _cellPad);
+    if (product == null || product.basePrice == null) return Container(padding: _cellPad);
 
     final cookingLoss = ingredient.cookingLossPctOverride ?? 0;
     final outputWeight = ingredient.netWeight * (1 - cookingLoss / 100);
     final effectiveGross = ingredient.grossWeight > 0 ? ingredient.grossWeight : 1;
-    final pricePerKg = outputWeight > 0 ? (product.basePrice * 1000 / effectiveGross) * (effectiveGross / outputWeight) : 0.0;
+    final pricePerKg = outputWeight > 0 ? (product.basePrice! * 1000 / effectiveGross) * (effectiveGross / outputWeight) : 0.0;
 
     return Container(
       padding: _cellPad,
