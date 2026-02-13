@@ -12,7 +12,7 @@ import '../models/tt_ingredient.dart';
 import '../services/ai_service.dart';
 import '../services/image_service.dart';
 import '../services/services.dart';
-// import 'excel_style_ttk_table.dart';
+import 'excel_style_ttk_table.dart';
 
 /// Создание или редактирование ТТК. Ингредиенты — из номенклатуры или из других ТТК (ПФ).
 ///
@@ -1459,12 +1459,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                     child: ConstrainedBox(
                       constraints: BoxConstraints(minWidth: MediaQuery.of(context).size.width),
                       child: canEdit
-                            ? _SimpleTtkTable(
+                            ? ExcelStyleTtkTable(
                             loc: loc,
                             dishName: _nameController.text,
                             isSemiFinished: _isSemiFinished,
                             ingredients: _ingredients,
                             canEdit: true,
+                            dishNameController: _nameController,
+                            technologyController: _technologyController,
                             productStore: context.read<ProductStore>(),
                             onAdd: _showAddIngredient,
                             onUpdate: (i, ing) {
@@ -1486,6 +1488,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                               });
                             },
                             onRemove: _removeIngredient,
+                            onSuggestWaste: _suggestWasteForRow,
                           )
                             : _TtkCookTable(
                                 loc: loc,
@@ -2764,85 +2767,3 @@ class _TechCardPicker extends StatelessWidget {
   }
 }
 
-// Простая версия таблицы для тестирования на web
-class _SimpleTtkTable extends StatelessWidget {
-  final LocalizationService loc;
-  final String dishName;
-  final bool isSemiFinished;
-  final List<TTIngredient> ingredients;
-  final bool canEdit;
-  final ProductStore productStore;
-  final void Function([int?]) onAdd;
-  final void Function(int, TTIngredient) onUpdate;
-  final void Function(int) onRemove;
-
-  const _SimpleTtkTable({
-    required this.loc,
-    required this.dishName,
-    required this.isSemiFinished,
-    required this.ingredients,
-    required this.canEdit,
-    required this.productStore,
-    required this.onAdd,
-    required this.onUpdate,
-    required this.onRemove,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: Colors.green.withOpacity(0.1),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            color: Colors.red.withOpacity(0.2),
-            padding: const EdgeInsets.all(8),
-            child: Text(
-              '🎯 ПРОСТАЯ ТАБЛИЦА ТТК (видна если зеленый фон)',
-              style: const TextStyle(color: Colors.red, fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text('ТТК: $dishName (${isSemiFinished ? 'ПФ' : 'Блюдо'})', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          Text('Ингредиентов: ${ingredients.length}', style: const TextStyle(fontSize: 14)),
-          const SizedBox(height: 16),
-          if (canEdit)
-            ElevatedButton(
-              onPressed: () => onAdd(),
-              child: Text(loc.t('add_ingredient')),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
-            ),
-          const SizedBox(height: 16),
-          if (ingredients.isEmpty)
-            Container(
-              color: Colors.orange.withOpacity(0.2),
-              padding: const EdgeInsets.all(16),
-              child: const Text(
-                'Нет ингредиентов. Нажмите кнопку "Добавить ингредиент"',
-                style: TextStyle(fontSize: 16, color: Colors.black),
-              ),
-            )
-          else
-            ...ingredients.map((ing) => Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: ListTile(
-                title: Text(ing.productName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text('${ing.grossWeight}г → ${ing.netWeight}г'),
-                trailing: canEdit ? IconButton(
-                  icon: Icon(Icons.delete, color: Colors.red),
-                  onPressed: () => onRemove(ingredients.indexOf(ing)),
-                ) : null,
-              ),
-            )),
-        ],
-      ),
-    );
-  }
-}
