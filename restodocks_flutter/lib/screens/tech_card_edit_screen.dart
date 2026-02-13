@@ -1450,11 +1450,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                             isSemiFinished: _isSemiFinished,
                             ingredients: _ingredients,
                             canEdit: true,
-                            dishNameController: _nameController,
-                            technologyController: _technologyController,
                             productStore: context.read<ProductStore>(),
                             onAdd: _showAddIngredient,
-                            onRemove: _removeIngredient,
                             onUpdate: (i, ing) {
                               setState(() {
                                 if (_ingredients.isEmpty && i == 0) {
@@ -1473,7 +1470,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                                 }
                               });
                             },
-                            onSuggestWaste: _suggestWasteForRow,
+                            onRemove: _removeIngredient,
                           )
                             : _TtkCookTable(
                                 loc: loc,
@@ -2759,8 +2756,6 @@ class _SimpleTtkTable extends StatelessWidget {
   final bool isSemiFinished;
   final List<TTIngredient> ingredients;
   final bool canEdit;
-  final TextEditingController? dishNameController;
-  final TextEditingController? technologyController;
   final ProductStore productStore;
   final void Function([int?]) onAdd;
   final void Function(int, TTIngredient) onUpdate;
@@ -2772,8 +2767,6 @@ class _SimpleTtkTable extends StatelessWidget {
     required this.isSemiFinished,
     required this.ingredients,
     required this.canEdit,
-    this.dishNameController,
-    this.technologyController,
     required this.productStore,
     required this.onAdd,
     required this.onUpdate,
