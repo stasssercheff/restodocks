@@ -60,6 +60,10 @@ class TTIngredient extends Equatable {
   @JsonKey(name: 'manual_effective_gross')
   final double? manualEffectiveGross;
 
+  /// Выходной вес после ужарки (готовый продукт)
+  @JsonKey(name: 'output_weight')
+  final double outputWeight;
+
   // Итоговые питательные вещества
   @JsonKey(name: 'final_calories')
   final double finalCalories;
@@ -93,6 +97,7 @@ class TTIngredient extends Equatable {
     this.cookingLossPctOverride,
     this.isNetWeightManual = false,
     this.manualEffectiveGross,
+    this.outputWeight = 0,
     required this.finalCalories,
     required this.finalProtein,
     required this.finalFat,
@@ -129,6 +134,7 @@ class TTIngredient extends Equatable {
       primaryWastePct: 0,
       gramsPerPiece: gramsPerPiece,
       isNetWeightManual: false,
+      outputWeight: grossWeight,
       finalCalories: totalCalories * factor,
       finalProtein: totalProtein * factor,
       finalFat: totalFat * factor,
@@ -156,6 +162,7 @@ class TTIngredient extends Equatable {
     Object? cookingLossPctOverride = _undefined,
     Object? isNetWeightManual = _undefined,
     Object? manualEffectiveGross = _undefined,
+    Object? outputWeight = _undefined,
     Object? finalCalories = _undefined,
     Object? finalProtein = _undefined,
     Object? finalFat = _undefined,
@@ -178,6 +185,7 @@ class TTIngredient extends Equatable {
       cookingLossPctOverride: cookingLossPctOverride == _undefined ? this.cookingLossPctOverride : cookingLossPctOverride as double?,
       isNetWeightManual: isNetWeightManual == _undefined ? this.isNetWeightManual : isNetWeightManual as bool,
       manualEffectiveGross: manualEffectiveGross == _undefined ? this.manualEffectiveGross : manualEffectiveGross as double?,
+      outputWeight: outputWeight == _undefined ? this.outputWeight : outputWeight as double,
       finalCalories: finalCalories == _undefined ? this.finalCalories : finalCalories as double,
       finalProtein: finalProtein == _undefined ? this.finalProtein : finalProtein as double,
       finalFat: finalFat == _undefined ? this.finalFat : finalFat as double,
@@ -209,6 +217,7 @@ class TTIngredient extends Equatable {
       unit: 'g',
       primaryWastePct: 0,
       isNetWeightManual: false,
+      outputWeight: 0,
       finalCalories: 0,
       finalProtein: 0,
       finalFat: 0,
@@ -247,6 +256,7 @@ class TTIngredient extends Equatable {
         primaryWastePct: wastePct,
         gramsPerPiece: gramsPerPiece,
         isNetWeightManual: netWeight != null,
+        outputWeight: netWeight ?? grossWeight,
         finalCalories: 0,
         finalProtein: 0,
         finalFat: 0,
@@ -307,6 +317,7 @@ class TTIngredient extends Equatable {
       gramsPerPiece: gramsPerPiece,
       cookingLossPctOverride: cookingLossPctOverride,
       isNetWeightManual: netWeight != null,
+      outputWeight: finalNetWeight,
       finalCalories: finalCalories,
       finalProtein: finalProtein,
       finalFat: finalFat,
@@ -597,6 +608,7 @@ class TTIngredient extends Equatable {
     cookingLossPctOverride,
     isNetWeightManual,
     manualEffectiveGross,
+    outputWeight,
     finalCalories,
     finalProtein,
     finalFat,
