@@ -566,9 +566,9 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
       if (query.isEmpty) {
         _filteredProducts = widget.products.take(10).toList(); // Показываем первые 10 продуктов если поле пустое
       } else {
-        // Ищем продукты, которые содержат введенный текст (без учета регистра)
+        // Ищем продукты, которые начинаются с введенного текста (без учета регистра)
         _filteredProducts = widget.products
-            .where((product) => product.name.toLowerCase().contains(query.toLowerCase()))
+            .where((product) => product.name.toLowerCase().startsWith(query.toLowerCase()))
             .take(20) // Ограничиваем до 20 результатов для производительности
             .toList();
       }
