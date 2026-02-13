@@ -73,7 +73,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         scrollDirection: Axis.vertical,
         child:         ConstrainedBox(
           constraints: const BoxConstraints(minWidth: 1400), // Минимальная ширина для всех столбцов
-          child: Table(
+          child: IntrinsicHeight(
+            child: Table(
             border: TableBorder.all(color: Colors.black, width: 1),
             columnWidths: const {
               0: FixedColumnWidth(70),   // Тип ТТК
@@ -206,6 +207,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
               ),
             ],
           ),
+          ),
         ),
       ),
     );
@@ -242,11 +244,14 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   Widget _buildTechnologyCell(int rowSpan) {
     return Container(
       padding: _cellPad,
+      constraints: const BoxConstraints(minHeight: 44),
       child: widget.canEdit && widget.technologyController != null
           ? TextField(
               controller: widget.technologyController,
-              maxLines: 3,
+              maxLines: null, // Позволяет неограниченное количество строк
+              minLines: 1,    // Минимум 1 строка
               style: const TextStyle(fontSize: 12),
+              textAlign: TextAlign.left,
               decoration: const InputDecoration(
                 border: InputBorder.none,
                 contentPadding: EdgeInsets.zero,
@@ -256,6 +261,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
           : Text(
               widget.technologyController?.text ?? '',
               style: const TextStyle(fontSize: 12),
+              softWrap: true, // Перенос слов
             ),
     );
   }
