@@ -529,6 +529,7 @@ class _ProductSearchDropdown extends StatefulWidget {
 
 class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
   final LayerLink _layerLink = LayerLink();
   OverlayEntry? _overlayEntry;
   bool _isDropdownOpen = false;
@@ -543,7 +544,7 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
   }
 
   void _showDropdownOnInput() {
-    if (_searchController.text.isNotEmpty && !_isDropdownOpen) {
+    if (!_isDropdownOpen) {
       setState(() {
         _isDropdownOpen = true;
       });
@@ -554,6 +555,7 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
   @override
   void dispose() {
     _searchController.dispose();
+    _searchFocusNode.dispose();
     _hideOverlay();
     super.dispose();
   }
@@ -604,7 +606,7 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
                     ),
                     child: TextField(
                       controller: _searchController,
-                      autofocus: true,
+                      focusNode: _searchFocusNode,
                       style: const TextStyle(fontSize: 12),
                       decoration: const InputDecoration(
                         hintText: 'Поиск продукта...',
@@ -613,6 +615,14 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
                         border: InputBorder.none,
                         isDense: true,
                       ),
+                      onTap: () {
+                        if (!_isDropdownOpen) {
+                          setState(() {
+                            _isDropdownOpen = true;
+                          });
+                          _showOverlay();
+                        }
+                      },
                     ),
                   ),
                   // Список отфильтрованных продуктов
