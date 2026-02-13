@@ -248,7 +248,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
   Widget _buildHeaderCell(String text) {
     return Container(
-      padding: _cellPad,
+      height: 44,
       child: Center(
         child: Text(
           text,
@@ -261,7 +261,6 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
   Widget _buildMergedCell(String text, int rowSpan) {
     return Container(
-      padding: _cellPad,
       child: Center(
         child: Text(
           text,
@@ -295,7 +294,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                 fillColor: Colors.transparent,
               ),
             )
-          : Container(
+          : Center(
               child: Text(
                 widget.technologyController?.text ?? '',
                 style: const TextStyle(fontSize: 12),
@@ -309,7 +308,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   Widget _buildProductCell(TTIngredient ingredient, int rowIndex) {
     if (!widget.canEdit) {
       return Container(
-        padding: _cellPad,
+        height: 44,
         child: Center(
           child: Text(
             ingredient.sourceTechCardName ?? ingredient.productName,
@@ -323,7 +322,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     if (ingredient.productId != null) {
       final product = widget.productStore.allProducts.where((p) => p.id == ingredient.productId).firstOrNull;
       return Container(
-        padding: _cellPad,
+        height: 44,
         child: Center(
           child: Text(
             product?.name ?? ingredient.productName,
@@ -443,7 +442,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     final cost = product != null && product.basePrice != null ? product.basePrice! * ingredient.grossWeight / 1000 : 0.0;
 
     return Container(
-      padding: _cellPad,
+      height: 44,
       child: Center(
         child: Text(
           '${cost.toStringAsFixed(0)}₽',
@@ -457,13 +456,13 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     final product = ingredient.productId != null
         ? widget.productStore.allProducts.where((p) => p.id == ingredient.productId).firstOrNull
         : null;
-    if (product == null || product.basePrice == null || ingredient.outputWeight <= 0) return Container(padding: _cellPad);
+    if (product == null || product.basePrice == null || ingredient.outputWeight <= 0) return Container(height: 44);
 
     // Стоимость за кг готового продукта = (цена за кг брутто * брутто) / выход
     final pricePerKg = (product.basePrice! * ingredient.grossWeight) / ingredient.outputWeight;
 
     return Container(
-      padding: _cellPad,
+      height: 44,
       child: Center(
         child: Text(
           '${pricePerKg.toStringAsFixed(0)}₽/кг',
@@ -475,7 +474,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
   Widget _buildTotalCell(String text) {
     return Container(
-      padding: _cellPad,
+      height: 44,
       child: Center(
         child: Text(
           text,
@@ -515,7 +514,7 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
   @override
   void initState() {
     super.initState();
-    _filteredProducts = widget.products;
+    _filteredProducts = widget.products.take(10).toList(); // Показываем первые 10 продуктов при инициализации
     _searchController.addListener(_filterProducts);
   }
 
@@ -527,11 +526,16 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
   }
 
   void _filterProducts() {
-    final query = _searchController.text.toLowerCase();
+    final query = _searchController.text.toLowerCase().trim();
     setState(() {
-      _filteredProducts = widget.products
-          .where((product) => product.name.toLowerCase().contains(query))
-          .toList();
+      if (query.isEmpty) {
+        _filteredProducts = widget.products.take(10).toList(); // Показываем первые 10 продуктов если поле пустое
+      } else {
+        _filteredProducts = widget.products
+            .where((product) => product.name.toLowerCase().contains(query))
+            .take(20) // Ограничиваем до 20 результатов для производительности
+            .toList();
+      }
     });
   }
 
