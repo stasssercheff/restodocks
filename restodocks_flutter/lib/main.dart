@@ -13,26 +13,15 @@ import 'screens/screens.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  print('DEBUG: main() started');
+  // App started
 
-  // DEBUG: Показываем временный экран загрузки
+  // Temporary loading screen
   runApp(
-    MaterialApp(
+    const MaterialApp(
+      debugShowCheckedModeBanner: false,
       home: Scaffold(
-        body: Container(
-          color: Colors.yellow.withOpacity(0.3),
-          child: const Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(height: 20),
-                Text('DEBUG: Loading app...', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                SizedBox(height: 10),
-                Text('Check Safari console for debug logs', style: TextStyle(fontSize: 14)),
-              ],
-            ),
-          ),
+        body: Center(
+          child: CircularProgressIndicator(),
         ),
       ),
     ),
@@ -43,34 +32,34 @@ void main() async {
 
   // 1. Пробуем config.json (Vercel подставляет при сборке)
   try {
-    print('DEBUG: Loading config.json');
+    // Loading config.json
     final json = await rootBundle.loadString('assets/config.json');
     final map = jsonDecode(json) as Map<String, dynamic>;
     supabaseUrl = (map['SUPABASE_URL'] as String?) ?? '';
     supabaseAnonKey = (map['SUPABASE_ANON_KEY'] as String?) ?? '';
-    print('DEBUG: config.json loaded - URL: ${supabaseUrl.isNotEmpty}, Key: ${supabaseAnonKey.isNotEmpty}');
+    // config.json loaded
   } catch (e) {
-    print('DEBUG: config.json error: $e');
+    // config.json error
   }
 
   // 2. Локальная разработка: .env
   if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
     try {
-      print('DEBUG: Loading .env');
+      // Loading .env
       await dotenv.load(fileName: ".env");
       supabaseUrl = dotenv.env['SUPABASE_URL'] ?? '';
       supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'] ?? '';
-      print('DEBUG: .env loaded - URL: ${supabaseUrl.isNotEmpty}, Key: ${supabaseAnonKey.isNotEmpty}');
+      // .env loaded
     } catch (e) {
       print('DEBUG: .env error: $e');
     }
   }
 
   // Обработка ошибок инициализации
-  print('DEBUG: Final config - URL: ${supabaseUrl.isNotEmpty}, Key: ${supabaseAnonKey.isNotEmpty}');
+  // Final config loaded
   try {
     if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
-      print('DEBUG: Config missing, showing error screen');
+      // Config missing, showing error screen
       runApp(
         MaterialApp(
           home: Scaffold(
@@ -110,23 +99,22 @@ void main() async {
       return;
     }
 
-    print('DEBUG: Initializing Supabase...');
+    // Initializing Supabase...
     await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
-    print('DEBUG: Supabase initialized');
+    // Supabase initialized
 
-    print('DEBUG: Initializing LocalizationService...');
+    // Initializing LocalizationService...
     await LocalizationService.initialize();
-    print('DEBUG: LocalizationService initialized');
+    // LocalizationService initialized
 
-    print('DEBUG: Initializing ThemeService...');
+    // Initializing ThemeService...
     await ThemeService().initialize();
-    print('DEBUG: ThemeService initialized');
+    // ThemeService initialized
 
-    print('DEBUG: Starting RestodocksApp...');
+    // Starting RestodocksApp...
     runApp(const RestodocksApp());
   } catch (e, stackTrace) {
-    print('DEBUG: Initialization error: $e');
-    print('DEBUG: Stack trace: $stackTrace');
+    // Initialization error
     // Показываем ошибку пользователю вместо белого экрана
     runApp(
       MaterialApp(
@@ -172,7 +160,7 @@ class RestodocksApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    print('DEBUG: RestodocksApp.build() called');
+    // RestodocksApp.build() called
     return MultiProvider(
       providers: AppProviders.providers,
       child: Consumer2<LocalizationService, ThemeService>(

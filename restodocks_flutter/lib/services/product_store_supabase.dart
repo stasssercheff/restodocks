@@ -42,9 +42,9 @@ class ProductStoreSupabase {
           .toList()
         ..sort();
 
-      print('✅ Загружено ${_allProducts.length} продуктов из Supabase');
+      // Products loaded successfully
     } catch (e) {
-      print('❌ Ошибка загрузки продуктов: $e');
+      // Error loading products
     } finally {
       _isLoading = false;
     }
@@ -120,7 +120,7 @@ class ProductStoreSupabase {
         _categories.sort();
       }
     } catch (e) {
-      print('Ошибка добавления продукта: $e');
+      // Error adding product
       rethrow;
     }
   }
@@ -140,7 +140,7 @@ class ProductStoreSupabase {
         _allProducts[index] = updatedProduct;
       }
     } catch (e) {
-      print('Ошибка обновления продукта: $e');
+      // Error updating product
       rethrow;
     }
   }
@@ -159,7 +159,7 @@ class ProductStoreSupabase {
       await _supabase.deleteData('products', 'id', productId);
       _allProducts.removeWhere((product) => product.id == productId);
     } catch (e) {
-      print('Ошибка удаления продукта: $e');
+      // Error deleting product
       rethrow;
     }
   }
@@ -179,7 +179,7 @@ class ProductStoreSupabase {
           .map((e) => (e as Map)['product_id'] as String)
           .toSet();
     } catch (e) {
-      print('Ошибка загрузки номенклатуры: $e');
+      // Error loading nomenclature
       _nomenclatureIds = {};
     }
   }
@@ -193,7 +193,7 @@ class ProductStoreSupabase {
       );
       _nomenclatureIds.add(productId);
     } catch (e) {
-      print('Ошибка добавления в номенклатуру: $e');
+      // Error adding to nomenclature
       rethrow;
     }
   }
@@ -257,7 +257,7 @@ class ProductStoreSupabase {
         ..sort();
 
     } catch (e) {
-      print('Ошибка загрузки продуктов для отдела $department: $e');
+      // Error loading products for department
     } finally {
       _isLoading = false;
     }
