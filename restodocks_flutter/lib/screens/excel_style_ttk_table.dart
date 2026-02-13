@@ -44,6 +44,21 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   // Отслеживаем последнее изменение для правильных расчетов
   final Map<int, String> _lastChangedField = {};
 
+  // Контроллеры для полей ввода
+  final Map<String, TextEditingController> _controllers = {};
+
+  @override
+  void dispose() {
+    for (final controller in _controllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  TextEditingController _getController(String key, String initialValue) {
+    return _controllers[key] ??= TextEditingController(text: initialValue);
+  }
+
   @override
   Widget build(BuildContext context) {
     return _buildTtkTable(context);
@@ -119,11 +134,11 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   children: [
                     // Тип ТТК (объединенная ячейка)
                     rowIndex == 0 ? _buildMergedCell(widget.isSemiFinished ? 'ПФ' : 'Блюдо', allRows.length) :
-                    const SizedBox(height: 44), // Пустая ячейка нормальной высоты
+                    const SizedBox(height: 44, width: double.infinity), // Пустая ячейка нормальной высоты
 
                     // Название (объединенная ячейка)
                     rowIndex == 0 ? _buildMergedCell(widget.dishName, allRows.length) :
-                    const SizedBox(height: 44), // Пустая ячейка нормальной высоты
+                    const SizedBox(height: 44, width: double.infinity), // Пустая ячейка нормальной высоты
 
                     // Продукт
                     _buildProductCell(ingredient, rowIndex),
@@ -134,7 +149,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                       _updateIngredient(rowIndex, ingredient.copyWith(grossWeight: gross));
                       _lastChangedField[rowIndex] = 'gross';
                       _recalculate(rowIndex, ingredient.copyWith(grossWeight: gross));
-                    }),
+                    }, 'gross_$rowIndex'),
 
                     // % отхода
                     _buildNumericCell(ingredient.primaryWastePct.toStringAsFixed(1), (value) {
@@ -142,7 +157,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                       _updateIngredient(rowIndex, ingredient.copyWith(primaryWastePct: waste.clamp(0, 99.9)));
                       _lastChangedField[rowIndex] = 'waste';
                       _recalculate(rowIndex, ingredient.copyWith(primaryWastePct: waste.clamp(0, 99.9)));
-                    }),
+                    }, 'waste_$rowIndex'),
 
                     // Нетто
                     _buildNumericCell(ingredient.netWeight.toStringAsFixed(0), (value) {
@@ -150,7 +165,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                       _updateIngredient(rowIndex, ingredient.copyWith(netWeight: net));
                       _lastChangedField[rowIndex] = 'net';
                       _recalculate(rowIndex, ingredient.copyWith(netWeight: net));
-                    }),
+                    }, 'net_$rowIndex'),
 
                     // Способ приготовления
                     _buildCookingMethodCell(ingredient, rowIndex),
@@ -161,7 +176,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                       _updateIngredient(rowIndex, ingredient.copyWith(cookingLossPctOverride: loss.clamp(0, 99.9)));
                       _lastChangedField[rowIndex] = 'cooking_loss';
                       _recalculate(rowIndex, ingredient.copyWith(cookingLossPctOverride: loss.clamp(0, 99.9)));
-                    }),
+                    }, 'cooking_loss_$rowIndex'),
 
                     // Выход
                     _buildNumericCell(ingredient.netWeight.toStringAsFixed(0), (value) {
@@ -169,7 +184,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                       _updateIngredient(rowIndex, ingredient.copyWith(netWeight: output));
                       _lastChangedField[rowIndex] = 'output';
                       _recalculate(rowIndex, ingredient);
-                    }),
+                    }, 'output_$rowIndex'),
 
                     // Стоимость
                     _buildCostCell(ingredient),
@@ -179,11 +194,11 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
                     // Технология (объединенная ячейка)
                     rowIndex == 0 ? _buildTechnologyCell(allRows.length) :
-                    const SizedBox(height: 44), // Пустая ячейка
+                    const SizedBox(height: 44, width: double.infinity), // Пустая ячейка
 
                     // Кнопка удаления (только для строк с данными, не для пустой строки)
                     ingredient.productName.isNotEmpty ? _buildDeleteButton(rowIndex) :
-                    const SizedBox(height: 44), // Пустая ячейка для пустой строки
+                    const SizedBox(height: 44, width: double.infinity), // Пустая ячейка для пустой строки
                   ],
                 );
               }),
@@ -217,6 +232,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
   Widget _buildHeaderCell(String text) {
     return Container(
+      height: 44, // Фиксированная высота для центровки
       padding: _cellPad,
       child: Center(
         child: Text(
@@ -230,6 +246,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
   Widget _buildMergedCell(String text, int rowSpan) {
     return Container(
+      height: 44, // Фиксированная высота для центровки
       padding: _cellPad,
       child: Center(
         child: Text(
@@ -243,8 +260,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
   Widget _buildTechnologyCell(int rowSpan) {
     return Container(
+      height: 44, // Фиксированная высота для центровки
       padding: _cellPad,
-      constraints: const BoxConstraints(minHeight: 44),
       child: widget.canEdit && widget.technologyController != null
           ? TextField(
               controller: widget.technologyController,
@@ -269,6 +286,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   Widget _buildProductCell(TTIngredient ingredient, int rowIndex) {
     if (!widget.canEdit) {
       return Container(
+        height: 44, // Фиксированная высота для центровки
         padding: _cellPad,
         child: Center(
           child: Text(
@@ -283,6 +301,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     if (ingredient.productId != null) {
       final product = widget.productStore.allProducts.where((p) => p.id == ingredient.productId).firstOrNull;
       return Container(
+        height: 44, // Фиксированная высота для центровки
         padding: _cellPad,
         child: Center(
           child: Text(
@@ -296,6 +315,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
     // Показываем dropdown для выбора продукта
     return Container(
+      height: 44, // Фиксированная высота для центровки
       padding: _cellPad,
       child: Center(
         child: DropdownButton<String>(
@@ -323,13 +343,14 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     );
   }
 
-  Widget _buildNumericCell(String value, Function(String) onChanged) {
+  Widget _buildNumericCell(String value, Function(String) onChanged, String key) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+      height: 44, // Фиксированная высота для центровки
       child: Center(
         child: widget.canEdit
             ? TextField(
-                controller: TextEditingController(text: value),
+                controller: _getController(key, value),
                 keyboardType: TextInputType.number,
                 style: const TextStyle(fontSize: 12),
                 textAlign: TextAlign.center,
@@ -347,6 +368,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
   Widget _buildCookingMethodCell(TTIngredient ingredient, int rowIndex) {
     return Container(
+      height: 44, // Фиксированная высота для центровки
       padding: _cellPad,
       child: Center(
         child: widget.canEdit
@@ -382,6 +404,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     final cost = product != null && product.basePrice != null ? product.basePrice! * ingredient.grossWeight / 1000 : 0.0;
 
     return Container(
+      height: 44, // Фиксированная высота для центровки
       padding: _cellPad,
       child: Center(
         child: Text(
@@ -396,7 +419,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     final product = ingredient.productId != null
         ? widget.productStore.allProducts.where((p) => p.id == ingredient.productId).firstOrNull
         : null;
-    if (product == null || product.basePrice == null) return Container(padding: _cellPad);
+    if (product == null || product.basePrice == null) return Container(height: 44, padding: _cellPad);
 
     final cookingLoss = ingredient.cookingLossPctOverride ?? 0;
     final outputWeight = ingredient.netWeight * (1 - cookingLoss / 100);
@@ -404,6 +427,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     final pricePerKg = outputWeight > 0 ? (product.basePrice! * 1000 / effectiveGross) * (effectiveGross / outputWeight) : 0.0;
 
     return Container(
+      height: 44, // Фиксированная высота для центровки
       padding: _cellPad,
       child: Center(
         child: Text(
@@ -416,6 +440,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
   Widget _buildTotalCell(String text) {
     return Container(
+      height: 44, // Фиксированная высота для центровки
       padding: _cellPad,
       child: Center(
         child: Text(
@@ -462,6 +487,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
   Widget _buildDeleteButton(int rowIndex) {
     return Container(
+      height: 44, // Фиксированная высота для центровки
       padding: const EdgeInsets.all(2),
       child: Center(
         child: IconButton(
