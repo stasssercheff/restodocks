@@ -67,6 +67,13 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     final ingredients = widget.ingredients.where((ing) => !ing.isPlaceholder).toList();
     final allRows = [...ingredients];
 
+    // Инициализируем outputWeight для существующих ингредиентов
+    for (var i = 0; i < allRows.length; i++) {
+      if (allRows[i].productName.isNotEmpty && allRows[i].outputWeight == 0) {
+        allRows[i] = allRows[i].copyWith(outputWeight: allRows[i].netWeight);
+      }
+    }
+
     // Добавляем пустую строку, если последняя не пустая или если строк меньше 2
     if (allRows.isEmpty || (allRows.last.productName.isNotEmpty)) {
       allRows.add(TTIngredient.emptyPlaceholder());
@@ -82,24 +89,24 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       child: SingleChildScrollView(
         scrollDirection: Axis.vertical,
         child:         ConstrainedBox(
-          constraints: const BoxConstraints(minWidth: 1400), // Минимальная ширина для всех столбцов
+          constraints: const BoxConstraints(minWidth: 1000), // Минимальная ширина для всех столбцов - уменьшена
           child: IntrinsicHeight(
             child: Table(
             border: TableBorder.all(color: Colors.black, width: 1),
             columnWidths: const {
-              0: FixedColumnWidth(70),   // Тип ТТК
-              1: FixedColumnWidth(100),  // Название
-              2: FixedColumnWidth(130),  // Продукт
-              3: FixedColumnWidth(70),   // Брутто
-              4: FixedColumnWidth(70),   // % отхода
-              5: FixedColumnWidth(70),   // Нетто
-              6: FixedColumnWidth(100),  // Способ
-              7: FixedColumnWidth(70),   // % ужарки
-              8: FixedColumnWidth(70),   // Выход
-              9: FixedColumnWidth(80),   // Стоимость
-              10: FixedColumnWidth(80),  // Цена за кг
-              11: FixedColumnWidth(120), // Технология
-              12: FixedColumnWidth(50),  // Удаление
+              0: FixedColumnWidth(50),   // Тип ТТК - уменьшено
+              1: FixedColumnWidth(70),   // Название - уменьшено
+              2: FixedColumnWidth(100),  // Продукт - уменьшено
+              3: FixedColumnWidth(60),   // Брутто - уменьшено
+              4: FixedColumnWidth(60),   // % отхода - уменьшено
+              5: FixedColumnWidth(60),   // Нетто - уменьшено
+              6: FixedColumnWidth(80),   // Способ - уменьшено
+              7: FixedColumnWidth(60),   // % ужарки - уменьшено
+              8: FixedColumnWidth(60),   // Выход - уменьшено
+              9: FixedColumnWidth(70),   // Стоимость - уменьшено
+              10: FixedColumnWidth(70),  // Цена за кг - уменьшено
+              11: FixedColumnWidth(100), // Технология - уменьшено
+              12: FixedColumnWidth(40),  // Удаление - уменьшено
             },
             children: [
               // Шапка
@@ -219,17 +226,18 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                 decoration: BoxDecoration(color: Colors.red.shade50),
                 children: [
                   _buildTotalCell('Итого'),
-                  const SizedBox(height: 44), // Пустые ячейки
-                  const SizedBox(height: 44),
-                  const SizedBox(height: 44),
-                  const SizedBox(height: 44),
-                  const SizedBox(height: 44),
-                  const SizedBox(height: 44),
-                  const SizedBox(height: 44),
-                  _buildTotalCell('${totalOutput.toStringAsFixed(0)}г'),
-                  _buildTotalCell('${totalCost.toStringAsFixed(0)}₽'),
-                  _buildTotalCell('${costPerKg.toStringAsFixed(0)}₽/кг'),
-                  const SizedBox(height: 44), // Пустая ячейка для кнопки удаления в итого
+                  const SizedBox(height: 44), // Название
+                  const SizedBox(height: 44), // Продукт
+                  const SizedBox(height: 44), // Брутто
+                  const SizedBox(height: 44), // % отхода
+                  const SizedBox(height: 44), // Нетто
+                  const SizedBox(height: 44), // Способ
+                  const SizedBox(height: 44), // % ужарки
+                  _buildTotalCell('${totalOutput.toStringAsFixed(0)}г'), // Выход
+                  _buildTotalCell('${totalCost.toStringAsFixed(0)}₽'), // Стоимость
+                  _buildTotalCell('${costPerKg.toStringAsFixed(0)}₽/кг'), // Цена за кг
+                  const SizedBox(height: 44), // Технология
+                  const SizedBox(height: 44), // Удаление
                 ],
               ),
             ],
@@ -357,13 +365,19 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   }
 
   Widget _buildNumericCell(String value, Function(String) onChanged, String key) {
+    // Обновляем контроллер если значение изменилось
+    final controller = _getController(key, value);
+    if (controller.text != value) {
+      controller.text = value;
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
       height: 44, // Фиксированная высота для центровки
       child: Center(
         child: widget.canEdit
             ? TextField(
-                controller: _getController(key, value),
+                controller: controller,
                 keyboardType: TextInputType.number,
                 style: const TextStyle(fontSize: 12),
                 textAlign: TextAlign.center,
@@ -373,6 +387,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   isDense: true,
                 ),
                 onChanged: onChanged,
+                onSubmitted: onChanged,
               )
             : Text(value, style: const TextStyle(fontSize: 12), textAlign: TextAlign.center),
       ),
