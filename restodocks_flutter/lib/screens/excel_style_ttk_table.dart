@@ -561,13 +561,14 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
   }
 
   void _filterProducts() {
-    final query = _searchController.text.toLowerCase().trim();
+    final query = _searchController.text.trim();
     setState(() {
       if (query.isEmpty) {
         _filteredProducts = widget.products.take(10).toList(); // Показываем первые 10 продуктов если поле пустое
       } else {
+        // Ищем продукты, которые содержат введенный текст (без учета регистра)
         _filteredProducts = widget.products
-            .where((product) => product.name.toLowerCase().contains(query))
+            .where((product) => product.name.toLowerCase().contains(query.toLowerCase()))
             .take(20) // Ограничиваем до 20 результатов для производительности
             .toList();
       }
@@ -594,67 +595,31 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
                 border: Border.all(color: Colors.grey.shade400, width: 1),
                 borderRadius: BorderRadius.circular(4),
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Поле поиска в первой строке списка
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
-                      border: const Border(bottom: BorderSide(color: Colors.grey, width: 0.5)),
-                    ),
-                    child: TextField(
-                      controller: _searchController,
-                      focusNode: _searchFocusNode,
-                      style: const TextStyle(fontSize: 12),
-                      decoration: const InputDecoration(
-                        hintText: 'Поиск продукта...',
-                        hintStyle: TextStyle(fontSize: 12),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-                        border: InputBorder.none,
-                        isDense: true,
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: _filteredProducts.length,
+                itemBuilder: (context, index) {
+                  final product = _filteredProducts[index];
+                  return InkWell(
+                    onTap: () {
+                      widget.onProductSelected(product);
+                      _searchController.text = product.name;
+                      _hideOverlay();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                      decoration: index < _filteredProducts.length - 1
+                          ? const BoxDecoration(
+                              border: Border(bottom: BorderSide(color: Colors.grey, width: 0.2)),
+                            )
+                          : null,
+                      child: Text(
+                        product.name,
+                        style: const TextStyle(fontSize: 12),
                       ),
-                      onTap: () {
-                        if (!_isDropdownOpen) {
-                          setState(() {
-                            _isDropdownOpen = true;
-                          });
-                          _showOverlay();
-                        }
-                      },
                     ),
-                  ),
-                  // Список отфильтрованных продуктов
-                  Flexible(
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: _filteredProducts.length,
-                      itemBuilder: (context, index) {
-                        final product = _filteredProducts[index];
-                        return InkWell(
-                          onTap: () {
-                            widget.onProductSelected(product);
-                            _searchController.text = product.name;
-                            _hideOverlay();
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                            decoration: index < _filteredProducts.length - 1
-                                ? const BoxDecoration(
-                                    border: Border(bottom: BorderSide(color: Colors.grey, width: 0.2)),
-                                  )
-                                : null,
-                            child: Text(
-                              product.name,
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
+                  );
+                },
               ),
             ),
           ),
@@ -688,11 +653,8 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
   Widget build(BuildContext context) {
     return CompositedTransformTarget(
       link: _layerLink,
-      child: InkWell(
-        onTap: _toggleDropdown,
-        child: Container(
+      child: Container(
           height: 44,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
           decoration: BoxDecoration(
             border: Border.all(color: Colors.grey.shade400, width: 1),
             borderRadius: BorderRadius.circular(4),
@@ -701,10 +663,25 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
           child: Row(
             children: [
               Expanded(
-                child: Text(
-                  _searchController.text.isEmpty ? 'Выберите продукт' : _searchController.text,
-                  style: const TextStyle(fontSize: 12, color: Colors.black),
-                  overflow: TextOverflow.ellipsis,
+                child: TextField(
+                  controller: _searchController,
+                  focusNode: _searchFocusNode,
+                  style: const TextStyle(fontSize: 12),
+                  decoration: InputDecoration(
+                    hintText: 'Выберите продукт',
+                    hintStyle: const TextStyle(fontSize: 12, color: Colors.grey),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                    border: InputBorder.none,
+                    isDense: true,
+                  ),
+                  onTap: () {
+                    if (!_isDropdownOpen) {
+                      setState(() {
+                        _isDropdownOpen = true;
+                      });
+                      _showOverlay();
+                    }
+                  },
                 ),
               ),
               Icon(
@@ -715,7 +692,6 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
             ],
           ),
         ),
-      ),
     );
   }
 }
