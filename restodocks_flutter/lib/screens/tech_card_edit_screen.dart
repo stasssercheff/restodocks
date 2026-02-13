@@ -7,10 +7,6 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../models/models.dart';
-import '../models/culinary_units.dart';
-import '../models/tt_ingredient.dart';
-import '../services/ai_service.dart';
-import '../services/image_service.dart';
 import '../services/services.dart';
 import 'excel_style_ttk_table.dart';
 
@@ -62,7 +58,7 @@ class _EditableShrinkageCellState extends State<_EditableShrinkageCell> {
 
   @override
   Widget build(BuildContext context) {
-    final fill = Theme.of(context).colorScheme.surfaceContainerLow.withOpacity(0.7);
+    final fill = Theme.of(context).colorScheme.surfaceContainerLow.withValues(alpha: 0.7);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => _focusNode.requestFocus(),
@@ -128,7 +124,7 @@ class _EditableWasteCellState extends State<_EditableWasteCell> {
 
   @override
   Widget build(BuildContext context) {
-    final fill = Theme.of(context).colorScheme.surfaceContainerLow.withOpacity(0.7);
+    final fill = Theme.of(context).colorScheme.surfaceContainerLow.withValues(alpha: 0.7);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => _focusNode.requestFocus(),
@@ -203,7 +199,7 @@ class _EditableProductNameCellState extends State<_EditableProductNameCell> {
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
           filled: true,
-          fillColor: Theme.of(context).colorScheme.surfaceContainerLow.withOpacity(0.7),
+          fillColor: Theme.of(context).colorScheme.surfaceContainerLow.withValues(alpha: 0.7),
         ),
         onChanged: widget.onChanged,
       ),
@@ -254,7 +250,7 @@ class _EditableGrossCellState extends State<_EditableGrossCell> {
 
   @override
   Widget build(BuildContext context) {
-    final fill = Theme.of(context).colorScheme.surfaceContainerLow.withOpacity(0.7);
+    final fill = Theme.of(context).colorScheme.surfaceContainerLow.withValues(alpha: 0.7);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => _focusNode.requestFocus(),
@@ -327,7 +323,7 @@ class _EditablePricePerKgCellState extends State<_EditablePricePerKgCell> {
 
   @override
   Widget build(BuildContext context) {
-    final fill = Theme.of(context).colorScheme.surfaceContainerLow.withOpacity(0.7);
+    final fill = Theme.of(context).colorScheme.surfaceContainerLow.withValues(alpha: 0.7);
     return TextField(
       controller: _ctrl,
       keyboardType: TextInputType.numberWithOptions(decimal: true),
@@ -401,7 +397,7 @@ class _EditableCostCellState extends State<_EditableCostCell> {
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
           filled: true,
-          fillColor: Theme.of(context).colorScheme.surfaceContainerLow.withOpacity(0.7),
+          fillColor: Theme.of(context).colorScheme.surfaceContainerLow.withValues(alpha: 0.7),
         ),
         style: const TextStyle(fontSize: 12),
         onSubmitted: (_) => _submit(),
@@ -1214,10 +1210,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () { print('DEBUG: Back button pressed'); Navigator.of(context).pop(); }, style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
+        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.of(context).pop(), style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
         title: Text(_isNew ? loc.t('create_tech_card') : (_techCard?.getDisplayNameInLists(loc.currentLanguageCode) ?? loc.t('tech_cards'))),
         actions: [
-          if (canEdit) IconButton(icon: const Icon(Icons.save), onPressed: () { print('DEBUG: Save button pressed'); _save(); }, tooltip: loc.t('save'), style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
+          if (canEdit) IconButton(icon: const Icon(Icons.save), onPressed: _save, tooltip: loc.t('save'), style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
           if (canEdit && !_isNew) IconButton(icon: const Icon(Icons.delete_outline), onPressed: () => _confirmDelete(context, loc), tooltip: loc.t('delete_tech_card'), style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
           // Кнопка экспорта текущей ТТК
           if (!_isNew && _techCard != null) IconButton(
@@ -1241,7 +1237,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
             tooltip: 'Экспорт в Excel',
             style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
           ),
-          IconButton(icon: const Icon(Icons.home), onPressed: () { print('DEBUG: Home button pressed'); context.go('/home'); }, tooltip: loc.t('home'), style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
+          IconButton(icon: const Icon(Icons.home), onPressed: () => context.go('/home'), tooltip: loc.t('home'), style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
         ],
       ),
       body: LayoutBuilder(
@@ -1256,36 +1252,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                   child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // DEBUG: Показать состояние загрузки и ингредиентов
-                Container(
-                  color: Colors.blue.withOpacity(0.1),
-                  padding: const EdgeInsets.all(8),
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'DEBUG: Создание ТТК',
-                        style: const TextStyle(color: Colors.red, fontSize: 14, fontWeight: FontWeight.bold),
-                      ),
-                      Text('Loading: $_loading', style: const TextStyle(color: Colors.black, fontSize: 12)),
-                      Text('Error: $_error', style: const TextStyle(color: Colors.black, fontSize: 12)),
-                      Text('Ingredients: ${_ingredients.length}', style: const TextStyle(color: Colors.black, fontSize: 12)),
-                      Text('CanEdit: $canEdit', style: const TextStyle(color: Colors.black, fontSize: 12)),
-                      Text('IsNew: $_isNew', style: const TextStyle(color: Colors.black, fontSize: 12)),
-                      Text('TechCard: ${_techCard != null ? 'EXISTS' : 'NULL'}', style: const TextStyle(color: Colors.black, fontSize: 12)),
-                      const SizedBox(height: 8),
-                      Container(
-                        color: Colors.yellow.withOpacity(0.3),
-                        padding: const EdgeInsets.all(8),
-                        child: const Text(
-                          'Если вы видите это сообщение, значит таблица ТТК должна быть ниже!',
-                          style: TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
                 // Шапка: название, категория, тип — на узком экране колонкой, на широком строкой
                 if (narrow) ...[
                   TextField(
@@ -2005,7 +1971,7 @@ class _TtkTableState extends State<_TtkTable> {
                             border: const OutlineInputBorder(),
                             contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                             filled: true,
-                            fillColor: theme.colorScheme.surfaceContainerLow.withOpacity(0.5),
+                            fillColor: theme.colorScheme.surfaceContainerLow.withValues(alpha: 0.5),
                           ),
                         ),
                       ),
@@ -2076,7 +2042,7 @@ class _TtkTableState extends State<_TtkTable> {
                         border: InputBorder.none,
                         contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                         filled: true,
-                        fillColor: Theme.of(context).colorScheme.surfaceContainerLow.withOpacity(0.7),
+                        fillColor: Theme.of(context).colorScheme.surfaceContainerLow.withValues(alpha: 0.7),
                       ),
                       style: const TextStyle(fontSize: 12),
                     )
@@ -2130,7 +2096,7 @@ class _TtkTableState extends State<_TtkTable> {
             ),
           ),
         ),
-        fillColor: Theme.of(context).colorScheme.errorContainer.withOpacity(0.3),
+        fillColor: Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.3),
         dataCell: true,
       ),
     );
@@ -2222,7 +2188,7 @@ class _TtkCookTableState extends State<_TtkCookTable> {
       },
       children: [
         TableRow(
-          decoration: BoxDecoration(color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3)),
+          decoration: BoxDecoration(color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3)),
           children: [
             _cell(widget.loc.t('ttk_dish'), bold: true),
             _cell(widget.loc.t('ttk_product'), bold: true),
@@ -2341,7 +2307,7 @@ class _EditableNetCellState extends State<_EditableNetCell> {
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
           filled: true,
-          fillColor: Theme.of(context).colorScheme.surfaceContainerLow.withOpacity(0.7),
+          fillColor: Theme.of(context).colorScheme.surfaceContainerLow.withValues(alpha: 0.7),
         ),
         style: const TextStyle(fontSize: 12),
         onSubmitted: (_) => _submit(),
