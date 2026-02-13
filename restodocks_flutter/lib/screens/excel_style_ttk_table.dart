@@ -12,7 +12,7 @@ class ExcelStyleTtkTable extends StatefulWidget {
   final bool canEdit;
   final TextEditingController? dishNameController;
   final TextEditingController? technologyController;
-  final ProductStore productStore;
+  final ProductStoreSupabase productStore;
   final void Function([int?]) onAdd;
   final void Function(int, TTIngredient) onUpdate;
   final void Function(int) onRemove;

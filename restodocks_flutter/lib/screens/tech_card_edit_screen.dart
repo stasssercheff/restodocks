@@ -1467,7 +1467,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                             canEdit: true,
                             dishNameController: _nameController,
                             technologyController: _technologyController,
-                            productStore: context.read<ProductStore>(),
+                            productStore: context.read<ProductStoreSupabase>(),
                             onAdd: _showAddIngredient,
                             onUpdate: (i, ing) {
                               setState(() {
