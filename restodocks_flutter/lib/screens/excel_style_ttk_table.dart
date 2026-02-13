@@ -270,11 +270,11 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     if (!widget.canEdit) {
       return Container(
         padding: _cellPad,
-        child: Align(
-          alignment: Alignment.centerLeft,
+        child: Center(
           child: Text(
             ingredient.sourceTechCardName ?? ingredient.productName,
             style: const TextStyle(fontSize: 12),
+            textAlign: TextAlign.center,
           ),
         ),
       );
@@ -284,11 +284,11 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       final product = widget.productStore.allProducts.where((p) => p.id == ingredient.productId).firstOrNull;
       return Container(
         padding: _cellPad,
-        child: Align(
-          alignment: Alignment.centerLeft,
+        child: Center(
           child: Text(
             product?.name ?? ingredient.productName,
             style: const TextStyle(fontSize: 12),
+            textAlign: TextAlign.center,
           ),
         ),
       );
@@ -297,26 +297,28 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     // Показываем dropdown для выбора продукта
     return Container(
       padding: _cellPad,
-      child: DropdownButton<String>(
-        isExpanded: true,
-        hint: const Text('Выберите продукт', style: TextStyle(fontSize: 12)),
-        value: null,
-        items: widget.productStore.allProducts.map((product) {
-          return DropdownMenuItem<String>(
-            value: product.id,
-            child: Text(product.name, style: const TextStyle(fontSize: 12)),
-          );
-        }).toList(),
-        onChanged: (productId) {
-          if (productId != null) {
-            final product = widget.productStore.allProducts.firstWhere((p) => p.id == productId);
-            _updateIngredient(rowIndex, ingredient.copyWith(
-              productId: productId,
-              productName: product.name,
-              unit: product.unit,
-            ));
-          }
-        },
+      child: Center(
+        child: DropdownButton<String>(
+          isExpanded: true,
+          hint: const Text('Выберите продукт', style: TextStyle(fontSize: 12)),
+          value: null,
+          items: widget.productStore.allProducts.map((product) {
+            return DropdownMenuItem<String>(
+              value: product.id,
+              child: Text(product.name, style: const TextStyle(fontSize: 12)),
+            );
+          }).toList(),
+          onChanged: (productId) {
+            if (productId != null) {
+              final product = widget.productStore.allProducts.firstWhere((p) => p.id == productId);
+              _updateIngredient(rowIndex, ingredient.copyWith(
+                productId: productId,
+                productName: product.name,
+                unit: product.unit,
+              ));
+            }
+          },
+        ),
       ),
     );
   }
@@ -324,47 +326,52 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   Widget _buildNumericCell(String value, Function(String) onChanged) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
-      child: widget.canEdit
-          ? TextField(
-              controller: TextEditingController(text: value),
-              keyboardType: TextInputType.number,
-              style: const TextStyle(fontSize: 12),
-              textAlign: TextAlign.center,
-              decoration: const InputDecoration(
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.zero,
-                isDense: true,
-              ),
-              onChanged: onChanged,
-            )
-          : Text(value, style: const TextStyle(fontSize: 12), textAlign: TextAlign.center),
+      child: Center(
+        child: widget.canEdit
+            ? TextField(
+                controller: TextEditingController(text: value),
+                keyboardType: TextInputType.number,
+                style: const TextStyle(fontSize: 12),
+                textAlign: TextAlign.center,
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.zero,
+                  isDense: true,
+                ),
+                onChanged: onChanged,
+              )
+            : Text(value, style: const TextStyle(fontSize: 12), textAlign: TextAlign.center),
+      ),
     );
   }
 
   Widget _buildCookingMethodCell(TTIngredient ingredient, int rowIndex) {
     return Container(
       padding: _cellPad,
-      child: widget.canEdit
-          ? DropdownButton<String>(
-              isExpanded: true,
-              hint: const Text('Способ', style: TextStyle(fontSize: 12)),
-              value: ingredient.cookingProcessId,
-              items: CookingProcess.defaultProcesses.map((process) {
-                return DropdownMenuItem<String>(
-                  value: process.id,
-                  child: Text(process.name, style: const TextStyle(fontSize: 12)),
-                );
-              }).toList(),
-              onChanged: (processId) {
-                _updateIngredient(rowIndex, ingredient.copyWith(cookingProcessId: processId));
-              },
-            )
-          : Text(
-              ingredient.cookingProcessId != null
-                  ? CookingProcess.findById(ingredient.cookingProcessId!)?.name ?? ''
-                  : '',
-              style: const TextStyle(fontSize: 12),
-            ),
+      child: Center(
+        child: widget.canEdit
+            ? DropdownButton<String>(
+                isExpanded: true,
+                hint: const Text('Способ', style: TextStyle(fontSize: 12)),
+                value: ingredient.cookingProcessId,
+                items: CookingProcess.defaultProcesses.map((process) {
+                  return DropdownMenuItem<String>(
+                    value: process.id,
+                    child: Text(process.name, style: const TextStyle(fontSize: 12)),
+                  );
+                }).toList(),
+                onChanged: (processId) {
+                  _updateIngredient(rowIndex, ingredient.copyWith(cookingProcessId: processId));
+                },
+              )
+            : Text(
+                ingredient.cookingProcessId != null
+                    ? CookingProcess.findById(ingredient.cookingProcessId!)?.name ?? ''
+                    : '',
+                style: const TextStyle(fontSize: 12),
+                textAlign: TextAlign.center,
+              ),
+      ),
     );
   }
 
@@ -456,11 +463,13 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   Widget _buildDeleteButton(int rowIndex) {
     return Container(
       padding: const EdgeInsets.all(2),
-      child: IconButton(
-        icon: const Icon(Icons.delete, color: Colors.red, size: 18),
-        onPressed: () => _removeIngredient(rowIndex),
-        padding: EdgeInsets.zero,
-        constraints: const BoxConstraints(),
+      child: Center(
+        child: IconButton(
+          icon: const Icon(Icons.delete, color: Colors.red, size: 18),
+          onPressed: () => _removeIngredient(rowIndex),
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(),
+        ),
       ),
     );
   }
