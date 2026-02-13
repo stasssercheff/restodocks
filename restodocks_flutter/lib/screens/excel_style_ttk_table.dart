@@ -88,11 +88,11 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       scrollDirection: Axis.horizontal,
       child: SingleChildScrollView(
         scrollDirection: Axis.vertical,
-        child:         ConstrainedBox(
+        child: ConstrainedBox(
           constraints: const BoxConstraints(minWidth: 1000), // Минимальная ширина для всех столбцов - уменьшена
-          child: IntrinsicHeight(
-            child: Table(
+          child: Table(
             border: TableBorder.all(color: Colors.black, width: 1),
+            defaultVerticalAlignment: TableCellVerticalAlignment.top,
             columnWidths: const {
               0: FixedColumnWidth(50),   // Тип ТТК - уменьшено
               1: FixedColumnWidth(70),   // Название - уменьшено
@@ -136,11 +136,11 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   children: [
                     // Тип ТТК (объединенная ячейка)
                     rowIndex == 0 ? _buildMergedCell(widget.isSemiFinished ? 'ПФ' : 'Блюдо', allRows.length) :
-                    const SizedBox(height: 44, width: double.infinity), // Пустая ячейка нормальной высоты
+                    const SizedBox.shrink(), // Пустая ячейка
 
                     // Название (объединенная ячейка)
                     rowIndex == 0 ? _buildMergedCell(widget.dishName, allRows.length) :
-                    const SizedBox(height: 44, width: double.infinity), // Пустая ячейка нормальной высоты
+                    const SizedBox.shrink(), // Пустая ячейка
 
                     // Продукт
                     _buildProductCell(ingredient, rowIndex),
@@ -211,13 +211,12 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     // Цена за кг
                     _buildPricePerKgCell(ingredient),
 
-                    // Технология (объединенная ячейка)
-                    rowIndex == 0 ? _buildTechnologyCell(allRows.length) :
-                    const SizedBox(height: 44, width: double.infinity), // Пустая ячейка
+                    // Технология - обычная ячейка, которая может растягиваться
+                    _buildTechnologyCell(rowIndex),
 
                     // Кнопка удаления (только для строк с данными, не для пустой строки)
                     ingredient.productName.isNotEmpty ? _buildDeleteButton(rowIndex) :
-                    const SizedBox(height: 44, width: double.infinity), // Пустая ячейка для пустой строки
+                    const SizedBox.shrink(), // Пустая ячейка для пустой строки
                   ],
                 );
               }),
@@ -226,22 +225,21 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                 decoration: BoxDecoration(color: Colors.red.shade50),
                 children: [
                   _buildTotalCell('Итого'),
-                  const SizedBox(height: 44), // Название
-                  const SizedBox(height: 44), // Продукт
-                  const SizedBox(height: 44), // Брутто
-                  const SizedBox(height: 44), // % отхода
-                  const SizedBox(height: 44), // Нетто
-                  const SizedBox(height: 44), // Способ
-                  const SizedBox(height: 44), // % ужарки
+                  const SizedBox.shrink(), // Название
+                  const SizedBox.shrink(), // Продукт
+                  const SizedBox.shrink(), // Брутто
+                  const SizedBox.shrink(), // % отхода
+                  const SizedBox.shrink(), // Нетто
+                  const SizedBox.shrink(), // Способ
+                  const SizedBox.shrink(), // % ужарки
                   _buildTotalCell('${totalOutput.toStringAsFixed(0)}г'), // Выход
                   _buildTotalCell('${totalCost.toStringAsFixed(0)}₽'), // Стоимость
                   _buildTotalCell('${costPerKg.toStringAsFixed(0)}₽/кг'), // Цена за кг
-                  const SizedBox(height: 44), // Технология
-                  const SizedBox(height: 44), // Удаление
+                  const SizedBox.shrink(), // Технология
+                  const SizedBox.shrink(), // Удаление
                 ],
               ),
             ],
-          ),
           ),
         ),
       ),
@@ -252,7 +250,6 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
   Widget _buildHeaderCell(String text) {
     return Container(
-      height: 44, // Фиксированная высота для центровки
       padding: _cellPad,
       child: Center(
         child: Text(
@@ -266,7 +263,6 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
   Widget _buildMergedCell(String text, int rowSpan) {
     return Container(
-      height: 44, // Фиксированная высота для центровки
       padding: _cellPad,
       child: Center(
         child: Text(
@@ -278,10 +274,15 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     );
   }
 
-  Widget _buildTechnologyCell(int rowSpan) {
+  Widget _buildTechnologyCell(int rowIndex) {
+    // Технология показывается только в первой строке и может растягивать строку
+    if (rowIndex > 0) {
+      return const SizedBox.shrink();
+    }
+
     return Container(
-      height: 44, // Фиксированная высота для центровки
-      padding: _cellPad,
+      constraints: const BoxConstraints(minHeight: 44),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       child: widget.canEdit && widget.technologyController != null
           ? TextField(
               controller: widget.technologyController,
@@ -289,16 +290,25 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
               minLines: 1,    // Минимум 1 строка
               style: const TextStyle(fontSize: 12),
               textAlign: TextAlign.left,
-              decoration: const InputDecoration(
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.zero,
+              decoration: InputDecoration(
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(4),
+                  borderSide: BorderSide(color: Colors.grey.shade400, width: 1),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                 isDense: true,
+                filled: true,
+                fillColor: Colors.white,
               ),
             )
-          : Text(
-              widget.technologyController?.text ?? '',
-              style: const TextStyle(fontSize: 12),
-              softWrap: true, // Перенос слов
+          : Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+              child: Text(
+                widget.technologyController?.text ?? '',
+                style: const TextStyle(fontSize: 12),
+                textAlign: TextAlign.left,
+                softWrap: true,
+              ),
             ),
     );
   }
@@ -306,7 +316,6 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   Widget _buildProductCell(TTIngredient ingredient, int rowIndex) {
     if (!widget.canEdit) {
       return Container(
-        height: 44, // Фиксированная высота для центровки
         padding: _cellPad,
         child: Center(
           child: Text(
@@ -321,7 +330,6 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     if (ingredient.productId != null) {
       final product = widget.productStore.allProducts.where((p) => p.id == ingredient.productId).firstOrNull;
       return Container(
-        height: 44, // Фиксированная высота для центровки
         padding: _cellPad,
         child: Center(
           child: Text(
@@ -342,24 +350,18 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   }
 
   Widget _buildSearchableProductDropdown(TTIngredient ingredient, int rowIndex) {
-    return Center(
-      child: Container(
-        height: 40, // Размер под ячейку
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.shade400, width: 1),
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: _ProductSearchDropdown(
-          products: widget.productStore.allProducts,
-          onProductSelected: (product) {
-            _updateIngredient(rowIndex, ingredient.copyWith(
-              productId: product.id,
-              productName: product.name,
-              unit: product.unit,
-              outputWeight: ingredient.netWeight, // Инициализируем выход весом нетто
-            ));
-          },
-        ),
+    return Container(
+      height: 44, // Фиксированная высота для центровки
+      child: _ProductSearchDropdown(
+        products: widget.productStore.allProducts,
+        onProductSelected: (product) {
+          _updateIngredient(rowIndex, ingredient.copyWith(
+            productId: product.id,
+            productName: product.name,
+            unit: product.unit,
+            outputWeight: ingredient.netWeight, // Инициализируем выход весом нетто
+          ));
+        },
       ),
     );
   }
@@ -372,89 +374,86 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     }
 
     return Container(
-      height: 44, // Фиксированная высота для центровки
-      child: Center(
-        child: widget.canEdit
-            ? SizedBox(
-                height: 40, // Размер под ячейку
-                child: TextField(
-                  controller: controller,
-                  keyboardType: TextInputType.number,
-                  style: const TextStyle(fontSize: 12),
-                  textAlign: TextAlign.center,
-                  decoration: InputDecoration(
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(4),
-                      borderSide: BorderSide(color: Colors.grey.shade400, width: 1),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                    isDense: true,
-                  ),
-                  onChanged: onChanged,
-                  onSubmitted: onChanged,
+      child: widget.canEdit
+          ? TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              style: const TextStyle(fontSize: 12),
+              textAlign: TextAlign.center,
+              decoration: InputDecoration(
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(4),
+                  borderSide: BorderSide(color: Colors.grey.shade400, width: 1),
                 ),
-              )
-            : Text(value, style: const TextStyle(fontSize: 12), textAlign: TextAlign.center),
-      ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+                isDense: true,
+                filled: true,
+                fillColor: Colors.white,
+              ),
+              onChanged: onChanged,
+              onSubmitted: onChanged,
+            )
+          : Center(
+              child: Text(value, style: const TextStyle(fontSize: 12), textAlign: TextAlign.center),
+            ),
     );
   }
 
   Widget _buildCookingMethodCell(TTIngredient ingredient, int rowIndex) {
     return Container(
-      height: 44, // Фиксированная высота для центровки
-      child: Center(
-        child: widget.canEdit
-            ? Container(
-                height: 40, // Размер под ячейку
-                padding: const EdgeInsets.symmetric(horizontal: 2),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade400, width: 1),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: DropdownButton<String>(
-                  isExpanded: true,
-                  hint: const Text('Способ', style: TextStyle(fontSize: 12)),
-                  value: ingredient.cookingProcessId ?? (ingredient.cookingProcessName == 'Свой вариант' ? 'custom' : null),
-                  items: [
-                    const DropdownMenuItem<String>(
-                      value: 'custom',
-                      child: Text('Свой вариант', style: TextStyle(fontSize: 12)),
-                    ),
-                    ...CookingProcess.defaultProcesses.map((process) {
-                      return DropdownMenuItem<String>(
-                        value: process.id,
-                        child: Text(process.name, style: const TextStyle(fontSize: 12)),
-                      );
-                    }),
-                  ],
-                  onChanged: (processId) {
-                    if (processId == 'custom') {
-                      // Для "своего варианта" очищаем cookingProcessId и cookingProcessName
-                      _updateIngredient(rowIndex, ingredient.copyWith(
-                        cookingProcessId: null,
-                        cookingProcessName: 'Свой вариант',
-                      ));
-                    } else {
-                      final process = CookingProcess.defaultProcesses.firstWhere((p) => p.id == processId);
-                      _updateIngredient(rowIndex, ingredient.copyWith(
-                        cookingProcessId: processId,
-                        cookingProcessName: process.name,
-                      ));
-                    }
-                  },
-                  underline: const SizedBox(),
-                  icon: const Icon(Icons.arrow_drop_down, size: 16),
-                  style: const TextStyle(fontSize: 12, color: Colors.black),
-                ),
-              )
-            : Text(
+      child: widget.canEdit
+          ? Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade400, width: 1),
+                borderRadius: BorderRadius.circular(4),
+                color: Colors.white,
+              ),
+              child: DropdownButton<String>(
+                isExpanded: true,
+                hint: const Text('Способ', style: TextStyle(fontSize: 12)),
+                value: ingredient.cookingProcessId ?? (ingredient.cookingProcessName == 'Свой вариант' ? 'custom' : null),
+                items: [
+                  const DropdownMenuItem<String>(
+                    value: 'custom',
+                    child: Text('Свой вариант', style: TextStyle(fontSize: 12)),
+                  ),
+                  ...CookingProcess.defaultProcesses.map((process) {
+                    return DropdownMenuItem<String>(
+                      value: process.id,
+                      child: Text(process.name, style: const TextStyle(fontSize: 12)),
+                    );
+                  }),
+                ],
+                onChanged: (processId) {
+                  if (processId == 'custom') {
+                    // Для "своего варианта" очищаем cookingProcessId и cookingProcessName
+                    _updateIngredient(rowIndex, ingredient.copyWith(
+                      cookingProcessId: null,
+                      cookingProcessName: 'Свой вариант',
+                    ));
+                  } else {
+                    final process = CookingProcess.defaultProcesses.firstWhere((p) => p.id == processId);
+                    _updateIngredient(rowIndex, ingredient.copyWith(
+                      cookingProcessId: processId,
+                      cookingProcessName: process.name,
+                    ));
+                  }
+                },
+                underline: const SizedBox(),
+                icon: const Icon(Icons.arrow_drop_down, size: 16),
+                style: const TextStyle(fontSize: 12, color: Colors.black),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+              ),
+            )
+          : Center(
+              child: Text(
                 ingredient.cookingProcessId != null
                     ? CookingProcess.findById(ingredient.cookingProcessId!)?.name ?? ingredient.cookingProcessName ?? ''
                     : ingredient.cookingProcessName ?? '',
                 style: const TextStyle(fontSize: 12),
                 textAlign: TextAlign.center,
               ),
-      ),
+            ),
     );
   }
 
@@ -465,7 +464,6 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     final cost = product != null && product.basePrice != null ? product.basePrice! * ingredient.grossWeight / 1000 : 0.0;
 
     return Container(
-      height: 44, // Фиксированная высота для центровки
       padding: _cellPad,
       child: Center(
         child: Text(
@@ -480,13 +478,12 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     final product = ingredient.productId != null
         ? widget.productStore.allProducts.where((p) => p.id == ingredient.productId).firstOrNull
         : null;
-    if (product == null || product.basePrice == null || ingredient.outputWeight <= 0) return Container(height: 44, padding: _cellPad);
+    if (product == null || product.basePrice == null || ingredient.outputWeight <= 0) return Container(padding: _cellPad);
 
     // Стоимость за кг готового продукта = (цена за кг брутто * брутто) / выход
     final pricePerKg = (product.basePrice! * ingredient.grossWeight) / ingredient.outputWeight;
 
     return Container(
-      height: 44, // Фиксированная высота для центровки
       padding: _cellPad,
       child: Center(
         child: Text(
@@ -499,7 +496,6 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
   Widget _buildTotalCell(String text) {
     return Container(
-      height: 44, // Фиксированная высота для центровки
       padding: _cellPad,
       child: Center(
         child: Text(
@@ -517,7 +513,6 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
   Widget _buildDeleteButton(int rowIndex) {
     return Container(
-      height: 44, // Фиксированная высота для центровки
       padding: const EdgeInsets.all(2),
       child: Center(
         child: IconButton(
@@ -577,74 +572,108 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        TextField(
-          controller: _searchController,
-          style: const TextStyle(fontSize: 12),
-          decoration: InputDecoration(
-            hintText: 'Поиск продукта...',
-            hintStyle: const TextStyle(fontSize: 12),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            border: InputBorder.none,
-            suffixIcon: IconButton(
-              icon: Icon(_isDropdownOpen ? Icons.arrow_drop_up : Icons.arrow_drop_down, size: 16),
-              onPressed: () {
-                setState(() {
-                  _isDropdownOpen = !_isDropdownOpen;
-                });
-              },
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-            ),
-          ),
-          onTap: () {
-            setState(() {
-              _isDropdownOpen = true;
-            });
-          },
-        ),
-        if (_isDropdownOpen)
-          Container(
-            constraints: const BoxConstraints(maxHeight: 150),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade400),
-              borderRadius: BorderRadius.circular(4),
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: _filteredProducts.length,
-              itemBuilder: (context, index) {
-                final product = _filteredProducts[index];
-                return InkWell(
-                  onTap: () {
-                    widget.onProductSelected(product);
-                    _searchController.text = product.name;
-                    setState(() {
-                      _isDropdownOpen = false;
-                    });
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade400, width: 1),
+        borderRadius: BorderRadius.circular(4),
+        color: Colors.white,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          InkWell(
+            onTap: () {
+              setState(() {
+                _isDropdownOpen = !_isDropdownOpen;
+              });
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+              child: Row(
+                children: [
+                  Expanded(
                     child: Text(
-                      product.name,
-                      style: const TextStyle(fontSize: 12),
+                      _searchController.text.isEmpty ? 'Выберите продукт' : _searchController.text,
+                      style: const TextStyle(fontSize: 12, color: Colors.black),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                );
-              },
+                  Icon(
+                    _isDropdownOpen ? Icons.arrow_drop_up : Icons.arrow_drop_down,
+                    size: 16,
+                    color: Colors.grey,
+                  ),
+                ],
+              ),
             ),
           ),
-      ],
+          if (_isDropdownOpen)
+            Container(
+              constraints: const BoxConstraints(maxHeight: 200),
+              decoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: Colors.grey, width: 0.5)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Поле поиска в первой строке списка
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      border: const Border(bottom: BorderSide(color: Colors.grey, width: 0.5)),
+                    ),
+                    child: TextField(
+                      controller: _searchController,
+                      style: const TextStyle(fontSize: 12),
+                      decoration: const InputDecoration(
+                        hintText: 'Поиск продукта...',
+                        hintStyle: TextStyle(fontSize: 12),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                        border: InputBorder.none,
+                        isDense: true,
+                      ),
+                      onChanged: (value) {
+                        // Фильтрация происходит автоматически через listener
+                      },
+                    ),
+                  ),
+                  // Список отфильтрованных продуктов
+                  Flexible(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: _filteredProducts.length,
+                      itemBuilder: (context, index) {
+                        final product = _filteredProducts[index];
+                        return InkWell(
+                          onTap: () {
+                            widget.onProductSelected(product);
+                            _searchController.text = product.name;
+                            setState(() {
+                              _isDropdownOpen = false;
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                            decoration: index < _filteredProducts.length - 1
+                                ? const BoxDecoration(
+                                    border: Border(bottom: BorderSide(color: Colors.grey, width: 0.2)),
+                                  )
+                                : null,
+                            child: Text(
+                              product.name,
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
