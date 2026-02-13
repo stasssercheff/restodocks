@@ -333,31 +333,31 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       );
     }
 
-    // Показываем dropdown для выбора продукта
+    // Показываем searchable dropdown для выбора продукта
     return Container(
       height: 44, // Фиксированная высота для центровки
-      padding: _cellPad,
-      child: Center(
-        child: DropdownButton<String>(
-          isExpanded: true,
-          hint: const Text('Выберите продукт', style: TextStyle(fontSize: 12)),
-          value: null,
-          items: widget.productStore.allProducts.map((product) {
-            return DropdownMenuItem<String>(
-              value: product.id,
-              child: Text(product.name, style: const TextStyle(fontSize: 12)),
-            );
-          }).toList(),
-          onChanged: (productId) {
-            if (productId != null) {
-              final product = widget.productStore.allProducts.firstWhere((p) => p.id == productId);
-              _updateIngredient(rowIndex, ingredient.copyWith(
-                productId: productId,
-                productName: product.name,
-                unit: product.unit,
-                outputWeight: ingredient.netWeight, // Инициализируем выход весом нетто
-              ));
-            }
+      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+      child: _buildSearchableProductDropdown(ingredient, rowIndex),
+    );
+  }
+
+  Widget _buildSearchableProductDropdown(TTIngredient ingredient, int rowIndex) {
+    return Center(
+      child: Container(
+        height: 40, // Размер под ячейку
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey.shade400, width: 1),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: _ProductSearchDropdown(
+          products: widget.productStore.allProducts,
+          onProductSelected: (product) {
+            _updateIngredient(rowIndex, ingredient.copyWith(
+              productId: product.id,
+              productName: product.name,
+              unit: product.unit,
+              outputWeight: ingredient.netWeight, // Инициализируем выход весом нетто
+            ));
           },
         ),
       ),
@@ -372,22 +372,27 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
       height: 44, // Фиксированная высота для центровки
       child: Center(
         child: widget.canEdit
-            ? TextField(
-                controller: controller,
-                keyboardType: TextInputType.number,
-                style: const TextStyle(fontSize: 12),
-                textAlign: TextAlign.center,
-                decoration: const InputDecoration(
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.zero,
-                  isDense: true,
+            ? SizedBox(
+                height: 40, // Размер под ячейку
+                child: TextField(
+                  controller: controller,
+                  keyboardType: TextInputType.number,
+                  style: const TextStyle(fontSize: 12),
+                  textAlign: TextAlign.center,
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(4),
+                      borderSide: BorderSide(color: Colors.grey.shade400, width: 1),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                    isDense: true,
+                  ),
+                  onChanged: onChanged,
+                  onSubmitted: onChanged,
                 ),
-                onChanged: onChanged,
-                onSubmitted: onChanged,
               )
             : Text(value, style: const TextStyle(fontSize: 12), textAlign: TextAlign.center),
       ),
@@ -397,45 +402,55 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   Widget _buildCookingMethodCell(TTIngredient ingredient, int rowIndex) {
     return Container(
       height: 44, // Фиксированная высота для центровки
-      padding: _cellPad,
       child: Center(
         child: widget.canEdit
-            ? DropdownButton<String>(
-                isExpanded: true,
-                hint: const Text('Способ', style: TextStyle(fontSize: 12)),
-                value: ingredient.cookingProcessId ?? (ingredient.cookingProcessName == 'Свой вариант' ? 'custom' : null),
-                items: [
-                  const DropdownMenuItem<String>(
-                    value: 'custom',
-                    child: Text('Свой вариант', style: TextStyle(fontSize: 12)),
-                  ),
-                  ...CookingProcess.defaultProcesses.map((process) {
-                    return DropdownMenuItem<String>(
-                      value: process.id,
-                      child: Text(process.name, style: const TextStyle(fontSize: 12)),
-                    );
-                  }),
-                ],
-                onChanged: (processId) {
-                  if (processId == 'custom') {
-                    // Для "своего варианта" очищаем cookingProcessId и cookingProcessName
-                    _updateIngredient(rowIndex, ingredient.copyWith(
-                      cookingProcessId: null,
-                      cookingProcessName: 'Свой вариант',
-                    ));
-                  } else {
-                    final process = CookingProcess.defaultProcesses.firstWhere((p) => p.id == processId);
-                    _updateIngredient(rowIndex, ingredient.copyWith(
-                      cookingProcessId: processId,
-                      cookingProcessName: process.name,
-                    ));
-                  }
-                },
+            ? Container(
+                height: 40, // Размер под ячейку
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade400, width: 1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: DropdownButton<String>(
+                  isExpanded: true,
+                  hint: const Text('Способ', style: TextStyle(fontSize: 12)),
+                  value: ingredient.cookingProcessId ?? (ingredient.cookingProcessName == 'Свой вариант' ? 'custom' : null),
+                  items: [
+                    const DropdownMenuItem<String>(
+                      value: 'custom',
+                      child: Text('Свой вариант', style: TextStyle(fontSize: 12)),
+                    ),
+                    ...CookingProcess.defaultProcesses.map((process) {
+                      return DropdownMenuItem<String>(
+                        value: process.id,
+                        child: Text(process.name, style: const TextStyle(fontSize: 12)),
+                      );
+                    }),
+                  ],
+                  onChanged: (processId) {
+                    if (processId == 'custom') {
+                      // Для "своего варианта" очищаем cookingProcessId и cookingProcessName
+                      _updateIngredient(rowIndex, ingredient.copyWith(
+                        cookingProcessId: null,
+                        cookingProcessName: 'Свой вариант',
+                      ));
+                    } else {
+                      final process = CookingProcess.defaultProcesses.firstWhere((p) => p.id == processId);
+                      _updateIngredient(rowIndex, ingredient.copyWith(
+                        cookingProcessId: processId,
+                        cookingProcessName: process.name,
+                      ));
+                    }
+                  },
+                  underline: const SizedBox(),
+                  icon: const Icon(Icons.arrow_drop_down, size: 16),
+                  style: const TextStyle(fontSize: 12, color: Colors.black),
+                ),
               )
             : Text(
                 ingredient.cookingProcessId != null
-                    ? CookingProcess.findById(ingredient.cookingProcessId!)?.name ?? ''
-                    : '',
+                    ? CookingProcess.findById(ingredient.cookingProcessId!)?.name ?? ingredient.cookingProcessName ?? ''
+                    : ingredient.cookingProcessName ?? '',
                 style: const TextStyle(fontSize: 12),
                 textAlign: TextAlign.center,
               ),
@@ -517,5 +532,119 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
   void _removeIngredient(int index) {
     widget.onRemove(index);
+  }
+}
+
+class _ProductSearchDropdown extends StatefulWidget {
+  final List<Product> products;
+  final Function(Product) onProductSelected;
+
+  const _ProductSearchDropdown({
+    required this.products,
+    required this.onProductSelected,
+  });
+
+  @override
+  _ProductSearchDropdownState createState() => _ProductSearchDropdownState();
+}
+
+class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
+  final TextEditingController _searchController = TextEditingController();
+  bool _isDropdownOpen = false;
+  List<Product> _filteredProducts = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _filteredProducts = widget.products;
+    _searchController.addListener(_filterProducts);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _filterProducts() {
+    final query = _searchController.text.toLowerCase();
+    setState(() {
+      _filteredProducts = widget.products
+          .where((product) => product.name.toLowerCase().contains(query))
+          .toList();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        TextField(
+          controller: _searchController,
+          style: const TextStyle(fontSize: 12),
+          decoration: InputDecoration(
+            hintText: 'Поиск продукта...',
+            hintStyle: const TextStyle(fontSize: 12),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            border: InputBorder.none,
+            suffixIcon: IconButton(
+              icon: Icon(_isDropdownOpen ? Icons.arrow_drop_up : Icons.arrow_drop_down, size: 16),
+              onPressed: () {
+                setState(() {
+                  _isDropdownOpen = !_isDropdownOpen;
+                });
+              },
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+          ),
+          onTap: () {
+            setState(() {
+              _isDropdownOpen = true;
+            });
+          },
+        ),
+        if (_isDropdownOpen)
+          Container(
+            constraints: const BoxConstraints(maxHeight: 150),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey.shade400),
+              borderRadius: BorderRadius.circular(4),
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: _filteredProducts.length,
+              itemBuilder: (context, index) {
+                final product = _filteredProducts[index];
+                return InkWell(
+                  onTap: () {
+                    widget.onProductSelected(product);
+                    _searchController.text = product.name;
+                    setState(() {
+                      _isDropdownOpen = false;
+                    });
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    child: Text(
+                      product.name,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+      ],
+    );
   }
 }
