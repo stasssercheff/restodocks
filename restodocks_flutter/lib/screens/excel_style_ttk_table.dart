@@ -76,18 +76,19 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
           child: Table(
             border: TableBorder.all(color: Colors.black, width: 1),
             columnWidths: const {
-              0: FixedColumnWidth(80),   // Тип ТТК
-              1: FixedColumnWidth(120),  // Название
-              2: FixedColumnWidth(150),  // Продукт
-              3: FixedColumnWidth(80),   // Брутто
-              4: FixedColumnWidth(80),   // % отхода
-              5: FixedColumnWidth(80),   // Нетто
-              6: FixedColumnWidth(120),  // Способ
-              7: FixedColumnWidth(80),   // % ужарки
-              8: FixedColumnWidth(80),   // Выход
-              9: FixedColumnWidth(100),  // Стоимость
-              10: FixedColumnWidth(100), // Цена за кг
-              11: FixedColumnWidth(150), // Технология
+              0: FixedColumnWidth(70),   // Тип ТТК
+              1: FixedColumnWidth(100),  // Название
+              2: FixedColumnWidth(130),  // Продукт
+              3: FixedColumnWidth(70),   // Брутто
+              4: FixedColumnWidth(70),   // % отхода
+              5: FixedColumnWidth(70),   // Нетто
+              6: FixedColumnWidth(100),  // Способ
+              7: FixedColumnWidth(70),   // % ужарки
+              8: FixedColumnWidth(70),   // Выход
+              9: FixedColumnWidth(80),   // Стоимость
+              10: FixedColumnWidth(80),  // Цена за кг
+              11: FixedColumnWidth(120), // Технология
+              12: FixedColumnWidth(50),  // Удаление
             },
             children: [
               // Шапка
@@ -106,6 +107,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   _buildHeaderCell('Стоимость'),
                   _buildHeaderCell('Цена за кг'),
                   _buildHeaderCell('Технология'),
+                  _buildHeaderCell(''), // Столбец для удаления
                 ],
               ),
               // Строки с данными
@@ -176,7 +178,11 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
                     // Технология (объединенная ячейка)
                     rowIndex == 0 ? _buildTechnologyCell(allRows.length) :
-                    SizedBox(height: 44), // Пустая ячейка
+                    const SizedBox(height: 44), // Пустая ячейка
+
+                    // Кнопка удаления (только для строк с данными, не для пустой строки)
+                    ingredient.productName.isNotEmpty ? _buildDeleteButton(rowIndex) :
+                    const SizedBox(height: 44), // Пустая ячейка для пустой строки
                   ],
                 );
               }),
@@ -195,7 +201,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   _buildTotalCell('${totalOutput.toStringAsFixed(0)}г'),
                   _buildTotalCell('${totalCost.toStringAsFixed(0)}₽'),
                   _buildTotalCell('${costPerKg.toStringAsFixed(0)}₽/кг'),
-                  const SizedBox(height: 44),
+                  const SizedBox(height: 44), // Пустая ячейка для кнопки удаления в итого
                 ],
               ),
             ],
@@ -311,7 +317,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
   Widget _buildNumericCell(String value, Function(String) onChanged) {
     return Container(
-      padding: _cellPad,
+      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
       child: widget.canEdit
           ? TextField(
               controller: TextEditingController(text: value),
@@ -439,5 +445,21 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         _updateIngredient(index, ingredient.copyWith(cookingLossPctOverride: lossPct.clamp(0, 99.9)));
       }
     }
+  }
+
+  Widget _buildDeleteButton(int rowIndex) {
+    return Container(
+      padding: const EdgeInsets.all(2),
+      child: IconButton(
+        icon: const Icon(Icons.delete, color: Colors.red, size: 18),
+        onPressed: () => _removeIngredient(rowIndex),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(),
+      ),
+    );
+  }
+
+  void _removeIngredient(int index) {
+    widget.onRemove(index);
   }
 }
