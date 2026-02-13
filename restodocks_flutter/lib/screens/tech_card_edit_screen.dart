@@ -1261,14 +1261,29 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                   color: Colors.blue.withOpacity(0.1),
                   padding: const EdgeInsets.all(8),
                   margin: const EdgeInsets.only(bottom: 8),
-                  child: Text(
-                    'DEBUG: Создание ТТК\n'
-                    'Loading: $_loading\n'
-                    'Error: $_error\n'
-                    'Ingredients: ${_ingredients.length}\n'
-                    'CanEdit: $canEdit\n'
-                    'IsNew: $_isNew',
-                    style: const TextStyle(color: Colors.red, fontSize: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'DEBUG: Создание ТТК',
+                        style: const TextStyle(color: Colors.red, fontSize: 14, fontWeight: FontWeight.bold),
+                      ),
+                      Text('Loading: $_loading', style: const TextStyle(color: Colors.black, fontSize: 12)),
+                      Text('Error: $_error', style: const TextStyle(color: Colors.black, fontSize: 12)),
+                      Text('Ingredients: ${_ingredients.length}', style: const TextStyle(color: Colors.black, fontSize: 12)),
+                      Text('CanEdit: $canEdit', style: const TextStyle(color: Colors.black, fontSize: 12)),
+                      Text('IsNew: $_isNew', style: const TextStyle(color: Colors.black, fontSize: 12)),
+                      Text('TechCard: ${_techCard != null ? 'EXISTS' : 'NULL'}', style: const TextStyle(color: Colors.black, fontSize: 12)),
+                      const SizedBox(height: 8),
+                      Container(
+                        color: Colors.yellow.withOpacity(0.3),
+                        padding: const EdgeInsets.all(8),
+                        child: const Text(
+                          'Если вы видите это сообщение, значит таблица ТТК должна быть ниже!',
+                          style: TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 // Шапка: название, категория, тип — на узком экране колонкой, на широком строкой
@@ -2775,24 +2790,59 @@ class _SimpleTtkTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text('ТТК: $dishName (${isSemiFinished ? 'ПФ' : 'Блюдо'})'),
-        Text('Ингредиентов: ${ingredients.length}'),
-        if (canEdit)
-          ElevatedButton(
-            onPressed: () => onAdd(),
-            child: Text(loc.t('add_ingredient')),
+    return Container(
+      color: Colors.green.withOpacity(0.1),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            color: Colors.red.withOpacity(0.2),
+            padding: const EdgeInsets.all(8),
+            child: Text(
+              '🎯 ПРОСТАЯ ТАБЛИЦА ТТК (видна если зеленый фон)',
+              style: const TextStyle(color: Colors.red, fontSize: 16, fontWeight: FontWeight.bold),
+            ),
           ),
-        ...ingredients.map((ing) => ListTile(
-          title: Text(ing.productName),
-          subtitle: Text('${ing.grossWeight}г → ${ing.netWeight}г'),
-          trailing: canEdit ? IconButton(
-            icon: Icon(Icons.delete),
-            onPressed: () => onRemove(ingredients.indexOf(ing)),
-          ) : null,
-        )),
-      ],
+          const SizedBox(height: 16),
+          Text('ТТК: $dishName (${isSemiFinished ? 'ПФ' : 'Блюдо'})', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          Text('Ингредиентов: ${ingredients.length}', style: const TextStyle(fontSize: 14)),
+          const SizedBox(height: 16),
+          if (canEdit)
+            ElevatedButton(
+              onPressed: () => onAdd(),
+              child: Text(loc.t('add_ingredient')),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+            ),
+          const SizedBox(height: 16),
+          if (ingredients.isEmpty)
+            Container(
+              color: Colors.orange.withOpacity(0.2),
+              padding: const EdgeInsets.all(16),
+              child: const Text(
+                'Нет ингредиентов. Нажмите кнопку "Добавить ингредиент"',
+                style: TextStyle(fontSize: 16, color: Colors.black),
+              ),
+            )
+          else
+            ...ingredients.map((ing) => Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: ListTile(
+                title: Text(ing.productName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text('${ing.grossWeight}г → ${ing.netWeight}г'),
+                trailing: canEdit ? IconButton(
+                  icon: Icon(Icons.delete, color: Colors.red),
+                  onPressed: () => onRemove(ingredients.indexOf(ing)),
+                ) : null,
+              ),
+            )),
+        ],
+      ),
     );
   }
 }
