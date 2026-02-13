@@ -12,7 +12,7 @@ import '../models/tt_ingredient.dart';
 import '../services/ai_service.dart';
 import '../services/image_service.dart';
 import '../services/services.dart';
-import 'excel_style_ttk_table.dart';
+// import 'excel_style_ttk_table.dart';
 
 /// Создание или редактирование ТТК. Ингредиенты — из номенклатуры или из других ТТК (ПФ).
 ///
@@ -1444,7 +1444,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                     child: ConstrainedBox(
                       constraints: BoxConstraints(minWidth: MediaQuery.of(context).size.width),
                       child: canEdit
-                            ? ExcelStyleTtkTable(
+                            ? _SimpleTtkTable(
                             loc: loc,
                             dishName: _nameController.text,
                             isSemiFinished: _isSemiFinished,
@@ -2748,6 +2748,58 @@ class _TechCardPicker extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// Простая версия таблицы для тестирования на web
+class _SimpleTtkTable extends StatelessWidget {
+  final LocalizationService loc;
+  final String dishName;
+  final bool isSemiFinished;
+  final List<TTIngredient> ingredients;
+  final bool canEdit;
+  final TextEditingController? dishNameController;
+  final TextEditingController? technologyController;
+  final ProductStore productStore;
+  final void Function([int?]) onAdd;
+  final void Function(int, TTIngredient) onUpdate;
+  final void Function(int) onRemove;
+
+  const _SimpleTtkTable({
+    required this.loc,
+    required this.dishName,
+    required this.isSemiFinished,
+    required this.ingredients,
+    required this.canEdit,
+    this.dishNameController,
+    this.technologyController,
+    required this.productStore,
+    required this.onAdd,
+    required this.onUpdate,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text('ТТК: $dishName (${isSemiFinished ? 'ПФ' : 'Блюдо'})'),
+        Text('Ингредиентов: ${ingredients.length}'),
+        if (canEdit)
+          ElevatedButton(
+            onPressed: () => onAdd(),
+            child: Text(loc.t('add_ingredient')),
+          ),
+        ...ingredients.map((ing) => ListTile(
+          title: Text(ing.productName),
+          subtitle: Text('${ing.grossWeight}г → ${ing.netWeight}г'),
+          trailing: canEdit ? IconButton(
+            icon: Icon(Icons.delete),
+            onPressed: () => onRemove(ingredients.indexOf(ing)),
+          ) : null,
+        )),
+      ],
     );
   }
 }
