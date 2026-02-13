@@ -94,18 +94,19 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
             border: TableBorder.all(color: Colors.black, width: 1),
             defaultVerticalAlignment: TableCellVerticalAlignment.top,
             columnWidths: const {
-              0: FixedColumnWidth(50),   // Тип ТТК - уменьшено
-              1: FixedColumnWidth(70),   // Название - уменьшено
-              2: FixedColumnWidth(100),  // Продукт - уменьшено
-              3: FixedColumnWidth(60),   // Брутто - уменьшено
-              4: FixedColumnWidth(60),   // % отхода - уменьшено
-              5: FixedColumnWidth(60),   // Нетто - уменьшено
-              6: FixedColumnWidth(80),   // Способ - уменьшено
-              7: FixedColumnWidth(60),   // % ужарки - уменьшено
-              8: FixedColumnWidth(60),   // Выход - уменьшено
-              9: FixedColumnWidth(70),   // Стоимость - уменьшено
-              10: FixedColumnWidth(70),  // Цена за кг - уменьшено
-              11: FixedColumnWidth(100), // Технология - уменьшено
+              0: FixedColumnWidth(50),   // Тип ТТК
+              1: FixedColumnWidth(70),   // Название
+              2: FixedColumnWidth(100),  // Продукт
+              3: FixedColumnWidth(60),   // Брутто
+              4: FixedColumnWidth(60),   // % отхода
+              5: FixedColumnWidth(60),   // Нетто
+              6: FixedColumnWidth(80),   // Способ
+              7: FixedColumnWidth(60),   // % ужарки
+              8: FixedColumnWidth(60),   // Выход
+              9: FixedColumnWidth(70),   // Стоимость
+              10: FixedColumnWidth(70),  // Цена за кг
+              11: FixedColumnWidth(100), // Технология
+              12: FixedColumnWidth(40),  // Удаление
             },
             children: [
               // Шапка
@@ -124,6 +125,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   _buildHeaderCell('Стоимость'),
                   _buildHeaderCell('Цена за кг'),
                   _buildHeaderCell('Технология'),
+                  _buildHeaderCell(''), // Столбец удаления
                 ],
               ),
               // Строки с данными
@@ -216,6 +218,9 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     // Технология - обычная ячейка, которая может растягиваться
                     _buildTechnologyCell(rowIndex),
 
+                    // Кнопка удаления
+                    _buildDeleteButton(rowIndex),
+
                   ],
                 );
               }),
@@ -235,6 +240,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   _buildTotalCell('${totalCost.toStringAsFixed(0)}₽'), // Стоимость
                   _buildTotalCell('${costPerKg.toStringAsFixed(0)}₽/кг'), // Цена за кг
                   const SizedBox.shrink(), // Технология
+                  const SizedBox.shrink(), // Удаление
                 ],
               ),
             ],
@@ -488,6 +494,23 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     widget.onUpdate(index, updated);
   }
 
+  Widget _buildDeleteButton(int rowIndex) {
+    return Container(
+      height: 44, // Фиксированная высота для центровки
+      child: Center(
+        child: IconButton(
+          icon: const Icon(Icons.delete, color: Colors.red, size: 18),
+          onPressed: () => _removeIngredient(rowIndex),
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(),
+        ),
+      ),
+    );
+  }
+
+  void _removeIngredient(int index) {
+    widget.onRemove(index);
+  }
 
 }
 
@@ -516,6 +539,16 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
     super.initState();
     _filteredProducts = widget.products.take(10).toList(); // Показываем первые 10 продуктов при инициализации
     _searchController.addListener(_filterProducts);
+    _searchController.addListener(_showDropdownOnInput);
+  }
+
+  void _showDropdownOnInput() {
+    if (_searchController.text.isNotEmpty && !_isDropdownOpen) {
+      setState(() {
+        _isDropdownOpen = true;
+      });
+      _showOverlay();
+    }
   }
 
   @override
