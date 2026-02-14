@@ -148,8 +148,14 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     // Брутто
                     _buildNumericCell(ingredient.grossWeight.toStringAsFixed(0), (value) {
                       final gross = double.tryParse(value) ?? 0;
-                      _updateIngredient(rowIndex, ingredient.copyWith(grossWeight: gross));
-                      // При изменении брутто ничего автоматически не пересчитываем
+                      // При изменении брутто пересчитываем нетто и выход
+                      final net = gross * (1 - ingredient.primaryWastePct / 100);
+                      final output = net * (1 - (ingredient.cookingLossPctOverride ?? 0) / 100);
+                      _updateIngredient(rowIndex, ingredient.copyWith(
+                        grossWeight: gross,
+                        netWeight: net,
+                        outputWeight: output,
+                      ));
                     }, 'gross_$rowIndex'),
 
                     // % отхода
@@ -445,7 +451,20 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     final product = ingredient.productId != null
         ? widget.productStore.allProducts.where((p) => p.id == ingredient.productId).firstOrNull
         : null;
-    final cost = product != null && product.basePrice != null ? product.basePrice! * ingredient.grossWeight / 1000 : 0.0;
+
+    double cost = 0.0;
+    if (product != null && product.basePrice != null) {
+      // Конвертируем в граммы для расчетов
+      final grossG = ingredient.grossWeight; // Уже в граммах согласно модели
+
+      if (ingredient.unit == 'pcs' || ingredient.unit == 'шт') {
+        final gramsPerPiece = ingredient.gramsPerPiece ?? 100; // Предполагаем 100г на шт если не указано
+        final pieces = grossG / gramsPerPiece;
+        cost = (product.basePrice ?? 0) * pieces;
+      } else {
+        cost = (product.basePrice ?? 0) * (grossG / 1000.0);
+      }
+    }
 
     return Container(
       height: 44,
@@ -464,8 +483,21 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         : null;
     if (product == null || product.basePrice == null || ingredient.outputWeight <= 0) return Container(height: 44);
 
-    // Стоимость за кг готового продукта = (цена за кг брутто * брутто) / выход
-    final pricePerKg = (product.basePrice! * ingredient.grossWeight) / ingredient.outputWeight;
+    // Расчет стоимости за кг готового продукта
+    // Общая стоимость брутто / выход в кг = цена за кг выхода
+    double totalCostBrutto = 0.0;
+    final grossG = ingredient.grossWeight; // в граммах
+
+    if (ingredient.unit == 'pcs' || ingredient.unit == 'шт') {
+      final gramsPerPiece = ingredient.gramsPerPiece ?? 100;
+      final pieces = grossG / gramsPerPiece;
+      totalCostBrutto = (product.basePrice ?? 0) * pieces;
+    } else {
+      totalCostBrutto = (product.basePrice ?? 0) * (grossG / 1000.0);
+    }
+
+    final outputKg = ingredient.outputWeight / 1000.0; // переводим выход в кг
+    final pricePerKg = outputKg > 0 ? totalCostBrutto / outputKg : 0.0;
 
     return Container(
       height: 44,
