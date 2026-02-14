@@ -18,8 +18,7 @@ class ExcelStyleTtkTable extends StatefulWidget {
   final void Function(int)? onSuggestWaste;
   final void Function(int)? onSuggestCookingLoss;
 
-  const ExcelStyleTtkTable({
-    super.key,
+  ExcelStyleTtkTable({
     required this.loc,
     required this.dishName,
     required this.isSemiFinished,
@@ -33,7 +32,7 @@ class ExcelStyleTtkTable extends StatefulWidget {
     required this.onRemove,
     this.onSuggestWaste,
     this.onSuggestCookingLoss,
-  });
+  }) : super(key: ValueKey('${dishName}_${isSemiFinished}_${dishNameController?.text ?? ""}'));
 
   @override
   State<ExcelStyleTtkTable> createState() => _ExcelStyleTtkTableState();
@@ -378,6 +377,10 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         updatedIngredient = updatedIngredient.copyWith(outputWeight: outputWeight);
 
         _updateIngredient(rowIndex, updatedIngredient);
+        // Принудительно обновляем UI
+        if (mounted) {
+          setState(() {});
+        }
       },
     );
   }
