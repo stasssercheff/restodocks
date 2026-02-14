@@ -333,13 +333,38 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
     if (ingredient.productId != null) {
       final product = widget.productStore.allProducts.where((p) => p.id == ingredient.productId).firstOrNull;
-      return Container(
-        height: 44,
-        child: Center(
-          child: Text(
-            product?.name ?? ingredient.productName,
-            style: const TextStyle(fontSize: 12),
-            textAlign: TextAlign.center,
+      return InkWell(
+        onTap: () {
+          // При клике на выбранный продукт открываем dropdown для изменения
+          // Очищаем productId, чтобы показать поле поиска
+          _updateIngredient(rowIndex, ingredient.copyWith(
+            productId: null,
+            productName: '',
+          ));
+        },
+        child: Container(
+          height: 44,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey.shade400, width: 1),
+            borderRadius: BorderRadius.circular(4),
+            color: Colors.white,
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  product?.name ?? ingredient.productName,
+                  style: const TextStyle(fontSize: 12),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              const Icon(
+                Icons.edit,
+                size: 16,
+                color: Colors.grey,
+              ),
+            ],
           ),
         ),
       );
@@ -628,8 +653,12 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
 
   void _validateAndSelectProduct() {
     final query = _searchController.text.trim();
-    if (query.isEmpty) return;
+    if (query.isEmpty) {
+      _hideOverlay();
+      return;
+    }
 
+    // Сначала ищем точное совпадение
     final exactMatch = widget.products.firstWhere(
       (product) => product.name.toLowerCase() == query.toLowerCase(),
       orElse: () => null as Product,
@@ -638,9 +667,11 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
     if (exactMatch != null) {
       widget.onProductSelected(exactMatch);
       _searchController.text = exactMatch.name;
+      _hideOverlay();
       return;
     }
 
+    // Ищем наиболее подходящий продукт по первым буквам
     final bestMatch = widget.products.firstWhere(
       (product) => product.name.toLowerCase().startsWith(query.toLowerCase()),
       orElse: () => null as Product,
@@ -649,9 +680,48 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
     if (bestMatch != null) {
       widget.onProductSelected(bestMatch);
       _searchController.text = bestMatch.name;
+      _hideOverlay();
     } else {
-      _searchController.clear();
+      // Ищем наиболее близкий вариант по количеству совпадающих символов
+      final closestMatch = _findClosestMatch(query);
+      if (closestMatch != null) {
+        widget.onProductSelected(closestMatch);
+        _searchController.text = closestMatch.name;
+        _hideOverlay();
+      } else {
+        // Ничего подходящего нет, очищаем поле
+        _searchController.clear();
+        _hideOverlay();
+      }
     }
+  }
+
+  Product? _findClosestMatch(String query) {
+    Product? bestMatch;
+    int bestScore = 0;
+    final queryLower = query.toLowerCase();
+
+    for (final product in widget.products) {
+      final name = product.name.toLowerCase();
+
+      // Считаем количество совпадающих символов с начала
+      int score = 0;
+      for (int i = 0; i < queryLower.length && i < name.length; i++) {
+        if (queryLower[i] == name[i]) {
+          score++;
+        } else {
+          break;
+        }
+      }
+
+      // Если совпадает хотя бы первый символ, считаем это вариантом
+      if (score > bestScore && score > 0) {
+        bestScore = score;
+        bestMatch = product;
+      }
+    }
+
+    return bestMatch;
   }
 
   void _showOverlay() {
