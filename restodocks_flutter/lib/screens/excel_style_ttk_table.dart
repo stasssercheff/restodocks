@@ -162,8 +162,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     _buildNumericCell(ingredient.primaryWastePct == 0 ? '' : ingredient.primaryWastePct.toStringAsFixed(1), (value) {
                       final waste = double.tryParse(value) ?? 0;
                       final clampedWaste = waste.clamp(0, 99.9);
-                      // При изменении % отхода автоматически пересчитываем нетто
-                      final net = ingredient.grossWeight * (1 - clampedWaste / 100);
+                      // При изменении % отхода автоматически пересчитываем нетто (если брутто > 0)
+                      final net = ingredient.grossWeight > 0 ? ingredient.grossWeight * (1 - clampedWaste / 100) : ingredient.netWeight;
                       _updateIngredient(rowIndex, ingredient.copyWith(
                         primaryWastePct: clampedWaste,
                         netWeight: net,
@@ -173,10 +173,10 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     // Нетто
                     _buildNumericCell(ingredient.netWeight.toStringAsFixed(0), (value) {
                       final net = double.tryParse(value) ?? 0;
-                      // При изменении нетто автоматически пересчитываем % отхода
+                      // При изменении нетто автоматически пересчитываем % отхода (если брутто > 0)
                       final wastePct = ingredient.grossWeight > 0
                         ? ((1 - net / ingredient.grossWeight) * 100).clamp(0, 99.9)
-                        : 0.0;
+                        : ingredient.primaryWastePct;
                       _updateIngredient(rowIndex, ingredient.copyWith(
                         netWeight: net,
                         primaryWastePct: wastePct,
@@ -524,6 +524,14 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
   void _updateIngredient(int index, TTIngredient updated) {
     widget.onUpdate(index, updated);
+    // Принудительно обновляем контроллеры после изменения данных
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        setState(() {
+          // Контроллеры обновятся автоматически в _buildNumericCell
+        });
+      }
+    });
   }
 
   Widget _buildDeleteButton(int rowIndex) {
@@ -582,8 +590,42 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
       Future.delayed(const Duration(milliseconds: 100), () {
         if (mounted && !_searchFocusNode.hasFocus) {
           _hideOverlay();
+          // При потери фокуса проверяем, соответствует ли введенный текст продукту
+          _validateAndSelectProduct();
         }
       });
+    }
+  }
+
+  void _validateAndSelectProduct() {
+    final query = _searchController.text.trim();
+    if (query.isEmpty) return;
+
+    // Ищем точное совпадение
+    final exactMatch = widget.products.firstWhere(
+      (product) => product.name.toLowerCase() == query.toLowerCase(),
+      orElse: () => null as Product,
+    );
+
+    if (exactMatch != null) {
+      // Если есть точное совпадение, выбираем его
+      widget.onProductSelected(exactMatch);
+      _searchController.text = exactMatch.name;
+    } else {
+      // Ищем наиболее подходящий продукт по первым буквам
+      final bestMatch = widget.products.firstWhere(
+        (product) => product.name.toLowerCase().startsWith(query.toLowerCase()),
+        orElse: () => null as Product,
+      );
+
+      if (bestMatch != null) {
+        // Выбираем наиболее подходящий продукт
+        widget.onProductSelected(bestMatch);
+        _searchController.text = bestMatch.name;
+      } else {
+        // Если ничего не найдено, очищаем поле
+        _searchController.clear();
+      }
     }
   }
 
@@ -734,6 +776,11 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
                       });
                       _showOverlay();
                     }
+                  },
+                  onSubmitted: (value) {
+                    // При нажатии Enter выбираем наиболее подходящий продукт
+                    _validateAndSelectProduct();
+                    _hideOverlay();
                   },
                 ),
               ),
