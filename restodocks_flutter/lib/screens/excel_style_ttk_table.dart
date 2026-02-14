@@ -133,11 +133,11 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                 return TableRow(
                   children: [
                     // Тип ТТК (объединенная ячейка)
-                    rowIndex == 0 ? _buildMergedCell(widget.isSemiFinished ? 'ПФ' : 'Блюдо', allRows.length) :
+                    rowIndex == 0 ? _buildMergedCell(widget.isSemiFinished ? 'ПФ' : 'Блюдо', allRows.length - 1) :
                     const SizedBox.shrink(), // Пустая ячейка
 
                     // Название (объединенная ячейка)
-                    rowIndex == 0 ? _buildMergedCell(widget.dishNameController?.text ?? widget.dishName, allRows.length) :
+                    rowIndex == 0 ? _buildMergedCell(widget.dishNameController?.text ?? widget.dishName, allRows.length - 1) :
                     const SizedBox.shrink(), // Пустая ячейка
 
                     // Продукт
@@ -220,8 +220,9 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     // Цена за кг
                     _buildPricePerKgCell(ingredient),
 
-                    // Технология - обычная ячейка, которая может растягиваться
-                    _buildTechnologyCell(rowIndex),
+                    // Технология - объединенная ячейка
+                    rowIndex == 0 ? _buildMergedTechnologyCell(allRows.length - 1) :
+                    const SizedBox.shrink(), // Пустая ячейка
 
                     // Кнопка удаления
                     _buildDeleteButton(rowIndex),
@@ -272,24 +273,22 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
   Widget _buildMergedCell(String text, int rowSpan) {
     return Container(
-      child: Center(
-        child: Text(
-          text,
-          style: const TextStyle(fontSize: 12),
-          textAlign: TextAlign.center,
-        ),
+      height: rowSpan * 44.0, // Высота всех объединенных строк
+      alignment: Alignment.topCenter, // Выравнивание текста по верху
+      padding: const EdgeInsets.only(top: 12), // Отступ от верха
+      child: Text(
+        text,
+        style: const TextStyle(fontSize: 12),
+        textAlign: TextAlign.center,
       ),
     );
   }
 
-  Widget _buildTechnologyCell(int rowIndex) {
-    // Технология показывается только в первой строке и может растягивать строку
-    if (rowIndex > 0) {
-      return const SizedBox.shrink();
-    }
-
+  Widget _buildMergedTechnologyCell(int rowSpan) {
     return Container(
-      constraints: const BoxConstraints(minHeight: 44),
+      height: rowSpan * 44.0, // Высота всех объединенных строк
+      alignment: Alignment.topLeft, // Выравнивание текста по левому верхнему углу
+      padding: const EdgeInsets.only(top: 12, left: 4), // Отступы
       child: widget.canEdit && widget.technologyController != null
           ? TextField(
               controller: widget.technologyController,
@@ -305,15 +304,18 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                 fillColor: Colors.transparent,
               ),
             )
-          : Center(
-              child: Text(
-                widget.technologyController?.text ?? '',
-                style: const TextStyle(fontSize: 12),
-                textAlign: TextAlign.left,
-                softWrap: true,
-              ),
+          : Text(
+              widget.technologyController?.text ?? '',
+              style: const TextStyle(fontSize: 12),
+              textAlign: TextAlign.left,
+              softWrap: true,
             ),
     );
+  }
+
+  Widget _buildTechnologyCell(int rowIndex) {
+    // Эта функция больше не используется, оставлена для совместимости
+    return const SizedBox.shrink();
   }
 
   Widget _buildProductCell(TTIngredient ingredient, int rowIndex) {
