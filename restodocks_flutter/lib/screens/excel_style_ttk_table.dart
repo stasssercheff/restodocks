@@ -95,11 +95,11 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
               0: FixedColumnWidth(50),   // Тип ТТК
               1: FixedColumnWidth(70),   // Название
               2: FixedColumnWidth(100),  // Продукт
-              3: FixedColumnWidth(60),   // Брутто
-              4: FixedColumnWidth(60),   // % отхода
-              5: FixedColumnWidth(60),   // Нетто
+              3: FixedColumnWidth(70),   // Брутто
+              4: FixedColumnWidth(70),   // % отхода
+              5: FixedColumnWidth(70),   // Нетто
               6: FixedColumnWidth(80),   // Способ
-              7: FixedColumnWidth(60),   // % ужарки
+              7: FixedColumnWidth(70),   // % ужарки
               8: FixedColumnWidth(60),   // Выход
               9: FixedColumnWidth(70),   // Стоимость
               10: FixedColumnWidth(70),  // Цена за кг
@@ -186,9 +186,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
                     // % ужарки
                     _buildNumericCell(
-                      (ingredient.cookingProcessId == null && ingredient.cookingProcessName != 'Свой вариант')
-                        ? '0'
-                        : ((ingredient.cookingLossPctOverride ?? 0) == 0 ? '' : (ingredient.cookingLossPctOverride ?? 0).toStringAsFixed(1)),
+                      ((ingredient.cookingLossPctOverride ?? 0) == 0 ? '' : (ingredient.cookingLossPctOverride ?? 0).toStringAsFixed(1)),
                       (value) {
                       final loss = double.tryParse(value) ?? 0;
                       final clampedLoss = loss.clamp(0, 100);
@@ -833,6 +831,7 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
                   }
                 },
                 onChanged: (value) {
+                  // Показываем dropdown при вводе
                   if (!_isDropdownOpen && value.isNotEmpty) {
                     setState(() {
                       _isDropdownOpen = true;
@@ -840,39 +839,9 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
                     _showOverlay();
                   }
 
-                  // Проверяем, есть ли продукты, начинающиеся с введенного текста
-                  final trimmedValue = value.trim();
-                  if (trimmedValue.isNotEmpty) {
-                    final hasMatches = widget.products.any(
-                      (product) => product.name.toLowerCase().startsWith(trimmedValue.toLowerCase())
-                    );
-
-                    // Если нет подходящих продуктов, не позволяем ввести этот текст
-                    if (!hasMatches) {
-                      // Находим максимально возможный префикс, который соответствует продуктам
-                      String validPrefix = '';
-                      for (int i = 1; i <= trimmedValue.length; i++) {
-                        final prefix = trimmedValue.substring(0, i);
-                        final hasPrefixMatches = widget.products.any(
-                          (product) => product.name.toLowerCase().startsWith(prefix.toLowerCase())
-                        );
-                        if (hasPrefixMatches) {
-                          validPrefix = prefix;
-                        } else {
-                          break;
-                        }
-                      }
-
-                      // Если валидный префикс короче введенного текста, обрезаем
-                      if (validPrefix.length < trimmedValue.length) {
-                        _searchController.text = validPrefix;
-                        _searchController.selection = TextSelection.collapsed(offset: validPrefix.length);
-                        return;
-                      }
-                    }
-                  }
-
+                  // Автовыбор при точном совпадении или единственном результате
                   if (value.length >= 2) {
+                    final trimmedValue = value.trim();
                     final exactMatch = widget.products.firstWhere(
                       (product) => product.name.toLowerCase() == trimmedValue.toLowerCase(),
                       orElse: () => null as Product,
@@ -897,7 +866,25 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
                   }
                 },
                 onSubmitted: (value) {
-                  _validateAndSelectProduct();
+                  final trimmedValue = value.trim();
+                  if (trimmedValue.isNotEmpty) {
+                    final hasMatches = widget.products.any(
+                      (product) => product.name.toLowerCase().startsWith(trimmedValue.toLowerCase())
+                    );
+
+                    if (!hasMatches) {
+                      // Если нет подходящих продуктов, находим ближайший и выбираем его
+                      final closestMatch = _findClosestMatch(trimmedValue);
+                      if (closestMatch != null) {
+                        widget.onProductSelected(closestMatch);
+                        _searchController.text = closestMatch.name;
+                      } else {
+                        _searchController.clear();
+                      }
+                    } else {
+                      _validateAndSelectProduct();
+                    }
+                  }
                   _hideOverlay();
                 },
               ),
