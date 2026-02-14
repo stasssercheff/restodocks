@@ -573,6 +573,18 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
     _filteredProducts = widget.products.take(10).toList(); // Показываем первые 10 продуктов при инициализации
     _searchController.addListener(_filterProducts);
     _searchController.addListener(_showDropdownOnInput);
+    _searchFocusNode.addListener(_onFocusChange);
+  }
+
+  void _onFocusChange() {
+    if (!_searchFocusNode.hasFocus && _isDropdownOpen) {
+      // Закрываем dropdown только если фокус ушел от поля поиска
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (mounted && !_searchFocusNode.hasFocus) {
+          _hideOverlay();
+        }
+      });
+    }
   }
 
   void _showDropdownOnInput() {
@@ -708,6 +720,15 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
                   ),
                   onTap: () {
                     if (!_isDropdownOpen) {
+                      setState(() {
+                        _isDropdownOpen = true;
+                      });
+                      _showOverlay();
+                    }
+                  },
+                  onChanged: (value) {
+                    // При вводе текста автоматически открываем dropdown если он закрыт
+                    if (!_isDropdownOpen && value.isNotEmpty) {
                       setState(() {
                         _isDropdownOpen = true;
                       });
