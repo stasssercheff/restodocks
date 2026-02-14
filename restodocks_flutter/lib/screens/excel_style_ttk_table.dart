@@ -74,10 +74,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       }
     }
 
-    // Добавляем пустую строку, если последняя не пустая или если строк меньше 2
-    if (allRows.isEmpty || (allRows.last.productName.isNotEmpty)) {
-      allRows.add(TTIngredient.emptyPlaceholder());
-    }
+    // Всегда добавляем пустую строку для нового ингредиента
+    allRows.add(TTIngredient.emptyPlaceholder());
 
     // Добавляем строку "Итого"
     final totalOutput = allRows.where((ing) => ing.productName.isNotEmpty).fold<double>(0, (s, ing) => s + ing.outputWeight);
@@ -161,7 +159,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     // % отхода
                     _buildNumericCell(ingredient.primaryWastePct == 0 ? '' : ingredient.primaryWastePct.toStringAsFixed(1), (value) {
                       final waste = double.tryParse(value) ?? 0;
-                      final clampedWaste = waste.clamp(0, 99.9);
+                      final clampedWaste = waste.clamp(0, 100);
                       // При изменении % отхода автоматически пересчитываем нетто (если брутто > 0)
                       final net = ingredient.grossWeight > 0 ? ingredient.grossWeight * (1 - clampedWaste / 100) : ingredient.netWeight;
                       _updateIngredient(rowIndex, ingredient.copyWith(
@@ -193,7 +191,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                         : ((ingredient.cookingLossPctOverride ?? 0) == 0 ? '' : (ingredient.cookingLossPctOverride ?? 0).toStringAsFixed(1)),
                       (value) {
                       final loss = double.tryParse(value) ?? 0;
-                      final clampedLoss = loss.clamp(0, 99.9);
+                      final clampedLoss = loss.clamp(0, 100);
                       // При изменении % ужарки автоматически пересчитываем выход
                       final output = ingredient.netWeight * (1 - clampedLoss / 100);
                       _updateIngredient(rowIndex, ingredient.copyWith(
@@ -202,18 +200,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                       ));
                     }, 'cooking_loss_$rowIndex'),
 
-                    // Выход
-                    _buildNumericCell(ingredient.outputWeight.toStringAsFixed(0), (value) {
-                      final output = double.tryParse(value) ?? 0;
-                      // При изменении выхода автоматически пересчитываем % ужарки
-                      final lossPct = ingredient.netWeight > 0
-                        ? ((1 - output / ingredient.netWeight) * 100).clamp(0, 99.9)
-                        : 0.0;
-                      _updateIngredient(rowIndex, ingredient.copyWith(
-                        outputWeight: output,
-                        cookingLossPctOverride: lossPct,
-                      ));
-                    }, 'output_$rowIndex'),
+                    // Выход (автоматически рассчитывается из нетто и % ужарки)
+                    _buildReadOnlyCell(ingredient.outputWeight.toStringAsFixed(0)),
 
                     // Стоимость
                     _buildCostCell(ingredient),
@@ -382,6 +370,10 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     return _ProductSearchDropdown(
       products: widget.productStore.allProducts,
       onProductSelected: (product) {
+        // Если это пустая строка и мы выбираем продукт, добавляем новую пустую строку
+        if (ingredient.productName.isEmpty && rowIndex == widget.ingredients.length - 1) {
+          widget.onAdd();
+        }
         _updateIngredient(rowIndex, ingredient.copyWith(
           productId: product.id,
           productName: product.name,
@@ -400,6 +392,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     }
 
     return Container(
+      height: 44,
+      alignment: Alignment.center,
       child: widget.canEdit
           ? TextField(
               controller: controller,
@@ -416,9 +410,15 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
               onChanged: onChanged,
               onSubmitted: onChanged,
             )
-          : Center(
-              child: Text(value, style: const TextStyle(fontSize: 12), textAlign: TextAlign.center),
-            ),
+          : Text(value, style: const TextStyle(fontSize: 12), textAlign: TextAlign.center),
+    );
+  }
+
+  Widget _buildReadOnlyCell(String value) {
+    return Container(
+      height: 44,
+      alignment: Alignment.center,
+      child: Text(value, style: const TextStyle(fontSize: 12), textAlign: TextAlign.center),
     );
   }
 
