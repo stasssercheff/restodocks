@@ -120,8 +120,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   _buildHeaderCell('Способ'),
                   _buildHeaderCell('% ужарки'),
                   _buildHeaderCell('Выход'),
-                  _buildHeaderCell('Стоимость'),
                   _buildHeaderCell('Цена за кг'),
+                  const SizedBox.shrink(), // Пустой столбец
                   _buildHeaderCell('Технология'),
                   _buildHeaderCell(''), // Столбец удаления
                 ],
@@ -243,8 +243,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   const SizedBox.shrink(), // Способ
                   const SizedBox.shrink(), // % ужарки
                   _buildTotalCell('${totalOutput.toStringAsFixed(0)}г'), // Выход
-                  _buildTotalCell('${totalCost.toStringAsFixed(0)}₽'), // Стоимость
-                  _buildTotalCell('${costPerKg.toStringAsFixed(0)}₽/кг'), // Цена за кг
+                  _buildTotalCell('${costPerKg.toStringAsFixed(0)}₽/кг'), // Стоимость за 1 кг
+                  const SizedBox.shrink(), // Цена за кг (пустая)
                   const SizedBox.shrink(), // Технология
                   const SizedBox.shrink(), // Удаление
                 ],
@@ -464,7 +464,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                 ...CookingProcess.defaultProcesses.map((process) {
                   return DropdownMenuItem<String>(
                     value: process.id,
-                    child: Text(process.name, style: const TextStyle(fontSize: 12)),
+                    child: Text(process.getLocalizedName(widget.loc.currentLanguageCode), style: const TextStyle(fontSize: 12)),
                   );
                 }),
               ],
@@ -490,7 +490,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
           : Center(
               child: Text(
                 ingredient.cookingProcessId != null
-                    ? CookingProcess.findById(ingredient.cookingProcessId!)?.name ?? ingredient.cookingProcessName ?? ''
+                    ? CookingProcess.findById(ingredient.cookingProcessId!)?.getLocalizedName(widget.loc.currentLanguageCode) ?? ingredient.cookingProcessName ?? ''
                     : ingredient.cookingProcessName ?? '',
                 style: const TextStyle(fontSize: 12),
                 textAlign: TextAlign.center,
