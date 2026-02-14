@@ -139,7 +139,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     const SizedBox.shrink(), // Пустая ячейка
 
                     // Название (объединенная ячейка)
-                    rowIndex == 0 ? _buildMergedCell(widget.dishName, allRows.length) :
+                    rowIndex == 0 ? _buildMergedCell(widget.dishNameController?.text ?? widget.dishName, allRows.length) :
                     const SizedBox.shrink(), // Пустая ячейка
 
                     // Продукт
@@ -578,64 +578,10 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
   @override
   void initState() {
     super.initState();
-    _filteredProducts = widget.products.take(10).toList(); // Показываем первые 10 продуктов при инициализации
+    _filteredProducts = widget.products.take(10).toList();
     _searchController.addListener(_filterProducts);
     _searchController.addListener(_showDropdownOnInput);
     _searchFocusNode.addListener(_onFocusChange);
-  }
-
-  void _onFocusChange() {
-    if (!_searchFocusNode.hasFocus && _isDropdownOpen) {
-      // Закрываем dropdown только если фокус ушел от поля поиска
-      Future.delayed(const Duration(milliseconds: 100), () {
-        if (mounted && !_searchFocusNode.hasFocus) {
-          _hideOverlay();
-          // При потери фокуса проверяем, соответствует ли введенный текст продукту
-          _validateAndSelectProduct();
-        }
-      });
-    }
-  }
-
-  void _validateAndSelectProduct() {
-    final query = _searchController.text.trim();
-    if (query.isEmpty) return;
-
-    // Ищем точное совпадение
-    final exactMatch = widget.products.firstWhere(
-      (product) => product.name.toLowerCase() == query.toLowerCase(),
-      orElse: () => null as Product,
-    );
-
-    if (exactMatch != null) {
-      // Если есть точное совпадение, выбираем его
-      widget.onProductSelected(exactMatch);
-      _searchController.text = exactMatch.name;
-    } else {
-      // Ищем наиболее подходящий продукт по первым буквам
-      final bestMatch = widget.products.firstWhere(
-        (product) => product.name.toLowerCase().startsWith(query.toLowerCase()),
-        orElse: () => null as Product,
-      );
-
-      if (bestMatch != null) {
-        // Выбираем наиболее подходящий продукт
-        widget.onProductSelected(bestMatch);
-        _searchController.text = bestMatch.name;
-      } else {
-        // Если ничего не найдено, очищаем поле
-        _searchController.clear();
-      }
-    }
-  }
-
-  void _showDropdownOnInput() {
-    if (!_isDropdownOpen) {
-      setState(() {
-        _isDropdownOpen = true;
-      });
-      _showOverlay();
-    }
   }
 
   @override
@@ -650,15 +596,62 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
     final query = _searchController.text.trim();
     setState(() {
       if (query.isEmpty) {
-        _filteredProducts = widget.products.take(10).toList(); // Показываем первые 10 продуктов если поле пустое
+        _filteredProducts = widget.products.take(10).toList();
       } else {
-        // Ищем продукты, которые начинаются с введенного текста (без учета регистра)
         _filteredProducts = widget.products
             .where((product) => product.name.toLowerCase().startsWith(query.toLowerCase()))
-            .take(20) // Ограничиваем до 20 результатов для производительности
+            .take(20)
             .toList();
       }
     });
+  }
+
+  void _showDropdownOnInput() {
+    if (!_isDropdownOpen) {
+      setState(() {
+        _isDropdownOpen = true;
+      });
+      _showOverlay();
+    }
+  }
+
+  void _onFocusChange() {
+    if (!_searchFocusNode.hasFocus && _isDropdownOpen) {
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (mounted && !_searchFocusNode.hasFocus) {
+          _hideOverlay();
+          _validateAndSelectProduct();
+        }
+      });
+    }
+  }
+
+  void _validateAndSelectProduct() {
+    final query = _searchController.text.trim();
+    if (query.isEmpty) return;
+
+    final exactMatch = widget.products.firstWhere(
+      (product) => product.name.toLowerCase() == query.toLowerCase(),
+      orElse: () => null as Product,
+    );
+
+    if (exactMatch != null) {
+      widget.onProductSelected(exactMatch);
+      _searchController.text = exactMatch.name;
+      return;
+    }
+
+    final bestMatch = widget.products.firstWhere(
+      (product) => product.name.toLowerCase().startsWith(query.toLowerCase()),
+      orElse: () => null as Product,
+    );
+
+    if (bestMatch != null) {
+      widget.onProductSelected(bestMatch);
+      _searchController.text = bestMatch.name;
+    } else {
+      _searchController.clear();
+    }
   }
 
   void _showOverlay() {
@@ -719,19 +712,10 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
   void _hideOverlay() {
     _overlayEntry?.remove();
     _overlayEntry = null;
-    setState(() {
-      _isDropdownOpen = false;
-    });
-  }
-
-  void _toggleDropdown() {
-    if (_isDropdownOpen) {
-      _hideOverlay();
-    } else {
+    if (mounted) {
       setState(() {
-        _isDropdownOpen = true;
+        _isDropdownOpen = false;
       });
-      _showOverlay();
     }
   }
 
@@ -740,58 +724,81 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
     return CompositedTransformTarget(
       link: _layerLink,
       child: Container(
-          height: 44,
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey.shade400, width: 1),
-            borderRadius: BorderRadius.circular(4),
-            color: Colors.white,
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _searchController,
-                  focusNode: _searchFocusNode,
-                  style: const TextStyle(fontSize: 12),
-                  decoration: InputDecoration(
-                    hintText: 'Выберите продукт',
-                    hintStyle: const TextStyle(fontSize: 12, color: Colors.grey),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-                    border: InputBorder.none,
-                    isDense: true,
-                  ),
-                  onTap: () {
-                    if (!_isDropdownOpen) {
-                      setState(() {
-                        _isDropdownOpen = true;
-                      });
-                      _showOverlay();
-                    }
-                  },
-                  onChanged: (value) {
-                    // При вводе текста автоматически открываем dropdown если он закрыт
-                    if (!_isDropdownOpen && value.isNotEmpty) {
-                      setState(() {
-                        _isDropdownOpen = true;
-                      });
-                      _showOverlay();
-                    }
-                  },
-                  onSubmitted: (value) {
-                    // При нажатии Enter выбираем наиболее подходящий продукт
-                    _validateAndSelectProduct();
-                    _hideOverlay();
-                  },
-                ),
-              ),
-              Icon(
-                _isDropdownOpen ? Icons.arrow_drop_up : Icons.arrow_drop_down,
-                size: 16,
-                color: Colors.grey,
-              ),
-            ],
-          ),
+        height: 44,
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey.shade400, width: 1),
+          borderRadius: BorderRadius.circular(4),
+          color: Colors.white,
         ),
+        child: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _searchController,
+                focusNode: _searchFocusNode,
+                style: const TextStyle(fontSize: 12),
+                decoration: InputDecoration(
+                  hintText: 'Выберите продукт',
+                  hintStyle: const TextStyle(fontSize: 12, color: Colors.grey),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                  border: InputBorder.none,
+                  isDense: true,
+                ),
+                onTap: () {
+                  if (!_isDropdownOpen) {
+                    setState(() {
+                      _isDropdownOpen = true;
+                    });
+                    _showOverlay();
+                  }
+                },
+                onChanged: (value) {
+                  if (!_isDropdownOpen && value.isNotEmpty) {
+                    setState(() {
+                      _isDropdownOpen = true;
+                    });
+                    _showOverlay();
+                  }
+
+                  if (value.length >= 2) {
+                    final trimmedValue = value.trim();
+                    final exactMatch = widget.products.firstWhere(
+                      (product) => product.name.toLowerCase() == trimmedValue.toLowerCase(),
+                      orElse: () => null as Product,
+                    );
+
+                    if (exactMatch != null) {
+                      widget.onProductSelected(exactMatch);
+                      _searchController.text = exactMatch.name;
+                      _hideOverlay();
+                      return;
+                    }
+
+                    final matches = widget.products.where(
+                      (product) => product.name.toLowerCase().startsWith(trimmedValue.toLowerCase())
+                    ).toList();
+
+                    if (matches.length == 1) {
+                      widget.onProductSelected(matches.first);
+                      _searchController.text = matches.first.name;
+                      _hideOverlay();
+                    }
+                  }
+                },
+                onSubmitted: (value) {
+                  _validateAndSelectProduct();
+                  _hideOverlay();
+                },
+              ),
+            ),
+            Icon(
+              _isDropdownOpen ? Icons.arrow_drop_up : Icons.arrow_drop_down,
+              size: 16,
+              color: Colors.grey,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
