@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../models/models.dart';
 import '../services/services.dart';
 
@@ -95,11 +96,11 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
               0: FixedColumnWidth(50),   // Тип ТТК
               1: FixedColumnWidth(70),   // Название
               2: FixedColumnWidth(100),  // Продукт
-              3: FixedColumnWidth(70),   // Брутто
-              4: FixedColumnWidth(70),   // % отхода
-              5: FixedColumnWidth(70),   // Нетто
+              3: FixedColumnWidth(80),   // Брутто
+              4: FixedColumnWidth(80),   // % отхода
+              5: FixedColumnWidth(80),   // Нетто
               6: FixedColumnWidth(80),   // Способ
-              7: FixedColumnWidth(70),   // % ужарки
+              7: FixedColumnWidth(80),   // % ужарки
               8: FixedColumnWidth(60),   // Выход
               9: FixedColumnWidth(70),   // Стоимость
               10: FixedColumnWidth(70),  // Цена за кг
@@ -157,7 +158,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     }, 'gross_$rowIndex'),
 
                     // % отхода
-                    _buildNumericCell(ingredient.primaryWastePct == 0 ? '' : ingredient.primaryWastePct.toStringAsFixed(1), (value) {
+                    _buildNumericCell(ingredient.primaryWastePct == 0 ? '' : ingredient.primaryWastePct.toString(), (value) {
                       final waste = double.tryParse(value) ?? 0;
                       final clampedWaste = waste.clamp(0, 100);
                       // При изменении % отхода автоматически пересчитываем нетто (если брутто > 0)
@@ -189,7 +190,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
                     // % ужарки
                     _buildNumericCell(
-                      ((ingredient.cookingLossPctOverride ?? 0) == 0 ? '' : (ingredient.cookingLossPctOverride ?? 0).toStringAsFixed(1)),
+                      ((ingredient.cookingLossPctOverride ?? 0) == 0 ? '' : (ingredient.cookingLossPctOverride ?? 0).toString()),
                       (value) {
                       final loss = double.tryParse(value) ?? 0;
                       final clampedLoss = loss.clamp(0, 100);
@@ -420,7 +421,10 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       child: widget.canEdit
           ? TextField(
               controller: controller,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: TextInputType.text,
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+              ],
               style: const TextStyle(fontSize: 12),
               textAlign: TextAlign.center,
               decoration: const InputDecoration(
