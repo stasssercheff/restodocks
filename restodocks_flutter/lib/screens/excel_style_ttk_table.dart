@@ -175,9 +175,12 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                       final wastePct = ingredient.grossWeight > 0
                         ? ((1 - net / ingredient.grossWeight) * 100).clamp(0, 100)
                         : ingredient.primaryWastePct;
+                      // Пересчитываем выход в соответствии с % ужарки
+                      final output = net * (1 - (ingredient.cookingLossPctOverride ?? 0) / 100);
                       _updateIngredient(rowIndex, ingredient.copyWith(
                         netWeight: net,
                         primaryWastePct: wastePct,
+                        outputWeight: output,
                       ));
                     }, 'net_$rowIndex'),
 
@@ -382,12 +385,22 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         if (ingredient.productName.isEmpty && rowIndex == widget.ingredients.length - 1) {
           widget.onAdd();
         }
-        _updateIngredient(rowIndex, ingredient.copyWith(
+        // Сначала обновляем продукт, потом пересчитаем выход
+        var updatedIngredient = ingredient.copyWith(
           productId: product.id,
           productName: product.name,
           unit: product.unit,
-          outputWeight: ingredient.netWeight, // Инициализируем выход весом нетто
-        ));
+        );
+
+        // Если % ужарки не задан или равен 0, выход = нетто, иначе рассчитываем по формуле
+        final cookingLoss = updatedIngredient.cookingLossPctOverride ?? 0;
+        final outputWeight = cookingLoss == 0
+          ? updatedIngredient.netWeight
+          : updatedIngredient.netWeight * (1 - cookingLoss / 100);
+
+        updatedIngredient = updatedIngredient.copyWith(outputWeight: outputWeight);
+
+        _updateIngredient(rowIndex, updatedIngredient);
       },
     );
   }
@@ -405,7 +418,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       child: widget.canEdit
           ? TextField(
               controller: controller,
-              keyboardType: TextInputType.number,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
               style: const TextStyle(fontSize: 12),
               textAlign: TextAlign.center,
               decoration: const InputDecoration(
@@ -637,6 +650,12 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
             .toList();
       }
     });
+
+    // Пересоздаем overlay для обновления списка
+    if (_isDropdownOpen && _overlayEntry != null) {
+      _hideOverlay();
+      _showOverlay();
+    }
   }
 
   void _showDropdownOnInput() {
