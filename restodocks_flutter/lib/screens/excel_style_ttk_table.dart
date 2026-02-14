@@ -173,7 +173,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                       final net = double.tryParse(value) ?? 0;
                       // При изменении нетто автоматически пересчитываем % отхода (если брутто > 0)
                       final wastePct = ingredient.grossWeight > 0
-                        ? ((1 - net / ingredient.grossWeight) * 100).clamp(0, 99.9)
+                        ? ((1 - net / ingredient.grossWeight) * 100).clamp(0, 100)
                         : ingredient.primaryWastePct;
                       _updateIngredient(rowIndex, ingredient.copyWith(
                         netWeight: net,
@@ -200,8 +200,18 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                       ));
                     }, 'cooking_loss_$rowIndex'),
 
-                    // Выход (автоматически рассчитывается из нетто и % ужарки)
-                    _buildReadOnlyCell(ingredient.outputWeight.toStringAsFixed(0)),
+                    // Выход
+                    _buildNumericCell(ingredient.outputWeight.toStringAsFixed(0), (value) {
+                      final output = double.tryParse(value) ?? 0;
+                      // При изменении выхода автоматически пересчитываем % ужарки (если нетто > 0)
+                      final lossPct = ingredient.netWeight > 0
+                        ? ((1 - output / ingredient.netWeight) * 100).clamp(0, 100)
+                        : ingredient.cookingLossPctOverride ?? 0.0;
+                      _updateIngredient(rowIndex, ingredient.copyWith(
+                        outputWeight: output,
+                        cookingLossPctOverride: lossPct,
+                      ));
+                    }, 'output_$rowIndex'),
 
                     // Стоимость
                     _buildCostCell(ingredient),
@@ -830,8 +840,39 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
                     _showOverlay();
                   }
 
+                  // Проверяем, есть ли продукты, начинающиеся с введенного текста
+                  final trimmedValue = value.trim();
+                  if (trimmedValue.isNotEmpty) {
+                    final hasMatches = widget.products.any(
+                      (product) => product.name.toLowerCase().startsWith(trimmedValue.toLowerCase())
+                    );
+
+                    // Если нет подходящих продуктов, не позволяем ввести этот текст
+                    if (!hasMatches) {
+                      // Находим максимально возможный префикс, который соответствует продуктам
+                      String validPrefix = '';
+                      for (int i = 1; i <= trimmedValue.length; i++) {
+                        final prefix = trimmedValue.substring(0, i);
+                        final hasPrefixMatches = widget.products.any(
+                          (product) => product.name.toLowerCase().startsWith(prefix.toLowerCase())
+                        );
+                        if (hasPrefixMatches) {
+                          validPrefix = prefix;
+                        } else {
+                          break;
+                        }
+                      }
+
+                      // Если валидный префикс короче введенного текста, обрезаем
+                      if (validPrefix.length < trimmedValue.length) {
+                        _searchController.text = validPrefix;
+                        _searchController.selection = TextSelection.collapsed(offset: validPrefix.length);
+                        return;
+                      }
+                    }
+                  }
+
                   if (value.length >= 2) {
-                    final trimmedValue = value.trim();
                     final exactMatch = widget.products.firstWhere(
                       (product) => product.name.toLowerCase() == trimmedValue.toLowerCase(),
                       orElse: () => null as Product,
