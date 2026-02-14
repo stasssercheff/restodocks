@@ -335,39 +335,13 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
     if (ingredient.productId != null) {
       final product = widget.productStore.allProducts.where((p) => p.id == ingredient.productId).firstOrNull;
-      return InkWell(
-        onTap: () {
-          // При клике на выбранный продукт открываем dropdown для изменения
-          // Очищаем productId, чтобы показать поле поиска
-          _updateIngredient(rowIndex, ingredient.copyWith(
-            productId: null,
-            productName: '',
-          ));
-        },
-        child: Container(
-          height: 44,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey.shade400, width: 1),
-            borderRadius: BorderRadius.circular(4),
-            color: Colors.white,
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  product?.name ?? ingredient.productName,
-                  style: const TextStyle(fontSize: 12),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              const Icon(
-                Icons.edit,
-                size: 16,
-                color: Colors.grey,
-              ),
-            ],
-          ),
+      return Container(
+        height: 44,
+        alignment: Alignment.center,
+        child: Text(
+          product?.name ?? ingredient.productName,
+          style: const TextStyle(fontSize: 12),
+          textAlign: TextAlign.center,
         ),
       );
     }
@@ -576,14 +550,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
   void _updateIngredient(int index, TTIngredient updated) {
     widget.onUpdate(index, updated);
-    // Принудительно обновляем контроллеры после изменения данных
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        setState(() {
-          // Контроллеры обновятся автоматически в _buildNumericCell
-        });
-      }
-    });
+    // Принудительно обновляем UI после изменения данных
+    setState(() {});
   }
 
   Widget _buildDeleteButton(int rowIndex) {
