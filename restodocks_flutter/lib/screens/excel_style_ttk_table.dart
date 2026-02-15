@@ -46,6 +46,16 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   final Map<String, TextEditingController> _controllers = {};
 
   @override
+  void didUpdateWidget(ExcelStyleTtkTable oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Если изменилось название или тип ТТК, принудительно обновляем UI
+    if (oldWidget.dishNameController?.text != widget.dishNameController?.text ||
+        oldWidget.isSemiFinished != widget.isSemiFinished) {
+      setState(() {});
+    }
+  }
+
+  @override
   void dispose() {
     for (final controller in _controllers.values) {
       controller.dispose();
@@ -384,10 +394,6 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     return _ProductSearchDropdown(
       products: widget.productStore.allProducts,
       onProductSelected: (product) {
-        // Если это пустая строка и мы выбираем продукт, добавляем новую пустую строку
-        if (ingredient.productName.isEmpty && rowIndex == widget.ingredients.length - 1) {
-          widget.onAdd();
-        }
         // Сначала обновляем продукт, потом пересчитаем выход
         var updatedIngredient = ingredient.copyWith(
           productId: product.id,
@@ -404,6 +410,13 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         updatedIngredient = updatedIngredient.copyWith(outputWeight: outputWeight);
 
         _updateIngredient(rowIndex, updatedIngredient);
+
+        // Добавляем новую пустую строку только если это была последняя строка
+        if (rowIndex == widget.ingredients.length - 1) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            widget.onAdd();
+          });
+        }
       },
     );
   }
