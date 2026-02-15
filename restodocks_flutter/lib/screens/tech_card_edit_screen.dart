@@ -902,17 +902,21 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     if (popNavigator) Navigator.of(context).pop();
     final loc = context.read<LocalizationService>();
     final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'RUB';
+    final productStore = context.read<ProductStoreSupabase>();
+    final establishmentId = context.read<AccountManagerSupabase>().establishment?.id;
     final ing = TTIngredient.fromProduct(
       product: p,
       cookingProcess: cookingProcess,
       grossWeight: value,
       netWeight: null,
       primaryWastePct: primaryWastePct,
-      defaultCurrency: currency,
       languageCode: loc.currentLanguageCode,
       unit: unit,
       gramsPerPiece: gramsPerPiece,
       cookingLossPctOverride: cookingLossPctOverride,
+      productStore: productStore,
+      establishmentId: establishmentId,
+      defaultCurrency: currency,
     );
     setState(() {
       if (replaceIndex != null && replaceIndex >= 0 && replaceIndex < _ingredients.length) {
@@ -934,15 +938,19 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
       if (!mounted) return;
       final loc = context.read<LocalizationService>();
       final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'RUB';
+      final productStore = context.read<ProductStoreSupabase>();
+      final establishmentId = context.read<AccountManagerSupabase>().establishment?.id;
       final ing = TTIngredient.fromProduct(
         product: p,
         cookingProcess: null,
         grossWeight: grossGrams ?? 100,
         netWeight: null,
         primaryWastePct: p.primaryWastePct ?? 0,
-        defaultCurrency: currency,
         languageCode: loc.currentLanguageCode,
         unit: p.unit ?? 'g',
+        productStore: productStore,
+        establishmentId: establishmentId,
+        defaultCurrency: currency,
       );
       setState(() {
         if (replaceIndex >= 0 && replaceIndex < _ingredients.length) {

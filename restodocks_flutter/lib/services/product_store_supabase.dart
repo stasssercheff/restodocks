@@ -14,6 +14,9 @@ class ProductStoreSupabase {
   List<String> _categories = [];
   bool _isLoading = false;
 
+  // Кэш цен заведения: productId -> (price, currency)
+  final Map<String, (double?, String?)?> _priceCache = {};
+
   // Геттеры
   List<Product> get allProducts => _allProducts;
   List<String> get categories => _categories;
@@ -168,16 +171,27 @@ class ProductStoreSupabase {
   Set<String> _nomenclatureIds = {};
   Set<String> get nomenclatureProductIds => Set.from(_nomenclatureIds);
 
-  /// Загрузить номенклатуру заведения (ID продуктов)
+  /// Загрузить номенклатуру заведения (ID продуктов и цены)
   Future<void> loadNomenclature(String establishmentId) async {
     try {
       final data = await _supabase.client
           .from('establishment_products')
-          .select('product_id')
+          .select('product_id, price, currency')
           .eq('establishment_id', establishmentId);
-      _nomenclatureIds = (data as List)
-          .map((e) => (e as Map)['product_id'] as String)
-          .toSet();
+
+      _nomenclatureIds = {};
+      for (final item in data as List) {
+        final productId = item['product_id'] as String;
+        _nomenclatureIds.add(productId);
+
+        // Кэшируем цены
+        final cacheKey = '${establishmentId}_$productId';
+        if (item['price'] != null) {
+          _priceCache[cacheKey] = ((item['price'] as num).toDouble(), item['currency'] as String?);
+        } else {
+          _priceCache[cacheKey] = null;
+        }
+      }
     } catch (e) {
       // Error loading nomenclature
       _nomenclatureIds = {};
@@ -261,5 +275,19 @@ class ProductStoreSupabase {
     } finally {
       _isLoading = false;
     }
+  }
+
+  /// Получить цену продукта для конкретного заведения
+  /// Возвращает (price, currency) или null если цена не установлена
+  (double?, String?)? getEstablishmentPrice(String productId, String? establishmentId) {
+    if (establishmentId == null) return null;
+
+    final cacheKey = '${establishmentId}_$productId';
+    return _priceCache[cacheKey];
+  }
+
+  /// Очистить кэш цен
+  void clearPriceCache() {
+    _priceCache.clear();
   }
 }

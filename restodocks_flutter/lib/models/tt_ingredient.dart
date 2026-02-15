@@ -4,6 +4,7 @@ import 'package:json_annotation/json_annotation.dart';
 import 'product.dart';
 import 'cooking_process.dart';
 import 'culinary_units.dart';
+import '../services/product_store_supabase.dart';
 
 part 'tt_ingredient.g.dart';
 
@@ -80,6 +81,9 @@ class TTIngredient extends Equatable {
   @JsonKey(name: 'cost')
   final double cost;
 
+  @JsonKey(name: 'cost_currency')
+  final String? costCurrency;
+
   const TTIngredient({
     required this.id,
     this.productId,
@@ -102,6 +106,7 @@ class TTIngredient extends Equatable {
     required this.finalFat,
     required this.finalCarbs,
     required this.cost,
+    this.costCurrency,
   });
 
   /// Ингредиент из полуфабриката (другой ТТК). КБЖУ и стоимость масштабируются по весу.
@@ -167,6 +172,7 @@ class TTIngredient extends Equatable {
     Object? finalFat = _undefined,
     Object? finalCarbs = _undefined,
     Object? cost = _undefined,
+    Object? costCurrency = _undefined,
   }) {
     return TTIngredient(
       id: id == _undefined ? this.id : id as String,
@@ -190,6 +196,7 @@ class TTIngredient extends Equatable {
       finalFat: finalFat == _undefined ? this.finalFat : finalFat as double,
       finalCarbs: finalCarbs == _undefined ? this.finalCarbs : finalCarbs as double,
       cost: cost == _undefined ? this.cost : cost as double,
+      costCurrency: costCurrency == _undefined ? this.costCurrency : costCurrency as String?,
     );
   }
 
@@ -222,6 +229,7 @@ class TTIngredient extends Equatable {
       finalFat: 0,
       finalCarbs: 0,
       cost: 0,
+      costCurrency: null,
     );
   }
 
@@ -235,11 +243,13 @@ class TTIngredient extends Equatable {
     required double grossWeight,
     double? netWeight,
     double? primaryWastePct,
-    required String defaultCurrency,
     String languageCode = 'ru',
     String unit = 'g',
     double? gramsPerPiece,
     double? cookingLossPctOverride,
+    ProductStoreSupabase? productStore,
+    String? establishmentId,
+    String? defaultCurrency,
   }) {
     final wastePct = primaryWastePct ?? product?.primaryWastePct ?? 0;
     if (product == null) {
@@ -294,13 +304,17 @@ class TTIngredient extends Equatable {
       finalCarbs = nutrition.carbs;
     }
 
-    // Расчёт стоимости: при unit шт — цена за штуку, иначе — за кг
+    // Расчёт стоимости: используем цену из заведения или базовую
+    final establishmentPrice = productStore?.getEstablishmentPrice(product.id, establishmentId);
+    final productPrice = establishmentPrice?.$1 ?? product.basePrice;
+    final productCurrency = establishmentPrice?.$2 ?? defaultCurrency ?? 'RUB';
+
     double cost;
     if (unit == 'pcs' || unit == 'шт') {
       final pieces = grossG / (gramsPerPiece ?? 50);
-      cost = (product.basePrice ?? 0) * pieces;
+      cost = (productPrice ?? 0) * pieces;
     } else {
-      cost = (product.basePrice ?? 0) * (grossG / 1000.0);
+      cost = (productPrice ?? 0) * (grossG / 1000.0);
     }
 
     return TTIngredient(
@@ -322,6 +336,7 @@ class TTIngredient extends Equatable {
       finalFat: finalFat,
       finalCarbs: finalCarbs,
       cost: cost,
+      costCurrency: productCurrency,
     );
   }
 
@@ -613,5 +628,6 @@ class TTIngredient extends Equatable {
     finalFat,
     finalCarbs,
     cost,
+    costCurrency,
   ];
 }
