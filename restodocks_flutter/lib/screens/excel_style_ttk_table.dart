@@ -92,28 +92,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     final totalCost = allRows.where((ing) => ing.productName.isNotEmpty).fold<double>(0, (s, ing) => s + ing.cost);
     final costPerKg = totalOutput > 0 ? totalCost / totalOutput * 1000 : 0;
 
-    // Сумма всех цен за кг ингредиентов
-    final totalPricePerKg = allRows.where((ing) => ing.productName.isNotEmpty).fold<double>(0, (sum, ing) {
-      final product = ing.productId != null
-          ? widget.productStore.allProducts.where((p) => p.id == ing.productId).firstOrNull
-          : null;
-      if (product == null || product.basePrice == null || ing.outputWeight <= 0) return sum;
-
-      double totalCostBrutto = 0.0;
-      final grossG = ing.grossWeight;
-
-      if (ing.unit == 'pcs' || ing.unit == 'шт') {
-        final gramsPerPiece = ing.gramsPerPiece ?? 100;
-        final pieces = grossG / gramsPerPiece;
-        totalCostBrutto = (product.basePrice ?? 0) * pieces;
-      } else {
-        totalCostBrutto = (product.basePrice ?? 0) * (grossG / 1000.0);
-      }
-
-      final outputKg = ing.outputWeight / 1000.0;
-      final pricePerKg = outputKg > 0 ? totalCostBrutto / outputKg : 0.0;
-      return sum + pricePerKg;
-    });
+    // Сумма всех базовых цен ингредиентов
+    final totalPricePerKg = allRows.where((ing) => ing.productName.isNotEmpty).fold<double>(0, (sum, ing) => sum + ing.cost);
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -410,6 +390,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
           productId: product.id,
           productName: product.name,
           unit: product.unit,
+          cost: product.basePrice ?? 0.0, // Сохраняем базовую цену в cost
         );
 
         // Выход всегда равен нетто (после учета % отхода)
@@ -521,14 +502,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   }
 
   Widget _buildCostCell(TTIngredient ingredient) {
-    final product = ingredient.productId != null
-        ? widget.productStore.allProducts.where((p) => p.id == ingredient.productId).firstOrNull
-        : null;
-
-    final cost = product?.basePrice ?? 0.0;
-
-    // Отладка
-    print('CostCell: productId=${ingredient.productId}, product=${product?.name}, basePrice=${product?.basePrice}, cost=$cost');
+    // Используем сохраненное значение cost (базовая цена продукта)
+    final cost = ingredient.cost;
 
     return Container(
       height: 44,
@@ -542,15 +517,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   }
 
   Widget _buildPricePerKgCell(TTIngredient ingredient) {
-    final product = ingredient.productId != null
-        ? widget.productStore.allProducts.where((p) => p.id == ingredient.productId).firstOrNull
-        : null;
-
-    // Отладка
-    print('PricePerKgCell: productId=${ingredient.productId}, product=${product?.name}, basePrice=${product?.basePrice}, outputWeight=${ingredient.outputWeight}');
-
     // Просто показываем базовую цену, как и в стоимости
-    final price = product?.basePrice ?? 0.0;
+    final price = ingredient.cost;
 
     return Container(
       height: 44,
