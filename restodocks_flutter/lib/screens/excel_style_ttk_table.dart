@@ -527,6 +527,9 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
     final cost = product?.basePrice ?? 0.0;
 
+    // Отладка
+    print('CostCell: productId=${ingredient.productId}, product=${product?.name}, basePrice=${product?.basePrice}, cost=$cost');
+
     return Container(
       height: 44,
       child: Center(
@@ -542,29 +545,18 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     final product = ingredient.productId != null
         ? widget.productStore.allProducts.where((p) => p.id == ingredient.productId).firstOrNull
         : null;
-    if (product == null || product.basePrice == null || ingredient.outputWeight <= 0) return Container(height: 44);
 
-    // Расчет стоимости за кг готового продукта
-    // Общая стоимость брутто / выход в кг = цена за кг выхода
-    double totalCostBrutto = 0.0;
-    final grossG = ingredient.grossWeight; // в граммах
+    // Отладка
+    print('PricePerKgCell: productId=${ingredient.productId}, product=${product?.name}, basePrice=${product?.basePrice}, outputWeight=${ingredient.outputWeight}');
 
-    if (ingredient.unit == 'pcs' || ingredient.unit == 'шт') {
-      final gramsPerPiece = ingredient.gramsPerPiece ?? 100;
-      final pieces = grossG / gramsPerPiece;
-      totalCostBrutto = (product.basePrice ?? 0) * pieces;
-    } else {
-      totalCostBrutto = (product.basePrice ?? 0) * (grossG / 1000.0);
-    }
-
-    final outputKg = ingredient.outputWeight / 1000.0; // переводим выход в кг
-    final pricePerKg = outputKg > 0 ? totalCostBrutto / outputKg : 0.0;
+    // Просто показываем базовую цену, как и в стоимости
+    final price = product?.basePrice ?? 0.0;
 
     return Container(
       height: 44,
       child: Center(
         child: Text(
-          pricePerKg.toStringAsFixed(0),
+          price.toStringAsFixed(0),
           style: const TextStyle(fontSize: 12),
         ),
       ),
