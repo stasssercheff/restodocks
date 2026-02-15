@@ -17,7 +17,8 @@ class TechCardServiceSupabase {
   static Map<String, dynamic> _ingredientPayloadForDb(TTIngredient ingredient) {
     final data = Map<String, dynamic>.from(ingredient.toJson());
     data.remove('id');
-    // Не удаляем cooking_loss_pct_override, если оно есть в базе данных
+    // Убираем null поля, чтобы не было проблем с базой данных
+    data.removeWhere((key, value) => value == null);
     return data;
   }
 

@@ -664,18 +664,20 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
     final query = _searchController.text.trim();
     setState(() {
       if (query.isEmpty) {
-        // Убираем дубликаты по имени и ID
+        // Убираем дубликаты по имени (оставляем первый продукт с данным именем)
         final uniqueProducts = <String, Product>{};
         for (final product in widget.products) {
-          uniqueProducts[product.id] = product;
+          if (!uniqueProducts.containsKey(product.name.toLowerCase())) {
+            uniqueProducts[product.name.toLowerCase()] = product;
+          }
         }
         _filteredProducts = uniqueProducts.values.take(10).toList();
       } else {
-        // Убираем дубликаты и фильтруем
+        // Убираем дубликаты по имени и фильтруем
         final uniqueProducts = <String, Product>{};
         for (final product in widget.products) {
           if (product.name.toLowerCase().startsWith(query.toLowerCase())) {
-            uniqueProducts[product.id] = product;
+            uniqueProducts[product.name.toLowerCase()] = product;
           }
         }
         _filteredProducts = uniqueProducts.values.take(20).toList();

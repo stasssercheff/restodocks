@@ -18,6 +18,7 @@ TTIngredient _$TTIngredientFromJson(Map<String, dynamic> json) => TTIngredient(
       netWeight: (json['net_weight'] as num).toDouble(),
       unit: json['unit'] as String? ?? 'g',
       primaryWastePct: (json['primary_waste_pct'] as num?)?.toDouble() ?? 0,
+      gramsPerPiece: (json['gramsPerPiece'] as num?)?.toDouble(),
       cookingLossPctOverride:
           (json['cooking_loss_pct_override'] as num?)?.toDouble(),
       isNetWeightManual: json['is_net_weight_manual'] as bool? ?? false,
@@ -44,6 +45,7 @@ Map<String, dynamic> _$TTIngredientToJson(TTIngredient instance) =>
       'net_weight': instance.netWeight,
       'unit': instance.unit,
       'primary_waste_pct': instance.primaryWastePct,
+      'gramsPerPiece': instance.gramsPerPiece,
       'cooking_loss_pct_override': instance.cookingLossPctOverride,
       'is_net_weight_manual': instance.isNetWeightManual,
       'manual_effective_gross': instance.manualEffectiveGross,
