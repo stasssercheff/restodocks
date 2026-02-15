@@ -48,6 +48,11 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   @override
   void didUpdateWidget(ExcelStyleTtkTable oldWidget) {
     super.didUpdateWidget(oldWidget);
+    // Если изменился dishNameController, снимаем старый listener и добавляем новый
+    if (oldWidget.dishNameController != widget.dishNameController) {
+      oldWidget.dishNameController?.removeListener(_onDishNameChanged);
+      widget.dishNameController?.addListener(_onDishNameChanged);
+    }
     // Если изменилось название или тип ТТК, принудительно обновляем UI
     if (oldWidget.dishNameController?.text != widget.dishNameController?.text ||
         oldWidget.isSemiFinished != widget.isSemiFinished) {
@@ -56,10 +61,21 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    widget.dishNameController?.addListener(_onDishNameChanged);
+  }
+
+  void _onDishNameChanged() {
+    setState(() {});
+  }
+
+  @override
   void dispose() {
     for (final controller in _controllers.values) {
       controller.dispose();
     }
+    widget.dishNameController?.removeListener(_onDishNameChanged);
     super.dispose();
   }
 
@@ -91,6 +107,29 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     final totalOutput = allRows.where((ing) => ing.productName.isNotEmpty).fold<double>(0, (s, ing) => s + ing.outputWeight);
     final totalCost = allRows.where((ing) => ing.productName.isNotEmpty).fold<double>(0, (s, ing) => s + ing.cost);
     final costPerKg = totalOutput > 0 ? totalCost / totalOutput * 1000 : 0;
+
+    // Сумма всех цен за кг ингредиентов
+    final totalPricePerKg = allRows.where((ing) => ing.productName.isNotEmpty).fold<double>(0, (sum, ing) {
+      final product = ing.productId != null
+          ? widget.productStore.allProducts.where((p) => p.id == ing.productId).firstOrNull
+          : null;
+      if (product == null || product.basePrice == null || ing.outputWeight <= 0) return sum;
+
+      double totalCostBrutto = 0.0;
+      final grossG = ing.grossWeight;
+
+      if (ing.unit == 'pcs' || ing.unit == 'шт') {
+        final gramsPerPiece = ing.gramsPerPiece ?? 100;
+        final pieces = grossG / gramsPerPiece;
+        totalCostBrutto = (product.basePrice ?? 0) * pieces;
+      } else {
+        totalCostBrutto = (product.basePrice ?? 0) * (grossG / 1000.0);
+      }
+
+      final outputKg = ing.outputWeight / 1000.0;
+      final pricePerKg = outputKg > 0 ? totalCostBrutto / outputKg : 0.0;
+      return sum + pricePerKg;
+    });
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -130,8 +169,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   _buildHeaderCell('Способ'),
                   _buildHeaderCell('% ужарки'),
                   _buildHeaderCell('Выход'),
+                  _buildHeaderCell('Стоимость'),
                   _buildHeaderCell('Цена за кг'),
-                  const SizedBox.shrink(), // Пустой столбец
                   _buildHeaderCell('Технология'),
                   _buildHeaderCell(''), // Столбец удаления
                 ],
@@ -254,7 +293,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   const SizedBox.shrink(), // % ужарки
                   _buildTotalCell('${totalOutput.toStringAsFixed(0)}г'), // Выход
                   _buildTotalCell('${costPerKg.toStringAsFixed(0)}'), // Стоимость за 1 кг
-                  const SizedBox.shrink(), // Цена за кг (пустая)
+                  _buildTotalCell('${totalPricePerKg.toStringAsFixed(0)}'), // Сумма цен за кг
                   const SizedBox.shrink(), // Технология
                   const SizedBox.shrink(), // Удаление
                 ],
