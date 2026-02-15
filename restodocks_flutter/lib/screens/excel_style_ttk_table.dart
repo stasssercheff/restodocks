@@ -620,6 +620,7 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
   OverlayEntry? _overlayEntry;
   bool _isDropdownOpen = false;
   List<Product> _filteredProducts = [];
+  bool _isSelectingProduct = false; // Флаг для предотвращения конфликта при выборе продукта
 
   @override
   void initState() {
@@ -668,9 +669,10 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
   }
 
   void _onFocusChange() {
-    if (!_searchFocusNode.hasFocus && _isDropdownOpen) {
-      Future.delayed(const Duration(milliseconds: 100), () {
-        if (mounted && !_searchFocusNode.hasFocus) {
+    if (!_searchFocusNode.hasFocus && _isDropdownOpen && !_isSelectingProduct) {
+      // Не закрываем overlay сразу, даем время на обработку клика
+      Future.delayed(const Duration(milliseconds: 150), () {
+        if (mounted && !_searchFocusNode.hasFocus && _isDropdownOpen && !_isSelectingProduct) {
           _hideOverlay();
           _validateAndSelectProduct();
         }
@@ -778,9 +780,14 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
                   final product = _filteredProducts[index];
                   return InkWell(
                     onTap: () {
+                      _isSelectingProduct = true;
                       widget.onProductSelected(product);
                       _searchController.text = product.name;
                       _hideOverlay();
+                      // Сбрасываем флаг через короткое время
+                      Future.delayed(const Duration(milliseconds: 50), () {
+                        _isSelectingProduct = false;
+                      });
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
