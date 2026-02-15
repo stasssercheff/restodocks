@@ -1055,7 +1055,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.of(context).pop(), style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
+        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop(), style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
         title: Text(_isNew ? loc.t('create_tech_card') : (_techCard?.getDisplayNameInLists(loc.currentLanguageCode) ?? loc.t('tech_cards'))),
         actions: [
           if (canEdit) IconButton(icon: const Icon(Icons.save), onPressed: _save, tooltip: loc.t('save'), style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
