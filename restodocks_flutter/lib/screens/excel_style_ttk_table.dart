@@ -253,7 +253,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   const SizedBox.shrink(), // Способ
                   const SizedBox.shrink(), // % ужарки
                   _buildTotalCell('${totalOutput.toStringAsFixed(0)}г'), // Выход
-                  _buildTotalCell('${costPerKg.toStringAsFixed(0)}₽/кг'), // Стоимость за 1 кг
+                  _buildTotalCell('${costPerKg.toStringAsFixed(0)}'), // Стоимость за 1 кг
                   const SizedBox.shrink(), // Цена за кг (пустая)
                   const SizedBox.shrink(), // Технология
                   const SizedBox.shrink(), // Удаление
@@ -535,7 +535,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       height: 44,
       child: Center(
         child: Text(
-          '${cost.toStringAsFixed(0)}₽',
+          cost.toStringAsFixed(0),
           style: const TextStyle(fontSize: 12),
         ),
       ),
@@ -568,7 +568,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       height: 44,
       child: Center(
         child: Text(
-          '${pricePerKg.toStringAsFixed(0)}₽/кг',
+          pricePerKg.toStringAsFixed(0),
           style: const TextStyle(fontSize: 12),
         ),
       ),
