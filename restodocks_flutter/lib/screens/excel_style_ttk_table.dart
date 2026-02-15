@@ -32,7 +32,7 @@ class ExcelStyleTtkTable extends StatefulWidget {
     required this.onRemove,
     this.onSuggestWaste,
     this.onSuggestCookingLoss,
-  }) : super(key: ValueKey('${dishName}_${isSemiFinished}_${dishNameController?.text ?? ""}'));
+  });
 
   @override
   State<ExcelStyleTtkTable> createState() => _ExcelStyleTtkTableState();
@@ -45,37 +45,12 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   // Контроллеры для полей ввода
   final Map<String, TextEditingController> _controllers = {};
 
-  @override
-  void didUpdateWidget(ExcelStyleTtkTable oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // Если изменился dishNameController, снимаем старый listener и добавляем новый
-    if (oldWidget.dishNameController != widget.dishNameController) {
-      oldWidget.dishNameController?.removeListener(_onDishNameChanged);
-      widget.dishNameController?.addListener(_onDishNameChanged);
-    }
-    // Если изменилось название или тип ТТК, принудительно обновляем UI
-    if (oldWidget.dishNameController?.text != widget.dishNameController?.text ||
-        oldWidget.isSemiFinished != widget.isSemiFinished) {
-      setState(() {});
-    }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    widget.dishNameController?.addListener(_onDishNameChanged);
-  }
-
-  void _onDishNameChanged() {
-    setState(() {});
-  }
 
   @override
   void dispose() {
     for (final controller in _controllers.values) {
       controller.dispose();
     }
-    widget.dishNameController?.removeListener(_onDishNameChanged);
     super.dispose();
   }
 
@@ -85,7 +60,16 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
   @override
   Widget build(BuildContext context) {
-    return _buildTtkTable(context);
+    if (widget.dishNameController != null) {
+      return ValueListenableBuilder<TextEditingValue>(
+        valueListenable: widget.dishNameController!,
+        builder: (context, value, child) {
+          return _buildTtkTable(context);
+        },
+      );
+    } else {
+      return _buildTtkTable(context);
+    }
   }
 
   Widget _buildTtkTable(BuildContext context) {
@@ -214,6 +198,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                       _updateIngredient(rowIndex, ingredient.copyWith(
                         primaryWastePct: clampedWaste,
                         netWeight: net,
+                        outputWeight: net, // Выход всегда равен нетто
                       ));
                     }, 'waste_$rowIndex'),
 
@@ -229,7 +214,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                       _updateIngredient(rowIndex, ingredient.copyWith(
                         netWeight: net,
                         primaryWastePct: wastePct,
-                        outputWeight: output,
+                        outputWeight: net, // Выход всегда равен нетто
                       ));
                     }, 'net_$rowIndex'),
 
@@ -242,26 +227,13 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                       (value) {
                       final loss = double.tryParse(value) ?? 0;
                       final clampedLoss = loss.clamp(0, 100);
-                      // При изменении % ужарки автоматически пересчитываем выход
-                      final output = ingredient.netWeight * (1 - clampedLoss / 100);
                       _updateIngredient(rowIndex, ingredient.copyWith(
                         cookingLossPctOverride: clampedLoss,
-                        outputWeight: output,
                       ));
                     }, 'cooking_loss_$rowIndex'),
 
-                    // Выход
-                    _buildNumericCell(ingredient.outputWeight == 0 ? '' : ingredient.outputWeight.toStringAsFixed(0), (value) {
-                      final output = double.tryParse(value) ?? 0;
-                      // При изменении выхода автоматически пересчитываем % ужарки (если нетто > 0)
-                      final lossPct = ingredient.netWeight > 0
-                        ? ((1 - output / ingredient.netWeight) * 100).clamp(0, 100)
-                        : ingredient.cookingLossPctOverride ?? 0.0;
-                      _updateIngredient(rowIndex, ingredient.copyWith(
-                        outputWeight: output,
-                        cookingLossPctOverride: lossPct,
-                      ));
-                    }, 'output_$rowIndex'),
+                    // Выход (всегда равен нетто)
+                    _buildReadOnlyCell(ingredient.outputWeight == 0 ? '' : ingredient.outputWeight.toStringAsFixed(0)),
 
                     // Стоимость
                     _buildCostCell(ingredient),
@@ -440,11 +412,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
           unit: product.unit,
         );
 
-        // Если % ужарки не задан или равен 0, выход = нетто, иначе рассчитываем по формуле
-        final cookingLoss = updatedIngredient.cookingLossPctOverride ?? 0;
-        final outputWeight = cookingLoss == 0
-          ? updatedIngredient.netWeight
-          : updatedIngredient.netWeight * (1 - cookingLoss / 100);
+        // Выход всегда равен нетто (после учета % отхода)
+        final outputWeight = updatedIngredient.netWeight;
 
         updatedIngredient = updatedIngredient.copyWith(outputWeight: outputWeight);
 
@@ -695,12 +664,21 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
     final query = _searchController.text.trim();
     setState(() {
       if (query.isEmpty) {
-        _filteredProducts = widget.products.take(10).toList();
+        // Убираем дубликаты по имени и ID
+        final uniqueProducts = <String, Product>{};
+        for (final product in widget.products) {
+          uniqueProducts[product.id] = product;
+        }
+        _filteredProducts = uniqueProducts.values.take(10).toList();
       } else {
-        _filteredProducts = widget.products
-            .where((product) => product.name.toLowerCase().startsWith(query.toLowerCase()))
-            .take(20)
-            .toList();
+        // Убираем дубликаты и фильтруем
+        final uniqueProducts = <String, Product>{};
+        for (final product in widget.products) {
+          if (product.name.toLowerCase().startsWith(query.toLowerCase())) {
+            uniqueProducts[product.id] = product;
+          }
+        }
+        _filteredProducts = uniqueProducts.values.take(20).toList();
       }
     });
 
