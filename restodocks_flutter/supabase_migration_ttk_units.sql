@@ -11,3 +11,6 @@ COMMENT ON COLUMN tt_ingredients.grams_per_piece IS 'Грамм на штуку 
 
 ALTER TABLE tt_ingredients ADD COLUMN IF NOT EXISTS cooking_loss_pct_override REAL;
 COMMENT ON COLUMN tt_ingredients.cooking_loss_pct_override IS 'Ручной % ужарки (если задан — вместо способа приготовления)';
+
+ALTER TABLE tt_ingredients ADD COLUMN IF NOT EXISTS output_weight REAL DEFAULT 0;
+COMMENT ON COLUMN tt_ingredients.output_weight IS 'Выходной вес после ужарки (готовый продукт)';

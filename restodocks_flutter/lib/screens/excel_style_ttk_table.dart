@@ -525,19 +525,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         ? widget.productStore.allProducts.where((p) => p.id == ingredient.productId).firstOrNull
         : null;
 
-    double cost = 0.0;
-    if (product != null && product.basePrice != null) {
-      // Конвертируем в граммы для расчетов
-      final grossG = ingredient.grossWeight; // Уже в граммах согласно модели
-
-      if (ingredient.unit == 'pcs' || ingredient.unit == 'шт') {
-        final gramsPerPiece = ingredient.gramsPerPiece ?? 100; // Предполагаем 100г на шт если не указано
-        final pieces = grossG / gramsPerPiece;
-        cost = (product.basePrice ?? 0) * pieces;
-      } else {
-        cost = (product.basePrice ?? 0) * (grossG / 1000.0);
-      }
-    }
+    final cost = product?.basePrice ?? 0.0;
 
     return Container(
       height: 44,
