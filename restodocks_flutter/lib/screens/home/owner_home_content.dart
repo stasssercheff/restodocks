@@ -214,10 +214,17 @@ class _Tile extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 data.title,
-                style: const TextStyle(
+                style: TextStyle(
                   color: Colors.white,
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
+                  shadows: [
+                    const Shadow(
+                      color: Color(0x80000000),
+                      offset: Offset(1, 1),
+                      blurRadius: 2,
+                    ),
+                  ],
                 ),
                 textAlign: TextAlign.center,
                 maxLines: 2,
@@ -227,9 +234,16 @@ class _Tile extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   data.subtitle!,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: Colors.white70,
                     fontSize: 12,
+                    shadows: [
+                      const Shadow(
+                        color: Color(0x80000000),
+                        offset: Offset(1, 1),
+                        blurRadius: 2,
+                      ),
+                    ],
                   ),
                   textAlign: TextAlign.center,
                   maxLines: 2,
