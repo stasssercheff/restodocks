@@ -90,10 +90,12 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     // Добавляем строку "Итого"
     final totalOutput = allRows.where((ing) => ing.productName.isNotEmpty).fold<double>(0, (s, ing) => s + ing.outputWeight);
     final totalCost = allRows.where((ing) => ing.productName.isNotEmpty).fold<double>(0, (s, ing) => s + ing.cost);
-    final costPerKg = totalOutput > 0 ? totalCost / totalOutput * 1000 : 0;
 
-    // Сумма всех базовых цен ингредиентов
-    final totalPricePerKg = allRows.where((ing) => ing.productName.isNotEmpty).fold<double>(0, (sum, ing) => sum + ing.cost);
+    // Средняя стоимость за кг всех ингредиентов
+    final ingredientsWithWeight = allRows.where((ing) => ing.productName.isNotEmpty && ing.outputWeight > 0).toList();
+    final avgCostPerKg = ingredientsWithWeight.isNotEmpty
+        ? ingredientsWithWeight.map((ing) => ing.cost / (ing.outputWeight / 1000)).fold<double>(0, (sum, price) => sum + price) / ingredientsWithWeight.length
+        : 0.0;
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -244,8 +246,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   const SizedBox.shrink(), // Способ
                   const SizedBox.shrink(), // % ужарки
                   _buildTotalCell('${totalOutput.toStringAsFixed(0)}г'), // Выход
-                  _buildTotalCell('${costPerKg.toStringAsFixed(0)}'), // Стоимость за 1 кг
-                  _buildTotalCell('${totalPricePerKg.toStringAsFixed(0)}'), // Сумма цен за кг
+                  _buildTotalCell('${totalCost.toStringAsFixed(0)}'), // Общая стоимость
+                  _buildTotalCell('${avgCostPerKg.isNaN ? 0 : avgCostPerKg.toStringAsFixed(0)}'), // Средняя цена за кг
                   const SizedBox.shrink(), // Технология
                   const SizedBox.shrink(), // Удаление
                 ],
@@ -517,14 +519,14 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   }
 
   Widget _buildPricePerKgCell(TTIngredient ingredient) {
-    // Просто показываем базовую цену, как и в стоимости
-    final price = ingredient.cost;
+    // Стоимость за кг = общая стоимость / вес в кг
+    final pricePerKg = ingredient.outputWeight > 0 ? ingredient.cost / (ingredient.outputWeight / 1000) : 0;
 
     return Container(
       height: 44,
       child: Center(
         child: Text(
-          price.toStringAsFixed(0),
+          pricePerKg.toStringAsFixed(0),
           style: const TextStyle(fontSize: 12),
         ),
       ),

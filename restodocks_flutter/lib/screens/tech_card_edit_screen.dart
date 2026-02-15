@@ -571,6 +571,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   @override
   void initState() {
     super.initState();
+    // Добавляем listener для обновления таблицы при изменении названия
+    _nameController.addListener(() {
+      setState(() {}); // Обновляем UI при изменении названия
+    });
     // Добавляем placeholder сразу, чтобы таблица отображалась
     _ingredients.add(TTIngredient.emptyPlaceholder());
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
