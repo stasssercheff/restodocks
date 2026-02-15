@@ -154,7 +154,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     _buildProductCell(ingredient, rowIndex),
 
                     // Брутто
-                    _buildNumericCell(ingredient.grossWeight.toStringAsFixed(0), (value) {
+                    _buildNumericCell(ingredient.grossWeight == 0 ? '' : ingredient.grossWeight.toStringAsFixed(0), (value) {
                       final gross = double.tryParse(value) ?? 0;
                       // При изменении брутто пересчитываем нетто и выход
                       final net = gross * (1 - ingredient.primaryWastePct / 100);
@@ -179,7 +179,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     }, 'waste_$rowIndex'),
 
                     // Нетто
-                    _buildNumericCell(ingredient.netWeight.toStringAsFixed(0), (value) {
+                    _buildNumericCell(ingredient.netWeight == 0 ? '' : ingredient.netWeight.toStringAsFixed(0), (value) {
                       final net = double.tryParse(value) ?? 0;
                       // При изменении нетто автоматически пересчитываем % отхода (если брутто > 0)
                       final wastePct = ingredient.grossWeight > 0
@@ -212,7 +212,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     }, 'cooking_loss_$rowIndex'),
 
                     // Выход
-                    _buildNumericCell(ingredient.outputWeight.toStringAsFixed(0), (value) {
+                    _buildNumericCell(ingredient.outputWeight == 0 ? '' : ingredient.outputWeight.toStringAsFixed(0), (value) {
                       final output = double.tryParse(value) ?? 0;
                       // При изменении выхода автоматически пересчитываем % ужарки (если нетто > 0)
                       final lossPct = ingredient.netWeight > 0
