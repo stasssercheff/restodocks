@@ -575,6 +575,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     _nameController.addListener(() {
       setState(() {}); // Обновляем UI при изменении названия
     });
+    // Добавляем listener для обновления таблицы при изменении технологии
+    _technologyController.addListener(() {
+      setState(() {}); // Обновляем UI при изменении технологии
+    });
     // Добавляем placeholder сразу, чтобы таблица отображалась
     _ingredients.add(TTIngredient.emptyPlaceholder());
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
