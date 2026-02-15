@@ -46,7 +46,7 @@ class TTIngredient extends Equatable {
   @JsonKey(name: 'primary_waste_pct')
   final double primaryWastePct; // процент отхода при первичной обработке
 
-  @JsonKey(name: 'grams_per_piece')
+  @JsonKey(ignore: true)
   final double? gramsPerPiece; // для шт: грамм на штуку
 
   /// Ручной % ужарки (если задан — используется вместо способа приготовления)

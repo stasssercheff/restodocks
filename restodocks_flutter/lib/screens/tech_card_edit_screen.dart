@@ -620,14 +620,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
         await svc.saveTechCard(updated);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('tech_card_created'))));
-          context.pushReplacement('/tech-cards/${created.id}');
+          context.go('/tech-cards');
         }
       } else {
         final updated = _applyEdits(tc, dishName: name, category: category, isSemiFinished: _isSemiFinished, portionWeight: portion, yieldGrams: yieldVal, technologyLocalized: techMap, ingredients: toSaveIngredients);
         await svc.saveTechCard(updated);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.read<LocalizationService>().t('save') + ' ✓')));
-          _load();
+          context.go('/tech-cards');
         }
       }
     } catch (e) {
