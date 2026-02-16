@@ -147,13 +147,27 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                 final ingredient = entry.value;
                 return TableRow(
                   children: [
-                    // Тип ТТК (объединенная ячейка)
-                    rowIndex == 0 ? _buildMergedCell(widget.isSemiFinished ? 'ПФ' : 'Блюдо', allRows.length - 1) :
-                    const SizedBox.shrink(), // Пустая ячейка
+                    // Тип ТТК (в каждой строке)
+                    Container(
+                      height: 44,
+                      alignment: Alignment.center,
+                      child: Text(
+                        widget.isSemiFinished ? 'ПФ' : 'Блюдо',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                    ),
 
-                    // Название (объединенная ячейка)
-                    rowIndex == 0 ? _buildMergedCell(widget.dishNameController?.text ?? widget.dishName, allRows.length - 1) :
-                    const SizedBox.shrink(), // Пустая ячейка
+                    // Название (в каждой строке)
+                    Container(
+                      height: 44,
+                      alignment: Alignment.centerLeft,
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Text(
+                        widget.dishNameController?.text ?? widget.dishName,
+                        style: const TextStyle(fontSize: 12),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
 
                     // Продукт
                     _buildProductCell(ingredient, rowIndex),
@@ -238,7 +252,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                 decoration: BoxDecoration(color: Colors.red.shade50),
                 children: [
                   _buildTotalCell('Итого'),
-                  const SizedBox.shrink(), // Название
+                  _buildTotalCell(widget.isSemiFinished ? 'ПФ' : 'Блюдо'), // Тип ТТК
+                  _buildTotalCell(widget.dishNameController?.text ?? widget.dishName), // Название
                   const SizedBox.shrink(), // Продукт
                   const SizedBox.shrink(), // Брутто
                   const SizedBox.shrink(), // % отхода
