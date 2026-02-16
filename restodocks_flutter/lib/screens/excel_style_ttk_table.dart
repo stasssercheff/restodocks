@@ -87,6 +87,27 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     // Всегда добавляем пустую строку для нового ингредиента
     allRows.add(TTIngredient.emptyPlaceholder());
 
+    // Если нет данных, добавляем примерную строку для отображения структуры таблицы
+    if (allRows.isEmpty || (allRows.length == 1 && allRows[0].isPlaceholder)) {
+      // Добавляем примерную строку для демонстрации структуры
+      allRows.insert(0, TTIngredient(
+        id: 'example',
+        productId: null,
+        productName: 'Пример продукта',
+        grossWeight: 1000,
+        netWeight: 900,
+        unit: 'g',
+        primaryWastePct: 10,
+        isNetWeightManual: false,
+        outputWeight: 900,
+        finalCalories: 200,
+        finalProtein: 20,
+        finalFat: 10,
+        finalCarbs: 15,
+        cost: 50,
+      ));
+    }
+
     // Добавляем строку "Итого"
     final totalOutput = allRows.where((ing) => ing.productName.isNotEmpty).fold<double>(0, (s, ing) => s + ing.outputWeight);
     final totalCost = allRows.where((ing) => ing.productName.isNotEmpty).fold<double>(0, (s, ing) => s + ing.cost);
