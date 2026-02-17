@@ -146,7 +146,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   _buildHeaderCell('% ужарки'),
                   _buildHeaderCell('Выход'),
                   _buildHeaderCell('Цена'),
-                  _buildHeaderCell('Стоимость (за кг)'),
+                  _buildHeaderCell('Стоимость (за кг/прц)'),
                   _buildHeaderCell(''), // Столбец удаления
                 ],
               ),
