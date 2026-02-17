@@ -87,28 +87,9 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     // Всегда добавляем пустую строку для нового ингредиента
     allRows.add(TTIngredient.emptyPlaceholder());
 
-    // Если нет данных, добавляем примерную строку для отображения структуры таблицы
+    // Всегда добавляем пустую строку для нового ингредиента
     if (allRows.isEmpty || (allRows.length == 1 && allRows[0].isPlaceholder)) {
-      // Добавляем примерную строку для демонстрации структуры
-      allRows.insert(0, TTIngredient(
-        id: 'example',
-        productId: null,
-        productName: 'Пример продукта',
-        grossWeight: 1000,
-        netWeight: 900,
-        unit: 'g',
-        primaryWastePct: 10,
-        isNetWeightManual: false,
-        outputWeight: 900,
-        finalCalories: 200,
-        finalProtein: 20,
-        finalFat: 10,
-        finalCarbs: 15,
-        cost: 50,
-      ));
-
-      // Также добавляем полностью редактируемую строку
-      allRows.insert(1, TTIngredient.emptyPlaceholder());
+      allRows.add(TTIngredient.emptyPlaceholder());
     }
 
     // Добавляем строку "Итого"
@@ -171,14 +152,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                 final ingredient = entry.value;
 
                 // Вычисляем правильный индекс для оригинального списка ingredients
-                // Если это примерная строка или placeholder, используем специальную обработку
-                final originalIngredients = widget.ingredients.where((ing) => !ing.isPlaceholder).toList();
                 int originalIndex;
-
-                if (ingredient.id == 'example') {
-                  // Примерная строка - не обновляем, просто показываем
-                  originalIndex = -1;
-                } else if (ingredient.isPlaceholder) {
+                if (ingredient.isPlaceholder) {
                   // Placeholder строка - добавляем новый элемент
                   originalIndex = widget.ingredients.length;
                 } else {
@@ -214,99 +189,72 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     ),
 
                     // Продукт
-                    ingredient.id == 'example'
-                      ? InkWell(
-                          onTap: () {
-                            // При клике на примерный продукт, открываем выбор продукта
-                            widget.onAdd();
-                          },
-                          child: Container(
-                            height: 44,
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              ingredient.productName,
-                              style: const TextStyle(fontSize: 12, color: Colors.blue),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        )
-                      : _buildProductCell(ingredient, originalIndex),
+                    _buildProductCell(ingredient, originalIndex),
 
                     // Брутто
-                    ingredient.id == 'example'
-                      ? _buildReadOnlyCell(ingredient.grossWeight.toStringAsFixed(0))
-                      : _buildNumericCell(ingredient.grossWeight == 0 ? '' : ingredient.grossWeight.toStringAsFixed(0), (value) {
-                          final gross = double.tryParse(value) ?? 0;
-                          // При изменении брутто пересчитываем нетто и выход
-                          final net = gross * (1 - ingredient.primaryWastePct / 100);
-                          final output = net * (1 - (ingredient.cookingLossPctOverride ?? 0) / 100);
-                          _updateIngredient(originalIndex, ingredient.copyWith(
-                            grossWeight: gross,
-                            netWeight: net,
-                            outputWeight: output,
-                          ));
-                        }, 'gross_$rowIndex'),
+                    _buildNumericCell(ingredient.grossWeight == 0 ? '' : ingredient.grossWeight.toStringAsFixed(0), (value) {
+                      final gross = double.tryParse(value) ?? 0;
+                      // При изменении брутто пересчитываем нетто и выход
+                      final net = gross * (1 - ingredient.primaryWastePct / 100);
+                      final output = net * (1 - (ingredient.cookingLossPctOverride ?? 0) / 100);
+                      _updateIngredient(originalIndex, ingredient.copyWith(
+                        grossWeight: gross,
+                        netWeight: net,
+                        outputWeight: output,
+                      ));
+                    }, 'gross_$rowIndex'),
 
                     // % отхода
-                    ingredient.id == 'example'
-                      ? _buildReadOnlyCell(ingredient.primaryWastePct.toString())
-                      : _buildNumericCell(ingredient.primaryWastePct == 0 ? '' : ingredient.primaryWastePct.toString(), (value) {
-                          final waste = double.tryParse(value) ?? 0;
-                          final clampedWaste = waste.clamp(0, 100);
-                          // При изменении % отхода автоматически пересчитываем нетто (если брутто > 0)
-                          final net = ingredient.grossWeight > 0 ? ingredient.grossWeight * (1 - clampedWaste / 100) : ingredient.netWeight;
-                          _updateIngredient(originalIndex, ingredient.copyWith(
-                            primaryWastePct: clampedWaste,
-                            netWeight: net,
-                            outputWeight: net, // Выход всегда равен нетто
-                          ));
-                        }, 'waste_$rowIndex'),
+                    _buildNumericCell(ingredient.primaryWastePct == 0 ? '' : ingredient.primaryWastePct.toString(), (value) {
+                      final waste = double.tryParse(value) ?? 0;
+                      final clampedWaste = waste.clamp(0, 100);
+                      // При изменении % отхода автоматически пересчитываем нетто (если брутто > 0)
+                      final net = ingredient.grossWeight > 0 ? ingredient.grossWeight * (1 - clampedWaste / 100) : ingredient.netWeight;
+                      _updateIngredient(originalIndex, ingredient.copyWith(
+                        primaryWastePct: clampedWaste,
+                        netWeight: net,
+                        outputWeight: net, // Выход всегда равен нетто
+                      ));
+                    }, 'waste_$rowIndex'),
 
                     // Нетто
-                    ingredient.id == 'example'
-                      ? _buildReadOnlyCell(ingredient.netWeight.toStringAsFixed(0))
-                      : _buildNumericCell(ingredient.netWeight == 0 ? '' : ingredient.netWeight.toStringAsFixed(0), (value) {
-                          final net = double.tryParse(value) ?? 0;
-                          // При изменении нетто автоматически пересчитываем % отхода (если брутто > 0)
-                          final wastePct = ingredient.grossWeight > 0
-                            ? ((1 - net / ingredient.grossWeight) * 100).clamp(0, 100)
-                            : ingredient.primaryWastePct;
-                          // Пересчитываем выход в соответствии с % ужарки
-                          final output = net * (1 - (ingredient.cookingLossPctOverride ?? 0) / 100);
-                          _updateIngredient(originalIndex, ingredient.copyWith(
-                            netWeight: net,
-                            primaryWastePct: wastePct,
-                            outputWeight: net, // Выход всегда равен нетто
-                          ));
-                        }, 'net_$rowIndex'),
+                    _buildNumericCell(ingredient.netWeight == 0 ? '' : ingredient.netWeight.toStringAsFixed(0), (value) {
+                      final net = double.tryParse(value) ?? 0;
+                      // При изменении нетто автоматически пересчитываем % отхода (если брутто > 0)
+                      final wastePct = ingredient.grossWeight > 0
+                        ? ((1 - net / ingredient.grossWeight) * 100).clamp(0, 100)
+                        : ingredient.primaryWastePct;
+                      // Пересчитываем выход в соответствии с % ужарки
+                      final output = net * (1 - (ingredient.cookingLossPctOverride ?? 0) / 100);
+                      _updateIngredient(originalIndex, ingredient.copyWith(
+                        netWeight: net,
+                        primaryWastePct: wastePct,
+                        outputWeight: net, // Выход всегда равен нетто
+                      ));
+                    }, 'net_$rowIndex'),
 
                     // Способ приготовления
-                    ingredient.id == 'example'
-                      ? _buildReadOnlyCell('Жарка')
-                      : _buildCookingMethodCell(ingredient, originalIndex),
+                    _buildCookingMethodCell(ingredient, originalIndex),
 
                     // % ужарки
-                    ingredient.id == 'example'
-                      ? _buildReadOnlyCell('0')
-                      : _buildNumericCell(
-                          ((ingredient.cookingLossPctOverride ?? 0) == 0 ? '' : (ingredient.cookingLossPctOverride ?? 0).toString()),
-                          (value) {
-                          final loss = double.tryParse(value) ?? 0;
-                          final clampedLoss = loss.clamp(0, 100);
-                          _updateIngredient(originalIndex, ingredient.copyWith(
-                            cookingLossPctOverride: clampedLoss,
-                          ));
-                        }, 'cooking_loss_$rowIndex'),
+                    _buildNumericCell(
+                      ((ingredient.cookingLossPctOverride ?? 0) == 0 ? '' : (ingredient.cookingLossPctOverride ?? 0).toString()),
+                      (value) {
+                      final loss = double.tryParse(value) ?? 0;
+                      final clampedLoss = loss.clamp(0, 100);
+                      _updateIngredient(originalIndex, ingredient.copyWith(
+                        cookingLossPctOverride: clampedLoss,
+                      ));
+                    }, 'cooking_loss_$rowIndex'),
 
                     // Выход (всегда равен нетто)
                     _buildReadOnlyCell(ingredient.outputWeight == 0 ? '' : ingredient.outputWeight.toStringAsFixed(0)),
 
                     // Стоимость
-                    _buildReadOnlyCell(ingredient.cost.toStringAsFixed(0)),
+                    _buildCostCell(ingredient),
 
                     // Цена за кг
-                    _buildReadOnlyCell(ingredient.outputWeight > 0 ? (ingredient.cost / (ingredient.outputWeight / 1000)).toStringAsFixed(0) : '0'),
+                    _buildPricePerKgCell(ingredient),
 
                     // Технология
                     Container(
@@ -321,7 +269,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     ),
 
                     // Кнопка удаления
-                    ingredient.id == 'example' ? const SizedBox.shrink() : _buildDeleteButton(originalIndex),
+                    _buildDeleteButton(originalIndex),
 
                   ],
                 );
