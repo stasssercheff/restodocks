@@ -22,6 +22,7 @@ class ProductsScreen extends StatefulWidget {
 }
 
 enum _CatalogSort { nameAz, nameZa, priceAsc, priceDesc }
+enum _NomenclatureFilter { all, products, semiFinished }
 
 /// Единица измерения для отображения в номенклатуре: кг, шт, г, л и т.д. (не сырой "pcs"/"kg" из БД).
 String _unitDisplay(String? unit, String lang) {
@@ -39,8 +40,7 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
   bool _filterLactoseFree = false;
   // Фильтры номенклатуры
   _CatalogSort _nomSort = _CatalogSort.nameAz;
-  bool _nomFilterGlutenFree = false;
-  bool _nomFilterLactoseFree = false;
+  _NomenclatureFilter _nomFilter = _NomenclatureFilter.all;
 
   // Список элементов номенклатуры (продукты + ТТК ПФ)
   List<NomenclatureItem> _nomenclatureItems = [];
@@ -94,14 +94,12 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
     catalogList = _sortProducts(catalogList, _catalogSort);
     // Фильтруем элементы номенклатуры
     var nomItems = _nomenclatureItems.where((item) {
+      // Фильтр по типу (продукты/ПФ)
+      if (_nomFilter == _NomenclatureFilter.products && item.isTechCard) return false;
+      if (_nomFilter == _NomenclatureFilter.semiFinished && item.isProduct) return false;
+
       // Фильтр по категории (только для продуктов)
       if (_category != null && item.isProduct && item.product!.category != _category) return false;
-
-      // Фильтр по глютену (только для продуктов)
-      if (_nomFilterGlutenFree && item.isProduct && !item.product!.isGlutenFree) return false;
-
-      // Фильтр по лактозе (только для продуктов)
-      if (_nomFilterLactoseFree && item.isProduct && !item.product!.isLactoseFree) return false;
 
       // Поисковый запрос
       if (_query.isNotEmpty) {
@@ -206,11 +204,9 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
                   canRemove: canEdit,
                   loc: loc,
                   sort: _nomSort,
-                  filterGlutenFree: _nomFilterGlutenFree,
-                  filterLactoseFree: _nomFilterLactoseFree,
+                  filterType: _nomFilter,
                   onSortChanged: (s) => setState(() => _nomSort = s),
-                  onFilterGlutenChanged: (v) => setState(() => _nomFilterGlutenFree = v),
-                  onFilterLactoseChanged: (v) => setState(() => _nomFilterLactoseFree = v),
+                  onFilterTypeChanged: (f) => setState(() => _nomFilter = f),
                   onRefresh: () => _ensureLoaded().then((_) => setState(() {})),
                   onSwitchToCatalog: () {
                     _tabController.animateTo(1);
@@ -650,11 +646,9 @@ class _NomenclatureTab extends StatelessWidget {
     required this.canRemove,
     required this.loc,
     required this.sort,
-    required this.filterGlutenFree,
-    required this.filterLactoseFree,
+    required this.filterType,
     required this.onSortChanged,
-    required this.onFilterGlutenChanged,
-    required this.onFilterLactoseChanged,
+    required this.onFilterTypeChanged,
     required this.onRefresh,
     required this.onSwitchToCatalog,
   });
@@ -665,11 +659,9 @@ class _NomenclatureTab extends StatelessWidget {
   final bool canRemove;
   final LocalizationService loc;
   final _CatalogSort sort;
-  final bool filterGlutenFree;
-  final bool filterLactoseFree;
+  final _NomenclatureFilter filterType;
   final void Function(_CatalogSort) onSortChanged;
-  final void Function(bool) onFilterGlutenChanged;
-  final void Function(bool) onFilterLactoseChanged;
+  final void Function(_NomenclatureFilter) onFilterTypeChanged;
   final VoidCallback onRefresh;
   final VoidCallback onSwitchToCatalog;
 
@@ -861,14 +853,19 @@ class _NomenclatureTab extends StatelessWidget {
                 ],
               ),
               FilterChip(
-                label: Text(loc.t('filter_gluten_free'), style: const TextStyle(fontSize: 11)),
-                selected: filterGlutenFree,
-                onSelected: onFilterGlutenChanged,
+                label: Text('Продукты', style: const TextStyle(fontSize: 11)),
+                selected: filterType == _NomenclatureFilter.products,
+                onSelected: (_) => onFilterTypeChanged(_NomenclatureFilter.products),
               ),
               FilterChip(
-                label: Text(loc.t('filter_lactose_free'), style: const TextStyle(fontSize: 11)),
-                selected: filterLactoseFree,
-                onSelected: onFilterLactoseChanged,
+                label: Text('ПФ', style: const TextStyle(fontSize: 11)),
+                selected: filterType == _NomenclatureFilter.semiFinished,
+                onSelected: (_) => onFilterTypeChanged(_NomenclatureFilter.semiFinished),
+              ),
+              FilterChip(
+                label: Text('Все', style: const TextStyle(fontSize: 11)),
+                selected: filterType == _NomenclatureFilter.all,
+                onSelected: (_) => onFilterTypeChanged(_NomenclatureFilter.all),
               ),
             ],
           ),
