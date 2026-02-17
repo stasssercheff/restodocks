@@ -285,91 +285,60 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                 ],
               ),
 
-              // Строка технологии как часть таблицы
+              // Поле технологии под таблицей на всю ширину
               if (ingredients.isNotEmpty)
-                Table(
-                  border: TableBorder.all(color: Colors.black, width: 1),
-                  defaultVerticalAlignment: TableCellVerticalAlignment.top,
-                  columnWidths: const {
-                    0: FixedColumnWidth(50),   // Тип ТТК
-                    1: FixedColumnWidth(120),  // Название
-                    2: FixedColumnWidth(100),  // Продукт
-                    3: FixedColumnWidth(80),   // Брутто
-                    4: FixedColumnWidth(80),   // % отхода
-                    5: FixedColumnWidth(80),   // Нетто
-                    6: FixedColumnWidth(80),   // Способ
-                    7: FixedColumnWidth(80),   // % ужарки
-                    8: FixedColumnWidth(60),   // Выход
-                    9: FixedColumnWidth(70),   // Стоимость
-                    10: FixedColumnWidth(70),  // Цена за кг
-                    11: FixedColumnWidth(40),  // Удаление
-                  },
-                  children: [
-                    TableRow(
-                      children: [
-                        const SizedBox.shrink(), // Тип ТТК
-                        const SizedBox.shrink(), // Название
-                        // Заголовок "Технология" в колонке продукта
-                        Container(
-                          height: 44,
-                          alignment: Alignment.centerLeft,
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          decoration: BoxDecoration(color: Colors.grey.shade200),
-                          child: Text(
-                            'Технология',
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                          ),
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(top: 16),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.black, width: 1),
+                    color: Colors.white,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Заголовок технологии
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade200,
+                          border: const Border(bottom: BorderSide(color: Colors.black, width: 1)),
                         ),
-                        const SizedBox.shrink(), // Брутто
-                        const SizedBox.shrink(), // % отхода
-                        const SizedBox.shrink(), // Нетто
-                        const SizedBox.shrink(), // Способ
-                        const SizedBox.shrink(), // % ужарки
-                        const SizedBox.shrink(), // Выход
-                        const SizedBox.shrink(), // Стоимость
-                        const SizedBox.shrink(), // Цена за кг
-                        const SizedBox.shrink(), // Удаление
-                      ],
-                    ),
-                    // Строка с полем ввода технологии
-                    TableRow(
-                      children: [
-                        // Пустая ячейка для первой колонки
-                        Container(
-                          height: 120,
-                          decoration: BoxDecoration(color: Colors.grey.shade50),
+                        child: Text(
+                          'Технология',
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                         ),
-                        // Поле ввода технологии (охватывает все остальные колонки)
-                        TableCell(
-                          verticalAlignment: TableCellVerticalAlignment.fill,
-                          child: Container(
-                            height: 120,
-                            padding: const EdgeInsets.all(8),
-                            child: widget.canEdit && widget.technologyController != null
-                                ? TextField(
-                                    controller: widget.technologyController,
-                                    maxLines: null,
-                                    style: const TextStyle(fontSize: 12),
-                                    textAlign: TextAlign.left,
-                                    decoration: const InputDecoration(
-                                      border: InputBorder.none,
-                                      contentPadding: EdgeInsets.zero,
-                                      isDense: true,
-                                      filled: true,
-                                      fillColor: Colors.transparent,
-                                      hintText: 'Введите технологию приготовления...',
-                                    ),
-                                  )
-                                : Text(
-                                    widget.technologyController?.text ?? '',
-                                    style: const TextStyle(fontSize: 12),
-                                    textAlign: TextAlign.left,
-                                  ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                      ),
+                      // Поле для ввода технологии
+                      Container(
+                        width: double.infinity,
+                        constraints: const BoxConstraints(minHeight: 120),
+                        padding: const EdgeInsets.all(12),
+                        child: widget.canEdit && widget.technologyController != null
+                            ? TextField(
+                                controller: widget.technologyController,
+                                maxLines: null,
+                                minLines: 5,
+                                style: const TextStyle(fontSize: 12),
+                                textAlign: TextAlign.left,
+                                decoration: const InputDecoration(
+                                  border: InputBorder.none,
+                                  contentPadding: EdgeInsets.zero,
+                                  isDense: true,
+                                  filled: true,
+                                  fillColor: Colors.transparent,
+                                  hintText: 'Введите технологию приготовления...',
+                                ),
+                              )
+                            : Text(
+                                widget.technologyController?.text ?? '',
+                                style: const TextStyle(fontSize: 12),
+                                textAlign: TextAlign.left,
+                              ),
+                      ),
+                    ],
+                  ),
                 ),
             ],
           ),
