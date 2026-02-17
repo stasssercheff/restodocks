@@ -84,22 +84,42 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
       setState(() => _processed++);
 
       try {
-        // Временно отключаем AI для тестирования
-        final normalizedName = item.name;
-        final names = <String, String>{for (final c in allLangs) c: normalizedName};
+        // Используем ИИ для проверки и улучшения данных продукта
+        ProductVerificationResult? verification;
+        try {
+          final aiService = context.read<AiServiceSupabase>();
+          verification = await aiService.verifyProduct(
+            item.name,
+            currentPrice: item.price,
+          );
+        } catch (aiError) {
+          // Если AI не работает, продолжаем без него
+          print('AI verification failed for "${item.name}": $aiError');
+          verification = null;
+        }
+
+        // Используем проверенные ИИ данные или оригинальные
+        final normalizedName = verification?.normalizedName ?? item.name;
+        var names = <String, String>{for (final c in allLangs) c: normalizedName};
+
+        // Для больших списков переводим только если ИИ дал нормализованное имя
+        if (widget.items.length > 5 && verification?.normalizedName != null && verification!.normalizedName != item.name) {
+          final translated = await TranslationService.translateToAll(normalizedName, sourceLang, allLangs);
+          if (translated.isNotEmpty) names = translated;
+        }
 
         final product = Product(
           id: const Uuid().v4(),
           name: normalizedName,
-          category: 'manual',
+          category: verification?.suggestedCategory ?? 'manual',
           names: names,
-          calories: null,
+          calories: verification?.suggestedCalories,
           protein: null,
           fat: null,
           carbs: null,
-          unit: 'g',
-          basePrice: item.price,
-          currency: item.price != null ? defCur : null,
+          unit: verification?.suggestedUnit ?? 'g',
+          basePrice: verification?.suggestedPrice ?? item.price,
+          currency: (verification?.suggestedPrice ?? item.price) != null ? defCur : null,
         );
 
           try {
