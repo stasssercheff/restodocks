@@ -44,12 +44,15 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
   // Контроллеры для полей ввода
   final Map<String, TextEditingController> _controllers = {};
-
+  final Map<String, FocusNode> _focusNodes = {};
 
   @override
   void dispose() {
     for (final controller in _controllers.values) {
       controller.dispose();
+    }
+    for (final focusNode in _focusNodes.values) {
+      focusNode.dispose();
     }
     super.dispose();
   }
@@ -58,18 +61,111 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     return _controllers[key] ??= TextEditingController(text: initialValue);
   }
 
+  FocusNode _getFocusNode(String key) {
+    return _focusNodes[key] ??= FocusNode();
+  }
+
+  void _handleKeyEvent(RawKeyEvent event) {
+    if (event is! RawKeyDownEvent) return;
+
+    final focusScope = FocusScope.of(context);
+    if (focusScope == null) return;
+
+    final currentNode = focusScope.focusedChild;
+    if (currentNode == null) return;
+
+    // Получаем координаты текущей ячейки
+    final cellCoords = _getCellCoordinates(currentNode);
+    if (cellCoords == null) return;
+
+    int newRow = cellCoords.$1;
+    int newCol = cellCoords.$2;
+
+    switch (event.logicalKey.keyLabel) {
+      case 'Arrow Up':
+        newRow = (newRow - 1).clamp(0, _getMaxRow());
+        break;
+      case 'Arrow Down':
+        newRow = (newRow + 1).clamp(0, _getMaxRow());
+        break;
+      case 'Arrow Left':
+        newCol = (newCol - 1).clamp(0, _getMaxCol());
+        break;
+      case 'Arrow Right':
+        newCol = (newCol + 1).clamp(0, _getMaxCol());
+        break;
+      default:
+        return;
+    }
+
+    // Перемещаем фокус на новую ячейку
+    final newCellKey = _getCellKey(newRow, newCol);
+    if (newCellKey != null) {
+      final newNode = _focusNodes[newCellKey];
+      if (newNode != null) {
+        newNode.requestFocus();
+      }
+    }
+  }
+
+  (int, int)? _getCellCoordinates(FocusNode? node) {
+    if (node == null) return null;
+
+    for (final entry in _focusNodes.entries) {
+      if (entry.value == node) {
+        final parts = entry.key.split('_');
+        if (parts.length >= 2) {
+          final row = int.tryParse(parts[0]);
+          final col = int.tryParse(parts[1]);
+          if (row != null && col != null) {
+            return (row, col);
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  String? _getCellKey(int row, int col) {
+    // Возвращаем ключ в формате "row_col"
+    return '${row}_$col';
+  }
+
+  int _getMaxRow() {
+    final ingredients = widget.ingredients.where((ing) => !ing.isPlaceholder).toList();
+    return ingredients.length; // 0-based index
+  }
+
+  int _getMaxCol() {
+    return 7; // Максимальный индекс столбца с редактируемыми полями
+  }
+
   @override
   Widget build(BuildContext context) {
+    Widget table = _buildTtkTable(context);
+
+    // Обновляем таблицу при изменении названия
     if (widget.dishNameController != null) {
-      return ValueListenableBuilder<TextEditingValue>(
+      table = ValueListenableBuilder<TextEditingValue>(
         valueListenable: widget.dishNameController!,
-        builder: (context, value, child) {
-          return _buildTtkTable(context);
-        },
+        builder: (context, value, child) => table,
       );
-    } else {
-      return _buildTtkTable(context);
     }
+
+    // Обновляем таблицу при изменении технологии
+    if (widget.technologyController != null) {
+      table = ValueListenableBuilder<TextEditingValue>(
+        valueListenable: widget.technologyController!,
+        builder: (context, value, child) => table,
+      );
+    }
+
+    // Добавляем навигацию клавишами со стрелками
+    return RawKeyboardListener(
+      focusNode: FocusNode(),
+      onKey: _handleKeyEvent,
+      child: table,
+    );
   }
 
   Widget _buildTtkTable(BuildContext context) {
@@ -202,7 +298,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                         netWeight: net,
                         outputWeight: output,
                       ));
-                    }, 'gross_$rowIndex'),
+                    }, '${rowIndex}_3'),
 
                     // % отхода
                     _buildNumericCell(ingredient.primaryWastePct == 0 ? '' : ingredient.primaryWastePct.toString(), (value) {
@@ -215,7 +311,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                         netWeight: net,
                         outputWeight: net, // Выход всегда равен нетто
                       ));
-                    }, 'waste_$rowIndex'),
+                    }, '${rowIndex}_4'),
 
                     // Нетто
                     _buildNumericCell(ingredient.netWeight == 0 ? '' : ingredient.netWeight.toStringAsFixed(0), (value) {
@@ -231,7 +327,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                         primaryWastePct: wastePct,
                         outputWeight: net, // Выход всегда равен нетто
                       ));
-                    }, 'net_$rowIndex'),
+                    }, '${rowIndex}_5'),
 
                     // Способ приготовления
                     _buildCookingMethodCell(ingredient, originalIndex),
@@ -245,7 +341,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                       _updateIngredient(originalIndex, ingredient.copyWith(
                         cookingLossPctOverride: clampedLoss,
                       ));
-                    }, 'cooking_loss_$rowIndex'),
+                    }, '${rowIndex}_7'),
 
                     // Выход (всегда равен нетто)
                     _buildReadOnlyCell(ingredient.outputWeight == 0 ? '' : ingredient.outputWeight.toStringAsFixed(0)),
@@ -467,6 +563,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       child: widget.canEdit
           ? TextField(
               controller: controller,
+              focusNode: _getFocusNode(key),
               keyboardType: TextInputType.text,
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
