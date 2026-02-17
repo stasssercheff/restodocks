@@ -95,6 +95,9 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
     // Отладка
     print('DEBUG Таблица ТТК: totalCost=$totalCost, totalOutput=$totalOutput, costPerKg=$costPerKgFinishedProduct');
+    allRows.where((ing) => ing.productName.isNotEmpty).forEach((ing) {
+      print('DEBUG Ингредиент: ${ing.productName}, cost=${ing.cost}, grossWeight=${ing.grossWeight}, outputWeight=${ing.outputWeight}');
+    });
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
