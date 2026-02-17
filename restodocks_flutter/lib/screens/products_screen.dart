@@ -372,7 +372,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
   Future<void> _uploadFromTxt(LocalizationService loc) async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['txt', 'xlsx', 'xls'],
+      allowedExtensions: ['txt', 'xlsx', 'xls', 'rtf'],
       withData: true,
     );
     if (result == null || result.files.isEmpty || result.files.single.bytes == null) return;
@@ -387,9 +387,42 @@ class _ProductsScreenState extends State<ProductsScreen> {
         return;
       }
       await _addProductsFromText(text, loc);
+    } else if (fileName.endsWith('.rtf')) {
+      final bytes = result.files.single.bytes!;
+      final text = _extractTextFromRtf(utf8.decode(bytes, allowMalformed: true));
+      if (text.trim().isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('file_empty'))));
+        return;
+      }
+      await _addProductsFromText(text, loc);
     } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
       await _addProductsFromExcel(result.files.single.bytes!, loc);
     }
+  }
+
+  /// Извлекает обычный текст из RTF файла
+  String _extractTextFromRtf(String rtfContent) {
+    // Удаляем все RTF управляющие последовательности
+    // Это упрощенная версия - удаляем все фигурные скобки и их содержимое, а также другие RTF команды
+    var text = rtfContent;
+
+    // Удаляем заголовок RTF
+    final rtfHeaderEnd = text.indexOf('\\viewkind');
+    if (rtfHeaderEnd != -1) {
+      text = text.substring(rtfHeaderEnd);
+    }
+
+    // Удаляем все команды в фигурных скобках (группы)
+    text = text.replaceAll(RegExp(r'\{[^}]*\}'), '');
+
+    // Удаляем оставшиеся RTF команды (начинаются с \)
+    text = text.replaceAll(RegExp(r'\\[a-z]+\d*'), '');
+
+    // Удаляем лишние пробелы и переносы строк
+    text = text.replaceAll(RegExp(r'\s+'), ' ').trim();
+
+    return text;
   }
 
   Future<void> _addProductsFromExcel(Uint8List bytes, LocalizationService loc) async {
