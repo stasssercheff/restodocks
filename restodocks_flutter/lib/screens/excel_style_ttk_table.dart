@@ -437,8 +437,6 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     // Добавляем ПФ
     if (widget.semiFinishedProducts != null) {
       for (final pf in widget.semiFinishedProducts!) {
-        // Создаем NomenclatureItem для получения стоимости
-        final nomenclatureItem = NomenclatureItem.techCard(pf);
         allItems.add(SelectableItem(
           type: 'pf',
           item: pf,
