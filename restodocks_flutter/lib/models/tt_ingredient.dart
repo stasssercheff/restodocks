@@ -81,6 +81,9 @@ class TTIngredient extends Equatable {
   @JsonKey(name: 'cost')
   final double cost;
 
+  @JsonKey(name: 'price_per_kg')
+  final double? pricePerKg; // Цена за кг из номенклатуры
+
   @JsonKey(name: 'cost_currency')
   final String? costCurrency;
 
@@ -106,6 +109,7 @@ class TTIngredient extends Equatable {
     required this.finalFat,
     required this.finalCarbs,
     required this.cost,
+    this.pricePerKg,
     this.costCurrency,
   });
 
@@ -144,6 +148,7 @@ class TTIngredient extends Equatable {
       finalFat: totalFat * factor,
       finalCarbs: totalCarbs * factor,
       cost: totalCost * factor,
+      pricePerKg: null,
     );
   }
 
@@ -172,6 +177,7 @@ class TTIngredient extends Equatable {
     Object? finalFat = _undefined,
     Object? finalCarbs = _undefined,
     Object? cost = _undefined,
+    Object? pricePerKg = _undefined,
     Object? costCurrency = _undefined,
   }) {
     return TTIngredient(
@@ -196,6 +202,7 @@ class TTIngredient extends Equatable {
       finalFat: finalFat == _undefined ? this.finalFat : finalFat as double,
       finalCarbs: finalCarbs == _undefined ? this.finalCarbs : finalCarbs as double,
       cost: cost == _undefined ? this.cost : cost as double,
+      pricePerKg: pricePerKg == _undefined ? this.pricePerKg : pricePerKg as double?,
       costCurrency: costCurrency == _undefined ? this.costCurrency : costCurrency as String?,
     );
   }
@@ -229,6 +236,7 @@ class TTIngredient extends Equatable {
       finalFat: 0,
       finalCarbs: 0,
       cost: 0,
+      pricePerKg: null,
       costCurrency: null,
     );
   }
@@ -334,6 +342,7 @@ class TTIngredient extends Equatable {
       finalFat: finalFat,
       finalCarbs: finalCarbs,
       cost: cost,
+      pricePerKg: productPrice,
       costCurrency: productCurrency,
     );
   }

@@ -543,8 +543,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   }
 
   Widget _buildCostCell(TTIngredient ingredient) {
-    // Цена за кг из номенклатуры (фиксированная)
-    final pricePerKg = ingredient.grossWeight > 0 ? ingredient.cost / (ingredient.grossWeight / 1000) : 0;
+    // Цена за кг из номенклатуры (фиксированная, не рассчитывается)
+    final pricePerKg = ingredient.pricePerKg ?? 0;
 
     return Container(
       height: 44,
