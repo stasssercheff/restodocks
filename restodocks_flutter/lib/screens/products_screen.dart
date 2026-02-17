@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 
 import '../models/culinary_units.dart';
 import '../models/models.dart';
+import '../models/nomenclature_item.dart';
 import '../services/ai_service.dart';
 import '../services/nutrition_api_service.dart';
 import '../services/services.dart';
@@ -41,6 +42,9 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
   bool _nomFilterGlutenFree = false;
   bool _nomFilterLactoseFree = false;
 
+  // Список элементов номенклатуры (продукты + ТТК ПФ)
+  List<NomenclatureItem> _nomenclatureItems = [];
+
   @override
   void initState() {
     super.initState();
@@ -59,10 +63,17 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
     final account = context.read<AccountManagerSupabase>();
     final estId = account.establishment?.id;
     if (estId == null) return;
+
+    final techCardService = context.read<TechCardServiceSupabase>();
+
     if (store.allProducts.isEmpty && !store.isLoading) {
       await store.loadProducts();
     }
     await store.loadNomenclature(estId);
+
+    // Загружаем элементы номенклатуры (продукты + ТТК ПФ)
+    _nomenclatureItems = await store.getAllNomenclatureItems(estId, techCardService);
+
     if (mounted) setState(() {});
   }
 
@@ -81,20 +92,28 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
       lactoseFree: _filterLactoseFree ? true : null,
     );
     catalogList = _sortProducts(catalogList, _catalogSort);
-    var nomProducts = estId != null
-        ? store.getNomenclatureProducts(estId).where((p) {
-            if (_category != null && p.category != _category) return false;
-            if (_nomFilterGlutenFree && !p.isGlutenFree) return false;
-            if (_nomFilterLactoseFree && !p.isLactoseFree) return false;
-            if (_query.isNotEmpty) {
-              final q = _query.toLowerCase();
-              return p.name.toLowerCase().contains(q) ||
-                  p.getLocalizedName(loc.currentLanguageCode).toLowerCase().contains(q);
-            }
-            return true;
-          }).toList()
-        : <Product>[];
-    nomProducts = _sortProducts(nomProducts, _nomSort);
+    // Фильтруем элементы номенклатуры
+    var nomItems = _nomenclatureItems.where((item) {
+      // Фильтр по категории (только для продуктов)
+      if (_category != null && item.isProduct && item.product!.category != _category) return false;
+
+      // Фильтр по глютену (только для продуктов)
+      if (_nomFilterGlutenFree && item.isProduct && !item.product!.isGlutenFree) return false;
+
+      // Фильтр по лактозе (только для продуктов)
+      if (_nomFilterLactoseFree && item.isProduct && !item.product!.isLactoseFree) return false;
+
+      // Поисковый запрос
+      if (_query.isNotEmpty) {
+        final q = _query.toLowerCase();
+        return item.name.toLowerCase().contains(q) ||
+            item.getLocalizedName(loc.currentLanguageCode).toLowerCase().contains(q);
+      }
+      return true;
+    }).toList();
+
+    // Сортируем
+    nomItems = _sortNomenclatureItems(nomItems, _nomSort);
 
     return Scaffold(
       appBar: AppBar(
@@ -106,7 +125,7 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
             Text(loc.t('nomenclature')),
             Text(
               _tabController.index == 0
-                  ? '${nomProducts.length} в номенклатуре'
+                  ? '${nomItems.length} в номенклатуре'
                   : '${store.allProducts.length} в справочнике',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -181,7 +200,7 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
               controller: _tabController,
               children: [
                 _NomenclatureTab(
-                  products: nomProducts,
+                  items: nomItems,
                   store: store,
                   estId: estId ?? '',
                   canRemove: canEdit,
@@ -238,6 +257,25 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
         break;
       case _CatalogSort.priceDesc:
         copy.sort((a, b) => (b.basePrice ?? 0).compareTo(a.basePrice ?? 0));
+        break;
+    }
+    return copy;
+  }
+
+  List<NomenclatureItem> _sortNomenclatureItems(List<NomenclatureItem> list, _CatalogSort sort) {
+    final copy = List<NomenclatureItem>.from(list);
+    switch (sort) {
+      case _CatalogSort.nameAz:
+        copy.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+        break;
+      case _CatalogSort.nameZa:
+        copy.sort((a, b) => b.name.toLowerCase().compareTo(a.name.toLowerCase()));
+        break;
+      case _CatalogSort.priceAsc:
+        copy.sort((a, b) => (a.price ?? 0).compareTo(b.price ?? 0));
+        break;
+      case _CatalogSort.priceDesc:
+        copy.sort((a, b) => (b.price ?? 0).compareTo(a.price ?? 0));
         break;
     }
     return copy;
@@ -606,7 +644,7 @@ class _AddProductDialogState extends State<_AddProductDialog> {
 
 class _NomenclatureTab extends StatelessWidget {
   const _NomenclatureTab({
-    required this.products,
+    required this.items,
     required this.store,
     required this.estId,
     required this.canRemove,
@@ -621,7 +659,7 @@ class _NomenclatureTab extends StatelessWidget {
     required this.onSwitchToCatalog,
   });
 
-  final List<Product> products;
+  final List<NomenclatureItem> items;
   final ProductStoreSupabase store;
   final String estId;
   final bool canRemove;
@@ -645,10 +683,34 @@ class _NomenclatureTab extends StatelessWidget {
     return map[c] ?? c;
   }
 
-  bool _needsKbju(Product p) =>
-      (p.calories == null || p.calories == 0) && p.protein == null && p.fat == null && p.carbs == null;
+  String _buildProductSubtitle(Product p) {
+    return (p.category == 'misc' || p.category == 'manual')
+        ? '${p.calories?.round() ?? 0} ккал · ${_unitDisplay(p.unit, loc.currentLanguageCode)}'
+        : '${_categoryLabel(p.category)} · ${p.calories?.round() ?? 0} ккал · ${_unitDisplay(p.unit, loc.currentLanguageCode)}';
+  }
 
-  bool _needsTranslation(Product p) {
+  String _buildTechCardSubtitle(TechCard tc) {
+    // Рассчитываем стоимость за кг для ТТК
+    if (tc.ingredients.isEmpty) {
+      return 'ПФ · Цена не рассчитана · Выход: ${tc.yield.toStringAsFixed(0)}г';
+    }
+
+    final totalCost = tc.ingredients.fold<double>(0, (sum, ing) => sum + ing.cost);
+    final totalOutput = tc.ingredients.fold<double>(0, (sum, ing) => sum + ing.outputWeight);
+    final costPerKg = totalOutput > 0 ? (totalCost / totalOutput) * 1000 : 0;
+
+    return 'ПФ · ${costPerKg.toStringAsFixed(0)} ₽/кг · Выход: ${tc.yield.toStringAsFixed(0)}г';
+  }
+
+  bool _needsKbju(NomenclatureItem item) {
+    if (item.isTechCard) return false; // ТТК не нуждаются в КБЖУ
+    final p = item.product!;
+    return (p.calories == null || p.calories == 0) && p.protein == null && p.fat == null && p.carbs == null;
+  }
+
+  bool _needsTranslation(NomenclatureItem item) {
+    if (item.isTechCard) return false; // ТТК не нуждаются в переводе имен
+    final p = item.product!;
     final allLangs = LocalizationService.productLanguageCodes;
     final n = p.names;
     if (n == null || n.isEmpty) return true;
@@ -661,7 +723,7 @@ class _NomenclatureTab extends StatelessWidget {
     return false;
   }
 
-  Future<void> _loadKbjuForAll(BuildContext context, List<Product> list) async {
+  Future<void> _loadKbjuForAll(BuildContext context, List<NomenclatureItem> list) async {
     if (!context.mounted) return;
     await showDialog<void>(
       context: context,
@@ -763,15 +825,15 @@ class _NomenclatureTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (products.isEmpty) {
+    if (items.isEmpty) {
       return _NomenclatureEmpty(
         loc: loc,
         onSwitchToCatalog: onSwitchToCatalog,
       );
     }
 
-    final needsKbju = products.where((p) => p.category == 'manual' && _needsKbju(p)).toList();
-    final needsTranslation = products.where(_needsTranslation).toList();
+    final needsKbju = items.where((item) => item.isProduct && item.product!.category == 'manual' && _needsKbju(item)).toList();
+    final needsTranslation = items.where(_needsTranslation).toList();
     return Column(
       children: [
         Padding(
@@ -805,7 +867,7 @@ class _NomenclatureTab extends StatelessWidget {
             ],
           ),
         ),
-        if (needsKbju.isNotEmpty || needsTranslation.isNotEmpty || products.isNotEmpty)
+        if (needsKbju.isNotEmpty || needsTranslation.isNotEmpty || items.isNotEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: Wrap(
@@ -829,7 +891,7 @@ class _NomenclatureTab extends StatelessWidget {
                   child: FilledButton.tonalIcon(
                     onPressed: () => _verifyWithAi(context, products),
                     icon: const Icon(Icons.auto_awesome, size: 20),
-                    label: Text(loc.t('verify_with_ai').replaceAll('%s', '${products.length}')),
+                    label: Text(loc.t('verify_with_ai').replaceAll('%s', '${items.length}')),
                   ),
                 ),
               ],
@@ -838,9 +900,9 @@ class _NomenclatureTab extends StatelessWidget {
         Expanded(
           child: ListView.builder(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-            itemCount: products.length,
+            itemCount: items.length,
             itemBuilder: (_, i) {
-              final p = products[i];
+              final item = items[i];
               return Card(
                 margin: const EdgeInsets.only(bottom: 6),
                 child: ListTile(
@@ -854,27 +916,29 @@ class _NomenclatureTab extends StatelessWidget {
                       ),
                     ),
                   ),
-                  title: Text(p.getLocalizedName(loc.currentLanguageCode)),
+                  title: Text(item.getLocalizedName(loc.currentLanguageCode)),
                   subtitle: Text(
-                    (p.category == 'misc' || p.category == 'manual')
-                        ? '${p.calories?.round() ?? 0} ккал · ${_unitDisplay(p.unit, loc.currentLanguageCode)}'
-                        : '${_categoryLabel(p.category)} · ${p.calories?.round() ?? 0} ккал · ${_unitDisplay(p.unit, loc.currentLanguageCode)}',
+                    item.isProduct
+                        ? _buildProductSubtitle(item.product!)
+                        : _buildTechCardSubtitle(item.techCard!),
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      IconButton(
-                        icon: const Icon(Icons.edit_outlined),
-                        tooltip: loc.t('edit_product'),
-                        onPressed: () => _showEditProduct(context, p),
-                      ),
-                      if (canRemove)
+                      if (item.isProduct) ...[
                         IconButton(
-                          icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
-                          tooltip: loc.t('remove_from_nomenclature'),
-                          onPressed: () => _confirmRemove(context, p),
+                          icon: const Icon(Icons.edit_outlined),
+                          tooltip: loc.t('edit_product'),
+                          onPressed: () => _showEditProduct(context, item.product!),
                         ),
+                        if (canRemove)
+                          IconButton(
+                            icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                            tooltip: loc.t('remove_from_nomenclature'),
+                            onPressed: () => _confirmRemove(context, item.product!),
+                          ),
+                      ],
                     ],
                   ),
                 ),

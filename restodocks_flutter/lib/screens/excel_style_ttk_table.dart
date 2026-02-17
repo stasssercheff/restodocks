@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/models.dart';
+import '../models/nomenclature_item.dart';
 import '../services/services.dart';
 
 class ExcelStyleTtkTable extends StatefulWidget {
@@ -436,6 +437,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     // Добавляем ПФ
     if (widget.semiFinishedProducts != null) {
       for (final pf in widget.semiFinishedProducts!) {
+        // Создаем NomenclatureItem для получения стоимости
+        final nomenclatureItem = NomenclatureItem.techCard(pf);
         allItems.add(SelectableItem(
           type: 'pf',
           item: pf,
@@ -486,13 +489,24 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         } else if (selectedItem.type == 'pf') {
           final pf = selectedItem.item as TechCard;
           // Для ПФ создаем ингредиент с ссылкой на ТТК
+
+          // Рассчитываем стоимость за кг для ПФ
+          double? pfPricePerKg;
+          if (pf.ingredients.isNotEmpty) {
+            final totalCost = pf.ingredients.fold<double>(0, (sum, ing) => sum + ing.cost);
+            final totalOutput = pf.ingredients.fold<double>(0, (sum, ing) => sum + ing.outputWeight);
+            if (totalOutput > 0) {
+              pfPricePerKg = (totalCost / totalOutput) * 1000;
+            }
+          }
+
           var updatedIngredient = ingredient.copyWith(
             sourceTechCardId: pf.id,
             sourceTechCardName: pf.dishName,
             productName: 'ПФ ${pf.getDisplayNameInLists(widget.loc.currentLanguageCode)}',
             unit: 'г',
-            pricePerKg: null, // Для ПФ цена рассчитывается отдельно
-            cost: 0.0,
+            pricePerKg: pfPricePerKg, // Стоимость за кг ПФ
+            cost: 0.0, // Пока cost = 0, будет пересчитан при вводе grossWeight
           );
 
           _updateIngredient(rowIndex, updatedIngredient);
