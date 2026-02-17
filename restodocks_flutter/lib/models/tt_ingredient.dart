@@ -311,13 +311,9 @@ class TTIngredient extends Equatable {
     final productPrice = establishmentPrice?.$1 ?? product.basePrice;
     final productCurrency = establishmentPrice?.$2 ?? defaultCurrency ?? 'RUB';
 
-    double cost;
-    if (actualUnit == 'pcs' || actualUnit == 'шт') {
-      final pieces = grossG / (gramsPerPiece ?? 50);
-      cost = (productPrice ?? 0) * pieces;
-    } else {
-      cost = (productPrice ?? 0) * (grossG / 1000.0);
-    }
+    // Расчет стоимости: цена за грамм * вес брутто
+    final pricePerGram = (productPrice ?? 0) / 1000.0;
+    double cost = pricePerGram * grossG;
 
     return TTIngredient(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
