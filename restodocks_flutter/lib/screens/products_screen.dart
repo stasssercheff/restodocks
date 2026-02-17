@@ -152,24 +152,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
               onChanged: (v) => setState(() => _query = v),
             ),
           ),
-          if (store.allProducts.any((p) => p.category == 'manual'))
-            SizedBox(
-              height: 44,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                children: [
-                  _Chip(
-                    label: _categoryLabel('manual'),
-                    selected: _filterManual,
-                    onTap: () => setState(() {
-                      _filterManual = !_filterManual;
-                      if (_filterManual) _category = null;
-                    }),
-                  ),
-                ],
-              ),
-            ),
           Expanded(
             child: _NomenclatureTab(
               items: nomItems,
