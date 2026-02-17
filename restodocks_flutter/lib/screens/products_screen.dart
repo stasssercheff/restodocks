@@ -531,77 +531,159 @@ class _ProductsScreenState extends State<ProductsScreen> {
     );
     if (confirmed != true || !mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Начинаю загрузку ${items.length} продуктов...')));
+    // Показываем диалог с прогрессом загрузки
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => _UploadProgressDialog(
+        items: items,
+        loc: loc,
+      ),
+    );
 
+    // Обновляем список после загрузки
     final store = context.read<ProductStoreSupabase>();
     final account = context.read<AccountManagerSupabase>();
     final estId = account.establishment?.id;
-    if (estId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('no_establishment'))));
-      return;
+    if (estId != null) {
+      await store.loadProducts();
+      await store.loadNomenclature(estId);
+    }
+    if (mounted) setState(() {});
+  }
+
+  /// Диалог с прогрессом загрузки продуктов
+  class _UploadProgressDialog extends StatefulWidget {
+    const _UploadProgressDialog({
+      required this.items,
+      required this.loc,
+    });
+
+    final List<({String name, double? price})> items;
+    final LocalizationService loc;
+
+    @override
+    State<_UploadProgressDialog> createState() => _UploadProgressDialogState();
+  }
+
+  class _UploadProgressDialogState extends State<_UploadProgressDialog> {
+    var _processed = 0;
+    var _added = 0;
+    var _failed = 0;
+    var _isCompleted = false;
+
+    @override
+    void initState() {
+      super.initState();
+      _startUpload();
     }
 
-    var added = 0;
-    var failed = 0;
-    final defCur = account.establishment?.defaultCurrency ?? 'VND';
-    final sourceLang = loc.currentLanguageCode;
-    final allLangs = LocalizationService.productLanguageCodes;
+    Future<void> _startUpload() async {
+      final store = context.read<ProductStoreSupabase>();
+      final account = context.read<AccountManagerSupabase>();
+      final estId = account.establishment?.id;
 
-    var processed = 0;
-    for (final item in items) {
-      processed++;
-      if (processed % 20 == 0 && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Обработано $processed из ${items.length} продуктов...'),
-          duration: const Duration(seconds: 1),
-        ));
-      }
-      try {
-        var names = <String, String>{for (final c in allLangs) c: item.name};
-        if (items.length <= 5) {
-          final translated = await TranslationService.translateToAll(item.name, sourceLang, allLangs);
-          if (translated.isNotEmpty) names = translated;
+      if (estId == null) {
+        if (mounted) {
+          Navigator.of(context).pop();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(widget.loc.t('no_establishment'))),
+          );
         }
-        final product = Product(
-          id: const Uuid().v4(),
-          name: item.name,
-          category: 'manual',
-          names: names,
-          calories: null,
-          protein: null,
-          fat: null,
-          carbs: null,
-          unit: 'g',
-          basePrice: item.price,
-          currency: item.price != null ? defCur : null,
+        return;
+      }
+
+      final defCur = account.establishment?.defaultCurrency ?? 'VND';
+      final sourceLang = widget.loc.currentLanguageCode;
+      final allLangs = LocalizationService.productLanguageCodes;
+
+      for (final item in widget.items) {
+        if (!mounted) return;
+
+        setState(() => _processed++);
+
+        try {
+          var names = <String, String>{for (final c in allLangs) c: item.name};
+          if (widget.items.length <= 5) {
+            final translated = await TranslationService.translateToAll(item.name, sourceLang, allLangs);
+            if (translated.isNotEmpty) names = translated;
+          }
+
+          final product = Product(
+            id: const Uuid().v4(),
+            name: item.name,
+            category: 'manual',
+            names: names,
+            calories: null,
+            protein: null,
+            fat: null,
+            carbs: null,
+            unit: 'g',
+            basePrice: item.price,
+            currency: item.price != null ? defCur : null,
+          );
+
+          await store.addProduct(product);
+          await store.addToNomenclature(estId, product.id);
+
+          setState(() => _added++);
+
+          // Небольшая задержка чтобы не перегружать сервер
+          await Future.delayed(const Duration(milliseconds: 50));
+        } catch (e) {
+          setState(() => _failed++);
+        }
+      }
+
+      setState(() => _isCompleted = true);
+
+      // Автоматически закрываем диалог через 2 секунды
+      await Future.delayed(const Duration(seconds: 2));
+      if (mounted) {
+        Navigator.of(context).pop();
+
+        final msg = _failed == 0
+            ? widget.loc.t('upload_added').replaceAll('%s', '$_added')
+            : '${widget.loc.t('upload_added').replaceAll('%s', '$_added')}. ${widget.loc.t('upload_failed').replaceAll('%s', '$_failed')}';
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(msg), duration: const Duration(seconds: 5)),
         );
-        await store.addProduct(product);
-        await store.addToNomenclature(estId, product.id);
-        added++;
-
-        // Небольшая задержка чтобы не перегружать сервер
-        await Future.delayed(const Duration(milliseconds: 50));
-      } catch (e) {
-        failed++;
-        if (processed % 10 == 0 && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Ошибка при добавлении "${item.name}": $e'),
-            duration: const Duration(seconds: 3),
-          ));
-        }
       }
-      if (!mounted) return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Завершаю загрузку...')));
 
-    await store.loadProducts();
-    await store.loadNomenclature(estId);
-    if (!mounted) return;
-    setState(() {});
-    final msg = failed == 0
-        ? loc.t('upload_added').replaceAll('%s', '$added')
-        : '${loc.t('upload_added').replaceAll('%s', '$added')}. ${loc.t('upload_failed').replaceAll('%s', '$failed')}';
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), duration: const Duration(seconds: 5)));
+    @override
+    Widget build(BuildContext context) {
+      final progress = widget.items.isEmpty ? 1.0 : _processed / widget.items.length;
+
+      return AlertDialog(
+        title: Text('Загрузка продуктов'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Обработано $_processed из ${widget.items.length} продуктов'),
+            const SizedBox(height: 16),
+            LinearProgressIndicator(value: progress),
+            const SizedBox(height: 8),
+            Text('Добавлено: $_added${_failed > 0 ? ', Ошибок: $_failed' : ''}'),
+            if (_isCompleted) ...[
+              const SizedBox(height: 16),
+              const Icon(Icons.check_circle, color: Colors.green, size: 48),
+              const SizedBox(height: 8),
+              const Text('Загрузка завершена!'),
+            ],
+          ],
+        ),
+        actions: _isCompleted
+            ? [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Закрыть'),
+                ),
+              ]
+            : null,
+      );
+    }
   }
 
   void _showCurrencyDialog(
