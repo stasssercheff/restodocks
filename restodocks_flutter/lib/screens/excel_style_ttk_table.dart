@@ -476,9 +476,14 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     final allItems = <SelectableItem>[];
 
     // Добавляем продукты только из номенклатуры (где есть стоимость за кг/шт)
-    final nomenclatureProducts = widget.establishmentId != null
+    var nomenclatureProducts = widget.establishmentId != null
         ? widget.productStore.getNomenclatureProducts(widget.establishmentId!)
-        : widget.productStore.allProducts.where((p) => p.basePrice != null && p.basePrice! > 0).toList(); // Fallback: все продукты с ценой
+        : <Product>[]; // Пустой список, если establishmentId null
+
+    // Fallback: если номенклатурные продукты пустые, используем все продукты с ценой
+    if (nomenclatureProducts.isEmpty) {
+      nomenclatureProducts = widget.productStore.allProducts.where((p) => p.basePrice != null && p.basePrice! > 0).toList();
+    }
 
     for (final product in nomenclatureProducts) {
       allItems.add(SelectableItem(
