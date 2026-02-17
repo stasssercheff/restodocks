@@ -101,7 +101,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         ? // Для ПФ: стоимость за кг готового продукта
           (totalOutput > 0 ? ((totalCost / totalOutput) * 1000).ceil() : 0)
         : // Для блюд: сумма стоимостей всех ингредиентов (gross costs)
-          totalCost.round();
+          totalCost;
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
