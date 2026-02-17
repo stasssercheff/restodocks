@@ -83,7 +83,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     // Инициализируем outputWeight для существующих ингредиентов
     for (var i = 0; i < allRows.length; i++) {
       if (allRows[i].productName.isNotEmpty && allRows[i].outputWeight == 0) {
-        allRows[i] = allRows[i].copyWith(outputWeight: allRows[i].netWeight);
+        final output = allRows[i].netWeight * (1 - (allRows[i].cookingLossPctOverride ?? 0) / 100);
+        allRows[i] = allRows[i].copyWith(outputWeight: output);
       }
     }
 
@@ -210,7 +211,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                       _updateIngredient(rowIndex, ingredient.copyWith(
                         netWeight: net,
                         primaryWastePct: wastePct,
-                        outputWeight: net, // Выход всегда равен нетто
+                        outputWeight: output, // Выход с учетом ужарки
                       ));
                     }, 'net_$rowIndex'),
 
@@ -459,8 +460,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
             cost: 0.0, // Пока cost = 0, будет пересчитан при вводе grossWeight
           );
 
-          // Выход всегда равен нетто (после учета % отхода)
-          final outputWeight = updatedIngredient.netWeight;
+          // Выход = нетто с учетом % ужарки
+          final outputWeight = updatedIngredient.netWeight * (1 - (updatedIngredient.cookingLossPctOverride ?? 0) / 100);
 
           updatedIngredient = updatedIngredient.copyWith(outputWeight: outputWeight);
 
@@ -625,6 +626,9 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   Widget _buildPricePerKgCell(TTIngredient ingredient) {
     // Стоимость за кг выхода (меняется в зависимости от брутто и отхода)
     final costPerKgOutput = ingredient.outputWeight > 0 ? (ingredient.cost / ingredient.outputWeight) * 1000 : 0;
+
+    // Отладочный вывод
+    print('DEBUG: ${ingredient.productName} - cost: ${ingredient.cost}, outputWeight: ${ingredient.outputWeight}, costPerKg: ${costPerKgOutput.toStringAsFixed(0)}');
 
     return Container(
       height: 44,
