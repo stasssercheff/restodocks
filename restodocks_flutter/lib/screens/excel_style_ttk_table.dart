@@ -483,19 +483,17 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     final allItems = <SelectableItem>[];
 
     // Добавляем продукты только из номенклатуры (где есть стоимость за кг/шт)
-    if (widget.establishmentId != null) {
-      for (final product in widget.productStore.getNomenclatureProducts(widget.establishmentId!)) {
-        allItems.add(SelectableItem(
-          type: 'product',
-          item: product,
-          displayName: product.getLocalizedName('ru'),
-          searchName: product.name.toLowerCase(),
-        ));
-      }
+    for (final product in widget.productStore.getNomenclatureProducts(widget.establishmentId ?? '')) {
+      allItems.add(SelectableItem(
+        type: 'product',
+        item: product,
+        displayName: product.getLocalizedName('ru'),
+        searchName: product.name.toLowerCase(),
+      ));
     }
 
     // Добавляем ПФ
-    if (widget.semiFinishedProducts != null) {
+    if (widget.semiFinishedProducts != null && widget.semiFinishedProducts!.isNotEmpty) {
       for (final pf in widget.semiFinishedProducts!) {
         allItems.add(SelectableItem(
           type: 'pf',
