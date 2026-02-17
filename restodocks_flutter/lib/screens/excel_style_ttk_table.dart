@@ -644,18 +644,6 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     // Стоимость за кг выхода (меняется в зависимости от брутто и отхода)
     final costPerKgOutput = ingredient.outputWeight > 0 ? (ingredient.cost / ingredient.outputWeight) * 1000 : 0;
 
-    // Подробный отладочный вывод
-    print('DEBUG Стоимость за кг для ${ingredient.productName}:');
-    print('  - Цена за кг из карточки: ${ingredient.pricePerKg}');
-    print('  - Брутто вес: ${ingredient.grossWeight}г');
-    print('  - Нетто вес: ${ingredient.netWeight}г');
-    print('  - Выход вес: ${ingredient.outputWeight}г');
-    print('  - % отхода: ${ingredient.primaryWastePct}%');
-    print('  - % ужарки: ${ingredient.cookingLossPctOverride ?? 0}%');
-    print('  - Общая стоимость: ${ingredient.cost}');
-    print('  - Стоимость за кг выхода: ${costPerKgOutput.toStringAsFixed(0)}');
-    print('');
-
     return Container(
       height: 44,
       child: Center(
