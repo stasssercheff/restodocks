@@ -431,7 +431,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         allItems.add(SelectableItem(
           type: 'pf',
           item: pf,
-          displayName: 'ПФ ${pf.getDisplayNameInLists(widget.loc)}',
+          displayName: 'ПФ ${pf.getDisplayNameInLists(widget.loc.currentLanguageCode)}',
           searchName: pf.dishName.toLowerCase(),
         ));
       }
@@ -471,7 +471,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
           var updatedIngredient = ingredient.copyWith(
             sourceTechCardId: pf.id,
             sourceTechCardName: pf.dishName,
-            productName: 'ПФ ${pf.getDisplayNameInLists(widget.loc)}',
+            productName: 'ПФ ${pf.getDisplayNameInLists(widget.loc.currentLanguageCode)}',
             unit: 'г',
             pricePerKg: null, // Для ПФ цена рассчитывается отдельно
             cost: 0.0,
@@ -765,7 +765,6 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
       Future.delayed(const Duration(milliseconds: 150), () {
         if (mounted && !_searchFocusNode.hasFocus && _isDropdownOpen && !_isSelectingProduct) {
           _hideOverlay();
-          _validateAndSelectProduct();
         }
       });
     }
@@ -883,32 +882,6 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
                     _showOverlay();
                   }
                   _filterProducts();
-
-                  // Автовыбор при точном совпадении или единственном результате
-                  if (value.length >= 2) {
-                    final trimmedValue = value.trim();
-                    final exactMatch = widget.products.firstWhere(
-                      (product) => product.name.toLowerCase() == trimmedValue.toLowerCase(),
-                      orElse: () => null as Product,
-                    );
-
-                    if (exactMatch != null) {
-                      widget.onProductSelected(exactMatch);
-                      _searchController.text = exactMatch.name;
-                      _hideOverlay();
-                      return;
-                    }
-
-                    final matches = widget.products.where(
-                      (product) => product.name.toLowerCase().startsWith(trimmedValue.toLowerCase())
-                    ).toList();
-
-                    if (matches.length == 1) {
-                      widget.onProductSelected(matches.first);
-                      _searchController.text = matches.first.name;
-                      _hideOverlay();
-                    }
-                  }
                 },
               ),
             ),
