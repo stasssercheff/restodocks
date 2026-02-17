@@ -49,6 +49,7 @@ class _UploadProgressDialog extends StatefulWidget {
 class _UploadProgressDialogState extends State<_UploadProgressDialog> {
   var _processed = 0;
   var _added = 0;
+  var _skipped = 0; // Продукты, которые уже существуют
   var _failed = 0;
   var _isCompleted = false;
 
@@ -101,16 +102,62 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
           currency: item.price != null ? defCur : null,
         );
 
-        await store.addProduct(product);
-        await store.addToNomenclature(estId, product.id);
+          try {
+            await store.addProduct(product);
+          } catch (e) {
+            if (e.toString().contains('duplicate key') ||
+                e.toString().contains('already exists') ||
+                e.toString().contains('unique constraint')) {
+              // Продукт уже существует, просто добавляем в номенклатуру
+              // Сначала попробуем найти продукт по имени
+              try {
+                final supabaseClient = Supabase.instance.client;
+                final existingProducts = await supabaseClient
+                    .from('products')
+                    .select('id')
+                    .eq('name', product.name)
+                    .limit(1);
 
-        setState(() => _added++);
+                if (existingProducts.isNotEmpty) {
+                  final existingId = existingProducts[0]['id'] as String;
+                  await store.addToNomenclature(estId, existingId);
+                  setState(() => _skipped++);
+                  continue;
+                }
+              } catch (findError) {
+                print('Failed to find existing product "${product.name}": $findError');
+              }
+            }
+            // Другая ошибка
+            print('Failed to add product "${product.name}": $e');
+            setState(() => _failed++);
+            continue;
+          }
+
+          try {
+            await store.addToNomenclature(estId, product.id);
+          } catch (e) {
+            // Возможно продукт уже в номенклатуре - считаем это успехом
+            if (e.toString().contains('duplicate key') ||
+                e.toString().contains('already exists') ||
+                e.toString().contains('unique constraint')) {
+              setState(() => _skipped++);
+              continue;
+            }
+            // Другая ошибка
+            print('Failed to add to nomenclature "${product.name}": $e');
+            setState(() => _failed++);
+            continue;
+          }
+
+          setState(() => _added++);
 
           // Небольшая задержка чтобы не перегружать сервер
           await Future.delayed(const Duration(milliseconds: 50));
-      } catch (e) {
-        setState(() => _failed++);
-      }
+        } catch (e) {
+          print('Unexpected error for "${item.name}": $e');
+          setState(() => _failed++);
+        }
     }
 
     setState(() => _isCompleted = true);
@@ -120,9 +167,9 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
     if (mounted) {
       Navigator.of(context).pop();
 
-      final msg = _failed == 0
-          ? widget.loc.t('upload_added').replaceAll('%s', '$_added')
-          : '${widget.loc.t('upload_added').replaceAll('%s', '$_added')}. ${widget.loc.t('upload_failed').replaceAll('%s', '$_failed')}';
+        final msg = _failed == 0
+            ? widget.loc.t('upload_added').replaceAll('%s', '${_added + _skipped}')
+            : '${widget.loc.t('upload_added').replaceAll('%s', '${_added + _skipped}')}. ${widget.loc.t('upload_failed').replaceAll('%s', '$_failed')}';
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(msg), duration: const Duration(seconds: 5)),
@@ -145,7 +192,7 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
           const SizedBox(height: 16),
           LinearProgressIndicator(value: progress),
           const SizedBox(height: 8),
-          Text('Добавлено: $_added${_failed > 0 ? ', Ошибок: $_failed' : ''}'),
+            Text('Добавлено: $_added${_skipped > 0 ? ', Пропущено: $_skipped' : ''}${_failed > 0 ? ', Ошибок: $_failed' : ''}'),
           if (_isCompleted) ...[
             const SizedBox(height: 16),
             const Icon(Icons.check_circle, color: Colors.green, size: 48),
