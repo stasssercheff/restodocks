@@ -276,6 +276,7 @@ class TTIngredient extends Equatable {
 
     // Конвертируем в граммы для расчётов
     final grossG = CulinaryUnits.toGrams(grossWeight, unit, gramsPerPiece: gramsPerPiece);
+    print('DEBUG grossG calculation: grossWeight=$grossWeight, unit=$unit, gramsPerPiece=$gramsPerPiece, grossG=$grossG');
 
     // Эффективный вес после отхода (первичная обработка)
     final waste = wastePct.clamp(0.0, 99.9) / 100.0;
