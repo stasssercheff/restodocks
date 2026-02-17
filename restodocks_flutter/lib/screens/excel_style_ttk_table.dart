@@ -560,7 +560,6 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   Widget _buildPricePerKgCell(TTIngredient ingredient) {
     // Стоимость брутто - показывается в строке продукта
     final grossCost = ingredient.cost;
-    print('DEBUG PRICE CELL: ${ingredient.productName}, grossCost=$grossCost');
 
     return Container(
       height: 44,
