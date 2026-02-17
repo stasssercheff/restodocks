@@ -251,8 +251,8 @@ class TTIngredient extends Equatable {
     String? establishmentId,
     String? defaultCurrency,
   }) {
-    // Используем 'g' для весовых продуктов, игнорируя product.unit
-    final actualUnit = (product?.unit == 'pcs' || product?.unit == 'шт') ? 'pcs' : 'g';
+    // Всегда используем 'g' для всех продуктов в ТТК, игнорируя product.unit
+    final actualUnit = 'g';
     final wastePct = primaryWastePct ?? product?.primaryWastePct ?? 0;
     if (product == null) {
       return TTIngredient(
