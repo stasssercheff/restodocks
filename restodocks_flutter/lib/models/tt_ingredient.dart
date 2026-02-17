@@ -309,12 +309,17 @@ class TTIngredient extends Equatable {
     final productPrice = establishmentPrice?.$1 ?? product.basePrice;
     final productCurrency = establishmentPrice?.$2 ?? defaultCurrency ?? 'RUB';
 
+    // Отладка стоимости
+    print('DEBUG TTIngredient: ${product.getLocalizedName(languageCode)}, unit=$unit, grossG=$grossG, productPrice=$productPrice');
+
     double cost;
     if (unit == 'pcs' || unit == 'шт') {
       final pieces = grossG / (gramsPerPiece ?? 50);
       cost = (productPrice ?? 0) * pieces;
+      print('DEBUG TTIngredient: pieces=$pieces, cost=$cost (pcs calculation)');
     } else {
       cost = (productPrice ?? 0) * (grossG / 1000.0);
+      print('DEBUG TTIngredient: cost=$cost (weight calculation)');
     }
 
     return TTIngredient(
