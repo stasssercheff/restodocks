@@ -88,6 +88,11 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
             // Советы
             _TipsSection(),
+
+            const SizedBox(height: 24),
+
+            // Быстрые действия
+            _QuickActions(),
           ],
         ),
       ),
@@ -294,6 +299,93 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     rtf = rtf.replaceAll(RegExp(r'\s+'), ' ').trim();
 
     return rtf;
+  }
+}
+
+class _QuickActions extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final loc = context.watch<LocalizationService>();
+
+    return Card(
+      elevation: 1,
+      color: Colors.green[50],
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.rocket_launch, color: Colors.green[700]),
+                const SizedBox(width: 8),
+                Text(
+                  'Быстрые действия:',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green[700],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _buildQuickAction(
+              context,
+              'Посмотреть номенклатуру',
+              'Проверить добавленные продукты',
+              () => context.push('/products'),
+            ),
+            _buildQuickAction(
+              context,
+              'Создать ТТК',
+              'Использовать новые продукты в рецептах',
+              () => context.push('/tech-cards'),
+            ),
+            _buildQuickAction(
+              context,
+              'Создать меню',
+              'Добавить блюда в меню ресторана',
+              () => context.push('/menu'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickAction(BuildContext context, String title, String subtitle, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[400]),
+          ],
+        ),
+      ),
+    );
   }
 }
 
