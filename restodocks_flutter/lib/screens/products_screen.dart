@@ -12,6 +12,7 @@ import '../models/culinary_units.dart';
 import '../models/models.dart';
 import '../models/nomenclature_item.dart';
 import '../services/ai_service.dart';
+import '../services/ai_service_supabase.dart';
 import '../services/nutrition_api_service.dart';
 import '../services/services.dart';
 
@@ -603,24 +604,35 @@ class _ProductsScreenState extends State<ProductsScreen> {
         setState(() => _processed++);
 
         try {
-          var names = <String, String>{for (final c in allLangs) c: item.name};
-          if (widget.items.length <= 5) {
-            final translated = await TranslationService.translateToAll(item.name, sourceLang, allLangs);
+          // Используем ИИ для проверки и улучшения данных продукта
+          final aiService = context.read<AiServiceSupabase>();
+          final verification = await aiService.verifyProduct(
+            item.name,
+            currentPrice: item.price,
+          );
+
+          // Используем проверенные ИИ данные или оригинальные
+          final normalizedName = verification?.normalizedName ?? item.name;
+          var names = <String, String>{for (final c in allLangs) c: normalizedName};
+
+          // Для больших списков переводим только если ИИ дал нормализованное имя
+          if (widget.items.length > 5 && verification?.normalizedName != null && verification!.normalizedName != item.name) {
+            final translated = await TranslationService.translateToAll(normalizedName, sourceLang, allLangs);
             if (translated.isNotEmpty) names = translated;
           }
 
           final product = Product(
             id: const Uuid().v4(),
-            name: item.name,
-            category: 'manual',
+            name: normalizedName,
+            category: verification?.suggestedCategory ?? 'manual',
             names: names,
-            calories: null,
+            calories: verification?.suggestedCalories,
             protein: null,
             fat: null,
             carbs: null,
-            unit: 'g',
-            basePrice: item.price,
-            currency: item.price != null ? defCur : null,
+            unit: verification?.suggestedUnit ?? 'g',
+            basePrice: verification?.suggestedPrice ?? item.price,
+            currency: (verification?.suggestedPrice ?? item.price) != null ? defCur : null,
           );
 
           await store.addProduct(product);
@@ -629,7 +641,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
           setState(() => _added++);
 
           // Небольшая задержка чтобы не перегружать сервер
-          await Future.delayed(const Duration(milliseconds: 50));
+          await Future.delayed(const Duration(milliseconds: 100));
         } catch (e) {
           setState(() => _failed++);
         }
@@ -657,11 +669,13 @@ class _ProductsScreenState extends State<ProductsScreen> {
       final progress = widget.items.isEmpty ? 1.0 : _processed / widget.items.length;
 
       return AlertDialog(
-        title: Text('Загрузка продуктов'),
+        title: Text('ИИ обрабатывает продукты'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text('Обработано $_processed из ${widget.items.length} продуктов'),
+            const SizedBox(height: 8),
+            Text('ИИ проверяет названия, категории и цены...', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
             const SizedBox(height: 16),
             LinearProgressIndicator(value: progress),
             const SizedBox(height: 8),
@@ -670,7 +684,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
               const SizedBox(height: 16),
               const Icon(Icons.check_circle, color: Colors.green, size: 48),
               const SizedBox(height: 8),
-              const Text('Загрузка завершена!'),
+              const Text('Все продукты успешно добавлены!'),
             ],
           ],
         ),
