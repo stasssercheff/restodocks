@@ -28,15 +28,24 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   Set<String> _selectedTechCards = {}; // ID выбранных карточек
   bool _selectionMode = false;
 
-  String _categoryLabel(String c) {
-    const map = {
-      'sauce': 'Соус', 'vegetables': 'Овощи', 'meat': 'Мясо', 'seafood': 'Рыба',
-      'side': 'Гарнир', 'subside': 'Подгарнир', 'bakery': 'Выпечка', 'dessert': 'Десерт',
-      'decor': 'Декор', 'soup': 'Суп', 'misc': 'Разное', 'beverages': 'Напитки',
+  String _categoryLabel(String c, LocalizationService loc) {
+    final lang = loc.currentLanguageCode;
+    final Map<String, Map<String, String>> categoryTranslations = {
+      'sauce': {'ru': 'Соус', 'en': 'Sauce'},
+      'vegetables': {'ru': 'Овощи', 'en': 'Vegetables'},
+      'meat': {'ru': 'Мясо', 'en': 'Meat'},
+      'seafood': {'ru': 'Рыба', 'en': 'Seafood'},
+      'side': {'ru': 'Гарнир', 'en': 'Side dish'},
+      'subside': {'ru': 'Подгарнир', 'en': 'Sub-side dish'},
+      'bakery': {'ru': 'Выпечка', 'en': 'Bakery'},
+      'dessert': {'ru': 'Десерт', 'en': 'Dessert'},
+      'decor': {'ru': 'Декор', 'en': 'Decor'},
+      'soup': {'ru': 'Суп', 'en': 'Soup'},
+      'misc': {'ru': 'Разное', 'en': 'Misc'},
+      'beverages': {'ru': 'Напитки', 'en': 'Beverages'},
     };
-    final result = map[c] ?? c;
-    print('CATEGORY: $c -> $result');
-    return result;
+
+    return categoryTranslations[c]?[lang] ?? c;
   }
 
   double _calculateCostPerKg(TechCard tc) {
@@ -491,7 +500,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                 cells: [
                   DataCell(Text(tc.isSemiFinished ? 'ПФ' : 'Блюдо')),
                   DataCell(Text(tc.getDisplayNameInLists(lang))),
-                  DataCell(Text(_categoryLabel(tc.category))),
+                  DataCell(Text(_categoryLabel(tc.category, loc))),
                   DataCell(Text(_calculateCostPerKg(tc).toStringAsFixed(0))),
                 ],
                 onSelectChanged: _selectionMode ? null : (_) => context.push('/tech-cards/${tc.id}'),

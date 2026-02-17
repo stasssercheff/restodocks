@@ -442,7 +442,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   String? _error;
   /// 'photo' | 'excel' — какая кнопка сейчас загружает (чтобы показывать правильный текст).
   final _nameController = TextEditingController();
-  static const _categoryOptions = ['misc', 'vegetables', 'fruits', 'meat', 'seafood', 'dairy', 'grains', 'bakery', 'pantry', 'spices', 'beverages', 'eggs', 'legumes', 'nuts'];
+  static const _categoryOptions = ['sauce', 'vegetables', 'meat', 'seafood', 'side', 'subside', 'bakery', 'dessert', 'decor', 'soup', 'misc', 'beverages'];
   String _selectedCategory = 'misc';
   bool _isSemiFinished = true; // ПФ или блюдо (порция — в карточках блюд, отдельно)
   final _technologyController = TextEditingController();
@@ -453,33 +453,38 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   bool get _isNew => widget.techCardId.isEmpty || widget.techCardId == 'new';
 
   String _categoryLabel(String c, String lang) {
-    if (lang == 'ru') {
-      const map = {
-        'vegetables': 'Овощи', 'fruits': 'Фрукты', 'meat': 'Мясо', 'seafood': 'Рыба',
-        'dairy': 'Молочное', 'grains': 'Крупы', 'bakery': 'Выпечка', 'pantry': 'Бакалея',
-        'spices': 'Специи', 'beverages': 'Напитки', 'eggs': 'Яйца', 'legumes': 'Бобовые',
-        'nuts': 'Орехи', 'misc': 'Разное',
-      };
-      return map[c] ?? c;
-    }
-    return c == 'misc' ? 'misc' : c;
+    final Map<String, Map<String, String>> categoryTranslations = {
+      'sauce': {'ru': 'Соус', 'en': 'Sauce'},
+      'vegetables': {'ru': 'Овощи', 'en': 'Vegetables'},
+      'meat': {'ru': 'Мясо', 'en': 'Meat'},
+      'seafood': {'ru': 'Рыба', 'en': 'Seafood'},
+      'side': {'ru': 'Гарнир', 'en': 'Side dish'},
+      'subside': {'ru': 'Подгарнир', 'en': 'Sub-side dish'},
+      'bakery': {'ru': 'Выпечка', 'en': 'Bakery'},
+      'dessert': {'ru': 'Десерт', 'en': 'Dessert'},
+      'decor': {'ru': 'Декор', 'en': 'Decor'},
+      'soup': {'ru': 'Суп', 'en': 'Soup'},
+      'misc': {'ru': 'Разное', 'en': 'Misc'},
+      'beverages': {'ru': 'Напитки', 'en': 'Beverages'},
+    };
+
+    return categoryTranslations[c]?[lang] ?? c;
   }
 
   /// Простой вывод категории из названия блюда (для предзаполнения из ИИ).
   String _inferCategory(String dishName) {
     final lower = dishName.toLowerCase();
+    if (lower.contains('соус') || lower.contains('sauce')) return 'sauce';
     if (lower.contains('овощ') || lower.contains('vegetable') || lower.contains('салат')) return 'vegetables';
-    if (lower.contains('фрукт') || lower.contains('fruit') || lower.contains('ягод')) return 'fruits';
     if (lower.contains('мяс') || lower.contains('meat') || lower.contains('куриц') || lower.contains('говядин')) return 'meat';
-    if (lower.contains('рыб') || lower.contains('fish') || lower.contains('море')) return 'seafood';
-    if (lower.contains('молок') || lower.contains('dairy') || lower.contains('сыр') || lower.contains('cream')) return 'dairy';
-    if (lower.contains('круп') || lower.contains('grain') || lower.contains('рис') || lower.contains('макарон')) return 'grains';
+    if (lower.contains('рыб') || lower.contains('fish') || lower.contains('море') || lower.contains('seafood')) return 'seafood';
+    if (lower.contains('гарнир') || lower.contains('side')) return 'side';
+    if (lower.contains('подгарнир') || lower.contains('subside')) return 'subside';
     if (lower.contains('выпеч') || lower.contains('bakery') || lower.contains('хлеб') || lower.contains('тест')) return 'bakery';
+    if (lower.contains('десерт') || lower.contains('dessert')) return 'dessert';
+    if (lower.contains('декор') || lower.contains('decor')) return 'decor';
+    if (lower.contains('суп') || lower.contains('soup')) return 'soup';
     if (lower.contains('напит') || lower.contains('beverage') || lower.contains('сок') || lower.contains('компот')) return 'beverages';
-    if (lower.contains('специ') || lower.contains('spice')) return 'spices';
-    if (lower.contains('яйц') || lower.contains('egg')) return 'eggs';
-    if (lower.contains('боб') || lower.contains('legume')) return 'legumes';
-    if (lower.contains('орех') || lower.contains('nut')) return 'nuts';
     return 'misc';
   }
 
