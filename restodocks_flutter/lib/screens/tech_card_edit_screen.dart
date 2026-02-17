@@ -494,6 +494,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
       await context.read<ProductStoreSupabase>().loadProducts();
       final est = context.read<AccountManagerSupabase>().establishment;
       if (est != null) {
+        await context.read<ProductStoreSupabase>().loadNomenclature(est.id);
         final tcs = await context.read<TechCardServiceSupabase>().getTechCardsForEstablishment(est.id);
         if (mounted) {
           _pickerTechCards = _isNew ? tcs : tcs.where((t) => t.id != widget.techCardId).toList();

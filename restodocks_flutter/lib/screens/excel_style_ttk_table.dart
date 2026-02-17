@@ -493,7 +493,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     }
 
     // Добавляем ПФ
-    if (widget.semiFinishedProducts != null && widget.semiFinishedProducts!.isNotEmpty) {
+    if (widget.semiFinishedProducts != null) {
       for (final pf in widget.semiFinishedProducts!) {
         allItems.add(SelectableItem(
           type: 'pf',
