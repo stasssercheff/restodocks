@@ -448,6 +448,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   final _technologyController = TextEditingController();
   final List<TTIngredient> _ingredients = [];
   List<TechCard> _pickerTechCards = [];
+  List<TechCard> _semiFinishedProducts = [];
 
   bool get _isNew => widget.techCardId.isEmpty || widget.techCardId == 'new';
 
@@ -491,6 +492,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
         final tcs = await context.read<TechCardServiceSupabase>().getTechCardsForEstablishment(est.id);
         if (mounted) {
           _pickerTechCards = _isNew ? tcs : tcs.where((t) => t.id != widget.techCardId).toList();
+          _semiFinishedProducts = tcs.where((t) => t.isSemiFinished).toList();
         }
       }
       if (_isNew) {
@@ -1235,6 +1237,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                             technologyController: _technologyController,
                             productStore: context.read<ProductStoreSupabase>(),
                             establishmentId: context.read<AccountManagerSupabase>().establishment?.id,
+                            semiFinishedProducts: _semiFinishedProducts,
                             onAdd: _showAddIngredient,
                             onUpdate: (i, ing) {
                               setState(() {

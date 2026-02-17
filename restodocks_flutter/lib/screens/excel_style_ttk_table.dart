@@ -13,6 +13,7 @@ class ExcelStyleTtkTable extends StatefulWidget {
   final TextEditingController? technologyController;
   final ProductStoreSupabase productStore;
   final String? establishmentId;
+  final List<TechCard>? semiFinishedProducts;
   final void Function([int?]) onAdd;
   final void Function(int, TTIngredient) onUpdate;
   final void Function(int) onRemove;
@@ -29,6 +30,7 @@ class ExcelStyleTtkTable extends StatefulWidget {
     this.technologyController,
     required this.productStore,
     this.establishmentId,
+    this.semiFinishedProducts,
     required this.onAdd,
     required this.onUpdate,
     required this.onRemove,
@@ -94,7 +96,6 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
     // Стоимость за кг готового продукта: (сумма стоимостей брутто / общий нетто вес) * 1000, округлить вверх
     final costPerKgFinishedProduct = totalOutput > 0 ? ((totalCost / totalOutput) * 1000).ceil() : 0;
-    print('TOTALS: totalCost=$totalCost, totalOutput=$totalOutput, costPerKg=$costPerKgFinishedProduct');
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -411,29 +412,73 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   }
 
   Widget _buildSearchableProductDropdown(TTIngredient ingredient, int rowIndex) {
+    // Создаем объединенный список: продукты + ПФ
+    final allItems = <SelectableItem>[];
+
+    // Добавляем продукты
+    for (final product in widget.productStore.allProducts) {
+      allItems.add(SelectableItem(
+        type: 'product',
+        item: product,
+        displayName: product.getLocalizedName('ru'),
+        searchName: product.name.toLowerCase(),
+      ));
+    }
+
+    // Добавляем ПФ
+    if (widget.semiFinishedProducts != null) {
+      for (final pf in widget.semiFinishedProducts!) {
+        allItems.add(SelectableItem(
+          type: 'pf',
+          item: pf,
+          displayName: 'ПФ ${pf.getDisplayNameInLists(widget.loc)}',
+          searchName: pf.dishName.toLowerCase(),
+        ));
+      }
+    }
+
+    // Сортируем по displayName
+    allItems.sort((a, b) => a.displayName.compareTo(b.displayName));
+
     return _ProductSearchDropdown(
-      products: widget.productStore.allProducts,
+      items: allItems,
       loc: widget.loc,
-      onProductSelected: (product) {
-        // Получаем цену за кг
-        final establishmentPrice = widget.productStore?.getEstablishmentPrice(product.id, widget.establishmentId);
-        final productPrice = establishmentPrice?.$1 ?? product.basePrice;
+      onProductSelected: (selectedItem) {
+        if (selectedItem.type == 'product') {
+          final product = selectedItem.item as Product;
+          // Получаем цену за кг
+          final establishmentPrice = widget.productStore?.getEstablishmentPrice(product.id, widget.establishmentId);
+          final productPrice = establishmentPrice?.$1 ?? product.basePrice;
 
-        // Сначала обновляем продукт, потом пересчитаем выход
-        var updatedIngredient = ingredient.copyWith(
-          productId: product.id,
-          productName: product.name,
-          unit: product.unit,
-          pricePerKg: productPrice, // Сохраняем цену за кг
-          cost: 0.0, // Пока cost = 0, будет пересчитан при вводе grossWeight
-        );
+          // Сначала обновляем продукт, потом пересчитаем выход
+          var updatedIngredient = ingredient.copyWith(
+            productId: product.id,
+            productName: product.name,
+            unit: product.unit,
+            pricePerKg: productPrice, // Сохраняем цену за кг
+            cost: 0.0, // Пока cost = 0, будет пересчитан при вводе grossWeight
+          );
 
-        // Выход всегда равен нетто (после учета % отхода)
-        final outputWeight = updatedIngredient.netWeight;
+          // Выход всегда равен нетто (после учета % отхода)
+          final outputWeight = updatedIngredient.netWeight;
 
-        updatedIngredient = updatedIngredient.copyWith(outputWeight: outputWeight);
+          updatedIngredient = updatedIngredient.copyWith(outputWeight: outputWeight);
 
-        _updateIngredient(rowIndex, updatedIngredient);
+          _updateIngredient(rowIndex, updatedIngredient);
+        } else if (selectedItem.type == 'pf') {
+          final pf = selectedItem.item as TechCard;
+          // Для ПФ создаем ингредиент с ссылкой на ТТК
+          var updatedIngredient = ingredient.copyWith(
+            sourceTechCardId: pf.id,
+            sourceTechCardName: pf.dishName,
+            productName: 'ПФ ${pf.getDisplayNameInLists(widget.loc)}',
+            unit: 'г',
+            pricePerKg: null, // Для ПФ цена рассчитывается отдельно
+            cost: 0.0,
+          );
+
+          _updateIngredient(rowIndex, updatedIngredient);
+        }
 
         // Добавляем новую пустую строку только если это была последняя строка
         if (rowIndex == widget.ingredients.length - 1) {
@@ -630,13 +675,27 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
 }
 
+class SelectableItem {
+  final String type; // 'product' или 'pf'
+  final dynamic item; // Product или TechCard
+  final String displayName;
+  final String searchName;
+
+  SelectableItem({
+    required this.type,
+    required this.item,
+    required this.displayName,
+    required this.searchName,
+  });
+}
+
 class _ProductSearchDropdown extends StatefulWidget {
-  final List<Product> products;
-  final Function(Product) onProductSelected;
+  final List<SelectableItem> items;
+  final Function(SelectableItem) onProductSelected;
   final LocalizationService loc;
 
   const _ProductSearchDropdown({
-    required this.products,
+    required this.items,
     required this.onProductSelected,
     required this.loc,
   });
@@ -651,13 +710,13 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
   final LayerLink _layerLink = LayerLink();
   OverlayEntry? _overlayEntry;
   bool _isDropdownOpen = false;
-  List<Product> _filteredProducts = [];
+  List<SelectableItem> _filteredItems = [];
   bool _isSelectingProduct = false; // Флаг для предотвращения конфликта при выборе продукта
 
   @override
   void initState() {
     super.initState();
-    _filteredProducts = widget.products.take(10).toList();
+    _filteredItems = widget.items.take(50).toList();
     _searchController.addListener(_filterProducts);
     _searchController.addListener(_showDropdownOnInput);
     _searchFocusNode.addListener(_onFocusChange);
@@ -675,37 +734,12 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
     final query = _searchController.text.trim();
     setState(() {
       if (query.isEmpty) {
-        // Убираем дубликаты по имени (оставляем первый продукт с данным именем)
-        final uniqueProducts = <String, Product>{};
-        for (final product in widget.products) {
-          if (!uniqueProducts.containsKey(product.name.toLowerCase())) {
-            uniqueProducts[product.name.toLowerCase()] = product;
-          }
-        }
-        _filteredProducts = uniqueProducts.values.toList()
-          ..sort((a, b) {
-            final aName = a.getLocalizedName(widget.loc.currentLanguageCode);
-            final bName = b.getLocalizedName(widget.loc.currentLanguageCode);
-            print('SORT: ${a.name} -> $aName vs ${b.name} -> $bName');
-            return aName.compareTo(bName);
-          });
-        _filteredProducts = _filteredProducts.take(50).toList();
+        _filteredItems = widget.items.take(50).toList();
       } else {
-        // Убираем дубликаты по имени и фильтруем
-        final uniqueProducts = <String, Product>{};
-        for (final product in widget.products) {
-          if (product.name.toLowerCase().startsWith(query.toLowerCase())) {
-            uniqueProducts[product.name.toLowerCase()] = product;
-          }
-        }
-        _filteredProducts = uniqueProducts.values.toList()
-          ..sort((a, b) {
-            final aName = a.getLocalizedName(widget.loc.currentLanguageCode);
-            final bName = b.getLocalizedName(widget.loc.currentLanguageCode);
-            print('SORT: ${a.name} -> $aName vs ${b.name} -> $bName');
-            return aName.compareTo(bName);
-          });
-        _filteredProducts = _filteredProducts.take(20).toList();
+        _filteredItems = widget.items
+            .where((item) => item.searchName.contains(query.toLowerCase()))
+            .take(20)
+            .toList();
       }
     });
 
@@ -737,78 +771,6 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
     }
   }
 
-  void _validateAndSelectProduct() {
-    final query = _searchController.text.trim();
-    if (query.isEmpty) {
-      _hideOverlay();
-      return;
-    }
-
-    // Сначала ищем точное совпадение
-    final exactMatch = widget.products.firstWhere(
-      (product) => product.name.toLowerCase() == query.toLowerCase(),
-      orElse: () => null as Product,
-    );
-
-    if (exactMatch != null) {
-      widget.onProductSelected(exactMatch);
-      _searchController.text = exactMatch.name;
-      _hideOverlay();
-      return;
-    }
-
-    // Ищем наиболее подходящий продукт по первым буквам
-    final bestMatch = widget.products.firstWhere(
-      (product) => product.name.toLowerCase().startsWith(query.toLowerCase()),
-      orElse: () => null as Product,
-    );
-
-    if (bestMatch != null) {
-      widget.onProductSelected(bestMatch);
-      _searchController.text = bestMatch.name;
-      _hideOverlay();
-    } else {
-      // Ищем наиболее близкий вариант по количеству совпадающих символов
-      final closestMatch = _findClosestMatch(query);
-      if (closestMatch != null) {
-        widget.onProductSelected(closestMatch);
-        _searchController.text = closestMatch.name;
-        _hideOverlay();
-      } else {
-        // Ничего подходящего нет, очищаем поле
-        _searchController.clear();
-        _hideOverlay();
-      }
-    }
-  }
-
-  Product? _findClosestMatch(String query) {
-    Product? bestMatch;
-    int bestScore = 0;
-    final queryLower = query.toLowerCase();
-
-    for (final product in widget.products) {
-      final name = product.name.toLowerCase();
-
-      // Считаем количество совпадающих символов с начала
-      int score = 0;
-      for (int i = 0; i < queryLower.length && i < name.length; i++) {
-        if (queryLower[i] == name[i]) {
-          score++;
-        } else {
-          break;
-        }
-      }
-
-      // Если совпадает хотя бы первый символ, считаем это вариантом
-      if (score > bestScore && score > 0) {
-        bestScore = score;
-        bestMatch = product;
-      }
-    }
-
-    return bestMatch;
-  }
 
   void _showOverlay() {
     if (_overlayEntry != null) return;
@@ -832,14 +794,14 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
               ),
               child: ListView.builder(
                 shrinkWrap: true,
-                itemCount: _filteredProducts.length,
+                itemCount: _filteredItems.length,
                 itemBuilder: (context, index) {
-                  final product = _filteredProducts[index];
+                  final item = _filteredItems[index];
                   return InkWell(
                     onTap: () {
                       _isSelectingProduct = true;
-                      widget.onProductSelected(product);
-                      _searchController.text = product.name;
+                      widget.onProductSelected(item);
+                      _searchController.text = item.displayName;
                       _hideOverlay();
                       // Сбрасываем флаг через короткое время
                       Future.delayed(const Duration(milliseconds: 50), () {
@@ -848,13 +810,13 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                      decoration: index < _filteredProducts.length - 1
+                      decoration: index < _filteredItems.length - 1
                           ? const BoxDecoration(
                               border: Border(bottom: BorderSide(color: Colors.grey, width: 0.2)),
                             )
                           : null,
                       child: Text(
-                        product.name,
+                        item.displayName,
                         style: const TextStyle(fontSize: 12),
                       ),
                     ),
@@ -947,28 +909,6 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
                       _hideOverlay();
                     }
                   }
-                },
-                onSubmitted: (value) {
-                  final trimmedValue = value.trim();
-                  if (trimmedValue.isNotEmpty) {
-                    final hasMatches = widget.products.any(
-                      (product) => product.name.toLowerCase().startsWith(trimmedValue.toLowerCase())
-                    );
-
-                    if (!hasMatches) {
-                      // Если нет подходящих продуктов, находим ближайший и выбираем его
-                      final closestMatch = _findClosestMatch(trimmedValue);
-                      if (closestMatch != null) {
-                        widget.onProductSelected(closestMatch);
-                        _searchController.text = closestMatch.name;
-                      } else {
-                        _searchController.clear();
-                      }
-                    } else {
-                      _validateAndSelectProduct();
-                    }
-                  }
-                  _hideOverlay();
                 },
               ),
             ),
