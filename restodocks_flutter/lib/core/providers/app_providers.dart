@@ -2,6 +2,7 @@ import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 
 import '../../services/services.dart';
+import '../../services/ai_service_supabase.dart';
 
 /// Настройка всех провайдеров приложения
 class AppProviders {
@@ -29,7 +30,7 @@ class AppProviders {
         Provider<ChecklistServiceSupabase>(
           create: (_) => ChecklistServiceSupabase(),
         ),
-        Provider<AiService>(
+        Provider<AiServiceSupabase>(
           create: (_) => AiServiceSupabase(),
         ),
 
