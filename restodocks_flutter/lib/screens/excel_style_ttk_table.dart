@@ -228,7 +228,13 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     }, 'cooking_loss_$rowIndex'),
 
                     // Выход (всегда равен нетто)
-                    _buildReadOnlyCell(ingredient.outputWeight == 0 ? '' : ingredient.outputWeight.toStringAsFixed(0)),
+                    _buildNumericCell(ingredient.outputWeight == 0 ? '' : ingredient.outputWeight.toStringAsFixed(0), (value) {
+                      final output = double.tryParse(value) ?? 0;
+                      _updateIngredient(rowIndex, ingredient.copyWith(
+                        outputWeight: output,
+                        isNetWeightManual: true, // Помечаем что выход изменен вручную
+                      ));
+                    }, 'output_$rowIndex'),
 
                     // Стоимость
                     _buildCostCell(ingredient),
@@ -266,7 +272,6 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   const SizedBox.shrink(), // % отхода
                   const SizedBox.shrink(), // Нетто
                   const SizedBox.shrink(), // Способ
-                  const SizedBox.shrink(), // % ужарки
                   _buildTotalCell('${totalOutput.toStringAsFixed(0)}г'), // Выход
                   _buildTotalCell('${totalCost.toStringAsFixed(0)}'), // Общая стоимость
                   _buildTotalCell('${avgCostPerKg.isNaN ? 0 : avgCostPerKg.toStringAsFixed(0)}'), // Средняя цена за кг
@@ -444,23 +449,36 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     return Container(
       height: 44,
       child: widget.canEdit
-          ? TextField(
-              controller: controller,
-              keyboardType: TextInputType.text,
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-              ],
-              style: const TextStyle(fontSize: 12),
-              textAlign: TextAlign.center,
-              decoration: const InputDecoration(
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 12),
-                isDense: true,
-                filled: true,
-                fillColor: Colors.white,
+          ? GestureDetector(
+              onTap: () {
+                // Force focus on TextField when tapped
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  final focusNode = FocusNode();
+                  focusNode.requestFocus();
+                  // Dispose focus node after use
+                  Future.delayed(const Duration(milliseconds: 100), () {
+                    focusNode.dispose();
+                  });
+                });
+              },
+              child: TextField(
+                controller: controller,
+                keyboardType: TextInputType.text,
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                ],
+                style: const TextStyle(fontSize: 12),
+                textAlign: TextAlign.center,
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+                  isDense: true,
+                  filled: true,
+                  fillColor: Colors.white,
+                ),
+                onChanged: onChanged,
+                onSubmitted: onChanged,
               ),
-              onChanged: onChanged,
-              onSubmitted: onChanged,
             )
           : Container(
               alignment: Alignment.center,
@@ -863,13 +881,13 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
                   }
                 },
                 onChanged: (value) {
-                  // Показываем dropdown при вводе
                   if (!_isDropdownOpen && value.isNotEmpty) {
                     setState(() {
                       _isDropdownOpen = true;
                     });
                     _showOverlay();
                   }
+                  _filterProducts();
 
                   // Автовыбор при точном совпадении или единственном результате
                   if (value.length >= 2) {
@@ -921,10 +939,22 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
                 },
               ),
             ),
-            Icon(
-              _isDropdownOpen ? Icons.arrow_drop_up : Icons.arrow_drop_down,
-              size: 16,
-              color: Colors.grey,
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _isDropdownOpen = !_isDropdownOpen;
+                });
+                if (_isDropdownOpen) {
+                  _showOverlay();
+                } else {
+                  _hideOverlay();
+                }
+              },
+              child: Icon(
+                _isDropdownOpen ? Icons.arrow_drop_up : Icons.arrow_drop_down,
+                size: 16,
+                color: Colors.grey,
+              ),
             ),
           ],
         ),
