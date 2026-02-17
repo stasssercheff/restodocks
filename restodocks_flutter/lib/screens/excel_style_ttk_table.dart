@@ -632,7 +632,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 class _ProductSearchDropdown extends StatefulWidget {
   final List<Product> products;
   final Function(Product) onProductSelected;
-  final AppLocalizations loc;
+  final LocalizationService loc;
 
   const _ProductSearchDropdown({
     required this.products,
@@ -682,7 +682,7 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
           }
         }
         _filteredProducts = uniqueProducts.values.toList()
-          ..sort((a, b) => a.getLocalizedName(widget.loc).compareTo(b.getLocalizedName(widget.loc)));  // Сортировка в обратном алфавитном порядке
+          ..sort((a, b) => a.getLocalizedName(widget.loc.currentLanguageCode).compareTo(b.getLocalizedName(widget.loc.currentLanguageCode)));  // Сортировка в алфавитном порядке
         _filteredProducts = _filteredProducts.take(10).toList();
       } else {
         // Убираем дубликаты по имени и фильтруем
@@ -693,7 +693,7 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
           }
         }
         _filteredProducts = uniqueProducts.values.toList()
-          ..sort((a, b) => a.getLocalizedName(widget.loc).compareTo(b.getLocalizedName(widget.loc)));  // Сортировка в обратном алфавитном порядке
+          ..sort((a, b) => a.getLocalizedName(widget.loc.currentLanguageCode).compareTo(b.getLocalizedName(widget.loc.currentLanguageCode)));  // Сортировка в алфавитном порядке
         _filteredProducts = _filteredProducts.take(20).toList();
       }
     });
