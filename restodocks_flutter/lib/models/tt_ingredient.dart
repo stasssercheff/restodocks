@@ -314,6 +314,7 @@ class TTIngredient extends Equatable {
     // Расчет стоимости: цена за грамм * вес брутто
     final pricePerGram = (productPrice ?? 0) / 1000.0;
     double cost = pricePerGram * grossG;
+    print('DEBUG COST: ${product.getLocalizedName(languageCode)}, productPrice=$productPrice, pricePerGram=$pricePerGram, grossG=$grossG, cost=$cost');
 
     return TTIngredient(
       id: DateTime.now().millisecondsSinceEpoch.toString(),

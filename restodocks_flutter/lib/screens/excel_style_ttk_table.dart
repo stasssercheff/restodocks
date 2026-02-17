@@ -560,6 +560,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   Widget _buildPricePerKgCell(TTIngredient ingredient) {
     // Стоимость за кг выхода (нетто) - показывается в строке продукта
     final costPerKgOutput = ingredient.outputWeight > 0 ? (ingredient.cost / ingredient.outputWeight) * 1000 : 0;
+    print('DEBUG PRICE CELL: ${ingredient.productName}, cost=${ingredient.cost}, outputWeight=${ingredient.outputWeight}, costPerKgOutput=$costPerKgOutput');
 
     return Container(
       height: 44,
