@@ -558,14 +558,14 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   }
 
   Widget _buildPricePerKgCell(TTIngredient ingredient) {
-    // Стоимость взятого количества (брутто) - показывается в строке продукта
-    final costOfGrossWeight = ingredient.cost;
+    // Стоимость за кг данного продукта в готовом блюде
+    final costPerKgInDish = ingredient.outputWeight > 0 ? ingredient.cost / (ingredient.outputWeight / 1000) : 0;
 
     return Container(
       height: 44,
       child: Center(
         child: Text(
-          costOfGrossWeight.toStringAsFixed(0),
+          costPerKgInDish.toStringAsFixed(0),
           style: const TextStyle(fontSize: 12),
         ),
       ),
