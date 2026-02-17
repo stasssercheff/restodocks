@@ -45,6 +45,13 @@ class OwnerHomeContent extends StatelessWidget {
               color: Colors.teal,
             ),
             _TileData(
+              icon: Icons.upload_file,
+              title: loc.t('upload_products'),
+              subtitle: loc.t('upload_products_desc'),
+              onTap: () => context.push('/products/upload'),
+              color: Colors.purple,
+            ),
+            _TileData(
               icon: Icons.assignment,
               title: loc.t('inventory_blank'),
               onTap: () => context.push('/inventory'),

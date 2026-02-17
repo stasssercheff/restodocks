@@ -7,6 +7,7 @@ export 'bar_screen.dart';
 export 'dining_room_screen.dart';
 export 'management_screen.dart';
 export 'products_screen.dart';
+export 'product_upload_screen.dart';
 export 'profile_screen.dart';
 export 'settings_screen.dart';
 export 'inventory_screen.dart';

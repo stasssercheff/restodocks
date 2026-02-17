@@ -139,6 +139,10 @@ class AppRouter {
         path: '/products',
         builder: (context, state) => const ProductsScreen(),
       ),
+      GoRoute(
+        path: '/products/upload',
+        builder: (context, state) => const ProductUploadScreen(),
+      ),
 
       GoRoute(
         path: '/product-order',

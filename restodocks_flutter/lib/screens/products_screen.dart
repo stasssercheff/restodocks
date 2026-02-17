@@ -462,25 +462,67 @@ class _ProductsScreenState extends State<ProductsScreen> {
     await showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Загрузить список'),
+        title: const Text('Добавить продукты в номенклатуру'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            const Text(
+              'Загрузите список продуктов из файла или вставьте текстом.\n'
+              'Продукты будут добавлены в общую базу и в вашу номенклатуру.',
+              style: TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 16),
             ListTile(
-              leading: const Icon(Icons.file_upload),
-              title: const Text('Из файла (.txt, .xlsx, .xls)'),
+              leading: const Icon(Icons.file_upload, color: Colors.blue),
+              title: const Text('Из файла'),
+              subtitle: const Text('Excel (.xlsx, .xls), Текст (.txt), RTF (.rtf)'),
               onTap: () {
                 Navigator.of(ctx).pop();
                 _uploadFromTxt(loc);
               },
             ),
             ListTile(
-              leading: const Icon(Icons.content_paste),
-              title: const Text('Вставить из текста'),
+              leading: const Icon(Icons.content_paste, color: Colors.green),
+              title: const Text('Вставить текст'),
+              subtitle: const Text('Скопировать и вставить список'),
               onTap: () {
                 Navigator.of(ctx).pop();
-                _showPasteDialog(loc);
+                _showPasteDialog(context, loc);
               },
+            ),
+            const Divider(),
+            ExpansionTile(
+              title: const Text('Формат данных'),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Пример формата:', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'Авокадо\t₫99,000\n'
+                          'Базилик\t₫267,000\n'
+                          'Баклажан\t₫12,000\n'
+                          'Молоко\t₫38,000',
+                          style: TextStyle(fontFamily: 'monospace', fontSize: 12),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text('• Название и цена разделяются табуляцией (Tab) или пробелами'),
+                      const Text('• Можно использовать запятые в ценах'),
+                      const Text('• Поддерживаются символы валюты (₫, $, €, руб.)'),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ],
         ),
