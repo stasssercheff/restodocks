@@ -412,7 +412,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   Widget _buildSearchableProductDropdown(TTIngredient ingredient, int rowIndex) {
     return _ProductSearchDropdown(
       products: widget.productStore.allProducts,
-      loc: loc,
+      loc: widget.loc,
       onProductSelected: (product) {
         // Получаем цену за кг
         final establishmentPrice = widget.productStore?.getEstablishmentPrice(product.id, widget.establishmentId);
