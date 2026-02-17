@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import 'excel_style_ttk_table.dart';
+
 import '../models/models.dart';
 import '../services/ai_service.dart';
 import '../services/image_service.dart';
@@ -477,6 +479,35 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         ),
       );
     }
+
+    // Разделяем список на ПФ и Блюда
+    final semiFinishedCards = _list.where((tc) => tc.isSemiFinished).toList();
+    final dishCards = _list.where((tc) => !tc.isSemiFinished).toList();
+
+    return DefaultTabController(
+      length: 2,
+      child: Column(
+        children: [
+          TabBar(
+            tabs: const [
+              Tab(text: 'ПФ'),
+              Tab(text: 'Блюда'),
+            ],
+          ),
+          Expanded(
+            child: TabBarView(
+              children: [
+                _buildTechCardsTable(semiFinishedCards, loc),
+                _buildTechCardsTable(dishCards, loc),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTechCardsTable(List<TechCard> techCards, LocalizationService loc) {
     final lang = loc.currentLanguageCode;
     return RefreshIndicator(
       onRefresh: _load,
@@ -485,27 +516,28 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         scrollDirection: Axis.vertical,
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
-          child: DataTable(
-            headingRowColor: WidgetStateProperty.all(Theme.of(context).colorScheme.primaryContainer),
-            columns: [
-              DataColumn(label: Text('Тип ТТК', style: const TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('Название', style: const TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('Категория', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('Стоимость за кг', style: TextStyle(fontWeight: FontWeight.bold))),
-            ],
-            rows: List.generate(_list.length, (i) {
-              final tc = _list[i];
-              return DataRow(
-                selected: _selectedTechCards.contains(tc.id),
-                cells: [
-                  DataCell(Text(tc.isSemiFinished ? 'ПФ' : 'Блюдо')),
-                  DataCell(Text(tc.getDisplayNameInLists(lang))),
-                  DataCell(Text(_categoryLabel(tc.category, loc))),
-                  DataCell(Text(_calculateCostPerKg(tc).toStringAsFixed(0))),
-                ],
-                onSelectChanged: _selectionMode ? null : (_) => context.push('/tech-cards/${tc.id}'),
-              );
-            }),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 1000), // Та же ширина как при создании
+            child: DataTable(
+              headingRowColor: WidgetStateProperty.all(Theme.of(context).colorScheme.primaryContainer),
+              columns: [
+                DataColumn(label: Text('Название', style: const TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(label: Text('Категория', style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(label: Text('Стоимость за кг', style: TextStyle(fontWeight: FontWeight.bold))),
+              ],
+              rows: List.generate(techCards.length, (i) {
+                final tc = techCards[i];
+                return DataRow(
+                  selected: _selectedTechCards.contains(tc.id),
+                  cells: [
+                    DataCell(Text(tc.getDisplayNameInLists(lang))),
+                    DataCell(Text(_categoryLabel(tc.category, loc))),
+                    DataCell(Text(_calculateCostPerKg(tc).toStringAsFixed(0))),
+                  ],
+                  onSelectChanged: _selectionMode ? null : (_) => context.push('/tech-cards/${tc.id}'),
+                );
+              }),
+            ),
           ),
         ),
       ),
