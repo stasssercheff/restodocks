@@ -84,11 +84,18 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
 
       try {
         // Используем ИИ для проверки и улучшения данных продукта
-        final aiService = context.read<AiServiceSupabase>();
-        final verification = await aiService.verifyProduct(
-          item.name,
-          currentPrice: item.price,
-        );
+        ProductVerificationResult? verification;
+        try {
+          final aiService = context.read<AiServiceSupabase>();
+          verification = await aiService.verifyProduct(
+            item.name,
+            currentPrice: item.price,
+          );
+        } catch (aiError) {
+          // Если AI не работает, продолжаем без него
+          print('AI verification failed for "${item.name}": $aiError');
+          verification = null;
+        }
 
         // Используем проверенные ИИ данные или оригинальные
         final normalizedName = verification?.normalizedName ?? item.name;
