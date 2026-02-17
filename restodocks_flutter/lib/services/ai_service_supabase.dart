@@ -201,6 +201,8 @@ class AiServiceSupabase implements AiService {
     if (data == null) return null;
     return ProductVerificationResult(
       normalizedName: data['normalizedName'] as String?,
+      suggestedCategory: data['suggestedCategory'] as String?,
+      suggestedUnit: data['suggestedUnit'] as String?,
       suggestedPrice: data['suggestedPrice'] != null ? (data['suggestedPrice'] as num).toDouble() : null,
       suggestedCalories: data['suggestedCalories'] != null ? (data['suggestedCalories'] as num).toDouble() : null,
       suggestedProtein: data['suggestedProtein'] != null ? (data['suggestedProtein'] as num).toDouble() : null,
