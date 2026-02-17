@@ -139,6 +139,10 @@ class AppRouter {
         path: '/products',
         builder: (context, state) => const ProductsScreen(),
       ),
+      GoRoute(
+        path: '/products/catalog',
+        builder: (context, state) => const ProductsScreen(initialTab: 1),
+      ),
 
       GoRoute(
         path: '/product-order',
