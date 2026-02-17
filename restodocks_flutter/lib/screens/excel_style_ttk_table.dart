@@ -109,12 +109,11 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         scrollDirection: Axis.vertical,
         child: ConstrainedBox(
           constraints: const BoxConstraints(minWidth: 1000), // Минимальная ширина для всех столбцов - уменьшена
-          child: Row(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Левая часть: таблица без столбца технологии
-              Expanded(
-                child: Table(
+              // Таблица на всю ширину
+              Table(
             border: TableBorder.all(color: Colors.black, width: 1),
             defaultVerticalAlignment: TableCellVerticalAlignment.top,
             columnWidths: const {
@@ -286,41 +285,43 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
             ],
           ),
               ),
-              // Правая часть: объединенная ячейка технологии
+
+              // Поле технологии под таблицей на всю ширину
               if (ingredients.isNotEmpty)
                 Container(
-                  width: 100,
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(top: 16),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.black, width: 1),
+                    color: Colors.white,
+                  ),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Шапка технологии
+                      // Заголовок технологии
                       Container(
-                        height: 44,
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                         decoration: BoxDecoration(
-                          border: Border.all(color: Colors.black, width: 1),
                           color: Colors.grey.shade200,
+                          border: const Border(bottom: BorderSide(color: Colors.black, width: 1)),
                         ),
-                        alignment: Alignment.center,
                         child: Text(
                           'Технология',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                         ),
                       ),
-                      // Объединенная ячейка технологии
+                      // Поле для ввода технологии
                       Container(
-                        height: ingredients.length * 44.0,
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.black, width: 1),
-                          color: Colors.white,
-                        ),
-                        alignment: Alignment.topLeft,
-                        padding: const EdgeInsets.only(top: 12, left: 4, right: 4),
+                        width: double.infinity,
+                        constraints: const BoxConstraints(minHeight: 120),
+                        padding: const EdgeInsets.all(12),
                         child: widget.canEdit && widget.technologyController != null
                             ? TextField(
                                 controller: widget.technologyController,
                                 maxLines: null,
-                                minLines: 1,
-                                style: const TextStyle(fontSize: 11),
+                                minLines: 5,
+                                style: const TextStyle(fontSize: 12),
                                 textAlign: TextAlign.left,
                                 decoration: const InputDecoration(
                                   border: InputBorder.none,
@@ -328,21 +329,14 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                                   isDense: true,
                                   filled: true,
                                   fillColor: Colors.transparent,
+                                  hintText: 'Введите технологию приготовления...',
                                 ),
                               )
                             : Text(
                                 widget.technologyController?.text ?? '',
-                                style: const TextStyle(fontSize: 11),
+                                style: const TextStyle(fontSize: 12),
                                 textAlign: TextAlign.left,
                               ),
-                      ),
-                      // Пустое место для строки итого
-                      Container(
-                        height: 44,
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.black, width: 1),
-                          color: Colors.red.shade50,
-                        ),
                       ),
                     ],
                   ),
