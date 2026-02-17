@@ -15,10 +15,7 @@ import '../services/services.dart';
 
 /// Экран с двумя вкладками: Номенклатура (продукты заведения) и Справочник (все продукты, добавление в номенклатуру).
 class ProductsScreen extends StatefulWidget {
-  const ProductsScreen({super.key, this.initialTab = 0});
-
-  /// Начальная вкладка: 0 - номенклатура, 1 - справочник
-  final int initialTab;
+  const ProductsScreen({super.key});
 
   @override
   State<ProductsScreen> createState() => _ProductsScreenState();
@@ -51,7 +48,7 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this, initialIndex: widget.initialTab);
+    _tabController = TabController(length: 2, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _ensureLoaded());
   }
 
