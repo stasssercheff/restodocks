@@ -440,7 +440,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         allItems.add(SelectableItem(
           type: 'pf',
           item: pf,
-          displayName: 'ПФ ${pf.getDisplayNameInLists(widget.loc.currentLanguageCode)}',
+          displayName: pf.getDisplayNameInLists(widget.loc.currentLanguageCode),
           searchName: pf.dishName.toLowerCase(),
         ));
       }
@@ -501,7 +501,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
           var updatedIngredient = ingredient.copyWith(
             sourceTechCardId: pf.id,
             sourceTechCardName: pf.dishName,
-            productName: 'ПФ ${pf.getDisplayNameInLists(widget.loc.currentLanguageCode)}',
+            productName: pf.getDisplayNameInLists(widget.loc.currentLanguageCode),
             unit: 'г',
             pricePerKg: pfPricePerKg, // Стоимость за кг ПФ
             cost: 0.0, // Пока cost = 0, будет пересчитан при вводе grossWeight
@@ -653,14 +653,15 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   }
 
   Widget _buildPricePerKgCell(TTIngredient ingredient) {
-    // Стоимость за кг выхода (меняется в зависимости от брутто и отхода)
-    final costPerKgOutput = ingredient.outputWeight > 0 ? (ingredient.cost / ingredient.outputWeight) * 1000 : 0;
+    // Стоимость продукта по брутто (цена за кг * вес брутто в кг)
+    final pricePerKg = ingredient.pricePerKg ?? 0;
+    final grossCost = pricePerKg * (ingredient.grossWeight / 1000);
 
     return Container(
       height: 44,
       child: Center(
         child: Text(
-          costPerKgOutput.toStringAsFixed(0),
+          grossCost.toStringAsFixed(0),
           style: const TextStyle(fontSize: 12),
         ),
       ),
@@ -767,7 +768,8 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
         _filteredItems = widget.items.take(50).toList();
       } else {
         _filteredItems = widget.items
-            .where((item) => item.searchName.contains(query.toLowerCase()))
+            .where((item) => item.displayName.toLowerCase().contains(query.toLowerCase()) ||
+                            item.searchName.contains(query.toLowerCase()))
             .take(20)
             .toList();
       }
