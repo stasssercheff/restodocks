@@ -32,6 +32,153 @@ String _unitDisplay(String? unit, String lang) {
   return CulinaryUnits.displayName((unit ?? 'g').trim().toLowerCase(), lang);
 }
 
+/// Диалог с прогрессом загрузки продуктов
+class _UploadProgressDialog extends StatefulWidget {
+  const _UploadProgressDialog({
+    required this.items,
+    required this.loc,
+  });
+
+  final List<({String name, double? price})> items;
+  final LocalizationService loc;
+
+  @override
+  State<_UploadProgressDialog> createState() => _UploadProgressDialogState();
+}
+
+class _UploadProgressDialogState extends State<_UploadProgressDialog> {
+  var _processed = 0;
+  var _added = 0;
+  var _failed = 0;
+  var _isCompleted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _startUpload();
+  }
+
+  Future<void> _startUpload() async {
+    final store = context.read<ProductStoreSupabase>();
+    final account = context.read<AccountManagerSupabase>();
+    final estId = account.establishment?.id;
+
+    if (estId == null) {
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(widget.loc.t('no_establishment'))),
+        );
+      }
+      return;
+    }
+
+    final defCur = account.establishment?.defaultCurrency ?? 'VND';
+    final sourceLang = widget.loc.currentLanguageCode;
+    final allLangs = LocalizationService.productLanguageCodes;
+
+    for (final item in widget.items) {
+      if (!mounted) return;
+
+      setState(() => _processed++);
+
+      try {
+        // Используем ИИ для проверки и улучшения данных продукта
+        final aiService = context.read<AiServiceSupabase>();
+        final verification = await aiService.verifyProduct(
+          item.name,
+          currentPrice: item.price,
+        );
+
+        // Используем проверенные ИИ данные или оригинальные
+        final normalizedName = verification?.normalizedName ?? item.name;
+        var names = <String, String>{for (final c in allLangs) c: normalizedName};
+
+        // Для больших списков переводим только если ИИ дал нормализованное имя
+        if (widget.items.length > 5 && verification?.normalizedName != null && verification!.normalizedName != item.name) {
+          final translated = await TranslationService.translateToAll(normalizedName, sourceLang, allLangs);
+          if (translated.isNotEmpty) names = translated;
+        }
+
+        final product = Product(
+          id: const Uuid().v4(),
+          name: normalizedName,
+          category: verification?.suggestedCategory ?? 'manual',
+          names: names,
+          calories: verification?.suggestedCalories,
+          protein: null,
+          fat: null,
+          carbs: null,
+          unit: verification?.suggestedUnit ?? 'g',
+          basePrice: verification?.suggestedPrice ?? item.price,
+          currency: (verification?.suggestedPrice ?? item.price) != null ? defCur : null,
+        );
+
+        await store.addProduct(product);
+        await store.addToNomenclature(estId, product.id);
+
+        setState(() => _added++);
+
+        // Небольшая задержка чтобы не перегружать сервер
+        await Future.delayed(const Duration(milliseconds: 100));
+      } catch (e) {
+        setState(() => _failed++);
+      }
+    }
+
+    setState(() => _isCompleted = true);
+
+    // Автоматически закрываем диалог через 2 секунды
+    await Future.delayed(const Duration(seconds: 2));
+    if (mounted) {
+      Navigator.of(context).pop();
+
+      final msg = _failed == 0
+          ? widget.loc.t('upload_added').replaceAll('%s', '$_added')
+          : '${widget.loc.t('upload_added').replaceAll('%s', '$_added')}. ${widget.loc.t('upload_failed').replaceAll('%s', '$_failed')}';
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg), duration: const Duration(seconds: 5)),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = widget.items.isEmpty ? 1.0 : _processed / widget.items.length;
+
+    return AlertDialog(
+      title: Text('ИИ обрабатывает продукты'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('Обработано $_processed из ${widget.items.length} продуктов'),
+          const SizedBox(height: 8),
+          Text('ИИ проверяет названия, категории и цены...', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+          const SizedBox(height: 16),
+          LinearProgressIndicator(value: progress),
+          const SizedBox(height: 8),
+          Text('Добавлено: $_added${_failed > 0 ? ', Ошибок: $_failed' : ''}'),
+          if (_isCompleted) ...[
+            const SizedBox(height: 16),
+            const Icon(Icons.check_circle, color: Colors.green, size: 48),
+            const SizedBox(height: 8),
+            const Text('Все продукты успешно добавлены!'),
+          ],
+        ],
+      ),
+      actions: _isCompleted
+          ? [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Закрыть'),
+              ),
+            ]
+          : null,
+    );
+  }
+}
+
 class _ProductsScreenState extends State<ProductsScreen> {
   String _query = '';
   String? _category;
@@ -553,152 +700,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
     if (mounted) setState(() {});
   }
 
-  /// Диалог с прогрессом загрузки продуктов
-  class _UploadProgressDialog extends StatefulWidget {
-    const _UploadProgressDialog({
-      required this.items,
-      required this.loc,
-    });
-
-    final List<({String name, double? price})> items;
-    final LocalizationService loc;
-
-    @override
-    State<_UploadProgressDialog> createState() => _UploadProgressDialogState();
-  }
-
-  class _UploadProgressDialogState extends State<_UploadProgressDialog> {
-    var _processed = 0;
-    var _added = 0;
-    var _failed = 0;
-    var _isCompleted = false;
-
-    @override
-    void initState() {
-      super.initState();
-      _startUpload();
-    }
-
-    Future<void> _startUpload() async {
-      final store = context.read<ProductStoreSupabase>();
-      final account = context.read<AccountManagerSupabase>();
-      final estId = account.establishment?.id;
-
-      if (estId == null) {
-        if (mounted) {
-          Navigator.of(context).pop();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(widget.loc.t('no_establishment'))),
-          );
-        }
-        return;
-      }
-
-      final defCur = account.establishment?.defaultCurrency ?? 'VND';
-      final sourceLang = widget.loc.currentLanguageCode;
-      final allLangs = LocalizationService.productLanguageCodes;
-
-      for (final item in widget.items) {
-        if (!mounted) return;
-
-        setState(() => _processed++);
-
-        try {
-          // Используем ИИ для проверки и улучшения данных продукта
-          final aiService = context.read<AiServiceSupabase>();
-          final verification = await aiService.verifyProduct(
-            item.name,
-            currentPrice: item.price,
-          );
-
-          // Используем проверенные ИИ данные или оригинальные
-          final normalizedName = verification?.normalizedName ?? item.name;
-          var names = <String, String>{for (final c in allLangs) c: normalizedName};
-
-          // Для больших списков переводим только если ИИ дал нормализованное имя
-          if (widget.items.length > 5 && verification?.normalizedName != null && verification!.normalizedName != item.name) {
-            final translated = await TranslationService.translateToAll(normalizedName, sourceLang, allLangs);
-            if (translated.isNotEmpty) names = translated;
-          }
-
-          final product = Product(
-            id: const Uuid().v4(),
-            name: normalizedName,
-            category: verification?.suggestedCategory ?? 'manual',
-            names: names,
-            calories: verification?.suggestedCalories,
-            protein: null,
-            fat: null,
-            carbs: null,
-            unit: verification?.suggestedUnit ?? 'g',
-            basePrice: verification?.suggestedPrice ?? item.price,
-            currency: (verification?.suggestedPrice ?? item.price) != null ? defCur : null,
-          );
-
-          await store.addProduct(product);
-          await store.addToNomenclature(estId, product.id);
-
-          setState(() => _added++);
-
-          // Небольшая задержка чтобы не перегружать сервер
-          await Future.delayed(const Duration(milliseconds: 100));
-        } catch (e) {
-          setState(() => _failed++);
-        }
-      }
-
-      setState(() => _isCompleted = true);
-
-      // Автоматически закрываем диалог через 2 секунды
-      await Future.delayed(const Duration(seconds: 2));
-      if (mounted) {
-        Navigator.of(context).pop();
-
-        final msg = _failed == 0
-            ? widget.loc.t('upload_added').replaceAll('%s', '$_added')
-            : '${widget.loc.t('upload_added').replaceAll('%s', '$_added')}. ${widget.loc.t('upload_failed').replaceAll('%s', '$_failed')}';
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(msg), duration: const Duration(seconds: 5)),
-        );
-      }
-    }
-
-    @override
-    Widget build(BuildContext context) {
-      final progress = widget.items.isEmpty ? 1.0 : _processed / widget.items.length;
-
-      return AlertDialog(
-        title: Text('ИИ обрабатывает продукты'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Обработано $_processed из ${widget.items.length} продуктов'),
-            const SizedBox(height: 8),
-            Text('ИИ проверяет названия, категории и цены...', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-            const SizedBox(height: 16),
-            LinearProgressIndicator(value: progress),
-            const SizedBox(height: 8),
-            Text('Добавлено: $_added${_failed > 0 ? ', Ошибок: $_failed' : ''}'),
-            if (_isCompleted) ...[
-              const SizedBox(height: 16),
-              const Icon(Icons.check_circle, color: Colors.green, size: 48),
-              const SizedBox(height: 8),
-              const Text('Все продукты успешно добавлены!'),
-            ],
-          ],
-        ),
-        actions: _isCompleted
-            ? [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Закрыть'),
-                ),
-              ]
-            : null,
-      );
-    }
-  }
 
   void _showCurrencyDialog(
     BuildContext context,

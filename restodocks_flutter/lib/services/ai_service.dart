@@ -101,6 +101,8 @@ class ProductRecognitionResult {
 /// Результат верификации продукта ИИ: возможная цена, КБЖУ, исправление названия (для сверки по списку).
 class ProductVerificationResult {
   final String? normalizedName;
+  final String? suggestedCategory;
+  final String? suggestedUnit;
   final double? suggestedPrice;
   final double? suggestedCalories;
   final double? suggestedProtein;
@@ -109,6 +111,8 @@ class ProductVerificationResult {
 
   const ProductVerificationResult({
     this.normalizedName,
+    this.suggestedCategory,
+    this.suggestedUnit,
     this.suggestedPrice,
     this.suggestedCalories,
     this.suggestedProtein,
