@@ -411,12 +411,17 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     return _ProductSearchDropdown(
       products: widget.productStore.allProducts,
       onProductSelected: (product) {
+        // Получаем цену за кг
+        final establishmentPrice = widget.productStore?.getEstablishmentPrice(product.id, widget.establishmentId);
+        final productPrice = establishmentPrice?.$1 ?? product.basePrice;
+
         // Сначала обновляем продукт, потом пересчитаем выход
         var updatedIngredient = ingredient.copyWith(
           productId: product.id,
           productName: product.name,
           unit: product.unit,
-          cost: product.basePrice ?? 0.0, // Сохраняем базовую цену в cost
+          pricePerKg: productPrice, // Сохраняем цену за кг
+          cost: 0.0, // Пока cost = 0, будет пересчитан при вводе grossWeight
         );
 
         // Выход всегда равен нетто (после учета % отхода)
@@ -543,8 +548,19 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   }
 
   Widget _buildCostCell(TTIngredient ingredient) {
-    // Цена за кг из номенклатуры (фиксированная, не рассчитывается)
-    final pricePerKg = ingredient.pricePerKg ?? 0;
+    // Цена за кг из номенклатуры (фиксированная)
+    double pricePerKg = ingredient.pricePerKg ?? 0;
+
+    // Если цена не сохранена, но есть productId - получаем из ProductStore
+    if (pricePerKg == 0 && ingredient.productId != null) {
+      final establishmentPrice = widget.productStore?.getEstablishmentPrice(ingredient.productId!, widget.establishmentId);
+      pricePerKg = establishmentPrice?.$1 ?? 0;
+      // Для продуктов без establishment цены используем basePrice из кеша номенклатуры
+      if (pricePerKg == 0) {
+        // Здесь можно добавить логику для получения basePrice из номенклатуры
+        // Пока оставим 0
+      }
+    }
 
     return Container(
       height: 44,
