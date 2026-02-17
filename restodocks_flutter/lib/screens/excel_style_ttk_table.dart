@@ -44,18 +44,25 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
   // Контроллеры для полей ввода
   final Map<String, TextEditingController> _controllers = {};
-
+  final Map<String, FocusNode> _focusNodes = {};
 
   @override
   void dispose() {
     for (final controller in _controllers.values) {
       controller.dispose();
     }
+    for (final focusNode in _focusNodes.values) {
+      focusNode.dispose();
+    }
     super.dispose();
   }
 
   TextEditingController _getController(String key, String initialValue) {
     return _controllers[key] ??= TextEditingController(text: initialValue);
+  }
+
+  FocusNode _getFocusNode(String key) {
+    return _focusNodes[key] ??= FocusNode();
   }
 
   @override
@@ -446,23 +453,29 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       height: 44,
       alignment: Alignment.center,
       child: widget.canEdit
-          ? TextField(
-              controller: controller,
-              keyboardType: TextInputType.text,
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-              ],
-              style: const TextStyle(fontSize: 12),
-              textAlign: TextAlign.center,
-              decoration: const InputDecoration(
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.zero,
-                isDense: true,
-                filled: true,
-                fillColor: Colors.transparent,
+          ? GestureDetector(
+              onTap: () {
+                _getFocusNode(key).requestFocus();
+              },
+              child: TextField(
+                controller: controller,
+                focusNode: _getFocusNode(key),
+                keyboardType: TextInputType.text,
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                ],
+                style: const TextStyle(fontSize: 12),
+                textAlign: TextAlign.center,
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.zero,
+                  isDense: true,
+                  filled: true,
+                  fillColor: Colors.transparent,
+                ),
+                onChanged: onChanged,
+                onSubmitted: onChanged,
               ),
-              onChanged: onChanged,
-              onSubmitted: onChanged,
             )
           : Text(value, style: const TextStyle(fontSize: 12), textAlign: TextAlign.center),
     );
