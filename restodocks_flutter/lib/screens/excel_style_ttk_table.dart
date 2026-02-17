@@ -482,14 +482,16 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     // Создаем объединенный список: продукты + ПФ
     final allItems = <SelectableItem>[];
 
-    // Добавляем продукты
-    for (final product in widget.productStore.allProducts) {
-      allItems.add(SelectableItem(
-        type: 'product',
-        item: product,
-        displayName: product.getLocalizedName('ru'),
-        searchName: product.name.toLowerCase(),
-      ));
+    // Добавляем продукты только из номенклатуры (где есть стоимость за кг/шт)
+    if (widget.establishmentId != null) {
+      for (final product in widget.productStore.getNomenclatureProducts(widget.establishmentId!)) {
+        allItems.add(SelectableItem(
+          type: 'product',
+          item: product,
+          displayName: product.getLocalizedName('ru'),
+          searchName: product.name.toLowerCase(),
+        ));
+      }
     }
 
     // Добавляем ПФ
