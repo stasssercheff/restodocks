@@ -105,7 +105,10 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         scrollDirection: Axis.vertical,
         child: ConstrainedBox(
           constraints: const BoxConstraints(minWidth: 1000), // Минимальная ширина для всех столбцов - уменьшена
-          child: Table(
+          child: Stack(
+            children: [
+              // Основная таблица
+              Table(
             border: TableBorder.all(color: Colors.black, width: 1),
             defaultVerticalAlignment: TableCellVerticalAlignment.top,
             columnWidths: const {
@@ -252,30 +255,10 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     // Цена за кг
                     _buildPricePerKgCell(ingredient),
 
-                    // Технология
+                    // Технология (теперь объединенная - пустая ячейка)
                     Container(
-                      constraints: const BoxConstraints(minHeight: 44),
-                      alignment: Alignment.centerLeft,
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: rowIndex == 0 && widget.canEdit && widget.technologyController != null
-                          ? TextField(
-                              controller: widget.technologyController,
-                              maxLines: null,
-                              minLines: 1,
-                              style: const TextStyle(fontSize: 11),
-                              textAlign: TextAlign.left,
-                              decoration: const InputDecoration(
-                                border: InputBorder.none,
-                                contentPadding: EdgeInsets.zero,
-                                isDense: true,
-                                filled: true,
-                                fillColor: Colors.transparent,
-                              ),
-                            )
-                          : Text(
-                              rowIndex == 0 ? (widget.technologyController?.text ?? '') : '',
-                              style: const TextStyle(fontSize: 11),
-                            ),
+                      height: 44,
+                      color: Colors.transparent,
                     ),
 
                     // Кнопка удаления
@@ -299,10 +282,48 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   _buildTotalCell('${totalOutput.toStringAsFixed(0)}г'), // Выход
                   const SizedBox.shrink(), // Стоимость (пусто)
                   _buildTotalCell('${costPerKgFinishedProduct.toStringAsFixed(0)}'), // Стоимость за кг готового продукта
-                  _buildTotalCell(widget.technologyController?.text ?? ''), // Технология
+                  const SizedBox.shrink(), // Технология (теперь объединенная)
                   const SizedBox.shrink(), // Удаление
                 ],
               ),
+            ],
+          ),
+              // Объединенная ячейка технологии
+              if (ingredients.isNotEmpty)
+                Positioned(
+                  top: 44, // После шапки
+                  left: 50 + 120 + 100 + 80 + 80 + 80 + 80 + 80 + 60 + 70 + 70, // Сумма ширин предыдущих столбцов
+                  width: 100, // Ширина столбца Технология
+                  height: ingredients.length * 44.0, // Высота всех строк продуктов
+                  child: Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.black, width: 1),
+                      color: Colors.white,
+                    ),
+                    alignment: Alignment.topLeft,
+                    padding: const EdgeInsets.only(top: 12, left: 4, right: 4),
+                    child: widget.canEdit && widget.technologyController != null
+                        ? TextField(
+                            controller: widget.technologyController,
+                            maxLines: null,
+                            minLines: 1,
+                            style: const TextStyle(fontSize: 11),
+                            textAlign: TextAlign.left,
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.zero,
+                              isDense: true,
+                              filled: true,
+                              fillColor: Colors.transparent,
+                            ),
+                          )
+                        : Text(
+                            widget.technologyController?.text ?? '',
+                            style: const TextStyle(fontSize: 11),
+                            textAlign: TextAlign.left,
+                          ),
+                  ),
+                ),
             ],
           ),
         ),
