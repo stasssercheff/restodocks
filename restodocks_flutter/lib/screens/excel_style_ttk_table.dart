@@ -412,6 +412,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   Widget _buildSearchableProductDropdown(TTIngredient ingredient, int rowIndex) {
     return _ProductSearchDropdown(
       products: widget.productStore.allProducts,
+      loc: loc,
       onProductSelected: (product) {
         // Получаем цену за кг
         final establishmentPrice = widget.productStore?.getEstablishmentPrice(product.id, widget.establishmentId);
@@ -578,7 +579,6 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   Widget _buildPricePerKgCell(TTIngredient ingredient) {
     // Стоимость за кг выхода (меняется в зависимости от брутто и отхода)
     final costPerKgOutput = ingredient.outputWeight > 0 ? (ingredient.cost / ingredient.outputWeight) * 1000 : 0;
-    print('DEBUG _buildPricePerKgCell: ${ingredient.productName}, cost=${ingredient.cost}, grossWeight=${ingredient.grossWeight}, outputWeight=${ingredient.outputWeight}, costPerKgOutput=$costPerKgOutput');
 
     return Container(
       height: 44,
@@ -632,10 +632,12 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 class _ProductSearchDropdown extends StatefulWidget {
   final List<Product> products;
   final Function(Product) onProductSelected;
+  final AppLocalizations loc;
 
   const _ProductSearchDropdown({
     required this.products,
     required this.onProductSelected,
+    required this.loc,
   });
 
   @override
