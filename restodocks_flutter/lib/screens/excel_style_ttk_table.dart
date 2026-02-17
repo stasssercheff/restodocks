@@ -12,6 +12,7 @@ class ExcelStyleTtkTable extends StatefulWidget {
   final TextEditingController? dishNameController;
   final TextEditingController? technologyController;
   final ProductStoreSupabase productStore;
+  final String? establishmentId;
   final void Function([int?]) onAdd;
   final void Function(int, TTIngredient) onUpdate;
   final void Function(int) onRemove;
@@ -27,6 +28,7 @@ class ExcelStyleTtkTable extends StatefulWidget {
     this.dishNameController,
     this.technologyController,
     required this.productStore,
+    this.establishmentId,
     required this.onAdd,
     required this.onUpdate,
     required this.onRemove,
