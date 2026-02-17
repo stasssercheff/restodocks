@@ -282,12 +282,11 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   const SizedBox.shrink(), // Удаление
                 ],
               ),
-            ],
-          ),
+                ],
               ),
 
               // Поле технологии под таблицей на всю ширину
-              if (ingredients.isNotEmpty)
+              ...if (ingredients.isNotEmpty) [
                 Container(
                   width: double.infinity,
                   margin: const EdgeInsets.only(top: 16),
@@ -341,6 +340,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     ],
                   ),
                 ),
+              ],
+            ],
             ],
           ),
         ),
