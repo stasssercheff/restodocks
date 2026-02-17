@@ -93,12 +93,6 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     // Стоимость за кг готового продукта: (сумма стоимостей брутто / общий нетто вес) * 1000
     final costPerKgFinishedProduct = totalOutput > 0 ? (totalCost / totalOutput) * 1000 : 0.0;
 
-    // Отладка
-    print('DEBUG Таблица ТТК: totalCost=$totalCost, totalOutput=$totalOutput, costPerKg=$costPerKgFinishedProduct');
-    allRows.where((ing) => ing.productName.isNotEmpty).forEach((ing) {
-      print('DEBUG Ингредиент: ${ing.productName}, cost=${ing.cost}, grossWeight=${ing.grossWeight}, outputWeight=${ing.outputWeight}');
-    });
-
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: SingleChildScrollView(
@@ -564,14 +558,14 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   }
 
   Widget _buildPricePerKgCell(TTIngredient ingredient) {
-    // Стоимость взятого количества (брутто) - показывается в строке продукта
-    final costOfGrossWeight = ingredient.cost;
+    // Стоимость за кг выхода (нетто) - показывается в строке продукта
+    final costPerKgOutput = ingredient.outputWeight > 0 ? (ingredient.cost / ingredient.outputWeight) * 1000 : 0;
 
     return Container(
       height: 44,
       child: Center(
         child: Text(
-          costOfGrossWeight.toStringAsFixed(0),
+          costPerKgOutput.toStringAsFixed(0),
           style: const TextStyle(fontSize: 12),
         ),
       ),

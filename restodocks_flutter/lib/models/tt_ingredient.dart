@@ -251,7 +251,8 @@ class TTIngredient extends Equatable {
     String? establishmentId,
     String? defaultCurrency,
   }) {
-    print('DEBUG fromProduct: unit=$unit, gramsPerPiece=$gramsPerPiece, product.unit=${product?.unit}');
+    // Используем 'g' для весовых продуктов, игнорируя product.unit
+    final actualUnit = (product?.unit == 'pcs' || product?.unit == 'шт') ? 'pcs' : 'g';
     final wastePct = primaryWastePct ?? product?.primaryWastePct ?? 0;
     if (product == null) {
       return TTIngredient(
@@ -276,8 +277,7 @@ class TTIngredient extends Equatable {
     }
 
     // Конвертируем в граммы для расчётов
-    final grossG = CulinaryUnits.toGrams(grossWeight, unit, gramsPerPiece: gramsPerPiece);
-    print('DEBUG grossG calculation: grossWeight=$grossWeight, unit=$unit, gramsPerPiece=$gramsPerPiece, grossG=$grossG');
+    final grossG = CulinaryUnits.toGrams(grossWeight, actualUnit, gramsPerPiece: gramsPerPiece);
 
     // Эффективный вес после отхода (первичная обработка)
     final waste = wastePct.clamp(0.0, 99.9) / 100.0;
@@ -311,17 +311,12 @@ class TTIngredient extends Equatable {
     final productPrice = establishmentPrice?.$1 ?? product.basePrice;
     final productCurrency = establishmentPrice?.$2 ?? defaultCurrency ?? 'RUB';
 
-    // Отладка стоимости
-    print('DEBUG TTIngredient: ${product.getLocalizedName(languageCode)}, unit=$unit, grossG=$grossG, productPrice=$productPrice');
-
     double cost;
-    if (unit == 'pcs' || unit == 'шт') {
+    if (actualUnit == 'pcs' || actualUnit == 'шт') {
       final pieces = grossG / (gramsPerPiece ?? 50);
       cost = (productPrice ?? 0) * pieces;
-      print('DEBUG TTIngredient: pieces=$pieces, cost=$cost (pcs calculation)');
     } else {
       cost = (productPrice ?? 0) * (grossG / 1000.0);
-      print('DEBUG TTIngredient: cost=$cost (weight calculation)');
     }
 
     return TTIngredient(
