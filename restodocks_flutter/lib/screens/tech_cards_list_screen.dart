@@ -38,6 +38,16 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     return map[c] ?? c;
   }
 
+  double _calculateCostPerKg(TechCard tc) {
+    if (tc.ingredients.isEmpty || tc.yield <= 0) return 0.0;
+
+    // Суммируем стоимости всех ингредиентов
+    final totalCost = tc.ingredients.fold<double>(0, (sum, ing) => sum + ing.cost);
+
+    // Стоимость за кг = общая стоимость / выход в кг
+    return (totalCost / tc.yield) * 1000;
+  }
+
   Future<void> _load() async {
     final acc = context.read<AccountManagerSupabase>();
     final est = acc.establishment;
@@ -468,53 +478,20 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           child: DataTable(
             headingRowColor: WidgetStateProperty.all(Theme.of(context).colorScheme.primaryContainer),
             columns: [
-              DataColumn(
-                label: _selectionMode
-                    ? Checkbox(
-                        value: _selectedTechCards.length == _list.length && _list.isNotEmpty,
-                        onChanged: (value) {
-                          if (value == true) {
-                            setState(() {
-                              _selectedTechCards.addAll(_list.map((tc) => tc.id));
-                            });
-                          } else {
-                            setState(() {
-                              _selectedTechCards.clear();
-                            });
-                          }
-                        },
-                      )
-                    : const Text('#', style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
-              DataColumn(label: Text(loc.t('column_name'), style: const TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text(loc.t('column_category'), style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text(loc.t('ingredients_short'), style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text(loc.t('kcal'), style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text(loc.t('output_g'), style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('', style: TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(label: Text('Тип ТТК', style: const TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(label: Text('Название', style: const TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(label: Text('Категория', style: TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(label: Text('Стоимость за кг', style: TextStyle(fontWeight: FontWeight.bold))),
             ],
             rows: List.generate(_list.length, (i) {
               final tc = _list[i];
               return DataRow(
                 selected: _selectedTechCards.contains(tc.id),
                 cells: [
-                  DataCell(
-                    _selectionMode
-                        ? Checkbox(
-                            value: _selectedTechCards.contains(tc.id),
-                            onChanged: (value) => _toggleTechCardSelection(tc.id),
-                          )
-                        : Text('${i + 1}'),
-                  ),
+                  DataCell(Text(tc.isSemiFinished ? 'ПФ' : 'Блюдо')),
                   DataCell(Text(tc.getDisplayNameInLists(lang))),
                   DataCell(Text(_categoryLabel(tc.category))),
-                  DataCell(Text('${tc.ingredients.length}')),
-                  DataCell(Text('${tc.totalCalories.round()}')),
-                  DataCell(Text(tc.yield.toStringAsFixed(0))),
-                  DataCell(IconButton(
-                    icon: const Icon(Icons.chevron_right),
-                    onPressed: () => context.push('/tech-cards/${tc.id}'),
-                  )),
+                  DataCell(Text(_calculateCostPerKg(tc).toStringAsFixed(0))),
                 ],
                 onSelectChanged: _selectionMode ? null : (_) => context.push('/tech-cards/${tc.id}'),
               );
