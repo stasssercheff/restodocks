@@ -543,9 +543,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   }
 
   Widget _buildCostCell(TTIngredient ingredient) {
-    // Цена за кг из номенклатуры
+    // Цена за кг из номенклатуры (фиксированная)
     final pricePerKg = ingredient.grossWeight > 0 ? ingredient.cost / (ingredient.grossWeight / 1000) : 0;
-    print('DEBUG _buildCostCell: grossWeight=${ingredient.grossWeight}, cost=${ingredient.cost}, pricePerKg=$pricePerKg');
 
     return Container(
       height: 44,
@@ -559,15 +558,14 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   }
 
   Widget _buildPricePerKgCell(TTIngredient ingredient) {
-    // Стоимость брутто - показывается в строке продукта
-    final grossCost = ingredient.cost;
-    print('DEBUG _buildPricePerKgCell: cost=${ingredient.cost}, grossCost=$grossCost');
+    // Стоимость за кг выхода (меняется в зависимости от брутто и отхода)
+    final costPerKgOutput = ingredient.outputWeight > 0 ? (ingredient.cost / ingredient.outputWeight) * 1000 : 0;
 
     return Container(
       height: 44,
       child: Center(
         child: Text(
-          grossCost.toStringAsFixed(0),
+          costPerKgOutput.toStringAsFixed(0),
           style: const TextStyle(fontSize: 12),
         ),
       ),
