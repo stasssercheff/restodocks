@@ -6,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/culinary_units.dart';
@@ -487,7 +488,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
               subtitle: const Text('Скопировать и вставить список'),
               onTap: () {
                 Navigator.of(ctx).pop();
-                _showPasteDialog(context, loc);
+                _showPasteDialog(loc);
               },
             ),
             const Divider(),
@@ -518,7 +519,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                       const SizedBox(height: 8),
                       const Text('• Название и цена разделяются табуляцией (Tab) или пробелами'),
                       const Text('• Можно использовать запятые в ценах'),
-                      const Text('• Поддерживаются символы валюты (₫, $, €, руб.)'),
+                      const Text('• Поддерживаются символы валюты (₫, \$, €, руб.)'),
                     ],
                   ),
                 ),

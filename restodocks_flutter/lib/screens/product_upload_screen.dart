@@ -4,7 +4,9 @@ import 'dart:typed_data';
 import 'package:excel/excel.dart' hide Border;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/culinary_units.dart';
@@ -333,19 +335,19 @@ class _QuickActions extends StatelessWidget {
               context,
               'Посмотреть номенклатуру',
               'Проверить добавленные продукты',
-              () => context.push('/products'),
+              () => GoRouter.of(context).push('/products'),
             ),
             _buildQuickAction(
               context,
               'Создать ТТК',
               'Использовать новые продукты в рецептах',
-              () => context.push('/tech-cards'),
+              () => GoRouter.of(context).push('/tech-cards'),
             ),
             _buildQuickAction(
               context,
               'Создать меню',
               'Добавить блюда в меню ресторана',
-              () => context.push('/menu'),
+              () => GoRouter.of(context).push('/menu'),
             ),
           ],
         ),
