@@ -131,7 +131,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   _buildHeaderCell('Способ'),
                   _buildHeaderCell('% ужарки'),
                   _buildHeaderCell('Выход'),
-                  _buildHeaderCell('Стоимость'),
+                  _buildHeaderCell('Цена'),
                   _buildHeaderCell('Стоимость'),
                   _buildHeaderCell('Технология'),
                   _buildHeaderCell(''), // Столбец удаления
@@ -543,14 +543,14 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   }
 
   Widget _buildCostCell(TTIngredient ingredient) {
-    // Используем сохраненное значение cost (базовая цена продукта)
-    final cost = ingredient.cost;
+    // Цена за кг из номенклатуры
+    final pricePerKg = ingredient.grossWeight > 0 ? ingredient.cost / (ingredient.grossWeight / 1000) : 0;
 
     return Container(
       height: 44,
       child: Center(
         child: Text(
-          cost.toStringAsFixed(0),
+          pricePerKg.toStringAsFixed(0),
           style: const TextStyle(fontSize: 12),
         ),
       ),
