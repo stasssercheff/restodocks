@@ -221,10 +221,32 @@ class _ProductsScreenState extends State<ProductsScreen> {
   }
 
   ({String name, double? price}) _parseLine(String line) {
-    final parts = line.split('\t');
+    // Сначала пробуем разделить по табуляции
+    var parts = line.split('\t');
+    if (parts.length < 2) {
+      // Если нет табуляции, пробуем разделить по множественным пробелам
+      parts = line.split(RegExp(r'\s{2,}'));
+    }
+    if (parts.length < 2) {
+      // Если нет множественных пробелов, пробуем найти последнюю цифру в строке
+      final lastSpaceIndex = line.lastIndexOf(' ');
+      if (lastSpaceIndex > 0) {
+        final name = line.substring(0, lastSpaceIndex).trim();
+        final pricePart = line.substring(lastSpaceIndex + 1).trim();
+        final priceStr = pricePart
+            .replaceAll('₫', '')
+            .replaceAll(',', '')
+            .replaceAll(' ', '')
+            .trim();
+        final price = double.tryParse(priceStr);
+        return (name: name, price: price);
+      }
+      return (name: line.trim(), price: null);
+    }
+
     final name = parts[0].trim();
     if (name.isEmpty) return (name: '', price: null);
-    if (parts.length < 2) return (name: name, price: null);
+
     final priceStr = parts[1]
         .replaceAll('₫', '')
         .replaceAll(',', '')
@@ -469,8 +491,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
     // Отладка
     if (!mounted) return;
+    final sampleLines = lines.take(2).join('\n');
+    final sampleItems = items.take(2).map((item) => '${item.name}: ${item.price}').join(', ');
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('Найдено строк: ${lines.length}, валидных элементов: ${items.length}'),
+      content: Text('Найдено строк: ${lines.length}, валидных: ${items.length}\nСтроки: $sampleLines\nЭлементы: $sampleItems'),
+      duration: const Duration(seconds: 8),
     ));
 
     if (items.isEmpty) {
@@ -505,6 +530,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
       ),
     );
     if (confirmed != true || !mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Начинаю загрузку ${items.length} продуктов...')));
 
     final store = context.read<ProductStoreSupabase>();
     final account = context.read<AccountManagerSupabase>();
