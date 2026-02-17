@@ -81,6 +81,17 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
               onTap: _isLoading ? null : () => _showPasteDialog(),
             ),
 
+            const SizedBox(height: 12),
+
+            // Тестовая карточка для быстрой проверки
+            _UploadMethodCard(
+              icon: Icons.bug_report,
+              title: 'Тест (демо данные)',
+              description: 'Загрузить тестовые продукты для проверки',
+              color: Colors.orange,
+              onTap: _isLoading ? null : () => _loadTestData(),
+            ),
+
             const SizedBox(height: 24),
 
             // Пример формата
@@ -189,6 +200,18 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     }
   }
 
+  Future<void> _loadTestData() async {
+    print('DEBUG: Loading test data');
+    final loc = context.read<LocalizationService>();
+    const testData = '''Авокадо	₫99,000
+Базилик	₫267,000
+Баклажан	₫12,000
+Молоко	₫38,000
+Картофель	₫25,000''';
+
+    await _processText(testData, loc);
+  }
+
   Future<void> _processText(String text, LocalizationService loc) async {
     print('DEBUG: Processing text, input length: ${text.length}');
     final lines = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty);
@@ -204,27 +227,9 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       return;
     }
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Подтверждение'),
-        content: Text('Найдено ${items.length} продуктов. Добавить их в номенклатуру?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Отмена'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Добавить'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      await _addProductsToNomenclature(items, loc);
-    }
+    // Для тестирования убираем диалог подтверждения
+    print('DEBUG: Skipping confirmation dialog for testing');
+    await _addProductsToNomenclature(items, loc);
   }
 
   Future<void> _processExcel(Uint8List bytes, LocalizationService loc) async {
