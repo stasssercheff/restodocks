@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/models.dart';
+import '../models/nomenclature_item.dart';
 import 'supabase_service.dart';
 
 /// Сервис управления продуктами с использованием Supabase

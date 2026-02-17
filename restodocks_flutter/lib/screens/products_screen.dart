@@ -723,7 +723,7 @@ class _NomenclatureTab extends StatelessWidget {
     return false;
   }
 
-  Future<void> _loadKbjuForAll(BuildContext context, List<NomenclatureItem> list) async {
+  Future<void> _loadKbjuForAll(BuildContext context, List<Product> list) async {
     if (!context.mounted) return;
     await showDialog<void>(
       context: context,
@@ -876,20 +876,20 @@ class _NomenclatureTab extends StatelessWidget {
               children: [
                 if (needsKbju.isNotEmpty)
                   FilledButton.tonalIcon(
-                    onPressed: () => _loadKbjuForAll(context, needsKbju),
+                    onPressed: () => _loadKbjuForAll(context, needsKbju.where((item) => item.isProduct).map((item) => item.product!).toList()),
                     icon: const Icon(Icons.cloud_download, size: 20),
                     label: Text(loc.t('load_kbju_for_all').replaceAll('%s', '${needsKbju.length}')),
                   ),
                 if (needsTranslation.isNotEmpty)
                   FilledButton.tonalIcon(
-                    onPressed: () => _loadTranslationsForAll(context, needsTranslation),
+                    onPressed: () => _loadTranslationsForAll(context, needsTranslation.where((item) => item.isProduct).map((item) => item.product!).toList()),
                     icon: const Icon(Icons.translate, size: 20),
                     label: Text(loc.t('translate_names_for_all').replaceAll('%s', '${needsTranslation.length}')),
                   ),
                 Tooltip(
                   message: loc.t('verify_with_ai_tooltip'),
                   child: FilledButton.tonalIcon(
-                    onPressed: () => _verifyWithAi(context, products),
+                    onPressed: () => _verifyWithAi(context, items.where((item) => item.isProduct).map((item) => item.product!).toList()),
                     icon: const Icon(Icons.auto_awesome, size: 20),
                     label: Text(loc.t('verify_with_ai').replaceAll('%s', '${items.length}')),
                   ),
