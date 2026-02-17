@@ -106,7 +106,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
             Text(
               '${nomItems.length} в номенклатуре',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    color: Colors.black87,
                     fontWeight: FontWeight.normal,
                   ),
             ),
@@ -308,7 +308,14 @@ class _ProductsScreenState extends State<ProductsScreen> {
         ],
       ),
     );
-    if (text == null || text.trim().isEmpty || !mounted) return;
+    if (text == null || text.trim().isEmpty || !mounted) {
+      if (text == null) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Текст не введен')));
+      } else if (text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Текст пустой')));
+      }
+      return;
+    }
     await _addProductsFromText(text, loc);
   }
 
@@ -426,8 +433,14 @@ class _ProductsScreenState extends State<ProductsScreen> {
   Future<void> _addProductsFromText(String text, LocalizationService loc) async {
     final lines = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty);
     final items = lines.map(_parseLine).where((r) => r.name.isNotEmpty).toList();
+
+    // Отладка
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('Найдено строк: ${lines.length}, валидных элементов: ${items.length}'),
+    ));
+
     if (items.isEmpty) {
-      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('no_rows_to_add'))));
       return;
     }
