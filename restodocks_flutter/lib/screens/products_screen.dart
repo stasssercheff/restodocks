@@ -546,7 +546,16 @@ class _ProductsScreenState extends State<ProductsScreen> {
     final defCur = account.establishment?.defaultCurrency ?? 'VND';
     final sourceLang = loc.currentLanguageCode;
     final allLangs = LocalizationService.productLanguageCodes;
+
+    var processed = 0;
     for (final item in items) {
+      processed++;
+      if (processed % 20 == 0 && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Обработано $processed из ${items.length} продуктов...'),
+          duration: const Duration(seconds: 1),
+        ));
+      }
       try {
         var names = <String, String>{for (final c in allLangs) c: item.name};
         if (items.length <= 5) {
@@ -569,11 +578,22 @@ class _ProductsScreenState extends State<ProductsScreen> {
         await store.addProduct(product);
         await store.addToNomenclature(estId, product.id);
         added++;
-      } catch (_) {
+
+        // Небольшая задержка чтобы не перегружать сервер
+        await Future.delayed(const Duration(milliseconds: 50));
+      } catch (e) {
         failed++;
+        if (processed % 10 == 0 && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Ошибка при добавлении "${item.name}": $e'),
+            duration: const Duration(seconds: 3),
+          ));
+        }
       }
       if (!mounted) return;
     }
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Завершаю загрузку...')));
+
     await store.loadProducts();
     await store.loadNomenclature(estId);
     if (!mounted) return;
@@ -581,7 +601,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
     final msg = failed == 0
         ? loc.t('upload_added').replaceAll('%s', '$added')
         : '${loc.t('upload_added').replaceAll('%s', '$added')}. ${loc.t('upload_failed').replaceAll('%s', '$failed')}';
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), duration: const Duration(seconds: 5)));
   }
 
   void _showCurrencyDialog(
