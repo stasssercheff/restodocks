@@ -90,11 +90,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     final totalOutput = allRows.where((ing) => ing.productName.isNotEmpty).fold<double>(0, (s, ing) => s + ing.outputWeight);
     final totalCost = allRows.where((ing) => ing.productName.isNotEmpty).fold<double>(0, (s, ing) => s + ing.cost);
 
-    // Средняя стоимость за кг всех ингредиентов
-    final ingredientsWithWeight = allRows.where((ing) => ing.productName.isNotEmpty && ing.outputWeight > 0).toList();
-    final avgCostPerKg = ingredientsWithWeight.isNotEmpty
-        ? ingredientsWithWeight.map((ing) => ing.cost / (ing.outputWeight / 1000)).fold<double>(0, (sum, price) => sum + price) / ingredientsWithWeight.length
-        : 0.0;
+    // Стоимость за кг готового продукта (общая стоимость / общий выход * 1000)
+    final costPerKgFinishedProduct = totalOutput > 0 ? (totalCost / totalOutput) * 1000 : 0.0;
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -266,15 +263,15 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                 children: [
                   _buildTotalCell('Итого'),
                   _buildTotalCell(widget.isSemiFinished ? 'ПФ' : 'Блюдо'), // Тип ТТК
-                  _buildTotalCell(widget.dishNameController?.text ?? widget.dishName), // Название
-                  const SizedBox.shrink(), // Продукт
+                  const SizedBox.shrink(), // Название (пусто)
+                  const SizedBox.shrink(), // Продукт (пусто)
                   const SizedBox.shrink(), // Брутто
                   const SizedBox.shrink(), // % отхода
                   const SizedBox.shrink(), // Нетто
                   const SizedBox.shrink(), // Способ
                   _buildTotalCell('${totalOutput.toStringAsFixed(0)}г'), // Выход
-                  _buildTotalCell('${totalCost.toStringAsFixed(0)}'), // Общая стоимость
-                  _buildTotalCell('${avgCostPerKg.isNaN ? 0 : avgCostPerKg.toStringAsFixed(0)}'), // Средняя цена за кг
+                  const SizedBox.shrink(), // Стоимость (пусто)
+                  _buildTotalCell('${costPerKgFinishedProduct.toStringAsFixed(0)}'), // Стоимость за кг готового продукта
                   _buildTotalCell(widget.technologyController?.text ?? ''), // Технология
                   const SizedBox.shrink(), // Удаление
                 ],
@@ -561,14 +558,14 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   }
 
   Widget _buildPricePerKgCell(TTIngredient ingredient) {
-    // Стоимость за кг = общая стоимость / вес в кг
-    final pricePerKg = ingredient.outputWeight > 0 ? ingredient.cost / (ingredient.outputWeight / 1000) : 0;
+    // Стоимость взятого количества (брутто) - показывается в строке продукта
+    final costOfGrossWeight = ingredient.cost;
 
     return Container(
       height: 44,
       child: Center(
         child: Text(
-          pricePerKg.toStringAsFixed(0),
+          costOfGrossWeight.toStringAsFixed(0),
           style: const TextStyle(fontSize: 12),
         ),
       ),
