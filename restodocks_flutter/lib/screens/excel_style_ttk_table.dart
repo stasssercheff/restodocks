@@ -93,6 +93,9 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     // Стоимость за кг готового продукта: (сумма стоимостей брутто / общий нетто вес) * 1000
     final costPerKgFinishedProduct = totalOutput > 0 ? (totalCost / totalOutput) * 1000 : 0.0;
 
+    // Отладка
+    print('DEBUG Таблица ТТК: totalCost=$totalCost, totalOutput=$totalOutput, costPerKg=$costPerKgFinishedProduct');
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: SingleChildScrollView(
