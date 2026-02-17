@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
+import 'package:excel/excel.dart' hide Border;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -13,12 +15,9 @@ import '../services/ai_service.dart';
 import '../services/nutrition_api_service.dart';
 import '../services/services.dart';
 
-/// Экран с двумя вкладками: Номенклатура (продукты заведения) и Справочник (все продукты, добавление в номенклатуру).
+/// Экран номенклатуры: продукты и ПФ заведения с возможностью загрузки из файла.
 class ProductsScreen extends StatefulWidget {
-  const ProductsScreen({super.key, this.initialTab = 0});
-
-  /// Начальная вкладка: 0 - номенклатура, 1 - справочник
-  final int initialTab;
+  const ProductsScreen({super.key});
 
   @override
   State<ProductsScreen> createState() => _ProductsScreenState();
@@ -32,15 +31,9 @@ String _unitDisplay(String? unit, String lang) {
   return CulinaryUnits.displayName((unit ?? 'g').trim().toLowerCase(), lang);
 }
 
-class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _ProductsScreenState extends State<ProductsScreen> {
   String _query = '';
   String? _category;
-  // Справочник: сортировка и фильтры
-  _CatalogSort _catalogSort = _CatalogSort.nameAz;
-  bool _filterManual = false;
-  bool _filterGlutenFree = false;
-  bool _filterLactoseFree = false;
   // Фильтры номенклатуры
   _CatalogSort _nomSort = _CatalogSort.nameAz;
   _NomenclatureFilter _nomFilter = _NomenclatureFilter.all;
@@ -51,14 +44,7 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this, initialIndex: widget.initialTab);
     WidgetsBinding.instance.addPostFrameCallback((_) => _ensureLoaded());
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
   }
 
   Future<void> _ensureLoaded() async {
@@ -88,13 +74,6 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
     final estId = account.establishment?.id;
     final canEdit = account.currentEmployee?.canEditChecklistsAndTechCards ?? false;
 
-    var catalogList = store.getProducts(
-      category: _filterManual ? 'manual' : _category,
-      searchText: _query.isEmpty ? null : _query,
-      glutenFree: _filterGlutenFree ? true : null,
-      lactoseFree: _filterLactoseFree ? true : null,
-    );
-    catalogList = _sortProducts(catalogList, _catalogSort);
     // Фильтруем элементы номенклатуры
     var nomItems = _nomenclatureItems.where((item) {
       // Фильтр по типу (продукты/ПФ)
@@ -125,9 +104,7 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
           children: [
             Text(loc.t('nomenclature')),
             Text(
-              _tabController.index == 0
-                  ? '${nomItems.length} в номенклатуре'
-                  : '${store.allProducts.length} в справочнике',
+              '${nomItems.length} в номенклатуре',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.normal,
@@ -135,15 +112,12 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
             ),
           ],
         ),
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: [
-            Tab(text: loc.t('nomenclature')),
-            Tab(text: loc.t('product_catalog')),
-          ],
-          onTap: (_) => setState(() {}),
-        ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.upload_file),
+            onPressed: () => _showUploadDialog(context, loc),
+            tooltip: 'Загрузить список',
+          ),
           IconButton(
             icon: const Icon(Icons.attach_money),
             onPressed: account.establishment != null ? () => _showCurrencyDialog(context, loc, account, store) : null,
@@ -197,44 +171,18 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
               ),
             ),
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _NomenclatureTab(
-                  items: nomItems,
-                  store: store,
-                  estId: estId ?? '',
-                  canRemove: canEdit,
-                  loc: loc,
-                  sort: _nomSort,
-                  filterType: _nomFilter,
-                  onSortChanged: (s) => setState(() => _nomSort = s),
-                  onFilterTypeChanged: (f) => setState(() => _nomFilter = f),
-                  onRefresh: () => _ensureLoaded().then((_) => setState(() {})),
-                  onSwitchToCatalog: () {
-                    _tabController.animateTo(1);
-                    setState(() {});
-                  },
-                ),
-                _CatalogTab(
-                  products: catalogList,
-                  store: store,
-                  estId: estId ?? '',
-                  loc: loc,
-                  sort: _catalogSort,
-                  filterManual: _filterManual,
-                  filterGlutenFree: _filterGlutenFree,
-                  filterLactoseFree: _filterLactoseFree,
-                  onSortChanged: (s) => setState(() => _catalogSort = s),
-                  onFilterManualChanged: (v) => setState(() => _filterManual = v),
-                  onFilterGlutenChanged: (v) => setState(() => _filterGlutenFree = v),
-                  onFilterLactoseChanged: (v) => setState(() => _filterLactoseFree = v),
-                  onRefresh: () => _ensureLoaded().then((_) => setState(() {})),
-                  onUpload: () => _uploadFromTxt(loc),
-                  onPaste: () => _showPasteDialog(loc),
-                  onAddProduct: () => _showAddProductDialog(loc),
-                ),
-              ],
+            child: _NomenclatureTab(
+              items: nomItems,
+              store: store,
+              estId: estId ?? '',
+              canRemove: canEdit,
+              loc: loc,
+              sort: _nomSort,
+              filterType: _nomFilter,
+              onSortChanged: (s) => setState(() => _nomSort = s),
+              onFilterTypeChanged: (f) => setState(() => _nomFilter = f),
+              onRefresh: () => _ensureLoaded().then((_) => setState(() {})),
+              onSwitchToCatalog: () {}, // Не используется
             ),
           ),
         ],
@@ -302,6 +250,42 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
         .trim();
     final price = double.tryParse(priceStr);
     return (name: name, price: price);
+  }
+
+  Future<void> _showUploadDialog(BuildContext context, LocalizationService loc) async {
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Загрузить список'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.file_upload),
+              title: const Text('Из файла (.txt, .xlsx, .xls)'),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                _uploadFromTxt(loc);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.content_paste),
+              title: const Text('Вставить из текста'),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                _showPasteDialog(loc);
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Отмена'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _showPasteDialog(LocalizationService loc) async {
@@ -399,18 +383,62 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
   Future<void> _uploadFromTxt(LocalizationService loc) async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['txt'],
+      allowedExtensions: ['txt', 'xlsx', 'xls'],
       withData: true,
     );
     if (result == null || result.files.isEmpty || result.files.single.bytes == null) return;
-    final bytes = result.files.single.bytes!;
-    final text = utf8.decode(bytes, allowMalformed: true);
-    if (text.trim().isEmpty) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('file_empty'))));
-      return;
+    final fileName = result.files.single.name.toLowerCase();
+
+    if (fileName.endsWith('.txt')) {
+      final bytes = result.files.single.bytes!;
+      final text = utf8.decode(bytes, allowMalformed: true);
+      if (text.trim().isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('file_empty'))));
+        return;
+      }
+      await _addProductsFromText(text, loc);
+    } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+      await _addProductsFromExcel(result.files.single.bytes!, loc);
     }
-    await _addProductsFromText(text, loc);
+  }
+
+  Future<void> _addProductsFromExcel(Uint8List bytes, LocalizationService loc) async {
+    try {
+      final excel = Excel.decodeBytes(bytes);
+      final sheet = excel.tables[excel.tables.keys.first];
+      if (sheet == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: не найдена таблица в файле')));
+        return;
+      }
+
+      final lines = <String>[];
+      for (var i = 0; i < sheet.rows.length; i++) {
+        final row = sheet.rows[i];
+        if (row.isEmpty) continue;
+
+        // Берем первые 3 колонки: название, цена, единица
+        final name = row.length > 0 ? row[0]?.value?.toString() ?? '' : '';
+        final price = row.length > 1 ? row[1]?.value?.toString() ?? '' : '';
+        final unit = row.length > 2 ? row[2]?.value?.toString() ?? '' : 'г';
+
+        if (name.trim().isNotEmpty) {
+          lines.add('$name\t$price\t$unit');
+        }
+      }
+
+      final text = lines.join('\n');
+      if (text.trim().isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('file_empty'))));
+        return;
+      }
+      await _addProductsFromText(text, loc);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка обработки Excel файла: $e')));
+    }
   }
 
   Future<void> _addProductsFromText(String text, LocalizationService loc) async {
