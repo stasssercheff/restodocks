@@ -176,13 +176,18 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     // Брутто
                     _buildNumericCell(ingredient.grossWeight == 0 ? '' : ingredient.grossWeight.toStringAsFixed(0), (value) {
                       final gross = double.tryParse(value) ?? 0;
-                      // При изменении брутто пересчитываем нетто и выход
+                      // При изменении брутто пересчитываем нетто, выход и стоимость
                       final net = gross * (1 - ingredient.primaryWastePct / 100);
                       final output = net * (1 - (ingredient.cookingLossPctOverride ?? 0) / 100);
+
+                      // Пересчитываем стоимость: цена за кг * вес брутто в кг
+                      final newCost = (ingredient.pricePerKg ?? 0) * (gross / 1000.0);
+
                       _updateIngredient(rowIndex, ingredient.copyWith(
                         grossWeight: gross,
                         netWeight: net,
                         outputWeight: output,
+                        cost: newCost,
                       ));
                     }, 'gross_$rowIndex'),
 
@@ -190,12 +195,14 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     _buildNumericCell(ingredient.primaryWastePct == 0 ? '' : ingredient.primaryWastePct.toString(), (value) {
                       final waste = double.tryParse(value) ?? 0;
                       final clampedWaste = waste.clamp(0, 100);
-                      // При изменении % отхода автоматически пересчитываем нетто (если брутто > 0)
+                      // При изменении % отхода автоматически пересчитываем нетто, выход и стоимость
                       final net = ingredient.grossWeight > 0 ? ingredient.grossWeight * (1 - clampedWaste / 100) : ingredient.netWeight;
+                      final output = net * (1 - (ingredient.cookingLossPctOverride ?? 0) / 100);
+                      // Стоимость не меняется при изменении отхода - она зависит только от брутто веса
                       _updateIngredient(rowIndex, ingredient.copyWith(
                         primaryWastePct: clampedWaste,
                         netWeight: net,
-                        outputWeight: net, // Выход всегда равен нетто
+                        outputWeight: output,
                       ));
                     }, 'waste_$rowIndex'),
 
@@ -437,6 +444,16 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         ));
       }
     }
+
+    // Удаляем дубликаты по displayName (сохраняем первый найденный)
+    final seenDisplayNames = <String>{};
+    allItems.retainWhere((item) {
+      if (seenDisplayNames.contains(item.displayName)) {
+        return false;
+      }
+      seenDisplayNames.add(item.displayName);
+      return true;
+    });
 
     // Сортируем по displayName
     allItems.sort((a, b) => a.displayName.compareTo(b.displayName));
