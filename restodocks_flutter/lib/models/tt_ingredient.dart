@@ -251,6 +251,7 @@ class TTIngredient extends Equatable {
     String? establishmentId,
     String? defaultCurrency,
   }) {
+    print('DEBUG fromProduct: unit=$unit, gramsPerPiece=$gramsPerPiece, product.unit=${product?.unit}');
     final wastePct = primaryWastePct ?? product?.primaryWastePct ?? 0;
     if (product == null) {
       return TTIngredient(
