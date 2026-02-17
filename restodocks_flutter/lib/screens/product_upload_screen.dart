@@ -102,6 +102,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   }
 
   Future<void> _uploadFromFile() async {
+    print('DEBUG: Starting file upload');
     final loc = context.read<LocalizationService>();
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
@@ -109,23 +110,33 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       withData: true,
     );
 
-    if (result == null || result.files.isEmpty || result.files.single.bytes == null) return;
+    if (result == null || result.files.isEmpty || result.files.single.bytes == null) {
+      print('DEBUG: No file selected or no data');
+      return;
+    }
 
+    print('DEBUG: File selected: ${result.files.single.name}');
     final fileName = result.files.single.name.toLowerCase();
     final bytes = result.files.single.bytes!;
 
     if (fileName.endsWith('.txt')) {
       final text = utf8.decode(bytes, allowMalformed: true);
+      print('DEBUG: Processing text file, length: ${text.length}');
       await _processText(text, loc);
     } else if (fileName.endsWith('.rtf')) {
       final text = _extractTextFromRtf(utf8.decode(bytes, allowMalformed: true));
+      print('DEBUG: Processing RTF file, extracted length: ${text.length}');
       await _processText(text, loc);
     } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+      print('DEBUG: Processing Excel file');
       await _processExcel(bytes, loc);
+    } else {
+      print('DEBUG: Unsupported file type: $fileName');
     }
   }
 
   Future<void> _showPasteDialog() async {
+    print('DEBUG: Showing paste dialog');
     final loc = context.read<LocalizationService>();
     final controller = TextEditingController();
 
@@ -169,16 +180,24 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       ),
     );
 
+    print('DEBUG: Paste dialog result: text length = ${text?.length ?? 0}');
     if (text != null && text.trim().isNotEmpty) {
+      print('DEBUG: Processing pasted text');
       await _processText(text, loc);
+    } else {
+      print('DEBUG: No text to process');
     }
   }
 
   Future<void> _processText(String text, LocalizationService loc) async {
+    print('DEBUG: Processing text, input length: ${text.length}');
     final lines = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty);
+    print('DEBUG: Found ${lines.length} lines');
     final items = lines.map(_parseLine).where((r) => r.name.isNotEmpty).toList();
+    print('DEBUG: Parsed ${items.length} valid items');
 
     if (items.isEmpty) {
+      print('DEBUG: No valid items found');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Не найдено валидных продуктов в тексте')),
       );
@@ -242,9 +261,11 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   }
 
   Future<void> _addProductsToNomenclature(List<({String name, double? price})> items, LocalizationService loc) async {
+    print('DEBUG: Starting to add ${items.length} products to nomenclature');
     setState(() => _isLoading = true);
 
     try {
+      print('DEBUG: Showing upload progress dialog');
       await showDialog(
         context: context,
         barrierDismissible: false,
@@ -253,24 +274,34 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
           loc: loc,
         ),
       );
+      print('DEBUG: Upload dialog completed');
+    } catch (e) {
+      print('DEBUG: Error in upload dialog: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
 
     // Обновляем список продуктов
+    print('DEBUG: Refreshing product lists');
     final store = context.read<ProductStoreSupabase>();
     final account = context.read<AccountManagerSupabase>();
     final estId = account.establishment?.id;
+    print('DEBUG: Establishment ID: $estId');
 
     if (estId != null) {
       await store.loadProducts();
       await store.loadNomenclature(estId);
       if (mounted) setState(() {});
+      print('DEBUG: Product lists refreshed');
+    } else {
+      print('DEBUG: No establishment ID found');
     }
   }
 
   ({String name, double? price}) _parseLine(String line) {
+    print('DEBUG: Parsing line: "$line"');
     final parts = line.split(RegExp(r'\t|\s{2,}'));
+    print('DEBUG: Split into ${parts.length} parts: $parts');
     final name = parts.isNotEmpty ? parts[0].trim() : '';
     final priceStr = parts.length > 1 ? parts[1].trim() : '';
 
@@ -279,9 +310,12 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       // Убираем валюту и запятые
       final cleanPrice = priceStr.replaceAll(RegExp(r'[₫$€£руб.\s]'), '').replaceAll(',', '');
       price = double.tryParse(cleanPrice);
+      print('DEBUG: Cleaned price "$priceStr" -> "$cleanPrice" -> $price');
     }
 
-    return (name: name, price: price);
+    final result = (name: name, price: price);
+    print('DEBUG: Parsed result: name="$name", price=$price');
+    return result;
   }
 
   String _extractTextFromRtf(String rtf) {
@@ -584,11 +618,44 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
   }
 
   Future<void> _startUpload() async {
+    print('DEBUG: Starting upload process for ${widget.items.length} items');
+
+    try {
+      final store = context.read<ProductStoreSupabase>();
+      print('DEBUG: Got ProductStoreSupabase');
+    } catch (e) {
+      print('DEBUG: Failed to get ProductStoreSupabase: $e');
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка: не удалось получить доступ к хранилищу продуктов')),
+        );
+      }
+      return;
+    }
+
     final store = context.read<ProductStoreSupabase>();
+
+    try {
+      final account = context.read<AccountManagerSupabase>();
+      print('DEBUG: Got AccountManagerSupabase');
+    } catch (e) {
+      print('DEBUG: Failed to get AccountManagerSupabase: $e');
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка: не удалось получить доступ к аккаунту')),
+        );
+      }
+      return;
+    }
+
     final account = context.read<AccountManagerSupabase>();
     final estId = account.establishment?.id;
+    print('DEBUG: Establishment ID: $estId');
 
     if (estId == null) {
+      print('DEBUG: No establishment ID found');
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -602,9 +669,11 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
     final sourceLang = widget.loc.currentLanguageCode;
     final allLangs = LocalizationService.productLanguageCodes;
 
+    print('DEBUG: Starting to process ${widget.items.length} items');
     for (final item in widget.items) {
       if (!mounted) return;
 
+      print('DEBUG: Processing item ${widget.items.indexOf(item) + 1}/${widget.items.length}: "${item.name}" price=${item.price}');
       setState(() => _processed++);
 
       try {
@@ -680,11 +749,13 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
 
         try {
           await store.addToNomenclature(estId, product.id);
+          print('DEBUG: Successfully added "${product.name}" to nomenclature');
         } catch (e) {
           // Возможно продукт уже в номенклатуре - считаем это успехом
           if (e.toString().contains('duplicate key') ||
               e.toString().contains('already exists') ||
               e.toString().contains('unique constraint')) {
+            print('DEBUG: Product "${product.name}" already in nomenclature, skipping');
             setState(() => _skipped++);
             continue;
           }
@@ -695,6 +766,7 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
         }
 
         setState(() => _added++);
+        print('DEBUG: Successfully processed item "${item.name}"');
 
         // Небольшая задержка чтобы не перегружать сервер
         await Future.delayed(const Duration(milliseconds: 100));
