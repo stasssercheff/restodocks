@@ -90,10 +90,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     final totalOutput = allRows.where((ing) => ing.productName.isNotEmpty).fold<double>(0, (s, ing) => s + ing.outputWeight);
     final totalCost = allRows.where((ing) => ing.productName.isNotEmpty).fold<double>(0, (s, ing) => s + ing.cost);
 
-    // Стоимость за кг готового продукта: суммируем стоимости за кг каждого ингредиента
-    final costPerKgFinishedProduct = allRows
-        .where((ing) => ing.productName.isNotEmpty && ing.outputWeight > 0)
-        .fold<double>(0, (sum, ing) => sum + (ing.cost / ing.outputWeight * 1000));
+    // Стоимость за кг готового продукта: (сумма стоимостей брутто / общий выход в граммах) * 1000
+    final costPerKgFinishedProduct = totalOutput > 0 ? (totalCost / totalOutput) * 1000 : 0.0;
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
