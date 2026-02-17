@@ -683,10 +683,16 @@ class _NomenclatureTab extends StatelessWidget {
     return map[c] ?? c;
   }
 
-  String _buildProductSubtitle(Product p) {
+  String _buildProductSubtitle(Product p, ProductStoreSupabase store, String estId) {
+    final establishmentPrice = store.getEstablishmentPrice(p.id, estId);
+    final price = establishmentPrice?.$1 ?? p.basePrice;
+    final currency = establishmentPrice?.$2 ?? 'RUB';
+
+    final priceText = price != null ? '${price.toStringAsFixed(0)} ₽/${_unitDisplay(p.unit, loc.currentLanguageCode)}' : 'Цена не установлена';
+
     return (p.category == 'misc' || p.category == 'manual')
-        ? '${p.calories?.round() ?? 0} ккал · ${_unitDisplay(p.unit, loc.currentLanguageCode)}'
-        : '${_categoryLabel(p.category)} · ${p.calories?.round() ?? 0} ккал · ${_unitDisplay(p.unit, loc.currentLanguageCode)}';
+        ? '${p.calories?.round() ?? 0} ккал · $priceText'
+        : '${_categoryLabel(p.category)} · ${p.calories?.round() ?? 0} ккал · $priceText';
   }
 
   String _buildTechCardSubtitle(TechCard tc) {
@@ -919,7 +925,7 @@ class _NomenclatureTab extends StatelessWidget {
                   title: Text(item.getLocalizedName(loc.currentLanguageCode)),
                   subtitle: Text(
                     item.isProduct
-                        ? _buildProductSubtitle(item.product!)
+                        ? _buildProductSubtitle(item.product!, store, estId)
                         : _buildTechCardSubtitle(item.techCard!),
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
