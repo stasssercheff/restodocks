@@ -254,14 +254,28 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
                     // Технология
                     Container(
-                      height: 44,
+                      constraints: const BoxConstraints(minHeight: 44),
                       alignment: Alignment.centerLeft,
                       padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Text(
-                        rowIndex == 0 ? (widget.technologyController?.text ?? '') : '',
-                        style: const TextStyle(fontSize: 11),
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                      child: rowIndex == 0 && widget.canEdit && widget.technologyController != null
+                          ? TextField(
+                              controller: widget.technologyController,
+                              maxLines: null,
+                              minLines: 1,
+                              style: const TextStyle(fontSize: 11),
+                              textAlign: TextAlign.left,
+                              decoration: const InputDecoration(
+                                border: InputBorder.none,
+                                contentPadding: EdgeInsets.zero,
+                                isDense: true,
+                                filled: true,
+                                fillColor: Colors.transparent,
+                              ),
+                            )
+                          : Text(
+                              rowIndex == 0 ? (widget.technologyController?.text ?? '') : '',
+                              style: const TextStyle(fontSize: 11),
+                            ),
                     ),
 
                     // Кнопка удаления
