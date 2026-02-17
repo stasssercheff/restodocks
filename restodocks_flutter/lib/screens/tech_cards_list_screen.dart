@@ -30,10 +30,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
 
   String _categoryLabel(String c) {
     const map = {
-      'vegetables': 'Овощи', 'fruits': 'Фрукты', 'meat': 'Мясо', 'seafood': 'Рыба',
-      'dairy': 'Молочное', 'grains': 'Крупы', 'bakery': 'Выпечка', 'pantry': 'Бакалея',
-      'spices': 'Специи', 'beverages': 'Напитки', 'eggs': 'Яйца', 'legumes': 'Бобовые',
-      'nuts': 'Орехи', 'misc': '—',
+      'sauce': 'Соус', 'vegetables': 'Овощи', 'meat': 'Мясо', 'seafood': 'Рыба',
+      'side': 'Гарнир', 'subside': 'Подгарнир', 'bakery': 'Выпечка', 'dessert': 'Десерт',
+      'decor': 'Декор', 'soup': 'Суп', 'misc': 'Разное', 'beverages': 'Напитки',
     };
     return map[c] ?? c;
   }

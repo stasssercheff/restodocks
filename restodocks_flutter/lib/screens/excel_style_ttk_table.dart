@@ -676,7 +676,9 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
             uniqueProducts[product.name.toLowerCase()] = product;
           }
         }
-        _filteredProducts = uniqueProducts.values.take(10).toList();
+        _filteredProducts = uniqueProducts.values.toList()
+          ..sort((a, b) => b.name.compareTo(a.name));  // Сортировка в обратном алфавитном порядке
+        _filteredProducts = _filteredProducts.take(10).toList();
       } else {
         // Убираем дубликаты по имени и фильтруем
         final uniqueProducts = <String, Product>{};
@@ -685,7 +687,9 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
             uniqueProducts[product.name.toLowerCase()] = product;
           }
         }
-        _filteredProducts = uniqueProducts.values.take(20).toList();
+        _filteredProducts = uniqueProducts.values.toList()
+          ..sort((a, b) => b.name.compareTo(a.name));  // Сортировка в обратном алфавитном порядке
+        _filteredProducts = _filteredProducts.take(20).toList();
       }
     });
 
