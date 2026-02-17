@@ -578,6 +578,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   Widget _buildPricePerKgCell(TTIngredient ingredient) {
     // Стоимость за кг выхода (меняется в зависимости от брутто и отхода)
     final costPerKgOutput = ingredient.outputWeight > 0 ? (ingredient.cost / ingredient.outputWeight) * 1000 : 0;
+    print('DEBUG _buildPricePerKgCell: cost=${ingredient.cost}, outputWeight=${ingredient.outputWeight}, costPerKgOutput=$costPerKgOutput');
 
     return Container(
       height: 44,
@@ -679,7 +680,7 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
           }
         }
         _filteredProducts = uniqueProducts.values.toList()
-          ..sort((a, b) => b.name.compareTo(a.name));  // Сортировка в обратном алфавитном порядке
+          ..sort((a, b) => a.name.compareTo(b.name));  // Сортировка в обратном алфавитном порядке
         _filteredProducts = _filteredProducts.take(10).toList();
       } else {
         // Убираем дубликаты по имени и фильтруем
@@ -690,7 +691,7 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
           }
         }
         _filteredProducts = uniqueProducts.values.toList()
-          ..sort((a, b) => b.name.compareTo(a.name));  // Сортировка в обратном алфавитном порядке
+          ..sort((a, b) => a.name.compareTo(b.name));  // Сортировка в обратном алфавитном порядке
         _filteredProducts = _filteredProducts.take(20).toList();
       }
     });
