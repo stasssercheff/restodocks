@@ -94,6 +94,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
     // Стоимость за кг готового продукта: (сумма стоимостей брутто / общий нетто вес) * 1000, округлить вверх
     final costPerKgFinishedProduct = totalOutput > 0 ? ((totalCost / totalOutput) * 1000).ceil() : 0;
+    print('TOTALS: totalCost=$totalCost, totalOutput=$totalOutput, costPerKg=$costPerKgFinishedProduct');
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -682,8 +683,13 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
           }
         }
         _filteredProducts = uniqueProducts.values.toList()
-          ..sort((a, b) => a.getLocalizedName(widget.loc.currentLanguageCode).compareTo(b.getLocalizedName(widget.loc.currentLanguageCode)));  // Сортировка в алфавитном порядке
-        _filteredProducts = _filteredProducts.take(10).toList();
+          ..sort((a, b) {
+            final aName = a.getLocalizedName(widget.loc.currentLanguageCode);
+            final bName = b.getLocalizedName(widget.loc.currentLanguageCode);
+            print('SORT: ${a.name} -> $aName vs ${b.name} -> $bName');
+            return aName.compareTo(bName);
+          });
+        _filteredProducts = _filteredProducts.take(50).toList();
       } else {
         // Убираем дубликаты по имени и фильтруем
         final uniqueProducts = <String, Product>{};
@@ -693,7 +699,12 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
           }
         }
         _filteredProducts = uniqueProducts.values.toList()
-          ..sort((a, b) => a.getLocalizedName(widget.loc.currentLanguageCode).compareTo(b.getLocalizedName(widget.loc.currentLanguageCode)));  // Сортировка в алфавитном порядке
+          ..sort((a, b) {
+            final aName = a.getLocalizedName(widget.loc.currentLanguageCode);
+            final bName = b.getLocalizedName(widget.loc.currentLanguageCode);
+            print('SORT: ${a.name} -> $aName vs ${b.name} -> $bName');
+            return aName.compareTo(bName);
+          });
         _filteredProducts = _filteredProducts.take(20).toList();
       }
     });

@@ -34,7 +34,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       'side': 'Гарнир', 'subside': 'Подгарнир', 'bakery': 'Выпечка', 'dessert': 'Десерт',
       'decor': 'Декор', 'soup': 'Суп', 'misc': 'Разное', 'beverages': 'Напитки',
     };
-    return map[c] ?? c;
+    final result = map[c] ?? c;
+    print('CATEGORY: $c -> $result');
+    return result;
   }
 
   double _calculateCostPerKg(TechCard tc) {
