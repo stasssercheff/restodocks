@@ -59,7 +59,7 @@ class OwnerHomeContent extends StatelessWidget {
               title: loc.t('schedule'),
               subtitle: loc.t('payroll_kitchen'),
               onTap: () => context.push('/department/kitchen'),
-              color: Colors.red,
+              color: Colors.deepOrange,
             ),
             _TileData(
               icon: Icons.restaurant_menu,
@@ -227,9 +227,14 @@ class _Tile extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                   shadows: [
                     const Shadow(
-                      color: Color(0x80000000),
+                      color: Colors.black54,
                       offset: Offset(1, 1),
-                      blurRadius: 2,
+                      blurRadius: 3,
+                    ),
+                    const Shadow(
+                      color: Colors.black26,
+                      offset: Offset(0, 0),
+                      blurRadius: 6,
                     ),
                   ],
                 ),
