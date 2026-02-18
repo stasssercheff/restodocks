@@ -33,6 +33,9 @@ class AppProviders {
         Provider<AiServiceSupabase>(
           create: (_) => AiServiceSupabase(),
         ),
+        Provider<NutritionApiService>(
+          create: (_) => NutritionApiService(),
+        ),
 
         // Инициализация сервисов при запуске + загрузка продуктов после входа
         FutureProvider<void>(

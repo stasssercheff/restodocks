@@ -477,15 +477,43 @@ ${text}
           final normalizedName = verification?.normalizedName ?? item.name;
           var names = <String, String>{for (final c in allLangs) c: normalizedName};
 
+          // Проверяем питательные данные от AI
+          double? calories = verification?.suggestedCalories;
+          double? protein = verification?.suggestedProtein;
+          double? fat = verification?.suggestedFat;
+          double? carbs = verification?.suggestedCarbs;
+
+          // Если AI не дал питательные данные или они выглядят неправильно, используем Nutrition API
+          final hasValidNutrition = (calories != null && calories > 0) ||
+                                   (protein != null && protein > 0) ||
+                                   (fat != null && fat > 0) ||
+                                   (carbs != null && carbs > 0);
+
+          if (!hasValidNutrition) {
+            try {
+              final nutritionService = context.read<NutritionApiService>();
+              final nutritionResult = await nutritionService.searchNutrition(normalizedName);
+
+              if (nutritionResult != null && nutritionResult.hasData) {
+                calories = nutritionResult.calories ?? calories;
+                protein = nutritionResult.protein ?? protein;
+                fat = nutritionResult.fat ?? fat;
+                carbs = nutritionResult.carbs ?? carbs;
+              }
+            } catch (nutritionError) {
+              // Игнорируем ошибки Nutrition API
+            }
+          }
+
           final product = Product(
             id: const Uuid().v4(),
             name: normalizedName,
             category: verification?.suggestedCategory ?? 'manual',
             names: names,
-            calories: verification?.suggestedCalories,
-            protein: null,
-            fat: null,
-            carbs: null,
+            calories: calories,
+            protein: protein,
+            fat: fat,
+            carbs: carbs,
             unit: verification?.suggestedUnit ?? 'g',
             basePrice: verification?.suggestedPrice ?? item.price,
             currency: (verification?.suggestedPrice ?? item.price) != null ? defCur : null,
