@@ -13,3 +13,6 @@ export 'order_list.dart';
 export 'product_import_result.dart';
 export 'translation.dart';
 export 'nomenclature_item.dart';
+
+// Виджеты
+export '../widgets/data_safety_indicator.dart';

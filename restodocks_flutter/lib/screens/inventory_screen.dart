@@ -11,6 +11,8 @@ import '../services/ai_service.dart';
 import '../services/image_service.dart';
 import '../services/inventory_download.dart';
 import '../services/services.dart';
+import '../mixins/auto_save_mixin.dart';
+import '../mixins/input_change_listener_mixin.dart';
 
 /// Единица для ПФ в бланке: вес (г) или штуки/порции.
 const String _pfUnitGrams = 'g';
@@ -91,7 +93,8 @@ class InventoryScreen extends StatefulWidget {
   State<InventoryScreen> createState() => _InventoryScreenState();
 }
 
-class _InventoryScreenState extends State<InventoryScreen> {
+class _InventoryScreenState extends State<InventoryScreen>
+    with AutoSaveMixin<InventoryScreen>, InputChangeListenerMixin<InventoryScreen> {
   final ScrollController _hScroll = ScrollController();
   final List<_InventoryRow> _rows = [];
   /// Продукты, перерасчитанные из ПФ (третья секция); заполняется при загрузке файла.
@@ -108,6 +111,79 @@ class _InventoryScreenState extends State<InventoryScreen> {
     super.initState();
     _startTime = TimeOfDay.now();
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadNomenclature());
+
+    // Настроить автосохранение
+    setOnInputChanged(scheduleSave);
+  }
+
+  @override
+  String get draftKey => 'inventory';
+
+  @override
+  Map<String, dynamic> getCurrentState() {
+    return {
+      'date': _date.toIso8601String(),
+      'startTime': _startTime?.format(context) ?? '',
+      'endTime': _endTime?.format(context) ?? '',
+      'completed': _completed,
+      'sortMode': _sortMode.name,
+      'blockFilter': _blockFilter.name,
+      'rows': _rows.map((row) => {
+        'productId': row.product?.id,
+        'techCardId': row.techCard?.id,
+        'freeName': row.freeName,
+        'freeUnit': row.freeUnit,
+        'quantities': row.quantities,
+        'pfUnit': row.pfUnit,
+      }).toList(),
+      'aggregatedFromFile': _aggregatedFromFile,
+    };
+  }
+
+  @override
+  Future<void> restoreState(Map<String, dynamic> data) async {
+    setState(() {
+      _date = DateTime.parse(data['date'] ?? DateTime.now().toIso8601String());
+      _startTime = data['startTime'] != null && data['startTime'].isNotEmpty
+          ? TimeOfDay.fromDateTime(DateTime.parse('2023-01-01 ${data['startTime']}'))
+          : null;
+      _endTime = data['endTime'] != null && data['endTime'].isNotEmpty
+          ? TimeOfDay.fromDateTime(DateTime.parse('2023-01-01 ${data['endTime']}'))
+          : null;
+      _completed = data['completed'] ?? false;
+
+      final sortModeName = data['sortMode'] ?? 'lastAdded';
+      _sortMode = _InventorySort.values.firstWhere(
+        (e) => e.name == sortModeName,
+        orElse: () => _InventorySort.lastAdded,
+      );
+
+      final blockFilterName = data['blockFilter'] ?? 'all';
+      _blockFilter = _InventoryBlockFilter.values.firstWhere(
+        (e) => e.name == blockFilterName,
+        orElse: () => _InventoryBlockFilter.all,
+      );
+
+      // Восстановить строки
+      final rowsData = data['rows'] as List<dynamic>? ?? [];
+      _rows.clear();
+      for (final rowData in rowsData) {
+        final Map<String, dynamic> rowMap = rowData as Map<String, dynamic>;
+        _rows.add(_InventoryRow(
+          product: null, // Продукты нужно будет загрузить отдельно
+          techCard: null, // ТТК нужно будет загрузить отдельно
+          freeName: rowMap['freeName'],
+          freeUnit: rowMap['freeUnit'],
+          quantities: (rowMap['quantities'] as List<dynamic>?)?.map((e) => (e as num).toDouble()).toList() ?? [0.0],
+          pfUnit: rowMap['pfUnit'],
+        ));
+      }
+
+      _aggregatedFromFile = data['aggregatedFromFile'];
+    });
+
+    // Перезагрузить номенклатуру для восстановления связей с продуктами и ТТК
+    await _loadNomenclature();
   }
 
   /// Индексы строк-продуктов и свободных (номенклатура + с чека), отсортированы по выбранному режиму.
@@ -178,6 +254,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
         ));
       }
     });
+    scheduleSave(); // Автосохранение при добавлении строк из чека
   }
 
   Future<void> _scanReceipt(BuildContext context, LocalizationService loc) async {
@@ -304,6 +381,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
     setState(() {
       row.quantities[colIndex] = value;
     });
+    scheduleSave(); // Автосохранение при изменении количества
   }
 
   void _removeRow(int index) {
@@ -321,7 +399,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
       lastDate: DateTime(2030),
       locale: Locale(loc.currentLanguageCode),
     );
-    if (picked != null) setState(() => _date = picked);
+    if (picked != null) {
+      setState(() => _date = picked);
+      scheduleSave(); // Автосохранение при изменении даты
+    }
   }
 
   Future<void> _complete(BuildContext context) async {
@@ -392,6 +473,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
         _endTime = endTime;
         _completed = true;
       });
+      // Очистка черновика после успешной отправки
+      clearDraft();
     }
 
     // Генерация Excel и скачивание без почтового клиента
@@ -705,16 +788,21 @@ class _InventoryScreenState extends State<InventoryScreen> {
         ),
         title: Text(loc.t('inventory_blank_title')),
       ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      body: Stack(
         children: [
-          _buildHeader(loc, establishment, employee),
-          const Divider(height: 1),
-          Expanded(
-            child: _buildTable(loc),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildHeader(loc, establishment, employee),
+              const Divider(height: 1),
+              Expanded(
+                child: _buildTable(loc),
+              ),
+              const Divider(height: 1),
+              _buildFooter(loc),
+            ],
           ),
-          const Divider(height: 1),
-          _buildFooter(loc),
+          DataSafetyIndicator(isVisible: true),
         ],
       ),
     );

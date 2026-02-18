@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 
 import '../models/models.dart';
 import '../services/services.dart';
+import '../mixins/auto_save_mixin.dart';
+import '../mixins/input_change_listener_mixin.dart';
 
 /// Редактирование чеклиста-шаблона. Сохранить, создать по аналогии, удалить.
 class ChecklistEditScreen extends StatefulWidget {
@@ -15,12 +17,13 @@ class ChecklistEditScreen extends StatefulWidget {
   State<ChecklistEditScreen> createState() => _ChecklistEditScreenState();
 }
 
-class _ChecklistEditScreenState extends State<ChecklistEditScreen> {
+class _ChecklistEditScreenState extends State<ChecklistEditScreen>
+    with AutoSaveMixin<ChecklistEditScreen>, InputChangeListenerMixin<ChecklistEditScreen> {
   Checklist? _checklist;
   bool _loading = true;
   String? _error;
-  final _nameController = TextEditingController();
-  final _newItemController = TextEditingController();
+  late final TextEditingController _nameController;
+  late final TextEditingController _newItemController;
   final List<ChecklistItem> _items = [];
 
   Future<void> _load() async {
@@ -53,7 +56,51 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen> {
   @override
   void initState() {
     super.initState();
+
+    // Создать tracked контроллеры
+    _nameController = createTrackedController();
+    _newItemController = createTrackedController();
+
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+
+    // Настроить автосохранение
+    setOnInputChanged(scheduleSave);
+  }
+
+  @override
+  String get draftKey => 'checklist';
+
+  @override
+  Map<String, dynamic> getCurrentState() {
+    return {
+      'checklistId': widget.checklistId,
+      'name': _nameController.text,
+      'items': _items.map((item) => {
+        'id': item.id,
+        'title': item.title,
+        'sortOrder': item.sortOrder,
+      }).toList(),
+    };
+  }
+
+  @override
+  Future<void> restoreState(Map<String, dynamic> data) async {
+    if (data['checklistId'] != widget.checklistId) return; // Не наш черновик
+
+    setState(() {
+      _nameController.text = data['name'] ?? '';
+      final itemsData = data['items'] as List<dynamic>? ?? [];
+      _items.clear();
+      for (final itemData in itemsData) {
+        final Map<String, dynamic> itemMap = itemData as Map<String, dynamic>;
+        _items.add(ChecklistItem(
+          id: itemMap['id'] ?? '',
+          checklistId: widget.checklistId,
+          title: itemMap['title'] ?? '',
+          sortOrder: itemMap['sortOrder'] ?? 0,
+        ));
+      }
+    });
   }
 
   @override
@@ -91,6 +138,8 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(context.read<LocalizationService>().t('save') + ' ✓')),
         );
+        // Очистка черновика после успешного сохранения
+        clearDraft();
         _load();
       }
     } catch (e) {
@@ -169,10 +218,12 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen> {
       ));
       _newItemController.clear();
     });
+    scheduleSave(); // Автосохранение при добавлении элемента
   }
 
   void _removeItem(int i) {
     setState(() => _items.removeAt(i));
+    scheduleSave(); // Автосохранение при удалении элемента
   }
 
   @override
@@ -270,11 +321,13 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+      body: Stack(
+        children: [
+          SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
             TextField(
               controller: _nameController,
               readOnly: !canEdit,
@@ -333,6 +386,9 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen> {
           ],
         ),
       ),
-    );
+      DataSafetyIndicator(isVisible: true),
+    ],
+  ),
+);
   }
 }
