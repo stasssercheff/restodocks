@@ -270,6 +270,14 @@ class ProductStoreSupabase {
     _allProducts.removeWhere((product) => product.id == productId);
   }
 
+  /// Получить список ID продуктов в номенклатуре заведения
+  List<String> getNomenclatureIdsForEstablishment(String establishmentId) {
+    return _nomenclatureIds.where((id) {
+      // Проверяем, есть ли цена для этого продукта в этом заведении
+      return _priceCache.containsKey('${establishmentId}_$id');
+    }).toList();
+  }
+
   /// Установить цену продукта в номенклатуре заведения
   Future<void> setEstablishmentPrice(String establishmentId, String productId, double? price, String? currency) async {
     await _supabase.client.from('establishment_products').upsert(

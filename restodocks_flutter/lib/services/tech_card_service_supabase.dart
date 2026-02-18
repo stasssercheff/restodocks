@@ -385,4 +385,28 @@ class TechCardServiceSupabase {
     await saveTechCard(updatedTechCard);
     return updatedTechCard;
   }
+
+  /// Получить все технологические карты
+  Future<List<TechCard>> getAllTechCards() async {
+    final response = await _supabase.client
+        .from('tech_cards')
+        .select('''
+          *,
+          tech_card_ingredients (
+            *
+          )
+        ''');
+
+    final techCards = <TechCard>[];
+    for (final row in response) {
+      try {
+        techCards.add(TechCard.fromJson(row));
+      } catch (e) {
+        // Игнорируем проблемные записи
+        continue;
+      }
+    }
+
+    return techCards;
+  }
 }

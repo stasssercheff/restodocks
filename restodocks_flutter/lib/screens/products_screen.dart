@@ -9,6 +9,7 @@ import '../models/product.dart';
 import '../services/product_store_supabase.dart';
 import '../services/localization_service.dart';
 import '../services/account_manager_supabase.dart';
+import '../services/tech_card_service_supabase.dart';
 
 /// Экран базы продуктов: просмотр и управление продуктами с КБЖУ
 class ProductsScreen extends StatefulWidget {
@@ -63,8 +64,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Удалить дубликаты'),
-        content: const Text('Будут удалены продукты с одинаковым названием, ценой и характеристиками. Останется только один экземпляр каждого продукта. Продолжить?'),
+        title: const Text('Удалить полные дубликаты'),
+        content: const Text('Будут удалены продукты с одинаковым названием, ценой и характеристиками. Продукты, используемые в номенклатуре или ТТК, не будут удалены. Продолжить?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -85,23 +86,60 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
     try {
       final store = context.read<ProductStoreSupabase>();
+      final account = context.read<AccountManagerSupabase>();
+      final techCardService = context.read<TechCardServiceSupabase>();
+
+      // Получаем все ТТК для проверки использования продуктов
+      final allTechCards = await techCardService.getAllTechCards();
 
       // Группируем продукты по ключевым характеристикам
       final Map<String, List<Product>> groupedProducts = {};
 
       for (final product in _products) {
-        // Ключ для группировки: название + категория + калории + белки + жиры + углеводы
+        // Ключ для группировки: название + категория + калории + белки + жиры + углеводы + цена + валюта
         final key = '${product.name}_${product.category}_${product.calories}_${product.protein}_${product.fat}_${product.carbs}_${product.basePrice}_${product.currency}';
         groupedProducts.putIfAbsent(key, () => []).add(product);
       }
 
       int deletedCount = 0;
+      int skippedCount = 0;
 
       // Для каждой группы оставляем только первый продукт, остальные удаляем
       for (final products in groupedProducts.values) {
         if (products.length > 1) {
           for (int i = 1; i < products.length; i++) {
-            await store.deleteProduct(products[i].id);
+            final product = products[i];
+
+            // Проверяем, используется ли продукт в номенклатуре или ТТК
+            bool isUsed = false;
+            String usageMessage = '';
+
+            // Проверяем в номенклатуре текущего заведения
+            final establishment = account.establishment;
+            if (establishment != null) {
+              final nomenclatureIds = store.getNomenclatureIdsForEstablishment(establishment.id);
+              if (nomenclatureIds.contains(product.id)) {
+                isUsed = true;
+                usageMessage = 'Продукт используется в номенклатуре заведения "${establishment.name}"';
+              }
+            }
+
+            // Проверяем в ТТК
+            if (!isUsed) {
+              for (final techCard in allTechCards) {
+                if (techCard.ingredients.any((ing) => ing.productId == product.id)) {
+                  isUsed = true;
+                  break;
+                }
+              }
+            }
+
+            if (isUsed) {
+              skippedCount++;
+              continue;
+            }
+
+            await store.deleteProduct(product.id);
             deletedCount++;
           }
         }
@@ -110,7 +148,109 @@ class _ProductsScreenState extends State<ProductsScreen> {
       if (mounted) {
         await _loadProducts(); // Перезагружаем список
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Удалено дубликатов: $deletedCount')),
+          SnackBar(content: Text('Удалено дубликатов: $deletedCount${skippedCount > 0 ? ', пропущено (используются): $skippedCount' : ''}')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка удаления дубликатов: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _removeDuplicatesByName() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Удалить дубликаты по названию'),
+        content: const Text('Будут удалены продукты с одинаковым названием (независимо от цены и характеристик). Продукты, используемые в номенклатуре или ТТК, не будут удалены. Продолжить?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Отмена'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final store = context.read<ProductStoreSupabase>();
+      final account = context.read<AccountManagerSupabase>();
+      final techCardService = context.read<TechCardServiceSupabase>();
+
+      // Получаем все ТТК для проверки использования продуктов
+      final allTechCards = await techCardService.getAllTechCards();
+
+      // Группируем продукты только по названию
+      final Map<String, List<Product>> groupedProducts = {};
+
+      for (final product in _products) {
+        final key = product.name.toLowerCase().trim(); // Игнорируем регистр и пробелы
+        groupedProducts.putIfAbsent(key, () => []).add(product);
+      }
+
+      int deletedCount = 0;
+      int skippedCount = 0;
+
+      // Для каждой группы оставляем только первый продукт, остальные удаляем
+      for (final products in groupedProducts.values) {
+        if (products.length > 1) {
+          // Сортируем по дате создания или ID, чтобы оставить "старший" продукт
+          products.sort((a, b) => a.id.compareTo(b.id));
+
+          for (int i = 1; i < products.length; i++) {
+            final product = products[i];
+
+            // Проверяем, используется ли продукт в номенклатуре или ТТК
+            bool isUsed = false;
+
+            // Проверяем в номенклатуре текущего заведения
+            final establishment = account.establishment;
+            if (establishment != null) {
+              final nomenclatureIds = store.getNomenclatureIdsForEstablishment(establishment.id);
+              if (nomenclatureIds.contains(product.id)) {
+                isUsed = true;
+                usageMessage = 'Продукт используется в номенклатуре заведения "${establishment.name}"';
+              }
+            }
+
+            // Проверяем в ТТК
+            if (!isUsed) {
+              for (final techCard in allTechCards) {
+                if (techCard.ingredients.any((ing) => ing.productId == product.id)) {
+                  isUsed = true;
+                  break;
+                }
+              }
+            }
+
+            if (isUsed) {
+              skippedCount++;
+              continue;
+            }
+
+            await store.deleteProduct(product.id);
+            deletedCount++;
+          }
+        }
+      }
+
+      if (mounted) {
+        await _loadProducts(); // Перезагружаем список
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Удалено дубликатов по названию: $deletedCount${skippedCount > 0 ? ', пропущено (используются): $skippedCount' : ''}')),
         );
       }
     } catch (e) {
@@ -183,8 +323,13 @@ class _ProductsScreenState extends State<ProductsScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.delete_sweep),
-            tooltip: 'Удалить дубликаты',
+            tooltip: 'Удалить полные дубликаты',
             onPressed: _removeDuplicates,
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_forever),
+            tooltip: 'Удалить дубликаты по названию',
+            onPressed: _removeDuplicatesByName,
           ),
           IconButton(
             icon: const Icon(Icons.upload_file),
@@ -385,6 +530,59 @@ class _ProductDetailsDialogState extends State<_ProductDetailsDialog> {
   }
 
   Future<void> _deleteProduct() async {
+    // Сначала проверяем, используется ли продукт
+    final store = context.read<ProductStoreSupabase>();
+    final account = context.read<AccountManagerSupabase>();
+    final techCardService = context.read<TechCardServiceSupabase>();
+
+    bool isUsed = false;
+    String usageMessage = '';
+
+    try {
+      // Проверяем в номенклатуре текущего заведения
+      final establishment = account.establishment;
+      if (establishment != null) {
+        final nomenclatureIds = store.getNomenclatureIdsForEstablishment(establishment.id);
+        if (nomenclatureIds.contains(widget.product.id)) {
+          isUsed = true;
+          usageMessage = 'Продукт используется в номенклатуре заведения "${establishment.name}"';
+        }
+      }
+
+      // Проверяем в ТТК
+      if (!isUsed) {
+        final allTechCards = await techCardService.getAllTechCards();
+        for (final techCard in allTechCards) {
+          if (techCard.ingredients.any((ing) => ing.productId == widget.product.id)) {
+            isUsed = true;
+            usageMessage = 'Продукт используется в технологической карте "${techCard.dishName}"';
+            break;
+          }
+        }
+      }
+    } catch (e) {
+      // Если не удалось проверить, показываем предупреждение
+      isUsed = true;
+      usageMessage = 'Не удалось проверить использование продукта. Удаление запрещено для безопасности.';
+    }
+
+    if (isUsed) {
+      await showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Невозможно удалить продукт'),
+          content: Text(usageMessage),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -408,7 +606,6 @@ class _ProductDetailsDialogState extends State<_ProductDetailsDialog> {
 
     setState(() => _isUpdating = true);
     try {
-      final store = context.read<ProductStoreSupabase>();
       await store.deleteProduct(widget.product.id);
       if (mounted) {
         widget.onProductDeleted();
