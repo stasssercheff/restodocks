@@ -61,7 +61,12 @@ class SupabaseService {
 
   /// Вставка данных в таблицу
   Future<Map<String, dynamic>> insertData(String tableName, Map<String, dynamic> data) async {
+    print('DEBUG SupabaseService: Inserting into $tableName: $data');
     final response = await client.from(tableName).insert(data).select();
+    print('DEBUG SupabaseService: Insert response: $response');
+    if (response.isEmpty) {
+      throw Exception('Insert returned no data');
+    }
     return response.first;
   }
 

@@ -438,6 +438,7 @@ ${text}
   }
 
   Future<void> _addProductsToNomenclature(List<({String name, double? price})> items, LocalizationService loc) async {
+    print('DEBUG: Starting to process ${items.length} products');
     setState(() => _isLoading = true);
 
     try {
@@ -448,7 +449,10 @@ ${text}
       final sourceLang = loc.currentLanguageCode;
       final allLangs = LocalizationService.productLanguageCodes;
 
+      print('DEBUG: Establishment ID: $estId, Default currency: $defCur');
+
       if (estId == null) {
+        print('DEBUG: No establishment found!');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Не найдено заведение')),
         );
@@ -525,16 +529,23 @@ ${text}
             currency: (verification?.suggestedPrice ?? item.price) != null ? defCur : null,
           );
 
+          print('DEBUG: Created product: ${product.toJson()}');
+
           // Пытаемся добавить продукт
           try {
+            print('DEBUG: Adding product "${product.name}" to database...');
             await store.addProduct(product);
+            print('DEBUG: Successfully added product "${product.name}"');
           } catch (e) {
+            print('DEBUG: Failed to add product "${product.name}": $e');
             if (e.toString().contains('duplicate key') ||
                 e.toString().contains('already exists') ||
                 e.toString().contains('unique constraint')) {
+              print('DEBUG: Product "${product.name}" already exists, skipping');
               skipped++;
               continue;
             } else {
+              print('DEBUG: Unexpected error adding "${product.name}": $e');
               failed++;
               continue;
             }
@@ -542,14 +553,19 @@ ${text}
 
           // Добавляем в номенклатуру
           try {
+            print('DEBUG: Adding product "${product.name}" to nomenclature...');
             await store.addToNomenclature(estId, product.id);
             added++;
+            print('DEBUG: Successfully added "${product.name}" to nomenclature');
           } catch (e) {
+            print('DEBUG: Failed to add "${product.name}" to nomenclature: $e');
             if (e.toString().contains('duplicate key') ||
                 e.toString().contains('already exists') ||
                 e.toString().contains('unique constraint')) {
+              print('DEBUG: Product "${product.name}" already in nomenclature, skipping');
               skipped++;
             } else {
+              print('DEBUG: Unexpected error adding "${product.name}" to nomenclature: $e');
               failed++;
             }
           }
@@ -563,14 +579,19 @@ ${text}
       }
 
       // Обновляем список продуктов
+      print('DEBUG: Reloading products and nomenclature...');
       await store.loadProducts();
       await store.loadNomenclature(estId);
+      print('DEBUG: Products loaded: ${store.allProducts.length}');
+      print('DEBUG: Nomenclature loaded: ${store.nomenclatureProductIds.length}');
       if (mounted) setState(() {});
 
       // Показываем результат
       final message = failed == 0
           ? 'Добавлено: ${added + skipped}'
           : 'Добавлено: ${added + skipped}, Ошибок: $failed';
+
+      print('DEBUG: Final result - Added: $added, Skipped: $skipped, Failed: $failed');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

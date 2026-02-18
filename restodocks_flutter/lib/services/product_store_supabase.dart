@@ -30,14 +30,17 @@ class ProductStoreSupabase {
     _isLoading = true;
 
     try {
+      print('DEBUG ProductStore: Loading products from database...');
       final data = await _supabase.client
           .from('products')
           .select()
           .order('name');
 
+      print('DEBUG ProductStore: Loaded ${data.length} products from database');
       _allProducts = (data as List)
           .map((json) => Product.fromJson(json))
           .toList();
+      print('DEBUG ProductStore: Parsed ${_allProducts.length} products successfully');
 
       // Обновляем категории
       _categories = _allProducts
@@ -115,15 +118,19 @@ class ProductStoreSupabase {
   /// Добавить новый продукт
   Future<void> addProduct(Product product) async {
     try {
+      print('DEBUG ProductStore: Adding product "${product.name}" to database...');
       final response = await _supabase.insertData('products', product.toJson());
+      print('DEBUG ProductStore: Insert response: $response');
       final created = Product.fromJson(response);
       _allProducts.add(created);
+      print('DEBUG ProductStore: Product added successfully, total products: ${_allProducts.length}');
 
       if (!_categories.contains(created.category)) {
         _categories.add(created.category);
         _categories.sort();
       }
     } catch (e) {
+      print('DEBUG ProductStore: Error adding product: $e');
       // Error adding product
       rethrow;
     }
@@ -175,11 +182,13 @@ class ProductStoreSupabase {
   /// Загрузить номенклатуру заведения (ID продуктов и цены)
   Future<void> loadNomenclature(String establishmentId) async {
     try {
+      print('DEBUG ProductStore: Loading nomenclature for establishment $establishmentId...');
       final data = await _supabase.client
           .from('establishment_products')
           .select('product_id, price, currency')
           .eq('establishment_id', establishmentId);
 
+      print('DEBUG ProductStore: Loaded ${data.length} nomenclature items');
       _nomenclatureIds = {};
       for (final item in data as List) {
         final productId = item['product_id'] as String;
@@ -193,6 +202,7 @@ class ProductStoreSupabase {
           _priceCache[cacheKey] = null;
         }
       }
+      print('DEBUG ProductStore: Nomenclature loaded successfully: ${_nomenclatureIds.length} products');
     } catch (e) {
       // Error loading nomenclature
       _nomenclatureIds = {};
@@ -202,12 +212,16 @@ class ProductStoreSupabase {
   /// Добавить продукт в номенклатуру
   Future<void> addToNomenclature(String establishmentId, String productId) async {
     try {
-      await _supabase.client.from('establishment_products').upsert(
+      print('DEBUG ProductStore: Adding product $productId to nomenclature for establishment $establishmentId...');
+      final result = await _supabase.client.from('establishment_products').upsert(
         {'establishment_id': establishmentId, 'product_id': productId},
         onConflict: 'establishment_id,product_id',
       );
+      print('DEBUG ProductStore: Nomenclature upsert result: $result');
       _nomenclatureIds.add(productId);
+      print('DEBUG ProductStore: Product added to nomenclature successfully');
     } catch (e) {
+      print('DEBUG ProductStore: Error adding to nomenclature: $e');
       // Error adding to nomenclature
       rethrow;
     }
