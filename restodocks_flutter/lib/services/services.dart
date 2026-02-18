@@ -18,3 +18,4 @@ export 'ai_service.dart';
 export 'ai_service_supabase.dart';
 export 'order_list_storage_service.dart';
 export 'excel_export_service.dart';
+export 'domain_validation_service.dart';

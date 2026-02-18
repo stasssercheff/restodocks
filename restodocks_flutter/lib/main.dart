@@ -9,11 +9,19 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'core/core.dart';
 import 'services/services.dart';
+import 'services/domain_validation_service.dart';
 import 'screens/screens.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // App started
+
+  // Domain validation for web platform
+  if (!DomainValidationService.isDomainAllowed()) {
+    DomainValidationService.reportSuspiciousDomain();
+    DomainValidationService.showDomainWarning();
+    return; // Stop app execution
+  }
 
   // Temporary loading screen
   runApp(

@@ -42,8 +42,8 @@ flutter clean || true
 echo "==> flutter pub get"
 flutter pub get || { echo "ERROR: pub get failed"; exit 1; }
 
-echo "==> flutter build web --release"
-flutter build web --release 2>&1 | tee build.log
+echo "==> flutter build web --release --dart-define=FLUTTER_WEB_OBFUSCATE=true"
+flutter build web --release --dart-define=FLUTTER_WEB_OBFUSCATE=true 2>&1 | tee build.log
 BUILD_EXIT=${PIPESTATUS[0]}
 if [ "$BUILD_EXIT" -ne 0 ]; then
   echo "ERROR: flutter build web failed (exit $BUILD_EXIT). Last 120 lines of build.log:"
