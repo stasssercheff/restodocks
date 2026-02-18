@@ -62,12 +62,28 @@ class SupabaseService {
   /// Вставка данных в таблицу
   Future<Map<String, dynamic>> insertData(String tableName, Map<String, dynamic> data) async {
     print('DEBUG SupabaseService: Inserting into $tableName: $data');
-    final response = await client.from(tableName).insert(data).select();
-    print('DEBUG SupabaseService: Insert response: $response');
-    if (response.isEmpty) {
-      throw Exception('Insert returned no data');
+    try {
+      final response = await client.from(tableName).insert(data).select();
+      print('DEBUG SupabaseService: Insert response: $response');
+      if (response.isEmpty) {
+        print('DEBUG SupabaseService: Insert returned empty response, trying without select...');
+        // Если select не работает из-за RLS, пробуем просто insert
+        await client.from(tableName).insert(data);
+        print('DEBUG SupabaseService: Insert without select succeeded');
+        return data; // Возвращаем исходные данные
+      }
+      return response.first;
+    } catch (e) {
+      print('DEBUG SupabaseService: Insert failed: $e');
+      // Если insert().select() не работает, пробуем просто insert
+      if (e.toString().contains('permission') || e.toString().contains('RLS')) {
+        print('DEBUG SupabaseService: Retrying with insert only...');
+        await client.from(tableName).insert(data);
+        print('DEBUG SupabaseService: Insert only succeeded');
+        return data;
+      }
+      rethrow;
     }
-    return response.first;
   }
 
   /// Обновление данных в таблице

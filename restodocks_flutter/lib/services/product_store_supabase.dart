@@ -121,13 +121,25 @@ class ProductStoreSupabase {
       print('DEBUG ProductStore: Adding product "${product.name}" to database...');
       final response = await _supabase.insertData('products', product.toJson());
       print('DEBUG ProductStore: Insert response: $response');
-      final created = Product.fromJson(response);
-      _allProducts.add(created);
-      print('DEBUG ProductStore: Product added successfully, total products: ${_allProducts.length}');
 
-      if (!_categories.contains(created.category)) {
-        _categories.add(created.category);
-        _categories.sort();
+      // Если получили данные обратно, используем их
+      if (response != null && response.containsKey('id')) {
+        final created = Product.fromJson(response);
+        _allProducts.add(created);
+        print('DEBUG ProductStore: Product added successfully, total products: ${_allProducts.length}');
+
+        if (!_categories.contains(created.category)) {
+          _categories.add(created.category);
+          _categories.sort();
+        }
+      } else {
+        // Если не получили данные, добавляем локально созданный продукт
+        print('DEBUG ProductStore: No response data, adding locally created product');
+        _allProducts.add(product);
+        if (!_categories.contains(product.category)) {
+          _categories.add(product.category);
+          _categories.sort();
+        }
       }
     } catch (e) {
       print('DEBUG ProductStore: Error adding product: $e');
