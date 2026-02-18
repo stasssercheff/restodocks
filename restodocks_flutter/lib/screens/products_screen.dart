@@ -982,6 +982,18 @@ class _NomenclatureTab extends StatelessWidget {
 
     final priceText = price != null ? '${price.toStringAsFixed(0)} ₽/${_unitDisplay(p.unit, loc.currentLanguageCode)}' : 'Цена не установлена';
 
+    // Проверяем подписку для отображения КБЖУ
+    final account = context.read<AccountManagerSupabase>();
+    final hasPro = account.currentEmployee?.hasProSubscription ?? false;
+
+    if (!hasPro) {
+      // Без PRO подписки показываем только категорию и цену
+      return (p.category == 'misc' || p.category == 'manual')
+          ? '$priceText'
+          : '${_categoryLabel(p.category)} · $priceText';
+    }
+
+    // С PRO подпиской показываем КБЖУ
     return (p.category == 'misc' || p.category == 'manual')
         ? '${p.calories?.round() ?? 0} ккал · $priceText'
         : '${_categoryLabel(p.category)} · ${p.calories?.round() ?? 0} ккал · $priceText';
@@ -1004,6 +1016,12 @@ class _NomenclatureTab extends StatelessWidget {
     if (item.isTechCard) return false; // ТТК не нуждаются в КБЖУ
     final p = item.product!;
     return (p.calories == null || p.calories == 0) && p.protein == null && p.fat == null && p.carbs == null;
+  }
+
+  bool _canShowNutrition(BuildContext context) {
+    final account = context.read<AccountManagerSupabase>();
+    final employee = account.currentEmployee;
+    return employee?.hasProSubscription ?? false;
   }
 
   bool _needsTranslation(NomenclatureItem item) {
@@ -1177,7 +1195,7 @@ class _NomenclatureTab extends StatelessWidget {
               spacing: 8,
               runSpacing: 8,
               children: [
-                if (needsKbju.isNotEmpty)
+                if (needsKbju.isNotEmpty && _canShowNutrition(context))
                   FilledButton.tonalIcon(
                     onPressed: () => _loadKbjuForAll(context, needsKbju.where((item) => item.isProduct).map((item) => item.product!).toList()),
                     icon: const Icon(Icons.cloud_download, size: 20),

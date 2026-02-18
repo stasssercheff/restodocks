@@ -92,6 +92,9 @@ class Employee extends Equatable {
   @JsonKey(name: 'avatar_url')
   final String? avatarUrl;
 
+  @JsonKey(name: 'subscription_plan')
+  final String? subscriptionPlan; // 'free', 'pro', etc.
+
   /// Тип оплаты: 'per_shift' — за смену, 'hourly' — почасовая.
   @JsonKey(name: 'payment_type')
   final String? paymentType;
@@ -124,6 +127,7 @@ class Employee extends Equatable {
     required this.establishmentId,
     this.personalPin,
     this.avatarUrl,
+    this.subscriptionPlan,
     this.paymentType,
     this.ratePerShift,
     this.hourlyRate,
