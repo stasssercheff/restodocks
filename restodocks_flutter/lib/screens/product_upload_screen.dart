@@ -127,6 +127,65 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
             ),
             const SizedBox(height: 16),
 
+            // Отладочные логи (только в debug режиме)
+            if (kDebugMode) ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Отладочные логи:',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      height: 120,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.black,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: SingleChildScrollView(
+                        child: Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: Text(
+                            _debugLogs.join('\n'),
+                            style: const TextStyle(
+                              color: Colors.green,
+                              fontSize: 10,
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        TextButton(
+                          onPressed: () => setState(() => _debugLogs.clear()),
+                          child: const Text('Очистить'),
+                        ),
+                        TextButton(
+                          onPressed: () => _showDebugLogs(context),
+                          child: const Text('Показать все'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
             // Карточка загрузки из файла
             _UploadMethodCard(
               icon: Icons.file_upload,
@@ -299,6 +358,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
   Future<void> _uploadFromFile() async {
     print('=== _uploadFromFile called ===');
+    print('isLoading before: $_isLoading');
     final loc = context.read<LocalizationService>();
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
