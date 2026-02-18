@@ -823,9 +823,29 @@ ${text}
 
   Future<void> _processText(String text, LocalizationService loc, bool addToNomenclature) async {
     _addDebugLog('=== STARTING TEXT PROCESSING ===');
-    _addDebugLog('Text length: ${text.length}');
+    _addDebugLog('Text length: ${text.length} characters');
     _addDebugLog('Add to nomenclature: $addToNomenclature');
-    _addDebugLog('Raw text preview: "${text.substring(0, min(200, text.length))}"');
+    _addDebugLog('Raw text preview (first 200 chars): "${text.substring(0, min(200, text.length))}"');
+
+    // Проверяем основные параметры
+    final account = context.read<AccountManagerSupabase>();
+    final establishmentId = account.establishment?.id;
+    _addDebugLog('User logged in: ${account.isLoggedInSync}');
+    _addDebugLog('Establishment ID: $establishmentId');
+
+    if (!account.isLoggedInSync) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ошибка: пользователь не авторизован')),
+      );
+      return;
+    }
+
+    if (establishmentId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ошибка: не найдено заведение')),
+      );
+      return;
+    }
 
     _setLoadingMessage('Определяем формат текста...');
 
