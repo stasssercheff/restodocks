@@ -604,7 +604,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
               },
               child: TextField(
                 controller: controller,
-                keyboardType: TextInputType.text,
+                keyboardType: TextInputType.numberWithOptions(decimal: true),
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
                 ],

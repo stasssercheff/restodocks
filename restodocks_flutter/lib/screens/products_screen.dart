@@ -348,7 +348,7 @@ class _ProductDetailsDialogState extends State<_ProductDetailsDialog> {
                       hintText: '0.00',
                       border: const OutlineInputBorder(),
                     ),
-                    keyboardType: TextInputType.number,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   ),
                 ),
                 const SizedBox(width: 8),
