@@ -697,7 +697,9 @@ ${text}
 
     // Проверяем на табличный формат
     final tabLines = lines.where((line) => line.contains('\t')).length;
+    _addDebugLog('Tab detection: ${tabLines}/${lines.length} lines contain tabs');
     if (tabLines > lines.length * 0.5) {
+      _addDebugLog('Detected tab-delimited format');
       return 'tab_delimited';
     }
 
@@ -982,6 +984,11 @@ ${text}
   ({String name, double? price}) _parseLine(String line) {
     // Сначала попробуем найти паттерны с ценами в конце строки
     _addDebugLog('DEBUG: Parsing line: "${line.replaceAll('\t', '[TAB]')}"');
+
+    // Тестовый вывод для отладки (можно удалить после тестирования)
+    if (line.contains('Авокадо')) {
+      _addDebugLog('TEST: Found avocado line, contains tab: ${line.contains('\t')}, length: ${line.length}');
+    }
     final pricePatterns = [
       RegExp(r'[\d,]+\s*[₫$€£¥руб.]?\s*$'), // число с опциональной валютой в конце (добавил ¥ для японской йены)
       RegExp(r'\d+\.\d+\s*[₫$€£¥руб.]?\s*$'), // десятичное число
