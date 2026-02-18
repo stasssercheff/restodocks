@@ -221,6 +221,29 @@ class ProductStoreSupabase {
         .eq('establishment_id', establishmentId)
         .eq('product_id', productId);
     _nomenclatureIds.remove(productId);
+    // Очистить кэш цены
+    _priceCache.remove('${establishmentId}_$productId');
+  }
+
+  /// Установить цену продукта в номенклатуре заведения
+  Future<void> setEstablishmentPrice(String establishmentId, String productId, double? price, String? currency) async {
+    await _supabase.client.from('establishment_products').upsert(
+      {
+        'establishment_id': establishmentId,
+        'product_id': productId,
+        'price': price,
+        'currency': currency,
+      },
+      onConflict: 'establishment_id,product_id',
+    );
+
+    // Обновить кэш
+    final cacheKey = '${establishmentId}_$productId';
+    if (price != null && currency != null) {
+      _priceCache[cacheKey] = (price, currency);
+    } else {
+      _priceCache[cacheKey] = null;
+    }
   }
 
   /// Продукты в номенклатуре заведения

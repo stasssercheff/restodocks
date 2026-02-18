@@ -140,6 +140,10 @@ class AppRouter {
         builder: (context, state) => const ProductsScreen(),
       ),
       GoRoute(
+        path: '/nomenclature',
+        builder: (context, state) => const NomenclatureScreen(),
+      ),
+      GoRoute(
         path: '/products/upload',
         builder: (context, state) => const ProductUploadScreen(),
       ),

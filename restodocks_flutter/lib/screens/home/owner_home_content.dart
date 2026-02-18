@@ -39,6 +39,13 @@ class OwnerHomeContent extends StatelessWidget {
               color: Colors.teal,
             ),
             _TileData(
+              icon: Icons.assignment,
+              title: loc.t('nomenclature'),
+              subtitle: loc.t('nomenclature_desc'),
+              onTap: () => context.push('/nomenclature'),
+              color: Colors.blue,
+            ),
+            _TileData(
               icon: Icons.upload_file,
               title: loc.t('upload_products'),
               subtitle: loc.t('upload_products_desc'),
