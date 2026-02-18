@@ -2099,4 +2099,3 @@ class _TipsSection extends StatelessWidget {
     );
   }
 }
-}
