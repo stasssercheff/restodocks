@@ -827,6 +827,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
   // Удалены дублированные функции загрузки продуктов:
   // _showUploadDialog, _showPasteDialog, _uploadFromTxt
   // Теперь используется единый экран загрузки продуктов
+  // Fix for Vercel build issue
 
   static const _addProductCategories = ['manual', 'vegetables', 'fruits', 'meat', 'seafood', 'dairy', 'grains', 'bakery', 'pantry', 'spices', 'beverages', 'eggs', 'legumes', 'nuts', 'misc'];
   static const _addProductUnits = ['g', 'kg', 'pcs', 'шт', 'ml', 'L'];
