@@ -169,12 +169,22 @@ class _InventoryScreenState extends State<InventoryScreen>
       _rows.clear();
       for (final rowData in rowsData) {
         final Map<String, dynamic> rowMap = rowData as Map<String, dynamic>;
+        final quantities = (rowMap['quantities'] as List<dynamic>?)?.map((e) => (e as num).toDouble()).toList() ?? [0.0, 0.0];
+
+        // Нормализуем quantities для продуктов: всегда должна быть хотя бы одна пустая ячейка в конце
+        if (rowMap['freeName'] != null && quantities.isNotEmpty && quantities.last != 0.0) {
+          quantities.add(0.0);
+        } else if (rowMap['freeName'] != null && quantities.isEmpty) {
+          quantities.add(0.0);
+          quantities.add(0.0);
+        }
+
         _rows.add(_InventoryRow(
           product: null, // Продукты нужно будет загрузить отдельно
           techCard: null, // ТТК нужно будет загрузить отдельно
           freeName: rowMap['freeName'],
           freeUnit: rowMap['freeUnit'],
-          quantities: (rowMap['quantities'] as List<dynamic>?)?.map((e) => (e as num).toDouble()).toList() ?? [0.0],
+          quantities: quantities,
           pfUnit: rowMap['pfUnit'],
         ));
       }
@@ -229,11 +239,26 @@ class _InventoryScreenState extends State<InventoryScreen>
     setState(() {
       for (final p in products) {
         if (_rows.any((r) => r.product?.id == p.id)) continue;
-        _rows.add(_InventoryRow(product: p, techCard: null, quantities: [0.0]));
+        _rows.add(_InventoryRow(product: p, techCard: null, quantities: [0.0, 0.0]));
       }
       for (final tc in pfOnly) {
         if (_rows.any((r) => r.techCard?.id == tc.id)) continue;
-        _rows.add(_InventoryRow(product: null, techCard: tc, quantities: [0.0], pfUnit: _pfUnitPcs));
+        _rows.add(_InventoryRow(product: null, techCard: tc, quantities: [0.0, 0.0], pfUnit: _pfUnitPcs));
+      }
+
+      // Нормализуем существующие строки: добавляем пустые ячейки если необходимо
+      for (var i = 0; i < _rows.length; i++) {
+        final row = _rows[i];
+        if (!row.isPf) { // Только для продуктов и свободных строк
+          if (row.quantities.isEmpty) {
+            row.quantities.addAll([0.0, 0.0]);
+          } else if (row.quantities.last != 0.0) {
+            row.quantities.add(0.0);
+          } else if (row.quantities.length == 1) {
+            // Если только одна ячейка и она пустая, добавляем еще одну
+            row.quantities.add(0.0);
+          }
+        }
       }
     });
   }
@@ -250,7 +275,7 @@ class _InventoryScreenState extends State<InventoryScreen>
           techCard: null,
           freeName: line.productName.trim(),
           freeUnit: unit,
-          quantities: [qty],
+          quantities: [qty, 0.0],
         ));
       }
     });
@@ -294,6 +319,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     if (rowIndex < 0 || rowIndex >= _rows.length) return;
     if (_rows[rowIndex].isPf) return; // только продукты и свободные строки
     setState(() {
+      // Всегда добавляем пустую ячейку в конец
       _rows[rowIndex].quantities.add(0.0);
     });
   }
@@ -378,8 +404,17 @@ class _InventoryScreenState extends State<InventoryScreen>
     if (rowIndex < 0 || rowIndex >= _rows.length) return;
     final row = _rows[rowIndex];
     if (colIndex < 0 || colIndex >= row.quantities.length) return;
+
+    // Запоминаем предыдущее значение
+    final previousValue = row.quantities[colIndex];
+
     setState(() {
       row.quantities[colIndex] = value;
+
+      // Если заполнили последнюю ячейку (которая была пустой), добавляем новую пустую
+      if (!row.isPf && colIndex == row.quantities.length - 1 && previousValue == 0.0 && value > 0.0) {
+        row.quantities.add(0.0);
+      }
     });
     scheduleSave(); // Автосохранение при изменении количества
   }
@@ -677,6 +712,14 @@ class _InventoryScreenState extends State<InventoryScreen>
           } else if ((product.unit ?? '').toLowerCase() == 'kg' || product.unit == 'кг') {
             for (var i = 0; i < quantities.length; i++) quantities[i] = quantities[i] / 1000;
           }
+        }
+
+        // Нормализуем quantities: всегда должна быть хотя бы одна пустая ячейка в конце для продуктов
+        if (dishNameForPf == null && quantities.isNotEmpty && quantities.last != 0.0) {
+          quantities.add(0.0);
+        } else if (dishNameForPf == null && quantities.isEmpty) {
+          quantities.add(0.0);
+          quantities.add(0.0); // Для новых строк всегда две пустые ячейки
         }
 
         newRows.add(_InventoryRow(
