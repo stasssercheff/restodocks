@@ -151,6 +151,13 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     final loc = context.read<LocalizationService>();
     final controller = TextEditingController();
 
+    // Предварительно вставим тестовый текст для проверки
+    controller.text = '''Авокадо	₫99,000
+Анчоус	₫1,360,000
+Апельсин	₫50,000
+Базилик	₫267,000
+Баклажан	₫12,000''';
+
     final text = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -184,7 +191,11 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
             child: const Text('Отмена'),
           ),
           FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(controller.text),
+            onPressed: () => {
+              print('DEBUG: Add button pressed, text length: ${controller.text.length}'),
+              print('DEBUG: Text content: "${controller.text}"'),
+              Navigator.of(ctx).pop(controller.text)
+            },
             child: const Text('Добавить'),
           ),
         ],
@@ -192,11 +203,17 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     );
 
     print('DEBUG: Paste dialog result: text length = ${text?.length ?? 0}');
+    print('DEBUG: Text content: "${text ?? "null"}"');
     if (text != null && text.trim().isNotEmpty) {
       print('DEBUG: Processing pasted text');
       await _processText(text, loc);
     } else {
-      print('DEBUG: No text to process');
+      print('DEBUG: No text to process - showing error');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Текст не введен или пустой')),
+        );
+      }
     }
   }
 
@@ -213,11 +230,17 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   }
 
   Future<void> _processText(String text, LocalizationService loc) async {
-    print('DEBUG: Processing text, input length: ${text.length}');
+    print('DEBUG: ===== STARTING TEXT PROCESSING =====');
+    print('DEBUG: Raw input text length: ${text.length}');
+    print('DEBUG: Raw input text: "${text.replaceAll('\n', '\\n').replaceAll('\t', '\\t')}"');
+
     final lines = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty);
-    print('DEBUG: Found ${lines.length} lines');
+    print('DEBUG: After splitting - found ${lines.length} lines:');
+    lines.forEach((line) => print('DEBUG:   Line: "${line}"'));
+
     final items = lines.map(_parseLine).where((r) => r.name.isNotEmpty).toList();
-    print('DEBUG: Parsed ${items.length} valid items');
+    print('DEBUG: After parsing - ${items.length} valid items:');
+    items.forEach((item) => print('DEBUG:   Item: name="${item.name}", price=${item.price}'));
 
     if (items.isEmpty) {
       print('DEBUG: No valid items found');
@@ -623,20 +646,31 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
   }
 
   Future<void> _startUpload() async {
-    print('DEBUG: Starting upload process for ${widget.items.length} items');
+    print('DEBUG: ===== STARTING UPLOAD IN DIALOG =====');
+    print('DEBUG: Context mounted: $mounted');
+    print('DEBUG: Processing ${widget.items.length} items');
 
+    // Проверим, можем ли мы получить доступ к сервисам
     try {
-      final store = context.read<ProductStoreSupabase>();
-      print('DEBUG: Got ProductStoreSupabase');
+      print('DEBUG: Trying to read ProductStoreSupabase...');
+      final store = Provider.of<ProductStoreSupabase>(context, listen: false);
+      print('DEBUG: Successfully got ProductStoreSupabase via Provider.of');
     } catch (e) {
-      print('DEBUG: Failed to get ProductStoreSupabase: $e');
-      if (mounted) {
-        Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: не удалось получить доступ к хранилищу продуктов')),
-        );
+      print('DEBUG: Failed to get ProductStoreSupabase via Provider.of: $e');
+      try {
+        print('DEBUG: Trying context.read...');
+        final store = context.read<ProductStoreSupabase>();
+        print('DEBUG: Successfully got ProductStoreSupabase via context.read');
+      } catch (e2) {
+        print('DEBUG: Failed to get ProductStoreSupabase via context.read: $e2');
+        if (mounted) {
+          Navigator.of(context).pop();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Ошибка: сервисы недоступны в диалоге')),
+          );
+        }
+        return;
       }
-      return;
     }
 
     final store = context.read<ProductStoreSupabase>();
