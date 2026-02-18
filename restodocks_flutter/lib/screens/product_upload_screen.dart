@@ -165,6 +165,17 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
               onTap: _isLoading ? null : () => _showIntelligentImportDialog(),
             ),
 
+            const SizedBox(height: 12),
+
+            // Простой импорт Excel (альтернативный)
+            _UploadMethodCard(
+              icon: Icons.table_chart,
+              title: 'Простой импорт Excel',
+              description: 'Базовая обработка Excel файлов с улучшенной обработкой ошибок',
+              color: Colors.teal,
+              onTap: _isLoading ? null : () => _uploadExcelSimple(),
+            ),
+
             const SizedBox(height: 24),
 
             // Пример формата
@@ -226,6 +237,24 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _uploadExcelSimple() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['xlsx', 'xls'],
+      allowMultiple: false,
+    );
+
+    if (result != null && result.files.isNotEmpty) {
+      final file = result.files.first;
+      final bytes = file.bytes;
+
+      if (bytes != null) {
+        final loc = context.read<LocalizationService>();
+        await _processExcel(bytes, loc);
+      }
+    }
   }
 
   Future<void> _uploadFromFile() async {
@@ -731,43 +760,165 @@ ${text}
 
   Future<void> _processExcel(Uint8List bytes, LocalizationService loc) async {
     try {
+      _addDebugLog('=== STARTING EXCEL PROCESSING ===');
+      _addDebugLog('File size: ${bytes.length} bytes');
+
+      // Проверка заголовка файла для определения типа
+      String fileType = 'unknown';
+      if (bytes.length >= 4) {
+        final header = bytes.sublist(0, 4);
+        if (header[0] == 0x50 && header[1] == 0x4B) {
+          fileType = 'xlsx/zip'; // ZIP-based format (xlsx, docx, etc.)
+        } else if (header[0] == 0xD0 && header[1] == 0xCF) {
+          fileType = 'xls/ole'; // OLE format (xls)
+        }
+      }
+      _addDebugLog('Detected file type: $fileType');
+
       late Excel excel;
       try {
         excel = Excel.decodeBytes(bytes);
+        _addDebugLog('Excel file decoded successfully');
       } catch (excelError) {
         _addDebugLog('Excel decode error: $excelError');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка чтения Excel файла: $excelError')),
+          SnackBar(content: Text('Ошибка чтения Excel файла: $excelError\nВозможно файл поврежден или имеет неподдерживаемый формат.\nТип файла: $fileType')),
         );
         return;
       }
-      final sheet = excel.tables[excel.tables.keys.first];
-      if (sheet == null) {
+
+      if (excel.tables.isEmpty) {
+        _addDebugLog('ERROR: No tables found in Excel file');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: не найдена таблица в файле')),
+          SnackBar(content: Text('Ошибка: файл Excel не содержит таблиц')),
         );
         return;
       }
+
+      final sheetName = excel.tables.keys.first;
+      final sheet = excel.tables[sheetName];
+      _addDebugLog('Processing sheet: $sheetName');
+
+      if (sheet == null || sheet.rows.isEmpty) {
+        _addDebugLog('ERROR: Sheet is null or empty');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка: лист Excel пустой или недоступен')),
+        );
+        return;
+      }
+
+      _addDebugLog('Sheet has ${sheet.rows.length} rows');
 
       final lines = <String>[];
+      int processedRows = 0;
+      int errorRows = 0;
+
       for (var i = 0; i < sheet.rows.length; i++) {
-        final row = sheet.rows[i];
-        if (row.isEmpty) continue;
+        try {
+          final row = sheet.rows[i];
+          if (row == null || row.isEmpty) continue;
 
-        final name = row.length > 0 ? row[0]?.value?.toString() ?? '' : '';
-        final price = row.length > 1 ? row[1]?.value?.toString() ?? '' : '';
-        final unit = row.length > 2 ? row[2]?.value?.toString() ?? '' : 'г';
+          final name = row.length > 0 ? row[0]?.value?.toString() ?? '' : '';
+          final price = row.length > 1 ? row[1]?.value?.toString() ?? '' : '';
+          final unit = row.length > 2 ? row[2]?.value?.toString() ?? '' : 'г';
 
-        if (name.trim().isNotEmpty) {
-          lines.add('$name\t$price\t$unit');
+          if (name.trim().isNotEmpty) {
+            lines.add('$name\t$price\t$unit');
+            processedRows++;
+          }
+        } catch (rowError) {
+          _addDebugLog('Error processing row $i: $rowError');
+          errorRows++;
+          // Продолжаем обработку других строк
         }
       }
 
+      _addDebugLog('Processed $processedRows rows successfully, $errorRows rows had errors');
+      _addDebugLog('Generated ${lines.length} product lines');
+
+      if (lines.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка: не удалось извлечь ни одной строки с продуктами из Excel файла')),
+        );
+        return;
+      }
+
+      // Показываем превью первых строк
+      final preview = lines.take(3).join('\n');
+      _addDebugLog('Preview of extracted data:\n$preview');
+
       await _processText(lines.join('\n'), loc, true); // Для файлов всегда добавляем в номенклатуру
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка обработки Excel файла: $e')),
-      );
+      _addDebugLog('Standard Excel processing failed: $e');
+
+      // Пробуем альтернативный метод
+      _addDebugLog('Trying alternative CSV conversion method...');
+      try {
+        await _processExcelAsCsv(bytes, loc);
+      } catch (csvError) {
+        _addDebugLog('Alternative method also failed: $csvError');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка обработки Excel файла: $e\nАльтернативный метод также не сработал: $csvError\nПопробуйте:\n1. Сохранить файл как .xlsx из Excel\n2. Или скопируйте данные в текстовый формат')),
+        );
+      }
+    }
+  }
+
+  /// Альтернативная обработка Excel через конвертацию в CSV
+  Future<void> _processExcelAsCsv(Uint8List bytes, LocalizationService loc) async {
+    try {
+      _addDebugLog('=== TRYING EXCEL AS CSV CONVERSION ===');
+
+      // Пробуем прочитать как CSV с разделителями табуляции или запятыми
+      final content = String.fromCharCodes(bytes);
+      final lines = content.split('\n').where((line) => line.trim().isNotEmpty).toList();
+
+      if (lines.isEmpty) {
+        throw Exception('Файл пустой');
+      }
+
+      _addDebugLog('CSV conversion: found ${lines.length} lines');
+
+      // Определяем разделитель
+      final firstLine = lines.first;
+      String separator = '\t'; // По умолчанию табуляция
+
+      if (firstLine.contains(';')) {
+        separator = ';';
+        _addDebugLog('Detected semicolon separator');
+      } else if (firstLine.contains(',')) {
+        separator = ',';
+        _addDebugLog('Detected comma separator');
+      } else if (firstLine.contains('\t')) {
+        _addDebugLog('Detected tab separator');
+      }
+
+      // Конвертируем в табличный формат
+      final convertedLines = <String>[];
+      for (final line in lines) {
+        final parts = line.split(separator);
+        if (parts.length >= 2) {
+          final name = parts[0].trim();
+          final price = parts.length > 1 ? parts[1].trim() : '';
+          final unit = parts.length > 2 ? parts[2].trim() : 'г';
+
+          if (name.isNotEmpty) {
+            convertedLines.add('$name\t$price\t$unit');
+          }
+        }
+      }
+
+      _addDebugLog('Converted ${convertedLines.length} lines to tab format');
+
+      if (convertedLines.isEmpty) {
+        throw Exception('Не удалось конвертировать данные');
+      }
+
+      await _processText(convertedLines.join('\n'), loc, true);
+
+    } catch (e) {
+      _addDebugLog('CSV conversion failed: $e');
+      throw Exception('Не удалось обработать файл даже как CSV: $e');
     }
   }
 
