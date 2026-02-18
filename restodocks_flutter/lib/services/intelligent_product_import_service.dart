@@ -9,6 +9,7 @@ import '../models/tech_card.dart';
 import '../models/translation.dart';
 import 'ai_service_supabase.dart';
 import 'translation_service.dart';
+import 'translation_manager.dart';
 import 'product_store_supabase.dart';
 import 'tech_card_service_supabase.dart';
 
@@ -18,6 +19,7 @@ class IntelligentProductImportService {
   final TranslationService _translationService;
   final ProductStoreSupabase _productStore;
   final TechCardServiceSupabase _techCardService;
+  late final TranslationManager _translationManager;
 
   IntelligentProductImportService({
     required AiServiceSupabase aiService,
@@ -27,7 +29,12 @@ class IntelligentProductImportService {
   }) : _aiService = aiService,
        _translationService = translationService,
        _productStore = productStore,
-       _techCardService = techCardService;
+       _techCardService = techCardService {
+    _translationManager = TranslationManager(
+      aiService: _aiService,
+      translationService: _translationService,
+    );
+  }
 
   /// Импортировать продукты из Excel файла с интеллектуальным анализом
   Future<List<ProductImportResult>> importFromExcel(
@@ -147,7 +154,7 @@ class IntelligentProductImportService {
             }
           } else if (resolution == 'create') {
             // Создаем новый продукт
-            final translations = await _generateTranslations(
+            final translations = await _translationManager.generateTranslationsForProduct(
               result.fileName,
               result.detectedLanguage ?? 'en',
             );

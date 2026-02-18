@@ -20,6 +20,7 @@ class ExcelStyleTtkTable extends StatefulWidget {
   final void Function(int) onRemove;
   final void Function(int)? onSuggestWaste;
   final void Function(int)? onSuggestCookingLoss;
+  final bool isCook; // true для поваров - скрываем стоимость
 
   ExcelStyleTtkTable({
     required this.loc,
@@ -37,6 +38,7 @@ class ExcelStyleTtkTable extends StatefulWidget {
     required this.onRemove,
     this.onSuggestWaste,
     this.onSuggestCookingLoss,
+    this.isCook = false,
   });
 
   @override
@@ -278,7 +280,9 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   const SizedBox.shrink(), // Способ
                   _buildTotalCell('${totalOutput.toStringAsFixed(0)}г'), // Выход
                   const SizedBox.shrink(), // Стоимость (пусто)
-                  _buildTotalCell('${costPerKgFinishedProduct.toStringAsFixed(0)}'), // Стоимость за кг готового продукта
+                  widget.isCook
+                      ? const SizedBox.shrink() // Скрываем стоимость для поваров
+                      : _buildTotalCell('${costPerKgFinishedProduct.toStringAsFixed(0)}'), // Стоимость за кг готового продукта
                   const SizedBox.shrink(), // Удаление
                 ],
               ),

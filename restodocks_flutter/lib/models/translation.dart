@@ -38,20 +38,28 @@ class Translation extends Equatable {
 
   /// Создать новый перевод
   factory Translation.create({
+    required TranslationEntityType entityType,
+    required String entityId,
+    required String fieldName,
     required String sourceText,
     required String sourceLanguage,
     required String targetLanguage,
     required String translatedText,
     String? createdBy,
+    bool isManualOverride = false,
   }) {
     return Translation(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
+      entityType: entityType,
+      entityId: entityId,
+      fieldName: fieldName,
       sourceText: sourceText,
       sourceLanguage: sourceLanguage,
       targetLanguage: targetLanguage,
       translatedText: translatedText,
       createdAt: DateTime.now(),
       createdBy: createdBy,
+      isManualOverride: isManualOverride,
     );
   }
 

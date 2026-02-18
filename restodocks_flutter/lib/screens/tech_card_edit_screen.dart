@@ -407,6 +407,7 @@ TechCard _applyEdits(
   TechCard t, {
   String? dishName,
   String? category,
+  String? section,
   bool? isSemiFinished,
   double? portionWeight,
   double? yieldGrams,
@@ -416,6 +417,7 @@ TechCard _applyEdits(
   return t.copyWith(
     dishName: dishName,
     category: category,
+    section: section,
     isSemiFinished: isSemiFinished,
     portionWeight: portionWeight,
     yield: yieldGrams,
@@ -443,7 +445,28 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   /// 'photo' | 'excel' — какая кнопка сейчас загружает (чтобы показывать правильный текст).
   final _nameController = TextEditingController();
   static const _categoryOptions = ['sauce', 'vegetables', 'meat', 'seafood', 'side', 'subside', 'bakery', 'dessert', 'decor', 'soup', 'misc', 'beverages'];
+  static const _sectionOptions = {
+    'hot_kitchen': 'Горячий цех',
+    'cold_kitchen': 'Холодный цех',
+    'grill': 'Гриль (PRO)',
+    'pizza': 'Пицца (PRO)',
+    'sushi': 'Сушибар (PRO)',
+    'preparation': 'Заготовка',
+    'bakery': 'Выпечка (PRO)',
+    'confectionery': 'Кондитерский цех',
+  };
+
+  Map<String, String> _getAvailableSections(bool hasPro) {
+    return Map.fromEntries(_sectionOptions.entries.where((entry) {
+      if (!hasPro) {
+        // Без PRO показываем только не-PRO цехи
+        return !entry.value.contains('(PRO)');
+      }
+      return true;
+    }));
+  }
   String _selectedCategory = 'misc';
+  String? _selectedSection; // цех
   bool _isSemiFinished = true; // ПФ или блюдо (порция — в карточках блюд, отдельно)
   final _technologyController = TextEditingController();
   final List<TTIngredient> _ingredients = [];
@@ -560,6 +583,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           if (tc != null) {
             _nameController.text = tc.dishName;
             _selectedCategory = _categoryOptions.contains(tc.category) ? tc.category : 'misc';
+            _selectedSection = tc.section;
             _isSemiFinished = tc.isSemiFinished;
             _technologyController.text = tc.getLocalizedTechnology(context.read<LocalizationService>().currentLanguageCode);
             _ingredients
@@ -628,6 +652,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
         final created = await svc.createTechCard(
           dishName: name,
           category: category,
+          section: _selectedSection,
           isSemiFinished: _isSemiFinished,
           establishmentId: est.id,
           createdBy: emp.id,
@@ -639,7 +664,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           context.go('/tech-cards');
         }
       } else {
-        final updated = _applyEdits(tc, dishName: name, category: category, isSemiFinished: _isSemiFinished, portionWeight: portion, yieldGrams: yieldVal, technologyLocalized: techMap, ingredients: toSaveIngredients);
+        final updated = _applyEdits(tc, dishName: name, category: category, section: _selectedSection, isSemiFinished: _isSemiFinished, portionWeight: portion, yieldGrams: yieldVal, technologyLocalized: techMap, ingredients: toSaveIngredients);
         await svc.saveTechCard(updated);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.read<LocalizationService>().t('save') + ' ✓')));
@@ -1058,6 +1083,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
     final canEdit = context.watch<AccountManagerSupabase>().currentEmployee?.canEditChecklistsAndTechCards ?? false;
+    final employee = context.watch<AccountManagerSupabase>().currentEmployee;
+    final isCook = employee?.department == 'kitchen' && !canEdit; // Повар - кухня без прав редактирования
 
     if (_isNew && !canEdit) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1150,6 +1177,19 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                           decoration: InputDecoration(labelText: loc.t('category'), isDense: true, border: const OutlineInputBorder()),
                           child: Text(_categoryLabel(_selectedCategory, loc.currentLanguageCode)),
                         ),
+                  const SizedBox(height: 12),
+                  canEdit
+                      ? DropdownButtonFormField<String>(
+                          value: _selectedSection,
+                          decoration: InputDecoration(labelText: 'Цех', isDense: true, border: const OutlineInputBorder()),
+                          items: _getAvailableSections(context.read<AccountManagerSupabase>().hasProSubscription).entries.map((entry) =>
+                            DropdownMenuItem(value: entry.key, child: Text(entry.value))).toList(),
+                          onChanged: (v) => setState(() => _selectedSection = v),
+                        )
+                      : _selectedSection != null ? InputDecorator(
+                          decoration: InputDecoration(labelText: 'Цех', isDense: true, border: const OutlineInputBorder()),
+                          child: Text(_sectionOptions[_selectedSection!] ?? _selectedSection!),
+                        ) : const SizedBox.shrink(),
                   const SizedBox(height: 12),
                   canEdit
                       ? DropdownButtonFormField<bool>(
@@ -1248,6 +1288,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                             productStore: context.read<ProductStoreSupabase>(),
                             establishmentId: context.read<AccountManagerSupabase>().establishment?.id,
                             semiFinishedProducts: _semiFinishedProducts,
+                            isCook: isCook,
                             onAdd: _showAddIngredient,
                             onUpdate: (i, ing) {
                               setState(() {

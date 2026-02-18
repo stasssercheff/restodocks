@@ -118,8 +118,38 @@ class TranslationManager {
     );
 
     // Сохраняем в кеш и БД
-    await _translationService._saveToDatabase(translation);
-    _translationService._cache[translation.cacheKey] = translation;
+    await _translationService.saveToDatabase(translation);
+    _translationService.cache[translation.cacheKey] = translation;
+  }
+
+  /// Сгенерировать переводы для названия продукта
+  Future<Map<String, String>> generateTranslationsForProduct(String productName, String sourceLanguage) async {
+    final translations = <String, String>{};
+    translations[sourceLanguage] = productName;
+
+    for (final targetLang in _supportedLanguages) {
+      if (targetLang == sourceLanguage) continue;
+
+      try {
+        final translatedText = await _translationService.translate(
+          entityType: TranslationEntityType.product,
+          entityId: 'temp_${DateTime.now().millisecondsSinceEpoch}',
+          fieldName: 'name',
+          text: productName,
+          from: sourceLanguage,
+          to: targetLang,
+          allowOverride: true,
+        );
+
+        if (translatedText != null && translatedText != productName) {
+          translations[targetLang] = translatedText;
+        }
+      } catch (e) {
+        debugPrint('Translation error for $targetLang: $e');
+      }
+    }
+
+    return translations;
   }
 
   /// Определить язык текста через AI

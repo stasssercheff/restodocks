@@ -12,6 +12,9 @@ class TranslationService {
   // Локальный кеш переводов
   final Map<String, Translation> _cache = {};
 
+  // Публичный геттер для кеша
+  Map<String, Translation> get cache => _cache;
+
   TranslationService({
     required AiServiceSupabase aiService,
     required SupabaseService supabase,
@@ -79,7 +82,7 @@ class TranslationService {
           isManualOverride: false,
         );
 
-        await _saveToDatabase(translation);
+        await saveToDatabase(translation);
         _cache[cacheKey] = translation;
 
         return translatedText;
@@ -137,10 +140,6 @@ class TranslationService {
     return null;
   }
 
-  /// Сохранить перевод в базу данных
-  Future<void> _saveToDatabase(Translation translation) async {
-    await _supabase.insertData('translations', translation.toJson());
-  }
 
   /// Очистить кеш
   void clearCache() {
@@ -169,5 +168,13 @@ class TranslationService {
     }
 
     return stats;
+  }
+
+  /// Сохранить перевод в базу данных (public для TranslationManager)
+  Future<void> saveToDatabase(Translation translation) async {
+    final data = translation.toJson();
+    data.remove('id'); // Убираем id для insert
+
+    await _supabase.insertData('translations', data);
   }
 }

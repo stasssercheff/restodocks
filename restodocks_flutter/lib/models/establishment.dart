@@ -32,6 +32,9 @@ class Establishment extends Equatable {
   @JsonKey(name: 'default_currency')
   final String defaultCurrency;
 
+  @JsonKey(name: 'subscription_type')
+  final String? subscriptionType;
+
   @JsonKey(name: 'created_at')
   final DateTime createdAt;
 
@@ -47,6 +50,7 @@ class Establishment extends Equatable {
     this.phone,
     this.email,
     this.defaultCurrency = 'RUB',
+    this.subscriptionType,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -61,6 +65,7 @@ class Establishment extends Equatable {
     String? phone,
     String? email,
     String? defaultCurrency,
+    String? subscriptionType,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -73,6 +78,7 @@ class Establishment extends Equatable {
       phone: phone ?? this.phone,
       email: email ?? this.email,
       defaultCurrency: defaultCurrency ?? this.defaultCurrency,
+      subscriptionType: subscriptionType ?? this.subscriptionType,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

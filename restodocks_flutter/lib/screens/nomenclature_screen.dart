@@ -21,6 +21,7 @@ import '../models/checklist.dart';
 import '../models/schedule_model.dart';
 import '../models/order_list.dart';
 import '../models/nomenclature_item.dart';
+import '../models/translation.dart';
 import '../services/account_manager.dart';
 import '../services/account_manager_supabase.dart';
 import '../services/product_store.dart';
@@ -139,6 +140,9 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
           for (final lang in allLangs) {
             if (lang == sourceLang) continue;
             final translated = await translationService.translate(
+              entityType: TranslationEntityType.product,
+              entityId: item.name,
+              fieldName: 'name',
               text: normalizedName,
               from: sourceLang,
               to: lang,
@@ -2012,7 +2016,14 @@ class _LoadTranslationsProgressDialogState extends State<_LoadTranslationsProgre
         final merged = Map<String, String>.from(p.names ?? {});
         for (final target in missing) {
           if (target == sourceLang) continue;
-          final tr = await translationService.translate(text: source, from: sourceLang, to: target);
+          final tr = await translationService.translate(
+            entityType: TranslationEntityType.product,
+            entityId: p.id ?? p.name,
+            fieldName: 'name',
+            text: source,
+            from: sourceLang,
+            to: target,
+          );
           if (tr != null && tr.trim().isNotEmpty) merged[target] = tr;
           await Future<void>.delayed(const Duration(milliseconds: 150));
         }

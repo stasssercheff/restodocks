@@ -522,6 +522,8 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   }
 
   Future<void> _processTextWithAI(String text, LocalizationService loc, bool addToNomenclature) async {
+    _addDebugLog('=== STARTING AI TEXT PROCESSING ===');
+    _setLoadingMessage('Обрабатываем текст через ИИ...');
 
     setState(() => _isLoading = true);
 
@@ -549,9 +551,17 @@ ${text}
 ''';
 
 
+      _addDebugLog('Sending AI request...');
       final response = await aiService.invoke('ai-generate-checklist', {
         'prompt': prompt
-      });
+      }).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          _addDebugLog('AI request timed out after 30 seconds');
+          throw Exception('AI request timed out');
+        },
+      );
+      _addDebugLog('AI response received');
 
       if (response == null || !response.containsKey('itemTitles')) {
         throw Exception('AI не вернул результат');
@@ -695,7 +705,16 @@ ${text}
 
   Future<void> _processExcel(Uint8List bytes, LocalizationService loc) async {
     try {
-      final excel = Excel.decodeBytes(bytes);
+      late Excel excel;
+      try {
+        excel = Excel.decodeBytes(bytes);
+      } catch (excelError) {
+        _addDebugLog('Excel decode error: $excelError');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка чтения Excel файла: $excelError')),
+        );
+        return;
+      }
       final sheet = excel.tables[excel.tables.keys.first];
       if (sheet == null) {
         ScaffoldMessenger.of(context).showSnackBar(

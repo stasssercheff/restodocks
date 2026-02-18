@@ -35,6 +35,9 @@ class AccountManagerSupabase {
   /// Предпочитаемый язык пользователя
   String get preferredLanguage => _currentEmployee?.preferredLanguage ?? 'ru';
 
+  /// Есть ли PRO подписка
+  bool get hasProSubscription => _establishment?.subscriptionType == 'pro' || _establishment?.subscriptionType == 'premium';
+
   /// Авторизован ли пользователь (своя сессия employees или восстановленная из хранилища)
   bool get isLoggedInSync => _currentEmployee != null && _establishment != null;
 
