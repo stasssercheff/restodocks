@@ -9,6 +9,18 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
+// Глобальная переменная для хранения debug логов
+List<String> _debugLogs = [];
+
+void _addDebugLog(String message) {
+  final timestamp = DateTime.now().toIso8601String();
+  _debugLogs.add('[$timestamp] $message');
+  // Ограничиваем количество логов
+  if (_debugLogs.length > 100) {
+    _debugLogs.removeAt(0);
+  }
+}
+
 import '../models/culinary_units.dart';
 import '../models/models.dart';
 import '../services/services.dart';
@@ -32,6 +44,13 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       appBar: AppBar(
         title: Text(loc.t('upload_products')),
         backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.bug_report),
+            tooltip: 'Показать логи отладки',
+            onPressed: () => _showDebugLogs(context),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -438,7 +457,7 @@ ${text}
   }
 
   Future<void> _addProductsToNomenclature(List<({String name, double? price})> items, LocalizationService loc) async {
-    print('DEBUG: Starting to process ${items.length} products');
+    _addDebugLog('Starting to process ${items.length} products');
     setState(() => _isLoading = true);
 
     try {
@@ -487,9 +506,9 @@ ${text}
             item.name,
             currentPrice: item.price,
           );
-          print('DEBUG: AI verification successful for "${item.name}": calories=${verification?.suggestedCalories}, protein=${verification?.suggestedProtein}');
+          _addDebugLog('AI verification successful for "${item.name}": calories=${verification?.suggestedCalories}, protein=${verification?.suggestedProtein}');
         } catch (aiError) {
-          print('DEBUG: AI verification failed for "${item.name}": $aiError');
+          _addDebugLog('AI verification failed for "${item.name}": $aiError');
           verification = null;
         }
 
@@ -691,6 +710,43 @@ ${text}
     rtf = rtf.replaceAll(RegExp(r'\s+'), ' ').trim();
 
     return rtf;
+  }
+
+  void _showDebugLogs(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Логи отладки'),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 400,
+          child: _debugLogs.isEmpty
+              ? const Center(child: Text('Логов пока нет'))
+              : ListView.builder(
+                  itemCount: _debugLogs.length,
+                  itemBuilder: (context, index) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Text(
+                        _debugLogs[_debugLogs.length - 1 - index], // Показываем последние логи сверху
+                        style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                      ),
+                    );
+                  },
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => setState(() => _debugLogs.clear()),
+            child: const Text('Очистить'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Закрыть'),
+          ),
+        ],
+      ),
+    );
   }
 }
 
