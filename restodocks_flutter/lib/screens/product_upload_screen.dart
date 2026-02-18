@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:math';
@@ -40,8 +41,6 @@ class ProductUploadScreen extends StatefulWidget {
   @override
   State<ProductUploadScreen> createState() => _ProductUploadScreenState();
 }
-
-import 'dart:async';
 
 class _ProductUploadScreenState extends State<ProductUploadScreen> {
   bool _isLoading = false;

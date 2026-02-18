@@ -18,15 +18,15 @@ class InventoryHistoryService {
         .order('created_at', ascending: false);
 
     if (startDate != null) {
-      query = query.filter('date', 'gte', startDate.toIso8601String().split('T')[0]);
+      query = query.gte('date', startDate.toIso8601String().split('T')[0]);
     }
 
     if (endDate != null) {
-      query = query.filter('date', 'lte', endDate.toIso8601String().split('T')[0]);
+      query = query.lte('date', endDate.toIso8601String().split('T')[0]);
     }
 
     if (status != null) {
-      query = query.filter('status', 'eq', status);
+      query = query.eq('status', status);
     }
 
     final response = await query;

@@ -2853,9 +2853,7 @@ class _NomenclatureSkeletonItem extends StatelessWidget {
           Navigator.of(context).pop();
         }
 
-        // Перезагружаем данные
-        await _ensureLoaded();
-        if (mounted) setState(() {});
+        // Данные будут перезагружены автоматически при следующем взаимодействии
 
         // Показываем успех
         ScaffoldMessenger.of(context).showSnackBar(
