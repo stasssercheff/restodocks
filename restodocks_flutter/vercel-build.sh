@@ -42,9 +42,17 @@ flutter clean || true
 echo "==> flutter pub get"
 flutter pub get || { echo "ERROR: pub get failed"; exit 1; }
 
-echo "==> flutter build web --release --dart-define=FLUTTER_WEB_OBFUSCATE=true"
-flutter build web --release --dart-define=FLUTTER_WEB_OBFUSCATE=true 2>&1 | tee build.log
+# Build for release with source maps
+echo "==> flutter build web --profile --source-maps --no-tree-shake-icons"
+flutter build web --profile --source-maps --no-tree-shake-icons 2>&1 | tee build.log
 BUILD_EXIT=${PIPESTATUS[0]}
+
+if [ "$BUILD_EXIT" -ne 0 ]; then
+  echo "==> Profile build failed, trying release build without source maps..."
+  echo "==> flutter build web --release --dart-define=FLUTTER_WEB_OBFUSCATE=true"
+  flutter build web --release --dart-define=FLUTTER_WEB_OBFUSCATE=true 2>&1 | tee build.log
+  BUILD_EXIT=${PIPESTATUS[0]}
+fi
 if [ "$BUILD_EXIT" -ne 0 ]; then
   echo "ERROR: flutter build web failed (exit $BUILD_EXIT). Last 120 lines of build.log:"
   tail -120 build.log
@@ -55,4 +63,12 @@ if [ ! -f "build/web/index.html" ]; then
   echo "ERROR: build/web/index.html not found after build"
   exit 1
 fi
+
+# Проверяем, сгенерированы ли source maps
+if [ ! -f "build/web/flutter.js.map" ]; then
+  echo "WARNING: flutter.js.map not found - source maps may not be generated"
+else
+  echo "==> Source maps found: flutter.js.map"
+fi
+
 echo "==> Build OK: build/web ready"
