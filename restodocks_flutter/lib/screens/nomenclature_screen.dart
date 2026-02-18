@@ -658,20 +658,10 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
             onPressed: () => _showDuplicates(),
             tooltip: 'Показать дубликаты',
           ),
-          PopupMenuButton<String>(
+          IconButton(
             icon: const Icon(Icons.upload_file),
             tooltip: 'Загрузить продукты',
-            onSelected: (value) {
-              if (value == 'text') {
-                _showUploadDialog(context, loc);
-              } else if (value == 'file') {
-                context.push('/products/upload');
-              }
-            },
-            itemBuilder: (_) => [
-              PopupMenuItem(value: 'text', child: Text('Вставить текст')),
-              PopupMenuItem(value: 'file', child: Text('Из файла')),
-            ],
+            onPressed: () => context.push('/products/upload'),
           ),
           IconButton(
             icon: const Icon(Icons.attach_money),
@@ -834,7 +824,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     return (name: name, price: price);
   }
 
-  Future<void> _showUploadDialog(BuildContext context, LocalizationService loc) async {
+  // Функция _showUploadDialog удалена - теперь используется общий экран загрузки продуктов
     await showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
