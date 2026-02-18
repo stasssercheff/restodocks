@@ -83,6 +83,26 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
             const SizedBox(height: 12),
 
+            // Быстрая вставка из буфера
+            _UploadMethodCard(
+              icon: Icons.paste,
+              title: 'Быстрая вставка',
+              description: 'Вставить из буфера обмена и обработать',
+              color: Colors.teal,
+              onTap: _isLoading ? null : () => _pasteFromClipboard(),
+            ),
+
+            const SizedBox(height: 12),
+
+            // Умная обработка текста с AI
+            _UploadMethodCard(
+              icon: Icons.smart_toy,
+              title: 'AI обработка текста',
+              description: 'ИИ разберет любой формат списка продуктов',
+              color: Colors.purple,
+              onTap: _isLoading ? null : () => _showSmartPasteDialog(),
+            ),
+
             // Тестовая карточка для быстрой проверки
             _UploadMethodCard(
               icon: Icons.bug_report,
@@ -217,42 +237,276 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     }
   }
 
+  Future<void> _showSmartPasteDialog() async {
+    print('DEBUG: Showing smart AI paste dialog');
+    final controller = TextEditingController();
+    final loc = context.read<LocalizationService>();
+
+    // Пример различных форматов
+    controller.text = '''Возможные форматы:
+
+1. Название Цена
+Авокадо 99000
+Базилик 267000
+
+2. Название - Цена
+Анчоус - 1360000
+Апельсин - 50000
+
+3. Название: Цена
+Баклажан: 12000
+Молоко: 38000
+
+4. С валютами
+Авокадо ₫99,000
+Базилик $267,000
+Молоко €38,000
+
+5. Смешанный формат
+Картофель - 25 000 руб.
+Морковь 20.000₫
+Лук: 20000''';
+
+    final text = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('AI обработка списка продуктов'),
+        content: SizedBox(
+          width: 600,
+          height: 400,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'ИИ автоматически разберет любой формат списка продуктов.\n'
+                'Просто вставьте текст в любом формате:',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  maxLines: null,
+                  expands: true,
+                  textAlignVertical: TextAlignVertical.top,
+                  decoration: const InputDecoration(
+                    hintText: 'Вставьте список продуктов здесь...',
+                    border: OutlineInputBorder(),
+                    alignLabelWithHint: true,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text),
+            child: const Text('Обработать с AI'),
+          ),
+        ],
+      ),
+    );
+
+    if (text != null && text.trim().isNotEmpty) {
+      print('DEBUG: Processing with AI: ${text.length} chars');
+      await _processTextWithAI(text, loc);
+    }
+  }
+
+  Future<void> _processTextWithAI(String text, LocalizationService loc) async {
+    print('DEBUG: ===== AI TEXT PROCESSING =====');
+    print('DEBUG: Input text length: ${text.length}');
+
+    setState(() => _isLoading = true);
+
+    try {
+      // Используем AI для извлечения продуктов из текста
+      final aiService = context.read<AiServiceSupabase>();
+
+      // Создаем запрос к AI для извлечения списка продуктов
+      final prompt = '''
+Извлеки список продуктов из этого текста. Для каждого продукта укажи:
+- Название продукта
+- Цену (если указана, число без валюты)
+- Валюту (если указана)
+
+Формат ответа: каждая строка "Название|Цена|Валюта"
+Если цена или валюта не указаны, оставь пустым.
+
+Примеры:
+Авокадо|99000|VND
+Базилик|267000|
+Молоко||
+
+Текст для обработки:
+${text}
+''';
+
+      print('DEBUG: Sending to AI for product extraction');
+
+      final response = await aiService._invoke('ai-generate-checklist', {
+        'prompt': prompt
+      });
+
+      if (response == null || !response.containsKey('itemTitles')) {
+        print('DEBUG: AI response failed or invalid');
+        throw Exception('AI не вернул результат');
+      }
+
+      // Парсим результат
+      final rawItems = response['itemTitles'] as List? ?? [];
+      print('DEBUG: AI returned ${rawItems.length} raw items');
+
+      final items = <({String name, double? price})>[];
+      for (final rawItem in rawItems) {
+        try {
+          if (rawItem is String && rawItem.contains('|')) {
+            final parts = rawItem.split('|').map((s) => s.trim()).toList();
+            if (parts.length >= 1 && parts[0].isNotEmpty) {
+              final name = parts[0];
+              double? price;
+
+              if (parts.length >= 2 && parts[1].isNotEmpty) {
+                // Пробуем разные форматы чисел
+                final priceStr = parts[1].replaceAll(RegExp(r'[^\d.,]'), '').replaceAll(',', '.');
+                price = double.tryParse(priceStr);
+              }
+
+              items.add((name: name, price: price));
+              print('DEBUG: AI parsed: "$name" -> price: $price');
+            }
+          }
+        } catch (e) {
+          print('DEBUG: Failed to parse AI item: $rawItem, error: $e');
+        }
+      }
+
+      print('DEBUG: AI extracted ${items.length} products');
+      if (items.isNotEmpty) {
+        await _addProductsToNomenclature(items, loc);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('AI не смог извлечь продукты из текста')),
+        );
+      }
+
+    } catch (e) {
+      print('DEBUG: AI processing failed: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ошибка обработки текста AI: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   Future<void> _loadTestData() async {
     print('DEBUG: Loading test data');
     final loc = context.read<LocalizationService>();
     const testData = '''Авокадо	₫99,000
+Анчоус	₫1,360,000
+Апельсин	₫50,000
 Базилик	₫267,000
 Баклажан	₫12,000
-Молоко	₫38,000
-Картофель	₫25,000''';
+Балон для сифона	₫14,000
+Банка	₫15,000
+Бекон	₫290,000
+Бульон сухой грибной	₫145,000''';
 
     await _processText(testData, loc);
+  }
+
+  Future<void> _pasteFromClipboard() async {
+    print('DEBUG: Pasting from clipboard');
+    final loc = context.read<LocalizationService>();
+
+    try {
+      // Имитируем вставку - в реальном приложении нужно использовать Clipboard
+      // Но для веб-версии это может не работать, поэтому покажем диалог
+      await _showPasteDialog();
+    } catch (e) {
+      print('DEBUG: Clipboard paste failed: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Не удалось получить доступ к буферу обмена')),
+      );
+    }
   }
 
   Future<void> _processText(String text, LocalizationService loc) async {
     print('DEBUG: ===== STARTING TEXT PROCESSING =====');
     print('DEBUG: Raw input text length: ${text.length}');
-    print('DEBUG: Raw input text: "${text.replaceAll('\n', '\\n').replaceAll('\t', '\\t')}"');
 
-    final lines = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty);
-    print('DEBUG: After splitting - found ${lines.length} lines:');
-    lines.forEach((line) => print('DEBUG:   Line: "${line}"'));
+    // Определяем формат текста
+    final format = _detectTextFormat(text);
+    print('DEBUG: Detected format: $format');
 
-    final items = lines.map(_parseLine).where((r) => r.name.isNotEmpty).toList();
-    print('DEBUG: After parsing - ${items.length} valid items:');
-    items.forEach((item) => print('DEBUG:   Item: name="${item.name}", price=${item.price}'));
+    List<({String name, double? price})> items;
+
+    if (format == 'ai_needed') {
+      // Используем AI для сложных форматов
+      print('DEBUG: Format requires AI processing');
+      return await _processTextWithAI(text, loc);
+    } else {
+      // Обычный парсинг
+      final lines = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty);
+      print('DEBUG: After splitting - found ${lines.length} lines');
+
+      items = lines.map(_parseLine).where((r) => r.name.isNotEmpty).toList();
+      print('DEBUG: After parsing - ${items.length} valid items');
+      items.forEach((item) => print('DEBUG:   Item: name="${item.name}", price=${item.price}'));
+    }
 
     if (items.isEmpty) {
-      print('DEBUG: No valid items found');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Не найдено валидных продуктов в тексте')),
-      );
-      return;
+      print('DEBUG: No valid items found, trying AI fallback');
+      // Если обычный парсинг не сработал, пробуем AI
+      return await _processTextWithAI(text, loc);
     }
 
     // Для тестирования убираем диалог подтверждения
-    print('DEBUG: Skipping confirmation dialog for testing');
+    print('DEBUG: Processing ${items.length} items');
     await _addProductsToNomenclature(items, loc);
+  }
+
+  String _detectTextFormat(String text) {
+    final lines = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).take(5);
+
+    // Проверяем на сложные форматы
+    bool hasComplexFormat = false;
+
+    for (final line in lines) {
+      // Ищем признаки сложных форматов
+      if (line.contains(' - ') ||
+          line.contains(': ') ||
+          line.contains('•') ||
+          line.contains('(') && line.contains(')') ||
+          RegExp(r'\d+\s*[a-zA-Zа-яА-Я]+\s*\d').hasMatch(line)) {
+        hasComplexFormat = true;
+        break;
+      }
+    }
+
+    if (hasComplexFormat) {
+      return 'ai_needed';
+    }
+
+    // Проверяем на табличный формат
+    final tabLines = lines.where((line) => line.contains('\t')).length;
+    if (tabLines > lines.length * 0.5) {
+      return 'tab_delimited';
+    }
+
+    // Проверяем на формат с пробелами
+    final spaceLines = lines.where((line) => RegExp(r'\s{2,}').hasMatch(line)).length;
+    if (spaceLines > lines.length * 0.3) {
+      return 'space_delimited';
+    }
+
+    return 'simple';
   }
 
   Future<void> _processExcel(Uint8List bytes, LocalizationService loc) async {
@@ -321,19 +575,37 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
           print('DEBUG: Processing item: "${item.name}" price=${item.price}');
 
           // Создаем продукт
-          final product = Product(
-            id: const Uuid().v4(),
-            name: item.name,
-            category: 'manual',
-            names: <String, String>{for (final c in allLangs) c: item.name},
-            calories: null,
-            protein: null,
-            fat: null,
-            carbs: null,
-            unit: 'g',
-            basePrice: item.price,
-            currency: item.price != null ? defCur : null,
+        // Используем ИИ для улучшения данных продукта
+        ProductVerificationResult? verification;
+        try {
+          final aiService = context.read<AiServiceSupabase>();
+          verification = await aiService.verifyProduct(
+            item.name,
+            currentPrice: item.price,
           );
+          print('DEBUG: AI verification for "${item.name}": ${verification?.normalizedName ?? 'no changes'}');
+        } catch (aiError) {
+          print('DEBUG: AI verification failed for "${item.name}": $aiError');
+          verification = null;
+        }
+
+        // Используем проверенные ИИ данные или оригинальные
+        final normalizedName = verification?.normalizedName ?? item.name;
+        var names = <String, String>{for (final c in allLangs) c: normalizedName};
+
+        final product = Product(
+          id: const Uuid().v4(),
+          name: normalizedName,
+          category: verification?.suggestedCategory ?? 'manual',
+          names: names,
+          calories: verification?.suggestedCalories,
+          protein: null,
+          fat: null,
+          carbs: null,
+          unit: verification?.suggestedUnit ?? 'g',
+          basePrice: verification?.suggestedPrice ?? item.price,
+          currency: (verification?.suggestedPrice ?? item.price) != null ? defCur : null,
+        );
 
           // Пытаемся добавить продукт
           try {
@@ -411,21 +683,60 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
   ({String name, double? price}) _parseLine(String line) {
     print('DEBUG: Parsing line: "$line"');
-    final parts = line.split(RegExp(r'\t|\s{2,}'));
-    print('DEBUG: Split into ${parts.length} parts: $parts');
-    final name = parts.isNotEmpty ? parts[0].trim() : '';
-    final priceStr = parts.length > 1 ? parts[1].trim() : '';
 
+    // Сначала попробуем найти паттерны с ценами в конце строки
+    // Ищем числа с возможными валютами в конце строки
+    final pricePatterns = [
+      RegExp(r'[\d,]+\s*[₫$€£руб.]?\s*$'), // число с опциональной валютой в конце
+      RegExp(r'\d+\.\d+\s*[₫$€£руб.]?\s*$'), // десятичное число
+      RegExp(r'\d{1,3}(?:,\d{3})*\s*[₫$€£руб.]?\s*$'), // число с разделителями тысяч
+    ];
+
+    String name = line.trim();
     double? price;
-    if (priceStr.isNotEmpty) {
-      // Убираем валюту и запятые
-      final cleanPrice = priceStr.replaceAll(RegExp(r'[₫$€£руб.\s]'), '').replaceAll(',', '');
-      price = double.tryParse(cleanPrice);
-      print('DEBUG: Cleaned price "$priceStr" -> "$cleanPrice" -> $price');
+
+    for (final pattern in pricePatterns) {
+      final match = pattern.firstMatch(line);
+      if (match != null) {
+        final pricePart = match.group(0)!.trim();
+        name = line.substring(0, match.start).trim();
+
+        // Очищаем цену от валюты и форматирования
+        final cleanPrice = pricePart
+            .replaceAll(RegExp(r'[₫$€£руб.\s]'), '')
+            .replaceAll(',', '')
+            .replaceAll(' ', '');
+
+        price = double.tryParse(cleanPrice);
+        print('DEBUG: Found price pattern "$pricePart" -> cleaned "$cleanPrice" -> $price');
+
+        if (price != null) break;
+      }
+    }
+
+    // Если не нашли цену паттерном, пробуем старый способ с разделителями
+    if (price == null) {
+      final parts = line.split(RegExp(r'\t|\s{2,}|\s+\|\s+|\s*;\s*'));
+      print('DEBUG: Fallback parsing - split into ${parts.length} parts: $parts');
+      name = parts.isNotEmpty ? parts[0].trim() : line.trim();
+      final priceStr = parts.length > 1 ? parts[1].trim() : '';
+
+      if (priceStr.isNotEmpty) {
+        final cleanPrice = priceStr.replaceAll(RegExp(r'[₫$€£руб.\s]'), '').replaceAll(',', '').replaceAll(' ', '');
+        price = double.tryParse(cleanPrice);
+        print('DEBUG: Fallback price parsing "$priceStr" -> "$cleanPrice" -> $price');
+      }
+    }
+
+    // Если имя пустое или содержит только цену, это ошибка
+    if (name.isEmpty || RegExp(r'^\d').hasMatch(name)) {
+      print('DEBUG: Invalid name detected, using original line');
+      name = line.trim();
+      price = null;
     }
 
     final result = (name: name, price: price);
-    print('DEBUG: Parsed result: name="$name", price=$price');
+    print('DEBUG: Final parsed result: name="$name", price=$price');
     return result;
   }
 
