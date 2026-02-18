@@ -268,6 +268,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
 
   // Список элементов номенклатуры (продукты + ТТК ПФ)
   List<NomenclatureItem> _nomenclatureItems = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -291,7 +292,17 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     // Загружаем элементы номенклатуры (продукты + ТТК ПФ)
     _nomenclatureItems = await store.getAllNomenclatureItems(estId, techCardService);
 
-    if (mounted) setState(() {});
+    if (mounted) setState(() => _isLoading = false);
+  }
+
+  Widget _buildNomenclatureSkeletonLoading() {
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+      itemCount: 8, // Показываем 8 skeleton элементов
+      itemBuilder: (context, index) {
+        return const _NomenclatureSkeletonItem();
+      },
+    );
   }
 
   void _showEditProductForNomenclature(BuildContext context, Product p, ProductStoreSupabase store, LocalizationService loc, VoidCallback onRefresh) {
@@ -593,7 +604,9 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
             ),
           ),
           Expanded(
-            child: _NomenclatureTab(
+            child: _isLoading
+                ? _buildNomenclatureSkeletonLoading()
+                : _NomenclatureTab(
               items: nomItems,
               store: store,
               estId: estId ?? '',
@@ -2730,6 +2743,84 @@ class _CurrencySettingsDialogState extends State<_CurrencySettingsDialog> {
         ),
         FilledButton(onPressed: _saveAsDefault, child: Text(widget.loc.t('save'))),
       ],
+    );
+  }
+}
+
+class _NomenclatureSkeletonItem extends StatelessWidget {
+  const _NomenclatureSkeletonItem();
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 6),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            // Аватар с номером
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 16),
+            // Текстовая часть
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Название
+                  Container(
+                    height: 16,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Подзаголовок
+                  Container(
+                    height: 14,
+                    width: 200,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Кнопки действий
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

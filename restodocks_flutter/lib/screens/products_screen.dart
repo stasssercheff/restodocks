@@ -140,7 +140,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
           // Список продуктов
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? _buildSkeletonLoading()
                 : _filteredProducts.isEmpty
                     ? Center(
                         child: Text(
@@ -389,6 +389,79 @@ class _ProductDetailsDialogState extends State<_ProductDetailsDialog> {
           child: Text(loc.t('add_to_nomenclature')),
         ),
       ],
+    );
+  }
+
+  Widget _buildSkeletonLoading() {
+    return ListView.builder(
+      itemCount: 6, // Показываем 6 skeleton элементов
+      itemBuilder: (context, index) {
+        return const _ProductSkeletonItem();
+      },
+    );
+  }
+}
+
+class _ProductSkeletonItem extends StatelessWidget {
+  const _ProductSkeletonItem();
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            // Иконка
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(20),
+              ),
+            ),
+            const SizedBox(width: 16),
+            // Текстовая часть
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Название продукта
+                  Container(
+                    height: 16,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Категория и калории
+                  Container(
+                    height: 14,
+                    width: 120,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Кнопка добавления
+            Container(
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
