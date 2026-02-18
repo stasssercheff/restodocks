@@ -634,30 +634,40 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(loc.t('nomenclature')),
-            Text(
-              '${nomItems.length} в номенклатуре',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.black87,
-                    fontWeight: FontWeight.normal,
-                  ),
-            ),
-          ],
-        ),
+        title: Text(loc.t('nomenclature')),
         actions: [
+          // Счетчик элементов
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Text(
+                '${nomItems.length}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w500,
+                    ),
+              ),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.warning),
             onPressed: () => _showDuplicates(),
             tooltip: 'Показать дубликаты',
           ),
-          IconButton(
+          PopupMenuButton<String>(
             icon: const Icon(Icons.upload_file),
-            onPressed: () => _showUploadDialog(context, loc),
-            tooltip: 'Загрузить список',
+            tooltip: 'Загрузить продукты',
+            onSelected: (value) {
+              if (value == 'text') {
+                _showUploadDialog(context, loc);
+              } else if (value == 'file') {
+                context.push('/products/upload');
+              }
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem(value: 'text', child: Text('Вставить текст')),
+              PopupMenuItem(value: 'file', child: Text('Из файла')),
+            ],
           ),
           IconButton(
             icon: const Icon(Icons.attach_money),

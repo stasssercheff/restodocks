@@ -323,6 +323,19 @@ class _ProductsScreenState extends State<ProductsScreen> {
         ),
         title: Text(loc.t('products')),
         actions: [
+          // Счетчик продуктов
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Text(
+                '${_filteredProducts.length}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w500,
+                    ),
+              ),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.delete_sweep),
             tooltip: 'Удалить полные дубликаты',
