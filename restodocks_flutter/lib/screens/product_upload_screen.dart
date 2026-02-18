@@ -52,6 +52,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
   @override
   Widget build(BuildContext context) {
+    print('=== ProductUploadScreen build called, _isLoading: $_isLoading ===');
     final loc = context.watch<LocalizationService>();
 
     return Scaffold(
@@ -303,7 +304,10 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     );
     print('File picker result: ${result != null ? "files selected" : "cancelled"}');
 
-    if (result == null || result.files.isEmpty || result.files.single.bytes == null) return;
+    if (result == null || result.files.isEmpty || result.files.single.bytes == null) {
+      print('File picker cancelled or no data');
+      return;
+    }
 
     final fileName = result.files.single.name.toLowerCase();
     final bytes = result.files.single.bytes!;
@@ -338,6 +342,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
   Future<void> _showPasteDialog() async {
     print('=== _showPasteDialog called ===');
+    print('Current _isLoading state: $_isLoading');
     final loc = context.read<LocalizationService>();
     final controller = TextEditingController();
     bool addToNomenclature = true; // По умолчанию добавлять в номенклатуру
