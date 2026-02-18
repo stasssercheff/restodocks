@@ -3,6 +3,8 @@ import 'package:provider/single_child_widget.dart';
 
 import '../../services/services.dart';
 import '../../services/ai_service_supabase.dart';
+import '../../services/order_history_service.dart';
+import '../../services/inventory_history_service.dart';
 
 /// Настройка всех провайдеров приложения
 class AppProviders {
@@ -32,6 +34,12 @@ class AppProviders {
         ),
         Provider<AiServiceSupabase>(
           create: (_) => AiServiceSupabase(),
+        ),
+        Provider<OrderHistoryService>(
+          create: (_) => OrderHistoryService(),
+        ),
+        Provider<InventoryHistoryService>(
+          create: (_) => InventoryHistoryService(),
         ),
         Provider<NutritionApiService>(
           create: (_) => NutritionApiService(),

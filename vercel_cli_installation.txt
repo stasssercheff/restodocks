@@ -1,0 +1,28 @@
+УСТАНОВКА VERCEL CLI
+
+Vercel CLI - это программа для командной строки, которая позволяет деплоить проекты локально.
+
+ТРЕБОВАНИЯ:
+- Node.js (версия 14 или выше)
+- npm (устанавливается вместе с Node.js)
+
+ПРОВЕРКА УСТАНОВКИ:
+node --version
+npm --version
+
+УСТАНОВКА NODE.JS (если нет):
+1. Скачать с https://nodejs.org/
+2. Установить .pkg файл
+3. Проверить: node --version
+
+УСТАНОВКА VERCEL CLI:
+npm install -g vercel
+
+ПРОВЕРКА:
+vercel --version
+
+ИСПОЛЬЗОВАНИЕ ДЛЯ ДЕПЛОЯ:
+cd /Users/masurfsker/Documents/Restodocs/Restodocks
+vercel --prod
+
+Vercel CLI - альтернатива curl для локального деплоя

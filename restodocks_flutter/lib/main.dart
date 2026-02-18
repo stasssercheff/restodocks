@@ -46,8 +46,28 @@ void main() async {
     supabaseUrl = (map['SUPABASE_URL'] as String?) ?? '';
     supabaseAnonKey = (map['SUPABASE_ANON_KEY'] as String?) ?? '';
     // config.json loaded
+    print('=== CONFIG.JSON LOADED SUCCESSFULLY ===');
+    print('SUPABASE_URL: $supabaseUrl');
+    print('SUPABASE_ANON_KEY: ${supabaseAnonKey.substring(0, 20)}...');
   } catch (e) {
-    // config.json error
+    print('=== CONFIG.JSON ERROR: $e ===');
+    // config.json error - fallback to hardcoded for testing
+    supabaseUrl = 'https://osglfptwbuqqmqunttha.supabase.co';
+    supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zZ2xmcHR3YnVxcW1xdW50dGhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUwNTk0MDQsImV4cCI6MjA4MDYzNTQwNH0.Jy7yi2TNdSrmoBdILXBGRYB_vxGtq8scCZ9eCA9vfTE';
+    print('=== USING HARDCODED KEYS AS FALLBACK ===');
+  }
+
+  // 2. Локальная разработка: .env
+  if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
+    try {
+      // Loading .env
+      await dotenv.load(fileName: ".env");
+      supabaseUrl = dotenv.env['SUPABASE_URL'] ?? '';
+      supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'] ?? '';
+      // .env loaded
+    } catch (e) {
+      print('DEBUG: .env error: $e');
+    }
   }
 
   // 2. Локальная разработка: .env

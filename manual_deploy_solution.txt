@@ -1,0 +1,23 @@
+РУЧНОЙ ДЕПЛОЙ ЧЕРЕЗ DEPLOY HOOKS
+
+ПОСКОЛЬКУ WEBHOOK НЕ РАБОТАЕТ:
+
+1. В VERCEL DASHBOARD:
+   - Откройте проект restodocks
+   - Settings → Deploy Hooks
+   - Нажмите "+ Add"
+   - Name: manual-deploy
+   - Branch: main
+   - Create
+
+2. VERCEL ДАСТ URL:
+   https://api.vercel.com/v1/integrations/deploy/[PROJECT_ID]/[HOOK_ID]
+
+3. ЗАПУСК ДЕПЛОЯ:
+   curl -X POST [DEPLOY_HOOK_URL]
+
+4. ИЛИ ИСПОЛЬЗОВАТЬ В БРАУЗЕРЕ:
+   Открыть URL в браузере - запустит деплой
+
+5. ПРОВЕРКА:
+   В Vercel Dashboard появится новый деплой

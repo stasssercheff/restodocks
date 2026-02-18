@@ -1,0 +1,41 @@
+ИСПРАВЛЕНИЕ ERR_CONNECTION_REFUSED
+
+ПРИЧИНЫ ОШИБКИ:
+
+1. FLUTTER НЕ ЗАПУЩЕН:
+   - Нужно выполнить flutter run -d chrome
+   - Сервер не стартовал
+
+2. НЕПРАВИЛЬНЫЙ ПОРТ:
+   - Flutter использует случайный порт
+   - Проверить консоль на правильный URL
+
+3. CHROME ПРОБЛЕМЫ:
+   - Chrome не установлен
+   - Chrome не в PATH
+   - Использовать другой браузер
+
+4. FIREWALL:
+   - Firewall блокирует localhost
+
+5. DEPENDENCIES:
+   - flutter pub get не выполнен
+   - Отсутствуют зависимости
+
+РЕШЕНИЯ:
+
+1. ЗАПУСК С ПРАВИЛЬНЫМИ ФЛАГАМИ:
+   flutter run -d web-server --web-port=3000 --web-hostname=localhost
+
+2. ПРОВЕРКА ЗАПУСКА:
+   - Увидеть в консоли "Serving on http://localhost:3000"
+   - Открыть этот URL
+
+3. АЛЬТЕРНАТИВНЫЙ БРАУЗЕР:
+   flutter run -d web-server --web-port=3000
+   # Затем открыть в Safari или Firefox
+
+4. ОЧИСТКА:
+   flutter clean
+   flutter pub get
+   flutter run -d chrome

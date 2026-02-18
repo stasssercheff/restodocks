@@ -1,0 +1,31 @@
+ПОШАГОВАЯ НАСТРОЙКА ЛОКАЛЬНОГО СЕРВЕРА
+
+ШАГ 1: ОТКРЫТЬ ТЕРМИНАЛ
+- Запустить Terminal.app на Mac
+- Или использовать терминал в VS Code/Cursor
+
+ШАГ 2: ПЕРЕЙТИ В ПАПКУ ПРОЕКТА
+cd /Users/masurfsker/Documents/Restodocs/Restodocks/restodocks_flutter
+
+ШАГ 3: ПРОВЕРИТЬ FLUTTER
+flutter --version
+# Должен показать версию Flutter
+
+ШАГ 4: ОБНОВИТЬ ЗАВИСИМОСТИ
+flutter pub get
+
+ШАГ 5: ЗАПУСТИТЬ СЕРВЕР
+flutter run -d web-server --web-port=3000 --web-hostname=localhost
+
+ШАГ 6: ДОЖДАТЬСЯ СООБЩЕНИЯ
+Serving Restodocks on the web...
+Serving at http://localhost:3000
+
+ШАГ 7: ОТКРЫТЬ В БРАУЗЕРЕ
+- Safari: http://localhost:3000
+- Или Chrome: http://localhost:3000
+
+ПРОБЛЕМЫ:
+- Если "flutter command not found" → установить Flutter
+- Если порт занят → изменить порт на 3001
+- Если CORS ошибка → добавить localhost в Supabase

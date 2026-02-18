@@ -1,0 +1,22 @@
+НАСТРОЙКА DEPLOY HOOK ДЛЯ АВТОМАТИЧЕСКОГО ДЕПЛОЯ
+
+DEPLOY HOOK URL:
+https://api.vercel.com/v1/integrations/deploy/prj_4FMDqFFqx73cJSoap5uMyO6QSuG2/mmzEGXWRmk
+
+ВАРИАНТЫ ИСПОЛЬЗОВАНИЯ:
+
+1. WEBHOOK В GITHUB:
+   - Payload URL: https://api.vercel.com/v1/integrations/deploy/prj_4FMDqFFqx73cJSoap5uMyO6QSuG2/mmzEGXWRmk
+   - Content type: application/json
+   - Events: push
+   - Это заменит сломанный webhook
+
+2. РУЧНОЙ ЗАПУСК:
+   curl -X POST "https://api.vercel.com/v1/integrations/deploy/prj_4FMDqFFqx73cJSoap5uMyO6QSuG2/mmzEGXWRmk"
+
+3. В БРАУЗЕРЕ:
+   Открыть URL - запустит деплой
+
+ТЕСТИРОВАНИЕ:
+git commit --allow-empty -m "Test deploy hook"
+git push origin main

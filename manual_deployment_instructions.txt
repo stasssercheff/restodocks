@@ -1,0 +1,29 @@
+РУЧНАЯ ЗАГРУЗКА ЧЕРЕЗ CREATE DEPLOYMENT
+
+ШАГ 1: НАЙТИ КНОПКУ
+- Vercel Dashboard → Проект → Deployments
+- Кнопка "Create Deployment"
+
+ШАГ 2: ВЫБРАТЬ МЕТОД
+- "Upload" - загрузить файлы
+- Или "Import from Git" - но у нас локальные файлы
+
+ШАГ 3: ЗАГРУЗИТЬ ПАПКУ
+- Выбрать папку: restodocks_flutter/build/web
+- Drag & drop или кнопка выбора файла
+- Убедиться, что загружен index.html
+
+ШАГ 4: НАСТРОЙКИ
+- Framework: Other
+- Root Directory: ./ (или пусто)
+- Build Command: echo "Pre-built" (пустой)
+- Output Directory: ./ (или пусто)
+
+ШАГ 5: DEPLOY
+- Кнопка "Deploy"
+- Ждать завершения
+
+РЕЗУЛЬТАТ:
+- Новый деплой в списке
+- Через 5-10 минут сайт обновится
+- Обходит лимиты деплоев

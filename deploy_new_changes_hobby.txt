@@ -1,0 +1,37 @@
+КАК ЗАДЕПЛОИТЬ НОВЫЕ ИЗМЕНЕНИЯ В HOBBY ПЛАНЕ
+
+ПРОБЛЕМА: Deploy Hook не работает, redeploy не применит изменения
+
+РЕШЕНИЯ ДЛЯ НОВОГО ДЕПЛОЯ:
+
+1. PUSH В GIT (МОЖЕТ СРАБОТАТЬ):
+   git commit --allow-empty -m "Deploy inventory fixes"
+   git push origin main
+   - Webhook может сработать несмотря на ограничения
+
+2. GITHUB ACTIONS (РЕКОМЕНДУЮ):
+   Создать .github/workflows/deploy.yml:
+   ```yaml
+   name: Deploy to Vercel
+   on: [push]
+   jobs:
+     deploy:
+       runs-on: ubuntu-latest
+       steps:
+         - run: echo "Triggering Vercel deploy"
+         # Можно добавить curl с Deploy Hook
+   ```
+
+3. VERCEL CLI:
+   - Установить: npm i -g vercel
+   - Деплоить: vercel --prod
+
+4. РУЧНАЯ СБОРКА И ЗАГРУЗКА:
+   - flutter build web --release
+   - В Vercel Dashboard загрузить папку build/web
+
+5. ОБНОВИТЬ ДО PRO:
+   - $20/месяц
+   - Полный доступ к Deploy Hooks
+
+PUSH - самый простой способ попробовать!

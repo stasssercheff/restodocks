@@ -1,0 +1,26 @@
+КАК ПРОВЕРИТЬ ЛИМИТЫ VERCEL
+
+1. ОТКРЫТЬ DASHBOARD:
+   https://vercel.com/dashboard
+
+2. ВЫБРАТЬ ПРОЕКТ:
+   Кликнуть на проект restodocks
+
+3. ПЕРЕЙТИ В SETTINGS:
+   - Вкладка "Usage" или "Billing"
+   - Или "Account" → "Billing & Usage"
+
+4. ПРОСМОТРЕТЬ ЛИМИТЫ:
+   - Bandwidth used / limit
+   - Deployments used / limit  
+   - Functions used / limit
+   - Storage used / limit
+
+5. ЕСЛИ БЛИЗКО К ЛИМИТУ:
+   - Hobby: 100 deployments, 100GB bandwidth
+   - Pro: 3000 deployments, 3000GB bandwidth
+
+6. ПРЕВЫШЕНИЕ ЛИМИТА:
+   - Deployments остановятся
+   - Сайт может стать недоступным
+   - Появится предупреждение в Dashboard

@@ -1,0 +1,30 @@
+ОПТИМИЗАЦИЯ ЗАГРУЗКИ FLUTTER SDK В VERCEL
+
+ПРОБЛЕМА: Каждый деплой загружает 130 MB Flutter SDK
+
+РЕШЕНИЯ:
+
+1. ПРО ПЛАН VERCEL:
+   - Кэширование между деплоями
+   - Быстрая загрузка из кэша
+   - Снижение времени сборки
+
+2. GITHUB ACTIONS (БЕСПЛАТНО):
+   - Сборка на GitHub runners
+   - Загрузка готового build в Vercel
+   - Flutter SDK кэшируется
+
+3. ЛОКАЛЬНАЯ СБОРКА:
+   flutter build web --release
+   Загрузка build/web в Vercel вручную
+
+4. BUILD CACHE:
+   - Использовать .flutter cache
+   - Оптимизировать vercel.json
+
+5. ALTERNATIVE DEPLOY:
+   - Netlify (бесплатный для Flutter)
+   - Firebase Hosting
+   - GitHub Pages
+
+Pro план решает проблему кэширования!

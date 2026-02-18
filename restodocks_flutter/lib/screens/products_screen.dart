@@ -34,7 +34,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
   Future<void> _loadProducts() async {
     setState(() => _isLoading = true);
     try {
-      final store = context.read<ProductStoreSupabase>();
+    final store = context.read<ProductStoreSupabase>();
       await store.loadProducts();
       if (mounted) {
         // Проверяем на дубликаты перед установкой
@@ -96,7 +96,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
     try {
       final store = context.read<ProductStoreSupabase>();
-      final account = context.read<AccountManagerSupabase>();
+    final account = context.read<AccountManagerSupabase>();
 
       // Временно отключаем проверку ТТК из-за ошибки в getAllTechCards
       // final techCardService = context.read<TechCardServiceSupabase>();
@@ -106,8 +106,16 @@ class _ProductsScreenState extends State<ProductsScreen> {
       final Map<String, List<Product>> groupedProducts = {};
 
       for (final product in _products) {
-        // Ключ для группировки: название + категория + калории + белки + жиры + углеводы + цена + валюта
-        final key = '${product.name}_${product.category}_${product.calories}_${product.protein}_${product.fat}_${product.carbs}_${product.basePrice}_${product.currency}';
+        // Нормализуем название: убираем специальные символы, валютные значки, лишние пробелы
+        String normalizedName = product.name
+            .toLowerCase()
+            .replaceAll(RegExp(r'[^\w\s]'), '') // Убираем все специальные символы
+            .replaceAll(RegExp(r'\s+'), ' ')    // Заменяем множественные пробелы на один
+            .trim(); // Убираем пробелы по краям
+
+        // Ключ для группировки: нормализованное название + категория + калории + белки + жиры + углеводы
+        // НЕ включаем цену и валюту, так как они могут различаться для одного продукта
+        final key = '${normalizedName}_${product.category ?? ""}_${product.calories ?? 0}_${product.protein ?? 0}_${product.fat ?? 0}_${product.carbs ?? 0}';
         groupedProducts.putIfAbsent(key, () => []).add(product);
       }
 
@@ -199,9 +207,15 @@ class _ProductsScreenState extends State<ProductsScreen> {
       final store = context.read<ProductStoreSupabase>();
       final account = context.read<AccountManagerSupabase>();
 
-      // Временно отключаем проверку ТТК из-за ошибки getAllTechCards
-      // final techCardService = context.read<TechCardServiceSupabase>();
-      // final allTechCards = await techCardService.getAllTechCards();
+      // Попробуем получить все ТТК для проверки
+      List<dynamic> allTechCards = [];
+      try {
+        final techCardService = context.read<TechCardServiceSupabase>();
+        allTechCards = await techCardService.getAllTechCards();
+        print('Получено ${allTechCards.length} ТТК для проверки');
+      } catch (e) {
+        print('Не удалось получить ТТК: $e, продолжаем без проверки ТТК');
+      }
 
       int deletedCount = 0;
       int skippedCount = 0;
@@ -211,7 +225,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
         bool isUsed = false;
         String usageMessage = '';
 
-        // Проверяем в номенклатуре текущего заведения
+        // Проверяем в номенклатуре ТОЛЬКО текущего заведения
         final establishment = account.establishment;
         if (establishment != null) {
           final nomenclatureIds = store.getNomenclatureIdsForEstablishment(establishment.id);
@@ -221,23 +235,38 @@ class _ProductsScreenState extends State<ProductsScreen> {
           }
         }
 
-        // Временно отключаем проверку ТТК из-за ошибки getAllTechCards
-        // if (!isUsed) {
-        //   for (final techCard in allTechCards) {
-        //     if (techCard.ingredients.any((ing) => ing.productId == product.id)) {
-        //       isUsed = true;
-        //       break;
-        //     }
-        //   }
-        // }
+        // Проверяем использование в ТТК
+        if (!isUsed && allTechCards.isNotEmpty) {
+          for (final techCard in allTechCards) {
+            try {
+              // Предполагаем структуру ТТК
+              final ingredients = techCard['ingredients'] as List<dynamic>? ?? [];
+              if (ingredients.any((ing) => ing['product_id'] == product.id || ing['productId'] == product.id)) {
+                isUsed = true;
+                usageMessage = 'Продукт используется в ТТК "${techCard['dish_name'] ?? techCard['name'] ?? 'Неизвестно'}"';
+                break;
+              }
+            } catch (e) {
+              // Игнорируем ошибки в отдельных ТТК
+              continue;
+            }
+          }
+        }
 
         if (isUsed) {
+          print('Пропускаем продукт "${product.name}": $usageMessage');
           skippedCount++;
           continue;
         }
 
-        await store.deleteProduct(product.id);
-        deletedCount++;
+        try {
+          await store.deleteProduct(product.id);
+          print('Удален продукт "${product.name}" (${product.id})');
+          deletedCount++;
+        } catch (e) {
+          print('Ошибка при удалении продукта "${product.name}": $e');
+          skippedCount++;
+        }
       }
 
       if (mounted) {
@@ -271,9 +300,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
             onPressed: () => Navigator.of(ctx).pop(true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('Удалить'),
-          ),
-        ],
-      ),
+            ),
+          ],
+        ),
     );
 
     if (confirmed != true) return;
@@ -283,10 +312,16 @@ class _ProductsScreenState extends State<ProductsScreen> {
     try {
       final store = context.read<ProductStoreSupabase>();
       final account = context.read<AccountManagerSupabase>();
+      final techCardService = context.read<TechCardServiceSupabase>();
 
-      // Временно отключаем проверку ТТК из-за ошибки getAllTechCards
-      // final techCardService = context.read<TechCardServiceSupabase>();
-      // final allTechCards = await techCardService.getAllTechCards();
+      // Загружаем ТТК для проверки использования продуктов
+      List<TechCard> allTechCards = [];
+      try {
+        allTechCards = await techCardService.getAllTechCards();
+      } catch (e) {
+        print('Warning: Could not load tech cards for duplicate removal: $e');
+        // Продолжаем без проверки ТТК
+      }
 
       // Группируем продукты только по названию
       final Map<String, List<Product>> groupedProducts = {};
@@ -440,6 +475,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
             onPressed: _removeDuplicates,
           ),
           IconButton(
+            icon: const Icon(Icons.clear_all),
+            tooltip: 'Очистить ВСЕ продукты',
+            onPressed: _clearAllProducts,
+          ),
+          IconButton(
             icon: const Icon(Icons.delete_forever),
             tooltip: 'Удалить дубликаты по названию',
             onPressed: _removeDuplicatesByName,
@@ -449,17 +489,17 @@ class _ProductsScreenState extends State<ProductsScreen> {
             tooltip: 'Полное очищение списка',
             onPressed: _clearAllProducts,
           ),
-          IconButton(
+                      IconButton(
             icon: const Icon(Icons.upload_file),
             tooltip: loc.t('upload_products'),
             onPressed: () => context.push('/products/upload'),
           ),
-          IconButton(
+                        IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadProducts,
-          ),
-        ],
-      ),
+                        ),
+                    ],
+                  ),
       body: Column(
         children: [
           // Поиск
@@ -530,7 +570,7 @@ class _ProductListItem extends StatelessWidget {
         title: Text(product.getLocalizedName(loc.currentLanguageCode)),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+            children: [
             if (product.calories != null)
               Text('${product.calories!.round()} ${loc.t('kcal')}'),
             if (product.category != 'manual')
@@ -543,8 +583,8 @@ class _ProductListItem extends StatelessWidget {
           onPressed: onAddToNomenclature,
         ),
         onTap: onTap,
-      ),
-    );
+        ),
+      );
   }
 }
 
@@ -677,8 +717,8 @@ class _ProductDetailsDialogState extends State<_ProductDetailsDialog> {
             break;
           }
         }
-      }
-    } catch (e) {
+        }
+      } catch (e) {
       // Если не удалось проверить, показываем предупреждение
       isUsed = true;
       usageMessage = 'Не удалось проверить использование продукта. Удаление запрещено для безопасности.';
@@ -694,10 +734,10 @@ class _ProductDetailsDialogState extends State<_ProductDetailsDialog> {
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
               child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
+          ),
+        ],
+      ),
+    );
       return;
     }
 
@@ -750,15 +790,15 @@ class _ProductDetailsDialogState extends State<_ProductDetailsDialog> {
     return AlertDialog(
       title: Text(widget.product.getLocalizedName(loc.currentLanguageCode)),
       content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+            children: [
             // Категория
             if (widget.product.category != 'manual')
               Text('${loc.t('category')}: ${widget.product.category}'),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
             // КБЖУ
             if (widget.product.calories != null || widget.product.protein != null) ...[
@@ -778,18 +818,18 @@ class _ProductDetailsDialogState extends State<_ProductDetailsDialog> {
             // Установка цены
             Text(loc.t('price'), style: theme.textTheme.titleSmall),
             const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
+              Row(
+                children: [
+                  Expanded(
                   child: TextField(
-                    controller: _priceController,
-                    decoration: InputDecoration(
+                      controller: _priceController,
+                      decoration: InputDecoration(
                       hintText: '0.00',
-                      border: const OutlineInputBorder(),
+                        border: const OutlineInputBorder(),
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     ),
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   ),
-                ),
                 const SizedBox(width: 8),
                 DropdownButton<String>(
                   value: _currency ?? 'RUB',
@@ -804,9 +844,9 @@ class _ProductDetailsDialogState extends State<_ProductDetailsDialog> {
                   },
                 ),
               ],
-            ),
-          ],
-        ),
+                  ),
+                ],
+              ),
       ),
       actions: [
         TextButton(
@@ -848,7 +888,7 @@ class _ProductSkeletonItem extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Row(
-          children: [
+        children: [
             // Иконка
             Container(
               width: 40,
@@ -882,9 +922,9 @@ class _ProductSkeletonItem extends StatelessWidget {
                       color: Colors.grey[300],
                       borderRadius: BorderRadius.circular(4),
                     ),
-                  ),
-                ],
-              ),
+          ),
+        ],
+      ),
             ),
             // Кнопка добавления
             Container(

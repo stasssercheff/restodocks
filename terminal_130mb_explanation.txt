@@ -1,0 +1,33 @@
+ПОЧЕМУ ТЕРМИНАЛ ГРУЗИТ 130 MB
+
+ВОЗМОЖНЫЕ ПРИЧИНЫ ЗАГРУЗКИ 130 MB:
+
+1. VERCEL CLI УСТАНОВКА:
+   npm install -g vercel загружает ~50-100 MB пакетов
+
+2. FLUTTER SDK В VERCEL BUILD:
+   Vercel build загружает Flutter SDK (~130 MB)
+
+3. DEPENDENCIES ЗАГРУЗКА:
+   npm install или flutter pub get загружают пакеты
+
+4. NODE.JS УСТАНОВКА:
+   Установка Node.js - ~100 MB
+
+5. VERCEL BUILD CACHE:
+   Загрузка кэшированных файлов сборки
+
+6. GITHUB ACTIONS:
+   Загрузка runner образа и зависимостей
+
+ГДЕ МОЖНО УВИДЕТЬ ЗАГРУЗКУ:
+- Vercel Dashboard → Deployments → Build Logs
+- GitHub Actions → Workflow logs
+- Terminal при установке пакетов
+
+ЭТО НОРМАЛЬНО:
+- Современные инструменты требуют много зависимостей
+- Загрузка происходит только при первой установке
+- Потом используется кэш
+
+Если загрузка в Vercel build - это нормально для Flutter проектов

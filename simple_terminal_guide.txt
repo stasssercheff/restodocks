@@ -1,0 +1,35 @@
+ПРОСТОЙ ГУАЙД ДЛЯ ЗАПУСКА ЛОКАЛЬНОГО СЕРВЕРА
+
+ДЛЯ ПОЛНОСТЬЮ НОВИЧКОВ:
+
+1. НАЙТИ ТЕРМИНАЛ:
+   - Нажать Spotlight (Cmd + Space)
+   - Напечатать "Terminal"
+   - Нажать Enter
+
+2. ОТКРОЕТСЯ ЧЕРНОЕ ОКНО С ТЕКСТОМ:
+   masurfsker@Masurbook-Air ~ %
+
+3. СКОПИРОВАТЬ И ВСТАВИТЬ КОМАНДУ:
+   cd /Users/masurfsker/Documents/Restodocs/Restodocks/restodocks_flutter
+
+   (Правой кнопкой → Paste, или Cmd+V)
+
+4. НАЖАТЬ ENTER
+
+5. СКОПИРОВАТЬ СЛЕДУЮЩУЮ КОМАНДУ:
+   flutter run -d web-server --web-port=3000 --web-hostname=localhost
+
+6. НАЖАТЬ ENTER
+
+7. ПОДОЖДАТЬ ПОКА ПОЯВИТСЯ:
+   Serving at http://localhost:3000
+
+8. ОТКРЫТЬ SAFARI
+
+9. В АДРЕСНОЙ СТРОКЕ ВВЕСТИ:
+   http://localhost:3000
+
+10. НАЖАТЬ ENTER
+
+ГОТОВО! ПРИЛОЖЕНИЕ ЗАРАБОТАЕТ ЛОКАЛЬНО!

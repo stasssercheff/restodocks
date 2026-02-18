@@ -659,9 +659,25 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
             tooltip: 'Показать дубликаты',
           ),
           IconButton(
+            icon: const Icon(Icons.clear_all),
+            onPressed: () => _confirmClearAllNomenclature(context, loc),
+            tooltip: 'Очистить всю номенклатуру',
+          ),
+          IconButton(
             icon: const Icon(Icons.upload_file),
             tooltip: 'Загрузить продукты',
-            onPressed: () => context.push('/products/upload'),
+            onPressed: () {
+              print('=== Nomenclature upload button pressed ===');
+              try {
+                context.push('/products/upload');
+                print('=== Navigation to /products/upload successful ===');
+              } catch (e) {
+                print('=== Navigation error: $e ===');
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Ошибка навигации: $e')),
+                );
+              }
+            },
           ),
           IconButton(
             icon: const Icon(Icons.attach_money),
@@ -2774,5 +2790,94 @@ class _NomenclatureSkeletonItem extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// Подтверждение очистки всей номенклатуры
+  Future<void> _confirmClearAllNomenclature(BuildContext context, LocalizationService loc) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Очистить всю номенклатуру?'),
+        content: const Text(
+          'Это действие удалит ВСЕ продукты из номенклатуры заведения.\n\n'
+          'Продукты можно будет добавить заново через загрузку.\n\n'
+          'Это действие нельзя отменить!',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Отмена'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Удалить всё'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        final store = context.read<ProductStoreSupabase>();
+        final account = context.read<AccountManagerSupabase>();
+        final estId = account.establishment?.id;
+
+        if (estId == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Не найдено заведение')),
+          );
+          return;
+        }
+
+        // Показываем индикатор загрузки
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => const AlertDialog(
+            content: Row(
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(width: 16),
+                Text('Очищаем номенклатуру...'),
+              ],
+            ),
+          ),
+        );
+
+        // Очищаем номенклатуру
+        await store.clearAllNomenclature(estId);
+
+        // Закрываем диалог загрузки
+        if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
+
+        // Перезагружаем данные
+        await _ensureLoaded();
+        if (mounted) setState(() {});
+
+        // Показываем успех
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Вся номенклатура очищена'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+      } catch (e) {
+        // Закрываем диалог загрузки
+        if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка очистки: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }

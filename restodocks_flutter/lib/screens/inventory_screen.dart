@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:excel/excel.dart' hide Border;
@@ -5,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/models.dart';
 import '../services/ai_service.dart';
@@ -96,6 +98,7 @@ class InventoryScreen extends StatefulWidget {
 class _InventoryScreenState extends State<InventoryScreen>
     with AutoSaveMixin<InventoryScreen>, InputChangeListenerMixin<InventoryScreen> {
   final ScrollController _hScroll = ScrollController();
+  Timer? _serverAutoSaveTimer; // Таймер для автоматической отправки на сервер каждые 30 секунд
   final List<_InventoryRow> _rows = [];
   /// Продукты, перерасчитанные из ПФ (третья секция); заполняется при загрузке файла.
   List<Map<String, dynamic>>? _aggregatedFromFile;
@@ -112,8 +115,18 @@ class _InventoryScreenState extends State<InventoryScreen>
     _startTime = TimeOfDay.now();
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadNomenclature());
 
-    // Настроить автосохранение
-    setOnInputChanged(scheduleSave);
+    // Настроить автосохранение - сохранять чаще
+    setOnInputChanged(() {
+      // Сохранять немедленно при любом изменении
+      saveNow();
+    });
+
+    // Настроить автоматическую отправку на сервер каждые 30 секунд
+    _serverAutoSaveTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      if (mounted && !_completed) {
+        _autoSaveToServer();
+      }
+    });
   }
 
   @override
@@ -307,7 +320,58 @@ class _InventoryScreenState extends State<InventoryScreen>
   @override
   void dispose() {
     _hScroll.dispose();
+    _serverAutoSaveTimer?.cancel(); // Отменить таймер автосохранения на сервер
     super.dispose();
+  }
+
+  /// Автоматическая отправка данных на сервер каждые 30 секунд
+  Future<void> _autoSaveToServer() async {
+    if (_completed || _rows.isEmpty) return; // Не сохранять если завершено или пусто
+
+    try {
+      final account = context.read<AccountManagerSupabase>();
+      final establishmentId = account.establishment?.id;
+      if (establishmentId == null) return;
+
+      // Получить текущие данные
+      final currentState = getCurrentState();
+
+      // Отправить на сервер как черновик инвентаризации
+      await _saveDraftToServer(establishmentId, currentState);
+
+      print('📡 Auto-saved inventory draft to server');
+    } catch (e) {
+      // Тихая ошибка - не показывать пользователю
+      print('⚠️ Failed to auto-save inventory draft: $e');
+    }
+  }
+
+  /// Сохранить черновик инвентаризации на сервер
+  Future<void> _saveDraftToServer(String establishmentId, Map<String, dynamic> data) async {
+    try {
+      final account = context.read<AccountManagerSupabase>();
+      final employeeId = account.currentEmployee?.id;
+
+      final draftData = {
+        'establishment_id': establishmentId,
+        'employee_id': employeeId,
+        'draft_data': data,
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+
+      // Отправить в таблицу inventory_drafts
+      await Supabase.instance.client
+          .from('inventory_drafts')
+          .upsert(
+            draftData,
+            onConflict: 'establishment_id',
+          );
+
+      print('✅ Auto-saved inventory draft to server');
+    } catch (e) {
+      print('⚠️ Failed to save inventory draft to server: $e');
+      // Если сервер недоступен, данные все равно сохранены локально
+    }
   }
 
   int get _maxQuantityColumns {
@@ -398,6 +462,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     setState(() {
       _rows.add(_InventoryRow(product: p, techCard: null, quantities: [0.0]));
     });
+    saveNow(); // Сохранить немедленно при добавлении продукта
   }
 
   void _setQuantity(int rowIndex, int colIndex, double value) {
@@ -416,13 +481,16 @@ class _InventoryScreenState extends State<InventoryScreen>
         row.quantities.add(0.0);
       }
     });
-    scheduleSave(); // Автосохранение при изменении количества
+
+    // НЕМЕДЛЕННОЕ СОХРАНЕНИЕ при любом изменении количества
+    saveNow();
   }
 
   void _removeRow(int index) {
     setState(() {
       _rows.removeAt(index);
     });
+    saveNow(); // Сохранить немедленно при удалении строки
   }
 
   Future<void> _pickDate(BuildContext context) async {
@@ -502,6 +570,35 @@ class _InventoryScreenState extends State<InventoryScreen>
       recipientEmail: chef.email,
       payload: payload,
     );
+
+    // Сохраняем инвентаризацию в историю перед установкой статуса
+    try {
+      final inventoryService = context.read<InventoryHistoryService>();
+      await inventoryService.saveInventoryToHistory(
+        establishmentId: establishment.id,
+        employeeId: employee.id,
+        inventoryData: {
+          'rows': _rows.map((row) => {
+            'productId': row.product?.id,
+            'techCardId': row.techCard?.id,
+            'freeName': row.freeName,
+            'freeUnit': row.freeUnit,
+            'quantities': row.quantities,
+            'pfUnit': row.pfUnit,
+          }).toList(),
+          'aggregatedProducts': aggregatedProducts,
+          'payload': payload,
+        },
+        date: _date,
+        startTime: _startTime,
+        endTime: endTime,
+        notes: 'Отправлено шефу ${chef.fullName}',
+      );
+      print('✅ Inventory saved to history');
+    } catch (e) {
+      print('⚠️ Failed to save inventory to history: $e');
+      // Продолжаем выполнение, так как сохранение в историю не критично
+    }
 
     if (mounted) {
       setState(() {
@@ -1090,6 +1187,12 @@ class _InventoryScreenState extends State<InventoryScreen>
     final screenW = MediaQuery.of(context).size.width;
     final rightW = _colTotalWidth + _colGap + _maxQuantityColumns * (_colQtyWidth + _colGap) + 48;
     final totalW = (leftW + rightW).clamp(screenW, double.infinity);
+    // Use fixed column layout when there are many quantity columns
+    if (_maxQuantityColumns > 3) {
+      return _buildTableWithFixedColumn(loc);
+    }
+
+    // Original scrollable table for few columns
     return Scrollbar(
       thumbVisibility: true,
       controller: _hScroll,
@@ -1181,9 +1284,12 @@ class _InventoryScreenState extends State<InventoryScreen>
     );
   }
 
-  Widget _buildSectionHeader(LocalizationService loc, String title) {
+  Widget _buildSectionHeader(LocalizationService loc, String title, {bool isFixed = false}) {
     final theme = Theme.of(context);
+    final leftW = isFixed ? _leftWidth(context) : null;
+
     return Container(
+      width: leftW,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
         color: theme.colorScheme.primaryContainer.withOpacity(0.5),
@@ -1230,7 +1336,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     final row = _rows[actualIndex];
     final nameW = _colNameWidth(context);
     final maxCols = _maxQuantityColumns;
-    final qtyCols = row.isPf ? 1 : row.quantities.length;
+    final qtyCols = row.isPf ? 1 : (row.quantities.isEmpty ? 1 : row.quantities.length + (row.quantities.last == 0.0 ? 0 : 1));
     return InkWell(
       onLongPress: () {
         if (_completed) return;
@@ -1325,6 +1431,342 @@ class _InventoryScreenState extends State<InventoryScreen>
     return q.toStringAsFixed(1);
   }
 
+  Widget _buildTableWithFixedColumn(LocalizationService loc) {
+    final leftW = _leftWidth(context);
+    final screenW = MediaQuery.of(context).size.width;
+    final rightW = _colTotalWidth + _colGap + _maxQuantityColumns * (_colQtyWidth + _colGap) + 48;
+
+    return Column(
+      children: [
+        // Fixed header row
+        Row(
+          children: [
+            // Fixed left header
+            Container(
+              width: leftW,
+              child: _buildFixedHeaderRow(loc),
+            ),
+            // Scrollable right header
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                controller: _hScroll,
+                physics: const NeverScrollableScrollPhysics(),
+                child: SizedBox(
+                  width: rightW.clamp(screenW - leftW, double.infinity),
+                  child: _buildScrollableHeaderRow(loc),
+                ),
+              ),
+            ),
+          ],
+        ),
+        // Scrollable content
+        Expanded(
+          child: Row(
+            children: [
+              // Fixed left column (product info)
+              Container(
+                width: leftW,
+                decoration: BoxDecoration(
+                  border: Border(right: BorderSide(color: Theme.of(context).dividerColor.withOpacity(0.3))),
+                ),
+                child: SingleChildScrollView(
+                  physics: const ClampingScrollPhysics(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_blockFilter != _InventoryBlockFilter.pfOnly && _productIndices.isNotEmpty) ...[
+                        _buildSectionHeader(loc, loc.t('inventory_block_products'), isFixed: true),
+                        ..._productIndices.asMap().entries.map((e) => _buildFixedDataRow(loc, e.value, e.key + 1)),
+                      ],
+                      if (_blockFilter != _InventoryBlockFilter.productsOnly && _pfIndices.isNotEmpty) ...[
+                        _buildSectionHeader(loc, loc.t('inventory_block_pf'), isFixed: true),
+                        ..._pfIndices.asMap().entries.map((e) {
+                          final rowNum = _blockFilter == _InventoryBlockFilter.pfOnly ? e.key + 1 : _productIndices.length + e.key + 1;
+                          return _buildFixedDataRow(loc, e.value, rowNum);
+                        }),
+                      ],
+                      if (_aggregatedFromFile != null && _aggregatedFromFile!.isNotEmpty) ...[
+                        _buildSectionHeader(loc, loc.t('inventory_pf_products_title'), isFixed: true),
+                        _buildFixedAggregatedHeaderRow(loc),
+                        ..._aggregatedFromFile!.asMap().entries.map((e) => _buildFixedAggregatedDataRow(loc, e.value, e.key + 1)),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              // Scrollable right column (quantities)
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: const ClampingScrollPhysics(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Empty space to align with fixed headers
+                      SizedBox(height: _completed ? 56 : 48),
+                      if (_blockFilter != _InventoryBlockFilter.pfOnly && _productIndices.isNotEmpty) ...[
+                        SizedBox(height: 32), // Section header space
+                        ..._productIndices.asMap().entries.map((e) => _buildScrollableDataRow(loc, e.value)),
+                      ],
+                      if (_blockFilter != _InventoryBlockFilter.productsOnly && _pfIndices.isNotEmpty) ...[
+                        SizedBox(height: 32), // Section header space
+                        ..._pfIndices.asMap().entries.map((e) => _buildScrollableDataRow(loc, e.value)),
+                      ],
+                      if (_aggregatedFromFile != null && _aggregatedFromFile!.isNotEmpty) ...[
+                        SizedBox(height: 32), // Section header space
+                        _buildScrollableAggregatedHeaderRow(loc),
+                        ..._aggregatedFromFile!.asMap().entries.map((e) => _buildScrollableAggregatedDataRow(loc, e.value)),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFixedHeaderRow(LocalizationService loc) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: theme.dividerColor)),
+        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+      ),
+      child: Row(
+        children: [
+          SizedBox(width: _colNoWidth, child: Text('#', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+          SizedBox(width: _colGap),
+          SizedBox(width: _colNameWidth(context), child: Text(loc.t('inventory_item_name'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+          SizedBox(width: _colGap),
+          SizedBox(width: _colUnitWidth, child: Text(loc.t('inventory_unit'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScrollableHeaderRow(LocalizationService loc) {
+    final theme = Theme.of(context);
+    final maxCols = _maxQuantityColumns;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: theme.dividerColor)),
+        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+      ),
+      child: Row(
+        children: [
+          SizedBox(width: _colTotalWidth, child: Text(loc.t('inventory_total'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+          SizedBox(width: _colGap),
+          ...List.generate(
+            maxCols,
+            (colIndex) => Padding(
+              padding: EdgeInsets.only(right: colIndex < maxCols - 1 ? _colGap : 0),
+              child: SizedBox(
+                width: _colQtyWidth,
+                child: Text('${colIndex + 1}', textAlign: TextAlign.center, style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ),
+          if (!_completed) SizedBox(width: 28),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFixedDataRow(LocalizationService loc, int actualIndex, int rowNumber) {
+    final theme = Theme.of(context);
+    final row = _rows[actualIndex];
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
+        color: rowNumber.isEven ? theme.colorScheme.surface : theme.colorScheme.surfaceContainerLowest.withOpacity(0.5),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          SizedBox(width: _colNoWidth, child: Text('$rowNumber', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant))),
+          SizedBox(width: _colGap),
+          SizedBox(
+            width: _colNameWidth(context),
+            child: Text(
+              row.productName(loc.currentLanguageCode),
+              style: theme.textTheme.bodyMedium,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              softWrap: true,
+            ),
+          ),
+          SizedBox(width: _colGap),
+          SizedBox(
+            width: _colUnitWidth,
+            child: row.isPf && !_completed
+                ? DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: row.pfUnit ?? _pfUnitPcs,
+                      isDense: true,
+                      isExpanded: true,
+                      items: [
+                        DropdownMenuItem(value: _pfUnitPcs, child: Text(loc.currentLanguageCode == 'ru' ? 'порц.' : 'pcs', style: theme.textTheme.bodyMedium, overflow: TextOverflow.ellipsis)),
+                        DropdownMenuItem(value: _pfUnitGrams, child: Text(loc.currentLanguageCode == 'ru' ? 'гр' : 'g', style: theme.textTheme.bodyMedium, overflow: TextOverflow.ellipsis)),
+                      ],
+                      onChanged: (v) => v != null ? _setPfUnit(actualIndex, v) : null,
+                    ),
+                  )
+                : Text(row.unitDisplayForBlank(loc.currentLanguageCode), style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant), overflow: TextOverflow.ellipsis),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScrollableDataRow(LocalizationService loc, int actualIndex) {
+    final theme = Theme.of(context);
+    final row = _rows[actualIndex];
+    final maxCols = _maxQuantityColumns;
+    final qtyCols = row.isPf ? 1 : row.quantities.length;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: _colTotalWidth,
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(_formatQty(row.totalDisplay), style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+          ),
+          SizedBox(width: _colGap),
+          ...List.generate(
+            maxCols,
+            (colIndex) => Padding(
+              padding: EdgeInsets.only(right: colIndex < maxCols - 1 ? _colGap : 0),
+              child: SizedBox(
+                width: _colQtyWidth,
+                child: colIndex < qtyCols
+                    ? (_completed
+                        ? Text(_formatQty(row.quantityDisplayAt(colIndex)), style: theme.textTheme.bodyMedium)
+                        : _QtyCell(
+                            value: row.quantities[colIndex],
+                            useGrams: row.isWeightInKg,
+                            onChanged: (v) => _setQuantity(actualIndex, colIndex, v),
+                          ))
+                    : const SizedBox.shrink(),
+              ),
+            ),
+          ),
+          if (!_completed && !row.isPf)
+            SizedBox(
+              width: 28,
+              child: IconButton.filledTonal(
+                icon: const Icon(Icons.add, size: 18),
+                onPressed: () => _addQuantityToRow(actualIndex),
+                tooltip: loc.t('inventory_add_column_hint'),
+                style: IconButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(28, 28),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFixedAggregatedHeaderRow(LocalizationService loc) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: theme.dividerColor)),
+        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+      ),
+      child: Row(
+        children: [
+          SizedBox(width: _colNoWidth, child: Text(loc.t('inventory_excel_number'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+          SizedBox(width: _colGap),
+          Expanded(child: Text(loc.t('inventory_item_name'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScrollableAggregatedHeaderRow(LocalizationService loc) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: theme.dividerColor)),
+        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+      ),
+      child: Row(
+        children: [
+          SizedBox(width: 72, child: Text(loc.t('inventory_pf_gross_g'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+          SizedBox(width: _colGap),
+          SizedBox(width: 72, child: Text(loc.t('inventory_pf_net_g'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFixedAggregatedDataRow(LocalizationService loc, Map<String, dynamic> p, int rowNumber) {
+    final theme = Theme.of(context);
+    final name = p['productName'] as String? ?? '';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
+        color: theme.colorScheme.surface,
+      ),
+      child: Row(
+        children: [
+          SizedBox(width: _colNoWidth, child: Text('$rowNumber', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant))),
+          SizedBox(width: _colGap),
+          Expanded(
+            child: Text(
+              name,
+              style: theme.textTheme.bodyMedium,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScrollableAggregatedDataRow(LocalizationService loc, Map<String, dynamic> p) {
+    final theme = Theme.of(context);
+    final gross = ((p['grossGrams'] as num?)?.toDouble() ?? 0).round();
+    final net = ((p['netGrams'] as num?)?.toDouble() ?? 0).round();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+      ),
+      child: Row(
+        children: [
+          SizedBox(width: 72, child: Text('$gross', style: theme.textTheme.bodyMedium)),
+          SizedBox(width: _colGap),
+          SizedBox(width: 72, child: Text('$net', style: theme.textTheme.bodyMedium)),
+        ],
+      ),
+    );
+  }
+
   /// Компактный нижний блок: не перекрывает таблицу, минимум высоты.
   Widget _buildFooter(LocalizationService loc) {
     final theme = Theme.of(context);
@@ -1338,39 +1780,6 @@ class _InventoryScreenState extends State<InventoryScreen>
         top: false,
         child: Row(
           children: [
-            if (!_completed) ...[
-              IconButton.filledTonal(
-                onPressed: () => _showProductPicker(context, loc),
-                icon: const Icon(Icons.add, size: 20),
-                tooltip: loc.t('inventory_add_product'),
-                style: IconButton.styleFrom(padding: const EdgeInsets.all(10), minimumSize: const Size(40, 40)),
-              ),
-              const SizedBox(width: 6),
-              IconButton.filledTonal(
-                onPressed: () => _loadFilledFile(context, loc),
-                icon: const Icon(Icons.upload_file, size: 20),
-                tooltip: loc.t('inventory_load_blank'),
-                style: IconButton.styleFrom(padding: const EdgeInsets.all(10), minimumSize: const Size(40, 40)),
-              ),
-              const SizedBox(width: 6),
-              IconButton.filledTonal(
-                onPressed: () => _scanReceipt(context, loc),
-                icon: const Icon(Icons.document_scanner_outlined, size: 20),
-                tooltip: '${loc.t('inventory_scan_receipt')} (${loc.t('ai_badge')})',
-                style: IconButton.styleFrom(padding: const EdgeInsets.all(10), minimumSize: const Size(40, 40)),
-              ),
-              const SizedBox(width: 6),
-              Tooltip(
-                message: loc.t('inventory_add_column_hint'),
-                child: IconButton.filledTonal(
-                  onPressed: _rows.isEmpty ? null : _addColumnToAll,
-                  icon: const Icon(Icons.add_chart, size: 20),
-                  tooltip: loc.t('inventory_add_column'),
-                  style: IconButton.styleFrom(padding: const EdgeInsets.all(10), minimumSize: const Size(40, 40)),
-                ),
-              ),
-              const SizedBox(width: 8),
-            ],
             Expanded(
               child: FilledButton(
                 onPressed: _completed ? null : () => _complete(context),

@@ -1,0 +1,38 @@
+РЕШЕНИЯ ДЛЯ HOBBY ПЛАНА (БЕСПЛАТНОГО)
+
+Если у вас Hobby план, Deploy Hooks ограничены.
+
+АЛЬТЕРНАТИВНЫЕ СПОСОБЫ ДЕПЛОЯ:
+
+1. РУЧНОЙ REDEPLOY:
+   - Vercel Dashboard → Deployments
+   - Найти последний деплой → Redeploy
+   - Работает без ограничений
+
+2. GITHUB ACTIONS (БЕСПЛАТНО):
+   Создать .github/workflows/deploy.yml:
+   ```yaml
+   name: Deploy to Vercel
+   on:
+     push:
+       branches: [main]
+   jobs:
+     deploy:
+       runs-on: ubuntu-latest
+       steps:
+         - uses: actions/checkout@v3
+         - name: Deploy
+           run: curl -X POST $VERCEL_DEPLOY_HOOK_URL
+           env:
+             VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+   ```
+
+3. VERCEL CLI (ЛОКАЛЬНО):
+   - Установить: npm i -g vercel
+   - Деплой: vercel --prod
+
+4. ПРЯМАЯ ЗАГРУЗКА:
+   - flutter build web --release
+   - Загрузить build/web через Vercel Dashboard
+
+Hobby план поддерживает redeploy через Dashboard!

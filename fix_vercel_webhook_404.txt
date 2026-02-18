@@ -1,0 +1,28 @@
+ИСПРАВЛЕНИЕ ОШИБКИ 404 В WEBHOOK
+
+ПРОБЛЕМА: Webhook получает 404 ошибку от Vercel
+
+ВОЗМОЖНЫЕ ПРИЧИНЫ:
+1. Неправильный URL webhook
+2. Сломана интеграция Vercel-GitHub
+3. Репозиторий не подключен к Vercel
+
+РЕШЕНИЕ:
+
+1. ПРОВЕРИТЬ ИНТЕГРАЦИЮ В VERCEL:
+   - Открыть https://vercel.com/dashboard/integrations
+   - Найти GitHub integration
+   - Проверить статус подключения
+
+2. ПЕРЕПОДКЛЮЧИТЬ GITHUB:
+   - В Vercel: Settings → Git → Disconnect GitHub
+   - Reconnect GitHub
+   - Выбрать репозиторий stasssercheff/restodocks
+
+3. ПРАВИЛЬНЫЙ WEBHOOK URL:
+   - После переподключения Vercel покажет правильный webhook URL
+   - Обновите URL в GitHub settings/hooks
+
+4. ТЕСТИРОВАНИЕ:
+   git commit --allow-empty -m "Test webhook"
+   git push origin main

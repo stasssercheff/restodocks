@@ -1,0 +1,27 @@
+ПРОБЛЕМЫ С VERCEL DEPLOY HOOK (404)
+
+ВОЗМОЖНЫЕ ПРИЧИНЫ:
+1. Deploy Hook создан неправильно
+2. Репозиторий не подключен
+3. Проблемы с Vercel API
+
+РЕШЕНИЯ:
+
+1. ПЕРЕСОЗДАТЬ DEPLOY HOOK:
+   - В Vercel: Settings → Deploy Hooks
+   - Удалить старый hook
+   - Создать новый с именем deploy-main
+
+2. ПРОВЕРИТЬ ПОДКЛЮЧЕНИЕ РЕПОЗИТОРИЯ:
+   - Settings → Git
+   - Должен быть подключен stasssercheff/restodocks
+
+3. РУЧНОЙ ДЕПЛОЙ ЧЕРЕЗ VERCEL DASHBOARD:
+   - Deployments → Trigger Deploy
+   - Выбрать branch main
+
+4. ПРОВЕРИТЬ VERCEL STATUS:
+   https://vercel.com/docs/integrations#status
+
+5. ПОПРОБОВАТЬ GITHUB ACTIONS:
+   Создать .github/workflows/deploy.yml

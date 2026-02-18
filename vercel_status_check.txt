@@ -1,0 +1,25 @@
+ПРОВЕРКА СТАТУСА VERCEL ПРОЕКТА
+
+Если Deploy Hook не работает, проверить:
+
+1. СТАТУС VERCEL:
+   https://vercel.com/docs/integrations#status
+
+2. ПРОВЕРКА ПРОЕКТА:
+   - Проект существует
+   - Репозиторий подключен
+   - Build settings корректны
+
+3. VERCEL CLI (если установлен):
+   npx vercel --prod
+
+4. РУЧНОЙ РЕДЕПЛОЙ:
+   В Vercel Dashboard найти последний деплой и нажать "Redeploy"
+
+5. ПРОВЕРКА BUILD SETTINGS:
+   - Framework: Flutter
+   - Build Command: bash vercel-build.sh
+   - Output Directory: build/web
+
+АЛЬТЕРНАТИВА:
+Если ничего не работает, загрузить build/web вручную через Vercel Dashboard

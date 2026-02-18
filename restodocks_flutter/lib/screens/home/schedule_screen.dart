@@ -24,6 +24,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   static const double _dayCellWidth = 36;
   static const double _rowHeight = 44;
 
+  // Определяем, является ли устройство мобильным
+  bool get isMobile => MediaQuery.of(context).size.width < 600;
+
   final ScrollController _horizontalScrollController = ScrollController();
 
   ScheduleModel _model = ScheduleModel(
@@ -499,7 +502,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                     ? GestureDetector(
                         behavior: HitTestBehavior.opaque,
                         onTap: () => _onCellTap(slot.id, date),
-                        child: content,
+                        child: Container(
+                          constraints: BoxConstraints(
+                            minWidth: isMobile ? 44 : 36,
+                            minHeight: isMobile ? 44 : 36,
+                          ),
+                          child: content,
+                        ),
                       )
                     : content,
                 bg: bg,

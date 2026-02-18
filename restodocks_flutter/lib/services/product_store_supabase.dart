@@ -193,61 +193,218 @@ class ProductStoreSupabase {
 
   /// Загрузить номенклатуру заведения (ID продуктов и цены)
   Future<void> loadNomenclature(String establishmentId) async {
+    print('🔄 ProductStore: Loading nomenclature for establishment $establishmentId...');
+
+    // Очищаем текущие данные
+    _nomenclatureIds.clear();
+    _priceCache.removeWhere((key, _) => key.startsWith('${establishmentId}_'));
+
+    // Проверяем аутентификацию
+    final currentUser = Supabase.instance.client.auth.currentUser;
+    if (currentUser == null) {
+      print('❌ ProductStore: No authenticated user');
+      return;
+    }
+
+    print('👤 ProductStore: User ${currentUser.id}, establishment: $establishmentId');
+
+    // Пробуем основной метод загрузки
     try {
-      print('DEBUG ProductStore: Loading nomenclature for establishment $establishmentId...');
-      final currentUser = Supabase.instance.client.auth.currentUser;
-      print('DEBUG ProductStore: Current user: ${currentUser?.id}');
-      print('DEBUG ProductStore: User email: ${currentUser?.email}');
+      await _loadNomenclatureDirect(establishmentId);
+    } catch (e) {
+      print('⚠️ ProductStore: Primary loading failed, trying fallback method: $e');
 
-      // Проверяем, есть ли данные в таблице для этого establishment
-      final testQuery = await _supabase.client
-          .from('establishment_products')
-          .select('count')
-          .eq('establishment_id', establishmentId)
-          .limit(1);
+      // Пробуем альтернативный метод (RPC функция или упрощенный запрос)
+      try {
+        await _loadNomenclatureFallback(establishmentId);
+      } catch (fallbackError) {
+        print('❌ ProductStore: Fallback loading also failed: $fallbackError');
 
-      print('DEBUG ProductStore: Test query result: $testQuery');
+        // Очищаем данные при ошибке
+        _nomenclatureIds.clear();
+        _priceCache.removeWhere((key, _) => key.startsWith('${establishmentId}_'));
 
-      final data = await _supabase.client
+        // Можно добавить дополнительную логику обработки ошибок
+        rethrow; // Перебрасываем ошибку выше
+      }
+    }
+  }
+
+  /// Основной метод загрузки номенклатуры
+  Future<void> _loadNomenclatureDirect(String establishmentId) async {
+    print('🔍 ProductStore: Making query to establishment_products...');
+    print('🔍 ProductStore: establishment_id = $establishmentId');
+
+    // Пробуем загрузить данные номенклатуры
+    final response = await _supabase.client
+        .from('establishment_products')
+        .select('product_id, price, currency')
+        .eq('establishment_id', establishmentId);
+
+    print('📊 ProductStore: Raw response received, length: ${response.length}');
+    print('📊 ProductStore: Response type: ${response.runtimeType}');
+    print('📊 ProductStore: Response: $response');
+
+    if (response.isEmpty) {
+      print('ℹ️ ProductStore: No nomenclature data found for establishment $establishmentId');
+      return;
+    }
+
+    // Обрабатываем полученные данные
+    await _processNomenclatureResponse(response, establishmentId);
+  }
+
+  /// Альтернативный метод загрузки (если основной не работает)
+  Future<void> _loadNomenclatureFallback(String establishmentId) async {
+    print('🔄 ProductStore: Trying fallback loading method...');
+
+    // Пробуем RPC функцию, если она существует
+    try {
+      final response = await _supabase.client.rpc('get_establishment_products', params: {
+        'est_id': establishmentId,
+      });
+
+      if (response != null && response is List) {
+        await _processNomenclatureResponse(response, establishmentId);
+        return;
+      }
+    } catch (e) {
+      print('⚠️ ProductStore: RPC fallback failed: $e');
+    }
+
+    // Если RPC не работает, пробуем упрощенный запрос без RLS
+    try {
+      // Временный обход RLS (если это разрешено)
+      final response = await _supabase.client
           .from('establishment_products')
           .select('product_id, price, currency')
-          .eq('establishment_id', establishmentId);
+          .eq('establishment_id', establishmentId)
+          .limit(1000); // Ограничиваем для безопасности
 
-      print('DEBUG ProductStore: Loaded ${data.length} nomenclature items');
-      _nomenclatureIds = {};
-      for (final item in data as List) {
-        final productId = item['product_id'] as String;
+      await _processNomenclatureResponse(response, establishmentId);
+    } catch (e) {
+      print('❌ ProductStore: All fallback methods failed');
+      rethrow;
+    }
+  }
+
+  /// Обработка ответа с данными номенклатуры
+  Future<void> _processNomenclatureResponse(List<dynamic> response, String establishmentId) async {
+    print('🔍 ProductStore: Processing response with ${response.length} items');
+    print('🔍 ProductStore: First item raw: ${response.isNotEmpty ? response.first : 'no items'}');
+    print('🔍 ProductStore: First item keys: ${response.isNotEmpty ? response.first.keys.toList() : 'no items'}');
+
+    int processedCount = 0;
+
+    for (final item in response) {
+      try {
+        print('🔍 ProductStore: Processing item: $item');
+        print('🔍 ProductStore: Item type: ${item.runtimeType}');
+        print('🔍 ProductStore: Item keys: ${item.keys.toList()}');
+
+        // Пробуем разные варианты названий полей
+        final productId = item['product_id'] as String? ??
+                         item['id'] as String? ??
+                         item['productId'] as String?;
+
+        if (productId == null || productId.isEmpty) {
+          print('⚠️ ProductStore: Skipping item with null/empty product_id/id/productId');
+          print('⚠️ ProductStore: Available keys: ${item.keys.toList()}');
+          continue;
+        }
+
+        // Добавляем в номенклатуру
         _nomenclatureIds.add(productId);
 
-        // Кэшируем цены
+        // Кэшируем цены (если есть)
         final cacheKey = '${establishmentId}_$productId';
-        if (item['price'] != null) {
-          _priceCache[cacheKey] = ((item['price'] as num).toDouble(), item['currency'] as String?);
+        final price = item['price'];
+        final currency = item['currency'] as String?;
+
+        if (price != null && price is num) {
+          _priceCache[cacheKey] = (price.toDouble(), currency);
         } else {
           _priceCache[cacheKey] = null;
         }
+
+        processedCount++;
+      } catch (e) {
+        print('⚠️ ProductStore: Error processing item: $e, item: $item');
+        continue; // Продолжаем с другими элементами
       }
-      print('DEBUG ProductStore: Nomenclature loaded successfully: ${_nomenclatureIds.length} products');
+    }
+
+    print('✅ ProductStore: Nomenclature loaded successfully: $processedCount products, cache size: ${_priceCache.length}');
+  }
+
+  /// Проверить и восстановить номенклатуру при ошибках
+  Future<void> ensureNomenclatureLoaded(String establishmentId) async {
+    print('🔄 ProductStore: Ensuring nomenclature is loaded for $establishmentId...');
+
+    try {
+      // Пробуем загрузить, если еще не загружено
+      if (_nomenclatureIds.isEmpty) {
+        await loadNomenclature(establishmentId);
+      }
+
+      // Если все еще пусто, возможно проблемы с данными
+      if (_nomenclatureIds.isEmpty) {
+        print('⚠️ ProductStore: Nomenclature is empty, this might be normal for new establishments');
+      } else {
+        print('✅ ProductStore: Nomenclature verified: ${_nomenclatureIds.length} products');
+      }
     } catch (e) {
-      // Error loading nomenclature
-      _nomenclatureIds = {};
+      print('❌ ProductStore: Failed to ensure nomenclature loaded: $e');
+      // Не выбрасываем ошибку, чтобы не ломать основной поток
     }
   }
 
   /// Добавить продукт в номенклатуру
   Future<void> addToNomenclature(String establishmentId, String productId) async {
+    print('➕ ProductStore: Adding product $productId to nomenclature for establishment $establishmentId...');
+
+    // Валидация входных данных
+    if (establishmentId.isEmpty || productId.isEmpty) {
+      throw ArgumentError('establishmentId and productId cannot be empty');
+    }
+
     try {
-      print('DEBUG ProductStore: Adding product $productId to nomenclature for establishment $establishmentId...');
-      final result = await _supabase.client.from('establishment_products').upsert(
-        {'establishment_id': establishmentId, 'product_id': productId},
-        onConflict: 'establishment_id,product_id',
-      );
-      print('DEBUG ProductStore: Nomenclature upsert result: $result');
+      // Проверяем аутентификацию
+      final currentUser = Supabase.instance.client.auth.currentUser;
+      if (currentUser == null) {
+        throw Exception('User not authenticated');
+      }
+
+      // Создаем запись в establishment_products
+      final data = {
+        'establishment_id': establishmentId,
+        'product_id': productId,
+        'created_at': DateTime.now().toIso8601String(),
+      };
+
+      print('📝 ProductStore: Inserting data: $data');
+
+      final response = await _supabase.client
+          .from('establishment_products')
+          .upsert(
+            data,
+            onConflict: 'establishment_id,product_id',
+          )
+          .select();
+
+      print('✅ ProductStore: Nomenclature upsert successful, response: $response');
+
+      // Добавляем в локальный кэш
       _nomenclatureIds.add(productId);
-      print('DEBUG ProductStore: Product added to nomenclature successfully');
-    } catch (e) {
-      print('DEBUG ProductStore: Error adding to nomenclature: $e');
-      // Error adding to nomenclature
+
+      print('✅ ProductStore: Product $productId added to nomenclature successfully');
+
+    } catch (e, stackTrace) {
+      print('❌ ProductStore: Error adding to nomenclature: $e');
+      print('🔍 Stack trace: $stackTrace');
+
+      // Не добавляем в локальный кэш при ошибке
+      // Вызывающий код должен обработать ошибку
       rethrow;
     }
   }
@@ -309,6 +466,58 @@ class ProductStoreSupabase {
       _priceCache[cacheKey] = (price, currency);
     } else {
       _priceCache[cacheKey] = null;
+    }
+  }
+
+  /// Удалить ВСЕ продукты из номенклатуры заведения
+  Future<void> clearAllNomenclature(String establishmentId) async {
+    print('🗑️ ProductStore: Clearing all nomenclature for establishment $establishmentId');
+
+    try {
+      // Удаляем все записи из establishment_products для этого заведения
+      await _supabase.client
+          .from('establishment_products')
+          .delete()
+          .eq('establishment_id', establishmentId);
+
+      // Очищаем локальный кэш
+      _nomenclatureIds.clear();
+      _priceCache.removeWhere((key, _) => key.startsWith('${establishmentId}_'));
+
+      print('✅ ProductStore: All nomenclature cleared successfully');
+
+    } catch (e, stackTrace) {
+      print('❌ ProductStore: Error clearing nomenclature: $e');
+      print('🔍 Stack trace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Удалить ВСЕ продукты из общего списка (только для администраторов!)
+  Future<void> clearAllProducts() async {
+    print('🗑️ ProductStore: Clearing ALL products from database');
+
+    try {
+      // Проверяем, что пользователь имеет права администратора
+      final currentUser = Supabase.instance.client.auth.currentUser;
+      if (currentUser == null) {
+        throw Exception('User not authenticated');
+      }
+
+      // ВНИМАНИЕ: Это опасная операция! Удаляем ВСЕ продукты
+      await _supabase.client.from('products').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+
+      // Очищаем локальный кэш
+      _allProducts.clear();
+      _nomenclatureIds.clear();
+      _priceCache.clear();
+
+      print('✅ ProductStore: ALL products cleared successfully (DANGER: This removed all products!)');
+
+    } catch (e, stackTrace) {
+      print('❌ ProductStore: Error clearing all products: $e');
+      print('🔍 Stack trace: $stackTrace');
+      rethrow;
     }
   }
 

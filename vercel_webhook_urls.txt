@@ -1,0 +1,20 @@
+ПРАВИЛЬНЫЕ WEBHOOK URL ДЛЯ VERCEL
+
+СТАРЫЙ URL (дает 404):
+https://api.vercel.com/v1/integrations/webhooks/github
+
+ВОЗМОЖНЫЕ ПРАВИЛЬНЫЕ URL:
+
+1. С ПАРАМЕТРАМИ:
+   https://api.vercel.com/v1/integrations/webhooks/github?integrationId=...
+
+2. ДЛЯ DEPLOY HOOKS:
+   https://api.vercel.com/v1/integrations/deploy/[PROJECT_ID]/[HOOK_ID]
+
+3. ИЗ ДОКУМЕНТАЦИИ:
+   https://vercel.com/docs/integrations#webhooks
+
+ПРАВИЛЬНЫЙ ПОДХОД:
+1. Создать Deploy Hook в Vercel
+2. Использовать его URL для webhook в GitHub
+3. Или запускать деплой вручную через curl

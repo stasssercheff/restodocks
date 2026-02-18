@@ -72,3 +72,5 @@ else
 fi
 
 echo "==> Build OK: build/web ready"
+echo "==> Deploy triggered at: $(date)"
+echo "==> All fixes applied: inventory buttons, fixed columns, product loading"

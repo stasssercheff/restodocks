@@ -1,0 +1,44 @@
+ПОЧЕМУ ЛОКАЛЬНАЯ ВЕРСИЯ НЕ РАБОТАЕТ
+
+ОСНОВНЫЕ ПРОБЛЕМЫ:
+
+1. ПУТЬ К ПРОЕКТУ:
+   - Правильный: /Users/masurfsker/Documents/Restodocs/restodocks_flutter
+   - Мы пытались разные варианты, терминал не находил папку
+
+2. FLUTTER SDK:
+   - Возможно, не установлен или не в PATH
+   - flutter --version может не работать
+
+3. DEPENDENCIES:
+   - flutter pub get не выполнен
+   - Отсутствуют пакеты
+
+4. CORS ПРОБЛЕМЫ:
+   - Supabase блокирует localhost
+   - Нужно добавить http://localhost:3000 в CORS
+
+5. КОНФИГУРАЦИЯ:
+   - Неправильные ключи Supabase
+   - .env файл не загружается
+
+РЕШЕНИЯ:
+
+1. ИСПРАВИТЬ ПУТЬ:
+   cd /Users/masurfsker/Documents/Restodocs/restodocks_flutter
+
+2. ПРОВЕРИТЬ FLUTTER:
+   flutter doctor
+   flutter --version
+
+3. ОБНОВИТЬ DEPENDENCIES:
+   flutter clean
+   flutter pub get
+
+4. ДОБАВИТЬ CORS В SUPABASE:
+   Settings → API → Site URL добавить http://localhost:3000
+
+5. ПРАВИЛЬНЫЕ КЛЮЧИ:
+   Проверить config.json или .env
+
+ЛОКАЛЬНАЯ РАЗРАБОТКА ТРЕБУЕТ НАСТРОЙКИ FLUTTER SDK!

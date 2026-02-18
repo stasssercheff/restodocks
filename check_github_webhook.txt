@@ -1,0 +1,19 @@
+ПРОВЕРКА WEBHOOK GITHUB -> VERCEL
+
+1. Откройте в браузере: https://github.com/stasssercheff/restodocks/settings/hooks
+
+2. Найдите webhook с URL, содержащим "vercel.com"
+
+3. Проверьте:
+   - URL должен быть: https://api.vercel.com/v1/integrations/webhooks/github
+   - Content type: application/json
+   - Active: ✅ включен
+   - Events: отправка всего или минимум push
+
+4. Если webhook неактивен или URL неправильный - исправьте
+
+5. После исправления сделайте push в main ветку:
+   git commit --allow-empty -m "Test webhook"
+   git push origin main
+
+6. Проверьте в Vercel Dashboard - должен появиться новый деплой

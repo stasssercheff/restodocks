@@ -1092,6 +1092,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     final employee = context.watch<AccountManagerSupabase>().currentEmployee;
     final isCook = employee?.department == 'kitchen' && !canEdit; // Повар - кухня без прав редактирования
 
+    // Определяем, является ли устройство мобильным
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
     if (_isNew && !canEdit) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) context.pushReplacement('/tech-cards');
@@ -1163,6 +1166,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                   TextField(
                     controller: _nameController,
                     readOnly: !canEdit,
+                    style: TextStyle(fontSize: isMobile ? 16 : 14),
                     decoration: InputDecoration(
                       labelText: loc.t('ttk_name'),
                       isDense: true,
@@ -1223,6 +1227,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                           child: TextField(
                             controller: _nameController,
                             readOnly: !canEdit,
+                            style: TextStyle(fontSize: isMobile ? 16 : 14),
                             decoration: InputDecoration(
                               labelText: loc.t('ttk_name'),
                               isDense: true,
@@ -2197,6 +2202,40 @@ class _TtkCookTableState extends State<_TtkCookTable> {
             ),
           ],
         ),
+        // Технология приготовления (только если есть текст)
+        if (widget.technology.trim().isNotEmpty) ...[
+          TableRow(
+            children: [
+              TableCell(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.loc.t('ttk_technology'),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        widget.technology,
+                        style: const TextStyle(fontSize: 13, height: 1.4),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const TableCell(child: SizedBox()), // Пустые ячейки для выравнивания
+              const TableCell(child: SizedBox()),
+              const TableCell(child: SizedBox()),
+              const TableCell(child: SizedBox()),
+            ],
+          ),
+        ],
       ],
     );
   }

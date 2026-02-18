@@ -1,0 +1,26 @@
+ИСПРАВЛЕНИЕ WEBHOOK GITHUB -> VERCEL
+
+ШАГ 1: Проверьте webhook в GitHub
+https://github.com/stasssercheff/restodocks/settings/hooks
+
+Найдите webhook для Vercel и убедитесь:
+- Payload URL: https://api.vercel.com/v1/integrations/webhooks/github
+- Content type: application/json
+- Active: включен
+- Events: push (минимум)
+
+ШАГ 2: Если webhook отсутствует или неправильный
+- Удалите старый webhook
+- Создайте новый с параметрами выше
+
+ШАГ 3: Проверьте интеграцию в Vercel
+https://vercel.com/dashboard/integrations
+- GitHub integration должна быть активна
+- Проверьте статус подключения
+
+ШАГ 4: Тестирование
+git commit --allow-empty -m "Test webhook"
+git push origin main
+
+ШАГ 5: Мониторинг
+Проверьте в Vercel Dashboard появление нового деплоя

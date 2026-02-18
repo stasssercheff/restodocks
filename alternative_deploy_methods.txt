@@ -1,0 +1,20 @@
+АЛЬТЕРНАТИВНЫЕ МЕТОДЫ ДЕПЛОЯ КОГДА GITHUB ACTIONS НЕ РАБОТАЕТ
+
+1. VERCEL CLI (ЛОКАЛЬНО):
+   npm install -g vercel
+   cd /Users/masurfsker/Documents/Restodocs/Restodocks
+   vercel --prod
+
+2. РУЧНАЯ СБОРКА И ЗАГРУЗКА:
+   flutter build web --release
+   В Vercel Dashboard → Deploy → загрузить папку build/web
+
+3. ПРОВЕРКА WORKFLOW:
+   В GitHub → Actions → проверить статус последнего workflow
+   Возможно, нужно исправить синтаксис YAML
+
+4. ПРОСТОЙ DEPLOY HOOK БЕЗ GITHUB ACTIONS:
+   curl -X POST "https://api.vercel.com/v1/integrations/deploy/prj_4FMDqFFqx73cJSoap5uMyO6QSuG2/mmzEGXWRmk"
+
+5. ОБНОВЛЕНИЕ ДО PRO ПЛАНА:
+   $20/месяц - снимает все ограничения на Deploy Hooks

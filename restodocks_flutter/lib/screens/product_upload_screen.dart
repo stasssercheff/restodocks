@@ -44,6 +44,7 @@ class ProductUploadScreen extends StatefulWidget {
 class _ProductUploadScreenState extends State<ProductUploadScreen> {
   bool _isLoading = false;
   String _loadingMessage = '';
+  Timer? _loadingTimeoutTimer; // Таймер для предотвращения зависания загрузки
 
   void _setLoadingMessage(String message) {
     if (mounted) {
@@ -51,13 +52,145 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     }
   }
 
+  // Предотвращает зависание интерфейса в состоянии загрузки
+  void _startLoadingTimeout() {
+    _loadingTimeoutTimer?.cancel();
+    _loadingTimeoutTimer = Timer(const Duration(seconds: 30), () {
+      if (mounted && _isLoading) {
+        _addDebugLog('Loading timeout reached, resetting loading state');
+        setState(() => _isLoading = false);
+        _loadingMessage = '';
+      }
+    });
+  }
+
+  // Сбрасывает таймер таймаута
+  void _cancelLoadingTimeout() {
+    _loadingTimeoutTimer?.cancel();
+    _loadingTimeoutTimer = null;
+  }
+
+  @override
+  void dispose() {
+    _cancelLoadingTimeout(); // Отменяем таймер при уничтожении виджета
+    super.dispose();
+  }
+
+  Widget _buildErrorScreen(String message) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Загрузка продуктов'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 64, color: Colors.red),
+            const SizedBox(height: 16),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 16),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Вернуться назад'),
+            ),
+            const SizedBox(height: 16),
+            // Кнопка для тестирования API
+            OutlinedButton(
+              onPressed: () => _testApiCall(context),
+              child: const Text('Тестировать API'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _testApiCall(BuildContext context) async {
+    try {
+      _addDebugLog('Testing API call to establishment_products...');
+
+      final account = context.read<AccountManagerSupabase>();
+      final establishmentId = account.establishment?.id;
+
+      if (establishmentId == null) {
+        _addDebugLog('No establishment ID available');
+        return;
+      }
+
+      _addDebugLog('Establishment ID: $establishmentId');
+
+      // Тестируем прямой вызов API
+      final supabase = Supabase.instance.client;
+      final response = await supabase
+          .from('establishment_products')
+          .select('product_id, price, currency')
+          .eq('establishment_id', establishmentId)
+          .limit(3);
+
+      _addDebugLog('API Response: $response');
+      _addDebugLog('Response type: ${response.runtimeType}');
+      _addDebugLog('Response length: ${response.length}');
+
+      if (response.isNotEmpty) {
+        _addDebugLog('First item: ${response.first}');
+        _addDebugLog('First item keys: ${response.first.keys.toList()}');
+        _addDebugLog('First item types: ${response.first.values.map((v) => v.runtimeType).toList()}');
+      }
+
+    } catch (e, stackTrace) {
+      _addDebugLog('API Test failed: $e');
+      _addDebugLog('Stack trace: $stackTrace');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    print('=== ProductUploadScreen build called, _isLoading: $_isLoading ===');
-    final loc = context.watch<LocalizationService>();
-    print('LocalizationService available: ${loc != null}');
-    print('AccountManager available: ${context.read<AccountManagerSupabase>() != null}');
-    print('AiService available: ${context.read<AiService>() != null}');
+    _addDebugLog('ProductUploadScreen build called, _isLoading: $_isLoading');
+
+    try {
+      // Проверяем наличие провайдеров более безопасно
+      final loc = context.watch<LocalizationService>();
+      final account = context.watch<AccountManagerSupabase>();
+      final aiService = context.read<AiService>();
+
+      _addDebugLog('All providers available, isLoggedIn: ${account.isLoggedInSync}');
+
+      // Проверяем авторизацию
+      if (!account.isLoggedInSync) {
+        _addDebugLog('Not logged in');
+        return _buildErrorScreen('Необходимо войти в систему');
+      }
+
+      // Проверяем наличие заведения
+      final establishmentId = account.establishment?.id;
+      if (establishmentId == null) {
+        _addDebugLog('No establishment');
+        return _buildErrorScreen('Не найдено заведение');
+      }
+
+      _addDebugLog('ProductUploadScreen ready: establishmentId = $establishmentId');
+
+      return _buildMainScreen(loc, account, aiService, establishmentId);
+    } catch (e, stackTrace) {
+      _addDebugLog('Critical error in build: $e\n$stackTrace');
+      return _buildErrorScreen('Критическая ошибка: $e');
+    }
+  }
+
+  Widget _buildMainScreen(
+    LocalizationService loc,
+    AccountManagerSupabase account,
+    AiService aiService,
+    String establishmentId,
+  ) {
 
     return Scaffold(
       appBar: AppBar(
@@ -418,20 +551,27 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   }
 
   Future<void> _uploadFromFile() async {
-    print('=== _uploadFromFile called ===');
-    print('isLoading before: $_isLoading');
-    final loc = context.read<LocalizationService>();
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['txt', 'xlsx', 'xls', 'rtf', 'csv'],
-      withData: true,
-    );
-    print('File picker result: ${result != null ? "files selected" : "cancelled"}');
+    _addDebugLog('_uploadFromFile called');
 
-    if (result == null || result.files.isEmpty || result.files.single.bytes == null) {
-      print('File picker cancelled or no data');
-      return;
-    }
+    try {
+      setState(() => _isLoading = true);
+      _setLoadingMessage('Выбор файла...');
+      _startLoadingTimeout(); // Предотвращаем зависание
+
+      final loc = context.read<LocalizationService>();
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['txt', 'xlsx', 'xls', 'rtf', 'csv'],
+        withData: true,
+      );
+
+      _addDebugLog('File picker result: ${result != null ? "files selected" : "cancelled"}');
+
+      if (result == null || result.files.isEmpty || result.files.single.bytes == null) {
+        _addDebugLog('File picker cancelled or no data');
+        setState(() => _isLoading = false);
+        return;
+      }
 
     final fileName = result.files.single.name.toLowerCase();
     final bytes = result.files.single.bytes!;
@@ -462,17 +602,35 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
       await _processExcel(bytes, loc);
     }
+    } catch (e, stackTrace) {
+      _addDebugLog('Error in _uploadFromFile: $e\n$stackTrace');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка загрузки файла: $e')),
+        );
+      }
+    } finally {
+      _cancelLoadingTimeout(); // Сбрасываем таймер
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   Future<void> _showPasteDialog() async {
-    print('=== _showPasteDialog called ===');
-    print('Current _isLoading state: $_isLoading');
-    final loc = context.read<LocalizationService>();
-    final controller = TextEditingController();
-    bool addToNomenclature = true; // По умолчанию добавлять в номенклатуру
+    _addDebugLog('_showPasteDialog called');
 
-    print('Showing paste dialog...');
-    final result = await showDialog<({String text, bool addToNomenclature})>(
+    try {
+      setState(() => _isLoading = true);
+      _setLoadingMessage('Открытие диалога...');
+      _startLoadingTimeout(); // Предотвращаем зависание
+
+      final loc = context.read<LocalizationService>();
+      final controller = TextEditingController();
+      bool addToNomenclature = true; // По умолчанию добавлять в номенклатуру
+
+      _addDebugLog('Showing paste dialog...');
+      final result = await showDialog<({String text, bool addToNomenclature})>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) => AlertDialog(
@@ -525,6 +683,19 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
     if (result != null && result.text.trim().isNotEmpty) {
       await _processText(result.text, loc, result.addToNomenclature);
+    }
+    } catch (e, stackTrace) {
+      _addDebugLog('Error in _showPasteDialog: $e\n$stackTrace');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка вставки текста: $e')),
+        );
+      }
+    } finally {
+      _cancelLoadingTimeout(); // Сбрасываем таймер
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -1466,12 +1637,34 @@ ${text}
         }
       }
 
-      // Обновляем список продуктов
-      print('DEBUG: Reloading products and nomenclature...');
-      await store.loadProducts();
-      await store.loadNomenclature(estId);
-      print('DEBUG: Products loaded: ${store.allProducts.length}');
-      print('DEBUG: Nomenclature loaded: ${store.nomenclatureProductIds.length}');
+      // Обновляем список продуктов и номенклатуру
+      _addDebugLog('Reloading products and nomenclature...');
+
+      try {
+        await store.loadProducts();
+        _addDebugLog('Products loaded: ${store.allProducts.length}');
+      } catch (e) {
+        _addDebugLog('Error loading products: $e');
+        // Продолжаем, даже если продукты не загрузились
+      }
+
+      try {
+        await store.loadNomenclature(estId);
+        _addDebugLog('Nomenclature loaded: ${store.nomenclatureProductIds.length}');
+      } catch (e) {
+        _addDebugLog('Error loading nomenclature: $e');
+        // Показываем предупреждение, но не останавливаемся
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Предупреждение: не удалось загрузить номенклатуру ($e)'),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+
       if (mounted) setState(() {});
 
       // Показываем результат
@@ -1480,6 +1673,37 @@ ${text}
           : 'Добавлено: ${added + skipped}, Ошибок: $failed';
 
       print('DEBUG: Final result - Added: $added, Skipped: $skipped, Failed: $failed');
+
+      // Сохраняем заказ в историю
+      if (added > 0 || skipped > 0) {
+        try {
+          final orderService = context.read<OrderHistoryService>();
+          final employeeId = account.currentEmployee?.id;
+
+          if (employeeId != null) {
+            await orderService.saveOrderToHistory(
+              establishmentId: estId,
+              employeeId: employeeId,
+              orderData: {
+                'items': items.map((item) => {
+                  'name': item.name,
+                  'price': item.price,
+                }).toList(),
+                'results': {
+                  'added': added,
+                  'skipped': skipped,
+                  'failed': failed,
+                },
+                'addToNomenclature': addToNomenclature,
+              },
+            );
+            print('DEBUG: Order saved to history');
+          }
+        } catch (e) {
+          print('DEBUG: Failed to save order to history: $e');
+          // Не показываем ошибку пользователю - история не критична
+        }
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1855,6 +2079,7 @@ class _TipsSection extends StatelessWidget {
       ),
     );
   }
+}
 
   Widget _buildTip(String text) {
     return Padding(
