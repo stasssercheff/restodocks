@@ -373,6 +373,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
               onLoadKbju: (ctx, list) => _loadKbjuForAll(ctx, list),
               onLoadTranslations: (ctx, list) => _loadTranslationsForAll(ctx, list),
               onVerifyWithAi: (ctx, list) => _verifyWithAi(ctx, list),
+              onNeedsKbju: _needsKbju,
+              onNeedsTranslation: _needsTranslation,
+              onCanShowNutrition: _canShowNutrition,
+              onBuildProductSubtitle: _buildProductSubtitle,
+              onBuildTechCardSubtitle: _buildTechCardSubtitle,
             ),
           ),
         ],
@@ -962,6 +967,11 @@ class _NomenclatureTab extends StatefulWidget {
     required this.onLoadKbju,
     required this.onLoadTranslations,
     required this.onVerifyWithAi,
+    required this.onNeedsKbju,
+    required this.onNeedsTranslation,
+    required this.onCanShowNutrition,
+    required this.onBuildProductSubtitle,
+    required this.onBuildTechCardSubtitle,
   });
 
   final List<NomenclatureItem> items;
@@ -980,6 +990,11 @@ class _NomenclatureTab extends StatefulWidget {
   final void Function(BuildContext, List<Product>) onLoadKbju;
   final void Function(BuildContext, List<Product>) onLoadTranslations;
   final void Function(BuildContext, List<Product>) onVerifyWithAi;
+  final bool Function(NomenclatureItem) onNeedsKbju;
+  final bool Function(NomenclatureItem) onNeedsTranslation;
+  final bool Function(BuildContext) onCanShowNutrition;
+  final String Function(BuildContext, Product, ProductStoreSupabase, String, LocalizationService) onBuildProductSubtitle;
+  final String Function(TechCard) onBuildTechCardSubtitle;
 
   static String _categoryLabel(String c) {
     const map = {
@@ -991,7 +1006,7 @@ class _NomenclatureTab extends StatefulWidget {
     return map[c] ?? c;
   }
 
-  static String _buildProductSubtitle(BuildContext context, Product p, ProductStoreSupabase store, String estId, LocalizationService loc) {
+  String _buildProductSubtitle(BuildContext context, Product p, ProductStoreSupabase store, String estId, LocalizationService loc) {
     final establishmentPrice = store.getEstablishmentPrice(p.id, estId);
     final price = establishmentPrice?.$1 ?? p.basePrice;
     final currency = establishmentPrice?.$2 ?? 'RUB';
@@ -1015,7 +1030,7 @@ class _NomenclatureTab extends StatefulWidget {
         : '${_categoryLabel(p.category)} · ${p.calories?.round() ?? 0} ккал · $priceText';
   }
 
-  static String _buildTechCardSubtitle(TechCard tc) {
+  String _buildTechCardSubtitle(TechCard tc) {
     // Рассчитываем стоимость за кг для ТТК
     if (tc.ingredients.isEmpty) {
       return 'ПФ · Цена не рассчитана · Выход: ${tc.yield.toStringAsFixed(0)}г';
@@ -1028,7 +1043,7 @@ class _NomenclatureTab extends StatefulWidget {
     return 'ПФ · ${costPerKg.toStringAsFixed(0)} ₽/кг · Выход: ${tc.yield.toStringAsFixed(0)}г';
   }
 
-  static bool _needsKbju(NomenclatureItem item) {
+  bool _needsKbju(NomenclatureItem item) {
     if (item.isTechCard) return false; // ТТК не нуждаются в КБЖУ
     final p = item.product!;
     return (p.calories == null || p.calories == 0) && p.protein == null && p.fat == null && p.carbs == null;
@@ -1040,7 +1055,7 @@ class _NomenclatureTab extends StatefulWidget {
     return employee?.hasProSubscription ?? false;
   }
 
-  static bool _needsTranslation(NomenclatureItem item) {
+  bool _needsTranslation(NomenclatureItem item) {
     if (item.isTechCard) return false; // ТТК не нуждаются в переводе имен
     final p = item.product!;
     final allLangs = LocalizationService.productLanguageCodes;
@@ -1169,8 +1184,8 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
       );
     }
 
-    final needsKbju = widget.items.where((item) => item.isProduct && item.product!.category == 'manual' && _needsKbju(item)).toList();
-    final needsTranslation = widget.items.where(_needsTranslation).toList();
+    final needsKbju = widget.items.where((item) => item.isProduct && item.product!.category == 'manual' && widget.onNeedsKbju(item)).toList();
+    final needsTranslation = widget.items.where(widget.onNeedsTranslation).toList();
     return Column(
       children: [
         Padding(
@@ -1216,7 +1231,7 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                if (needsKbju.isNotEmpty && _canShowNutrition(context))
+                if (needsKbju.isNotEmpty && widget.onCanShowNutrition(context))
                   FilledButton.tonalIcon(
                     onPressed: () => widget.onLoadKbju(context, needsKbju.where((item) => item.isProduct).map((item) => item.product!).toList()),
                     icon: const Icon(Icons.cloud_download, size: 20),
@@ -1261,8 +1276,8 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
                   title: Text(item.getLocalizedName(widget.loc.currentLanguageCode)),
                   subtitle: Text(
                     item.isProduct
-                        ? _buildProductSubtitle(context, item.product!, widget.store, widget.estId, widget.loc)
-                        : _buildTechCardSubtitle(item.techCard!),
+                        ? widget.onBuildProductSubtitle(context, item.product!, widget.store, widget.estId, widget.loc)
+                        : widget.onBuildTechCardSubtitle(item.techCard!),
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   trailing: Row(
@@ -1292,7 +1307,7 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
     );
   }
 
-  static void _showEditProduct(BuildContext context, Product p, ProductStoreSupabase store, LocalizationService loc, VoidCallback onRefresh) {
+  void _showEditProduct(BuildContext context, Product p, ProductStoreSupabase store, LocalizationService loc, VoidCallback onRefresh) {
     showDialog<void>(
       context: context,
       builder: (ctx) => _ProductEditDialog(
@@ -1304,7 +1319,7 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
     );
   }
 
-  static Future<void> _confirmRemove(BuildContext context, Product p, ProductStoreSupabase store, LocalizationService loc, VoidCallback onRefresh, String estId) async {
+  Future<void> _confirmRemove(BuildContext context, Product p, ProductStoreSupabase store, LocalizationService loc, VoidCallback onRefresh, String estId) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
