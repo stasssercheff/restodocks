@@ -9,6 +9,10 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
+import '../models/culinary_units.dart';
+import '../models/models.dart';
+import '../services/services.dart';
+
 // Глобальная переменная для хранения debug логов
 List<String> _debugLogs = [];
 
@@ -20,10 +24,6 @@ void _addDebugLog(String message) {
     _debugLogs.removeAt(0);
   }
 }
-
-import '../models/culinary_units.dart';
-import '../models/models.dart';
-import '../services/services.dart';
 
 /// Экран для загрузки продуктов в номенклатуру
 class ProductUploadScreen extends StatefulWidget {
