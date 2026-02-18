@@ -230,6 +230,19 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ТЕСТ: Виден ли экран вообще?
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              color: Colors.red,
+              child: const Text(
+                'ЭКРАН ВИДЕН! ЕСЛИ ВЫ ЭТО ВИДИТЕ - ЭКРАН РАБОТАЕТ',
+                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            const SizedBox(height: 20),
+
             // Индикатор загрузки
             if (_isLoading) ...[
               Container(
