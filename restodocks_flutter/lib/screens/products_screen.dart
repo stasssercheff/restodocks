@@ -37,8 +37,17 @@ class _ProductsScreenState extends State<ProductsScreen> {
       final store = context.read<ProductStoreSupabase>();
       await store.loadProducts();
       if (mounted) {
+        // Проверяем на дубликаты перед установкой
+        final uniqueProducts = <String, Product>{};
+        for (final product in store.allProducts) {
+          uniqueProducts[product.id] = product;
+        }
+        final deduplicatedProducts = uniqueProducts.values.toList();
+
+        print('DEBUG: Loaded ${store.allProducts.length} products, deduplicated to ${deduplicatedProducts.length}');
+
         setState(() {
-          _products = store.allProducts;
+          _products = deduplicatedProducts;
           _isLoading = false;
         });
       }
