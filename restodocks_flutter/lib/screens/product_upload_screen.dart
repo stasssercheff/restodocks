@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
 import 'package:excel/excel.dart' hide Border;
 import 'package:file_picker/file_picker.dart';
@@ -63,11 +64,31 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         title: Text(loc.t('upload_products')),
         backgroundColor: Theme.of(context).colorScheme.primaryContainer,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.bug_report),
-            tooltip: 'Показать логи отладки',
-            onPressed: () => _showDebugLogs(context),
-          ),
+          if (kDebugMode) ...[
+            IconButton(
+              icon: const Icon(Icons.bug_report),
+              tooltip: 'Показать логи отладки',
+              onPressed: () => _showDebugLogs(context),
+            ),
+          ],
+          // Кнопка с количеством логов
+          if (kDebugMode && _debugLogs.isNotEmpty) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.orange,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '${_debugLogs.length}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
       body: SingleChildScrollView(
@@ -127,64 +148,6 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Отладочные логи (только в debug режиме)
-            if (kDebugMode) ...[
-              Container(
-                padding: const EdgeInsets.all(12),
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey[300]!),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Отладочные логи:',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      height: 120,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: Colors.black,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: SingleChildScrollView(
-                        child: Padding(
-                          padding: const EdgeInsets.all(8),
-                          child: Text(
-                            _debugLogs.join('\n'),
-                            style: const TextStyle(
-                              color: Colors.green,
-                              fontSize: 10,
-                              fontFamily: 'monospace',
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        TextButton(
-                          onPressed: () => setState(() => _debugLogs.clear()),
-                          child: const Text('Очистить'),
-                        ),
-                        TextButton(
-                          onPressed: () => _showDebugLogs(context),
-                          child: const Text('Показать все'),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
 
             // Карточка загрузки из файла
             _UploadMethodCard(
@@ -357,6 +320,12 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
   Future<void> _uploadExcelSimple() async {
     print('=== _uploadExcelSimple called ===');
+
+    // Показываем диалог с логами в debug режиме
+    if (kDebugMode) {
+      _showDebugLogs(context);
+    }
+
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['xlsx', 'xls'],
@@ -378,6 +347,12 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   Future<void> _uploadFromFile() async {
     print('=== _uploadFromFile called ===');
     print('isLoading before: $_isLoading');
+
+    // Показываем диалог с логами в debug режиме
+    if (kDebugMode) {
+      _showDebugLogs(context);
+    }
+
     final loc = context.read<LocalizationService>();
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
@@ -425,6 +400,12 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   Future<void> _showPasteDialog() async {
     print('=== _showPasteDialog called ===');
     print('Current _isLoading state: $_isLoading');
+
+    // Показываем диалог с логами в debug режиме
+    if (kDebugMode) {
+      _showDebugLogs(context);
+    }
+
     final loc = context.read<LocalizationService>();
     final controller = TextEditingController();
     bool addToNomenclature = true; // По умолчанию добавлять в номенклатуру
@@ -488,6 +469,12 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
   Future<void> _showSmartPasteDialog() async {
     print('=== _showSmartPasteDialog called ===');
+
+    // Показываем диалог с логами в debug режиме
+    if (kDebugMode) {
+      _showDebugLogs(context);
+    }
+
     final controller = TextEditingController();
     final loc = context.read<LocalizationService>();
     bool addToNomenclature = true; // По умолчанию добавлять в номенклатуру
@@ -580,6 +567,12 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
   Future<void> _showIntelligentImportDialog() async {
     print('=== _showIntelligentImportDialog called ===');
+
+    // Показываем диалог с логами в debug режиме
+    if (kDebugMode) {
+      _showDebugLogs(context);
+    }
+
     final loc = context.read<LocalizationService>();
     final account = context.read<AccountManagerSupabase>();
     final establishmentId = account.establishment?.id;
@@ -1547,20 +1540,26 @@ ${text}
           height: 400,
           child: _debugLogs.isEmpty
               ? const Center(child: Text('Логов пока нет'))
-              : ListView.builder(
-                  itemCount: _debugLogs.length,
-                  itemBuilder: (context, index) {
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 2),
-                      child: Text(
-                        _debugLogs[_debugLogs.length - 1 - index], // Показываем последние логи сверху
-                        style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
-                      ),
-                    );
-                  },
+              : SingleChildScrollView(
+                  child: SelectableText(
+                    _debugLogs.join('\n'),
+                    style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                  ),
                 ),
         ),
         actions: [
+          TextButton(
+            onPressed: () async {
+              final logs = _debugLogs.join('\n');
+              await Clipboard.setData(ClipboardData(text: logs));
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Логи скопированы в буфер обмена')),
+                );
+              }
+            },
+            child: const Text('Копировать'),
+          ),
           TextButton(
             onPressed: () => setState(() => _debugLogs.clear()),
             child: const Text('Очистить'),
