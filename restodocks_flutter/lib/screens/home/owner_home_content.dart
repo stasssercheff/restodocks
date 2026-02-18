@@ -32,16 +32,10 @@ class OwnerHomeContent extends StatelessWidget {
               color: Colors.green,
             ),
             _TileData(
-              icon: Icons.inventory_2,
-              title: loc.t('nomenclature'),
-              onTap: () => context.push('/products'),
-              color: Colors.orange,
-            ),
-            _TileData(
               icon: Icons.library_books,
-              title: loc.t('product_catalog'),
-              subtitle: loc.t('all_products'),
-              onTap: () => context.push('/products/catalog'),
+              title: loc.t('products'),
+              subtitle: loc.t('product_database'),
+              onTap: () => context.push('/products'),
               color: Colors.teal,
             ),
             _TileData(

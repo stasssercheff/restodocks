@@ -459,6 +459,7 @@
     "upload_add_to_nomenclature_hint": "Продукты будут добавлены в справочник и в номенклатуру заведения.",
     "upload_products": "Загрузить продукты",
     "upload_products_desc": "Добавить из файла или текста",
+    "product_database": "База данных продуктов",
     "cooking_process": "Техн. процесс",
     "no_process": "Без обработки",
     "quantity_label": "Количество",
@@ -986,6 +987,8 @@
     "upload_add_to_nomenclature_hint": "Products will be added to the catalog and to the establishment nomenclature.",
     "upload_products": "Upload products",
     "upload_products_desc": "Add from file or text",
+    "product_database": "Product database",
+    "products": "Products",
     "cooking_process": "Tech. process",
     "no_process": "No process",
     "quantity_label": "Quantity",
@@ -1186,7 +1189,10 @@
     "add_ingredient": "Zutat hinzufügen",
     "back": "Zurück",
     "tt_type_pf": "HF",
-    "tt_type_dish": "Gericht"
+    "tt_type_dish": "Gericht",
+    "upload_products": "Produkte hochladen",
+    "upload_products_desc": "Aus Datei oder Text hinzufügen",
+    "product_database": "Produktdatenbank"
   },
   "fr": {
     "app_name": "Restodocks",
@@ -1235,6 +1241,9 @@
     "add_ingredient": "Ajouter ingrédient",
     "back": "Retour",
     "tt_type_pf": "SF",
-    "tt_type_dish": "Plat"
+    "tt_type_dish": "Plat",
+    "upload_products": "Télécharger produits",
+    "upload_products_desc": "Ajouter depuis fichier ou texte",
+    "product_database": "Base de données produits"
   }
 }

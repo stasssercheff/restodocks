@@ -12,7 +12,7 @@ import 'nutrition_api_service.dart';
 class AiServiceSupabase implements AiService {
   SupabaseClient get _client => Supabase.instance.client;
 
-  Future<Map<String, dynamic>?> _invoke(String name, Map<String, dynamic> body) async {
+  Future<Map<String, dynamic>?> invoke(String name, Map<String, dynamic> body) async {
     try {
       final res = await _client.functions.invoke(name, body: body);
       if (res.status != 200) {

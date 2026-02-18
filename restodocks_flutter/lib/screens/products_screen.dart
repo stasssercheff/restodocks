@@ -938,8 +938,9 @@ class _AddProductDialogState extends State<_AddProductDialog> {
   }
 }
 
-class _NomenclatureTab extends StatelessWidget {
+class _NomenclatureTab extends StatefulWidget {
   const _NomenclatureTab({
+    super.key,
     required this.items,
     required this.store,
     required this.estId,
@@ -1140,16 +1141,21 @@ class _NomenclatureTab extends StatelessWidget {
   }
 
   @override
+  State<_NomenclatureTab> createState() => _NomenclatureTabState();
+}
+
+class _NomenclatureTabState extends State<_NomenclatureTab> {
+  @override
   Widget build(BuildContext context) {
-    if (items.isEmpty) {
+    if (widget.items.isEmpty) {
       return _NomenclatureEmpty(
-        loc: loc,
-        onSwitchToCatalog: onSwitchToCatalog,
+        loc: widget.loc,
+        onSwitchToCatalog: widget.onSwitchToCatalog,
       );
     }
 
-    final needsKbju = items.where((item) => item.isProduct && item.product!.category == 'manual' && _needsKbju(item)).toList();
-    final needsTranslation = items.where(_needsTranslation).toList();
+    final needsKbju = widget.items.where((item) => item.isProduct && item.product!.category == 'manual' && _needsKbju(item)).toList();
+    final needsTranslation = widget.items.where(_needsTranslation).toList();
     return Column(
       children: [
         Padding(
@@ -1161,34 +1167,34 @@ class _NomenclatureTab extends StatelessWidget {
             children: [
               PopupMenuButton<_CatalogSort>(
                 icon: const Icon(Icons.sort),
-                tooltip: loc.t('sort_name_az').split(' ').take(2).join(' '),
-                onSelected: onSortChanged,
+                tooltip: widget.loc.t('sort_name_az').split(' ').take(2).join(' '),
+                onSelected: widget.onSortChanged,
                 itemBuilder: (_) => [
-                  PopupMenuItem(value: _CatalogSort.nameAz, child: Text(loc.t('sort_name_az'))),
-                  PopupMenuItem(value: _CatalogSort.nameZa, child: Text(loc.t('sort_name_za'))),
-                  PopupMenuItem(value: _CatalogSort.priceAsc, child: Text(loc.t('sort_price_asc'))),
-                  PopupMenuItem(value: _CatalogSort.priceDesc, child: Text(loc.t('sort_price_desc'))),
+                  PopupMenuItem(value: _CatalogSort.nameAz, child: Text(widget.loc.t('sort_name_az'))),
+                  PopupMenuItem(value: _CatalogSort.nameZa, child: Text(widget.loc.t('sort_name_za'))),
+                  PopupMenuItem(value: _CatalogSort.priceAsc, child: Text(widget.loc.t('sort_price_asc'))),
+                  PopupMenuItem(value: _CatalogSort.priceDesc, child: Text(widget.loc.t('sort_price_desc'))),
                 ],
               ),
               FilterChip(
                 label: Text('Продукты', style: const TextStyle(fontSize: 11)),
-                selected: filterType == _NomenclatureFilter.products,
-                onSelected: (_) => onFilterTypeChanged(_NomenclatureFilter.products),
+                selected: widget.filterType == _NomenclatureFilter.products,
+                onSelected: (_) => widget.onFilterTypeChanged(_NomenclatureFilter.products),
               ),
               FilterChip(
                 label: Text('ПФ', style: const TextStyle(fontSize: 11)),
-                selected: filterType == _NomenclatureFilter.semiFinished,
-                onSelected: (_) => onFilterTypeChanged(_NomenclatureFilter.semiFinished),
+                selected: widget.filterType == _NomenclatureFilter.semiFinished,
+                onSelected: (_) => widget.onFilterTypeChanged(_NomenclatureFilter.semiFinished),
               ),
               FilterChip(
                 label: Text('Все', style: const TextStyle(fontSize: 11)),
-                selected: filterType == _NomenclatureFilter.all,
-                onSelected: (_) => onFilterTypeChanged(_NomenclatureFilter.all),
+                selected: widget.filterType == _NomenclatureFilter.all,
+                onSelected: (_) => widget.onFilterTypeChanged(_NomenclatureFilter.all),
               ),
             ],
           ),
         ),
-        if (needsKbju.isNotEmpty || needsTranslation.isNotEmpty || items.isNotEmpty)
+        if (needsKbju.isNotEmpty || needsTranslation.isNotEmpty || widget.items.isNotEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: Wrap(
@@ -1199,13 +1205,13 @@ class _NomenclatureTab extends StatelessWidget {
                   FilledButton.tonalIcon(
                     onPressed: () => _loadKbjuForAll(context, needsKbju.where((item) => item.isProduct).map((item) => item.product!).toList()),
                     icon: const Icon(Icons.cloud_download, size: 20),
-                    label: Text(loc.t('load_kbju_for_all').replaceAll('%s', '${needsKbju.length}')),
+                    label: Text(widget.loc.t('load_kbju_for_all').replaceAll('%s', '${needsKbju.length}')),
                   ),
                 if (needsTranslation.isNotEmpty)
                   FilledButton.tonalIcon(
                     onPressed: () => _loadTranslationsForAll(context, needsTranslation.where((item) => item.isProduct).map((item) => item.product!).toList()),
                     icon: const Icon(Icons.translate, size: 20),
-                    label: Text(loc.t('translate_names_for_all').replaceAll('%s', '${needsTranslation.length}')),
+                    label: Text(widget.loc.t('translate_names_for_all').replaceAll('%s', '${needsTranslation.length}')),
                   ),
                 Tooltip(
                   message: loc.t('verify_with_ai_tooltip'),

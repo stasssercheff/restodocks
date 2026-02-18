@@ -1495,7 +1495,7 @@ class _TtkTableState extends State<_TtkTable> {
     }
 
     // Отрисовка по шаблону: шапка → N строк данных (у каждой полный набор ячеек) → строка «Итого». Колонка «Название» — одна объединённая ячейка поверх (Stack).
-    return SizedBox(
+    final table = SizedBox(
       width: tableWidth,
       child: Stack(
         clipBehavior: Clip.none,

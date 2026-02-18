@@ -206,7 +206,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
 4. С валютами
 Авокадо ₫99,000
-Базилик $267,000
+Базилик \$267,000
 Молоко €38,000
 
 5. Смешанный формат
@@ -292,7 +292,7 @@ ${text}
 ''';
 
 
-      final response = await aiService._invoke('ai-generate-checklist', {
+      final response = await aiService.invoke('ai-generate-checklist', {
         'prompt': prompt
       });
 
@@ -495,7 +495,7 @@ ${text}
           // Fallback к Nutrition API только если AI не дал данные
           try {
             final nutritionService = context.read<NutritionApiService>();
-            final nutritionResult = await nutritionService.searchNutrition(normalizedName);
+            final nutritionResult = await nutritionService.fetchNutrition(normalizedName);
 
             if (nutritionResult != null && nutritionResult.hasData) {
               calories = calories ?? nutritionResult.calories;
