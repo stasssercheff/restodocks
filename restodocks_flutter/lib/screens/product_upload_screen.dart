@@ -743,7 +743,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
     try {
       // Используем AI для извлечения продуктов из текста
-      final aiService = context.read<AiServiceSupabase>();
+      final aiService = context.read<AiService>();
 
       // Создаем запрос к AI для извлечения списка продуктов
       final prompt = '''
@@ -764,25 +764,16 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 ${text}
 ''';
 
-
       _addDebugLog('Sending AI request...');
-      final response = await aiService.invoke('ai-generate-checklist', {
-        'prompt': prompt
-      }).timeout(
-        const Duration(seconds: 30),
-        onTimeout: () {
-          _addDebugLog('AI request timed out after 30 seconds');
-          throw Exception('AI request timed out');
-        },
-      );
+      final checklistResult = await aiService.generateChecklistFromPrompt(prompt);
       _addDebugLog('AI response received');
 
-      if (response == null || !response.containsKey('itemTitles')) {
+      if (checklistResult == null || checklistResult.itemTitles.isEmpty) {
         throw Exception('AI не вернул результат');
       }
 
-      // Парсим результат
-      final rawItems = response['itemTitles'] as List? ?? [];
+      // Парсим результат - itemTitles содержит строки в формате "Название|Цена|Валюта"
+      final rawItems = checklistResult.itemTitles;
 
       final items = <({String name, double? price})>[];
       for (final rawItem in rawItems) {
@@ -944,16 +935,29 @@ ${text}
       _addDebugLog('Detected file type: $fileType');
 
       late Excel excel;
+      bool excelDecoded = false;
       try {
         excel = Excel.decodeBytes(bytes);
         _addDebugLog('Excel file decoded successfully');
+        excelDecoded = true;
       } catch (excelError) {
         _addDebugLog('Excel decode error: $excelError');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка чтения Excel файла: $excelError\nВозможно файл поврежден или имеет неподдерживаемый формат.\nТип файла: $fileType')),
-        );
-        return;
+        // Пробуем обработать как текст (CSV-подобный формат)
+        _addDebugLog('Trying to process as text/CSV...');
+        try {
+          final textContent = String.fromCharCodes(bytes);
+          await _processText(textContent, loc, true);
+          return;
+        } catch (textError) {
+          _addDebugLog('Text processing also failed: $textError');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Ошибка чтения Excel файла: $excelError\nПопытка обработки как текст тоже неудачна.\nВозможно файл поврежден или имеет неподдерживаемый формат.\nТип файла: $fileType')),
+          );
+          return;
+        }
       }
+
+      if (!excelDecoded) return;
 
       if (excel.tables.isEmpty) {
         _addDebugLog('ERROR: No tables found in Excel file');
@@ -981,23 +985,39 @@ ${text}
       int processedRows = 0;
       int errorRows = 0;
 
-      for (var i = 0; i < sheet.rows.length; i++) {
-        try {
-          final row = sheet.rows[i];
-          if (row == null || row.isEmpty) continue;
+      try {
+        for (var i = 0; i < sheet.rows.length; i++) {
+          try {
+            final row = sheet.rows[i];
+            if (row == null || row.isEmpty) continue;
 
-          final name = row.length > 0 ? row[0]?.value?.toString() ?? '' : '';
-          final price = row.length > 1 ? row[1]?.value?.toString() ?? '' : '';
-          final unit = row.length > 2 ? row[2]?.value?.toString() ?? '' : 'г';
+            final name = row.length > 0 ? row[0]?.value?.toString() ?? '' : '';
+            final price = row.length > 1 ? row[1]?.value?.toString() ?? '' : '';
+            final unit = row.length > 2 ? row[2]?.value?.toString() ?? '' : 'г';
 
-          if (name.trim().isNotEmpty) {
-            lines.add('$name\t$price\t$unit');
-            processedRows++;
+            if (name.trim().isNotEmpty) {
+              lines.add('$name\t$price\t$unit');
+              processedRows++;
+            }
+          } catch (rowError) {
+            _addDebugLog('Error processing row $i: $rowError');
+            errorRows++;
+            // Продолжаем обработку других строк
           }
-        } catch (rowError) {
-          _addDebugLog('Error processing row $i: $rowError');
-          errorRows++;
-          // Продолжаем обработку других строк
+        }
+      } catch (sheetError) {
+        _addDebugLog('Error accessing sheet rows: $sheetError');
+        // Пробуем обработать как текст
+        try {
+          final textContent = String.fromCharCodes(bytes);
+          await _processText(textContent, loc, true);
+          return;
+        } catch (textError) {
+          _addDebugLog('Text processing fallback also failed: $textError');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Ошибка доступа к данным Excel: $sheetError\nFallback на текст тоже неудачен.')),
+          );
+          return;
         }
       }
 
