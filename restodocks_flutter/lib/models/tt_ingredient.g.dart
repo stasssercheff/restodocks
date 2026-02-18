@@ -30,6 +30,8 @@ TTIngredient _$TTIngredientFromJson(Map<String, dynamic> json) => TTIngredient(
       finalFat: (json['final_fat'] as num).toDouble(),
       finalCarbs: (json['final_carbs'] as num).toDouble(),
       cost: (json['cost'] as num).toDouble(),
+      pricePerKg: (json['price_per_kg'] as num?)?.toDouble(),
+      costCurrency: json['cost_currency'] as String?,
     );
 
 Map<String, dynamic> _$TTIngredientToJson(TTIngredient instance) =>
@@ -55,4 +57,6 @@ Map<String, dynamic> _$TTIngredientToJson(TTIngredient instance) =>
       'final_fat': instance.finalFat,
       'final_carbs': instance.finalCarbs,
       'cost': instance.cost,
+      'price_per_kg': instance.pricePerKg,
+      'cost_currency': instance.costCurrency,
     };

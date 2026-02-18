@@ -1,21 +1,11 @@
-import 'package:equatable/equatable.dart';
-import 'package:json_annotation/json_annotation.dart';
-
-part 'menu_item.g.dart';
 
 /// Пункт меню ресторана
-@JsonSerializable()
-class MenuItem extends Equatable {
+class MenuItem {
   final String id;
   final String name;
-  final Map<String, String>? nameLocalized;
   final String category;
-  final String? description;
-  final Map<String, String>? descriptionLocalized;
   final double price;
   final String currency;
-  final String? imageUrl;
-  final bool isAvailable;
   final String establishmentId;
 
   // Данные из ТТК
@@ -29,14 +19,9 @@ class MenuItem extends Equatable {
   const MenuItem({
     required this.id,
     required this.name,
-    this.nameLocalized,
     required this.category,
-    this.description,
-    this.descriptionLocalized,
     required this.price,
     required this.currency,
-    this.imageUrl,
-    this.isAvailable = true,
     required this.establishmentId,
     this.techCardId,
     this.calories,
@@ -46,14 +31,40 @@ class MenuItem extends Equatable {
     this.portionWeight = 100,
   });
 
-  factory MenuItem.fromJson(Map<String, dynamic> json) => _$MenuItemFromJson(json);
-  Map<String, dynamic> toJson() => _$MenuItemToJson(this);
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'category': category,
+    'price': price,
+    'currency': currency,
+    'establishmentId': establishmentId,
+    'techCardId': techCardId,
+    'calories': calories,
+    'protein': protein,
+    'fat': fat,
+    'carbs': carbs,
+    'portionWeight': portionWeight,
+  };
+
+  factory MenuItem.fromJson(Map<String, dynamic> json) => MenuItem(
+    id: json['id'] as String,
+    name: json['name'] as String,
+    category: json['category'] as String,
+    price: (json['price'] as num).toDouble(),
+    currency: json['currency'] as String,
+    establishmentId: json['establishmentId'] as String,
+    techCardId: json['techCardId'] as String?,
+    calories: json['calories'] != null ? (json['calories'] as num).toDouble() : null,
+    protein: json['protein'] != null ? (json['protein'] as num).toDouble() : null,
+    fat: json['fat'] != null ? (json['fat'] as num).toDouble() : null,
+    carbs: json['carbs'] != null ? (json['carbs'] as num).toDouble() : null,
+    portionWeight: json['portionWeight'] != null ? (json['portionWeight'] as num).toDouble() : 100,
+  );
 
   /// Создание пункта меню из ТТК
   factory MenuItem.fromTechCard({
     required String techCardId,
     required String dishName,
-    required Map<String, String>? dishNameLocalized,
     required String category,
     required double price,
     required String currency,
@@ -67,7 +78,6 @@ class MenuItem extends Equatable {
     return MenuItem(
       id: 'menu_${techCardId}_${DateTime.now().millisecondsSinceEpoch}',
       name: dishName,
-      nameLocalized: dishNameLocalized,
       category: category,
       price: price,
       currency: currency,
@@ -82,14 +92,7 @@ class MenuItem extends Equatable {
   }
 
   /// Получение локализованного имени
-  String getLocalizedName(String lang) {
-    return nameLocalized?[lang] ?? name;
-  }
-
-  /// Получение локализованного описания
-  String? getLocalizedDescription(String lang) {
-    return descriptionLocalized?[lang] ?? description;
-  }
+  String getLocalizedName(String lang) => name;
 
   /// Калории на порцию
   double get caloriesPerPortion => calories != null ? (calories! * portionWeight / 100) : 0;
@@ -102,25 +105,4 @@ class MenuItem extends Equatable {
 
   /// Углеводы на порцию
   double get carbsPerPortion => carbs != null ? (carbs! * portionWeight / 100) : 0;
-
-  @override
-  List<Object?> get props => [
-    id,
-    name,
-    nameLocalized,
-    category,
-    description,
-    descriptionLocalized,
-    price,
-    currency,
-    imageUrl,
-    isAvailable,
-    establishmentId,
-    techCardId,
-    calories,
-    protein,
-    fat,
-    carbs,
-    portionWeight,
-  ];
 }
