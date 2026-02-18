@@ -336,6 +336,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
   }
 
   String _buildProductSubtitle(BuildContext context, Product p, ProductStoreSupabase store, String estId, LocalizationService loc) {
+    final loc = context.read<LocalizationService>();
     final establishmentPrice = store.getEstablishmentPrice(p.id, estId);
     final price = establishmentPrice?.$1 ?? p.basePrice;
     final currency = establishmentPrice?.$2 ?? 'RUB';
@@ -401,6 +402,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
   Future<void> _loadKbjuForAll(BuildContext context, List<Product> list) async {
     if (!context.mounted) return;
+    final store = context.read<ProductStoreSupabase>();
+    final loc = context.read<LocalizationService>();
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -427,6 +430,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
   Future<void> _loadTranslationsForAll(BuildContext context, List<Product> list) async {
     if (!context.mounted) return;
+    final store = context.read<ProductStoreSupabase>();
+    final loc = context.read<LocalizationService>();
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -454,6 +459,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
   Future<void> _verifyWithAi(BuildContext context, List<Product> list) async {
     if (!context.mounted || list.isEmpty) return;
     final ai = context.read<AiService>();
+    final store = context.read<ProductStoreSupabase>();
+    final loc = context.read<LocalizationService>();
     List<_VerifyProductItem> results = [];
     await showDialog<void>(
       context: context,
