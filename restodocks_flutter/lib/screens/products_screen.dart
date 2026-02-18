@@ -368,8 +368,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
               onFilterTypeChanged: (f) => setState(() => _nomFilter = f),
               onRefresh: () => _ensureLoaded().then((_) => setState(() {})),
               onSwitchToCatalog: () {}, // Не используется
-              onEditProduct: (ctx, p) => _ProductsScreenState._showEditProduct(ctx, p, store, loc, () => _ensureLoaded().then((_) => setState(() {}))),
-              onRemoveProduct: (ctx, p) => _ProductsScreenState._confirmRemove(ctx, p, store, loc, () => _ensureLoaded().then((_) => setState(() {})), estId ?? ''),
+              onEditProduct: (ctx, p) => _showEditProduct(ctx, p, store, loc, () => _ensureLoaded().then((_) => setState(() {}))),
+              onRemoveProduct: (ctx, p) => _confirmRemove(ctx, p, store, loc, () => _ensureLoaded().then((_) => setState(() {})), estId ?? ''),
+              onLoadKbju: (ctx, list) => _loadKbjuForAll(ctx, list),
+              onLoadTranslations: (ctx, list) => _loadTranslationsForAll(ctx, list),
+              onVerifyWithAi: (ctx, list) => _verifyWithAi(ctx, list),
             ),
           ),
         ],
@@ -956,6 +959,9 @@ class _NomenclatureTab extends StatefulWidget {
     required this.onSwitchToCatalog,
     required this.onEditProduct,
     required this.onRemoveProduct,
+    required this.onLoadKbju,
+    required this.onLoadTranslations,
+    required this.onVerifyWithAi,
   });
 
   final List<NomenclatureItem> items;
@@ -971,8 +977,11 @@ class _NomenclatureTab extends StatefulWidget {
   final VoidCallback onSwitchToCatalog;
   final void Function(BuildContext, Product) onEditProduct;
   final void Function(BuildContext, Product) onRemoveProduct;
+  final void Function(BuildContext, List<Product>) onLoadKbju;
+  final void Function(BuildContext, List<Product>) onLoadTranslations;
+  final void Function(BuildContext, List<Product>) onVerifyWithAi;
 
-  String _categoryLabel(String c) {
+  static String _categoryLabel(String c) {
     const map = {
       'vegetables': 'Овощи', 'fruits': 'Фрукты', 'meat': 'Мясо', 'seafood': 'Рыба',
       'dairy': 'Молочное', 'grains': 'Крупы', 'bakery': 'Выпечка', 'pantry': 'Бакалея',
@@ -982,7 +991,7 @@ class _NomenclatureTab extends StatefulWidget {
     return map[c] ?? c;
   }
 
-  static String _buildProductSubtitle(Product p, ProductStoreSupabase store, String estId, LocalizationService loc) {
+  static String _buildProductSubtitle(BuildContext context, Product p, ProductStoreSupabase store, String estId, LocalizationService loc) {
     final establishmentPrice = store.getEstablishmentPrice(p.id, estId);
     final price = establishmentPrice?.$1 ?? p.basePrice;
     final currency = establishmentPrice?.$2 ?? 'RUB';
@@ -1046,7 +1055,7 @@ class _NomenclatureTab extends StatefulWidget {
     return false;
   }
 
-  static Future<void> _loadKbjuForAll(BuildContext context, List<Product> list) async {
+  Future<void> _loadKbjuForAll(BuildContext context, List<Product> list) async {
     if (!context.mounted) return;
     await showDialog<void>(
       context: context,
@@ -1072,7 +1081,7 @@ class _NomenclatureTab extends StatefulWidget {
     if (context.mounted) onRefresh();
   }
 
-  static Future<void> _loadTranslationsForAll(BuildContext context, List<Product> list) async {
+  Future<void> _loadTranslationsForAll(BuildContext context, List<Product> list) async {
     if (!context.mounted) return;
     await showDialog<void>(
       context: context,
@@ -1098,7 +1107,7 @@ class _NomenclatureTab extends StatefulWidget {
     if (context.mounted) onRefresh();
   }
 
-  static Future<void> _verifyWithAi(BuildContext context, List<Product> list) async {
+  Future<void> _verifyWithAi(BuildContext context, List<Product> list) async {
     if (!context.mounted || list.isEmpty) return;
     final ai = context.read<AiService>();
     List<_VerifyProductItem> results = [];
@@ -1160,8 +1169,8 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
       );
     }
 
-    final needsKbju = widget.items.where((item) => item.isProduct && item.product!.category == 'manual' && _ProductsScreenState._needsKbju(item)).toList();
-    final needsTranslation = widget.items.where(_ProductsScreenState._needsTranslation).toList();
+    final needsKbju = widget.items.where((item) => item.isProduct && item.product!.category == 'manual' && _needsKbju(item)).toList();
+    final needsTranslation = widget.items.where(_needsTranslation).toList();
     return Column(
       children: [
         Padding(
@@ -1207,24 +1216,24 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                if (needsKbju.isNotEmpty && _ProductsScreenState._canShowNutrition(context))
+                if (needsKbju.isNotEmpty && _canShowNutrition(context))
                   FilledButton.tonalIcon(
-                    onPressed: () => _ProductsScreenState._loadKbjuForAll(context, needsKbju.where((item) => item.isProduct).map((item) => item.product!).toList()),
+                    onPressed: () => widget.onLoadKbju(context, needsKbju.where((item) => item.isProduct).map((item) => item.product!).toList()),
                     icon: const Icon(Icons.cloud_download, size: 20),
                     label: Text(widget.loc.t('load_kbju_for_all').replaceAll('%s', '${needsKbju.length}')),
                   ),
                 if (needsTranslation.isNotEmpty)
                   FilledButton.tonalIcon(
-                    onPressed: () => _ProductsScreenState._loadTranslationsForAll(context, needsTranslation.where((item) => item.isProduct).map((item) => item.product!).toList()),
+                    onPressed: () => widget.onLoadTranslations(context, needsTranslation.where((item) => item.isProduct).map((item) => item.product!).toList()),
                     icon: const Icon(Icons.translate, size: 20),
                     label: Text(widget.loc.t('translate_names_for_all').replaceAll('%s', '${needsTranslation.length}')),
                   ),
                 Tooltip(
-                  message: loc.t('verify_with_ai_tooltip'),
+                  message: widget.loc.t('verify_with_ai_tooltip'),
                   child: FilledButton.tonalIcon(
-                    onPressed: () => _ProductsScreenState._verifyWithAi(context, widget.items.where((item) => item.isProduct).map((item) => item.product!).toList()),
+                    onPressed: () => widget.onVerifyWithAi(context, widget.items.where((item) => item.isProduct).map((item) => item.product!).toList()),
                     icon: const Icon(Icons.auto_awesome, size: 20),
-                    label: Text(loc.t('verify_with_ai').replaceAll('%s', '${items.length}')),
+                    label: Text(widget.loc.t('verify_with_ai').replaceAll('%s', '${widget.items.length}')),
                   ),
                 ),
               ],
@@ -1233,9 +1242,9 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
         Expanded(
           child: ListView.builder(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-            itemCount: items.length,
+            itemCount: widget.items.length,
             itemBuilder: (_, i) {
-              final item = items[i];
+              final item = widget.items[i];
               return Card(
                 margin: const EdgeInsets.only(bottom: 6),
                 child: ListTile(
@@ -1252,8 +1261,8 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
                   title: Text(item.getLocalizedName(widget.loc.currentLanguageCode)),
                   subtitle: Text(
                     item.isProduct
-                        ? _ProductsScreenState._buildProductSubtitle(item.product!, widget.store, widget.estId, widget.loc)
-                        : _ProductsScreenState._buildTechCardSubtitle(item.techCard!),
+                        ? _buildProductSubtitle(context, item.product!, widget.store, widget.estId, widget.loc)
+                        : _buildTechCardSubtitle(item.techCard!),
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   trailing: Row(
@@ -1939,7 +1948,7 @@ class _CatalogTab extends StatelessWidget {
     return map[c] ?? c;
   }
 
-  static Future<void> _loadKbjuForAll(BuildContext context, List<Product> list) async {
+  Future<void> _loadKbjuForAll(BuildContext context, List<Product> list) async {
     if (!context.mounted) return;
     await showDialog<void>(
       context: context,
@@ -2010,7 +2019,7 @@ class _CatalogTab extends StatelessWidget {
     return false;
   }
 
-  static Future<void> _loadTranslationsForAll(BuildContext context, List<Product> list) async {
+  Future<void> _loadTranslationsForAll(BuildContext context, List<Product> list) async {
     if (!context.mounted) return;
     await showDialog<void>(
       context: context,
