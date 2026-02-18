@@ -239,6 +239,25 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
               onTap: _isLoading ? null : () => _uploadExcelSimple(),
             ),
 
+            const SizedBox(height: 12),
+
+            // Тестовая кнопка (только в debug режиме)
+            if (kDebugMode) ...[
+              _UploadMethodCard(
+                icon: Icons.bug_report,
+                title: 'Тест функций',
+                description: 'Проверить работу экрана загрузки',
+                color: Colors.red,
+                onTap: () {
+                  print('=== Test button pressed ===');
+                  _addDebugLog('Тестовая кнопка нажата');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Тест пройден! Функции работают.')),
+                  );
+                },
+              ),
+            ],
+
             const SizedBox(height: 24),
 
             // Пример формата
