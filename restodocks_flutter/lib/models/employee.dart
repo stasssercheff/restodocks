@@ -95,6 +95,9 @@ class Employee extends Equatable {
   @JsonKey(name: 'subscription_plan')
   final String? subscriptionPlan; // 'free', 'pro', etc.
 
+  @JsonKey(name: 'preferred_language')
+  final String preferredLanguage; // 'ru', 'en', 'de', 'fr', 'es'
+
   /// Тип оплаты: 'per_shift' — за смену, 'hourly' — почасовая.
   @JsonKey(name: 'payment_type')
   final String? paymentType;
@@ -128,6 +131,7 @@ class Employee extends Equatable {
     this.personalPin,
     this.avatarUrl,
     this.subscriptionPlan,
+    this.preferredLanguage = 'ru',
     this.paymentType,
     this.ratePerShift,
     this.hourlyRate,
@@ -148,6 +152,7 @@ class Employee extends Equatable {
     String? establishmentId,
     String? personalPin,
     String? avatarUrl,
+    String? preferredLanguage,
     String? paymentType,
     double? ratePerShift,
     double? hourlyRate,
@@ -166,6 +171,7 @@ class Employee extends Equatable {
       establishmentId: establishmentId ?? this.establishmentId,
       personalPin: personalPin ?? this.personalPin,
       avatarUrl: avatarUrl ?? this.avatarUrl,
+      preferredLanguage: preferredLanguage ?? this.preferredLanguage,
       paymentType: paymentType ?? this.paymentType,
       ratePerShift: ratePerShift ?? this.ratePerShift,
       hourlyRate: hourlyRate ?? this.hourlyRate,
@@ -307,6 +313,7 @@ class Employee extends Equatable {
     establishmentId,
     personalPin,
     avatarUrl,
+    preferredLanguage,
     paymentType,
     ratePerShift,
     hourlyRate,
@@ -324,6 +331,7 @@ class Employee extends Equatable {
     String? section,
     required List<String> roles,
     required String establishmentId,
+    String preferredLanguage = 'ru',
   }) {
     final now = DateTime.now();
     return Employee(
@@ -335,6 +343,7 @@ class Employee extends Equatable {
       section: section,
       roles: roles,
       establishmentId: establishmentId,
+      preferredLanguage: preferredLanguage,
       personalPin: _generatePersonalPin(),
       isActive: true,
       createdAt: now,

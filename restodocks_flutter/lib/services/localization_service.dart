@@ -169,4 +169,30 @@ class LocalizationService extends ChangeNotifier {
         return '🏳️';
     }
   }
+
+  /// Получить локализованный текст для сущности
+  /// Используется для динамической локализации продуктов, ТТК и чек-листов
+  Future<String> getLocalizedEntityText({
+    required String entityType,
+    required String entityId,
+    required String fieldName,
+    required String sourceText,
+    required String sourceLanguage,
+  }) async {
+    // Пока возвращаем исходный текст - интеграция с TranslationManager
+    // будет добавлена позже
+    return sourceText;
+  }
+
+  /// Обработать сохранение сущности (триггер автоперевода)
+  Future<void> handleEntitySave({
+    required String entityType,
+    required String entityId,
+    required Map<String, String> textFields,
+    required String sourceLanguage,
+    String? userId,
+  }) async {
+    // Пока пустая реализация - интеграция с TranslationManager
+    // будет добавлена позже
+  }
 }

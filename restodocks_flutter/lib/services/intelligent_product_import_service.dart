@@ -6,6 +6,7 @@ import '../models/product.dart';
 import '../models/product_import_result.dart';
 import '../models/nomenclature_item.dart';
 import '../models/tech_card.dart';
+import '../models/translation.dart';
 import 'ai_service_supabase.dart';
 import 'translation_service.dart';
 import 'product_store_supabase.dart';
@@ -111,21 +112,23 @@ class IntelligentProductImportService {
 
         case MatchType.create:
           // Создаем новый продукт с переводами
-          final translations = await _generateTranslations(
-            result.matchResult.suggestedName ?? result.fileName,
-            result.detectedLanguage ?? 'en',
-          );
-
+          final productName = result.matchResult.suggestedName ?? result.fileName;
           final product = Product.create(
-            name: result.matchResult.suggestedName ?? result.fileName,
+            name: productName,
             category: 'imported',
-            names: translations,
             basePrice: result.filePrice ?? 0.0,
             currency: result.filePrice != null ? defaultCurrency : null,
           );
 
           await _productStore.addProduct(product);
           createdProducts.add(product);
+
+          // Генерируем и сохраняем переводы
+          await _generateAndSaveTranslations(
+            product.id,
+            productName,
+            result.detectedLanguage ?? 'en',
+          );
           break;
 
         case MatchType.fuzzy:
@@ -346,35 +349,21 @@ ${sampleTexts.take(5).join('\n')}
     }
   }
 
-  /// Сгенерировать переводы продукта
-  Future<Map<String, String>> _generateTranslations(String name, String sourceLanguage) async {
-    final translations = <String, String>{};
+  /// Сгенерировать переводы продукта (сохранение в БД)
+  Future<void> _generateAndSaveTranslations(String productId, String name, String sourceLanguage) async {
+    // Создаем TranslationManager для сохранения переводов
+    final translationManager = TranslationManager(
+      aiService: _aiService,
+      translationService: _translationService,
+    );
 
-    // Переводим на 5 языков: RU, EN, DE, FR, ES
-    final targetLanguages = ['ru', 'en', 'de', 'fr', 'es'];
-
-    for (final targetLang in targetLanguages) {
-      if (targetLang == sourceLanguage) {
-        translations[targetLang] = name;
-        continue;
-      }
-
-      try {
-        final translated = await _translationService.translate(
-          text: name,
-          from: sourceLanguage,
-          to: targetLang,
-        );
-
-        if (translated != null && translated.trim().isNotEmpty) {
-          translations[targetLang] = translated.trim();
-        }
-      } catch (e) {
-        // Продолжаем с другими языками
-      }
-    }
-
-    return translations;
+    // Сохраняем переводы через TranslationManager
+    await translationManager.handleEntitySave(
+      entityType: TranslationEntityType.product,
+      entityId: productId,
+      textFields: {'name': name},
+      sourceLanguage: sourceLanguage,
+    );
   }
 
   /// Разобрать цену из строки

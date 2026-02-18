@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:math';
 
 import 'package:excel/excel.dart' hide Border;
 import 'package:file_picker/file_picker.dart';
@@ -15,6 +16,7 @@ import '../models/product_import_result.dart';
 import '../services/services.dart';
 import '../services/intelligent_product_import_service.dart';
 import '../services/translation_service.dart';
+import '../services/translation_manager.dart';
 
 // Глобальная переменная для хранения debug логов
 List<String> _debugLogs = [];
@@ -38,6 +40,13 @@ class ProductUploadScreen extends StatefulWidget {
 
 class _ProductUploadScreenState extends State<ProductUploadScreen> {
   bool _isLoading = false;
+  String _loadingMessage = '';
+
+  void _setLoadingMessage(String message) {
+    if (mounted) {
+      setState(() => _loadingMessage = message);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -60,6 +69,35 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Индикатор загрузки
+            if (_isLoading) ...[
+              Container(
+                padding: const EdgeInsets.all(16),
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Text(
+                        _loadingMessage.isNotEmpty ? _loadingMessage : 'Обработка...',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
             // Заголовок
             Text(
               'Добавьте продукты в номенклатуру вашего заведения',
@@ -131,6 +169,34 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
             _FormatExample(),
 
             const SizedBox(height: 24),
+
+            // Тест парсинга
+            if (_isLoading) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.blue[600]),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Показать логи отладки для диагностики проблем',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => _showDebugLogs(context),
+                      child: const Text('Показать логи'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
 
             // Советы
             _TipsSection(),
@@ -403,7 +469,12 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         SnackBar(content: Text('Ошибка импорта: $e')),
       );
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _loadingMessage = '';
+        });
+      }
     }
   }
 
@@ -525,14 +596,25 @@ ${text}
         SnackBar(content: Text('Ошибка обработки текста AI: $e')),
       );
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _loadingMessage = '';
+        });
+      }
     }
   }
 
 
   Future<void> _processText(String text, LocalizationService loc, bool addToNomenclature) async {
+    _addDebugLog('Starting text processing. Text length: ${text.length}');
+    _addDebugLog('Raw text: "${text.substring(0, min(100, text.length))}"');
+
+    _setLoadingMessage('Определяем формат текста...');
+
     // Определяем формат текста
     final format = _detectTextFormat(text);
+    _addDebugLog('Detected format: $format');
 
     List<({String name, double? price})> items;
 
@@ -541,20 +623,29 @@ ${text}
       return await _processTextWithAI(text, loc, addToNomenclature);
     } else {
       // Обычный парсинг
+      _setLoadingMessage('Разбираем текст...');
       final lines = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty);
+      _addDebugLog('Found ${lines.length} lines to parse');
       items = lines.map(_parseLine).where((r) => r.name.isNotEmpty).toList();
+      _addDebugLog('Parsed ${items.length} items from ${lines.length} lines');
+      for (var i = 0; i < items.length; i++) {
+        _addDebugLog('Item ${i}: "${items[i].name}" -> ${items[i].price}');
+      }
     }
 
     if (items.isEmpty) {
+      _setLoadingMessage('Обычный парсинг не сработал, пробуем ИИ...');
       // Если обычный парсинг не сработал, пробуем AI
       return await _processTextWithAI(text, loc, addToNomenclature);
     }
 
+    _setLoadingMessage('Сохраняем ${items.length} продуктов...');
     await _addProductsToNomenclature(items, loc, addToNomenclature);
   }
 
   String _detectTextFormat(String text) {
     final lines = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).take(5);
+    print('DEBUG: Detecting format for ${lines.length} sample lines');
 
     // Проверяем на сложные форматы
     bool hasComplexFormat = false;
@@ -625,6 +716,8 @@ ${text}
 
   Future<void> _addProductsToNomenclature(List<({String name, double? price})> items, LocalizationService loc, bool addToNomenclature) async {
     _addDebugLog('Starting to process ${items.length} products');
+    print('DEBUG: Processing ${items.length} items, addToNomenclature: $addToNomenclature');
+    _setLoadingMessage('Обрабатываем ${items.length} продуктов...');
     setState(() => _isLoading = true);
 
     try {
@@ -734,6 +827,28 @@ ${text}
             print('DEBUG: Adding product "${product.name}" to database...');
             await store.addProduct(product);
             print('DEBUG: Successfully added product "${product.name}"');
+
+            // Запускаем автоматический перевод для нового продукта
+            final translationManager = TranslationManager(
+              aiService: context.read<AiServiceSupabase>(),
+              translationService: TranslationService(
+                aiService: context.read<AiServiceSupabase>(),
+                supabase: context.read<SupabaseService>(),
+              ),
+            );
+
+            await translationManager.handleEntitySave(
+              entityType: TranslationEntityType.product,
+              entityId: product.id,
+              textFields: {
+                'name': product.name,
+                if (product.names != null)
+                  for (final entry in product.names!.entries)
+                    'name_${entry.key}': entry.value,
+              },
+              sourceLanguage: 'ru', // TODO: определить язык из контекста
+              userId: context.read<AccountManagerSupabase>().currentEmployee?.id,
+            );
           } catch (e) {
             print('DEBUG: Failed to add product "${product.name}": $e');
             if (e.toString().contains('duplicate key') ||
@@ -811,12 +926,18 @@ ${text}
         );
       }
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _loadingMessage = '';
+        });
+      }
     }
   }
 
   ({String name, double? price}) _parseLine(String line) {
     // Сначала попробуем найти паттерны с ценами в конце строки
+    print('DEBUG: Parsing line: "${line}"');
     final pricePatterns = [
       RegExp(r'[\d,]+\s*[₫$€£руб.]?\s*$'), // число с опциональной валютой в конце
       RegExp(r'\d+\.\d+\s*[₫$€£руб.]?\s*$'), // десятичное число
@@ -861,6 +982,7 @@ ${text}
       price = null;
     }
 
+    print('DEBUG: Parsed result: name="${name}", price=${price}');
     return (name: name, price: price);
   }
 

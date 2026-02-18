@@ -18,28 +18,41 @@ class TranslationService {
   }) : _aiService = aiService,
        _supabase = supabase;
 
-  /// Перевести текст с кешированием
+  /// Перевести текст с кешированием для сущности
   Future<String?> translate({
+    required TranslationEntityType entityType,
+    required String entityId,
+    required String fieldName,
     required String text,
     required String from,
     required String to,
     String? userId,
+    bool allowOverride = true,
   }) async {
     if (text.trim().isEmpty) return text;
     if (from == to) return text;
 
-    final cacheKey = '${text}_${from}_${to}';
+    final cacheKey = '${entityType}_${entityId}_${fieldName}_${from}_${to}';
 
     // Проверяем локальный кеш
     if (_cache.containsKey(cacheKey)) {
-      return _cache[cacheKey]!.translatedText;
+      final cached = _cache[cacheKey]!;
+      // Если есть manual override и он запрещен, не перезаписываем
+      if (cached.isManualOverride && !allowOverride) {
+        return cached.translatedText;
+      }
+      return cached.translatedText;
     }
 
     // Проверяем базу данных
     try {
-      final existing = await _getFromDatabase(text, from, to);
+      final existing = await _getFromDatabase(entityType, entityId, fieldName, from, to);
       if (existing != null) {
         _cache[cacheKey] = existing;
+        // Если есть manual override и он запрещен, не перезаписываем
+        if (existing.isManualOverride && !allowOverride) {
+          return existing.translatedText;
+        }
         return existing.translatedText;
       }
     } catch (e) {
@@ -52,12 +65,18 @@ class TranslationService {
 
       if (translatedText != null && translatedText.trim().isNotEmpty) {
         // Сохраняем в базу данных
-        final translation = Translation.create(
+        final translation = Translation(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          entityType: entityType,
+          entityId: entityId,
+          fieldName: fieldName,
           sourceText: text,
           sourceLanguage: from,
           targetLanguage: to,
           translatedText: translatedText,
+          createdAt: DateTime.now(),
           createdBy: userId,
+          isManualOverride: false,
         );
 
         await _saveToDatabase(translation);
@@ -75,8 +94,7 @@ class TranslationService {
   /// Перевести через AI
   Future<String?> _translateWithAI(String text, String from, String to) async {
     final prompt = '''
-Переведи следующий текст с языка $from на язык $to.
-Сохрани стиль и терминологию, особенно если это название продукта.
+Ты профессиональный шеф-переводчик. Переведи кулинарный текст с языка $from на язык $to, сохраняя терминологию и структуру. Не переводи бренды и названия в кавычках.
 
 Текст: "$text"
 
@@ -95,11 +113,19 @@ class TranslationService {
   }
 
   /// Получить перевод из базы данных
-  Future<Translation?> _getFromDatabase(String text, String from, String to) async {
+  Future<Translation?> _getFromDatabase(
+    TranslationEntityType entityType,
+    String entityId,
+    String fieldName,
+    String from,
+    String to,
+  ) async {
     final response = await _supabase.client
         .from('translations')
         .select()
-        .eq('source_text', text)
+        .eq('entity_type', entityType.name)
+        .eq('entity_id', entityId)
+        .eq('field_name', fieldName)
         .eq('source_language', from)
         .eq('target_language', to)
         .maybeSingle();

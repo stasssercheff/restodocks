@@ -32,6 +32,9 @@ class AccountManagerSupabase {
   Establishment? get establishment => _establishment;
   Employee? get currentEmployee => _currentEmployee;
 
+  /// Предпочитаемый язык пользователя
+  String get preferredLanguage => _currentEmployee?.preferredLanguage ?? 'ru';
+
   /// Авторизован ли пользователь (своя сессия employees или восстановленная из хранилища)
   bool get isLoggedInSync => _currentEmployee != null && _establishment != null;
 
