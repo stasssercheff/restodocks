@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
+
 import 'package:excel/excel.dart' hide Border;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -167,6 +169,21 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
             // Пример формата
             _FormatExample(),
+
+            const SizedBox(height: 16),
+
+            // Кнопка тестирования парсинга
+            if (kDebugMode) ElevatedButton.icon(
+              onPressed: () {
+                final testLine = 'Авокадо\t₫99,000';
+                final result = _parseLine(testLine);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Тест парсинга: "$testLine" -> "${result.name}" @ ${result.price}')),
+                );
+              },
+              icon: const Icon(Icons.bug_report),
+              label: const Text('Тест парсинга'),
+            ),
 
             const SizedBox(height: 24),
 
