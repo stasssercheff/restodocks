@@ -335,6 +335,170 @@ class _ProductsScreenState extends State<ProductsScreen> {
     }
   }
 
+  String _buildProductSubtitle(BuildContext context, Product p, ProductStoreSupabase store, String estId, LocalizationService loc) {
+    final establishmentPrice = store.getEstablishmentPrice(p.id, estId);
+    final price = establishmentPrice?.$1 ?? p.basePrice;
+    final currency = establishmentPrice?.$2 ?? 'RUB';
+
+    final priceText = price != null ? '${price.toStringAsFixed(0)} ₽/${_unitDisplay(p.unit, loc.currentLanguageCode)}' : 'Цена не установлена';
+
+    // Проверяем подписку для отображения КБЖУ
+    final account = context.read<AccountManagerSupabase>();
+    final hasPro = account.currentEmployee?.hasProSubscription ?? false;
+
+    if (!hasPro) {
+      // Без PRO подписки показываем только категорию и цену
+      return (p.category == 'misc' || p.category == 'manual')
+          ? '$priceText'
+          : '${_categoryLabel(p.category)} · $priceText';
+    }
+
+    // С PRO подпиской показываем КБЖУ
+    return (p.category == 'misc' || p.category == 'manual')
+        ? '${p.calories?.round() ?? 0} ккал · $priceText'
+        : '${_categoryLabel(p.category)} · ${p.calories?.round() ?? 0} ккал · $priceText';
+  }
+
+  String _buildTechCardSubtitle(TechCard tc) {
+    // Рассчитываем стоимость за кг для ТТК
+    if (tc.ingredients.isEmpty) {
+      return 'ПФ · Цена не рассчитана · Выход: ${tc.yield.toStringAsFixed(0)}г';
+    }
+
+    final totalCost = tc.ingredients.fold<double>(0, (sum, ing) => sum + ing.cost);
+    final totalOutput = tc.ingredients.fold<double>(0, (sum, ing) => sum + ing.outputWeight);
+    final costPerKg = totalOutput > 0 ? (totalCost / totalOutput) * 1000 : 0;
+
+    return 'ПФ · ${costPerKg.toStringAsFixed(0)} ₽/кг · Выход: ${tc.yield.toStringAsFixed(0)}г';
+  }
+
+  bool _needsKbju(NomenclatureItem item) {
+    if (item.isTechCard) return false; // ТТК не нуждаются в КБЖУ
+    final p = item.product!;
+    return (p.calories == null || p.calories == 0) && p.protein == null && p.fat == null && p.carbs == null;
+  }
+
+  bool _canShowNutrition(BuildContext context) {
+    final account = context.read<AccountManagerSupabase>();
+    final employee = account.currentEmployee;
+    return employee?.hasProSubscription ?? false;
+  }
+
+  bool _needsTranslation(NomenclatureItem item) {
+    if (item.isTechCard) return false; // ТТК не нуждаются в переводе имен
+    final p = item.product!;
+    final allLangs = LocalizationService.productLanguageCodes;
+    final n = p.names;
+    if (n == null || n.isEmpty) return true;
+    if (allLangs.any((c) => (n[c] ?? '').trim().isEmpty)) return true;
+    // Ручные продукты с одинаковым текстом во всех языках — не переведены
+    if (p.category == 'manual') {
+      final vals = allLangs.map((c) => (n[c] ?? '').trim()).where((s) => s.isNotEmpty).toSet();
+      if (vals.length <= 1) return true;
+    }
+    return false;
+  }
+
+  Future<void> _loadKbjuForAll(BuildContext context, List<Product> list) async {
+    if (!context.mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => _LoadKbjuProgressDialog(
+        list: list,
+        store: store,
+        loc: loc,
+        onComplete: () {
+          Navigator.of(ctx).pop();
+          _ensureLoaded().then((_) => setState(() {}));
+          if (ctx.mounted) {
+            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(loc.t('kbju_load_done'))));
+          }
+        },
+        onError: (e) {
+          if (ctx.mounted) {
+            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))));
+          }
+        },
+      ),
+    );
+    if (context.mounted) _ensureLoaded().then((_) => setState(() {}));
+  }
+
+  Future<void> _loadTranslationsForAll(BuildContext context, List<Product> list) async {
+    if (!context.mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => _LoadTranslationsProgressDialog(
+        list: list,
+        store: store,
+        loc: loc,
+        onComplete: () {
+          Navigator.of(ctx).pop();
+          _ensureLoaded().then((_) => setState(() {}));
+          if (ctx.mounted) {
+            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(loc.t('translate_done'))));
+          }
+        },
+        onError: (e) {
+          if (ctx.mounted) {
+            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))));
+          }
+        },
+      ),
+    );
+    if (context.mounted) _ensureLoaded().then((_) => setState(() {}));
+  }
+
+  Future<void> _verifyWithAi(BuildContext context, List<Product> list) async {
+    if (!context.mounted || list.isEmpty) return;
+    final ai = context.read<AiService>();
+    List<_VerifyProductItem> results = [];
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => _VerifyProductsProgressDialog(
+        list: list,
+        store: store,
+        aiService: ai,
+        loc: loc,
+        onComplete: (r) {
+          results = r;
+          Navigator.of(ctx).pop();
+        },
+        onError: (e) {
+          if (ctx.mounted) {
+            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))));
+          }
+        },
+      ),
+    );
+    if (!context.mounted) return;
+    final withSuggestions = results.where((e) => e.hasAnySuggestion).toList();
+    if (withSuggestions.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('verify_no_suggestions'))));
+      _ensureLoaded().then((_) => setState(() {}));
+      return;
+    }
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => _VerifyProductsResultsDialog(
+        items: withSuggestions,
+        store: store,
+        loc: loc,
+        onApplied: () {
+          Navigator.of(ctx).pop();
+          _ensureLoaded().then((_) => setState(() {}));
+          if (ctx.mounted) {
+            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(loc.t('verify_applied'))));
+          }
+        },
+      ),
+    );
+    if (context.mounted) _ensureLoaded().then((_) => setState(() {}));
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
@@ -1072,169 +1236,6 @@ class _NomenclatureTab extends StatefulWidget {
     return map[c] ?? c;
   }
 
-  String _buildProductSubtitle(BuildContext context, Product p, ProductStoreSupabase store, String estId, LocalizationService loc) {
-    final establishmentPrice = store.getEstablishmentPrice(p.id, estId);
-    final price = establishmentPrice?.$1 ?? p.basePrice;
-    final currency = establishmentPrice?.$2 ?? 'RUB';
-
-    final priceText = price != null ? '${price.toStringAsFixed(0)} ₽/${_unitDisplay(p.unit, loc.currentLanguageCode)}' : 'Цена не установлена';
-
-    // Проверяем подписку для отображения КБЖУ
-    final account = context.read<AccountManagerSupabase>();
-    final hasPro = account.currentEmployee?.hasProSubscription ?? false;
-
-    if (!hasPro) {
-      // Без PRO подписки показываем только категорию и цену
-      return (p.category == 'misc' || p.category == 'manual')
-          ? '$priceText'
-          : '${_categoryLabel(p.category)} · $priceText';
-    }
-
-    // С PRO подпиской показываем КБЖУ
-    return (p.category == 'misc' || p.category == 'manual')
-        ? '${p.calories?.round() ?? 0} ккал · $priceText'
-        : '${_categoryLabel(p.category)} · ${p.calories?.round() ?? 0} ккал · $priceText';
-  }
-
-  String _buildTechCardSubtitle(TechCard tc) {
-    // Рассчитываем стоимость за кг для ТТК
-    if (tc.ingredients.isEmpty) {
-      return 'ПФ · Цена не рассчитана · Выход: ${tc.yield.toStringAsFixed(0)}г';
-    }
-
-    final totalCost = tc.ingredients.fold<double>(0, (sum, ing) => sum + ing.cost);
-    final totalOutput = tc.ingredients.fold<double>(0, (sum, ing) => sum + ing.outputWeight);
-    final costPerKg = totalOutput > 0 ? (totalCost / totalOutput) * 1000 : 0;
-
-    return 'ПФ · ${costPerKg.toStringAsFixed(0)} ₽/кг · Выход: ${tc.yield.toStringAsFixed(0)}г';
-  }
-
-  bool _needsKbju(NomenclatureItem item) {
-    if (item.isTechCard) return false; // ТТК не нуждаются в КБЖУ
-    final p = item.product!;
-    return (p.calories == null || p.calories == 0) && p.protein == null && p.fat == null && p.carbs == null;
-  }
-
-  bool _canShowNutrition(BuildContext context) {
-    final account = context.read<AccountManagerSupabase>();
-    final employee = account.currentEmployee;
-    return employee?.hasProSubscription ?? false;
-  }
-
-  bool _needsTranslation(NomenclatureItem item) {
-    if (item.isTechCard) return false; // ТТК не нуждаются в переводе имен
-    final p = item.product!;
-    final allLangs = LocalizationService.productLanguageCodes;
-    final n = p.names;
-    if (n == null || n.isEmpty) return true;
-    if (allLangs.any((c) => (n[c] ?? '').trim().isEmpty)) return true;
-    // Ручные продукты с одинаковым текстом во всех языках — не переведены
-    if (p.category == 'manual') {
-      final vals = allLangs.map((c) => (n[c] ?? '').trim()).where((s) => s.isNotEmpty).toSet();
-      if (vals.length <= 1) return true;
-    }
-    return false;
-  }
-
-  Future<void> _loadKbjuForAll(BuildContext context, List<Product> list) async {
-    if (!context.mounted) return;
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => _LoadKbjuProgressDialog(
-        list: list,
-        store: store,
-        loc: loc,
-        onComplete: () {
-          Navigator.of(ctx).pop();
-          onRefresh();
-          if (ctx.mounted) {
-            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(loc.t('kbju_load_done'))));
-          }
-        },
-        onError: (e) {
-          if (ctx.mounted) {
-            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))));
-          }
-        },
-      ),
-    );
-    if (context.mounted) onRefresh();
-  }
-
-  Future<void> _loadTranslationsForAll(BuildContext context, List<Product> list) async {
-    if (!context.mounted) return;
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => _LoadTranslationsProgressDialog(
-        list: list,
-        store: store,
-        loc: loc,
-        onComplete: () {
-          Navigator.of(ctx).pop();
-          onRefresh();
-          if (ctx.mounted) {
-            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(loc.t('translate_done'))));
-          }
-        },
-        onError: (e) {
-          if (ctx.mounted) {
-            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))));
-          }
-        },
-      ),
-    );
-    if (context.mounted) onRefresh();
-  }
-
-  Future<void> _verifyWithAi(BuildContext context, List<Product> list) async {
-    if (!context.mounted || list.isEmpty) return;
-    final ai = context.read<AiService>();
-    List<_VerifyProductItem> results = [];
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => _VerifyProductsProgressDialog(
-        list: list,
-        store: store,
-        aiService: ai,
-        loc: loc,
-        onComplete: (r) {
-          results = r;
-          Navigator.of(ctx).pop();
-        },
-        onError: (e) {
-          if (ctx.mounted) {
-            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))));
-          }
-        },
-      ),
-    );
-    if (!context.mounted) return;
-    final withSuggestions = results.where((e) => e.hasAnySuggestion).toList();
-    if (withSuggestions.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('verify_no_suggestions'))));
-      onRefresh();
-      return;
-    }
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => _VerifyProductsResultsDialog(
-        items: withSuggestions,
-        store: store,
-        loc: loc,
-        onApplied: () {
-          Navigator.of(ctx).pop();
-          onRefresh();
-          if (ctx.mounted) {
-            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(loc.t('verify_applied'))));
-          }
-        },
-      ),
-    );
-    if (context.mounted) onRefresh();
-  }
 
   @override
   State<_NomenclatureTab> createState() => _NomenclatureTabState();
