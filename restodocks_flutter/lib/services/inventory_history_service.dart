@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/material.dart';
 
 /// Сервис для работы с историей инвентаризаций
 class InventoryHistoryService {
@@ -17,15 +18,15 @@ class InventoryHistoryService {
         .order('created_at', ascending: false);
 
     if (startDate != null) {
-      query = query.gte('date', startDate.toIso8601String().split('T')[0]);
+      query = query.filter('date', 'gte', startDate.toIso8601String().split('T')[0]);
     }
 
     if (endDate != null) {
-      query = query.lte('date', endDate.toIso8601String().split('T')[0]);
+      query = query.filter('date', 'lte', endDate.toIso8601String().split('T')[0]);
     }
 
     if (status != null) {
-      query = query.eq('status', status);
+      query = query.filter('status', 'eq', status);
     }
 
     final response = await query;

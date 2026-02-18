@@ -41,6 +41,8 @@ class ProductUploadScreen extends StatefulWidget {
   State<ProductUploadScreen> createState() => _ProductUploadScreenState();
 }
 
+import 'dart:async';
+
 class _ProductUploadScreenState extends State<ProductUploadScreen> {
   bool _isLoading = false;
   String _loadingMessage = '';

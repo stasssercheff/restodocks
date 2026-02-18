@@ -17,15 +17,15 @@ class OrderHistoryService {
         .order('created_at', ascending: false);
 
     if (startDate != null) {
-      query = query.gte('created_at', startDate.toIso8601String());
+      query = query.filter('created_at', 'gte', startDate.toUtc().toIso8601String());
     }
 
     if (endDate != null) {
-      query = query.lte('created_at', endDate.toIso8601String());
+      query = query.filter('created_at', 'lte', endDate.toUtc().toIso8601String());
     }
 
     if (status != null) {
-      query = query.eq('status', status);
+      query = query.filter('status', 'eq', status);
     }
 
     final response = await query;

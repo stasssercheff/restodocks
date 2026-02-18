@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/product.dart';
+import '../models/tech_card.dart';
 import '../services/product_store_supabase.dart';
 import '../services/localization_service.dart';
 import '../services/account_manager_supabase.dart';
