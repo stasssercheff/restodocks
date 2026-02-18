@@ -11,7 +11,7 @@ class InventoryHistoryService {
     DateTime? endDate,
     String? status,
   }) async {
-    var query = _supabase
+    dynamic query = _supabase
         .from('inventory_history')
         .select('*, employees(full_name)')
         .eq('establishment_id', establishmentId);

@@ -80,3 +80,4 @@ flutter_*.js.map
 .flutter/
 # Vercel project link (org/project id) — в CI задаётся через secrets
 .vercel/
+.vercel

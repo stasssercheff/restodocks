@@ -10,7 +10,7 @@ class OrderHistoryService {
     DateTime? endDate,
     String? status,
   }) async {
-    var query = _supabase
+    dynamic query = _supabase
         .from('order_history')
         .select('*, employees(full_name)')
         .eq('establishment_id', establishmentId);
