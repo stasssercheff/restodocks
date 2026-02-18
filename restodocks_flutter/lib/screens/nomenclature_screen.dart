@@ -824,8 +824,9 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     return (name: name, price: price);
   }
 
-  // Функция _showUploadDialog удалена - теперь используется общий экран загрузки продуктов
-    await showDialog(
+  // Удалены дублированные функции загрузки продуктов:
+  // _showUploadDialog, _showPasteDialog, _uploadFromTxt
+  // Теперь используется единый экран загрузки продуктов
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Добавить продукты в номенклатуру'),
