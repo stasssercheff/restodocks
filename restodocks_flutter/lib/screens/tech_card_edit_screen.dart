@@ -920,6 +920,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'RUB';
     final productStore = context.read<ProductStoreSupabase>();
     final establishmentId = context.read<AccountManagerSupabase>().establishment?.id;
+    final hasProSubscription = context.read<AccountManagerSupabase>().currentEmployee?.hasProSubscription ?? false;
     final ing = TTIngredient.fromProduct(
       product: p,
       cookingProcess: cookingProcess,
@@ -932,6 +933,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
       cookingLossPctOverride: cookingLossPctOverride,
       productStore: productStore,
       establishmentId: establishmentId,
+      hasProSubscription: hasProSubscription,
       defaultCurrency: currency,
     );
     setState(() {
@@ -956,6 +958,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
       final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'RUB';
       final productStore = context.read<ProductStoreSupabase>();
       final establishmentId = context.read<AccountManagerSupabase>().establishment?.id;
+      final hasProSubscription = context.read<AccountManagerSupabase>().currentEmployee?.hasProSubscription ?? false;
       final ing = TTIngredient.fromProduct(
         product: p,
         cookingProcess: null,
@@ -967,6 +970,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
         productStore: productStore,
         establishmentId: establishmentId,
         defaultCurrency: currency,
+        hasProSubscription: hasProSubscription,
       );
       setState(() {
         if (replaceIndex >= 0 && replaceIndex < _ingredients.length) {

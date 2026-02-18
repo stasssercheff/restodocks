@@ -256,6 +256,12 @@ class Employee extends Equatable {
     return roles.first;
   }
 
+  /// Имеет ли сотрудник PRO подписку
+  bool get hasProSubscription => subscriptionPlan == 'pro' || subscriptionPlan == 'premium';
+
+  /// Тип подписки (free/pro)
+  String get subscriptionType => subscriptionPlan ?? 'free';
+
   /// Все роли через запятую для отображения в профиле (например: Владелец, Шеф-повар)
   String get rolesDisplayText {
     if (roles.isEmpty) return 'Сотрудник';

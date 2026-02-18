@@ -258,6 +258,7 @@ class TTIngredient extends Equatable {
     ProductStoreSupabase? productStore,
     String? establishmentId,
     String? defaultCurrency,
+    bool hasProSubscription = false,
   }) {
     // Всегда используем 'g' для всех продуктов в ТТК, игнорируя product.unit
     final actualUnit = 'g';
@@ -302,16 +303,22 @@ class TTIngredient extends Equatable {
       if (netWeight == null) {
         finalNetWeight = processed.finalWeight;
       }
-      finalCalories = processed.totalCalories;
-      finalProtein = processed.totalProtein;
-      finalFat = processed.totalFat;
-      finalCarbs = processed.totalCarbs;
+      // Используем КБЖУ только для PRO подписки
+      if (hasProSubscription) {
+        finalCalories = processed.totalCalories;
+        finalProtein = processed.totalProtein;
+        finalFat = processed.totalFat;
+        finalCarbs = processed.totalCarbs;
+      }
     } else {
-      final nutrition = product.getNutritionForWeight(finalNetWeight);
-      finalCalories = nutrition.calories;
-      finalProtein = nutrition.protein;
-      finalFat = nutrition.fat;
-      finalCarbs = nutrition.carbs;
+      // Используем КБЖУ только для PRO подписки
+      if (hasProSubscription) {
+        final nutrition = product.getNutritionForWeight(finalNetWeight);
+        finalCalories = nutrition.calories;
+        finalProtein = nutrition.protein;
+        finalFat = nutrition.fat;
+        finalCarbs = nutrition.carbs;
+      }
     }
 
     // Расчёт стоимости: используем цену из заведения или базовую
