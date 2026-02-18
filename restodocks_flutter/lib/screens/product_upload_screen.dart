@@ -642,13 +642,19 @@ ${text}
         _addDebugLog('Raw line ${i}: "${lines[i]}"');
       }
 
-      items = lines.map(_parseLine).where((r) => r.name.isNotEmpty).toList();
-      _addDebugLog('After filtering empty names: ${items.length} items remain');
+      final parsedResults = lines.map(_parseLine).toList();
+      _addDebugLog('Parsed ${parsedResults.length} lines:');
+      for (var i = 0; i < min(5, parsedResults.length); i++) {
+        _addDebugLog('  Line ${i}: "${lines[i]}" -> name="${parsedResults[i].name}", price=${parsedResults[i].price}');
+      }
+
+      items = parsedResults.where((r) => r.name.isNotEmpty).toList();
+      _addDebugLog('After filtering empty names: ${items.length} items remain (from ${parsedResults.length} parsed)');
 
       if (items.isEmpty) {
         _addDebugLog('ERROR: All items were filtered out! Check _parseLine logic.');
       } else {
-        _addDebugLog('First 3 parsed items:');
+        _addDebugLog('First 3 valid items:');
         for (var i = 0; i < min(3, items.length); i++) {
           _addDebugLog('  ${i}: "${items[i].name}" @ ${items[i].price}');
         }
@@ -656,6 +662,7 @@ ${text}
     }
 
     if (items.isEmpty) {
+      _addDebugLog('WARNING: Basic parsing failed, trying AI processing');
       _setLoadingMessage('Обычный парсинг не сработал, пробуем ИИ...');
       // Если обычный парсинг не сработал, пробуем AI
       return await _processTextWithAI(text, loc, addToNomenclature);
@@ -974,11 +981,11 @@ ${text}
 
   ({String name, double? price}) _parseLine(String line) {
     // Сначала попробуем найти паттерны с ценами в конце строки
-    print('DEBUG: Parsing line: "${line}"');
+    _addDebugLog('DEBUG: Parsing line: "${line.replaceAll('\t', '[TAB]')}"');
     final pricePatterns = [
-      RegExp(r'[\d,]+\s*[₫$€£руб.]?\s*$'), // число с опциональной валютой в конце
-      RegExp(r'\d+\.\d+\s*[₫$€£руб.]?\s*$'), // десятичное число
-      RegExp(r'\d{1,3}(?:,\d{3})*\s*[₫$€£руб.]?\s*$'), // число с разделителями тысяч
+      RegExp(r'[\d,]+\s*[₫$€£¥руб.]?\s*$'), // число с опциональной валютой в конце (добавил ¥ для японской йены)
+      RegExp(r'\d+\.\d+\s*[₫$€£¥руб.]?\s*$'), // десятичное число
+      RegExp(r'\d{1,3}(?:,\d{3})*\s*[₫$€£¥руб.]?\s*$'), // число с разделителями тысяч
     ];
 
     String name = line.trim();
@@ -992,7 +999,7 @@ ${text}
 
         // Очищаем цену от валюты и форматирования
         final cleanPrice = pricePart
-            .replaceAll(RegExp(r'[₫$€£руб.\s]'), '')
+            .replaceAll(RegExp(r'[₫$€£¥руб.\s]'), '')
             .replaceAll(',', '')
             .replaceAll(' ', '');
 
@@ -1019,7 +1026,7 @@ ${text}
       price = null;
     }
 
-    print('DEBUG: Parsed result: name="${name}", price=${price}');
+    _addDebugLog('DEBUG: Parsed result: name="${name}", price=${price}');
     return (name: name, price: price);
   }
 
