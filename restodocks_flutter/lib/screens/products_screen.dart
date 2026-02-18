@@ -109,10 +109,10 @@ class _ProductsScreenState extends State<ProductsScreen> {
         if (products.length > 1) {
           for (int i = 1; i < products.length; i++) {
             final product = products[i];
+            String usageMessage = '';
 
             // Проверяем, используется ли продукт в номенклатуре или ТТК
             bool isUsed = false;
-            String usageMessage = '';
 
             // Проверяем в номенклатуре текущего заведения
             final establishment = account.establishment;

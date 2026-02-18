@@ -11,7 +11,10 @@ import 'package:uuid/uuid.dart';
 
 import '../models/culinary_units.dart';
 import '../models/models.dart';
+import '../models/product_import_result.dart';
 import '../services/services.dart';
+import '../services/intelligent_product_import_service.dart';
+import '../services/translation_service.dart';
 
 // Глобальная переменная для хранения debug логов
 List<String> _debugLogs = [];
@@ -109,6 +112,17 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
               description: 'ИИ разберет любой формат списка продуктов',
               color: Colors.purple,
               onTap: _isLoading ? null : () => _showSmartPasteDialog(),
+            ),
+
+            const SizedBox(height: 12),
+
+            // Интеллектуальный импорт Excel
+            _UploadMethodCard(
+              icon: Icons.analytics,
+              title: 'Интеллектуальный импорт Excel',
+              description: 'AI определение языка, fuzzy matching, авто-переводы на 5 языков',
+              color: Colors.indigo,
+              onTap: _isLoading ? null : () => _showIntelligentImportDialog(),
             ),
 
             const SizedBox(height: 24),
@@ -305,6 +319,135 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     if (result != null && result.text.trim().isNotEmpty) {
       await _processTextWithAI(result.text, loc, result.addToNomenclature);
     }
+  }
+
+  Future<void> _showIntelligentImportDialog() async {
+    final loc = context.read<LocalizationService>();
+    final account = context.read<AccountManagerSupabase>();
+    final establishmentId = account.establishment?.id;
+
+    if (establishmentId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Не найдено заведение')),
+      );
+      return;
+    }
+
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['xlsx', 'xls'],
+      withData: true,
+    );
+
+    if (result == null || result.files.isEmpty || result.files.single.bytes == null) return;
+
+    final fileName = result.files.single.name;
+    final bytes = result.files.single.bytes!;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final excel = Excel.decodeBytes(bytes);
+      final importService = IntelligentProductImportService(
+        aiService: context.read<AiServiceSupabase>(),
+        translationService: TranslationService(
+          aiService: context.read<AiServiceSupabase>(),
+          supabase: context.read<SupabaseService>(),
+        ),
+        productStore: context.read<ProductStoreSupabase>(),
+        techCardService: context.read<TechCardServiceSupabase>(),
+      );
+
+      final importResults = await importService.importFromExcel(
+        excel,
+        fileName,
+        establishmentId,
+        account.establishment?.defaultCurrency ?? 'RUB',
+      );
+
+      // Обрабатываем результаты
+      final ambiguousResults = importResults.where((r) =>
+          r.matchResult.type == MatchType.ambiguous).toList();
+
+      if (ambiguousResults.isNotEmpty) {
+        // Показываем модальное окно для разрешения неоднозначностей
+        final resolutions = await _showAmbiguousMatchesDialog(ambiguousResults);
+        if (resolutions != null) {
+          await importService.processImportResults(
+            importResults,
+            resolutions,
+            establishmentId,
+            account.establishment?.defaultCurrency ?? 'RUB',
+          );
+        }
+      } else {
+        // Обрабатываем без неоднозначностей
+        await importService.processImportResults(
+          importResults,
+          {},
+          establishmentId,
+          account.establishment?.defaultCurrency ?? 'RUB',
+        );
+      }
+
+      // Показываем результаты
+      final successCount = importResults.where((r) => r.error == null).length;
+      final errorCount = importResults.where((r) => r.error != null).length;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Импорт завершен: $successCount успешно, $errorCount ошибок')),
+      );
+
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ошибка импорта: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<Map<String, String>?> _showAmbiguousMatchesDialog(List<ProductImportResult> ambiguousResults) async {
+    final resolutions = <String, String>{};
+
+    for (final result in ambiguousResults) {
+      final resolution = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Неоднозначное совпадение'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Продукт из файла: ${result.fileName}'),
+              Text('Найдено в базе: ${result.matchResult.existingProductName}'),
+              const SizedBox(height: 16),
+              const Text('Что сделать?'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop('replace'),
+              child: const Text('Заменить существующий'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop('create'),
+              child: const Text('Создать новый'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Пропустить'),
+            ),
+          ],
+        ),
+      );
+
+      if (resolution != null) {
+        resolutions[result.fileName] = resolution;
+      }
+    }
+
+    return resolutions.isNotEmpty ? resolutions : null;
   }
 
   Future<void> _processTextWithAI(String text, LocalizationService loc, bool addToNomenclature) async {

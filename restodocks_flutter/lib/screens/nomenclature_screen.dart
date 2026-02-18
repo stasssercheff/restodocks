@@ -41,6 +41,7 @@ import '../services/ai_service_supabase.dart';
 import '../services/order_list_storage_service.dart';
 import '../services/excel_export_service.dart';
 import '../services/domain_validation_service.dart';
+import '../services/translation_service.dart';
 
 /// Экран номенклатуры: продукты и ПФ заведения с ценами
 class NomenclatureScreen extends StatefulWidget {
@@ -88,6 +89,10 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
   Future<void> _startUpload() async {
     final store = context.read<ProductStoreSupabase>();
     final account = context.read<AccountManagerSupabase>();
+    final translationService = TranslationService(
+      aiService: context.read<AiServiceSupabase>(),
+      supabase: context.read<SupabaseService>(),
+    );
     final estId = account.establishment?.id;
 
     if (estId == null) {
@@ -130,8 +135,18 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
 
         // Для больших списков переводим только если ИИ дал нормализованное имя
         if (widget.items.length > 5 && verification?.normalizedName != null && verification!.normalizedName != item.name) {
-          final translated = await TranslationService.translateToAll(normalizedName, sourceLang, allLangs);
-          if (translated.isNotEmpty) names = translated;
+          // Переводим на все языки
+          for (final lang in allLangs) {
+            if (lang == sourceLang) continue;
+            final translated = await translationService.translate(
+              text: normalizedName,
+              from: sourceLang,
+              to: lang,
+            );
+            if (translated != null && translated.trim().isNotEmpty) {
+              names[lang] = translated.trim();
+            }
+          }
         }
 
         final product = Product(
@@ -1974,6 +1989,10 @@ class _LoadTranslationsProgressDialogState extends State<_LoadTranslationsProgre
   }
 
   Future<void> _run() async {
+    final translationService = TranslationService(
+      aiService: context.read<AiServiceSupabase>(),
+      supabase: context.read<SupabaseService>(),
+    );
     final allLangs = LocalizationService.productLanguageCodes;
     for (final p in widget.list) {
       try {
@@ -1993,7 +2012,7 @@ class _LoadTranslationsProgressDialogState extends State<_LoadTranslationsProgre
         final merged = Map<String, String>.from(p.names ?? {});
         for (final target in missing) {
           if (target == sourceLang) continue;
-          final tr = await TranslationService.translate(source, sourceLang, target);
+          final tr = await translationService.translate(text: source, from: sourceLang, to: target);
           if (tr != null && tr.trim().isNotEmpty) merged[target] = tr;
           await Future<void>.delayed(const Duration(milliseconds: 150));
         }
