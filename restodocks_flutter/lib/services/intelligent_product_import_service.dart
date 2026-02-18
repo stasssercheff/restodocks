@@ -65,6 +65,7 @@ class IntelligentProductImportService {
         try {
           final matchResult = await _findProductMatch(
             name,
+            price,
             language,
             allProducts,
             establishmentId,
@@ -106,8 +107,21 @@ class IntelligentProductImportService {
 
       switch (result.matchResult.type) {
         case MatchType.exact:
-          // Обновляем цену существующего продукта
+          // Обновляем цену существующего продукта (автоматически)
           if (result.matchResult.existingProductId != null && result.filePrice != null) {
+            await _productStore.setEstablishmentPrice(
+              establishmentId,
+              result.matchResult.existingProductId!,
+              result.filePrice,
+              defaultCurrency,
+            );
+          }
+          break;
+
+        case MatchType.priceUpdate:
+          // Обновляем цену только если пользователь выбрал 'update' или если нет решения (автоматическое обновление)
+          final resolution = resolutions[result.fileName];
+          if (resolution != 'skip' && result.matchResult.existingProductId != null && result.filePrice != null) {
             await _productStore.setEstablishmentPrice(
               establishmentId,
               result.matchResult.existingProductId!,
@@ -225,6 +239,7 @@ ${sampleTexts.take(5).join('\n')}
   /// Найти соответствие продукта в базе данных
   Future<ProductMatchResult> _findProductMatch(
     String fileName,
+    double? filePrice,
     String language,
     List<Product> allProducts,
     String establishmentId,
@@ -238,10 +253,28 @@ ${sampleTexts.take(5).join('\n')}
     }).toList();
 
     if (exactMatches.isNotEmpty) {
+      final existingProduct = exactMatches.first;
+
+      // Проверяем, отличается ли цена
+      if (filePrice != null) {
+        final currentPrice = _productStore.getEstablishmentPrice(existingProduct.id, establishmentId);
+        if (currentPrice != null && currentPrice.$1 != null) {
+          // Цена отличается - предлагаем обновление
+          if ((currentPrice.$1! - filePrice).abs() > 0.01) { // Учитываем погрешность округления
+            return ProductMatchResult(
+              type: MatchType.priceUpdate,
+              existingProductId: existingProduct.id,
+              existingProductName: existingProduct.name,
+            );
+          }
+        }
+      }
+
+      // Цена совпадает или не указана - точное совпадение
       return ProductMatchResult(
         type: MatchType.exact,
-        existingProductId: exactMatches.first.id,
-        existingProductName: exactMatches.first.name,
+        existingProductId: existingProduct.id,
+        existingProductName: existingProduct.name,
       );
     }
 

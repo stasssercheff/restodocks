@@ -529,8 +529,26 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       // Обрабатываем результаты
       final ambiguousResults = importResults.where((r) =>
           r.matchResult.type == MatchType.ambiguous).toList();
+      final priceUpdateResults = importResults.where((r) =>
+          r.matchResult.type == MatchType.priceUpdate).toList();
 
-      if (ambiguousResults.isNotEmpty) {
+      if (priceUpdateResults.isNotEmpty) {
+        // Показываем диалог для выбора режима обновления цен
+        final updateMode = await _showPriceUpdateModeDialog(priceUpdateResults);
+        if (updateMode == 'manual') {
+          // Обрабатываем вручную - показываем диалог для каждого продукта
+          await _processPriceUpdatesManually(importResults, importService, establishmentId, account);
+        } else if (updateMode == 'all') {
+          // Обновляем все цены автоматически
+          await importService.processImportResults(
+            importResults,
+            {},
+            establishmentId,
+            account.establishment?.defaultCurrency ?? 'RUB',
+          );
+        }
+        // Если null - пользователь отменил, ничего не делаем
+      } else if (ambiguousResults.isNotEmpty) {
         // Показываем модальное окно для разрешения неоднозначностей
         final resolutions = await _showAmbiguousMatchesDialog(ambiguousResults);
         if (resolutions != null) {
@@ -571,6 +589,107 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         });
       }
     }
+  }
+
+  Future<String?> _showPriceUpdateModeDialog(List<ProductImportResult> results) async {
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Найдены продукты с измененными ценами'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Найдено ${results.length} продуктов, у которых цена отличается от существующей в номенклатуре.'),
+            const SizedBox(height: 16),
+            const Text('Выберите способ обновления:'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Отмена'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop('manual'),
+            child: const Text('Обновить вручную'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop('all'),
+            child: const Text('Обновить все цены'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _processPriceUpdatesManually(
+    List<ProductImportResult> allResults,
+    IntelligentProductImportService importService,
+    String establishmentId,
+    AccountManagerSupabase account,
+  ) async {
+    final resolutions = <String, String>{};
+
+    // Обрабатываем только результаты с priceUpdate
+    final priceUpdateResults = allResults.where((r) => r.matchResult.type == MatchType.priceUpdate).toList();
+
+    for (final result in priceUpdateResults) {
+      final updatePrice = await _showPriceUpdateDialog(result);
+      if (updatePrice == true) {
+        resolutions[result.fileName] = 'update';
+      } else if (updatePrice == false) {
+        resolutions[result.fileName] = 'skip';
+      }
+      // Если null - пользователь отменил весь процесс
+      else {
+        return;
+      }
+    }
+
+    // Обрабатываем все результаты с resolutions
+    await importService.processImportResults(
+      allResults,
+      resolutions,
+      establishmentId,
+      account.establishment?.defaultCurrency ?? 'RUB',
+    );
+  }
+
+  Future<bool?> _showPriceUpdateDialog(ProductImportResult result) async {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Обновить цену продукта'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Продукт: ${result.fileName}'),
+            Text('Текущая цена в файле: ${result.filePrice}'),
+            const SizedBox(height: 8),
+            Text(
+              'Продукт найден в номенклатуре, но цена отличается.',
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Отмена импорта'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Пропустить'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Обновить цену'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<Map<String, String>?> _showAmbiguousMatchesDialog(List<ProductImportResult> ambiguousResults) async {
