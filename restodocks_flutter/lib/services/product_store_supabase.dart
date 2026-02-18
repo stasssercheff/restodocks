@@ -191,9 +191,6 @@ class ProductStoreSupabase {
   Set<String> _nomenclatureIds = {};
   Set<String> get nomenclatureProductIds => Set.from(_nomenclatureIds);
 
-  // Temporary getter for debugging
-  dynamic get supabaseClient => _supabase.client;
-
   /// Загрузить номенклатуру заведения (ID продуктов и цены)
   Future<void> loadNomenclature(String establishmentId) async {
     try {
