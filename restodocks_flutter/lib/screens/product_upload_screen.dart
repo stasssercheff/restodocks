@@ -83,17 +83,6 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
             const SizedBox(height: 12),
 
-            // Быстрая вставка из буфера
-            _UploadMethodCard(
-              icon: Icons.paste,
-              title: 'Быстрая вставка',
-              description: 'Вставить из буфера обмена и обработать',
-              color: Colors.teal,
-              onTap: _isLoading ? null : () => _pasteFromClipboard(),
-            ),
-
-            const SizedBox(height: 12),
-
             // Умная обработка текста с AI
             _UploadMethodCard(
               icon: Icons.smart_toy,
@@ -101,15 +90,6 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
               description: 'ИИ разберет любой формат списка продуктов',
               color: Colors.purple,
               onTap: _isLoading ? null : () => _showSmartPasteDialog(),
-            ),
-
-            // Тестовая карточка для быстрой проверки
-            _UploadMethodCard(
-              icon: Icons.bug_report,
-              title: 'Тест (демо данные)',
-              description: 'Загрузить тестовые продукты для проверки',
-              color: Colors.orange,
-              onTap: _isLoading ? null : () => _loadTestData(),
             ),
 
             const SizedBox(height: 24),
@@ -133,7 +113,6 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   }
 
   Future<void> _uploadFromFile() async {
-    print('DEBUG: Starting file upload');
     final loc = context.read<LocalizationService>();
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
@@ -141,42 +120,25 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       withData: true,
     );
 
-    if (result == null || result.files.isEmpty || result.files.single.bytes == null) {
-      print('DEBUG: No file selected or no data');
-      return;
-    }
+    if (result == null || result.files.isEmpty || result.files.single.bytes == null) return;
 
-    print('DEBUG: File selected: ${result.files.single.name}');
     final fileName = result.files.single.name.toLowerCase();
     final bytes = result.files.single.bytes!;
 
     if (fileName.endsWith('.txt')) {
       final text = utf8.decode(bytes, allowMalformed: true);
-      print('DEBUG: Processing text file, length: ${text.length}');
       await _processText(text, loc);
     } else if (fileName.endsWith('.rtf')) {
       final text = _extractTextFromRtf(utf8.decode(bytes, allowMalformed: true));
-      print('DEBUG: Processing RTF file, extracted length: ${text.length}');
       await _processText(text, loc);
     } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
-      print('DEBUG: Processing Excel file');
       await _processExcel(bytes, loc);
-    } else {
-      print('DEBUG: Unsupported file type: $fileName');
     }
   }
 
   Future<void> _showPasteDialog() async {
-    print('DEBUG: Showing paste dialog');
     final loc = context.read<LocalizationService>();
     final controller = TextEditingController();
-
-    // Предварительно вставим тестовый текст для проверки
-    controller.text = '''Авокадо	₫99,000
-Анчоус	₫1,360,000
-Апельсин	₫50,000
-Базилик	₫267,000
-Баклажан	₫12,000''';
 
     final text = await showDialog<String>(
       context: context,
@@ -211,34 +173,19 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
             child: const Text('Отмена'),
           ),
           FilledButton(
-            onPressed: () => {
-              print('DEBUG: Add button pressed, text length: ${controller.text.length}'),
-              print('DEBUG: Text content: "${controller.text}"'),
-              Navigator.of(ctx).pop(controller.text)
-            },
+            onPressed: () => Navigator.of(ctx).pop(controller.text),
             child: const Text('Добавить'),
           ),
         ],
       ),
     );
 
-    print('DEBUG: Paste dialog result: text length = ${text?.length ?? 0}');
-    print('DEBUG: Text content: "${text ?? "null"}"');
     if (text != null && text.trim().isNotEmpty) {
-      print('DEBUG: Processing pasted text');
       await _processText(text, loc);
-    } else {
-      print('DEBUG: No text to process - showing error');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Текст не введен или пустой')),
-        );
-      }
     }
   }
 
   Future<void> _showSmartPasteDialog() async {
-    print('DEBUG: Showing smart AI paste dialog');
     final controller = TextEditingController();
     final loc = context.read<LocalizationService>();
 
@@ -313,14 +260,11 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     );
 
     if (text != null && text.trim().isNotEmpty) {
-      print('DEBUG: Processing with AI: ${text.length} chars');
       await _processTextWithAI(text, loc);
     }
   }
 
   Future<void> _processTextWithAI(String text, LocalizationService loc) async {
-    print('DEBUG: ===== AI TEXT PROCESSING =====');
-    print('DEBUG: Input text length: ${text.length}');
 
     setState(() => _isLoading = true);
 
@@ -347,20 +291,17 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 ${text}
 ''';
 
-      print('DEBUG: Sending to AI for product extraction');
 
       final response = await aiService._invoke('ai-generate-checklist', {
         'prompt': prompt
       });
 
       if (response == null || !response.containsKey('itemTitles')) {
-        print('DEBUG: AI response failed or invalid');
         throw Exception('AI не вернул результат');
       }
 
       // Парсим результат
       final rawItems = response['itemTitles'] as List? ?? [];
-      print('DEBUG: AI returned ${rawItems.length} raw items');
 
       final items = <({String name, double? price})>[];
       for (final rawItem in rawItems) {
@@ -378,15 +319,13 @@ ${text}
               }
 
               items.add((name: name, price: price));
-              print('DEBUG: AI parsed: "$name" -> price: $price');
             }
           }
         } catch (e) {
-          print('DEBUG: Failed to parse AI item: $rawItem, error: $e');
+          // Игнорируем ошибки парсинга
         }
       }
 
-      print('DEBUG: AI extracted ${items.length} products');
       if (items.isNotEmpty) {
         await _addProductsToNomenclature(items, loc);
       } else {
@@ -396,7 +335,6 @@ ${text}
       }
 
     } catch (e) {
-      print('DEBUG: AI processing failed: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Ошибка обработки текста AI: $e')),
       );
@@ -405,70 +343,27 @@ ${text}
     }
   }
 
-  Future<void> _loadTestData() async {
-    print('DEBUG: Loading test data');
-    final loc = context.read<LocalizationService>();
-    const testData = '''Авокадо	₫99,000
-Анчоус	₫1,360,000
-Апельсин	₫50,000
-Базилик	₫267,000
-Баклажан	₫12,000
-Балон для сифона	₫14,000
-Банка	₫15,000
-Бекон	₫290,000
-Бульон сухой грибной	₫145,000''';
-
-    await _processText(testData, loc);
-  }
-
-  Future<void> _pasteFromClipboard() async {
-    print('DEBUG: Pasting from clipboard');
-    final loc = context.read<LocalizationService>();
-
-    try {
-      // Имитируем вставку - в реальном приложении нужно использовать Clipboard
-      // Но для веб-версии это может не работать, поэтому покажем диалог
-      await _showPasteDialog();
-    } catch (e) {
-      print('DEBUG: Clipboard paste failed: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Не удалось получить доступ к буферу обмена')),
-      );
-    }
-  }
 
   Future<void> _processText(String text, LocalizationService loc) async {
-    print('DEBUG: ===== STARTING TEXT PROCESSING =====');
-    print('DEBUG: Raw input text length: ${text.length}');
-
     // Определяем формат текста
     final format = _detectTextFormat(text);
-    print('DEBUG: Detected format: $format');
 
     List<({String name, double? price})> items;
 
     if (format == 'ai_needed') {
       // Используем AI для сложных форматов
-      print('DEBUG: Format requires AI processing');
       return await _processTextWithAI(text, loc);
     } else {
       // Обычный парсинг
       final lines = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty);
-      print('DEBUG: After splitting - found ${lines.length} lines');
-
       items = lines.map(_parseLine).where((r) => r.name.isNotEmpty).toList();
-      print('DEBUG: After parsing - ${items.length} valid items');
-      items.forEach((item) => print('DEBUG:   Item: name="${item.name}", price=${item.price}'));
     }
 
     if (items.isEmpty) {
-      print('DEBUG: No valid items found, trying AI fallback');
       // Если обычный парсинг не сработал, пробуем AI
       return await _processTextWithAI(text, loc);
     }
 
-    // Для тестирования убираем диалог подтверждения
-    print('DEBUG: Processing ${items.length} items');
     await _addProductsToNomenclature(items, loc);
   }
 
@@ -543,12 +438,9 @@ ${text}
   }
 
   Future<void> _addProductsToNomenclature(List<({String name, double? price})> items, LocalizationService loc) async {
-    print('DEBUG: Starting to add ${items.length} products to nomenclature');
     setState(() => _isLoading = true);
 
     try {
-      // Прямое добавление без диалога для тестирования
-      print('DEBUG: Adding products directly without dialog');
       final store = context.read<ProductStoreSupabase>();
       final account = context.read<AccountManagerSupabase>();
       final estId = account.establishment?.id;
@@ -556,10 +448,7 @@ ${text}
       final sourceLang = loc.currentLanguageCode;
       final allLangs = LocalizationService.productLanguageCodes;
 
-      print('DEBUG: Establishment ID: $estId, Currency: $defCur');
-
       if (estId == null) {
-        print('DEBUG: No establishment ID found');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Не найдено заведение')),
         );
@@ -572,54 +461,46 @@ ${text}
 
       for (final item in items) {
         try {
-          print('DEBUG: Processing item: "${item.name}" price=${item.price}');
+          // Используем ИИ для улучшения данных продукта
+          ProductVerificationResult? verification;
+          try {
+            final aiService = context.read<AiServiceSupabase>();
+            verification = await aiService.verifyProduct(
+              item.name,
+              currentPrice: item.price,
+            );
+          } catch (aiError) {
+            verification = null;
+          }
 
-          // Создаем продукт
-        // Используем ИИ для улучшения данных продукта
-        ProductVerificationResult? verification;
-        try {
-          final aiService = context.read<AiServiceSupabase>();
-          verification = await aiService.verifyProduct(
-            item.name,
-            currentPrice: item.price,
+          // Используем проверенные ИИ данные или оригинальные
+          final normalizedName = verification?.normalizedName ?? item.name;
+          var names = <String, String>{for (final c in allLangs) c: normalizedName};
+
+          final product = Product(
+            id: const Uuid().v4(),
+            name: normalizedName,
+            category: verification?.suggestedCategory ?? 'manual',
+            names: names,
+            calories: verification?.suggestedCalories,
+            protein: null,
+            fat: null,
+            carbs: null,
+            unit: verification?.suggestedUnit ?? 'g',
+            basePrice: verification?.suggestedPrice ?? item.price,
+            currency: (verification?.suggestedPrice ?? item.price) != null ? defCur : null,
           );
-          print('DEBUG: AI verification for "${item.name}": ${verification?.normalizedName ?? 'no changes'}');
-        } catch (aiError) {
-          print('DEBUG: AI verification failed for "${item.name}": $aiError');
-          verification = null;
-        }
-
-        // Используем проверенные ИИ данные или оригинальные
-        final normalizedName = verification?.normalizedName ?? item.name;
-        var names = <String, String>{for (final c in allLangs) c: normalizedName};
-
-        final product = Product(
-          id: const Uuid().v4(),
-          name: normalizedName,
-          category: verification?.suggestedCategory ?? 'manual',
-          names: names,
-          calories: verification?.suggestedCalories,
-          protein: null,
-          fat: null,
-          carbs: null,
-          unit: verification?.suggestedUnit ?? 'g',
-          basePrice: verification?.suggestedPrice ?? item.price,
-          currency: (verification?.suggestedPrice ?? item.price) != null ? defCur : null,
-        );
 
           // Пытаемся добавить продукт
           try {
             await store.addProduct(product);
-            print('DEBUG: Product "${item.name}" added to database');
           } catch (e) {
             if (e.toString().contains('duplicate key') ||
                 e.toString().contains('already exists') ||
                 e.toString().contains('unique constraint')) {
-              print('DEBUG: Product "${item.name}" already exists, skipping add');
               skipped++;
               continue;
             } else {
-              print('DEBUG: Failed to add product "${item.name}": $e');
               failed++;
               continue;
             }
@@ -628,16 +509,13 @@ ${text}
           // Добавляем в номенклатуру
           try {
             await store.addToNomenclature(estId, product.id);
-            print('DEBUG: Product "${item.name}" added to nomenclature');
             added++;
           } catch (e) {
             if (e.toString().contains('duplicate key') ||
                 e.toString().contains('already exists') ||
                 e.toString().contains('unique constraint')) {
-              print('DEBUG: Product "${item.name}" already in nomenclature');
               skipped++;
             } else {
-              print('DEBUG: Failed to add to nomenclature "${item.name}": $e');
               failed++;
             }
           }
@@ -646,12 +524,9 @@ ${text}
           await Future.delayed(const Duration(milliseconds: 100));
 
         } catch (e) {
-          print('DEBUG: Unexpected error processing "${item.name}": $e');
           failed++;
         }
       }
-
-      print('DEBUG: Processing complete - added: $added, skipped: $skipped, failed: $failed');
 
       // Обновляем список продуктов
       await store.loadProducts();
@@ -682,10 +557,7 @@ ${text}
   }
 
   ({String name, double? price}) _parseLine(String line) {
-    print('DEBUG: Parsing line: "$line"');
-
     // Сначала попробуем найти паттерны с ценами в конце строки
-    // Ищем числа с возможными валютами в конце строки
     final pricePatterns = [
       RegExp(r'[\d,]+\s*[₫$€£руб.]?\s*$'), // число с опциональной валютой в конце
       RegExp(r'\d+\.\d+\s*[₫$€£руб.]?\s*$'), // десятичное число
@@ -708,8 +580,6 @@ ${text}
             .replaceAll(' ', '');
 
         price = double.tryParse(cleanPrice);
-        print('DEBUG: Found price pattern "$pricePart" -> cleaned "$cleanPrice" -> $price');
-
         if (price != null) break;
       }
     }
@@ -717,27 +587,22 @@ ${text}
     // Если не нашли цену паттерном, пробуем старый способ с разделителями
     if (price == null) {
       final parts = line.split(RegExp(r'\t|\s{2,}|\s+\|\s+|\s*;\s*'));
-      print('DEBUG: Fallback parsing - split into ${parts.length} parts: $parts');
       name = parts.isNotEmpty ? parts[0].trim() : line.trim();
       final priceStr = parts.length > 1 ? parts[1].trim() : '';
 
       if (priceStr.isNotEmpty) {
         final cleanPrice = priceStr.replaceAll(RegExp(r'[₫$€£руб.\s]'), '').replaceAll(',', '').replaceAll(' ', '');
         price = double.tryParse(cleanPrice);
-        print('DEBUG: Fallback price parsing "$priceStr" -> "$cleanPrice" -> $price');
       }
     }
 
     // Если имя пустое или содержит только цену, это ошибка
     if (name.isEmpty || RegExp(r'^\d').hasMatch(name)) {
-      print('DEBUG: Invalid name detected, using original line');
       name = line.trim();
       price = null;
     }
 
-    final result = (name: name, price: price);
-    print('DEBUG: Final parsed result: name="$name", price=$price');
-    return result;
+    return (name: name, price: price);
   }
 
   String _extractTextFromRtf(String rtf) {
