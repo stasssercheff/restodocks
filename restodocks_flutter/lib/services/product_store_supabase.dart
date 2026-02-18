@@ -195,7 +195,18 @@ class ProductStoreSupabase {
   Future<void> loadNomenclature(String establishmentId) async {
     try {
       print('DEBUG ProductStore: Loading nomenclature for establishment $establishmentId...');
-      print('DEBUG ProductStore: Current user: ${Supabase.instance.client.auth.currentUser?.id}');
+      final currentUser = Supabase.instance.client.auth.currentUser;
+      print('DEBUG ProductStore: Current user: ${currentUser?.id}');
+      print('DEBUG ProductStore: User email: ${currentUser?.email}');
+
+      // Проверяем, есть ли данные в таблице для этого establishment
+      final testQuery = await _supabase.client
+          .from('establishment_products')
+          .select('count')
+          .eq('establishment_id', establishmentId)
+          .limit(1);
+
+      print('DEBUG ProductStore: Test query result: $testQuery');
 
       final data = await _supabase.client
           .from('establishment_products')

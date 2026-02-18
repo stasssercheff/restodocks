@@ -1,7 +1,11 @@
 -- Add RLS policies for establishment_products table
 -- This fixes the 400 error when loading nomenclature
 
--- Enable RLS for establishment_products
+-- First, drop existing policies if they exist
+DROP POLICY IF EXISTS "Users can view establishment products from their establishment" ON establishment_products;
+DROP POLICY IF EXISTS "Users can manage establishment products from their establishment" ON establishment_products;
+
+-- Enable RLS for establishment_products (if not already enabled)
 ALTER TABLE establishment_products ENABLE ROW LEVEL SECURITY;
 
 -- Allow users to view establishment products from their own establishments
