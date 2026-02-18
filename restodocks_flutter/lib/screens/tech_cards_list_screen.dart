@@ -301,13 +301,17 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         actions: [
           // Счетчик ТТК
           if (!_selectionMode) Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.8),
+                borderRadius: BorderRadius.circular(12),
+              ),
               child: Text(
                 '${_list.length}',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w500,
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontWeight: FontWeight.w600,
                     ),
               ),
             ),
