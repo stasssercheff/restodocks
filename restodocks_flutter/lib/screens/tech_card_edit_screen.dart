@@ -773,6 +773,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
 
     if (!mounted) return;
     final nomenclatureProducts = productStore.getNomenclatureProducts(est.id);
+    final allProducts = productStore.allProducts;
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -782,14 +783,15 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
         maxChildSize: 0.95,
         expand: false,
         builder: (_, scroll) => DefaultTabController(
-          length: 2,
+          length: 3,
           child: Scaffold(
             appBar: AppBar(
               title: Text(replaceIndex != null ? loc.t('change_ingredient') : loc.t('add_ingredient')),
               bottom: TabBar(
                 tabs: [
-                  Tab(text: loc.t('ingredient_from_product')),
-                  Tab(text: loc.t('ingredient_from_ttk')),
+                  Tab(text: loc.t('nomenclature')),
+                  Tab(text: loc.t('all_products')),
+                  Tab(text: loc.t('semi_finished')),
                 ],
               ),
             ),
@@ -797,6 +799,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
               children: [
                 _ProductPicker(
                   products: nomenclatureProducts,
+                  onPick: (p, w, proc, waste, unit, gpp, {cookingLossPctOverride}) => _addProductIngredient(p, w, proc, waste, unit, gpp, replaceIndex: replaceIndex, cookingLossPctOverride: cookingLossPctOverride),
+                ),
+                _ProductPicker(
+                  products: allProducts,
                   onPick: (p, w, proc, waste, unit, gpp, {cookingLossPctOverride}) => _addProductIngredient(p, w, proc, waste, unit, gpp, replaceIndex: replaceIndex, cookingLossPctOverride: cookingLossPctOverride),
                 ),
                 _TechCardPicker(techCards: _pickerTechCards, onPick: (t, w, unit, gpp) => _addTechCardIngredient(t, w, unit, gpp, replaceIndex: replaceIndex)),

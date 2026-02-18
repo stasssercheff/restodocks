@@ -394,7 +394,7 @@ class TechCardServiceSupabase {
         .from('tech_cards')
         .select('''
           *,
-          tech_card_ingredients (
+          tt_ingredients (
             *
           )
         ''');
