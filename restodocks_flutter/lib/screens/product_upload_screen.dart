@@ -127,7 +127,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
             _UploadMethodCard(
               icon: Icons.file_upload,
               title: 'Из файла',
-              description: 'Excel (.xlsx, .xls), Текст (.txt), RTF (.rtf)',
+              description: 'Excel (.xlsx, .xls), CSV (.csv), Текст (.txt), RTF (.rtf)',
               color: Colors.blue,
               onTap: _isLoading ? null : () => _uploadFromFile(),
             ),
@@ -180,6 +180,40 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
             // Пример формата
             _FormatExample(),
+
+            const SizedBox(height: 16),
+
+            // Инструкция по конвертации Excel
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.info_outline, color: Theme.of(context).colorScheme.primary),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Если Excel не загружается:',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Text('1. Откройте файл в Excel или Google Sheets'),
+                    const Text('2. Выделите данные (Ctrl+A)'),
+                    const Text('3. Скопируйте (Ctrl+C)'),
+                    const Text('4. Используйте "Вставить текст" вместо файла'),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Или сохраните как CSV и загрузите как файл',
+                      style: TextStyle(color: Theme.of(context).colorScheme.secondary),
+                    ),
+                  ],
+                ),
+              ),
+            ),
 
             const SizedBox(height: 16),
 
@@ -261,7 +295,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     final loc = context.read<LocalizationService>();
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['txt', 'xlsx', 'xls', 'rtf'],
+      allowedExtensions: ['txt', 'xlsx', 'xls', 'rtf', 'csv'],
       withData: true,
     );
 
@@ -276,6 +310,21 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     } else if (fileName.endsWith('.rtf')) {
       final text = _extractTextFromRtf(utf8.decode(bytes, allowMalformed: true));
       await _processText(text, loc, true);
+    } else if (fileName.endsWith('.csv')) {
+      final text = utf8.decode(bytes, allowMalformed: true);
+      final lines = text.split('\n').where((line) => line.trim().isNotEmpty).toList();
+      // Конвертируем CSV в табличный формат
+      final convertedLines = lines.map((line) {
+        // Определяем разделитель
+        if (line.contains(';')) {
+          return line.split(';').map((cell) => cell.trim()).join('\t');
+        } else if (line.contains(',')) {
+          return line.split(',').map((cell) => cell.trim()).join('\t');
+        } else {
+          return line; // Уже в нужном формате
+        }
+      }).toList();
+      await _processText(convertedLines.join('\n'), loc, true);
     } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
       await _processExcel(bytes, loc);
     }
