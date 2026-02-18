@@ -444,12 +444,26 @@ ${text}
     try {
       final store = context.read<ProductStoreSupabase>();
       final account = context.read<AccountManagerSupabase>();
+
+      // Проверяем инициализацию Supabase
+      print('DEBUG: Checking Supabase initialization...');
+      final supabaseClient = store.supabaseClient;
+      print('DEBUG: Supabase client available: ${supabaseClient != null}');
       final estId = account.establishment?.id;
       final defCur = account.establishment?.defaultCurrency ?? 'VND';
       final sourceLang = loc.currentLanguageCode;
       final allLangs = LocalizationService.productLanguageCodes;
 
       print('DEBUG: Establishment ID: $estId, Default currency: $defCur');
+      print('DEBUG: User logged in: ${account.isLoggedInSync}');
+
+      if (!account.isLoggedInSync) {
+        print('DEBUG: User not logged in!');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Пользователь не авторизован')),
+        );
+        return;
+      }
 
       if (estId == null) {
         print('DEBUG: No establishment found!');
