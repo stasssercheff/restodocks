@@ -373,11 +373,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
               onLoadKbju: (ctx, list) => _loadKbjuForAll(ctx, list),
               onLoadTranslations: (ctx, list) => _loadTranslationsForAll(ctx, list),
               onVerifyWithAi: (ctx, list) => _verifyWithAi(ctx, list),
-              onNeedsKbju: _needsKbju,
-              onNeedsTranslation: _needsTranslation,
-              onCanShowNutrition: _canShowNutrition,
-              onBuildProductSubtitle: _buildProductSubtitle,
-              onBuildTechCardSubtitle: _buildTechCardSubtitle,
+              onNeedsKbju: (item) => _needsKbju(item),
+              onNeedsTranslation: (item) => _needsTranslation(item),
+              onCanShowNutrition: (context) => _canShowNutrition(context),
+              onBuildProductSubtitle: (context, p, store, estId, loc) => _buildProductSubtitle(context, p, store, estId, loc),
+              onBuildTechCardSubtitle: (tc) => _buildTechCardSubtitle(tc),
             ),
           ),
         ],
@@ -1185,7 +1185,7 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
     }
 
     final needsKbju = widget.items.where((item) => item.isProduct && item.product!.category == 'manual' && widget.onNeedsKbju(item)).toList();
-    final needsTranslation = widget.items.where(widget.onNeedsTranslation).toList();
+    final needsTranslation = widget.items.where((item) => widget.onNeedsTranslation(item)).toList();
     return Column(
       children: [
         Padding(
