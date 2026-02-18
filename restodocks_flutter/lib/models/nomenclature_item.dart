@@ -12,6 +12,7 @@ class NomenclatureItem {
   String get name => product?.name ?? techCard!.dishName;
   String get category => product?.category ?? techCard!.category;
   double? get price => product?.basePrice ?? (techCard != null ? _calculateTechCardCostPerKg(techCard!) : null);
+  String? get currency => product?.currency;
 
   const NomenclatureItem.product(this.product) : techCard = null;
   const NomenclatureItem.techCard(this.techCard) : product = null;

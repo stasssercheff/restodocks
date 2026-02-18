@@ -50,6 +50,79 @@ class _ProductsScreenState extends State<ProductsScreen> {
     }
   }
 
+  Widget _buildSkeletonLoading() {
+    return ListView.builder(
+      itemCount: 6, // Показываем 6 skeleton элементов
+      itemBuilder: (context, index) {
+        return const _ProductSkeletonItem();
+      },
+    );
+  }
+
+  Future<void> _removeDuplicates() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Удалить дубликаты'),
+        content: const Text('Будут удалены продукты с одинаковым названием, ценой и характеристиками. Останется только один экземпляр каждого продукта. Продолжить?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Отмена'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final store = context.read<ProductStoreSupabase>();
+
+      // Группируем продукты по ключевым характеристикам
+      final Map<String, List<Product>> groupedProducts = {};
+
+      for (final product in _products) {
+        // Ключ для группировки: название + категория + калории + белки + жиры + углеводы
+        final key = '${product.name}_${product.category}_${product.calories}_${product.protein}_${product.fat}_${product.carbs}_${product.basePrice}_${product.currency}';
+        groupedProducts.putIfAbsent(key, () => []).add(product);
+      }
+
+      int deletedCount = 0;
+
+      // Для каждой группы оставляем только первый продукт, остальные удаляем
+      for (final products in groupedProducts.values) {
+        if (products.length > 1) {
+          for (int i = 1; i < products.length; i++) {
+            await store.deleteProduct(products[i].id);
+            deletedCount++;
+          }
+        }
+      }
+
+      if (mounted) {
+        await _loadProducts(); // Перезагружаем список
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Удалено дубликатов: $deletedCount')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка удаления дубликатов: $e')),
+        );
+      }
+    }
+  }
+
   List<Product> get _filteredProducts {
     if (_query.isEmpty) return _products;
     final query = _query.toLowerCase();
@@ -66,6 +139,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
         product: product,
         onPriceUpdated: _loadProducts,
         onAddedToNomenclature: _loadProducts,
+        onProductDeleted: _loadProducts,
       ),
     );
   }
@@ -107,6 +181,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
         ),
         title: Text(loc.t('products')),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.delete_sweep),
+            tooltip: 'Удалить дубликаты',
+            onPressed: _removeDuplicates,
+          ),
           IconButton(
             icon: const Icon(Icons.upload_file),
             tooltip: loc.t('upload_products'),
@@ -210,11 +289,13 @@ class _ProductDetailsDialog extends StatefulWidget {
   final Product product;
   final VoidCallback onPriceUpdated;
   final VoidCallback onAddedToNomenclature;
+  final VoidCallback onProductDeleted;
 
   const _ProductDetailsDialog({
     required this.product,
     required this.onPriceUpdated,
     required this.onAddedToNomenclature,
+    required this.onProductDeleted,
   });
 
   @override
@@ -294,6 +375,49 @@ class _ProductDetailsDialogState extends State<_ProductDetailsDialog> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Ошибка: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isUpdating = false);
+      }
+    }
+  }
+
+  Future<void> _deleteProduct() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Удалить продукт'),
+        content: Text('Вы уверены, что хотите удалить продукт "${widget.product.getLocalizedName(context.read<LocalizationService>().currentLanguageCode)}"? Это действие нельзя отменить.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Отмена'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isUpdating = true);
+    try {
+      final store = context.read<ProductStoreSupabase>();
+      await store.deleteProduct(widget.product.id);
+      if (mounted) {
+        widget.onProductDeleted();
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка удаления: $e')),
         );
       }
     } finally {
@@ -388,18 +512,15 @@ class _ProductDetailsDialogState extends State<_ProductDetailsDialog> {
           onPressed: _isUpdating ? null : _addToNomenclature,
           child: Text(loc.t('add_to_nomenclature')),
         ),
+        TextButton(
+          onPressed: _isUpdating ? null : _deleteProduct,
+          style: TextButton.styleFrom(foregroundColor: Colors.red),
+          child: const Text('Удалить продукт'),
+        ),
       ],
     );
   }
 
-  Widget _buildSkeletonLoading() {
-    return ListView.builder(
-      itemCount: 6, // Показываем 6 skeleton элементов
-      itemBuilder: (context, index) {
-        return const _ProductSkeletonItem();
-      },
-    );
-  }
 }
 
 class _ProductSkeletonItem extends StatelessWidget {

@@ -295,6 +295,72 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     if (mounted) setState(() => _isLoading = false);
   }
 
+  void _showDuplicates() {
+    final loc = context.read<LocalizationService>();
+
+    // Группируем по названию и цене для поиска дубликатов
+    final Map<String, List<NomenclatureItem>> groupedItems = {};
+
+    for (final item in _nomenclatureItems) {
+      final key = '${item.name}_${item.price}_${item.currency}';
+      groupedItems.putIfAbsent(key, () => []).add(item);
+    }
+
+    // Находим только группы с дубликатами
+    final duplicateGroups = groupedItems.values.where((group) => group.length > 1).toList();
+
+    if (duplicateGroups.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Дубликатов не найдено')),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Найденные дубликаты'),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 400,
+          child: ListView.builder(
+            itemCount: duplicateGroups.length,
+            itemBuilder: (context, groupIndex) {
+              final group = duplicateGroups[groupIndex];
+              final item = group.first;
+
+              return Card(
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${item.name} (${item.price ?? 0} ${item.currency ?? 'RUB'})',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        '${group.length} экземпляров',
+                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Закрыть'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildNomenclatureSkeletonLoading() {
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
@@ -564,6 +630,11 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.warning),
+            onPressed: () => _showDuplicates(),
+            tooltip: 'Показать дубликаты',
+          ),
           IconButton(
             icon: const Icon(Icons.upload_file),
             onPressed: () => _showUploadDialog(context, loc),

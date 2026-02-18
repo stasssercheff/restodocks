@@ -146,10 +146,10 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
     if (fileName.endsWith('.txt')) {
       final text = utf8.decode(bytes, allowMalformed: true);
-      await _processText(text, loc);
+      await _processText(text, loc, true);
     } else if (fileName.endsWith('.rtf')) {
       final text = _extractTextFromRtf(utf8.decode(bytes, allowMalformed: true));
-      await _processText(text, loc);
+      await _processText(text, loc, true);
     } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
       await _processExcel(bytes, loc);
     }
@@ -158,55 +158,68 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   Future<void> _showPasteDialog() async {
     final loc = context.read<LocalizationService>();
     final controller = TextEditingController();
+    bool addToNomenclature = true; // По умолчанию добавлять в номенклатуру
 
-    final text = await showDialog<String>(
+    final result = await showDialog<({String text, bool addToNomenclature})>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Вставить список продуктов'),
-        content: SizedBox(
-          width: 500,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Вставьте список продуктов в поле ниже.\nКаждая строка = один продукт.',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: controller,
-                maxLines: 15,
-                decoration: const InputDecoration(
-                  hintText: 'Пример:\nАвокадо\t₫99,000\nБазилик\t₫267,000\nМолоко\t₫38,000',
-                  border: OutlineInputBorder(),
-                  alignLabelWithHint: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: Text('Вставить список продуктов'),
+          content: SizedBox(
+            width: 500,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Вставьте список продуктов в поле ниже.\nКаждая строка = один продукт.',
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
-              ),
-            ],
+                const SizedBox(height: 16),
+                TextField(
+                  controller: controller,
+                  maxLines: 12,
+                  decoration: const InputDecoration(
+                    hintText: 'Пример:\nАвокадо\t₫99,000\nБазилик\t₫267,000\nМолоко\t₫38,000',
+                    border: OutlineInputBorder(),
+                    alignLabelWithHint: true,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                CheckboxListTile(
+                  title: Text('Добавить в номенклатуру заведения', style: Theme.of(context).textTheme.bodyMedium),
+                  subtitle: Text('Продукты будут доступны для создания техкарт', style: Theme.of(context).textTheme.bodySmall),
+                  value: addToNomenclature,
+                  onChanged: (value) => setState(() => addToNomenclature = value ?? true),
+                  dense: true,
+                  controlAffinity: ListTileControlAffinity.leading,
+                ),
+              ],
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Отмена'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop((text: controller.text, addToNomenclature: addToNomenclature)),
+              child: const Text('Добавить'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Отмена'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(controller.text),
-            child: const Text('Добавить'),
-          ),
-        ],
       ),
     );
 
-    if (text != null && text.trim().isNotEmpty) {
-      await _processText(text, loc);
+    if (result != null && result.text.trim().isNotEmpty) {
+      await _processText(result.text, loc, result.addToNomenclature);
     }
   }
 
   Future<void> _showSmartPasteDialog() async {
     final controller = TextEditingController();
     final loc = context.read<LocalizationService>();
+    bool addToNomenclature = true; // По умолчанию добавлять в номенклатуру
 
     // Пример различных форматов
     controller.text = '''Возможные форматы:
@@ -233,57 +246,68 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 Морковь 20.000₫
 Лук: 20000''';
 
-    final text = await showDialog<String>(
+    final result = await showDialog<({String text, bool addToNomenclature})>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('AI обработка списка продуктов'),
-        content: SizedBox(
-          width: 600,
-          height: 400,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'ИИ автоматически разберет любой формат списка продуктов.\n'
-                'Просто вставьте текст в любом формате:',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 16),
-              Expanded(
-                child: TextField(
-                  controller: controller,
-                  maxLines: null,
-                  expands: true,
-                  textAlignVertical: TextAlignVertical.top,
-                  decoration: const InputDecoration(
-                    hintText: 'Вставьте список продуктов здесь...',
-                    border: OutlineInputBorder(),
-                    alignLabelWithHint: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: Text('AI обработка списка продуктов'),
+          content: SizedBox(
+            width: 600,
+            height: 450,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'ИИ автоматически разберет любой формат списка продуктов.\n'
+                  'Просто вставьте текст в любом формате:',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: TextField(
+                    controller: controller,
+                    maxLines: null,
+                    expands: true,
+                    textAlignVertical: TextAlignVertical.top,
+                    decoration: const InputDecoration(
+                      hintText: 'Вставьте список продуктов здесь...',
+                      border: OutlineInputBorder(),
+                      alignLabelWithHint: true,
+                    ),
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 16),
+                CheckboxListTile(
+                  title: Text('Добавить в номенклатуру заведения', style: Theme.of(context).textTheme.bodyMedium),
+                  subtitle: Text('Продукты будут доступны для создания техкарт', style: Theme.of(context).textTheme.bodySmall),
+                  value: addToNomenclature,
+                  onChanged: (value) => setState(() => addToNomenclature = value ?? true),
+                  dense: true,
+                  controlAffinity: ListTileControlAffinity.leading,
+                ),
+              ],
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Отмена'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop((text: controller.text, addToNomenclature: addToNomenclature)),
+              child: const Text('Обработать с AI'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Отмена'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(controller.text),
-            child: const Text('Обработать с AI'),
-          ),
-        ],
       ),
     );
 
-    if (text != null && text.trim().isNotEmpty) {
-      await _processTextWithAI(text, loc);
+    if (result != null && result.text.trim().isNotEmpty) {
+      await _processTextWithAI(result.text, loc, result.addToNomenclature);
     }
   }
 
-  Future<void> _processTextWithAI(String text, LocalizationService loc) async {
+  Future<void> _processTextWithAI(String text, LocalizationService loc, bool addToNomenclature) async {
 
     setState(() => _isLoading = true);
 
@@ -346,7 +370,7 @@ ${text}
       }
 
       if (items.isNotEmpty) {
-        await _addProductsToNomenclature(items, loc);
+        await _addProductsToNomenclature(items, loc, addToNomenclature);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('AI не смог извлечь продукты из текста')),
@@ -363,7 +387,7 @@ ${text}
   }
 
 
-  Future<void> _processText(String text, LocalizationService loc) async {
+  Future<void> _processText(String text, LocalizationService loc, bool addToNomenclature) async {
     // Определяем формат текста
     final format = _detectTextFormat(text);
 
@@ -371,7 +395,7 @@ ${text}
 
     if (format == 'ai_needed') {
       // Используем AI для сложных форматов
-      return await _processTextWithAI(text, loc);
+      return await _processTextWithAI(text, loc, addToNomenclature);
     } else {
       // Обычный парсинг
       final lines = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty);
@@ -380,10 +404,10 @@ ${text}
 
     if (items.isEmpty) {
       // Если обычный парсинг не сработал, пробуем AI
-      return await _processTextWithAI(text, loc);
+      return await _processTextWithAI(text, loc, addToNomenclature);
     }
 
-    await _addProductsToNomenclature(items, loc);
+    await _addProductsToNomenclature(items, loc, addToNomenclature);
   }
 
   String _detectTextFormat(String text) {
@@ -448,7 +472,7 @@ ${text}
         }
       }
 
-      await _processText(lines.join('\n'), loc);
+      await _processText(lines.join('\n'), loc, true); // Для файлов всегда добавляем в номенклатуру
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Ошибка обработки Excel файла: $e')),
@@ -456,7 +480,7 @@ ${text}
     }
   }
 
-  Future<void> _addProductsToNomenclature(List<({String name, double? price})> items, LocalizationService loc) async {
+  Future<void> _addProductsToNomenclature(List<({String name, double? price})> items, LocalizationService loc, bool addToNomenclature) async {
     _addDebugLog('Starting to process ${items.length} products');
     setState(() => _isLoading = true);
 
@@ -582,23 +606,29 @@ ${text}
             }
           }
 
-          // Добавляем в номенклатуру
-          try {
-            print('DEBUG: Adding product "${product.name}" to nomenclature...');
-            await store.addToNomenclature(estId, product.id);
-            added++;
-            print('DEBUG: Successfully added "${product.name}" to nomenclature');
-          } catch (e) {
-            print('DEBUG: Failed to add "${product.name}" to nomenclature: $e');
-            if (e.toString().contains('duplicate key') ||
-                e.toString().contains('already exists') ||
-                e.toString().contains('unique constraint')) {
-              print('DEBUG: Product "${product.name}" already in nomenclature, skipping');
-              skipped++;
-            } else {
-              print('DEBUG: Unexpected error adding "${product.name}" to nomenclature: $e');
-              failed++;
+          // Добавляем в номенклатуру только если выбрана эта опция
+          if (addToNomenclature) {
+            try {
+              print('DEBUG: Adding product "${product.name}" to nomenclature...');
+              await store.addToNomenclature(estId, product.id);
+              added++;
+              print('DEBUG: Successfully added "${product.name}" to nomenclature');
+            } catch (e) {
+              print('DEBUG: Failed to add "${product.name}" to nomenclature: $e');
+              if (e.toString().contains('duplicate key') ||
+                  e.toString().contains('already exists') ||
+                  e.toString().contains('unique constraint')) {
+                print('DEBUG: Product "${product.name}" already in nomenclature, skipping');
+                skipped++;
+              } else {
+                print('DEBUG: Unexpected error adding "${product.name}" to nomenclature: $e');
+                failed++;
+              }
             }
+          } else {
+            // Продукт добавлен только в базу
+            added++;
+            print('DEBUG: Product "${product.name}" added to database only');
           }
 
           // Небольшая задержка

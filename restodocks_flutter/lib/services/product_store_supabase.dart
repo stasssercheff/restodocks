@@ -251,6 +251,25 @@ class ProductStoreSupabase {
     _priceCache.remove('${establishmentId}_$productId');
   }
 
+  /// Полностью удалить продукт из базы данных
+  Future<void> deleteProduct(String productId) async {
+    // Сначала удаляем из всех номенклатур
+    await _supabase.client
+        .from('establishment_products')
+        .delete()
+        .eq('product_id', productId);
+
+    // Затем удаляем сам продукт
+    await _supabase.client
+        .from('products')
+        .delete()
+        .eq('id', productId);
+
+    // Очистить кэш
+    _priceCache.removeWhere((key, value) => key.contains(productId));
+    _allProducts.removeWhere((product) => product.id == productId);
+  }
+
   /// Установить цену продукта в номенклатуре заведения
   Future<void> setEstablishmentPrice(String establishmentId, String productId, double? price, String? currency) async {
     await _supabase.client.from('establishment_products').upsert(
