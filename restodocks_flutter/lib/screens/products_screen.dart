@@ -12,6 +12,7 @@ import '../services/account_manager_supabase.dart';
 import '../services/tech_card_service_supabase.dart';
 
 /// Экран базы продуктов: просмотр и управление продуктами с КБЖУ
+/// Поддерживает интеллектуальный импорт и защиту от удаления используемых продуктов
 class ProductsScreen extends StatefulWidget {
   const ProductsScreen({super.key});
 
