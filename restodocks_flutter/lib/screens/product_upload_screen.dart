@@ -607,8 +607,10 @@ ${text}
 
 
   Future<void> _processText(String text, LocalizationService loc, bool addToNomenclature) async {
-    _addDebugLog('Starting text processing. Text length: ${text.length}');
-    _addDebugLog('Raw text: "${text.substring(0, min(100, text.length))}"');
+    _addDebugLog('=== STARTING TEXT PROCESSING ===');
+    _addDebugLog('Text length: ${text.length}');
+    _addDebugLog('Add to nomenclature: $addToNomenclature');
+    _addDebugLog('Raw text preview: "${text.substring(0, min(200, text.length))}"');
 
     _setLoadingMessage('Определяем формат текста...');
 
@@ -624,12 +626,22 @@ ${text}
     } else {
       // Обычный парсинг
       _setLoadingMessage('Разбираем текст...');
-      final lines = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty);
-      _addDebugLog('Found ${lines.length} lines to parse');
+      final lines = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+      _addDebugLog('=== PARSING ${lines.length} LINES ===');
+      for (var i = 0; i < min(3, lines.length); i++) {
+        _addDebugLog('Raw line ${i}: "${lines[i]}"');
+      }
+
       items = lines.map(_parseLine).where((r) => r.name.isNotEmpty).toList();
-      _addDebugLog('Parsed ${items.length} items from ${lines.length} lines');
-      for (var i = 0; i < items.length; i++) {
-        _addDebugLog('Item ${i}: "${items[i].name}" -> ${items[i].price}');
+      _addDebugLog('After filtering empty names: ${items.length} items remain');
+
+      if (items.isEmpty) {
+        _addDebugLog('ERROR: All items were filtered out! Check _parseLine logic.');
+      } else {
+        _addDebugLog('First 3 parsed items:');
+        for (var i = 0; i < min(3, items.length); i++) {
+          _addDebugLog('  ${i}: "${items[i].name}" @ ${items[i].price}');
+        }
       }
     }
 
@@ -715,8 +727,14 @@ ${text}
   }
 
   Future<void> _addProductsToNomenclature(List<({String name, double? price})> items, LocalizationService loc, bool addToNomenclature) async {
-    _addDebugLog('Starting to process ${items.length} products');
-    print('DEBUG: Processing ${items.length} items, addToNomenclature: $addToNomenclature');
+    _addDebugLog('=== STARTING PRODUCT CREATION ===');
+    _addDebugLog('Items to process: ${items.length}');
+    _addDebugLog('Add to nomenclature: $addToNomenclature');
+
+    if (items.isEmpty) {
+      _addDebugLog('ERROR: No items to process!');
+      return;
+    }
     _setLoadingMessage('Обрабатываем ${items.length} продуктов...');
     setState(() => _isLoading = true);
 
