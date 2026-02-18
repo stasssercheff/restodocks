@@ -7,6 +7,7 @@ ALTER TABLE employees ENABLE ROW LEVEL SECURITY;
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tech_cards ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tt_ingredients ENABLE ROW LEVEL SECURITY;
+ALTER TABLE establishment_products ENABLE ROW LEVEL SECURITY;
 
 -- Политики для establishments
 CREATE POLICY "Users can view their own establishment" ON establishments
@@ -68,5 +69,20 @@ CREATE POLICY "Users can manage ingredients from their establishment" ON tt_ingr
       SELECT id FROM tech_cards WHERE establishment_id IN (
         SELECT id FROM establishments WHERE owner_id::text = auth.uid()::text
       )
+    )
+  );
+
+-- Политики для establishment_products
+CREATE POLICY "Users can view establishment products from their establishment" ON establishment_products
+  FOR SELECT USING (
+    establishment_id IN (
+      SELECT id FROM establishments WHERE owner_id::text = auth.uid()::text
+    )
+  );
+
+CREATE POLICY "Users can manage establishment products from their establishment" ON establishment_products
+  FOR ALL USING (
+    establishment_id IN (
+      SELECT id FROM establishments WHERE owner_id::text = auth.uid()::text
     )
   );

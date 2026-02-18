@@ -195,6 +195,8 @@ class ProductStoreSupabase {
   Future<void> loadNomenclature(String establishmentId) async {
     try {
       print('DEBUG ProductStore: Loading nomenclature for establishment $establishmentId...');
+      print('DEBUG ProductStore: Current user: ${Supabase.instance.client.auth.currentUser?.id}');
+
       final data = await _supabase.client
           .from('establishment_products')
           .select('product_id, price, currency')
