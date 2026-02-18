@@ -368,6 +368,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
               onFilterTypeChanged: (f) => setState(() => _nomFilter = f),
               onRefresh: () => _ensureLoaded().then((_) => setState(() {})),
               onSwitchToCatalog: () {}, // Не используется
+              onEditProduct: (ctx, p) => _ProductsScreenState._showEditProduct(ctx, p, store, loc, () => _ensureLoaded().then((_) => setState(() {}))),
+              onRemoveProduct: (ctx, p) => _ProductsScreenState._confirmRemove(ctx, p, store, loc, () => _ensureLoaded().then((_) => setState(() {})), estId ?? ''),
             ),
           ),
         ],
@@ -952,6 +954,8 @@ class _NomenclatureTab extends StatefulWidget {
     required this.onFilterTypeChanged,
     required this.onRefresh,
     required this.onSwitchToCatalog,
+    required this.onEditProduct,
+    required this.onRemoveProduct,
   });
 
   final List<NomenclatureItem> items;
@@ -965,6 +969,8 @@ class _NomenclatureTab extends StatefulWidget {
   final void Function(_NomenclatureFilter) onFilterTypeChanged;
   final VoidCallback onRefresh;
   final VoidCallback onSwitchToCatalog;
+  final void Function(BuildContext, Product) onEditProduct;
+  final void Function(BuildContext, Product) onRemoveProduct;
 
   String _categoryLabel(String c) {
     const map = {
@@ -976,7 +982,7 @@ class _NomenclatureTab extends StatefulWidget {
     return map[c] ?? c;
   }
 
-  String _buildProductSubtitle(Product p, ProductStoreSupabase store, String estId) {
+  static String _buildProductSubtitle(Product p, ProductStoreSupabase store, String estId, LocalizationService loc) {
     final establishmentPrice = store.getEstablishmentPrice(p.id, estId);
     final price = establishmentPrice?.$1 ?? p.basePrice;
     final currency = establishmentPrice?.$2 ?? 'RUB';
@@ -1000,7 +1006,7 @@ class _NomenclatureTab extends StatefulWidget {
         : '${_categoryLabel(p.category)} · ${p.calories?.round() ?? 0} ккал · $priceText';
   }
 
-  String _buildTechCardSubtitle(TechCard tc) {
+  static String _buildTechCardSubtitle(TechCard tc) {
     // Рассчитываем стоимость за кг для ТТК
     if (tc.ingredients.isEmpty) {
       return 'ПФ · Цена не рассчитана · Выход: ${tc.yield.toStringAsFixed(0)}г';
@@ -1013,7 +1019,7 @@ class _NomenclatureTab extends StatefulWidget {
     return 'ПФ · ${costPerKg.toStringAsFixed(0)} ₽/кг · Выход: ${tc.yield.toStringAsFixed(0)}г';
   }
 
-  bool _needsKbju(NomenclatureItem item) {
+  static bool _needsKbju(NomenclatureItem item) {
     if (item.isTechCard) return false; // ТТК не нуждаются в КБЖУ
     final p = item.product!;
     return (p.calories == null || p.calories == 0) && p.protein == null && p.fat == null && p.carbs == null;
@@ -1025,7 +1031,7 @@ class _NomenclatureTab extends StatefulWidget {
     return employee?.hasProSubscription ?? false;
   }
 
-  bool _needsTranslation(NomenclatureItem item) {
+  static bool _needsTranslation(NomenclatureItem item) {
     if (item.isTechCard) return false; // ТТК не нуждаются в переводе имен
     final p = item.product!;
     final allLangs = LocalizationService.productLanguageCodes;
@@ -1040,7 +1046,7 @@ class _NomenclatureTab extends StatefulWidget {
     return false;
   }
 
-  Future<void> _loadKbjuForAll(BuildContext context, List<Product> list) async {
+  static Future<void> _loadKbjuForAll(BuildContext context, List<Product> list) async {
     if (!context.mounted) return;
     await showDialog<void>(
       context: context,
@@ -1066,7 +1072,7 @@ class _NomenclatureTab extends StatefulWidget {
     if (context.mounted) onRefresh();
   }
 
-  Future<void> _loadTranslationsForAll(BuildContext context, List<Product> list) async {
+  static Future<void> _loadTranslationsForAll(BuildContext context, List<Product> list) async {
     if (!context.mounted) return;
     await showDialog<void>(
       context: context,
@@ -1092,7 +1098,7 @@ class _NomenclatureTab extends StatefulWidget {
     if (context.mounted) onRefresh();
   }
 
-  Future<void> _verifyWithAi(BuildContext context, List<Product> list) async {
+  static Future<void> _verifyWithAi(BuildContext context, List<Product> list) async {
     if (!context.mounted || list.isEmpty) return;
     final ai = context.read<AiService>();
     List<_VerifyProductItem> results = [];
@@ -1154,8 +1160,8 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
       );
     }
 
-    final needsKbju = widget.items.where((item) => item.isProduct && item.product!.category == 'manual' && _needsKbju(item)).toList();
-    final needsTranslation = widget.items.where(_needsTranslation).toList();
+    final needsKbju = widget.items.where((item) => item.isProduct && item.product!.category == 'manual' && _ProductsScreenState._needsKbju(item)).toList();
+    final needsTranslation = widget.items.where(_ProductsScreenState._needsTranslation).toList();
     return Column(
       children: [
         Padding(
@@ -1201,22 +1207,22 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                if (needsKbju.isNotEmpty && _canShowNutrition(context))
+                if (needsKbju.isNotEmpty && _ProductsScreenState._canShowNutrition(context))
                   FilledButton.tonalIcon(
-                    onPressed: () => _loadKbjuForAll(context, needsKbju.where((item) => item.isProduct).map((item) => item.product!).toList()),
+                    onPressed: () => _ProductsScreenState._loadKbjuForAll(context, needsKbju.where((item) => item.isProduct).map((item) => item.product!).toList()),
                     icon: const Icon(Icons.cloud_download, size: 20),
                     label: Text(widget.loc.t('load_kbju_for_all').replaceAll('%s', '${needsKbju.length}')),
                   ),
                 if (needsTranslation.isNotEmpty)
                   FilledButton.tonalIcon(
-                    onPressed: () => _loadTranslationsForAll(context, needsTranslation.where((item) => item.isProduct).map((item) => item.product!).toList()),
+                    onPressed: () => _ProductsScreenState._loadTranslationsForAll(context, needsTranslation.where((item) => item.isProduct).map((item) => item.product!).toList()),
                     icon: const Icon(Icons.translate, size: 20),
                     label: Text(widget.loc.t('translate_names_for_all').replaceAll('%s', '${needsTranslation.length}')),
                   ),
                 Tooltip(
                   message: loc.t('verify_with_ai_tooltip'),
                   child: FilledButton.tonalIcon(
-                    onPressed: () => _verifyWithAi(context, items.where((item) => item.isProduct).map((item) => item.product!).toList()),
+                    onPressed: () => _ProductsScreenState._verifyWithAi(context, widget.items.where((item) => item.isProduct).map((item) => item.product!).toList()),
                     icon: const Icon(Icons.auto_awesome, size: 20),
                     label: Text(loc.t('verify_with_ai').replaceAll('%s', '${items.length}')),
                   ),
@@ -1243,11 +1249,11 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
                       ),
                     ),
                   ),
-                  title: Text(item.getLocalizedName(loc.currentLanguageCode)),
+                  title: Text(item.getLocalizedName(widget.loc.currentLanguageCode)),
                   subtitle: Text(
                     item.isProduct
-                        ? _buildProductSubtitle(item.product!, store, estId)
-                        : _buildTechCardSubtitle(item.techCard!),
+                        ? _ProductsScreenState._buildProductSubtitle(item.product!, widget.store, widget.estId, widget.loc)
+                        : _ProductsScreenState._buildTechCardSubtitle(item.techCard!),
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   trailing: Row(
@@ -1256,14 +1262,14 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
                       if (item.isProduct) ...[
                         IconButton(
                           icon: const Icon(Icons.edit_outlined),
-                          tooltip: loc.t('edit_product'),
-                          onPressed: () => _showEditProduct(context, item.product!),
+                          tooltip: widget.loc.t('edit_product'),
+                          onPressed: () => widget.onEditProduct(context, item.product!),
                         ),
-                        if (canRemove)
+                        if (widget.canRemove)
                           IconButton(
                             icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
-                            tooltip: loc.t('remove_from_nomenclature'),
-                            onPressed: () => _confirmRemove(context, item.product!),
+                            tooltip: widget.loc.t('remove_from_nomenclature'),
+                            onPressed: () => widget.onRemoveProduct(context, item.product!),
                           ),
                       ],
                     ],
@@ -1277,7 +1283,7 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
     );
   }
 
-  void _showEditProduct(BuildContext context, Product p) {
+  static void _showEditProduct(BuildContext context, Product p, ProductStoreSupabase store, LocalizationService loc, VoidCallback onRefresh) {
     showDialog<void>(
       context: context,
       builder: (ctx) => _ProductEditDialog(
@@ -1289,7 +1295,7 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
     );
   }
 
-  Future<void> _confirmRemove(BuildContext context, Product p) async {
+  static Future<void> _confirmRemove(BuildContext context, Product p, ProductStoreSupabase store, LocalizationService loc, VoidCallback onRefresh, String estId) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1933,7 +1939,7 @@ class _CatalogTab extends StatelessWidget {
     return map[c] ?? c;
   }
 
-  Future<void> _loadKbjuForAll(BuildContext context, List<Product> list) async {
+  static Future<void> _loadKbjuForAll(BuildContext context, List<Product> list) async {
     if (!context.mounted) return;
     await showDialog<void>(
       context: context,
@@ -2004,7 +2010,7 @@ class _CatalogTab extends StatelessWidget {
     return false;
   }
 
-  Future<void> _loadTranslationsForAll(BuildContext context, List<Product> list) async {
+  static Future<void> _loadTranslationsForAll(BuildContext context, List<Product> list) async {
     if (!context.mounted) return;
     await showDialog<void>(
       context: context,

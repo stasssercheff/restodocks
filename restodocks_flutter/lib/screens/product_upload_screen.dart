@@ -495,7 +495,7 @@ ${text}
           // Fallback к Nutrition API только если AI не дал данные
           try {
             final nutritionService = context.read<NutritionApiService>();
-            final nutritionResult = await nutritionService.fetchNutrition(normalizedName);
+            final nutritionResult = await NutritionApiService.fetchNutrition(normalizedName);
 
             if (nutritionResult != null && nutritionResult.hasData) {
               calories = calories ?? nutritionResult.calories;

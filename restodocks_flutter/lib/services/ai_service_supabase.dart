@@ -31,7 +31,7 @@ class AiServiceSupabase implements AiService {
 
   @override
   Future<GeneratedChecklist?> generateChecklistFromPrompt(String prompt) async {
-    final data = await _invoke('ai-generate-checklist', {'prompt': prompt});
+    final data = await invoke('ai-generate-checklist', {'prompt': prompt});
     if (data == null) return null;
     final name = data['name'] as String? ?? '';
     final list = data['itemTitles'];
@@ -42,7 +42,7 @@ class AiServiceSupabase implements AiService {
   @override
   Future<ReceiptRecognitionResult?> recognizeReceipt(Uint8List imageBytes) async {
     final base64 = base64Encode(imageBytes);
-    final data = await _invoke('ai-recognize-receipt', {'imageBase64': base64});
+    final data = await invoke('ai-recognize-receipt', {'imageBase64': base64});
     if (data == null) return null;
     final raw = data['lines'];
     final list = raw is List ? raw : [];
@@ -66,7 +66,7 @@ class AiServiceSupabase implements AiService {
   @override
   Future<TechCardRecognitionResult?> recognizeTechCardFromImage(Uint8List imageBytes) async {
     final base64 = base64Encode(imageBytes);
-    final data = await _invoke('ai-recognize-tech-card', {'imageBase64': base64});
+    final data = await invoke('ai-recognize-tech-card', {'imageBase64': base64});
     return _parseTechCardResult(data);
   }
 
@@ -85,7 +85,7 @@ class AiServiceSupabase implements AiService {
     try {
       final rows = _xlsxToRows(xlsxBytes);
       if (rows.isEmpty) return [];
-      final data = await _invoke('ai-recognize-tech-cards-batch', {'rows': rows});
+      final data = await invoke('ai-recognize-tech-cards-batch', {'rows': rows});
       if (data == null) return [];
       final raw = data['cards'];
       if (raw is! List) return [];
@@ -171,7 +171,7 @@ class AiServiceSupabase implements AiService {
 
   @override
   Future<ProductRecognitionResult?> recognizeProduct(String userInput) async {
-    final data = await _invoke('ai-recognize-product', {'userInput': userInput});
+    final data = await invoke('ai-recognize-product', {'userInput': userInput});
     if (data == null) return null;
     return ProductRecognitionResult(
       normalizedName: (data['normalizedName'] as String?) ?? userInput,
@@ -197,7 +197,7 @@ class AiServiceSupabase implements AiService {
       body['currentFat'] = currentNutrition.fat;
       body['currentCarbs'] = currentNutrition.carbs;
     }
-    final data = await _invoke('ai-verify-product', body);
+    final data = await invoke('ai-verify-product', body);
     if (data == null) return null;
     return ProductVerificationResult(
       normalizedName: data['normalizedName'] as String?,
@@ -222,7 +222,7 @@ class AiServiceSupabase implements AiService {
         'carbs': existing.carbs,
       };
     }
-    final data = await _invoke('ai-refine-nutrition', body);
+    final data = await invoke('ai-refine-nutrition', body);
     if (data == null) return null;
     return NutritionResult(
       calories: data['calories'] != null ? (data['calories'] as num).toDouble() : null,
