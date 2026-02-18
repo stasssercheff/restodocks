@@ -274,11 +274,13 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   }
 
   Future<void> _uploadExcelSimple() async {
+    print('=== _uploadExcelSimple called ===');
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['xlsx', 'xls'],
       allowMultiple: false,
     );
+    print('Excel simple picker result: ${result != null ? "files selected" : "cancelled"}');
 
     if (result != null && result.files.isNotEmpty) {
       final file = result.files.first;
@@ -292,19 +294,23 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   }
 
   Future<void> _uploadFromFile() async {
+    print('=== _uploadFromFile called ===');
     final loc = context.read<LocalizationService>();
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['txt', 'xlsx', 'xls', 'rtf', 'csv'],
       withData: true,
     );
+    print('File picker result: ${result != null ? "files selected" : "cancelled"}');
 
     if (result == null || result.files.isEmpty || result.files.single.bytes == null) return;
 
     final fileName = result.files.single.name.toLowerCase();
     final bytes = result.files.single.bytes!;
+    print('Processing file: $fileName');
 
     if (fileName.endsWith('.txt')) {
+      print('Processing as TXT file');
       final text = utf8.decode(bytes, allowMalformed: true);
       await _processText(text, loc, true);
     } else if (fileName.endsWith('.rtf')) {
@@ -331,10 +337,12 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   }
 
   Future<void> _showPasteDialog() async {
+    print('=== _showPasteDialog called ===');
     final loc = context.read<LocalizationService>();
     final controller = TextEditingController();
     bool addToNomenclature = true; // По умолчанию добавлять в номенклатуру
 
+    print('Showing paste dialog...');
     final result = await showDialog<({String text, bool addToNomenclature})>(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -392,6 +400,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   }
 
   Future<void> _showSmartPasteDialog() async {
+    print('=== _showSmartPasteDialog called ===');
     final controller = TextEditingController();
     final loc = context.read<LocalizationService>();
     bool addToNomenclature = true; // По умолчанию добавлять в номенклатуру
@@ -483,6 +492,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   }
 
   Future<void> _showIntelligentImportDialog() async {
+    print('=== _showIntelligentImportDialog called ===');
     final loc = context.read<LocalizationService>();
     final account = context.read<AccountManagerSupabase>();
     final establishmentId = account.establishment?.id;
@@ -736,6 +746,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   }
 
   Future<void> _processTextWithAI(String text, LocalizationService loc, bool addToNomenclature) async {
+    print('=== _processTextWithAI called ===');
     _addDebugLog('=== STARTING AI TEXT PROCESSING ===');
     _setLoadingMessage('Обрабатываем текст через ИИ...');
 
@@ -822,6 +833,9 @@ ${text}
 
 
   Future<void> _processText(String text, LocalizationService loc, bool addToNomenclature) async {
+    print('=== _processText called ===');
+    print('Text length: ${text.length}');
+    print('Add to nomenclature: $addToNomenclature');
     _addDebugLog('=== STARTING TEXT PROCESSING ===');
     _addDebugLog('Text length: ${text.length} characters');
     _addDebugLog('Add to nomenclature: $addToNomenclature');
@@ -830,6 +844,8 @@ ${text}
     // Проверяем основные параметры
     final account = context.read<AccountManagerSupabase>();
     final establishmentId = account.establishment?.id;
+    print('User logged in: ${account.isLoggedInSync}');
+    print('Establishment ID: $establishmentId');
     _addDebugLog('User logged in: ${account.isLoggedInSync}');
     _addDebugLog('Establishment ID: $establishmentId');
 
@@ -938,6 +954,7 @@ ${text}
   }
 
   Future<void> _processExcel(Uint8List bytes, LocalizationService loc) async {
+    print('=== _processExcel called ===');
     try {
       _addDebugLog('=== STARTING EXCEL PROCESSING ===');
       _addDebugLog('File size: ${bytes.length} bytes');
