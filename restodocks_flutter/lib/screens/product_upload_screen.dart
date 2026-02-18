@@ -465,9 +465,7 @@ ${text}
       final account = context.read<AccountManagerSupabase>();
 
       // Проверяем инициализацию Supabase
-      print('DEBUG: Checking Supabase initialization...');
-      final supabaseClient = store.supabaseClient;
-      print('DEBUG: Supabase client available: ${supabaseClient != null}');
+      _addDebugLog('Checking Supabase initialization...');
       final estId = account.establishment?.id;
       final defCur = account.establishment?.defaultCurrency ?? 'VND';
       final sourceLang = loc.currentLanguageCode;
