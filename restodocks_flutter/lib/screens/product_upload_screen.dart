@@ -293,36 +293,119 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     setState(() => _isLoading = true);
 
     try {
-      print('DEBUG: Showing upload progress dialog');
-      await showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (dialogContext) => _UploadProgressDialog(
-          items: items,
-          loc: loc,
-        ),
-      );
-      print('DEBUG: Upload dialog completed');
-    } catch (e) {
-      print('DEBUG: Error in upload dialog: $e');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+      // Прямое добавление без диалога для тестирования
+      print('DEBUG: Adding products directly without dialog');
+      final store = context.read<ProductStoreSupabase>();
+      final account = context.read<AccountManagerSupabase>();
+      final estId = account.establishment?.id;
+      final defCur = account.establishment?.defaultCurrency ?? 'VND';
+      final sourceLang = loc.currentLanguageCode;
+      final allLangs = LocalizationService.productLanguageCodes;
 
-    // Обновляем список продуктов
-    print('DEBUG: Refreshing product lists');
-    final store = context.read<ProductStoreSupabase>();
-    final account = context.read<AccountManagerSupabase>();
-    final estId = account.establishment?.id;
-    print('DEBUG: Establishment ID: $estId');
+      print('DEBUG: Establishment ID: $estId, Currency: $defCur');
 
-    if (estId != null) {
+      if (estId == null) {
+        print('DEBUG: No establishment ID found');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Не найдено заведение')),
+        );
+        return;
+      }
+
+      int added = 0;
+      int skipped = 0;
+      int failed = 0;
+
+      for (final item in items) {
+        try {
+          print('DEBUG: Processing item: "${item.name}" price=${item.price}');
+
+          // Создаем продукт
+          final product = Product(
+            id: const Uuid().v4(),
+            name: item.name,
+            category: 'manual',
+            names: <String, String>{for (final c in allLangs) c: item.name},
+            calories: null,
+            protein: null,
+            fat: null,
+            carbs: null,
+            unit: 'g',
+            basePrice: item.price,
+            currency: item.price != null ? defCur : null,
+          );
+
+          // Пытаемся добавить продукт
+          try {
+            await store.addProduct(product);
+            print('DEBUG: Product "${item.name}" added to database');
+          } catch (e) {
+            if (e.toString().contains('duplicate key') ||
+                e.toString().contains('already exists') ||
+                e.toString().contains('unique constraint')) {
+              print('DEBUG: Product "${item.name}" already exists, skipping add');
+              skipped++;
+              continue;
+            } else {
+              print('DEBUG: Failed to add product "${item.name}": $e');
+              failed++;
+              continue;
+            }
+          }
+
+          // Добавляем в номенклатуру
+          try {
+            await store.addToNomenclature(estId, product.id);
+            print('DEBUG: Product "${item.name}" added to nomenclature');
+            added++;
+          } catch (e) {
+            if (e.toString().contains('duplicate key') ||
+                e.toString().contains('already exists') ||
+                e.toString().contains('unique constraint')) {
+              print('DEBUG: Product "${item.name}" already in nomenclature');
+              skipped++;
+            } else {
+              print('DEBUG: Failed to add to nomenclature "${item.name}": $e');
+              failed++;
+            }
+          }
+
+          // Небольшая задержка
+          await Future.delayed(const Duration(milliseconds: 100));
+
+        } catch (e) {
+          print('DEBUG: Unexpected error processing "${item.name}": $e');
+          failed++;
+        }
+      }
+
+      print('DEBUG: Processing complete - added: $added, skipped: $skipped, failed: $failed');
+
+      // Обновляем список продуктов
       await store.loadProducts();
       await store.loadNomenclature(estId);
       if (mounted) setState(() {});
-      print('DEBUG: Product lists refreshed');
-    } else {
-      print('DEBUG: No establishment ID found');
+
+      // Показываем результат
+      final message = failed == 0
+          ? 'Добавлено: ${added + skipped}'
+          : 'Добавлено: ${added + skipped}, Ошибок: $failed';
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message), duration: const Duration(seconds: 5)),
+        );
+      }
+
+    } catch (e) {
+      print('DEBUG: Error in direct processing: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка обработки: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
