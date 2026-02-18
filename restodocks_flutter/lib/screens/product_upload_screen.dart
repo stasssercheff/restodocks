@@ -461,49 +461,55 @@ ${text}
 
       for (final item in items) {
         try {
-          // Используем ИИ для улучшения данных продукта
-          ProductVerificationResult? verification;
+        // Используем ИИ для улучшения данных продукта
+        ProductVerificationResult? verification;
+        try {
+          final aiService = context.read<AiServiceSupabase>();
+          verification = await aiService.verifyProduct(
+            item.name,
+            currentPrice: item.price,
+          );
+          print('DEBUG: AI verification successful for "${item.name}": calories=${verification?.suggestedCalories}, protein=${verification?.suggestedProtein}');
+        } catch (aiError) {
+          print('DEBUG: AI verification failed for "${item.name}": $aiError');
+          verification = null;
+        }
+
+        // Используем проверенные ИИ данные или оригинальные
+        final normalizedName = verification?.normalizedName ?? item.name;
+        var names = <String, String>{for (final c in allLangs) c: normalizedName};
+
+        // Проверяем питательные данные от AI
+        double? calories = verification?.suggestedCalories;
+        double? protein = verification?.suggestedProtein;
+        double? fat = verification?.suggestedFat;
+        double? carbs = verification?.suggestedCarbs;
+
+        // Если AI дал данные, используем их приоритетно
+        final hasValidNutritionFromAI = (calories != null && calories > 0) ||
+                                       (protein != null && protein > 0) ||
+                                       (fat != null && fat > 0) ||
+                                       (carbs != null && carbs > 0);
+
+        if (!hasValidNutritionFromAI) {
+          // Fallback к Nutrition API только если AI не дал данные
           try {
-            final aiService = context.read<AiServiceSupabase>();
-            verification = await aiService.verifyProduct(
-              item.name,
-              currentPrice: item.price,
-            );
-          } catch (aiError) {
-            verification = null;
-          }
+            final nutritionService = context.read<NutritionApiService>();
+            final nutritionResult = await nutritionService.searchNutrition(normalizedName);
 
-          // Используем проверенные ИИ данные или оригинальные
-          final normalizedName = verification?.normalizedName ?? item.name;
-          var names = <String, String>{for (final c in allLangs) c: normalizedName};
-
-          // Проверяем питательные данные от AI
-          double? calories = verification?.suggestedCalories;
-          double? protein = verification?.suggestedProtein;
-          double? fat = verification?.suggestedFat;
-          double? carbs = verification?.suggestedCarbs;
-
-          // Если AI не дал питательные данные или они выглядят неправильно, используем Nutrition API
-          final hasValidNutrition = (calories != null && calories > 0) ||
-                                   (protein != null && protein > 0) ||
-                                   (fat != null && fat > 0) ||
-                                   (carbs != null && carbs > 0);
-
-          if (!hasValidNutrition) {
-            try {
-              final nutritionService = context.read<NutritionApiService>();
-              final nutritionResult = await nutritionService.searchNutrition(normalizedName);
-
-              if (nutritionResult != null && nutritionResult.hasData) {
-                calories = nutritionResult.calories ?? calories;
-                protein = nutritionResult.protein ?? protein;
-                fat = nutritionResult.fat ?? fat;
-                carbs = nutritionResult.carbs ?? carbs;
-              }
-            } catch (nutritionError) {
-              // Игнорируем ошибки Nutrition API
+            if (nutritionResult != null && nutritionResult.hasData) {
+              calories = calories ?? nutritionResult.calories;
+              protein = protein ?? nutritionResult.protein;
+              fat = fat ?? nutritionResult.fat;
+              carbs = carbs ?? nutritionResult.carbs;
+              print('DEBUG: Used Nutrition API fallback for "${normalizedName}": calories=$calories');
             }
+          } catch (nutritionError) {
+            print('DEBUG: Nutrition API failed for "${normalizedName}": $nutritionError');
           }
+        } else {
+          print('DEBUG: Using AI nutrition data for "${normalizedName}": ${calories}kcal, ${protein}g protein');
+        }
 
           final product = Product(
             id: const Uuid().v4(),

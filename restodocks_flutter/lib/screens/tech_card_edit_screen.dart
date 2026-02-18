@@ -1404,8 +1404,13 @@ class _TtkTableState extends State<_TtkTable> {
     final ingredients = widget.ingredients;
     final totalNet = ingredients.fold<double>(0, (s, ing) => s + ing.netWeight);
     final totalCost = ingredients.fold<double>(0, (s, ing) => s + ing.cost);
+    final totalCalories = ingredients.fold<double>(0, (s, ing) => s + ing.finalCalories);
+    final totalProtein = ingredients.fold<double>(0, (s, ing) => s + ing.finalProtein);
+    final totalFat = ingredients.fold<double>(0, (s, ing) => s + ing.finalFat);
+    final totalCarbs = ingredients.fold<double>(0, (s, ing) => s + ing.finalCarbs);
     final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'RUB';
     final sym = currency == 'RUB' ? '₽' : currency == 'VND' ? '₫' : currency == 'USD' ? '\$' : currency;
+    final hasProSubscription = context.read<AccountManagerSupabase>().currentEmployee?.hasProSubscription ?? false;
 
     final hasDeleteCol = widget.canEdit;
     // Порядок колонок как в образце. Ширины подобраны так, чтобы вся строка с полями ввода помещалась на экране без горизонтальной прокрутки.
@@ -1866,6 +1871,89 @@ class _TtkTableState extends State<_TtkTable> {
                       overflow: TextOverflow.ellipsis,
                       maxLines: 10,
                     ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    // Панель с КБЖУ для PRO подписки
+    if (hasProSubscription && (totalCalories > 0 || totalProtein > 0 || totalFat > 0 || totalCarbs > 0)) {
+      return Column(
+        children: [
+          table,
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.blue.shade200),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.restaurant, color: Colors.blue.shade700),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Питательная ценность блюда (на 100г)',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue.shade700,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    _nutritionChip('Калории', '${totalCalories.round()} ккал', Colors.orange),
+                    const SizedBox(width: 12),
+                    _nutritionChip('Белки', '${totalProtein.toStringAsFixed(1)} г', Colors.red),
+                    const SizedBox(width: 12),
+                    _nutritionChip('Жиры', '${totalFat.toStringAsFixed(1)} г', Colors.yellow.shade700),
+                    const SizedBox(width: 12),
+                    _nutritionChip('Углеводы', '${totalCarbs.toStringAsFixed(1)} г', Colors.green),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
+    return table;
+  }
+
+  Widget _nutritionChip(String label, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: color.withOpacity(0.8),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 14,
+              color: color,
+              fontWeight: FontWeight.bold,
             ),
           ),
         ],

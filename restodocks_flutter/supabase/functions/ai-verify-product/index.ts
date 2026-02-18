@@ -46,31 +46,41 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const systemPrompt = `You are a nutrition expert for a restaurant database. For each food product:
+    const systemPrompt = `You are an expert food recognition and nutrition analyst for restaurants. Analyze each food product and provide complete information:
 
-1. normalizedName: Standard English name (e.g., "carrot", "strawberry"). Return null if already correct.
+1. PRODUCT IDENTIFICATION:
+   - normalizedName: Clean, standard name in English (e.g., "carrot", "chicken breast", "strawberry")
+   - suggestedCategory: Exact category from: "vegetables", "fruits", "meat", "seafood", "dairy", "grains", "bakery", "pantry", "spices", "beverages", "eggs", "legumes", "nuts", "misc"
+   - suggestedUnit: Standard unit - "g" for solids, "ml" for liquids, "pcs" for countable items
 
-2. suggestedCategory: One of: "vegetables", "fruits", "meat", "seafood", "dairy", "grains", "bakery", "pantry", "spices", "beverages", "eggs", "legumes", "nuts", "misc"
+2. PRICE ANALYSIS:
+   - suggestedPrice: Realistic wholesale USD per kg based on market data. Only suggest if input price seems wrong.
 
-3. suggestedUnit: "g" for most foods, "ml" for liquids, "pcs" for eggs/items counted
+3. NUTRITION DATA per 100g (MANDATORY - use accurate food composition data):
+   - suggestedCalories: kcal per 100g (precise value)
+   - suggestedProtein: grams per 100g (protein content)
+   - suggestedFat: grams per 100g (fat content)
+   - suggestedCarbs: grams per 100g (carbohydrate content)
 
-4. suggestedPrice: Wholesale USD per kg (realistic market prices). Only if missing/wrong.
+STRICT NUTRITION GUIDELINES:
+- Vegetables (carrot, tomato, lettuce): 20-50 kcal, low protein/fat, 5-15g carbs
+- Fruits (apple, banana, strawberry): 30-80 kcal, 0.5-1.5g protein, 0.2-0.5g fat, 10-25g carbs
+- Meat (chicken, beef, pork): 150-250 kcal, 20-35g protein, 3-15g fat, 0-2g carbs
+- Fish/Seafood (salmon, tuna): 120-250 kcal, 18-30g protein, 4-20g fat, 0-1g carbs
+- Dairy (milk, cheese, yogurt): 50-400 kcal, 3-35g protein, 1-35g fat, 3-10g carbs
+- Grains (rice, pasta, bread): 300-400 kcal, 8-15g protein, 1-5g fat, 70-85g carbs
+- Eggs: 155 kcal, 13g protein, 11g fat, 1g carbs
 
-5. NUTRITION per 100g (REQUIRED - use real food data):
-   - suggestedCalories: kcal per 100g
-   - suggestedProtein: grams per 100g
-   - suggestedFat: grams per 100g  
-   - suggestedCarbs: grams per 100g
+RECOGNITION PATTERNS:
+- "куриная грудка" → "chicken breast", meat, 165 kcal, 31g protein
+- "морковь" → "carrot", vegetables, 41 kcal, 10g carbs
+- "клубника" → "strawberry", fruits, 32 kcal, 8g carbs
+- "говядина" → "beef", meat, 250 kcal, 26g protein
+- "лосось" → "salmon", seafood, 206 kcal, 22g protein
 
-REAL EXAMPLES:
-- Carrot: calories: 41, protein: 0.9, fat: 0.2, carbs: 10
-- Strawberry: calories: 32, protein: 0.7, fat: 0.3, carbs: 8
-- Chicken breast: calories: 165, protein: 31, fat: 3.6, carbs: 0
-- Salmon: calories: 206, protein: 22, fat: 12, carbs: 0
+ALWAYS return complete, accurate nutrition data. Never use null for nutrition values.
 
-ALWAYS provide accurate nutrition data per 100g. Use null only if completely unknown.
-
-Output ONLY valid JSON with all keys. No markdown.`;
+Output ONLY valid JSON. No explanations.`;
 
     const current = [];
     if (body.currentPrice != null) current.push(`price per kg: ${body.currentPrice}`);
