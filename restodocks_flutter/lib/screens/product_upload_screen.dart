@@ -54,6 +54,9 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   Widget build(BuildContext context) {
     print('=== ProductUploadScreen build called, _isLoading: $_isLoading ===');
     final loc = context.watch<LocalizationService>();
+    print('LocalizationService available: ${loc != null}');
+    print('AccountManager available: ${context.read<AccountManagerSupabase>() != null}');
+    print('AiService available: ${context.read<AiService>() != null}');
 
     return Scaffold(
       appBar: AppBar(
@@ -851,6 +854,7 @@ ${text}
     final establishmentId = account.establishment?.id;
     print('User logged in: ${account.isLoggedInSync}');
     print('Establishment ID: $establishmentId');
+    print('Services check - Account: ${account != null}, Establishment: ${account.establishment != null}');
     _addDebugLog('User logged in: ${account.isLoggedInSync}');
     _addDebugLog('Establishment ID: $establishmentId');
 
