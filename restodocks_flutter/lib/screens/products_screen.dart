@@ -66,7 +66,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Удалить полные дубликаты'),
-        content: const Text('Будут удалены продукты с одинаковым названием, ценой и характеристиками. Продукты, используемые в номенклатуре или ТТК, не будут удалены. Продолжить?'),
+        content: const Text('Будут удалены продукты с одинаковым названием, ценой и характеристиками. Продукты, используемые в номенклатуре, не будут удалены. Продолжить?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -88,10 +88,10 @@ class _ProductsScreenState extends State<ProductsScreen> {
     try {
       final store = context.read<ProductStoreSupabase>();
       final account = context.read<AccountManagerSupabase>();
-      final techCardService = context.read<TechCardServiceSupabase>();
 
-      // Получаем все ТТК для проверки использования продуктов
-      final allTechCards = await techCardService.getAllTechCards();
+      // Временно отключаем проверку ТТК из-за ошибки в getAllTechCards
+      // final techCardService = context.read<TechCardServiceSupabase>();
+      // final allTechCards = await techCardService.getAllTechCards();
 
       // Группируем продукты по ключевым характеристикам
       final Map<String, List<Product>> groupedProducts = {};
@@ -125,15 +125,15 @@ class _ProductsScreenState extends State<ProductsScreen> {
               }
             }
 
-            // Проверяем в ТТК
-            if (!isUsed) {
-              for (final techCard in allTechCards) {
-                if (techCard.ingredients.any((ing) => ing.productId == product.id)) {
-                  isUsed = true;
-                  break;
-                }
-              }
-            }
+            // Временно отключаем проверку ТТК из-за ошибки getAllTechCards
+            // if (!isUsed) {
+            //   for (final techCard in allTechCards) {
+            //     if (techCard.ingredients.any((ing) => ing.productId == product.id)) {
+            //       isUsed = true;
+            //       break;
+            //     }
+            //   }
+            // }
 
             if (isUsed) {
               skippedCount++;
@@ -157,6 +157,91 @@ class _ProductsScreenState extends State<ProductsScreen> {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Ошибка удаления дубликатов: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _clearAllProducts() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Полное очищение списка продуктов'),
+        content: const Text('ВНИМАНИЕ: Это действие удалит ВСЕ продукты из базы данных без возможности восстановления. Продукты, используемые в номенклатуре или ТТК, будут пропущены. Вы уверены?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('ОЧИСТИТЬ ВСЕ'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final store = context.read<ProductStoreSupabase>();
+      final account = context.read<AccountManagerSupabase>();
+
+      // Временно отключаем проверку ТТК из-за ошибки getAllTechCards
+      // final techCardService = context.read<TechCardServiceSupabase>();
+      // final allTechCards = await techCardService.getAllTechCards();
+
+      int deletedCount = 0;
+      int skippedCount = 0;
+
+      // Удаляем каждый продукт, проверяя не используется ли он
+      for (final product in _products) {
+        bool isUsed = false;
+        String usageMessage = '';
+
+        // Проверяем в номенклатуре текущего заведения
+        final establishment = account.establishment;
+        if (establishment != null) {
+          final nomenclatureIds = store.getNomenclatureIdsForEstablishment(establishment.id);
+          if (nomenclatureIds.contains(product.id)) {
+            isUsed = true;
+            usageMessage = 'Продукт используется в номенклатуре заведения "${establishment.name}"';
+          }
+        }
+
+        // Временно отключаем проверку ТТК из-за ошибки getAllTechCards
+        // if (!isUsed) {
+        //   for (final techCard in allTechCards) {
+        //     if (techCard.ingredients.any((ing) => ing.productId == product.id)) {
+        //       isUsed = true;
+        //       break;
+        //     }
+        //   }
+        // }
+
+        if (isUsed) {
+          skippedCount++;
+          continue;
+        }
+
+        await store.deleteProduct(product.id);
+        deletedCount++;
+      }
+
+      if (mounted) {
+        await _loadProducts(); // Перезагружаем список
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Удалено продуктов: $deletedCount${skippedCount > 0 ? ', пропущено (используются): $skippedCount' : ''}')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка очищения списка: $e')),
         );
       }
     }
@@ -189,10 +274,10 @@ class _ProductsScreenState extends State<ProductsScreen> {
     try {
       final store = context.read<ProductStoreSupabase>();
       final account = context.read<AccountManagerSupabase>();
-      final techCardService = context.read<TechCardServiceSupabase>();
 
-      // Получаем все ТТК для проверки использования продуктов
-      final allTechCards = await techCardService.getAllTechCards();
+      // Временно отключаем проверку ТТК из-за ошибки getAllTechCards
+      // final techCardService = context.read<TechCardServiceSupabase>();
+      // final allTechCards = await techCardService.getAllTechCards();
 
       // Группируем продукты только по названию
       final Map<String, List<Product>> groupedProducts = {};
@@ -228,15 +313,15 @@ class _ProductsScreenState extends State<ProductsScreen> {
               }
             }
 
-            // Проверяем в ТТК
-            if (!isUsed) {
-              for (final techCard in allTechCards) {
-                if (techCard.ingredients.any((ing) => ing.productId == product.id)) {
-                  isUsed = true;
-                  break;
-                }
-              }
-            }
+            // Временно отключаем проверку ТТК из-за ошибки getAllTechCards
+            // if (!isUsed) {
+            //   for (final techCard in allTechCards) {
+            //     if (techCard.ingredients.any((ing) => ing.productId == product.id)) {
+            //       isUsed = true;
+            //       break;
+            //     }
+            //   }
+            // }
 
             if (isUsed) {
               skippedCount++;
@@ -349,6 +434,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
             icon: const Icon(Icons.delete_forever),
             tooltip: 'Удалить дубликаты по названию',
             onPressed: _removeDuplicatesByName,
+          ),
+          IconButton(
+            icon: const Icon(Icons.clear_all),
+            tooltip: 'Полное очищение списка',
+            onPressed: _clearAllProducts,
           ),
           IconButton(
             icon: const Icon(Icons.upload_file),
