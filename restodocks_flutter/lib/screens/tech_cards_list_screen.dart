@@ -360,50 +360,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                 ),
               ),
           ].where((_) => true), // чтобы actions не был null
-        ],
-        actions: [
-          if (canEdit)
-            AbsorbPointer(
-              absorbing: _loading,
-              child: PopupMenuButton<String>(
-                icon: Icon(Icons.add, color: _loading ? Theme.of(context).disabledColor : null),
-                tooltip: loc.t('create_tech_card'),
-                onSelected: (value) async {
-                  if (value == 'new') {
-                    context.push('/tech-cards/new');
-                  } else if (value == 'photo') {
-                    await _createFromPhoto(context, loc);
-                  } else if (value == 'excel') {
-                    await _createFromExcel(context, loc);
-                  }
-                },
-                itemBuilder: (_) => [
-                  PopupMenuItem(value: 'new', child: Text(loc.t('create_tech_card'))),
-                  PopupMenuItem(
-                    value: 'photo',
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(loc.t('ai_tech_card_from_photo')),
-                        const SizedBox(width: 8),
-                        Chip(label: Text(loc.t('ai_badge'), style: const TextStyle(fontSize: 10)), padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0), materialTapTargetSize: MaterialTapTargetSize.shrinkWrap, visualDensity: VisualDensity.compact),
-                      ],
-                    ),
-                  ),
-                  PopupMenuItem(
-                    value: 'excel',
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(loc.t('ai_tech_card_from_excel')),
-                        const SizedBox(width: 8),
-                        Chip(label: Text(loc.t('ai_badge'), style: const TextStyle(fontSize: 10)), padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0), materialTapTargetSize: MaterialTapTargetSize.shrinkWrap, visualDensity: VisualDensity.compact),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
           // Кнопка экспорта
           PopupMenuButton<String>(
             icon: const Icon(Icons.download),
