@@ -10,12 +10,37 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/culinary_units.dart';
-import '../models/models.dart';
+import '../models/product.dart';
+import '../models/employee.dart';
+import '../models/establishment.dart';
+import '../models/cooking_process.dart';
+import '../models/tt_ingredient.dart';
+import '../models/tech_card.dart';
+import '../models/menu_item.dart';
+import '../models/checklist.dart';
+import '../models/schedule_model.dart';
+import '../models/order_list.dart';
 import '../models/nomenclature_item.dart';
+import '../services/account_manager.dart';
+import '../services/account_manager_supabase.dart';
+import '../services/product_store.dart';
+import '../services/product_store_supabase.dart';
+import '../services/localization_service.dart';
+import '../services/image_service.dart';
+import '../services/tech_card_service.dart';
+import '../services/tech_card_service_supabase.dart';
+import '../services/inventory_document_service.dart';
+import '../services/checklist_service_supabase.dart';
+import '../services/nutrition_api_service.dart';
+import '../services/supabase_service.dart';
+import '../services/secure_storage_service.dart';
+import '../services/theme_service.dart';
+import '../services/translation_service.dart';
 import '../services/ai_service.dart';
 import '../services/ai_service_supabase.dart';
-import '../services/nutrition_api_service.dart';
-import '../services/services.dart';
+import '../services/order_list_storage_service.dart';
+import '../services/excel_export_service.dart';
+import '../services/domain_validation_service.dart';
 
 /// Экран номенклатуры: продукты и ПФ заведения с возможностью загрузки из файла.
 class ProductsScreen extends StatefulWidget {
@@ -269,6 +294,47 @@ class _ProductsScreenState extends State<ProductsScreen> {
     if (mounted) setState(() {});
   }
 
+  void _showEditProductForNomenclature(BuildContext context, Product p, ProductStoreSupabase store, LocalizationService loc, VoidCallback onRefresh) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => _ProductEditDialog(
+        product: p,
+        store: store,
+        loc: loc,
+        onSaved: onRefresh,
+      ),
+    );
+  }
+
+  Future<void> _confirmRemoveForNomenclature(BuildContext context, Product p, ProductStoreSupabase store, LocalizationService loc, VoidCallback onRefresh, String estId) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('remove_from_nomenclature')),
+        content: Text(
+          loc.t('remove_from_nomenclature_confirm').replaceAll('%s', p.getLocalizedName(loc.currentLanguageCode)),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(loc.t('cancel'))),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(loc.t('delete')),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    try {
+      await store.removeFromNomenclature(estId, p.id);
+      if (context.mounted) onRefresh();
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
@@ -368,8 +434,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
               onFilterTypeChanged: (f) => setState(() => _nomFilter = f),
               onRefresh: () => _ensureLoaded().then((_) => setState(() {})),
               onSwitchToCatalog: () {}, // Не используется
-              onEditProduct: (ctx, p) => _showEditProduct(ctx, p, store, loc, () => _ensureLoaded().then((_) => setState(() {}))),
-              onRemoveProduct: (ctx, p) => _confirmRemove(ctx, p, store, loc, () => _ensureLoaded().then((_) => setState(() {})), estId ?? ''),
+              onEditProduct: (ctx, p) => _showEditProductForNomenclature(ctx, p, store, loc, () => _ensureLoaded().then((_) => setState(() {}))),
+              onRemoveProduct: (ctx, p) => _confirmRemoveForNomenclature(ctx, p, store, loc, () => _ensureLoaded().then((_) => setState(() {})), estId ?? ''),
               onLoadKbju: (ctx, list) => _loadKbjuForAll(ctx, list),
               onLoadTranslations: (ctx, list) => _loadTranslationsForAll(ctx, list),
               onVerifyWithAi: (ctx, list) => _verifyWithAi(ctx, list),
@@ -1307,46 +1373,6 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
     );
   }
 
-  void _showEditProduct(BuildContext context, Product p, ProductStoreSupabase store, LocalizationService loc, VoidCallback onRefresh) {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => _ProductEditDialog(
-        product: p,
-        store: store,
-        loc: loc,
-        onSaved: onRefresh,
-      ),
-    );
-  }
-
-  Future<void> _confirmRemove(BuildContext context, Product p, ProductStoreSupabase store, LocalizationService loc, VoidCallback onRefresh, String estId) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.t('remove_from_nomenclature')),
-        content: Text(
-          loc.t('remove_from_nomenclature_confirm').replaceAll('%s', p.getLocalizedName(loc.currentLanguageCode)),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(loc.t('cancel'))),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(loc.t('delete')),
-          ),
-        ],
-      ),
-    );
-    if (ok != true || !context.mounted) return;
-    try {
-      await store.removeFromNomenclature(estId, p.id);
-      if (context.mounted) onRefresh();
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))));
-      }
-    }
-  }
 }
 
 class _NomenclatureEmpty extends StatelessWidget {
