@@ -13,20 +13,21 @@ class OrderHistoryService {
     var query = _supabase
         .from('order_history')
         .select('*, employees(full_name)')
-        .eq('establishment_id', establishmentId)
-        .order('created_at', ascending: false);
+        .eq('establishment_id', establishmentId);
 
     if (startDate != null) {
-      query = query.gte('created_at', startDate.toUtc().toIso8601String());
+      query = query.filter('created_at', 'gte', startDate.toUtc().toIso8601String());
     }
 
     if (endDate != null) {
-      query = query.lte('created_at', endDate.toUtc().toIso8601String());
+      query = query.filter('created_at', 'lte', endDate.toUtc().toIso8601String());
     }
 
     if (status != null) {
-      query = query.eq('status', status);
+      query = query.filter('status', 'eq', status);
     }
+
+    query = query.order('created_at', ascending: false);
 
     final response = await query;
     return List<Map<String, dynamic>>.from(response);

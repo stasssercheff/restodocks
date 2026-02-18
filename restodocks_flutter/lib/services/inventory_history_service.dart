@@ -14,20 +14,21 @@ class InventoryHistoryService {
     var query = _supabase
         .from('inventory_history')
         .select('*, employees(full_name)')
-        .eq('establishment_id', establishmentId)
-        .order('created_at', ascending: false);
+        .eq('establishment_id', establishmentId);
 
     if (startDate != null) {
-      query = query.gte('date', startDate.toIso8601String().split('T')[0]);
+      query = query.filter('date', 'gte', startDate.toIso8601String().split('T')[0]);
     }
 
     if (endDate != null) {
-      query = query.lte('date', endDate.toIso8601String().split('T')[0]);
+      query = query.filter('date', 'lte', endDate.toIso8601String().split('T')[0]);
     }
 
     if (status != null) {
-      query = query.eq('status', status);
+      query = query.filter('status', 'eq', status);
     }
+
+    query = query.order('created_at', ascending: false);
 
     final response = await query;
     return List<Map<String, dynamic>>.from(response);

@@ -658,11 +658,12 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
             onPressed: () => _showDuplicates(),
             tooltip: 'Показать дубликаты',
           ),
-          IconButton(
-            icon: const Icon(Icons.clear_all),
-            onPressed: () => _confirmClearAllNomenclature(context, loc),
-            tooltip: 'Очистить всю номенклатуру',
-          ),
+          // Temporarily disabled - method has compilation issues
+          // IconButton(
+          //   icon: const Icon(Icons.clear_all),
+          //   onPressed: () => _confirmClearAllNomenclature(context, loc),
+          //   tooltip: 'Очистить всю номенклатуру',
+          // ),
           IconButton(
             icon: const Icon(Icons.upload_file),
             tooltip: 'Загрузить продукты',
