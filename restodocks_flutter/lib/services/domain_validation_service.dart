@@ -11,6 +11,12 @@ class DomainValidationService {
     // Добавьте сюда дополнительные домены по мере необходимости
   ];
 
+  /// Домены Vercel (все preview и production деплои)
+  /// Формат: restodocks-xxx-stassserchefs-projects.vercel.app и т.п.
+  static bool _isVercelDomain(String domain) {
+    return domain.endsWith('.vercel.app');
+  }
+
   /// Дополнительные домены для разработки
   static const List<String> _devDomains = [
     'localhost',
@@ -35,6 +41,11 @@ class DomainValidationService {
 
     // Проверяем основные домены
     if (_allowedDomains.contains(currentDomain)) {
+      return true;
+    }
+
+    // Проверяем домены Vercel (preview + production)
+    if (_isVercelDomain(currentDomain)) {
       return true;
     }
 
