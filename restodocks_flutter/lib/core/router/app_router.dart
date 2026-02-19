@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -25,10 +26,21 @@ import '../../services/services.dart';
 
 const _publicPaths = ['/', '/splash', '/login', '/register', '/register-company', '/register-owner', '/register-employee'];
 
+/// Начальный путь: при обновлении страницы (web) сохраняем текущий URL.
+String _getInitialLocation() {
+  if (kIsWeb) {
+    try {
+      final path = Uri.base.path;
+      if (path.isNotEmpty && path != '/') return path;
+    } catch (_) {}
+  }
+  return '/';
+}
+
 /// Настройка маршрутизации приложения
 class AppRouter {
   static final GoRouter router = GoRouter(
-    initialLocation: '/',
+    initialLocation: _getInitialLocation(),
     redirect: (context, state) async {
       final loc = state.matchedLocation;
       if (_publicPaths.any((p) => loc.startsWith(p))) return null;

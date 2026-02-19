@@ -45,6 +45,8 @@ class ProductUploadScreen extends StatefulWidget {
 class _ProductUploadScreenState extends State<ProductUploadScreen> {
   bool _isLoading = false;
   String _loadingMessage = '';
+  int _loadingProgress = 0;
+  int _loadingTotal = 0;
   Timer? _loadingTimeoutTimer; // Таймер для предотвращения зависания загрузки
 
   void _setLoadingMessage(String message) {
@@ -240,20 +242,38 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: Colors.blue.withOpacity(0.3)),
                 ),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                    Row(
+                      children: [
+                        const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Text(
+                            _loadingMessage.isNotEmpty ? _loadingMessage : 'Обработка...',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Text(
-                        _loadingMessage.isNotEmpty ? _loadingMessage : 'Обработка...',
-                        style: Theme.of(context).textTheme.bodyMedium,
+                    if (_loadingTotal > 0) ...[
+                      const SizedBox(height: 12),
+                      LinearProgressIndicator(
+                        value: _loadingProgress / _loadingTotal,
+                        backgroundColor: Colors.blue.withOpacity(0.2),
+                        valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
                       ),
-                    ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '$_loadingProgress / $_loadingTotal',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.blue.shade700),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -1459,7 +1479,11 @@ ${text}
       return;
     }
     _setLoadingMessage('Обрабатываем ${items.length} продуктов...');
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _loadingTotal = items.length;
+      _loadingProgress = 0;
+    });
 
     try {
       final store = context.read<ProductStoreSupabase>();
@@ -1494,8 +1518,16 @@ ${text}
       int added = 0;
       int skipped = 0;
       int failed = 0;
+      int idx = 0;
 
       for (final item in items) {
+        if (mounted) {
+          setState(() {
+            _loadingProgress = idx;
+            _loadingMessage = 'Обрабатываем ${idx + 1} из ${items.length}: ${item.name}';
+          });
+        }
+        idx++;
         try {
         // Используем ИИ для улучшения данных продукта
         ProductVerificationResult? verification;
@@ -1666,7 +1698,10 @@ ${text}
         }
       }
 
-      if (mounted) setState(() {});
+      if (mounted) setState(() {
+        _loadingProgress = items.length;
+        _loadingMessage = 'Готово';
+      });
 
       // Показываем результат
       final message = failed == 0
@@ -1707,8 +1742,22 @@ ${text}
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message), duration: const Duration(seconds: 5)),
+        showDialog<void>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Загрузка завершена'),
+            content: Text(
+              failed == 0
+                  ? 'Успешно добавлено: ${added + skipped} продуктов.'
+                  : 'Добавлено: ${added + skipped}.\nОшибок при добавлении: $failed.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
         );
       }
 
@@ -1724,6 +1773,8 @@ ${text}
         setState(() {
           _isLoading = false;
           _loadingMessage = '';
+          _loadingProgress = 0;
+          _loadingTotal = 0;
         });
       }
     }
@@ -1737,8 +1788,10 @@ ${text}
     if (line.contains('Авокадо')) {
       _addDebugLog('TEST: Found avocado line, contains tab: ${line.contains('\t')}, length: ${line.length}');
     }
+    // Важно: паттерн с валютой ПЕРЕД числом (₫99,000) идёт первым
     final pricePatterns = [
-      RegExp(r'[\d,]+\s*[₫$€£¥руб.]?\s*$'), // число с опциональной валютой в конце (добавил ¥ для японской йены)
+      RegExp(r'[₫$€£¥руб.]\s*[\d,\.]+\s*$'), // валюта перед числом: ₫99,000 или ₫ 99.000
+      RegExp(r'[\d,]+\s*[₫$€£¥руб.]?\s*$'), // число с опциональной валютой в конце
       RegExp(r'\d+\.\d+\s*[₫$€£¥руб.]?\s*$'), // десятичное число
       RegExp(r'\d{1,3}(?:,\d{3})*\s*[₫$€£¥руб.]?\s*$'), // число с разделителями тысяч
     ];

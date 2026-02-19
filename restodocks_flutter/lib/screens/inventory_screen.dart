@@ -109,28 +109,9 @@ class _InventoryScreenState extends State<InventoryScreen>
   _InventorySort _sortMode = _InventorySort.lastAdded;
   _InventoryBlockFilter _blockFilter = _InventoryBlockFilter.all;
 
-  /// Сохранить данные немедленно в локальное хранилище
+  /// Сохранить данные немедленно в локальное хранилище (SharedPreferences/localStorage)
   void saveNow() {
-    // Сохраняем текущие данные инвентаризации
-    final data = {
-      'date': _date.toIso8601String(),
-      'startTime': _startTime?.format(context) ?? '',
-      'endTime': _endTime?.format(context) ?? '',
-      'completed': _completed,
-      'rows': _rows.map((row) => {
-        'productId': row.product?.id ?? '',
-        'quantities': row.quantities,
-      }).toList(),
-    };
-
-    // Сохраняем в localStorage через сервис или напрямую
-    // Для простоты используем простой подход
-    try {
-      // Здесь можно добавить сохранение в localStorage или другой механизм
-      // Пока просто игнорируем ошибки сохранения
-    } catch (e) {
-      // Игнорируем ошибки локального сохранения
-    }
+    saveImmediately(); // Немедленно, без debounce — данные не потеряются при закрытии/падении
   }
 
   @override
