@@ -2,6 +2,7 @@ import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 
 import '../../services/services.dart';
+import '../../services/ai_service.dart';
 import '../../services/ai_service_supabase.dart';
 import '../../services/order_history_service.dart';
 import '../../services/inventory_history_service.dart';
@@ -34,6 +35,9 @@ class AppProviders {
         ),
         Provider<AiServiceSupabase>(
           create: (_) => AiServiceSupabase(),
+        ),
+        Provider<AiService>(
+          create: (context) => context.read<AiServiceSupabase>(),
         ),
         Provider<OrderHistoryService>(
           create: (_) => OrderHistoryService(),
