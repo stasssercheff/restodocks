@@ -14,14 +14,18 @@ import 'screens/screens.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // App started
-
-  // Domain validation for web platform
-  if (!DomainValidationService.isDomainAllowed()) {
-    DomainValidationService.reportSuspiciousDomain();
-    DomainValidationService.showDomainWarning();
-    return; // Stop app execution
-  }
+  FlutterError.onError = (details) {
+    debugPrint('FlutterError: ${details.exception}');
+    debugPrint('Stack: ${details.stack}');
+  };
+  // Domain validation — disabled temporarily for debugging white screen
+  // try {
+  //   if (!DomainValidationService.isDomainAllowed()) {
+  //     DomainValidationService.reportSuspiciousDomain();
+  //     DomainValidationService.showDomainWarning();
+  //     return;
+  //   }
+  // } catch (e, st) { debugPrint('DomainValidation: $e'); }
 
   // Temporary loading screen
   runApp(
@@ -40,15 +44,18 @@ void main() async {
 
   // 1. Пробуем config.json (Vercel подставляет при сборке)
   try {
-    // Loading config.json
     final json = await rootBundle.loadString('assets/config.json');
     final map = jsonDecode(json) as Map<String, dynamic>;
-    supabaseUrl = (map['SUPABASE_URL'] as String?) ?? '';
-    supabaseAnonKey = (map['SUPABASE_ANON_KEY'] as String?) ?? '';
+    supabaseUrl = ((map['SUPABASE_URL'] as String?) ?? '').replaceAll(RegExp(r'[\n\r\t]'), '').trim();
+    supabaseAnonKey = ((map['SUPABASE_ANON_KEY'] as String?) ?? '').replaceAll(RegExp(r'[\n\r\t]'), '').trim();
+    // Исправление опечатки supabase.con -> supabase.co
+    if (supabaseUrl.contains('supabase.con')) {
+      supabaseUrl = supabaseUrl.replaceAll('supabase.con', 'supabase.co');
+    }
     // config.json loaded
     print('=== CONFIG.JSON LOADED SUCCESSFULLY ===');
     print('SUPABASE_URL: $supabaseUrl');
-    print('SUPABASE_ANON_KEY: ${supabaseAnonKey.substring(0, 20)}...');
+    print('SUPABASE_ANON_KEY: ${supabaseAnonKey.length > 20 ? '${supabaseAnonKey.substring(0, 20)}...' : '${supabaseAnonKey.length} chars'}');
   } catch (e) {
     print('=== CONFIG.JSON ERROR: $e ===');
     // config.json error - fallback to hardcoded for testing
@@ -83,8 +90,12 @@ void main() async {
     }
   }
 
+  // Финальная очистка URL (опечатка supabase.con -> supabase.co) — всегда
+  if (supabaseUrl.contains('supabase.con')) {
+    supabaseUrl = supabaseUrl.replaceAll('supabase.con', 'supabase.co');
+  }
+
   // Обработка ошибок инициализации
-  // Final config loaded
   try {
     if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
       // Config missing, showing error screen

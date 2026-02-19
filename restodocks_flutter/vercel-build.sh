@@ -26,14 +26,30 @@ export PATH="$PWD/$FLUTTER_DIR/bin:$PATH"
 flutter config --no-analytics --no-version-check
 flutter --version || { echo "ERROR: Flutter version failed"; exit 1; }
 
-echo "==> Writing config.json from env"
+echo "==> Writing config.json from env (with trim)"
 python3 -c "
-import os, json
+import os, json, re
+def clean(s):
+    if not s: return ''
+    s = re.sub(r'[\n\r\t]', '', str(s).strip())
+    s = s.replace('supabase.con', 'supabase.co')  # fix typo
+    return s
+url = clean(os.environ.get('SUPABASE_URL', ''))
+key = clean(os.environ.get('SUPABASE_ANON_KEY', ''))
+if not url or not key:
+    print('WARNING: SUPABASE_URL or SUPABASE_ANON_KEY empty after trim, using fallback from repo')
+    # Fallback: read existing config.json if present (repo has correct values)
+    p = os.path.join('assets', 'config.json')
+    if os.path.exists(p):
+        with open(p) as f:
+            existing = json.load(f)
+        url = url or existing.get('SUPABASE_URL', '')
+        key = key or existing.get('SUPABASE_ANON_KEY', '')
 p = os.path.join('assets', 'config.json')
-d = {'SUPABASE_URL': os.environ.get('SUPABASE_URL', ''), 'SUPABASE_ANON_KEY': os.environ.get('SUPABASE_ANON_KEY', '')}
+d = {'SUPABASE_URL': url, 'SUPABASE_ANON_KEY': key}
 with open(p, 'w') as f:
-  json.dump(d, f)
-print('config.json written')
+    json.dump(d, f)
+print('config.json written, URL len=%d, key len=%d' % (len(url), len(key)))
 " || { echo "ERROR: config.json failed"; exit 1; }
 
 echo "==> flutter clean"

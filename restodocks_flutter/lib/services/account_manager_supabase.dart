@@ -223,15 +223,18 @@ class AccountManagerSupabase {
 
   /// Поиск сотрудника по email и паролю (без PIN — по всем заведениям)
   /// Возвращает (Employee, Establishment) при успехе
+  /// Использует ilike для email — регистронезависимый поиск (Stassser@gmail.com = stassser@gmail.com)
   Future<({Employee employee, Establishment establishment})?> findEmployeeByEmailAndPasswordGlobal({
     required String email,
     required String password,
   }) async {
     try {
+      final emailTrim = email.trim();
+      if (emailTrim.isEmpty) return null;
       final empList = await _supabase.client
           .from('employees')
           .select()
-          .eq('email', email.trim())
+          .ilike('email', emailTrim)
           .eq('is_active', true);
 
       if (empList == null || (empList as List).isEmpty) return null;
