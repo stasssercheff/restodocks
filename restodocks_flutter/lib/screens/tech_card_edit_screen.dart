@@ -1361,7 +1361,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
               child: ConstrainedBox(
                 constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.25),
                 child: Container(
-              width: double.infinity,
+                  width: double.infinity,
               margin: const EdgeInsets.only(top: 12),
               decoration: BoxDecoration(
                 border: Border.all(color: Theme.of(context).colorScheme.outline),
