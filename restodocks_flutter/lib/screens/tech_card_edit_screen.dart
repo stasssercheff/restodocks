@@ -1371,36 +1371,37 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                      border: const Border(bottom: BorderSide(color: Colors.grey, width: 1)),
-                    ),
-                    child: Text(loc.t('ttk_technology'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                  ),
-                  Flexible(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(12),
-                      child: canEdit
-                          ? TextField(
-                              controller: _technologyController,
-                              maxLines: null,
-                              minLines: 2,
-                              style: const TextStyle(fontSize: 13),
-                              decoration: InputDecoration(
-                                border: InputBorder.none,
-                                isDense: true,
-                                filled: false,
-                                hintText: loc.t('ttk_technology'),
-                              ),
-                            )
-                          : Text(
-                              _technologyController.text.isEmpty ? '—' : _technologyController.text,
-                              style: const TextStyle(fontSize: 13, height: 1.4),
-                            ),
-                    ),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                          border: const Border(bottom: BorderSide(color: Colors.grey, width: 1)),
+                        ),
+                        child: Text(loc.t('ttk_technology'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                      ),
+                      Flexible(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.all(12),
+                          child: canEdit
+                              ? TextField(
+                                  controller: _technologyController,
+                                  maxLines: null,
+                                  minLines: 2,
+                                  style: const TextStyle(fontSize: 13),
+                                  decoration: InputDecoration(
+                                    border: InputBorder.none,
+                                    isDense: true,
+                                    filled: false,
+                                    hintText: loc.t('ttk_technology'),
+                                  ),
+                                )
+                              : Text(
+                                  _technologyController.text.isEmpty ? '—' : _technologyController.text,
+                                  style: const TextStyle(fontSize: 13, height: 1.4),
+                                ),
+                        ),
+                      ),
                   ),
                 ],
               ),
