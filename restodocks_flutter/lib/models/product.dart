@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'package:json_annotation/json_annotation.dart';
+import 'package:uuid/uuid.dart';
 
 part 'product.g.dart';
 
@@ -268,7 +269,7 @@ class Product extends Equatable {
     List<String>? supplierIds,
   }) {
     return Product(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: const Uuid().v4(),
       name: name,
       category: category,
       names: names,

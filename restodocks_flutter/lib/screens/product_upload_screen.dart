@@ -416,40 +416,78 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
     final bytes = result.files.single.bytes!;
     final name = result.files.single.name.toLowerCase();
-    List<String> rows = [];
+    List<String> rows;
 
     if (name.endsWith('.csv') || name.endsWith('.txt')) {
       final text = utf8.decode(bytes, allowMalformed: true);
       rows = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
     } else {
-      try {
-        final excel = Excel.decodeBytes(bytes);
-        for (final sheetName in excel.tables.keys) {
-          final sheet = excel.tables[sheetName]!;
-          for (final row in sheet.rows) {
-            if (row.isEmpty) continue;
-            final parts = row.map((c) => c?.value?.toString().trim() ?? '').toList();
-            if (parts.any((p) => p.isNotEmpty)) {
-              rows.add(parts.join('\t'));
-            }
-          }
+      rows = _extractRowsFromExcel(bytes);
+      if (rows.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Не удалось прочитать Excel. Проверьте, что файл не повреждён и сохранён как .xlsx.',
+              ),
+            ),
+          );
         }
-      } catch (_) {
-        final text = utf8.decode(bytes, allowMalformed: true);
-        rows = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+        return;
       }
-    }
-
-    if (rows.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Не удалось извлечь данные из файла')),
-        );
-      }
-      return;
     }
 
     await _processWithDeferredModeration(rows: rows);
+  }
+
+  /// Извлекает строки из Excel (xlsx/xls). Не использует raw binary как текст — xlsx это ZIP с XML.
+  List<String> _extractRowsFromExcel(Uint8List bytes) {
+    try {
+      final excel = Excel.decodeBytes(bytes.toList());
+      if (excel.tables.isEmpty) return [];
+      final sheetName = excel.tables.keys.first;
+      final sheet = excel.tables[sheetName]!;
+      final rows = <String>[];
+      for (var r = 0; r < sheet.maxRows; r++) {
+        final parts = <String>[];
+        for (var c = 0; c < sheet.maxColumns; c++) {
+          final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r));
+          parts.add(_excelCellToStr(cell.value));
+        }
+        final line = parts.join('\t').trim();
+        if (line.isEmpty) continue;
+        if (_looksLikeGarbage(line)) continue;
+        rows.add(line);
+      }
+      return rows;
+    } catch (e) {
+      _addDebugLog('Excel decode error: $e');
+      return [];
+    }
+  }
+
+  static String _excelCellToStr(CellValue? v) {
+    if (v == null) return '';
+    if (v is TextCellValue) {
+      final val = v.value;
+      if (val is String) return val.trim();
+      try {
+        final t = (val as dynamic).text;
+        if (t != null) return (t is String ? t : t.toString()).trim();
+      } catch (_) {}
+      return val.toString().trim();
+    }
+    if (v is IntCellValue) return v.value.toString();
+    if (v is DoubleCellValue) return v.value.toString();
+    return v.toString().trim();
+  }
+
+  static bool _looksLikeGarbage(String line) {
+    if (line.length < 2) return true;
+    if (line.startsWith('PK') || line.contains('.xml') || line.contains('workbook') ||
+        line.contains('theme') || line.contains('[Content_Types]') ||
+        RegExp(r'^[\x00-\x1f\x7f-\xff]+$').hasMatch(line)) return true;
+    return false;
   }
 
   Future<void> _showImportWithModeration() async {
@@ -493,27 +531,12 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       if (result == null || result.files.isEmpty || result.files.single.bytes == null) return;
       final bytes = result.files.single.bytes!;
       final name = result.files.single.name.toLowerCase();
-      List<String> rows = [];
+      List<String> rows;
       if (name.endsWith('.csv') || name.endsWith('.txt')) {
         final text = utf8.decode(bytes, allowMalformed: true);
         rows = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
       } else {
-        try {
-          final excel = Excel.decodeBytes(bytes);
-          for (final sheetName in excel.tables.keys) {
-            final sheet = excel.tables[sheetName]!;
-            for (final row in sheet.rows) {
-              if (row.isEmpty) continue;
-              final parts = row.map((c) => c?.value?.toString().trim() ?? '').toList();
-              if (parts.any((p) => p.isNotEmpty)) {
-                rows.add(parts.join('\t'));
-              }
-            }
-          }
-        } catch (_) {
-          final text = utf8.decode(bytes, allowMalformed: true);
-          rows = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
-        }
+        rows = _extractRowsFromExcel(bytes);
       }
       if (rows.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
