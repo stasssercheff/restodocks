@@ -30,6 +30,51 @@ class AiServiceSupabase implements AiService {
   }
 
   @override
+  Future<List<ParsedProductItem>> parseProductList({List<String>? rows, String? text}) async {
+    final body = <String, dynamic>{};
+    if (rows != null && rows.isNotEmpty) body['rows'] = rows;
+    if (text != null && text.trim().isNotEmpty) body['text'] = text;
+    final data = await invoke('ai-parse-product-list', body);
+    if (data == null) return [];
+    final raw = data['items'];
+    if (raw is! List) return [];
+    return raw.map((e) {
+      if (e is! Map) return null;
+      final m = Map<String, dynamic>.from(e as Map);
+      return ParsedProductItem(
+        name: (m['name'] as String?) ?? '',
+        price: m['price'] != null ? (m['price'] as num).toDouble() : null,
+        unit: m['unit'] as String?,
+      );
+    }).whereType<ParsedProductItem>().toList();
+  }
+
+  @override
+  Future<List<String>> normalizeProductNames(List<String> names) async {
+    if (names.isEmpty) return [];
+    final data = await invoke('ai-normalize-product-names', {'names': names});
+    if (data == null) return names;
+    final raw = data['normalized'];
+    if (raw is! List) return names;
+    return raw.map((e) => e.toString().trim()).where((s) => s.isNotEmpty).toList();
+  }
+
+  @override
+  Future<List<List<String>>> findDuplicates(List<({String id, String name})> products) async {
+    if (products.length < 2) return [];
+    final data = await invoke('ai-find-duplicates', {
+      'products': products.map((p) => {'id': p.id, 'name': p.name}).toList(),
+    });
+    if (data == null) return [];
+    final raw = data['groups'];
+    if (raw is! List) return [];
+    return raw
+        .map((g) => g is List ? g.map((e) => e.toString()).toList() : <String>[])
+        .where((g) => g.length >= 2)
+        .toList();
+  }
+
+  @override
   Future<GeneratedChecklist?> generateChecklistFromPrompt(String prompt, {Map<String, dynamic>? context}) async {
     final body = <String, dynamic>{'prompt': prompt};
     if (context != null) body['context'] = context;

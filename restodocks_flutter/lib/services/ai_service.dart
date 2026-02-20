@@ -98,6 +98,15 @@ class ProductRecognitionResult {
   });
 }
 
+/// Результат парсинга списка продуктов (файл или текст)
+class ParsedProductItem {
+  final String name;
+  final double? price;
+  final String? unit;
+
+  const ParsedProductItem({required this.name, this.price, this.unit});
+}
+
 /// Результат верификации продукта ИИ: возможная цена, КБЖУ, исправление названия (для сверки по списку).
 class ProductVerificationResult {
   final String? normalizedName;
@@ -132,6 +141,15 @@ abstract class AiService {
   /// [context] — опционально: продукты, сотрудники, ТТК, график (ИИ учитывает при генерации).
   Future<GeneratedChecklist?> generateChecklistFromPrompt(String prompt, {Map<String, dynamic>? context});
 
+  /// Всеядный парсинг списка продуктов из сырых строк (Excel/CSV/текст).
+  Future<List<ParsedProductItem>> parseProductList({List<String>? rows, String? text});
+
+  /// Батч-исправление названий продуктов (опечатки, сленг).
+  Future<List<String>> normalizeProductNames(List<String> names);
+
+  /// Поиск дубликатов в списке продуктов по названиям.
+  Future<List<List<String>>> findDuplicates(List<({String id, String name})> products);
+
   /// Распознавание чека по фото (OCR + структурирование).
   Future<ReceiptRecognitionResult?> recognizeReceipt(Uint8List imageBytes);
 
@@ -164,6 +182,15 @@ class AiServiceStub implements AiService {
   @override
   Future<GeneratedChecklist?> generateChecklistFromPrompt(String prompt, {Map<String, dynamic>? context}) async =>
       null;
+
+  @override
+  Future<List<ParsedProductItem>> parseProductList({List<String>? rows, String? text}) async => [];
+
+  @override
+  Future<List<String>> normalizeProductNames(List<String> names) async => names;
+
+  @override
+  Future<List<List<String>>> findDuplicates(List<({String id, String name})> products) async => [];
 
   @override
   Future<ReceiptRecognitionResult?> recognizeReceipt(Uint8List imageBytes) async =>

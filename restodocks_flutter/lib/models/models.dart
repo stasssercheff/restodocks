@@ -11,6 +11,7 @@ export 'checklist.dart';
 export 'schedule_model.dart';
 export 'order_list.dart';
 export 'product_import_result.dart';
+export 'moderation_item.dart';
 export 'translation.dart';
 export 'nomenclature_item.dart';
 

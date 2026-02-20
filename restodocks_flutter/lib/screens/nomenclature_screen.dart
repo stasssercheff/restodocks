@@ -314,70 +314,77 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     if (mounted) setState(() => _isLoading = false);
   }
 
-  void _showDuplicates() {
+  Future<void> _showDuplicates() async {
     final loc = context.read<LocalizationService>();
+    final products = _nomenclatureItems
+        .where((i) => i.isProduct)
+        .map((i) => (id: i.id, name: i.getLocalizedName(loc.currentLanguageCode)))
+        .toList();
 
-    // Группируем по названию и цене для поиска дубликатов
-    final Map<String, List<NomenclatureItem>> groupedItems = {};
-
-    for (final item in _nomenclatureItems) {
-      final key = '${item.name}_${item.price}_${item.currency}';
-      groupedItems.putIfAbsent(key, () => []).add(item);
-    }
-
-    // Находим только группы с дубликатами
-    final duplicateGroups = groupedItems.values.where((group) => group.length > 1).toList();
-
-    if (duplicateGroups.isEmpty) {
+    if (products.length < 2) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Дубликатов не найдено')),
+        SnackBar(content: Text(loc.t('duplicates_need_more') ?? 'Нужно минимум 2 продукта для поиска дубликатов')),
       );
       return;
     }
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Найденные дубликаты'),
-        content: SizedBox(
-          width: double.maxFinite,
-          height: 400,
-          child: ListView.builder(
-            itemCount: duplicateGroups.length,
-            itemBuilder: (context, groupIndex) {
-              final group = duplicateGroups[groupIndex];
-              final item = group.first;
-
-              return Card(
-                margin: const EdgeInsets.symmetric(vertical: 4),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${item.name} (${item.price ?? 0} ${item.currency ?? 'RUB'})',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        '${group.length} экземпляров',
-                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Закрыть'),
-          ),
-        ],
-      ),
+      builder: (ctx) => const Center(child: CircularProgressIndicator()),
     );
+
+    try {
+      final ai = context.read<AiService>();
+      final groups = await ai.findDuplicates(products);
+      if (!mounted) return;
+      Navigator.of(context).pop();
+
+      if (groups.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.t('duplicates_none') ?? 'Похожих дубликатов не найдено')),
+        );
+        return;
+      }
+
+      final idToItem = {for (final i in _nomenclatureItems) i.id: i};
+      final duplicateGroups = groups.map((ids) => ids.map((id) => idToItem[id]).whereType<NomenclatureItem>().toList()).where((g) => g.length >= 2).toList();
+
+      if (duplicateGroups.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.t('duplicates_none') ?? 'Похожих дубликатов не найдено')),
+        );
+        return;
+      }
+
+      if (!mounted) return;
+      await showDialog(
+        context: context,
+        builder: (ctx) => _DuplicatesDialog(
+          groups: duplicateGroups,
+          loc: loc,
+          onRemove: (idsToRemove) async {
+            final store = context.read<ProductStoreSupabase>();
+            final estId = context.read<AccountManagerSupabase>().establishment?.id;
+            if (estId == null) return;
+            for (final id in idsToRemove) {
+              final item = idToItem[id];
+              if (item?.isProduct == true) {
+                await store.removeFromNomenclature(estId, id);
+              }
+            }
+            await _ensureLoaded();
+            if (mounted) setState(() {});
+          },
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${loc.t('error') ?? 'Ошибка'}: $e')),
+        );
+      }
+    }
   }
 
   Widget _buildNomenclatureSkeletonLoading() {
@@ -1049,6 +1056,125 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
           if (context.mounted) setState(() {});
         },
       ),
+    );
+  }
+}
+
+class _DuplicatesDialog extends StatefulWidget {
+  const _DuplicatesDialog({
+    required this.groups,
+    required this.loc,
+    required this.onRemove,
+  });
+
+  final List<List<NomenclatureItem>> groups;
+  final LocalizationService loc;
+  final Future<void> Function(List<String> idsToRemove) onRemove;
+
+  @override
+  State<_DuplicatesDialog> createState() => _DuplicatesDialogState();
+}
+
+class _DuplicatesDialogState extends State<_DuplicatesDialog> {
+  final Set<String> _selectedToRemove = {};
+  bool _saving = false;
+
+  void _selectAllExceptFirst() {
+    setState(() {
+      _selectedToRemove.clear();
+      for (final group in widget.groups) {
+        for (var i = 1; i < group.length; i++) {
+          _selectedToRemove.add(group[i].id);
+        }
+      }
+    });
+  }
+
+  Future<void> _applyRemoval() async {
+    if (_selectedToRemove.isEmpty) return;
+    setState(() => _saving = true);
+    await widget.onRemove(_selectedToRemove.toList());
+    if (mounted) Navigator.of(context).pop();
+    setState(() => _saving = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return AlertDialog(
+      title: Text(widget.loc.t('duplicates_title') ?? 'Поиск дубликатов'),
+      content: SizedBox(
+        width: 500,
+        height: 400,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              widget.loc.t('duplicates_hint') ?? 'ИИ нашёл похожие названия. Выберите, какие удалить (останется один эталон).',
+              style: theme.textTheme.bodySmall,
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: ListView.builder(
+                itemCount: widget.groups.length,
+                itemBuilder: (context, gi) {
+                  final group = widget.groups[gi];
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.loc.t('duplicates_group') ?? 'Группа ${gi + 1}',
+                            style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.primary),
+                          ),
+                          ...group.map((item) => CheckboxListTile(
+                                value: _selectedToRemove.contains(item.id),
+                                onChanged: (v) {
+                                  setState(() {
+                                    if (v == true) {
+                                      _selectedToRemove.add(item.id);
+                                    } else {
+                                      _selectedToRemove.remove(item.id);
+                                    }
+                                  });
+                                },
+                                title: Text(
+                                  item.name,
+                                  style: TextStyle(
+                                    fontWeight: group.indexOf(item) == 0 ? FontWeight.bold : FontWeight.normal,
+                                  ),
+                                ),
+                                subtitle: item.price != null ? Text('${item.price} ${item.currency ?? ''}') : null,
+                                controlAffinity: ListTileControlAffinity.leading,
+                                dense: true,
+                              )),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.of(context).pop(),
+          child: Text(widget.loc.t('cancel') ?? 'Закрыть'),
+        ),
+        TextButton(
+          onPressed: _saving ? null : _selectAllExceptFirst,
+          child: Text(widget.loc.t('duplicates_remove_all') ?? 'Удалить все кроме первого'),
+        ),
+        FilledButton(
+          onPressed: _saving || _selectedToRemove.isEmpty ? null : _applyRemoval,
+          child: _saving ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : Text(widget.loc.t('duplicates_apply') ?? 'Применить'),
+        ),
+      ],
     );
   }
 }

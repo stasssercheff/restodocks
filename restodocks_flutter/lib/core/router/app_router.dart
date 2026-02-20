@@ -172,6 +172,16 @@ class AppRouter {
           }
         },
       ),
+      GoRoute(
+        path: '/import-review',
+        builder: (context, state) {
+          final items = state.extra as List<ModerationItem>?;
+          if (items == null || items.isEmpty) {
+            return const _RedirectToNomenclature();
+          }
+          return ImportReviewScreen(items: items);
+        },
+      ),
 
       GoRoute(
         path: '/product-order',
@@ -318,6 +328,30 @@ class _RedirectToLoginState extends State<_RedirectToLogin> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) context.go('/login');
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(child: CircularProgressIndicator()),
+    );
+  }
+}
+
+class _RedirectToNomenclature extends StatefulWidget {
+  const _RedirectToNomenclature();
+
+  @override
+  State<_RedirectToNomenclature> createState() => _RedirectToNomenclatureState();
+}
+
+class _RedirectToNomenclatureState extends State<_RedirectToNomenclature> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.go('/nomenclature');
     });
   }
 

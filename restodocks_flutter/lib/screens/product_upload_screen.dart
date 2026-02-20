@@ -382,6 +382,16 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
               ),
             ],
 
+            // Импорт с отложенной модерацией (ТЗ)
+            _UploadMethodCard(
+              icon: Icons.edit_note,
+              title: 'Импорт с модерацией',
+              description: 'Файл или текст → предпросмотр → подтверждение (без диалогов на каждую строку)',
+              color: Colors.deepPurple,
+              onTap: _isLoading ? null : () => _showImportWithModeration(),
+            ),
+            const SizedBox(height: 12),
+
             // Карточка загрузки из файла
             _UploadMethodCard(
               icon: Icons.file_upload,
@@ -549,6 +559,226 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _showImportWithModeration() async {
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Импорт с модерацией'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.file_upload),
+              title: const Text('Из файла'),
+              subtitle: const Text('Excel, CSV'),
+              onTap: () => Navigator.of(ctx).pop('file'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.content_paste),
+              title: const Text('Вставить текст'),
+              subtitle: const Text('Из мессенджеров, заметок'),
+              onTap: () => Navigator.of(ctx).pop('text'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Отмена'),
+          ),
+        ],
+      ),
+    );
+    if (choice == null || !mounted) return;
+
+    if (choice == 'file') {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['xlsx', 'xls', 'csv', 'txt'],
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty || result.files.single.bytes == null) return;
+      final bytes = result.files.single.bytes!;
+      final name = result.files.single.name.toLowerCase();
+      List<String> rows = [];
+      if (name.endsWith('.csv') || name.endsWith('.txt')) {
+        final text = utf8.decode(bytes, allowMalformed: true);
+        rows = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+      } else {
+        try {
+          final excel = Excel.decodeBytes(bytes);
+          for (final sheetName in excel.tables.keys) {
+            final sheet = excel.tables[sheetName]!;
+            for (final row in sheet.rows) {
+              if (row.isEmpty) continue;
+              final parts = row.map((c) => c?.value?.toString().trim() ?? '').toList();
+              if (parts.any((p) => p.isNotEmpty)) {
+                rows.add(parts.join('\t'));
+              }
+            }
+          }
+        } catch (_) {
+          final text = utf8.decode(bytes, allowMalformed: true);
+          rows = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+        }
+      }
+      if (rows.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Не удалось извлечь данные из файла')),
+        );
+        return;
+      }
+      await _processWithDeferredModeration(rows: rows);
+    } else {
+      final controller = TextEditingController();
+      final result = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Вставить текст'),
+          content: SizedBox(
+            width: 500,
+            child: TextField(
+              controller: controller,
+              maxLines: 12,
+              decoration: const InputDecoration(
+                hintText: 'Вставьте список продуктов (название, цена, ед. изм.)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Отмена')),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(controller.text),
+              child: const Text('Анализ'),
+            ),
+          ],
+        ),
+      );
+      if (result != null && result.trim().isNotEmpty) {
+        await _processWithDeferredModeration(text: result);
+      }
+    }
+  }
+
+  Future<void> _processWithDeferredModeration({List<String>? rows, String? text}) async {
+    final acc = context.read<AccountManagerSupabase>();
+    final est = acc.establishment;
+    if (est == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Не найдено заведение')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    _setLoadingMessage('Анализ данных ИИ...');
+
+    try {
+      final ai = context.read<AiService>();
+      final parsed = rows != null
+          ? await ai.parseProductList(rows: rows)
+          : await ai.parseProductList(text: text!);
+
+      if (!mounted) return;
+      if (parsed.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('ИИ не смог извлечь продукты')),
+        );
+        return;
+      }
+
+      _setLoadingMessage('Сопоставление с базой...');
+      final store = context.read<ProductStoreSupabase>();
+      await store.ensureNomenclatureLoaded(est.id);
+      final existingProducts = store.getNomenclatureProducts(est.id);
+      final allProducts = store.allProducts;
+
+      final moderationItems = <ModerationItem>[];
+      final newNames = <String>[];
+      final newIndices = <int>[];
+
+      for (var i = 0; i < parsed.length; i++) {
+        final p = parsed[i];
+        final match = _findMatch(p.name, p.price, existingProducts, allProducts, est.id, store);
+        if (match.existingId != null) {
+          if (match.priceDiff) {
+            moderationItems.add(ModerationItem(
+              name: p.name,
+              price: p.price,
+              unit: p.unit,
+              existingProductId: match.existingId,
+              existingProductName: match.existingName,
+              existingPrice: match.existingPrice,
+              category: ModerationCategory.priceUpdate,
+            ));
+          }
+        } else {
+          newNames.add(p.name);
+          newIndices.add(moderationItems.length);
+          moderationItems.add(ModerationItem(
+            name: p.name,
+            price: p.price,
+            unit: p.unit,
+            category: ModerationCategory.newProduct,
+          ));
+        }
+      }
+
+      if (newNames.isNotEmpty) {
+        _setLoadingMessage('Исправление названий...');
+        final normalized = await ai.normalizeProductNames(newNames);
+        if (mounted && normalized.length == newNames.length) {
+          for (var j = 0; j < newIndices.length; j++) {
+            final idx = newIndices[j];
+            final norm = normalized[j];
+            if (norm != moderationItems[idx].name) {
+              moderationItems[idx] = moderationItems[idx].copyWith(
+                normalizedName: norm,
+                category: ModerationCategory.nameFix,
+              );
+            }
+          }
+        }
+      }
+
+      if (!mounted) return;
+      context.push('/import-review', extra: moderationItems);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  ({String? existingId, String? existingName, double? existingPrice, bool priceDiff}) _findMatch(
+    String name,
+    double? price,
+    List<Product> nomenclature,
+    List<Product> allProducts,
+    String establishmentId,
+    ProductStoreSupabase store,
+  ) {
+    final normalized = name.toLowerCase().replaceAll(RegExp(r'[^\w\s]'), '').replaceAll(RegExp(r'\s+'), ' ').trim();
+    for (final p in nomenclature) {
+      final pNames = [p.name, ...(p.names?.values ?? [])];
+      for (final n in pNames) {
+        final nNorm = n.toLowerCase().replaceAll(RegExp(r'[^\w\s]'), '').replaceAll(RegExp(r'\s+'), ' ').trim();
+        if (nNorm == normalized) {
+          final ep = store.getEstablishmentPrice(p.id, establishmentId);
+          final existingPrice = ep?.$1;
+          final priceDiff = price != null && existingPrice != null && (existingPrice - price).abs() > 0.01;
+          return (existingId: p.id, existingName: p.name, existingPrice: existingPrice, priceDiff: priceDiff);
+        }
+      }
+    }
+    return (existingId: null, existingName: null, existingPrice: null, priceDiff: false);
   }
 
   Future<void> _uploadExcelSimple() async {
