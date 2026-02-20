@@ -826,6 +826,7 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
 
   Future<void> _openPicker() async {
     final onSelect = widget.onProductSelected;
+    final nav = Navigator.of(context);
     final searchCtrl = TextEditingController(text: _searchController.text);
     List<SelectableItem> filtered = _filterItems(_searchController.text);
 
@@ -871,10 +872,8 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
                           return ListTile(
                             title: Text(item.displayName, style: const TextStyle(fontSize: 14)),
                             onTap: () {
-                              Navigator.of(ctx).pop();
-                              WidgetsBinding.instance.addPostFrameCallback((_) {
-                                onSelect(item);
-                              });
+                              onSelect(item);
+                              nav.pop();
                             },
                           );
                         },
@@ -884,7 +883,7 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
                     Padding(
                       padding: const EdgeInsets.all(8),
                       child: TextButton(
-                        onPressed: () => Navigator.of(ctx).pop(),
+                        onPressed: () => nav.pop(),
                         child: const Text('Отмена'),
                       ),
                     ),
