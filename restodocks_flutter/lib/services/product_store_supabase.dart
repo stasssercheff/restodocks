@@ -199,14 +199,7 @@ class ProductStoreSupabase {
     _nomenclatureIds.clear();
     _priceCache.removeWhere((key, _) => key.startsWith('${establishmentId}_'));
 
-    // Проверяем аутентификацию
-    final currentUser = Supabase.instance.client.auth.currentUser;
-    if (currentUser == null) {
-      print('❌ ProductStore: No authenticated user');
-      return;
-    }
-
-    print('👤 ProductStore: User ${currentUser.id}, establishment: $establishmentId');
+    print('👤 ProductStore: Loading nomenclature for establishment: $establishmentId');
 
     // Пробуем основной метод загрузки
     try {
@@ -369,12 +362,6 @@ class ProductStoreSupabase {
     }
 
     try {
-      // Проверяем аутентификацию
-      final currentUser = Supabase.instance.client.auth.currentUser;
-      if (currentUser == null) {
-        throw Exception('User not authenticated');
-      }
-
       // Создаем запись в establishment_products
       final data = {
         'establishment_id': establishmentId,

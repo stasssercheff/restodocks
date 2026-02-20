@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'package:excel/excel.dart' hide Border;
+import 'package:spreadsheet_decoder/spreadsheet_decoder.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -424,24 +425,35 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     } else {
       rows = _extractRowsFromExcel(bytes);
       if (rows.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Не удалось прочитать Excel. Проверьте, что файл не повреждён и сохранён как .xlsx.',
+        final csvFallback = _tryCsvFallback(bytes);
+        if (csvFallback.isNotEmpty) {
+          rows = csvFallback;
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Не удалось прочитать Excel. Попробуйте сохранить файл как .xlsx в Excel или экспортировать в CSV.',
+                ),
               ),
-            ),
-          );
+            );
+          }
+          return;
         }
-        return;
       }
     }
 
     await _processWithDeferredModeration(rows: rows);
   }
 
-  /// Извлекает строки из Excel (xlsx/xls). Не использует raw binary как текст — xlsx это ZIP с XML.
+  /// Извлекает строки из Excel (xlsx/xls). Использует excel пакет, при ошибке — spreadsheet_decoder.
   List<String> _extractRowsFromExcel(Uint8List bytes) {
+    final rows = _extractRowsFromExcelPackage(bytes);
+    if (rows.isNotEmpty) return rows;
+    return _extractRowsFromSpreadsheetDecoder(bytes);
+  }
+
+  List<String> _extractRowsFromExcelPackage(Uint8List bytes) {
     try {
       final excel = Excel.decodeBytes(bytes.toList());
       if (excel.tables.isEmpty) return [];
@@ -461,7 +473,27 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       }
       return rows;
     } catch (e) {
-      _addDebugLog('Excel decode error: $e');
+      _addDebugLog('Excel package decode error: $e');
+      return [];
+    }
+  }
+
+  List<String> _extractRowsFromSpreadsheetDecoder(Uint8List bytes) {
+    try {
+      final decoder = SpreadsheetDecoder.decodeBytes(bytes.toList());
+      if (decoder.tables.isEmpty) return [];
+      final table = decoder.tables.values.first;
+      final rows = <String>[];
+      for (final row in table.rows) {
+        final parts = row.map((c) => c?.toString().trim() ?? '').toList();
+        final line = parts.join('\t').trim();
+        if (line.isEmpty) continue;
+        if (_looksLikeGarbage(line)) continue;
+        rows.add(line);
+      }
+      return rows;
+    } catch (e) {
+      _addDebugLog('SpreadsheetDecoder error: $e');
       return [];
     }
   }
@@ -474,6 +506,20 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     if (v is IntCellValue) return v.value.toString();
     if (v is DoubleCellValue) return v.value.toString();
     return v.toString().trim();
+  }
+
+  List<String> _tryCsvFallback(Uint8List bytes) {
+    if (bytes.length < 4) return [];
+    if (bytes[0] == 0x50 && bytes[1] == 0x4B) return [];
+    try {
+      final text = utf8.decode(bytes, allowMalformed: true);
+      final lines = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+      if (lines.isEmpty) return [];
+      if (_looksLikeGarbage(lines.first)) return [];
+      return lines;
+    } catch (_) {
+      return [];
+    }
   }
 
   static bool _looksLikeGarbage(String line) {
