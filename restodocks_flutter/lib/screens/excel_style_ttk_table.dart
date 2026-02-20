@@ -519,11 +519,17 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         );
       }
 
-      // Показываем searchable dropdown для выбора продукта (по размеру ячейки)
-      return SizedBox(
+    // Показываем searchable dropdown для выбора продукта (по размеру ячейки)
+    return GestureDetector(
+      onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Клик по продукту работает!')),
+      ),
+      child: Container(
         height: 44,
-        child: _buildSearchableProductDropdown(ingredient, rowIndex),
-      );
+        color: Colors.blue.shade100,
+        child: const Center(child: Text('КЛИКНИТЕ ЗДЕСЬ')),
+      ),
+    );
     } catch (e, stackTrace) {
       // В случае ошибки показываем fallback
       return Container(
