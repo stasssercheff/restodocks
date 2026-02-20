@@ -56,6 +56,59 @@ class _SettingsScreenState extends State<SettingsScreen> {
     {'code': 'UZS', 'symbol': 'soʻm', 'name': 'Узбекский сум'},
   ];
 
+  String _homeButtonActionLabel(LocalizationService loc, HomeButtonAction action) {
+    switch (action) {
+      case HomeButtonAction.schedule:
+        return loc.t('schedule');
+      case HomeButtonAction.checklists:
+        return loc.t('checklists');
+      case HomeButtonAction.ttk:
+        return loc.t('tech_cards');
+      case HomeButtonAction.productOrder:
+        return loc.t('product_order');
+    }
+  }
+
+  void _showProRequiredDialog(BuildContext context, LocalizationService loc) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('${loc.t('home_button_config')} (${loc.t('pro')})'),
+        content: Text(loc.t('pro_required_hint')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showHomeButtonPicker(BuildContext context, LocalizationService loc, HomeButtonConfigService homeBtn) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('home_button_config')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: HomeButtonAction.values.map((action) {
+            final selected = homeBtn.action == action;
+            return ListTile(
+              leading: Icon(action.icon, color: selected ? Theme.of(ctx).colorScheme.primary : null),
+              title: Text(_homeButtonActionLabel(loc, action)),
+              trailing: selected ? const Icon(Icons.check, color: Colors.green) : null,
+              onTap: () async {
+                await homeBtn.setAction(action);
+                if (ctx.mounted) Navigator.of(ctx).pop();
+              },
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
   void _showLanguagePicker(BuildContext context, LocalizationService localization) {
     showDialog<void>(
       context: context,
@@ -305,10 +358,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onTap: () => _showCurrencyPicker(context, localization),
               ),
             ],
-            ListTile(
-              leading: const Icon(Icons.tune),
-              title: Text('${localization.t('home_button_config')} (${localization.t('pro')})'),
-              trailing: const Icon(Icons.chevron_right),
+            Consumer2<HomeButtonConfigService, AccountManagerSupabase>(
+              builder: (_, homeBtn, account, __) {
+                final isPro = account.hasProSubscription;
+                return ListTile(
+                  leading: const Icon(Icons.tune),
+                  title: Text('${localization.t('home_button_config')} (${localization.t('pro')})'),
+                  subtitle: Text(isPro ? _homeButtonActionLabel(localization, homeBtn.action) : localization.t('pro_required_hint')),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => isPro ? _showHomeButtonPicker(context, localization, homeBtn) : _showProRequiredDialog(context, localization),
+                );
+              },
             ),
             if (currentEmployee.hasRole('owner'))
               ListTile(

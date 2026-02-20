@@ -17,6 +17,9 @@ class AppProviders {
         ChangeNotifierProvider<ThemeService>(
           create: (_) => ThemeService(),
         ),
+        ChangeNotifierProvider<HomeButtonConfigService>(
+          create: (_) => HomeButtonConfigService(),
+        ),
         // Используем Supabase версии сервисов
         Provider<AccountManagerSupabase>(
           create: (_) => AccountManagerSupabase(),

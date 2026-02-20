@@ -34,7 +34,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final isOwner = currentEmployee.hasRole('owner');
     final isManagement = currentEmployee.canViewDepartment('management') && !isOwner;
-    final middleLabel = isOwner ? loc.t('notifications') : loc.t('schedule');
+    final account = context.watch<AccountManagerSupabase>();
+    final homeBtnConfig = context.watch<HomeButtonConfigService>();
+    final middleAction = isOwner ? null : (account.hasProSubscription ? homeBtnConfig.action : HomeButtonAction.schedule);
+    final middleLabel = isOwner ? loc.t('notifications') : _labelForAction(loc, middleAction!);
 
     return Scaffold(
       appBar: AppBar(
@@ -73,8 +76,8 @@ class _HomeScreenState extends State<HomeScreen> {
             label: loc.t('home'),
           ),
           NavigationDestination(
-            icon: Icon(isOwner ? Icons.notifications_none : Icons.calendar_month_outlined),
-            selectedIcon: Icon(isOwner ? Icons.notifications : Icons.calendar_month),
+            icon: Icon(isOwner ? Icons.notifications_none : (middleAction?.iconOutlined ?? Icons.calendar_month_outlined)),
+            selectedIcon: Icon(isOwner ? Icons.notifications : (middleAction?.icon ?? Icons.calendar_month)),
             label: middleLabel,
           ),
           NavigationDestination(
@@ -88,11 +91,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   String _appBarTitle(LocalizationService loc, bool isOwner) {
+    final account = context.read<AccountManagerSupabase>();
+    final homeBtnConfig = context.read<HomeButtonConfigService>();
+    final middleAction = isOwner ? null : (account.hasProSubscription ? homeBtnConfig.action : HomeButtonAction.schedule);
     switch (_selectedIndex) {
       case 0:
         return loc.t('app_name');
       case 1:
-        return isOwner ? loc.t('notifications') : loc.t('schedule');
+        return isOwner ? loc.t('notifications') : _labelForAction(loc, middleAction!);
       case 2:
         return loc.t('personal_cabinet');
       default:
@@ -110,7 +116,22 @@ class _HomeScreenState extends State<HomeScreen> {
     return StaffHomeContent(employee: employee);
   }
 
+  String _labelForAction(LocalizationService loc, HomeButtonAction action) {
+    switch (action) {
+      case HomeButtonAction.schedule:
+        return loc.t('schedule');
+      case HomeButtonAction.checklists:
+        return loc.t('checklists');
+      case HomeButtonAction.ttk:
+        return loc.t('tech_cards');
+      case HomeButtonAction.productOrder:
+        return loc.t('product_order');
+    }
+  }
+
   Widget _buildMiddleTab(Employee employee, bool isOwner, LocalizationService loc) {
+    final account = context.read<AccountManagerSupabase>();
+    final homeBtnConfig = context.read<HomeButtonConfigService>();
     if (isOwner) {
       return _MiddleTabBody(
         icon: Icons.notifications_none,
@@ -118,10 +139,11 @@ class _HomeScreenState extends State<HomeScreen> {
         onTap: () => context.push('/notifications'),
       );
     }
+    final action = account.hasProSubscription ? homeBtnConfig.action : HomeButtonAction.schedule;
     return _MiddleTabBody(
-      icon: Icons.calendar_month,
-      title: loc.t('schedule'),
-      onTap: () => context.push('/schedule'),
+      icon: action.icon,
+      title: _labelForAction(loc, action),
+      onTap: () => context.push(action.route),
     );
   }
 

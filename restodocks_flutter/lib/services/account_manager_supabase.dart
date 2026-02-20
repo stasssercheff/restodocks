@@ -385,17 +385,34 @@ class AccountManagerSupabase {
   /// Обновить данные сотрудника (пароль не обновляется — используйте отдельный поток смены пароля).
   Future<void> updateEmployee(Employee employee) async {
     try {
-      final employeeData = employee.toJson()
+      var employeeData = employee.toJson()
         ..remove('password')
         ..remove('password_hash');
       _stripAvatarFromPayload(employeeData);
 
-      await _supabase.updateData(
-        'employees',
-        employeeData,
-        'id',
-        employee.id,
-      );
+      try {
+        await _supabase.updateData(
+          'employees',
+          employeeData,
+          'id',
+          employee.id,
+        );
+      } catch (e) {
+        if (_isPaymentColumnError(e)) {
+          employeeData = Map<String, dynamic>.from(employeeData)
+            ..remove('payment_type')
+            ..remove('rate_per_shift')
+            ..remove('hourly_rate');
+          await _supabase.updateData(
+            'employees',
+            employeeData,
+            'id',
+            employee.id,
+          );
+        } else {
+          rethrow;
+        }
+      }
 
       if (_currentEmployee?.id == employee.id) {
         _currentEmployee = employee;
@@ -404,6 +421,14 @@ class AccountManagerSupabase {
       print('Ошибка обновления сотрудника: $e');
       rethrow;
     }
+  }
+
+  bool _isPaymentColumnError(Object e) {
+    final msg = e.toString().toLowerCase();
+    return msg.contains('payment_type') ||
+        msg.contains('rate_per_shift') ||
+        msg.contains('hourly_rate') ||
+        (msg.contains('column') && (msg.contains('exist') || msg.contains('found')));
   }
 
   /// Обновить данные заведения

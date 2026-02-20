@@ -352,7 +352,10 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
     } catch (e) {
       if (mounted) setState(() {
         _isLoading = false;
-        _error = e.toString();
+        final msg = e.toString().toLowerCase();
+        _error = (msg.contains('payment') || msg.contains('column') || msg.contains('pgrst'))
+            ? context.read<LocalizationService>().t('employee_save_error_schema')
+            : e.toString();
       });
     }
   }

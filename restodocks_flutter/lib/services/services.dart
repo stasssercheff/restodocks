@@ -13,6 +13,7 @@ export 'nutrition_api_service.dart';
 export 'supabase_service.dart';
 export 'secure_storage_service.dart';
 export 'theme_service.dart';
+export 'home_button_config_service.dart';
 export 'translation_service.dart';
 export 'translation_manager.dart';
 export 'ai_service.dart';

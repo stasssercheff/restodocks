@@ -150,6 +150,9 @@ void main() async {
     await ThemeService().initialize();
     // ThemeService initialized
 
+    await HomeButtonConfigService().initialize();
+    // HomeButtonConfigService initialized
+
     // Starting RestodocksApp...
     runApp(const RestodocksApp());
   } catch (e, stackTrace) {
