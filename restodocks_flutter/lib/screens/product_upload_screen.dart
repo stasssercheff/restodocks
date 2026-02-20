@@ -6,8 +6,10 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import 'package:archive/archive.dart';
 import 'package:excel/excel.dart' hide Border;
 import 'package:spreadsheet_decoder/spreadsheet_decoder.dart';
+import 'package:xml/xml.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -318,7 +320,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
             _UploadMethodCard(
               icon: Icons.file_upload,
               title: '2. Загрузить из файла',
-              description: 'Excel (.xlsx, .xls), CSV (.csv) или текст (.txt). '
+              description: 'Excel, CSV, текст (.txt, .rtf), Word (.docx), Apple Pages (.pages), Numbers (.numbers). '
                   'Модерация, поиск дубликатов ИИ, сверка цен.',
               color: Colors.blue,
               onTap: _isLoading ? null : () => _uploadFromFileUnified(),
@@ -410,40 +412,132 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   Future<void> _uploadFromFileUnified() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['xlsx', 'xls', 'csv', 'txt'],
+      allowedExtensions: ['xlsx', 'xls', 'csv', 'txt', 'rtf', 'pages', 'numbers', 'docx'],
       withData: true,
     );
     if (result == null || result.files.isEmpty || result.files.single.bytes == null) return;
 
     final bytes = result.files.single.bytes!;
     final name = result.files.single.name.toLowerCase();
-    List<String> rows;
+    List<String> rows = _extractRowsFromFile(bytes, name);
 
-    if (name.endsWith('.csv') || name.endsWith('.txt')) {
-      final text = utf8.decode(bytes, allowMalformed: true);
-      rows = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
-    } else {
-      rows = _extractRowsFromExcel(bytes);
-      if (rows.isEmpty) {
-        final csvFallback = _tryCsvFallback(bytes);
-        if (csvFallback.isNotEmpty) {
-          rows = csvFallback;
-        } else {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text(
-                  'Не удалось прочитать Excel. Попробуйте сохранить файл как .xlsx в Excel или экспортировать в CSV.',
-                ),
-              ),
-            );
-          }
-          return;
-        }
+    if (rows.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Не удалось извлечь данные. Попробуйте экспортировать в CSV или .xlsx.',
+            ),
+          ),
+        );
       }
+      return;
     }
 
     await _processWithDeferredModeration(rows: rows);
+  }
+
+  List<String> _extractRowsFromFile(Uint8List bytes, String name) {
+    if (name.endsWith('.csv') || name.endsWith('.txt')) {
+      final text = utf8.decode(bytes, allowMalformed: true);
+      return text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+    }
+    if (name.endsWith('.rtf')) {
+      final text = _extractTextFromRtf(utf8.decode(bytes, allowMalformed: true));
+      return text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+    }
+    if (name.endsWith('.pages')) return _extractRowsFromPages(bytes);
+    if (name.endsWith('.numbers')) return _extractRowsFromNumbers(bytes);
+    if (name.endsWith('.docx')) return _extractRowsFromDocx(bytes);
+    if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
+      final rows = _extractRowsFromExcel(bytes);
+      if (rows.isNotEmpty) return rows;
+      final csvFallback = _tryCsvFallback(bytes);
+      return csvFallback;
+    }
+    return [];
+  }
+
+  List<String> _extractRowsFromPages(Uint8List bytes) {
+    try {
+      final archive = ZipDecoder().decodeBytes(bytes);
+      ArchiveFile? xmlFile = archive.findFile('index.xml.gz') ?? archive.findFile('Index/Document.xml') ?? archive.findFile('index.xml');
+      if (xmlFile == null) {
+        for (final f in archive.files) {
+          if (f.name.endsWith('.xml') && !f.name.contains('Preferences')) {
+            xmlFile = f;
+            break;
+          }
+        }
+      }
+      if (xmlFile == null) return [];
+      var data = xmlFile.content as List<int>;
+      if (xmlFile.name.endsWith('.gz')) {
+        data = GZipDecoder().decodeBytes(data);
+      }
+      final xml = XmlDocument.parse(utf8.decode(data));
+      final text = xml.descendants.where((n) => n is XmlText).map((n) => (n as XmlText).text.trim()).where((s) => s.isNotEmpty).join('\n');
+      return text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+    } catch (e) {
+      _addDebugLog('Pages extract error: $e');
+      return [];
+    }
+  }
+
+  List<String> _extractRowsFromNumbers(Uint8List bytes) {
+    final excelRows = _extractRowsFromExcel(bytes);
+    if (excelRows.isNotEmpty) return excelRows;
+    try {
+      final archive = ZipDecoder().decodeBytes(bytes);
+      for (final f in archive.files) {
+        if (f.name.contains('Data') && f.name.endsWith('.xml') || f.name.contains('table') && f.name.endsWith('.xml')) {
+          final xml = XmlDocument.parse(utf8.decode(f.content as List<int>));
+          final rows = <String>[];
+          for (final row in xml.findAllElements('row')) {
+            final cells = row.findElements('cell').map((c) => c.innerText.trim()).toList();
+            final line = cells.join('\t').trim();
+            if (line.isNotEmpty && !_looksLikeGarbage(line)) rows.add(line);
+          }
+          if (rows.isNotEmpty) return rows;
+        }
+      }
+      final anyXml = archive.files.where((f) => f.name.endsWith('.xml'));
+      for (final f in anyXml) {
+        try {
+          final xml = XmlDocument.parse(utf8.decode(f.content as List<int>));
+          final text = xml.descendants.where((n) => n is XmlText).map((n) => (n as XmlText).text.trim()).where((s) => s.isNotEmpty).join('\n');
+          final lines = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+          if (lines.length >= 2) return lines;
+        } catch (_) {}
+      }
+    } catch (e) {
+      _addDebugLog('Numbers extract error: $e');
+    }
+    return [];
+  }
+
+  List<String> _extractRowsFromDocx(Uint8List bytes) {
+    try {
+      final archive = ZipDecoder().decodeBytes(bytes);
+      final doc = archive.findFile('word/document.xml');
+      if (doc == null) return [];
+      final xml = XmlDocument.parse(utf8.decode(doc.content as List<int>));
+      final paras = xml.descendants.whereType<XmlElement>().where((e) => e.localName == 'p');
+      final lines = <String>[];
+      for (final p in paras) {
+        final texts = p.descendants.whereType<XmlElement>().where((e) => e.localName == 't').map((e) => e.innerText).toList();
+        final line = texts.join('').trim();
+        if (line.isNotEmpty) lines.add(line);
+      }
+      if (lines.isEmpty) {
+        final allT = xml.descendants.whereType<XmlElement>().where((e) => e.localName == 't').map((e) => e.innerText).join(' ');
+        if (allT.trim().isNotEmpty) return allT.split(RegExp(r'\s+')).where((s) => s.length > 1).toList();
+      }
+      return lines;
+    } catch (e) {
+      _addDebugLog('Docx extract error: $e');
+      return [];
+    }
   }
 
   /// Извлекает строки из Excel (xlsx/xls). Использует excel пакет, при ошибке — spreadsheet_decoder.
@@ -565,19 +659,13 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     if (choice == 'file') {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['xlsx', 'xls', 'csv', 'txt'],
+        allowedExtensions: ['xlsx', 'xls', 'csv', 'txt', 'rtf', 'pages', 'numbers', 'docx'],
         withData: true,
       );
       if (result == null || result.files.isEmpty || result.files.single.bytes == null) return;
       final bytes = result.files.single.bytes!;
       final name = result.files.single.name.toLowerCase();
-      List<String> rows;
-      if (name.endsWith('.csv') || name.endsWith('.txt')) {
-        final text = utf8.decode(bytes, allowMalformed: true);
-        rows = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
-      } else {
-        rows = _extractRowsFromExcel(bytes);
-      }
+      final rows = _extractRowsFromFile(bytes, name);
       if (rows.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Не удалось извлечь данные из файла')),
