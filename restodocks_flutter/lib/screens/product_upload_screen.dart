@@ -469,13 +469,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   static String _excelCellToStr(CellValue? v) {
     if (v == null) return '';
     if (v is TextCellValue) {
-      final val = v.value;
-      if (val is String) return val.trim();
-      try {
-        final t = (val as dynamic).text;
-        if (t != null) return (t is String ? t : t.toString()).trim();
-      } catch (_) {}
-      return val.toString().trim();
+      return v.value.toString().trim();
     }
     if (v is IntCellValue) return v.value.toString();
     if (v is DoubleCellValue) return v.value.toString();

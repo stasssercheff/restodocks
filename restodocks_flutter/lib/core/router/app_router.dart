@@ -24,7 +24,7 @@ import '../../models/order_list.dart';
 import '../../services/ai_service.dart';
 import '../../services/services.dart';
 
-const _publicPaths = ['/', '/splash', '/login', '/register', '/register-company', '/register-owner', '/register-employee'];
+const _publicPaths = ['/', '/splash', '/login', '/register', '/register-company', '/register-owner', '/register-employee', '/forgot-password', '/reset-password'];
 
 /// Начальный путь: при обновлении страницы (web) сохраняем текущий URL.
 String _getInitialLocation() {
@@ -88,6 +88,18 @@ class AppRouter {
       GoRoute(
         path: '/register',
         builder: (context, state) => const RegisterScreen(),
+      ),
+      // Восстановление доступа
+      GoRoute(
+        path: '/forgot-password',
+        builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: '/reset-password',
+        builder: (context, state) {
+          final token = state.queryParameters['token'];
+          return ResetPasswordScreen(token: token);
+        },
       ),
 
       // Главный экран
