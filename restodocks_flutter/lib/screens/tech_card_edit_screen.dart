@@ -1362,11 +1362,11 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                 constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.25),
                 child: Container(
                   width: double.infinity,
-              margin: const EdgeInsets.only(top: 12),
-              decoration: BoxDecoration(
-                border: Border.all(color: Theme.of(context).colorScheme.outline),
-                color: Theme.of(context).colorScheme.surfaceContainerLowest,
-              ),
+                  margin: const EdgeInsets.only(top: 12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Theme.of(context).colorScheme.outline),
+                    color: Theme.of(context).colorScheme.surfaceContainerLowest,
+                  ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
