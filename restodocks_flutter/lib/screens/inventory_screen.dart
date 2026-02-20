@@ -1032,7 +1032,7 @@ class _InventoryScreenState extends State<InventoryScreen>
               ],
             ],
           ),
-          DataSafetyIndicator(isVisible: !keyboardVisible),
+          DataSafetyIndicator(isVisible: true),
         ],
       ),
     );
