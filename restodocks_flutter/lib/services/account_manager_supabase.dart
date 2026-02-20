@@ -350,19 +350,32 @@ class AccountManagerSupabase {
     return isLoggedInSync;
   }
 
-  /// Получить всех сотрудников компании
+  /// Получить всех сотрудников компании (только активные)
   Future<List<Employee>> getEmployeesForEstablishment(String establishmentId) async {
     try {
       final data = await _supabase.client
           .from('employees')
           .select()
-          .eq('establishment_id', establishmentId);
+          .eq('establishment_id', establishmentId)
+          .eq('is_active', true);
 
       return (data as List).map((json) => Employee.fromJson(json)).toList();
     } catch (e) {
       print('Ошибка получения сотрудников: $e');
       return [];
     }
+  }
+
+  /// Удалить сотрудника (деактивация: is_active = false).
+  /// Владельца удалять нельзя.
+  Future<void> deleteEmployee(Employee employee) async {
+    if (employee.roles.contains('owner')) {
+      throw Exception('Нельзя удалить владельца');
+    }
+    await _supabase.client
+        .from('employees')
+        .update({'is_active': false})
+        .eq('id', employee.id);
   }
 
   /// Шеф-повара заведения (для инвентаризации: кабинет + email).
@@ -382,7 +395,36 @@ class AccountManagerSupabase {
     }
   }
 
-  /// Обновить данные сотрудника (пароль не обновляется — используйте отдельный поток смены пароля).
+  /// Смена пароля (для текущего пользователя). Проверяет текущий пароль.
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final emp = _currentEmployee;
+    if (emp == null) throw Exception('Нет текущего пользователя');
+    if (newPassword.length < 6) throw Exception('Новый пароль не менее 6 символов');
+
+    final data = await _supabase.client
+        .from('employees')
+        .select('password_hash')
+        .eq('id', emp.id)
+        .limit(1)
+        .single();
+    final hash = data['password_hash'] as String?;
+    if (hash == null || hash.isEmpty) throw Exception('Ошибка проверки пароля');
+
+    if (!BCrypt.checkpw(currentPassword, hash) && hash != currentPassword) {
+      throw Exception('Неверный текущий пароль');
+    }
+
+    final newHash = BCrypt.hashpw(newPassword, BCrypt.gensalt());
+    await _supabase.client
+        .from('employees')
+        .update({'password_hash': newHash})
+        .eq('id', emp.id);
+  }
+
+  /// Обновить данные сотрудника (пароль не обновляется — используйте changePassword).
   Future<void> updateEmployee(Employee employee) async {
     try {
       var employeeData = employee.toJson()

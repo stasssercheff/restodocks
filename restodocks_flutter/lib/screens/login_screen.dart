@@ -8,7 +8,10 @@ import '../models/models.dart';
 
 /// Экран входа в систему
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({super.key, this.returnTo});
+
+  /// Путь для перехода после успешного входа (сохранение места при F5)
+  final String? returnTo;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -226,7 +229,12 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (mounted) {
-        context.go('/home');
+        final target = widget.returnTo;
+        if (target != null && target.startsWith('/') && !target.startsWith('/login')) {
+          context.go(target);
+        } else {
+          context.go('/home');
+        }
       }
     } catch (e) {
       if (!mounted) return;

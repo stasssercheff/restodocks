@@ -20,9 +20,11 @@ class ScheduleScreen extends StatefulWidget {
 class _ScheduleScreenState extends State<ScheduleScreen> {
   static const int _defaultWeeks = 12;
   static const double _slotColumnWidth = 120;
-  /// Ширина ячейки дня: 7 дней влезают на экран телефона (7 × 36 ≈ 252px).
-  static const double _dayCellWidth = 36;
+  /// Ширина ячейки дня — увеличена, чтобы влезало время смены (09:00–18:00).
+  static const double _dayCellWidth = 52;
   static const double _rowHeight = 44;
+  /// Высота строк даты и дня недели — компактнее.
+  static const double _headerRowHeight = 28;
 
   // Определяем, является ли устройство мобильным
   bool get isMobile => MediaQuery.of(context).size.width < 600;
@@ -375,10 +377,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       );
     }
 
-    Widget rightCell(Widget child, {Color? bg}) {
+    Widget rightCell(Widget child, {Color? bg, double? height}) {
       return Container(
         width: _dayCellWidth,
-        height: _rowHeight,
+        height: height ?? _rowHeight,
         padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
         alignment: Alignment.center,
         decoration: BoxDecoration(
@@ -389,14 +391,14 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       );
     }
 
-    // Строка 1: заголовок «Дата» + даты
+    // Строка 1: заголовок «Дата» + даты (компактная высота)
     leftCells.add(leftCell(
-      Text(loc.t('schedule_date'), style: TextStyle(fontWeight: FontWeight.w600, color: headerFg, fontSize: 12)),
-      height: _rowHeight,
+      Text(loc.t('schedule_date'), style: TextStyle(fontWeight: FontWeight.w600, color: headerFg, fontSize: 11)),
+      height: _headerRowHeight,
       decoration: BoxDecoration(color: headerBg, border: Border(right: BorderSide(color: borderColor))),
     ));
     rightRows.add(Container(
-      height: _rowHeight,
+      height: _headerRowHeight,
       decoration: BoxDecoration(color: headerBg),
       child: Row(
         children: dates.map((d) {
@@ -407,6 +409,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           return rightCell(
             Text(DateFormat('dd.MM', localeStr).format(d), textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: fg)),
             bg: bg,
+            height: _headerRowHeight,
           );
         }).toList(),
       ),
@@ -415,11 +418,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     // Строка 2: «День» + Пн, Вт, ...
     leftCells.add(leftCell(
       Text(loc.t('schedule_day'), style: TextStyle(fontWeight: FontWeight.w600, color: headerFg, fontSize: 11)),
-      height: _rowHeight,
+      height: _headerRowHeight,
       decoration: BoxDecoration(color: headerBg, border: Border(right: BorderSide(color: borderColor))),
     ));
     rightRows.add(Container(
-      height: _rowHeight,
+      height: _headerRowHeight,
       decoration: BoxDecoration(color: headerBg),
       child: Row(
         children: dates.map((d) {
@@ -430,6 +433,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           return rightCell(
             Text(weekdays[d.weekday - 1], textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: fg)),
             bg: bg,
+            height: _headerRowHeight,
           );
         }).toList(),
       ),

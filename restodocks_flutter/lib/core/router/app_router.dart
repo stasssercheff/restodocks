@@ -24,20 +24,22 @@ import '../../models/order_list.dart';
 import '../../services/ai_service.dart';
 import '../../services/services.dart';
 
-/// Публичные пути (без проверки авторизации). Не использовать startsWith('/') — иначе все пути считаются публичными.
+/// Публичные пути (без проверки авторизации).
 bool _isPublicPath(String loc) {
   if (loc == '/' || loc == '/splash') return true;
   if (loc.startsWith('/login') || loc.startsWith('/register') ||
+      loc.startsWith('/register-company') || loc.startsWith('/register-owner') ||
       loc.startsWith('/forgot-password') || loc.startsWith('/reset-password')) return true;
   return false;
 }
 
-/// Начальный путь: при обновлении страницы (web) сохраняем текущий URL.
+/// Начальный путь: при обновлении страницы (web) используем текущий URL — пользователь остаётся там, где был.
 String _getInitialLocation() {
   if (kIsWeb) {
     try {
-      final path = Uri.base.path;
-      if (path.isNotEmpty && path != '/') return path;
+      var path = Uri.base.path;
+      if (path.isEmpty) path = '/';
+      if (path != '/') return path;
     } catch (_) {}
   }
   return '/';
@@ -50,10 +52,13 @@ class AppRouter {
     redirect: (context, state) async {
       final loc = state.matchedLocation;
       if (_isPublicPath(loc)) return null;
-      // Сессия уже восстановлена в main() — при F5 остаёмся на текущем URL, данные перезагружаются экраном
+      // Сессия восстановлена в main() — при F5 остаёмся на текущем URL
       final account = context.read<AccountManagerSupabase>();
       if (!account.isLoggedInSync) await account.initialize();
-      if (!account.isLoggedInSync) return '/login';
+      if (!account.isLoggedInSync) {
+        final returnTo = loc.isNotEmpty ? Uri.encodeComponent(loc) : '';
+        return returnTo.isNotEmpty ? '/login?returnTo=$returnTo' : '/login';
+      }
       return null;
     },
     routes: [
@@ -69,10 +74,13 @@ class AppRouter {
         builder: (context, state) => const SplashScreen(),
       ),
 
-      // Экран входа
+      // Экран входа (returnTo — куда вернуться после входа)
       GoRoute(
         path: '/login',
-        builder: (context, state) => const LoginScreen(),
+        builder: (context, state) {
+          final returnTo = state.uri.queryParameters['returnTo'];
+          return LoginScreen(returnTo: returnTo);
+        },
       ),
 
       // Регистрация компании

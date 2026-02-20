@@ -62,7 +62,7 @@ class _OrderListCreateScreenState extends State<OrderListCreateScreen> {
     final loc = context.watch<LocalizationService>();
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.go('/product-order')),
         title: Text(loc.t('order_list_create')),
       ),
       body: SingleChildScrollView(

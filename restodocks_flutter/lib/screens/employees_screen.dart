@@ -1,3 +1,6 @@
+import 'dart:math';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -150,8 +153,10 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
         employee: _list[i],
         loc: loc,
         canEdit: canEdit,
+        currentEmployeeId: acc.currentEmployee?.id,
         onUpdated: _load,
         onEdit: () => _openEditEmployee(context, _list[i]),
+        onDelete: () => _deleteEmployee(context, _list[i]),
       )),
       ],
     );
@@ -169,6 +174,43 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
         onCancel: () => Navigator.of(ctx).pop(),
       ),
     );
+  }
+
+  Future<void> _deleteEmployee(BuildContext context, Employee employee) async {
+    final loc = context.read<LocalizationService>();
+    if (employee.roles.contains('owner')) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('employee_cannot_delete_owner') ?? 'Нельзя удалить владельца')));
+      return;
+    }
+    if (employee.id == context.read<AccountManagerSupabase>().currentEmployee?.id) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('employee_cannot_delete_self') ?? 'Нельзя удалить самого себя')));
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('delete') ?? 'Удалить'),
+        content: Text('${loc.t('employee_delete_confirm') ?? 'Удалить сотрудника'} «${employee.fullName}»?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(loc.t('cancel') ?? 'Отмена')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Theme.of(ctx).colorScheme.error),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(loc.t('delete') ?? 'Удалить'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await context.read<AccountManagerSupabase>().deleteEmployee(employee);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('employee_deleted') ?? 'Сотрудник удалён')));
+        _load();
+      }
+    } catch (e) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
   }
 
   void _openAddEmployee(BuildContext context) {
@@ -194,15 +236,19 @@ class _EmployeeCard extends StatelessWidget {
     required this.employee,
     required this.loc,
     required this.canEdit,
+    required this.currentEmployeeId,
     required this.onUpdated,
     required this.onEdit,
+    required this.onDelete,
   });
 
   final Employee employee;
   final LocalizationService loc;
   final bool canEdit;
+  final String? currentEmployeeId;
   final VoidCallback onUpdated;
   final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   static String roleDisplay(Employee e) {
     const roleKeys = {
@@ -259,10 +305,21 @@ class _EmployeeCard extends StatelessWidget {
                     ),
                   ),
                   if (canEdit)
-                    IconButton(
-                      icon: const Icon(Icons.edit_outlined),
-                      onPressed: onEdit,
-                      tooltip: loc.t('edit'),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit_outlined),
+                          onPressed: onEdit,
+                          tooltip: loc.t('edit'),
+                        ),
+                        if (!employee.roles.contains('owner') && employee.id != currentEmployeeId)
+                          IconButton(
+                            icon: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error),
+                            onPressed: onDelete,
+                            tooltip: loc.t('delete'),
+                          ),
+                      ],
                     ),
                 ],
               ),
@@ -545,39 +602,50 @@ class _EmployeeAddSheet extends StatefulWidget {
 class _EmployeeAddSheetState extends State<_EmployeeAddSheet> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
   String _department = 'kitchen';
   String? _section = 'hot_kitchen';
   final List<String> _roles = ['cook'];
   bool _saving = false;
   String? _error;
 
+  static const _chars = 'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+  static String _generatePassword() {
+    final r = Random.secure();
+    return List.generate(12, (_) => _chars[r.nextInt(_chars.length)]).join();
+  }
+
+  static String _appUrl() {
+    if (kIsWeb) {
+      try {
+        final origin = Uri.base.origin;
+        if (origin.isNotEmpty) return origin;
+      } catch (_) {}
+    }
+    return 'https://restodocks.com';
+  }
+
   @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
-    _passwordController.dispose();
     super.dispose();
   }
 
   Future<void> _create() async {
+    final loc = context.read<LocalizationService>();
     final name = _nameController.text.trim();
     final email = _emailController.text.trim();
-    final password = _passwordController.text;
     if (name.isEmpty) {
-      setState(() => _error = 'Введите ФИО');
+      setState(() => _error = loc.t('full_name_required') ?? 'Введите ФИО');
       return;
     }
     if (email.isEmpty) {
-      setState(() => _error = 'Введите email');
-      return;
-    }
-    if (password.length < 6) {
-      setState(() => _error = 'Пароль не менее 6 символов');
+      setState(() => _error = loc.t('email_required') ?? 'Введите email');
       return;
     }
     if (_roles.isEmpty) {
-      setState(() => _error = 'Выберите роль');
+      setState(() => _error = loc.t('role_required') ?? 'Выберите роль');
       return;
     }
     setState(() { _saving = true; _error = null; });
@@ -585,9 +653,10 @@ class _EmployeeAddSheetState extends State<_EmployeeAddSheet> {
       final acc = context.read<AccountManagerSupabase>();
       final taken = await acc.isEmailTakenInEstablishment(email, widget.establishment.id);
       if (taken && mounted) {
-        setState(() { _error = 'Этот email уже зарегистрирован'; _saving = false; });
+        setState(() { _error = loc.t('email_already_registered') ?? 'Этот email уже зарегистрирован'; _saving = false; });
         return;
       }
+      final password = _generatePassword();
       await acc.createEmployeeForCompany(
         company: widget.establishment,
         fullName: name,
@@ -597,7 +666,20 @@ class _EmployeeAddSheetState extends State<_EmployeeAddSheet> {
         section: _department == 'kitchen' ? _section : null,
         roles: _roles,
       );
-      if (mounted) widget.onSaved();
+      context.read<EmailService>().sendRegistrationEmail(
+        isOwner: false,
+        to: email,
+        companyName: widget.establishment.name,
+        email: email,
+        password: password,
+        loginUrl: _appUrl(),
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.t('employee_invite_sent') ?? 'Сотрудник создан. Письмо с данными для входа отправлено на $email')),
+        );
+        widget.onSaved();
+      }
     } catch (e) {
       if (mounted) setState(() { _error = e.toString(); _saving = false; });
     }
@@ -645,17 +727,7 @@ class _EmployeeAddSheetState extends State<_EmployeeAddSheet> {
                         keyboardType: TextInputType.emailAddress,
                         decoration: InputDecoration(
                           labelText: loc.t('email') ?? 'Email',
-                          border: const OutlineInputBorder(),
-                          filled: true,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _passwordController,
-                        obscureText: true,
-                        decoration: InputDecoration(
-                          labelText: loc.t('password'),
-                          hintText: loc.t('password_too_short') ?? 'мин. 6 символов',
+                          hintText: loc.t('employee_invite_hint') ?? 'На почту придёт письмо со ссылкой и временным паролем',
                           border: const OutlineInputBorder(),
                           filled: true,
                         ),

@@ -17,6 +17,23 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  void _showChangePassword(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => _ChangePasswordDialog(
+        onSaved: () {
+          if (ctx.mounted) {
+            Navigator.of(ctx).pop();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(context.read<LocalizationService>().t('password_changed') ?? 'Пароль изменён')),
+            );
+          }
+        },
+        onCancel: () => Navigator.of(ctx).pop(),
+      ),
+    );
+  }
+
   void _showEditProfile(BuildContext context) {
     final account = context.read<AccountManagerSupabase>();
     final emp = account.currentEmployee;
@@ -190,6 +207,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   ListTile(leading: const Icon(Icons.person), title: Text(localization.t('name')), subtitle: Text(currentEmployee.fullName), trailing: const Icon(Icons.chevron_right), onTap: () => _showEditProfile(context)),
                   ListTile(leading: const Icon(Icons.email), title: Text(localization.t('email')), subtitle: Text(currentEmployee.email)),
+                  ListTile(
+                    leading: const Icon(Icons.lock),
+                    title: Text(localization.t('change_password') ?? 'Сменить пароль'),
+                    subtitle: Text(localization.t('change_password_hint') ?? 'Изменить пароль входа'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => _showChangePassword(context),
+                  ),
                   ListTile(leading: const Icon(Icons.photo_camera), title: Text(localization.t('photo')), subtitle: Text(currentEmployee.avatarUrl != null ? localization.t('photo_set') : localization.t('photo_not_set')), trailing: const Icon(Icons.chevron_right), onTap: () => _showEditProfile(context)),
                 ],
               ),
@@ -438,6 +462,134 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
       height: size,
       decoration: BoxDecoration(color: Colors.grey[300], shape: BoxShape.circle),
       child: Icon(Icons.person, size: size * 0.5, color: Colors.grey[600]),
+    );
+  }
+}
+
+/// Диалог смены пароля
+class _ChangePasswordDialog extends StatefulWidget {
+  const _ChangePasswordDialog({required this.onSaved, required this.onCancel});
+
+  final VoidCallback onSaved;
+  final VoidCallback onCancel;
+
+  @override
+  State<_ChangePasswordDialog> createState() => _ChangePasswordDialogState();
+}
+
+class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
+  final _currentCtrl = TextEditingController();
+  final _newCtrl = TextEditingController();
+  final _confirmCtrl = TextEditingController();
+  bool _obscureCurrent = true;
+  bool _obscureNew = true;
+  bool _obscureConfirm = true;
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _currentCtrl.dispose();
+    _newCtrl.dispose();
+    _confirmCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final loc = context.read<LocalizationService>();
+    final current = _currentCtrl.text;
+    final newP = _newCtrl.text;
+    final confirm = _confirmCtrl.text;
+
+    if (current.isEmpty) {
+      setState(() => _error = loc.t('enter_current_password') ?? 'Введите текущий пароль');
+      return;
+    }
+    if (newP.length < 6) {
+      setState(() => _error = loc.t('password_too_short') ?? 'Новый пароль не менее 6 символов');
+      return;
+    }
+    if (newP != confirm) {
+      setState(() => _error = loc.t('passwords_mismatch') ?? 'Пароли не совпадают');
+      return;
+    }
+
+    setState(() { _saving = true; _error = null; });
+    try {
+      await context.read<AccountManagerSupabase>().changePassword(
+        currentPassword: current,
+        newPassword: newP,
+      );
+      if (mounted) widget.onSaved();
+    } catch (e) {
+      if (mounted) setState(() { _error = e.toString(); _saving = false; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = context.read<LocalizationService>();
+    final theme = Theme.of(context);
+
+    return AlertDialog(
+      title: Text(loc.t('change_password') ?? 'Сменить пароль'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              controller: _currentCtrl,
+              obscureText: _obscureCurrent,
+              decoration: InputDecoration(
+                labelText: loc.t('current_password') ?? 'Текущий пароль',
+                border: const OutlineInputBorder(),
+                suffixIcon: IconButton(
+                  icon: Icon(_obscureCurrent ? Icons.visibility : Icons.visibility_off),
+                  onPressed: () => setState(() => _obscureCurrent = !_obscureCurrent),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _newCtrl,
+              obscureText: _obscureNew,
+              decoration: InputDecoration(
+                labelText: loc.t('new_password') ?? 'Новый пароль',
+                border: const OutlineInputBorder(),
+                suffixIcon: IconButton(
+                  icon: Icon(_obscureNew ? Icons.visibility : Icons.visibility_off),
+                  onPressed: () => setState(() => _obscureNew = !_obscureNew),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _confirmCtrl,
+              obscureText: _obscureConfirm,
+              decoration: InputDecoration(
+                labelText: loc.t('confirm_password') ?? 'Повторите пароль',
+                border: const OutlineInputBorder(),
+                suffixIcon: IconButton(
+                  icon: Icon(_obscureConfirm ? Icons.visibility : Icons.visibility_off),
+                  onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                ),
+              ),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: widget.onCancel, child: Text(loc.t('cancel') ?? 'Отмена')),
+        FilledButton(
+          onPressed: _saving ? null : _save,
+          child: _saving ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)) : Text(loc.t('save') ?? 'Сохранить'),
+        ),
+      ],
     );
   }
 }

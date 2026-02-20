@@ -1004,6 +1004,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     final account = context.watch<AccountManagerSupabase>();
     final establishment = account.establishment;
     final employee = account.currentEmployee;
+    final keyboardVisible = MediaQuery.of(context).viewInsets.bottom > 0;
 
     return Scaffold(
       appBar: AppBar(
@@ -1018,16 +1019,20 @@ class _InventoryScreenState extends State<InventoryScreen>
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _buildHeader(loc, establishment, employee),
-              const Divider(height: 1),
+              if (!keyboardVisible) ...[
+                _buildHeader(loc, establishment, employee),
+                const Divider(height: 1),
+              ],
               Expanded(
-                child: _buildTable(loc),
+                child: _buildTable(loc, compactMode: keyboardVisible),
               ),
-              const Divider(height: 1),
-              _buildFooter(loc),
+              if (!keyboardVisible) ...[
+                const Divider(height: 1),
+                _buildFooter(loc),
+              ],
             ],
           ),
-          DataSafetyIndicator(isVisible: true),
+          DataSafetyIndicator(isVisible: !keyboardVisible),
         ],
       ),
     );
@@ -1300,7 +1305,7 @@ class _InventoryScreenState extends State<InventoryScreen>
   double _colNameWidth(BuildContext context) =>
       _leftWidth(context) - _colNoWidth - _colUnitWidth;
 
-  Widget _buildTable(LocalizationService loc) {
+  Widget _buildTable(LocalizationService loc, {bool compactMode = false}) {
     if (_rows.isEmpty) {
       return Center(
         child: Padding(
@@ -1330,9 +1335,8 @@ class _InventoryScreenState extends State<InventoryScreen>
     final screenW = MediaQuery.of(context).size.width;
     final rightW = _colTotalWidth + _colGap + _maxQuantityColumns * (_colQtyWidth + _colGap) + 48;
     final totalW = (leftW + rightW).clamp(screenW, double.infinity);
-    // Use fixed column layout when there are many quantity columns
     if (_maxQuantityColumns > 3) {
-      return _buildTableWithFixedColumn(loc);
+      return _buildTableWithFixedColumn(loc, compactMode: compactMode);
     }
 
     // Original scrollable table for few columns
@@ -1353,22 +1357,22 @@ class _InventoryScreenState extends State<InventoryScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _buildHeaderRow(loc),
+                  if (!compactMode) _buildHeaderRow(loc),
                   if (_blockFilter != _InventoryBlockFilter.pfOnly && _productIndices.isNotEmpty) ...[
-                    _buildSectionHeader(loc, loc.t('inventory_block_products')),
+                    if (!compactMode) _buildSectionHeader(loc, loc.t('inventory_block_products')),
                     ..._productIndices.asMap().entries.map((e) => _buildDataRow(loc, e.value, e.key + 1)),
                   ],
                   if (_blockFilter != _InventoryBlockFilter.productsOnly && _pfIndices.isNotEmpty) ...[
-                    _buildSectionHeader(loc, loc.t('inventory_block_pf')),
+                    if (!compactMode) _buildSectionHeader(loc, loc.t('inventory_block_pf')),
                     ..._pfIndices.asMap().entries.map((e) {
                       final rowNum = _blockFilter == _InventoryBlockFilter.pfOnly ? e.key + 1 : _productIndices.length + e.key + 1;
                       return _buildDataRow(loc, e.value, rowNum);
                     }),
                   ],
                   if (_aggregatedFromFile != null && _aggregatedFromFile!.isNotEmpty) ...[
-                    const Divider(height: 24),
-                    _buildSectionHeader(loc, loc.t('inventory_pf_products_title')),
-                    _buildAggregatedHeaderRow(loc),
+                    if (!compactMode) const Divider(height: 24),
+                    if (!compactMode) _buildSectionHeader(loc, loc.t('inventory_pf_products_title')),
+                    if (!compactMode) _buildAggregatedHeaderRow(loc),
                     ..._aggregatedFromFile!.asMap().entries.map((e) => _buildAggregatedDataRow(loc, e.value, e.key + 1)),
                   ],
                 ],
@@ -1585,36 +1589,33 @@ class _InventoryScreenState extends State<InventoryScreen>
     return q.toStringAsFixed(1);
   }
 
-  Widget _buildTableWithFixedColumn(LocalizationService loc) {
+  Widget _buildTableWithFixedColumn(LocalizationService loc, {bool compactMode = false}) {
     final leftW = _leftWidth(context);
     final screenW = MediaQuery.of(context).size.width;
     final rightW = _colTotalWidth + _colGap + _maxQuantityColumns * (_colQtyWidth + _colGap) + 48;
 
     return Column(
       children: [
-        // Fixed header row
-        Row(
-          children: [
-            // Fixed left header
-            Container(
-              width: leftW,
-              child: _buildFixedHeaderRow(loc),
-            ),
-            // Scrollable right header
-            Expanded(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                controller: _hScroll,
-                physics: const NeverScrollableScrollPhysics(),
-                child: SizedBox(
-                  width: rightW.clamp(screenW - leftW, double.infinity),
-                  child: _buildScrollableHeaderRow(loc),
+        if (!compactMode)
+          Row(
+            children: [
+              Container(
+                width: leftW,
+                child: _buildFixedHeaderRow(loc),
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  controller: _hScroll,
+                  physics: const NeverScrollableScrollPhysics(),
+                  child: SizedBox(
+                    width: rightW.clamp(screenW - leftW, double.infinity),
+                    child: _buildScrollableHeaderRow(loc),
+                  ),
                 ),
               ),
-            ),
-          ],
-        ),
-        // Scrollable content
+            ],
+          ),
         Expanded(
           child: Row(
             children: [
@@ -1631,19 +1632,19 @@ class _InventoryScreenState extends State<InventoryScreen>
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (_blockFilter != _InventoryBlockFilter.pfOnly && _productIndices.isNotEmpty) ...[
-                        _buildSectionHeader(loc, loc.t('inventory_block_products'), isFixed: true),
+                        if (!compactMode) _buildSectionHeader(loc, loc.t('inventory_block_products'), isFixed: true),
                         ..._productIndices.asMap().entries.map((e) => _buildFixedDataRow(loc, e.value, e.key + 1)),
                       ],
                       if (_blockFilter != _InventoryBlockFilter.productsOnly && _pfIndices.isNotEmpty) ...[
-                        _buildSectionHeader(loc, loc.t('inventory_block_pf'), isFixed: true),
+                        if (!compactMode) _buildSectionHeader(loc, loc.t('inventory_block_pf'), isFixed: true),
                         ..._pfIndices.asMap().entries.map((e) {
                           final rowNum = _blockFilter == _InventoryBlockFilter.pfOnly ? e.key + 1 : _productIndices.length + e.key + 1;
                           return _buildFixedDataRow(loc, e.value, rowNum);
                         }),
                       ],
                       if (_aggregatedFromFile != null && _aggregatedFromFile!.isNotEmpty) ...[
-                        _buildSectionHeader(loc, loc.t('inventory_pf_products_title'), isFixed: true),
-                        _buildFixedAggregatedHeaderRow(loc),
+                        if (!compactMode) _buildSectionHeader(loc, loc.t('inventory_pf_products_title'), isFixed: true),
+                        if (!compactMode) _buildFixedAggregatedHeaderRow(loc),
                         ..._aggregatedFromFile!.asMap().entries.map((e) => _buildFixedAggregatedDataRow(loc, e.value, e.key + 1)),
                       ],
                     ],
@@ -1658,19 +1659,18 @@ class _InventoryScreenState extends State<InventoryScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Empty space to align with fixed headers
-                      SizedBox(height: _completed ? 56 : 48),
+                      if (!compactMode) SizedBox(height: _completed ? 56 : 48),
                       if (_blockFilter != _InventoryBlockFilter.pfOnly && _productIndices.isNotEmpty) ...[
-                        SizedBox(height: 32), // Section header space
+                        if (!compactMode) const SizedBox(height: 32),
                         ..._productIndices.asMap().entries.map((e) => _buildScrollableDataRow(loc, e.value)),
                       ],
                       if (_blockFilter != _InventoryBlockFilter.productsOnly && _pfIndices.isNotEmpty) ...[
-                        SizedBox(height: 32), // Section header space
+                        if (!compactMode) const SizedBox(height: 32),
                         ..._pfIndices.asMap().entries.map((e) => _buildScrollableDataRow(loc, e.value)),
                       ],
                       if (_aggregatedFromFile != null && _aggregatedFromFile!.isNotEmpty) ...[
-                        SizedBox(height: 32), // Section header space
-                        _buildScrollableAggregatedHeaderRow(loc),
+                        if (!compactMode) const SizedBox(height: 32),
+                        if (!compactMode) _buildScrollableAggregatedHeaderRow(loc),
                         ..._aggregatedFromFile!.asMap().entries.map((e) => _buildScrollableAggregatedDataRow(loc, e.value)),
                       ],
                     ],

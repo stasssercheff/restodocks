@@ -117,7 +117,7 @@ class _OrderListProductsScreenState extends State<OrderListProductsScreen> {
     final lang = loc.currentLanguageCode;
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.go('/product-order')),
         title: Text(loc.t('order_list_add_products')),
         actions: [
           if (_list.items.isNotEmpty)

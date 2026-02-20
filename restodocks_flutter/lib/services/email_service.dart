@@ -9,7 +9,7 @@ class EmailService {
   SupabaseClient get _client => Supabase.instance.client;
 
   /// Отправить письмо при регистрации (владелец или сотрудник).
-  /// Не бросает исключения — ошибки логируются.
+  /// [loginUrl] — ссылка на сайт для входа (в письме сотруднику).
   Future<void> sendRegistrationEmail({
     required bool isOwner,
     required String to,
@@ -17,6 +17,7 @@ class EmailService {
     required String email,
     required String password,
     String? pinCode,
+    String? loginUrl,
   }) async {
     try {
       final res = await _client.functions.invoke(
@@ -28,6 +29,7 @@ class EmailService {
           'email': email,
           'password': password,
           if (pinCode != null) 'pinCode': pinCode,
+          if (loginUrl != null) 'loginUrl': loginUrl,
         },
       );
       if (res.status != 200) {

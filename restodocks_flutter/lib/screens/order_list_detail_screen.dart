@@ -1,5 +1,4 @@
-import 'dart:convert';
-
+import 'package:excel/excel.dart' hide Border;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -134,11 +133,14 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
     final store = context.read<ProductStoreSupabase>();
     if (store.allProducts.isEmpty) await store.loadProducts();
 
-    final lines = <String>[];
-    lines.add(_list!.name);
-    lines.add('${loc.tForLanguage(lang, 'order_list_supplier_name')}: ${_list!.supplierName}');
-    lines.add('');
-    lines.add('${loc.tForLanguage(lang, 'order_list_quantity')}\t${loc.tForLanguage(lang, 'order_list_unit')}\t${loc.tForLanguage(lang, 'inventory_item_name')}');
+    final excel = Excel.createExcel();
+    final sheet = excel[excel.getDefaultSheet()!];
+    sheet.merge(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0), CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: 0));
+    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0)).value = TextCellValue(_list!.name);
+    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 1)).value = TextCellValue('${loc.tForLanguage(lang, 'order_list_supplier_name')}: ${_list!.supplierName}');
+    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 3)).value = TextCellValue(loc.tForLanguage(lang, 'order_list_quantity'));
+    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: 3)).value = TextCellValue(loc.tForLanguage(lang, 'order_list_unit'));
+    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: 3)).value = TextCellValue(loc.tForLanguage(lang, 'inventory_item_name'));
     for (var idx = 0; idx < _list!.items.length; idx++) {
       final item = _list!.items[idx];
       final q = idx < _qtyControllers.length
@@ -148,18 +150,22 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
               ? store.findProductById(item.productId!)?.getLocalizedName(lang)
               : null) ??
           item.productName;
-      lines.add('$q\t${_unitLabel(item.unit, lang)}\t$productName');
+      final r = idx + 4;
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: r)).value = TextCellValue(q.toString());
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: r)).value = TextCellValue(_unitLabel(item.unit, lang));
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: r)).value = TextCellValue(productName);
     }
+    var lastRow = _list!.items.length + 4;
     final commentText = _commentCtrl.text.trim();
     if (commentText.isNotEmpty) {
-      lines.add('');
-      lines.add('${loc.tForLanguage(lang, 'order_list_comment')}: $commentText');
+      lastRow++;
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: lastRow)).value = TextCellValue('${loc.tForLanguage(lang, 'order_list_comment')}: $commentText');
     }
-    final content = lines.join('\n');
-    final bytes = utf8.encode(content);
+    final out = excel.encode();
+    if (out == null) throw StateError('Excel encode failed');
     final dateStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    final fileName = 'order_${_list!.name.replaceAll(RegExp(r'[^\w\-.]'), '_')}_$dateStr.txt';
-    await saveFileBytes(fileName, bytes);
+    final fileName = 'order_${_list!.name.replaceAll(RegExp(r'[^\w\-.]'), '_')}_$dateStr.xlsx';
+    await saveFileBytes(fileName, out);
 
     // Отправить шеф-повару во Входящие
     final account = context.read<AccountManagerSupabase>();
@@ -224,14 +230,14 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
     }
     if (_list == null) {
       return Scaffold(
-        appBar: AppBar(leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()), title: Text(loc.t('product_order'))),
+        appBar: AppBar(leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.go('/product-order')), title: Text(loc.t('product_order'))),
         body: const Center(child: Text('Список не найден')),
       );
     }
     final list = _list!;
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.go('/product-order')),
         title: Text(list.name),
         actions: [
           IconButton(icon: const Icon(Icons.home), onPressed: () => context.go('/home'), tooltip: loc.t('home')),
