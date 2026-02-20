@@ -61,8 +61,7 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
 
         if (item.existingProductId != null) {
           if (item.displayPrice != null) {
-            await store.addToNomenclature(est.id, item.existingProductId!);
-            await store.setEstablishmentPrice(est.id, item.existingProductId!, item.displayPrice!, defCur);
+            await store.addToNomenclature(est.id, item.existingProductId!, price: item.displayPrice, currency: defCur);
             updated++;
           }
         } else {
@@ -73,10 +72,12 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
             currency: item.displayPrice != null ? defCur : null,
           );
           await store.addProduct(product);
-          await store.addToNomenclature(est.id, product.id);
-          if (item.displayPrice != null && item.displayPrice! > 0) {
-            await store.setEstablishmentPrice(est.id, product.id, item.displayPrice!, defCur);
-          }
+          await store.addToNomenclature(
+            est.id,
+            product.id,
+            price: item.displayPrice,
+            currency: item.displayPrice != null ? defCur : null,
+          );
           created++;
         }
       }

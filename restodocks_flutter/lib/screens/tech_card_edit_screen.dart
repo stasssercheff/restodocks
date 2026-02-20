@@ -1355,14 +1355,16 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                 ),
               ),
             ),
-            // Блок технологии под таблицей — ширина как у таблицы (1000px)
-            ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width > 1000 ? 1000 : MediaQuery.of(context).size.width,
-                maxHeight: MediaQuery.of(context).size.height * 0.25,
-              ),
-              child: Container(
-                width: double.infinity,
+            // Блок технологии — ширина ровно как у таблицы ТТК (1000px), не шире; на узких экранах — по ширине
+            Align(
+              alignment: Alignment.centerLeft,
+              child: SizedBox(
+                width: MediaQuery.of(context).size.width > 1000 ? 1000 : MediaQuery.of(context).size.width,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.25,
+                  ),
+                  child: Container(
                 margin: const EdgeInsets.only(top: 12),
                 decoration: BoxDecoration(
                   border: Border.all(color: Theme.of(context).colorScheme.outline),
@@ -1407,10 +1409,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                 ),
               ),
             ),
-          ],
+          ),
         ),
-      ),
-            ),
             if (canEdit)
               SafeArea(
                   top: false,
@@ -1436,11 +1436,15 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                     ),
                   ),
                 ),
-            ],
-          );
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
         },
       ),
-  );
+    );
   }
 }
 

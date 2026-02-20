@@ -142,6 +142,10 @@ void main() async {
     await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
     // Supabase initialized
 
+    // Восстановление сессии ДО старта приложения — при обновлении страницы (F5)
+    // пользователь остаётся залогиненным, данные просто перезагружаются как по кнопке «Обновить»
+    await AccountManagerSupabase().initialize();
+
     // Initializing LocalizationService...
     await LocalizationService.initialize();
     // LocalizationService initialized

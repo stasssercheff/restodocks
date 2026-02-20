@@ -590,44 +590,53 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         items: allItems,
         loc: widget.loc,
         onProductSelected: (selectedItem) {
-          TTIngredient? updated;
-          final idx = rowIndex;
-          if (selectedItem.type == 'product') {
-            final product = selectedItem.item as Product;
-            final establishmentPrice = widget.productStore.getEstablishmentPrice(product.id, widget.establishmentId);
-            final pricePerKg = establishmentPrice?.$1 ?? product.basePrice ?? 0.0;
-            final cost = pricePerKg * (ingredient.grossWeight / 1000);
-            var ing = ingredient.copyWith(
-              productId: product.id,
-              productName: product.name,
-              unit: product.unit,
-              pricePerKg: pricePerKg,
-              cost: cost,
-            );
-            final outputWeight = ing.netWeight * (1 - (ing.cookingLossPctOverride ?? 0) / 100);
-            updated = ing.copyWith(outputWeight: outputWeight);
-          } else if (selectedItem.type == 'pf') {
-            final pf = selectedItem.item as TechCard;
-            double? pfPricePerKg;
-            if (pf.ingredients.isNotEmpty) {
-              final totalCost = pf.ingredients.fold<double>(0, (sum, i) => sum + i.cost);
-              final totalOutput = pf.ingredients.fold<double>(0, (sum, i) => sum + i.outputWeight);
-              if (totalOutput > 0) pfPricePerKg = (totalCost / totalOutput) * 1000;
+          try {
+            TTIngredient? updated;
+            final idx = rowIndex;
+            if (selectedItem.type == 'product') {
+              final product = selectedItem.item as Product;
+              final establishmentPrice = widget.productStore.getEstablishmentPrice(product.id, widget.establishmentId);
+              final pricePerKg = establishmentPrice?.$1 ?? product.basePrice ?? 0.0;
+              final cost = pricePerKg * (ingredient.grossWeight / 1000);
+              var ing = ingredient.copyWith(
+                productId: product.id,
+                productName: product.name,
+                unit: product.unit ?? 'g',
+                pricePerKg: pricePerKg,
+                cost: cost,
+              );
+              final outputWeight = ing.netWeight * (1 - (ing.cookingLossPctOverride ?? 0) / 100);
+              updated = ing.copyWith(outputWeight: outputWeight);
+            } else if (selectedItem.type == 'pf') {
+              final pf = selectedItem.item as TechCard;
+              double? pfPricePerKg;
+              if (pf.ingredients.isNotEmpty) {
+                final totalCost = pf.ingredients.fold<double>(0, (sum, i) => sum + i.cost);
+                final totalOutput = pf.ingredients.fold<double>(0, (sum, i) => sum + i.outputWeight);
+                if (totalOutput > 0) pfPricePerKg = (totalCost / totalOutput) * 1000;
+              }
+              final gross = ingredient.grossWeight;
+              updated = ingredient.copyWith(
+                sourceTechCardId: pf.id,
+                sourceTechCardName: pf.dishName,
+                productName: pf.getDisplayNameInLists(widget.loc.currentLanguageCode),
+                unit: 'г',
+                pricePerKg: pfPricePerKg,
+                cost: (pfPricePerKg ?? 0) * (gross / 1000),
+              );
             }
-            final gross = ingredient.grossWeight;
-            updated = ingredient.copyWith(
-              sourceTechCardId: pf.id,
-              sourceTechCardName: pf.dishName,
-              productName: pf.getDisplayNameInLists(widget.loc.currentLanguageCode),
-              unit: 'г',
-              pricePerKg: pfPricePerKg,
-              cost: (pfPricePerKg ?? 0) * (gross / 1000),
-            );
-          }
-          if (updated != null) {
-            _updateIngredient(idx, updated);
-            if (idx == widget.ingredients.length - 1) {
-              WidgetsBinding.instance.addPostFrameCallback((_) => widget.onAdd());
+            if (updated != null) {
+              _updateIngredient(idx, updated);
+              if (idx == widget.ingredients.length - 1) {
+                WidgetsBinding.instance.addPostFrameCallback((_) => widget.onAdd());
+              }
+            }
+          } catch (e, st) {
+            debugPrint('TTK onProductSelected error: $e\n$st');
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Ошибка: $e'), backgroundColor: Colors.red),
+              );
             }
           }
         },

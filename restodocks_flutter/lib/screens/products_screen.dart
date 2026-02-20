@@ -452,7 +452,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
     try {
       final store = context.read<ProductStoreSupabase>();
-      await store.addToNomenclature(estId, product.id);
+      await store.addToNomenclature(estId, product.id, price: product.basePrice, currency: product.currency);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(loc.t('product_added_to_nomenclature'))),

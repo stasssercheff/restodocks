@@ -185,7 +185,7 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
 
                 if (existingProducts.isNotEmpty) {
                   final existingId = existingProducts[0]['id'] as String;
-                  await store.addToNomenclature(estId, existingId);
+                  await store.addToNomenclature(estId, existingId, price: item.price);
                   setState(() => _skipped++);
                   continue;
                 }
@@ -200,7 +200,7 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
           }
 
           try {
-            await store.addToNomenclature(estId, product.id);
+            await store.addToNomenclature(estId, product.id, price: product.basePrice, currency: product.currency);
           } catch (e) {
             // Возможно продукт уже в номенклатуре - считаем это успехом
             if (e.toString().contains('duplicate key') ||
@@ -1604,7 +1604,13 @@ class _AddAllProgressDialogState extends State<_AddAllProgressDialog> {
     for (final p in widget.list) {
       if (_error != null) break;
       try {
-        await widget.store.addToNomenclature(widget.estId, p.id);
+        final ep = widget.store.getEstablishmentPrice(p.id, widget.estId);
+        await widget.store.addToNomenclature(
+          widget.estId,
+          p.id,
+          price: ep?.$1 ?? p.basePrice,
+          currency: ep?.$2 ?? p.currency,
+        );
         if (!mounted) return;
         setState(() => _done++);
       } catch (e) {
@@ -2444,7 +2450,9 @@ class _CatalogTab extends StatelessWidget {
 
   Future<void> _addToNomenclature(BuildContext context, Product p) async {
     try {
-      await store.addToNomenclature(estId, p.id);
+      final establishmentPrice = store.getEstablishmentPrice(p.id, estId);
+      final price = establishmentPrice?.$1 ?? p.basePrice;
+      await store.addToNomenclature(estId, p.id, price: price, currency: establishmentPrice?.$2 ?? p.currency);
       if (context.mounted) onRefresh();
     } catch (e) {
       if (context.mounted) {

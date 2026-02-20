@@ -24,7 +24,13 @@ import '../../models/order_list.dart';
 import '../../services/ai_service.dart';
 import '../../services/services.dart';
 
-const _publicPaths = ['/', '/splash', '/login', '/register', '/register-company', '/register-owner', '/register-employee', '/forgot-password', '/reset-password'];
+/// Публичные пути (без проверки авторизации). Не использовать startsWith('/') — иначе все пути считаются публичными.
+bool _isPublicPath(String loc) {
+  if (loc == '/' || loc == '/splash') return true;
+  if (loc.startsWith('/login') || loc.startsWith('/register') ||
+      loc.startsWith('/forgot-password') || loc.startsWith('/reset-password')) return true;
+  return false;
+}
 
 /// Начальный путь: при обновлении страницы (web) сохраняем текущий URL.
 String _getInitialLocation() {
@@ -43,9 +49,10 @@ class AppRouter {
     initialLocation: _getInitialLocation(),
     redirect: (context, state) async {
       final loc = state.matchedLocation;
-      if (_publicPaths.any((p) => loc.startsWith(p))) return null;
+      if (_isPublicPath(loc)) return null;
+      // Сессия уже восстановлена в main() — при F5 остаёмся на текущем URL, данные перезагружаются экраном
       final account = context.read<AccountManagerSupabase>();
-      await account.initialize();
+      if (!account.isLoggedInSync) await account.initialize();
       if (!account.isLoggedInSync) return '/login';
       return null;
     },
