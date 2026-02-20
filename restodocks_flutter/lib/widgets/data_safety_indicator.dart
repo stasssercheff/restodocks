@@ -17,15 +17,16 @@ class DataSafetyIndicator extends StatelessWidget {
       bottom: 80, // Над нижней панелью с кнопкой
       right: 16,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: Colors.green.withOpacity(0.9),
-          borderRadius: BorderRadius.circular(16),
+          color: Colors.green.withOpacity(0.95),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.green.shade200, width: 1),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
+              color: Colors.black.withOpacity(0.15),
+              blurRadius: 6,
+              offset: const Offset(0, 3),
             ),
           ],
         ),
@@ -33,17 +34,31 @@ class DataSafetyIndicator extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              Icons.security,
-              size: 14,
+              Icons.security_rounded,
+              size: 16,
               color: Colors.white,
             ),
-            const SizedBox(width: 4),
-            Text(
-              'Данные защищены',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w500,
-                  ),
+            const SizedBox(width: 6),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Данные защищены',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 11,
+                      ),
+                ),
+                Text(
+                  'Автосохранение активно',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: 9,
+                      ),
+                ),
+              ],
             ),
           ],
         ),
