@@ -560,10 +560,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                 cost: 0,
               ));
             }
-            if (canEdit && (_ingredients.isEmpty || !_ingredients.last.isPlaceholder)) {
+            if (canEdit && _ingredients.isEmpty) {
+              _ingredients.add(TTIngredient.emptyPlaceholder());
+              _ingredients.add(TTIngredient.emptyPlaceholder());
+            } else if (canEdit && !_ingredients.last.isPlaceholder) {
               _ingredients.add(TTIngredient.emptyPlaceholder());
             }
           } else if (canEdit && _ingredients.isEmpty) {
+            _ingredients.add(TTIngredient.emptyPlaceholder());
             _ingredients.add(TTIngredient.emptyPlaceholder());
           }
           setState(() { _loading = false; });
@@ -589,7 +593,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
             _ingredients
               ..clear()
               ..addAll(tc.ingredients);
-            if (canEdit && (_ingredients.isEmpty || !_ingredients.last.isPlaceholder)) {
+            if (canEdit && _ingredients.isEmpty) {
+              _ingredients.add(TTIngredient.emptyPlaceholder());
+              _ingredients.add(TTIngredient.emptyPlaceholder());
+            } else if (canEdit && !_ingredients.last.isPlaceholder) {
               _ingredients.add(TTIngredient.emptyPlaceholder());
             }
           }
@@ -611,7 +618,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     _technologyController.addListener(() {
       setState(() {}); // Обновляем UI при изменении технологии
     });
-    // Добавляем placeholder сразу, чтобы таблица отображалась
+    // Сразу 2 строки для внесения продуктов; при заполнении последней добавится следующая
+    _ingredients.add(TTIngredient.emptyPlaceholder());
     _ingredients.add(TTIngredient.emptyPlaceholder());
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
@@ -1064,7 +1072,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     setState(() {
       _ingredients.removeAt(i);
       final canEdit = context.read<AccountManagerSupabase>().currentEmployee?.canEditChecklistsAndTechCards ?? false;
-      if (canEdit && (_ingredients.isEmpty || !_ingredients.last.isPlaceholder)) {
+      if (canEdit && _ingredients.isEmpty) {
+        _ingredients.add(TTIngredient.emptyPlaceholder());
+        _ingredients.add(TTIngredient.emptyPlaceholder());
+      } else if (canEdit && !_ingredients.last.isPlaceholder) {
         _ingredients.add(TTIngredient.emptyPlaceholder());
       }
     });
@@ -1344,10 +1355,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                 ),
               ),
             ),
-            // Блок технологии под таблицей
-            Container(
+            // Блок технологии под таблицей (ширина как у таблицы: min(1000, экран), не растягивается на весь экран)
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.of(context).size.width.clamp(0.0, 1000.0),
+                maxHeight: MediaQuery.of(context).size.height * 0.25,
+              ),
+              child: Container(
               width: double.infinity,
-              constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.25),
               margin: const EdgeInsets.only(top: 12),
               decoration: BoxDecoration(
                 border: Border.all(color: Theme.of(context).colorScheme.outline),
@@ -1390,6 +1405,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                   ),
                 ],
               ),
+            ),
             ),
           ],
         ),

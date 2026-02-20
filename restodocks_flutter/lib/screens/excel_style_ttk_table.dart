@@ -272,7 +272,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                 decoration: BoxDecoration(color: Colors.red.shade50),
                 children: [
                   _buildTotalCell('Итого'),
-                  _buildTotalCell(widget.isSemiFinished ? 'ПФ' : 'Блюдо'), // Тип ТТК
+                  const SizedBox.shrink(), // Тип ТТК в итоге не показываем
                   const SizedBox.shrink(), // Название (пусто)
                   const SizedBox.shrink(), // Продукт (пусто)
                   const SizedBox.shrink(), // Брутто
@@ -825,7 +825,7 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
   }
 
   Future<void> _openPicker() async {
-    final navigator = Navigator.of(context);
+    final navigator = Navigator.of(context, rootNavigator: true);
     final searchCtrl = TextEditingController(text: _searchController.text);
     List<SelectableItem> filtered = _filterItems(_searchController.text);
 
@@ -911,7 +911,7 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
       child: Material(
         color: Colors.white,
         child: InkWell(
-          onTap: () => _openPicker(),
+          onTap: _openPicker,
           child: Container(
             height: 44,
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
