@@ -2523,10 +2523,13 @@ class _ProductPickerState extends State<_ProductPicker> {
             itemCount: list.length,
             itemBuilder: (_, i) {
               final p = list[i];
-              return ListTile(
-                title: Text(p.getLocalizedName(lang)),
-                subtitle: Text('${p.calories?.round() ?? 0} ${loc.t('kcal')} · ${CulinaryUnits.displayName((p.unit ?? 'g').trim().toLowerCase(), loc.currentLanguageCode)}'),
+              return GestureDetector(
+                behavior: HitTestBehavior.opaque,
                 onTap: () => _askWeight(p, loc),
+                child: ListTile(
+                  title: Text(p.getLocalizedName(lang)),
+                  subtitle: Text('${p.calories?.round() ?? 0} ${loc.t('kcal')} · ${CulinaryUnits.displayName((p.unit ?? 'g').trim().toLowerCase(), loc.currentLanguageCode)}'),
+                ),
               );
             },
           ),
@@ -2690,10 +2693,13 @@ class _TechCardPicker extends StatelessWidget {
       itemCount: techCards.length,
       itemBuilder: (_, i) {
         final t = techCards[i];
-        return ListTile(
-          title: Text(t.getDisplayNameInLists(lang)),
-          subtitle: Text('${t.ingredients.length} ${loc.t('ingredients_short')} · ${t.totalCalories.round()} ${loc.t('kcal')}'),
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
           onTap: () => _askWeight(context, t),
+          child: ListTile(
+            title: Text(t.getDisplayNameInLists(lang)),
+            subtitle: Text('${t.ingredients.length} ${loc.t('ingredients_short')} · ${t.totalCalories.round()} ${loc.t('kcal')}'),
+          ),
         );
       },
     );
