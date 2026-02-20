@@ -485,9 +485,14 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         ? widget.productStore.getNomenclatureProducts(widget.establishmentId!)
         : <Product>[]; // Пустой список, если establishmentId null
 
+    print('TTK: establishmentId: ${widget.establishmentId}');
+    print('TTK: nomenclatureProducts length: ${nomenclatureProducts.length}');
+    print('TTK: allProducts length: ${widget.productStore.allProducts.length}');
+
     // Fallback: если номенклатурные продукты пустые, используем все продукты
     if (nomenclatureProducts.isEmpty) {
       nomenclatureProducts = List.from(widget.productStore.allProducts);
+      print('TTK: Using fallback allProducts, length: ${nomenclatureProducts.length}');
     }
 
     for (final product in nomenclatureProducts) {
@@ -498,6 +503,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         searchName: product.name.toLowerCase(),
       ));
     }
+
+    print('TTK: Created ${allItems.length} selectable items');
 
     // Добавляем ПФ
     if (widget.semiFinishedProducts != null) {
