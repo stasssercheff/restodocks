@@ -1168,6 +1168,11 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         );
       }
 
+      // Перезагружаем номенклатуру чтобы цены в кэше соответствовали БД
+      try {
+        await context.read<ProductStoreSupabase>().loadNomenclature(establishmentId);
+      } catch (_) {}
+
       // Показываем результаты
       final successCount = importResults.where((r) => r.error == null).length;
       final errorCount = importResults.where((r) => r.error != null).length;
@@ -1909,7 +1914,12 @@ ${text}
           if (addToNomenclature) {
             try {
               print('DEBUG: Adding product "${product.name}" to nomenclature...');
-              await store.addToNomenclature(estId, product.id);
+              await store.addToNomenclature(
+                estId,
+                product.id,
+                price: product.basePrice,
+                currency: product.currency ?? defCur,
+              );
               added++;
               print('DEBUG: Successfully added "${product.name}" to nomenclature');
             } catch (e) {

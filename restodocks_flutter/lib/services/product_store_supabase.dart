@@ -377,8 +377,8 @@ class ProductStoreSupabase {
     }
   }
 
-  /// Добавить продукт в номенклатуру
-  Future<void> addToNomenclature(String establishmentId, String productId) async {
+  /// Добавить продукт в номенклатуру (опционально с ценой)
+  Future<void> addToNomenclature(String establishmentId, String productId, {double? price, String? currency}) async {
     print('➕ ProductStore: Adding product $productId to nomenclature for establishment $establishmentId...');
 
     // Валидация входных данных
@@ -387,11 +387,13 @@ class ProductStoreSupabase {
     }
 
     try {
-      // Создаем запись в establishment_products (added_at есть DEFAULT NOW())
-      final data = {
+      // Создаем запись в establishment_products (с ценой если указана)
+      final data = <String, dynamic>{
         'establishment_id': establishmentId,
         'product_id': productId,
       };
+      if (price != null) data['price'] = price;
+      if (currency != null) data['currency'] = currency;
 
       print('📝 ProductStore: Inserting data: $data');
 
@@ -407,6 +409,13 @@ class ProductStoreSupabase {
 
       // Добавляем в локальный кэш
       _nomenclatureIds.add(productId);
+      // Обновляем кэш цен
+      final cacheKey = '${establishmentId}_$productId';
+      if (price != null && currency != null) {
+        _priceCache[cacheKey] = (price, currency);
+      } else if (price != null) {
+        _priceCache[cacheKey] = (price, currency ?? 'RUB');
+      }
 
       print('✅ ProductStore: Product $productId added to nomenclature successfully');
 
@@ -473,8 +482,8 @@ class ProductStoreSupabase {
 
     // Обновить кэш
     final cacheKey = '${establishmentId}_$productId';
-    if (price != null && currency != null) {
-      _priceCache[cacheKey] = (price, currency);
+    if (price != null) {
+      _priceCache[cacheKey] = (price, currency ?? 'RUB');
     } else {
       _priceCache[cacheKey] = null;
     }

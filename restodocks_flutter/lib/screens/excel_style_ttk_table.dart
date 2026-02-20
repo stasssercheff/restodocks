@@ -747,8 +747,6 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
   void _updateIngredient(int index, TTIngredient updated) {
     widget.onUpdate(index, updated);
-    // Принудительно обновляем UI после изменения данных
-    setState(() {});
   }
 
   Widget _buildDeleteButton(int rowIndex) {
@@ -825,10 +823,12 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
   }
 
   Future<void> _openPicker() async {
+    final onSelect = widget.onProductSelected;
+    final nav = Navigator.of(context);
     final searchCtrl = TextEditingController(text: _searchController.text);
     List<SelectableItem> filtered = _filterItems(_searchController.text);
 
-    final selected = await showDialog<SelectableItem>(
+    await showDialog<void>(
       context: context,
       barrierDismissible: false,
       barrierColor: Colors.black54,
@@ -869,7 +869,12 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
                           final item = filtered[i];
                           return ListTile(
                             title: Text(item.displayName, style: const TextStyle(fontSize: 14)),
-                            onTap: () => Navigator.of(ctx).pop(item),
+                            onTap: () {
+                              nav.pop();
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                onSelect(item);
+                              });
+                            },
                           );
                         },
                       ),
@@ -878,7 +883,7 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
                     Padding(
                       padding: const EdgeInsets.all(8),
                       child: TextButton(
-                        onPressed: () => Navigator.of(ctx).pop(),
+                        onPressed: () => nav.pop(),
                         child: const Text('Отмена'),
                       ),
                     ),
@@ -892,10 +897,7 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
     );
 
     searchCtrl.dispose();
-    if (selected != null && mounted) {
-      widget.onProductSelected(selected);
-      setState(() {});
-    }
+    if (mounted) setState(() {});
   }
 
   @override
