@@ -825,7 +825,6 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
   }
 
   Future<void> _openPicker() async {
-    final navigator = Navigator.of(context, rootNavigator: true);
     final searchCtrl = TextEditingController(text: _searchController.text);
     List<SelectableItem> filtered = _filterItems(_searchController.text);
 
@@ -833,7 +832,6 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
       context: context,
       barrierDismissible: true,
       barrierColor: Colors.black54,
-      useRootNavigator: true,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) {
           return AlertDialog(
@@ -872,7 +870,7 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
                           child: GestureDetector(
                             behavior: HitTestBehavior.opaque,
                             onTap: () {
-                              navigator.pop(item);
+                              Navigator.of(ctx).pop(item);
                             },
                             child: ConstrainedBox(
                               constraints: const BoxConstraints(minHeight: 48),
@@ -910,7 +908,8 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
       height: 44,
       child: Material(
         color: Colors.white,
-        child: InkWell(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
           onTap: _openPicker,
           child: Container(
             height: 44,
@@ -934,3 +933,4 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
     );
   }
 }
+
