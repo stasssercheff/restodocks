@@ -12,16 +12,15 @@ class TechCardServiceSupabase {
 
   final SupabaseService _supabase = SupabaseService();
 
-  /// Payload для вставки в tt_ingredients: без id. Поле cooking_loss_pct_override
-  /// не передаём, чтобы не ломать БД без миграции supabase_migration_ttk_units.sql.
+  /// Payload для вставки в tt_ingredients. Только колонки из схемы БД.
+  /// Убираем: id, price_per_kg, cost_currency, gramsPerPiece — их нет в tt_ingredients.
   static Map<String, dynamic> _ingredientPayloadForDb(TTIngredient ingredient) {
     final data = Map<String, dynamic>.from(ingredient.toJson());
     data.remove('id');
-    // Убираем поля, которых нет в схеме tt_ingredients
-    data.remove('grams_per_piece');
     data.remove('price_per_kg');
     data.remove('cost_currency');
-    // Убираем null поля, чтобы не было проблем с базой данных
+    data.remove('gramsPerPiece'); // camelCase в toJson, колонка может отсутствовать
+    data.remove('grams_per_piece');
     data.removeWhere((key, value) => value == null);
     return data;
   }
