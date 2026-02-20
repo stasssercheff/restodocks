@@ -416,175 +416,201 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   }
 
   Widget _buildProductCell(TTIngredient ingredient, int rowIndex) {
-    if (!widget.canEdit) {
+    try {
+      if (!widget.canEdit) {
+        return Container(
+          height: 44,
+          child: Center(
+            child: Text(
+              ingredient.sourceTechCardName ?? ingredient.productName,
+              style: const TextStyle(fontSize: 12),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        );
+      }
+
+      if (ingredient.productId != null || ingredient.productName.isNotEmpty) {
+        final product = widget.productStore.findProductForIngredient(ingredient.productId, ingredient.productName);
+        return InkWell(
+          onTap: () {
+            // При клике на выбранный продукт открываем dropdown для изменения
+            // Очищаем productId, чтобы показать поле поиска
+            _updateIngredient(rowIndex, ingredient.copyWith(
+              productId: null,
+              productName: '',
+            ));
+          },
+          child: Container(
+            height: 44,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey.shade400, width: 1),
+              borderRadius: BorderRadius.circular(4),
+              color: Colors.white,
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    product?.name ?? ingredient.productName,
+                    style: const TextStyle(fontSize: 12),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const Icon(
+                  Icons.edit,
+                  size: 16,
+                  color: Colors.grey,
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+
+      // Показываем searchable dropdown для выбора продукта (по размеру ячейки)
+      return SizedBox(
+        height: 44,
+        child: _buildSearchableProductDropdown(ingredient, rowIndex),
+      );
+    } catch (e, stackTrace) {
+      // В случае ошибки показываем fallback
       return Container(
         height: 44,
-        child: Center(
-          child: Text(
-            ingredient.sourceTechCardName ?? ingredient.productName,
-            style: const TextStyle(fontSize: 12),
-            textAlign: TextAlign.center,
-          ),
+        color: Colors.red.shade100,
+        child: const Center(
+          child: Text('Error in product cell', style: TextStyle(color: Colors.red, fontSize: 10)),
         ),
       );
     }
-
-    if (ingredient.productId != null || ingredient.productName.isNotEmpty) {
-      final product = widget.productStore.findProductForIngredient(ingredient.productId, ingredient.productName);
-      return InkWell(
-        onTap: () {
-          // При клике на выбранный продукт открываем dropdown для изменения
-          // Очищаем productId, чтобы показать поле поиска
-          _updateIngredient(rowIndex, ingredient.copyWith(
-            productId: null,
-            productName: '',
-          ));
-        },
-        child: Container(
-          height: 44,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey.shade400, width: 1),
-            borderRadius: BorderRadius.circular(4),
-            color: Colors.white,
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  product?.name ?? ingredient.productName,
-                  style: const TextStyle(fontSize: 12),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              const Icon(
-                Icons.edit,
-                size: 16,
-                color: Colors.grey,
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    // Показываем searchable dropdown для выбора продукта (по размеру ячейки)
-    return SizedBox(
-      height: 44,
-      child: _buildSearchableProductDropdown(ingredient, rowIndex),
-    );
   }
 
   Widget _buildSearchableProductDropdown(TTIngredient ingredient, int rowIndex) {
-    // Создаем объединенный список: продукты + ПФ
-    final allItems = <SelectableItem>[];
+    try {
+      // Создаем объединенный список: продукты + ПФ
+      final allItems = <SelectableItem>[];
 
-    // Добавляем продукты только из номенклатуры (где есть стоимость за кг/шт)
-    var nomenclatureProducts = widget.establishmentId != null
-        ? widget.productStore.getNomenclatureProducts(widget.establishmentId!)
-        : <Product>[]; // Пустой список, если establishmentId null
+      // Добавляем продукты только из номенклатуры (где есть стоимость за кг/шт)
+      var nomenclatureProducts = widget.establishmentId != null
+          ? widget.productStore.getNomenclatureProducts(widget.establishmentId!)
+          : <Product>[]; // Пустой список, если establishmentId null
 
-    // Fallback: если номенклатурные продукты пустые, используем все продукты
-    if (nomenclatureProducts.isEmpty) {
-      nomenclatureProducts = List.from(widget.productStore.allProducts);
-    }
+      // Fallback: если номенклатурные продукты пустые, используем все продукты
+      if (nomenclatureProducts.isEmpty) {
+        nomenclatureProducts = List.from(widget.productStore.allProducts);
+      }
 
-    for (final product in nomenclatureProducts) {
-      allItems.add(SelectableItem(
-        type: 'product',
-        item: product,
-        displayName: product.getLocalizedName('ru'),
-        searchName: product.name.toLowerCase(),
-      ));
-    }
-
-    // Добавляем ПФ
-    if (widget.semiFinishedProducts != null) {
-      for (final pf in widget.semiFinishedProducts!) {
+      for (final product in nomenclatureProducts) {
         allItems.add(SelectableItem(
-          type: 'pf',
-          item: pf,
-          displayName: pf.getDisplayNameInLists(widget.loc.currentLanguageCode),
-          searchName: pf.dishName.toLowerCase(),
+          type: 'product',
+          item: product,
+          displayName: product.getLocalizedName('ru'),
+          searchName: product.name.toLowerCase(),
         ));
       }
-    }
 
-    // Удаляем дубликаты по displayName (сохраняем первый найденный)
-    final seenDisplayNames = <String>{};
-    allItems.retainWhere((item) {
-      if (seenDisplayNames.contains(item.displayName)) {
-        return false;
+      // Добавляем ПФ
+      if (widget.semiFinishedProducts != null) {
+        for (final pf in widget.semiFinishedProducts!) {
+          allItems.add(SelectableItem(
+            type: 'pf',
+            item: pf,
+            displayName: pf.getDisplayNameInLists(widget.loc.currentLanguageCode),
+            searchName: pf.dishName.toLowerCase(),
+          ));
+        }
       }
-      seenDisplayNames.add(item.displayName);
-      return true;
-    });
 
-    // Сортируем по displayName
-    allItems.sort((a, b) => a.displayName.compareTo(b.displayName));
+      // Удаляем дубликаты по displayName (сохраняем первый найденный)
+      final seenDisplayNames = <String>{};
+      allItems.retainWhere((item) {
+        if (seenDisplayNames.contains(item.displayName)) {
+          return false;
+        }
+        seenDisplayNames.add(item.displayName);
+        return true;
+      });
 
-    return _ProductSearchDropdown(
-      items: allItems,
-      loc: widget.loc,
-      onProductSelected: (selectedItem) {
-        if (selectedItem.type == 'product') {
-          final product = selectedItem.item as Product;
-          // Получаем цену за кг: establishment_products или product.basePrice
-          final establishmentPrice = widget.productStore.getEstablishmentPrice(product.id, widget.establishmentId);
-          final pricePerKg = establishmentPrice?.$1 ?? product.basePrice ?? 0.0;
-          // Стоимость = цена за кг * вес брутто в кг
-          final cost = pricePerKg * (ingredient.grossWeight / 1000);
+      // Сортируем по displayName
+      allItems.sort((a, b) => a.displayName.compareTo(b.displayName));
 
-          var updatedIngredient = ingredient.copyWith(
-            productId: product.id,
-            productName: product.name,
-            unit: product.unit,
-            pricePerKg: pricePerKg,
-            cost: cost,
-          );
+      return _ProductSearchDropdown(
+        items: allItems,
+        loc: widget.loc,
+        onProductSelected: (selectedItem) {
+          try {
+            if (selectedItem.type == 'product') {
+              final product = selectedItem.item as Product;
+              // Получаем цену за кг: establishment_products или product.basePrice
+              final establishmentPrice = widget.productStore.getEstablishmentPrice(product.id, widget.establishmentId);
+              final pricePerKg = establishmentPrice?.$1 ?? product.basePrice ?? 0.0;
+              // Стоимость = цена за кг * вес брутто в кг
+              final cost = pricePerKg * (ingredient.grossWeight / 1000);
 
-          // Выход = нетто с учетом % ужарки
-          final outputWeight = updatedIngredient.netWeight * (1 - (updatedIngredient.cookingLossPctOverride ?? 0) / 100);
-          updatedIngredient = updatedIngredient.copyWith(outputWeight: outputWeight);
+              var updatedIngredient = ingredient.copyWith(
+                productId: product.id,
+                productName: product.name,
+                unit: product.unit,
+                pricePerKg: pricePerKg,
+                cost: cost,
+              );
 
-          _updateIngredient(rowIndex, updatedIngredient);
-        } else if (selectedItem.type == 'pf') {
-          final pf = selectedItem.item as TechCard;
-          // Для ПФ создаем ингредиент с ссылкой на ТТК
+              // Выход = нетто с учетом % ужарки
+              final outputWeight = updatedIngredient.netWeight * (1 - (updatedIngredient.cookingLossPctOverride ?? 0) / 100);
+              updatedIngredient = updatedIngredient.copyWith(outputWeight: outputWeight);
 
-          // Рассчитываем стоимость за кг для ПФ
-          double? pfPricePerKg;
-          if (pf.ingredients.isNotEmpty) {
-            final totalCost = pf.ingredients.fold<double>(0, (sum, ing) => sum + ing.cost);
-            final totalOutput = pf.ingredients.fold<double>(0, (sum, ing) => sum + ing.outputWeight);
-            if (totalOutput > 0) {
-              pfPricePerKg = (totalCost / totalOutput) * 1000;
+              _updateIngredient(rowIndex, updatedIngredient);
+            } else if (selectedItem.type == 'pf') {
+              final pf = selectedItem.item as TechCard;
+              // Для ПФ создаем ингредиент с ссылкой на ТТК
+
+              // Рассчитываем стоимость за кг для ПФ
+              double? pfPricePerKg;
+              if (pf.ingredients.isNotEmpty) {
+                final totalCost = pf.ingredients.fold<double>(0, (sum, ing) => sum + ing.cost);
+                final totalOutput = pf.ingredients.fold<double>(0, (sum, ing) => sum + ing.outputWeight);
+                if (totalOutput > 0) {
+                  pfPricePerKg = (totalCost / totalOutput) * 1000;
+                }
+              }
+
+              final gross = ingredient.grossWeight;
+              final pfCost = (pfPricePerKg ?? 0) * (gross / 1000);
+              var updatedIngredient = ingredient.copyWith(
+                sourceTechCardId: pf.id,
+                sourceTechCardName: pf.dishName,
+                productName: pf.getDisplayNameInLists(widget.loc.currentLanguageCode),
+                unit: 'г',
+                pricePerKg: pfPricePerKg,
+                cost: pfCost,
+              );
+
+              _updateIngredient(rowIndex, updatedIngredient);
             }
+
+            // Добавляем новую пустую строку только если это была последняя строка
+            if (rowIndex == widget.ingredients.length - 1) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                widget.onAdd();
+              });
+            }
+          } catch (e, stackTrace) {
+            // Игнорируем ошибки в callback
           }
-
-          final gross = ingredient.grossWeight;
-          final pfCost = (pfPricePerKg ?? 0) * (gross / 1000);
-          var updatedIngredient = ingredient.copyWith(
-            sourceTechCardId: pf.id,
-            sourceTechCardName: pf.dishName,
-            productName: pf.getDisplayNameInLists(widget.loc.currentLanguageCode),
-            unit: 'г',
-            pricePerKg: pfPricePerKg,
-            cost: pfCost,
-          );
-
-          _updateIngredient(rowIndex, updatedIngredient);
-        }
-
-        // Добавляем новую пустую строку только если это была последняя строка
-        if (rowIndex == widget.ingredients.length - 1) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            widget.onAdd();
-          });
-        }
-      },
-    );
+        },
+      );
+    } catch (e, stackTrace) {
+      // В случае ошибки показываем fallback
+      return Container(
+        height: 44,
+        color: Colors.red.shade100,
+        child: const Center(
+          child: Text('Error in dropdown', style: TextStyle(color: Colors.red, fontSize: 10)),
+        ),
+      );
+    }
   }
 
   Widget _buildNumericCell(String value, Function(String) onChanged, String key) {
