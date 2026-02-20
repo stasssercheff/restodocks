@@ -870,10 +870,8 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
                           return ListTile(
                             title: Text(item.displayName, style: const TextStyle(fontSize: 14)),
                             onTap: () {
+                              onSelect(item);
                               nav.pop();
-                              WidgetsBinding.instance.addPostFrameCallback((_) {
-                                onSelect(item);
-                              });
                             },
                           );
                         },

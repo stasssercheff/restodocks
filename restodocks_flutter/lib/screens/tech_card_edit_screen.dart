@@ -469,7 +469,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   String? _selectedSection; // цех
   bool _isSemiFinished = true; // ПФ или блюдо (порция — в карточках блюд, отдельно)
   final _technologyController = TextEditingController();
-  final List<TTIngredient> _ingredients = [];
+  List<TTIngredient> _ingredients = [];
   List<TechCard> _pickerTechCards = [];
   List<TechCard> _semiFinishedProducts = [];
 
@@ -1315,19 +1315,20 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                             onUpdate: (i, ing) {
                               setState(() {
                                 if (_ingredients.isEmpty && i == 0) {
-                                  _ingredients.add(ing);
+                                  _ingredients = [ing];
                                   if (ing.isPlaceholder && ing.hasData) {
-                                    _ingredients[0] = ing.withRealId();
-                                    _ingredients.add(TTIngredient.emptyPlaceholder());
+                                    _ingredients = [ing.withRealId(), TTIngredient.emptyPlaceholder()];
                                   }
                                   return;
                                 }
                                 if (i >= _ingredients.length) return;
-                                _ingredients[i] = ing;
+                                final next = List<TTIngredient>.from(_ingredients);
+                                next[i] = ing;
                                 if (ing.isPlaceholder && ing.hasData) {
-                                  _ingredients[i] = ing.withRealId();
-                                  _ingredients.add(TTIngredient.emptyPlaceholder());
+                                  next[i] = ing.withRealId();
+                                  next.add(TTIngredient.emptyPlaceholder());
                                 }
+                                _ingredients = next;
                               });
                             },
                             onRemove: _removeIngredient,
