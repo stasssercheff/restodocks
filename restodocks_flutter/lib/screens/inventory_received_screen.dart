@@ -1,5 +1,4 @@
-import 'dart:convert';
-
+import 'package:excel/excel.dart' hide TextSpan;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -193,27 +192,82 @@ class _InventoryDocumentDetailScreen extends StatelessWidget {
     final payload = doc['payload'] as Map<String, dynamic>? ?? {};
     final header = payload['header'] as Map<String, dynamic>? ?? {};
     final rows = payload['rows'] as List<dynamic>? ?? [];
-    final lines = <String>[
-      'Инвентаризация',
-      'Дата: ${header['date'] ?? '—'}',
-      'Время начала: ${header['timeStart'] ?? '—'}',
-      'Время окончания: ${header['timeEnd'] ?? '—'}',
-      'Сотрудник: ${header['employeeName'] ?? '—'}',
-      'Заведение: ${header['establishmentName'] ?? '—'}',
-      '',
-      '№\tНаименование\tЕд.\tИтого',
-    ];
-    for (var i = 0; i < rows.length; i++) {
-      final r = rows[i] as Map<String, dynamic>;
-      lines.add('${i + 1}\t${r['productName'] ?? ''}\t${r['unit'] ?? ''}\t${_fmt(r['total'])}');
-    }
-    final bytes = utf8.encode(lines.join('\n'));
-    final date = header['date'] ?? DateTime.now().toIso8601String().split('T').first;
-    await saveFileBytes('inventory_$date.txt', bytes);
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.t('inventory_excel_downloaded') ?? 'Файл сохранён')),
-      );
+    try {
+      final excel = Excel.createExcel();
+      final sheet = excel[excel.getDefaultSheet()!];
+
+      var maxCols = 0;
+      for (var i = 0; i < rows.length; i++) {
+        final r = rows[i] as Map<String, dynamic>;
+        final quantities = r['quantities'] as List<dynamic>? ?? [];
+        if (quantities.length > maxCols) maxCols = quantities.length;
+      }
+      final headerCells = <CellValue>[
+        TextCellValue(loc.t('inventory_excel_number')),
+        TextCellValue(loc.t('inventory_item_name')),
+        TextCellValue(loc.t('inventory_unit')),
+        TextCellValue(loc.t('inventory_excel_total')),
+      ];
+      final fillLabel = loc.t('inventory_excel_fill_data');
+      for (var c = 0; c < maxCols; c++) {
+        headerCells.add(TextCellValue('$fillLabel ${c + 1}'));
+      }
+      sheet.appendRow(headerCells);
+      for (var i = 0; i < rows.length; i++) {
+        final r = rows[i] as Map<String, dynamic>;
+        final name = r['productName'] as String? ?? '';
+        final unit = r['unit'] as String? ?? '';
+        final total = (r['total'] as num?)?.toDouble() ?? 0.0;
+        final quantities = r['quantities'] as List<dynamic>? ?? [];
+        final rowCells = <CellValue>[
+          IntCellValue(i + 1),
+          TextCellValue(name),
+          TextCellValue(unit),
+          DoubleCellValue(total),
+        ];
+        for (var c = 0; c < maxCols; c++) {
+          final q = c < quantities.length ? (quantities[c] as num?)?.toDouble() ?? 0.0 : 0.0;
+          rowCells.add(DoubleCellValue(q));
+        }
+        sheet.appendRow(rowCells);
+      }
+      final aggregated = payload['aggregatedProducts'] as List<dynamic>? ?? [];
+      if (aggregated.isNotEmpty) {
+        sheet.appendRow([]);
+        sheet.appendRow([TextCellValue(loc.t('inventory_pf_products_title'))]);
+        sheet.appendRow([
+          TextCellValue(loc.t('inventory_excel_number')),
+          TextCellValue(loc.t('inventory_item_name')),
+          TextCellValue(loc.t('inventory_pf_gross_g')),
+          TextCellValue(loc.t('inventory_pf_net_g')),
+        ]);
+        for (var i = 0; i < aggregated.length; i++) {
+          final p = aggregated[i] as Map<String, dynamic>;
+          sheet.appendRow([
+            IntCellValue(i + 1),
+            TextCellValue((p['productName'] as String? ?? '').toString()),
+            IntCellValue(((p['grossGrams'] as num?)?.toDouble() ?? 0).round()),
+            IntCellValue(((p['netGrams'] as num?)?.toDouble() ?? 0).round()),
+          ]);
+        }
+      }
+
+      final out = excel.encode();
+      if (out != null && out.isNotEmpty) {
+        final date = header['date'] ?? DateTime.now().toIso8601String().split('T').first;
+        await saveFileBytes('inventory_$date.xlsx', out);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(loc.t('inventory_excel_downloaded') ?? 'Файл Excel сохранён')),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка: $e')),
+        );
+      }
     }
   }
 

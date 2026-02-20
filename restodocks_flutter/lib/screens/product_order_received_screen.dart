@@ -1,5 +1,4 @@
-import 'dart:convert';
-
+import 'package:excel/excel.dart' hide TextSpan;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -266,23 +265,43 @@ class _ProductOrderReceivedScreenState extends State<ProductOrderReceivedScreen>
     final payload = doc['payload'] as Map<String, dynamic>? ?? {};
     final header = payload['header'] as Map<String, dynamic>? ?? {};
     final rows = payload['rows'] as List<dynamic>? ?? [];
-    final lines = <String>[
-      header['listName'] ?? 'Заказ',
-      'Поставщик: ${header['supplierName'] ?? '—'}',
-      'Дата: ${header['date'] ?? '—'}',
-      'Сотрудник: ${header['employeeName'] ?? '—'}',
-      '',
-      'Кол-во\tЕд.\tНаименование',
-    ];
-    for (final r in rows) {
-      final m = r as Map<String, dynamic>;
-      lines.add('${_fmtNum(m['quantity'])}\t${m['unit'] ?? ''}\t${m['productName'] ?? ''}');
-    }
-    final bytes = utf8.encode(lines.join('\n'));
-    final dateStr = DateFormat('yyyy-MM-dd').format(DateTime.tryParse(doc['created_at']?.toString() ?? '') ?? DateTime.now());
-    await saveFileBytes('order_$dateStr.txt', bytes);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('order_list_save_to_device') ?? 'Сохранено на устройство')));
+    try {
+      final excel = Excel.createExcel();
+      final sheet = excel[excel.getDefaultSheet()!];
+
+      sheet.appendRow([TextCellValue(header['listName'] ?? 'Заказ')]);
+      sheet.appendRow([TextCellValue('${loc.t('inbox_header_supplier') ?? 'Поставщик'}: ${header['supplierName'] ?? '—'}')]);
+      sheet.appendRow([TextCellValue('${loc.t('inbox_header_date') ?? 'Дата'}: ${header['date'] ?? '—'}')]);
+      sheet.appendRow([TextCellValue('${loc.t('inbox_header_employee') ?? 'Сотрудник'}: ${header['employeeName'] ?? '—'}')]);
+      sheet.appendRow([]);
+
+      sheet.appendRow([
+        TextCellValue(loc.t('inventory_item_name')),
+        TextCellValue(loc.t('order_list_unit')),
+        TextCellValue(loc.t('order_list_quantity')),
+      ]);
+      for (final r in rows) {
+        final m = r as Map<String, dynamic>;
+        final qty = (m['quantity'] as num?)?.toDouble() ?? 0.0;
+        sheet.appendRow([
+          TextCellValue((m['productName'] ?? '').toString()),
+          TextCellValue((m['unit'] ?? '').toString()),
+          DoubleCellValue(qty),
+        ]);
+      }
+
+      final out = excel.encode();
+      if (out != null && out.isNotEmpty) {
+        final dateStr = DateFormat('yyyy-MM-dd').format(DateTime.tryParse(doc['created_at']?.toString() ?? '') ?? DateTime.now());
+        await saveFileBytes('order_$dateStr.xlsx', out);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('inventory_excel_downloaded') ?? 'Файл Excel сохранён')));
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+      }
     }
   }
 }
