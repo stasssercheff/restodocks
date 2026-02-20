@@ -830,64 +830,60 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
 
     final sel = await showDialog<SelectableItem>(
       context: context,
-      barrierDismissible: true,
+      barrierDismissible: false,
       barrierColor: Colors.black54,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) {
           return AlertDialog(
             contentPadding: EdgeInsets.zero,
-            content: SizedBox(
-              width: 320,
-              height: 400,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: TextField(
-                      controller: searchCtrl,
-                      autofocus: true,
-                      decoration: InputDecoration(
-                        hintText: 'Поиск по названию',
-                        prefixIcon: const Icon(Icons.search, size: 20),
-                        isDense: true,
-                        border: const OutlineInputBorder(),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            content: Material(
+              color: Colors.white,
+              child: SizedBox(
+                width: 360,
+                height: 440,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: TextField(
+                        controller: searchCtrl,
+                        autofocus: true,
+                        decoration: InputDecoration(
+                          hintText: 'Поиск по названию',
+                          prefixIcon: const Icon(Icons.search, size: 20),
+                          isDense: true,
+                          border: const OutlineInputBorder(),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                        onChanged: (_) {
+                          setState(() => filtered = _filterItems(searchCtrl.text));
+                        },
                       ),
-                      onChanged: (_) {
-                        setState(() => filtered = _filterItems(searchCtrl.text));
-                      },
                     ),
-                  ),
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: filtered.length,
-                      itemBuilder: (_, i) {
-                        final item = filtered[i];
-                        return Semantics(
-                          button: true,
-                          child: GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTap: () {
-                              Navigator.of(ctx).pop(item);
-                            },
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(minHeight: 48),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                                child: Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: Text(item.displayName, style: const TextStyle(fontSize: 13)),
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      },
+                    Expanded(
+                      child: ListView.builder(
+                        itemCount: filtered.length,
+                        itemBuilder: (_, i) {
+                          final item = filtered[i];
+                          return ListTile(
+                            title: Text(item.displayName, style: const TextStyle(fontSize: 14)),
+                            onTap: () => Navigator.of(ctx).pop(item),
+                          );
+                        },
+                      ),
                     ),
-                  ),
-                ],
+                    const Divider(height: 1),
+                    Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        child: const Text('Отмена'),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           );
