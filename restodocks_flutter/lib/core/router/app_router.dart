@@ -8,7 +8,7 @@ import '../../screens/screens.dart';
 import '../../screens/company_registration_screen.dart';
 import '../../screens/owner_registration_screen.dart';
 import '../../screens/home/schedule_screen.dart';
-import '../../screens/home/notifications_screen.dart';
+import '../../screens/home/inbox_screen.dart';
 import '../../screens/home/expenses_placeholder_screen.dart';
 import '../../screens/home/department_placeholder_screen.dart';
 import '../../screens/supabase_test_screen.dart';
@@ -133,7 +133,7 @@ class AppRouter {
       ),
       GoRoute(
         path: '/notifications',
-        builder: (context, state) => const NotificationsScreen(),
+        builder: (context, state) => const InboxScreen(),
       ),
       GoRoute(
         path: '/expenses',

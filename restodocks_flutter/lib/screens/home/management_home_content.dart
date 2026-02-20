@@ -23,7 +23,7 @@ class ManagementHomeContent extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       children: [
         _Tile(icon: Icons.calendar_month, title: loc.t('schedule'), onTap: () => context.push('/schedule')),
-        _Tile(icon: Icons.notifications, title: loc.t('notifications'), onTap: () => context.push('/notifications')),
+        _Tile(icon: Icons.inbox, title: loc.t('inbox'), onTap: () => context.push('/notifications')),
         _Tile(icon: Icons.people, title: loc.t('employees'), onTap: () => context.push('/employees')),
         if (isChef || roles.contains('sous_chef'))
           _Tile(icon: Icons.how_to_reg, title: loc.t('shift_confirmation'), onTap: () => context.push('/shift-confirmation')),
@@ -35,10 +35,8 @@ class ManagementHomeContent extends StatelessWidget {
         _Tile(icon: Icons.assignment, title: loc.t('nomenclature'), onTap: () => context.push('/nomenclature')),
         if (isChef || isBarManager)
           _Tile(icon: Icons.shopping_cart, title: loc.t('product_order'), onTap: () => context.push('/product-order')),
-        if (isChef) ...[
+        if (isChef)
           _Tile(icon: Icons.assignment, title: loc.t('inventory_blank'), onTap: () => context.push('/inventory')),
-          _Tile(icon: Icons.inbox, title: loc.t('inventory_received'), onTap: () => context.push('/inventory-received')),
-        ],
         if (isGeneral) ...[
           _Tile(icon: Icons.savings, title: '${loc.t('expenses')} (${loc.t('pro')})', onTap: () => context.push('/expenses')),
         ],

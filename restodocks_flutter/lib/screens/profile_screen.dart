@@ -197,13 +197,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const SizedBox(height: 24),
 
             Text(
-              localization.t('notifications'),
+              localization.t('inbox'),
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
             ListTile(
-              leading: const Icon(Icons.notifications),
-              title: Text(localization.t('notifications')),
+              leading: const Icon(Icons.inbox),
+              title: Text(localization.t('inbox')),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.push('/notifications'),
             ),

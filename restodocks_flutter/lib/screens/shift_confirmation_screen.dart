@@ -142,8 +142,25 @@ class _ShiftConfirmationScreenState extends State<ShiftConfirmationScreen> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Шапка: Дата | Цех | Сотрудник | Подтверждение
+          Container(
+            margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Expanded(flex: 1, child: Text(loc.t('inbox_header_date') ?? 'Дата', style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+                Expanded(flex: 2, child: Text(loc.t('inbox_header_section') ?? 'Цех', style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+                Expanded(flex: 2, child: Text(loc.t('inbox_header_employee') ?? 'Сотрудник', style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+                Expanded(flex: 1, child: Text(loc.t('inbox_header_confirmation') ?? 'Подтверждение', style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+              ],
+            ),
+          ),
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
                 Text(loc.t('shift_date') ?? 'Дата смены:', style: Theme.of(context).textTheme.titleSmall),
@@ -162,13 +179,6 @@ class _ShiftConfirmationScreenState extends State<ShiftConfirmationScreen> {
                   label: Text(dateStr),
                 ),
               ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Text(
-              loc.t('shift_confirmation_hint') ?? 'Отметьте, кто действительно был на смене. Сохраните после закрытия смены.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
           ),
           const SizedBox(height: 8),
@@ -197,16 +207,25 @@ class _ShiftConfirmationScreenState extends State<ShiftConfirmationScreen> {
                     itemBuilder: (_, i) {
                       final slot = slotsOnShift[i];
                       final confirmed = _isConfirmed(slot);
+                      String sectionName = slot.sectionId;
+                      for (final s in _model.sections) {
+                        if (s.id == slot.sectionId) {
+                          sectionName = loc.t(s.nameKey);
+                          break;
+                        }
+                      }
                       return Card(
                         margin: const EdgeInsets.only(bottom: 8),
-                        child: CheckboxListTile(
-                          title: Text(slot.name, style: const TextStyle(fontWeight: FontWeight.w500)),
-                          subtitle: _model.getTimeRange(slot.id, _selectedDate) != null
-                              ? Text(loc.t('schedule_shift') ?? 'Смена', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant))
-                              : null,
-                          value: confirmed,
-                          onChanged: (v) => _setConfirmed(slot, v ?? false),
-                          controlAffinity: ListTileControlAffinity.leading,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          child: Row(
+                            children: [
+                              Expanded(flex: 1, child: Text(dateStr, style: Theme.of(context).textTheme.bodySmall)),
+                              Expanded(flex: 2, child: Text(sectionName, style: Theme.of(context).textTheme.bodyMedium, overflow: TextOverflow.ellipsis)),
+                              Expanded(flex: 2, child: Text(slot.name, style: const TextStyle(fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis)),
+                              Expanded(flex: 1, child: Checkbox(value: confirmed, onChanged: (v) => _setConfirmed(slot, v ?? false))),
+                            ],
+                          ),
                         ),
                       );
                     },

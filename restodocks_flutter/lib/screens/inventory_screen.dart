@@ -953,7 +953,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     );
   }
 
-  /// Компактная шапка: на узком экране (телефон) фильтры выносятся во вторую строку, чтобы не обрезались.
+  /// Шапка: Дата | Цех | Сотрудник
   Widget _buildHeader(
     LocalizationService loc,
     Establishment? establishment,
@@ -961,6 +961,31 @@ class _InventoryScreenState extends State<InventoryScreen>
   ) {
     final theme = Theme.of(context);
     final narrow = MediaQuery.sizeOf(context).width < 420;
+    final dateStr = '${_date.day.toString().padLeft(2, '0')}.${_date.month.toString().padLeft(2, '0')}.${_date.year}';
+    final headerRow = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
+      ),
+      child: Row(
+        children: [
+          Expanded(child: Text(loc.t('inbox_header_date') ?? 'Дата', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+          Expanded(child: Text(loc.t('inbox_header_section') ?? 'Цех', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+          Expanded(child: Text(loc.t('inbox_header_employee') ?? 'Сотрудник', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+        ],
+      ),
+    );
+    final dataRow = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      child: Row(
+        children: [
+          Expanded(child: Text(dateStr, style: theme.textTheme.bodyMedium)),
+          Expanded(child: Text(establishment?.name ?? '—', style: theme.textTheme.bodyMedium, overflow: TextOverflow.ellipsis)),
+          Expanded(child: Text(employee?.fullName ?? '—', style: theme.textTheme.bodyMedium, overflow: TextOverflow.ellipsis)),
+        ],
+      ),
+    );
     final filterDropdown = !_completed && _rows.isNotEmpty
         ? DropdownButtonHideUnderline(
             child: DropdownButton<_InventoryBlockFilter>(
@@ -992,16 +1017,21 @@ class _InventoryScreenState extends State<InventoryScreen>
             ),
           )
         : null;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
-        border: Border(bottom: BorderSide(color: theme.dividerColor, width: 1)),
-      ),
-      child: SafeArea(
-        top: true,
-        bottom: false,
-        child: narrow
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        headerRow,
+        dataRow,
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerLow,
+            border: Border(bottom: BorderSide(color: theme.dividerColor, width: 1)),
+          ),
+          child: SafeArea(
+            top: true,
+            bottom: false,
+            child: narrow
             ? Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1081,7 +1111,9 @@ class _InventoryScreenState extends State<InventoryScreen>
                   ],
                 ],
               ),
-      ),
+          ),
+        ),
+      ],
     );
   }
 

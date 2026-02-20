@@ -116,11 +116,11 @@ class OwnerHomeContent extends StatelessWidget {
             ),
           ]),
           const SizedBox(height: 24),
-          _SectionTitle(title: loc.t('notifications')),
+          _SectionTitle(title: loc.t('inbox')),
           _buildTilesGrid(context, [
             _TileData(
-              icon: Icons.notifications,
-              title: loc.t('notifications'),
+              icon: Icons.inbox,
+              title: loc.t('inbox'),
               onTap: () => context.push('/notifications'),
               color: Colors.cyan,
             ),

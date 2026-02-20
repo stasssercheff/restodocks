@@ -59,6 +59,39 @@ class _OrderListsScreenState extends State<OrderListsScreen> {
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
+    final account = context.watch<AccountManagerSupabase>();
+    final establishment = account.establishment;
+    final employee = account.currentEmployee;
+    final dateStr = DateFormat('dd.MM.yyyy').format(DateTime.now());
+    final header = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(child: Text(loc.t('inbox_header_date') ?? 'Дата', style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+              Expanded(child: Text(loc.t('inbox_header_section') ?? 'Цех', style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+              Expanded(child: Text(loc.t('inbox_header_employee') ?? 'Сотрудник', style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+              Expanded(child: Text(loc.t('inbox_header_supplier') ?? 'Поставщик', style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Expanded(child: Text(dateStr, style: Theme.of(context).textTheme.bodyMedium)),
+              Expanded(child: Text(establishment?.name ?? '—', style: Theme.of(context).textTheme.bodyMedium, overflow: TextOverflow.ellipsis)),
+              Expanded(child: Text(employee?.fullName ?? '—', style: Theme.of(context).textTheme.bodyMedium, overflow: TextOverflow.ellipsis)),
+              Expanded(child: Text('—', style: Theme.of(context).textTheme.bodyMedium)),
+            ],
+          ),
+        ],
+      ),
+    );
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
@@ -67,9 +100,14 @@ class _OrderListsScreenState extends State<OrderListsScreen> {
           IconButton(icon: const Icon(Icons.home), onPressed: () => context.go('/home'), tooltip: loc.t('home')),
         ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _lists.isEmpty
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          header,
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _lists.isEmpty
               ? Center(
                   child: Padding(
                     padding: const EdgeInsets.all(24),
@@ -147,6 +185,9 @@ class _OrderListsScreenState extends State<OrderListsScreen> {
                     },
                   ),
                 ),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
           await context.push('/product-order/new');
