@@ -1300,6 +1300,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                       constraints: BoxConstraints(minWidth: MediaQuery.of(context).size.width),
                       child: canEdit
                             ? ExcelStyleTtkTable(
+                            key: ValueKey('ttk_${_ingredients.length}_${_ingredients.map((e) => e.productId ?? e.productName).join("|")}'),
                             loc: loc,
                             dishName: _nameController.text,
                             isSemiFinished: _isSemiFinished,

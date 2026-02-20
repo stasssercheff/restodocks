@@ -25,6 +25,7 @@ class ExcelStyleTtkTable extends StatefulWidget {
   final bool hideTechnologyBlock;
 
   ExcelStyleTtkTable({
+    super.key,
     required this.loc,
     required this.dishName,
     required this.isSemiFinished,
