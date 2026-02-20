@@ -520,16 +520,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       }
 
     // Показываем searchable dropdown для выбора продукта (по размеру ячейки)
-    return GestureDetector(
-      onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Клик по продукту работает!')),
-      ),
-      child: Container(
-        height: 44,
-        color: Colors.blue.shade100,
-        child: const Center(child: Text('КЛИКНИТЕ ЗДЕСЬ')),
-      ),
-    );
+    return _buildSearchableProductDropdown(ingredient, rowIndex);
     } catch (e, stackTrace) {
       // В случае ошибки показываем fallback
       return Container(
@@ -905,12 +896,6 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
   }
 
   Future<void> _openPicker() async {
-    // Показываем индикатор загрузки
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Открываем выбор продукта...')),
-      );
-    }
     final searchCtrl = TextEditingController(text: _searchController.text);
     List<SelectableItem> filtered = _filterItems(_searchController.text);
 
@@ -955,13 +940,7 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
                           final item = filtered[i];
                           return ListTile(
                             title: Text(item.displayName, style: const TextStyle(fontSize: 14)),
-                            onTap: () {
-                              // Показываем, что продукт выбран
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Выбран продукт: ${item.displayName}')),
-                              );
-                              Navigator.of(ctx).pop(item);
-                            },
+                            onTap: () => Navigator.of(ctx).pop(item),
                           );
                         },
                       ),
@@ -985,9 +964,6 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
 
     searchCtrl.dispose();
     if (selected != null && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Применяем выбор: ${selected.displayName}')),
-      );
       widget.onProductSelected(selected);
     }
   }
