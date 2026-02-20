@@ -899,6 +899,12 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
   }
 
   Future<void> _openPicker() async {
+    // Показываем индикатор загрузки
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Открываем выбор продукта...')),
+      );
+    }
     final searchCtrl = TextEditingController(text: _searchController.text);
     List<SelectableItem> filtered = _filterItems(_searchController.text);
 
@@ -943,7 +949,13 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
                           final item = filtered[i];
                           return ListTile(
                             title: Text(item.displayName, style: const TextStyle(fontSize: 14)),
-                            onTap: () => Navigator.of(ctx).pop(item),
+                            onTap: () {
+                              // Показываем, что продукт выбран
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Выбран продукт: ${item.displayName}')),
+                              );
+                              Navigator.of(ctx).pop(item);
+                            },
                           );
                         },
                       ),
@@ -967,6 +979,9 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
 
     searchCtrl.dispose();
     if (selected != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Применяем выбор: ${selected.displayName}')),
+      );
       widget.onProductSelected(selected);
     }
   }
