@@ -17,8 +17,10 @@ class TechCardServiceSupabase {
   static Map<String, dynamic> _ingredientPayloadForDb(TTIngredient ingredient) {
     final data = Map<String, dynamic>.from(ingredient.toJson());
     data.remove('id');
-    // Убираем поля, которые могут вызывать проблемы
-    data.remove('grams_per_piece'); // Временно, пока колонка не стабильна
+    // Убираем поля, которых нет в схеме tt_ingredients
+    data.remove('grams_per_piece');
+    data.remove('price_per_kg');
+    data.remove('cost_currency');
     // Убираем null поля, чтобы не было проблем с базой данных
     data.removeWhere((key, value) => value == null);
     return data;
