@@ -804,17 +804,6 @@ class _ProductSearchDropdown extends StatefulWidget {
 class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
-  final GlobalKey _cellKey = GlobalKey();
-  List<SelectableItem> _filteredItems = [];
-
-  static const double _dropdownWidth = 240.0;
-
-  @override
-  void initState() {
-    super.initState();
-    _filteredItems = widget.items.take(50).toList();
-    _searchController.addListener(_filter);
-  }
 
   @override
   void dispose() {
@@ -823,43 +812,76 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
     super.dispose();
   }
 
-  void _filter() {
-    final query = _searchController.text.trim();
-    setState(() {
-      if (query.isEmpty) {
-        _filteredItems = widget.items.take(50).toList();
-      } else {
-        _filteredItems = widget.items
-            .where((item) =>
-                item.displayName.toLowerCase().contains(query.toLowerCase()) ||
-                item.searchName.contains(query.toLowerCase()))
-            .take(30)
-            .toList();
-      }
-    });
+  List<SelectableItem> _filterItems(String query) {
+    if (query.isEmpty) {
+      return widget.items.take(80).toList();
+    }
+    final q = query.trim().toLowerCase();
+    return widget.items
+        .where((item) =>
+            item.displayName.toLowerCase().contains(q) ||
+            item.searchName.contains(q))
+        .take(50)
+        .toList();
   }
 
-  Future<void> _openMenu() async {
-    final box = _cellKey.currentContext?.findRenderObject() as RenderBox?;
-    if (box == null) return;
-    final pos = box.localToGlobal(Offset.zero);
-    final sel = await showMenu<SelectableItem>(
+  Future<void> _openPicker() async {
+    final searchCtrl = TextEditingController(text: _searchController.text);
+    List<SelectableItem> filtered = _filterItems(_searchController.text);
+
+    final sel = await showDialog<SelectableItem>(
       context: context,
-      position: RelativeRect.fromLTRB(
-        pos.dx,
-        pos.dy + 44,
-        pos.dx + _dropdownWidth,
-        pos.dy + 44 + 200,
+      barrierDismissible: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) {
+          return AlertDialog(
+            contentPadding: EdgeInsets.zero,
+            content: SizedBox(
+              width: 320,
+              height: 400,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: TextField(
+                      controller: searchCtrl,
+                      autofocus: true,
+                      decoration: InputDecoration(
+                        hintText: 'Поиск по названию',
+                        prefixIcon: const Icon(Icons.search, size: 20),
+                        isDense: true,
+                        border: const OutlineInputBorder(),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                      onChanged: (_) {
+                        setState(() => filtered = _filterItems(searchCtrl.text));
+                      },
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: filtered.length,
+                      itemBuilder: (_, i) {
+                        final item = filtered[i];
+                        return ListTile(
+                          dense: true,
+                          title: Text(item.displayName, style: const TextStyle(fontSize: 13)),
+                          onTap: () => Navigator.of(ctx).pop(item),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
-      constraints: BoxConstraints(maxWidth: _dropdownWidth, maxHeight: 200),
-      items: _filteredItems.map((item) {
-        return PopupMenuItem<SelectableItem>(
-          value: item,
-          height: 40,
-          child: Text(item.displayName, style: const TextStyle(fontSize: 13), overflow: TextOverflow.ellipsis),
-        );
-      }).toList(),
     );
+
+    searchCtrl.dispose();
     if (sel != null && mounted) {
       widget.onProductSelected(sel);
       _searchController.text = sel.displayName;
@@ -869,7 +891,6 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      key: _cellKey,
       height: 44,
       decoration: BoxDecoration(
         border: Border.all(color: Colors.grey.shade400, width: 1),
@@ -879,6 +900,7 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
       child: TextField(
         controller: _searchController,
         focusNode: _searchFocusNode,
+        readOnly: true,
         style: const TextStyle(fontSize: 12),
         decoration: InputDecoration(
           hintText: 'Выберите продукт',
@@ -887,8 +909,7 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
           border: InputBorder.none,
           isDense: true,
         ),
-        onTap: () => _openMenu(),
-        onChanged: (_) => _filter(),
+        onTap: () => _openPicker(),
       ),
     );
   }
