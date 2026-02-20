@@ -873,7 +873,10 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
                           final item = filtered[i];
                           return ListTile(
                             title: Text(item.displayName, style: const TextStyle(fontSize: 14)),
-                            onTap: () => Navigator.of(ctx).pop(item),
+                            onTap: () {
+                              print('TTK: Product selected: ${item.displayName}');
+                              Navigator.of(ctx).pop(item);
+                            },
                           );
                         },
                       ),
