@@ -693,17 +693,20 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     );
   }
 
-  Widget _buildCostCell(TTIngredient ingredient) {
-    // Цена за кг: из сохранённого pricePerKg, establishment_products или product.basePrice
+  double _resolvePricePerKg(TTIngredient ingredient) {
     double pricePerKg = ingredient.pricePerKg ?? 0;
     if (pricePerKg == 0 && (ingredient.productId != null || ingredient.productName.isNotEmpty)) {
-      final product = widget.productStore.findProductForIngredient(ingredient.productId, ingredient.productName);
+      final product = widget.productStore?.findProductForIngredient(ingredient.productId, ingredient.productName);
       if (product != null) {
-        final ep = widget.productStore.getEstablishmentPrice(product.id, widget.establishmentId);
+        final ep = widget.productStore?.getEstablishmentPrice(product.id, widget.establishmentId);
         pricePerKg = ep?.$1 ?? product.basePrice ?? 0;
       }
     }
+    return pricePerKg;
+  }
 
+  Widget _buildCostCell(TTIngredient ingredient) {
+    final pricePerKg = _resolvePricePerKg(ingredient);
     return Container(
       height: 44,
       child: Center(
@@ -717,7 +720,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
   Widget _buildPricePerKgCell(TTIngredient ingredient) {
     // Стоимость продукта по брутто (цена за кг * вес брутто в кг)
-    final pricePerKg = ingredient.pricePerKg ?? 0;
+    final pricePerKg = _resolvePricePerKg(ingredient);
     final grossCost = pricePerKg * (ingredient.grossWeight / 1000);
 
     return Container(
@@ -795,7 +798,7 @@ class _ProductSearchDropdown extends StatefulWidget {
   });
 
   @override
-  _ProductSearchDropdownState createState() => _ProductSearchDropdownState();
+  State<_ProductSearchDropdown> createState() => _ProductSearchDropdownState();
 }
 
 class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
@@ -803,17 +806,14 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
   final FocusNode _searchFocusNode = FocusNode();
   final LayerLink _layerLink = LayerLink();
   OverlayEntry? _overlayEntry;
-  bool _isDropdownOpen = false;
   List<SelectableItem> _filteredItems = [];
-  bool _isSelectingProduct = false; // Флаг для предотвращения конфликта при выборе продукта
 
   @override
   void initState() {
     super.initState();
     _filteredItems = widget.items.take(50).toList();
-    _searchController.addListener(_filterProducts);
+    _searchController.addListener(_filter);
     _searchController.addListener(_showDropdownOnInput);
-    _searchFocusNode.addListener(_onFocusChange);
   }
 
   @override
@@ -824,97 +824,70 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
     super.dispose();
   }
 
-  void _filterProducts() {
+  void _filter() {
     final query = _searchController.text.trim();
     setState(() {
       if (query.isEmpty) {
         _filteredItems = widget.items.take(50).toList();
       } else {
         _filteredItems = widget.items
-            .where((item) => item.displayName.toLowerCase().contains(query.toLowerCase()) ||
-                            item.searchName.contains(query.toLowerCase()))
-            .take(20)
+            .where((item) =>
+                item.displayName.toLowerCase().contains(query.toLowerCase()) ||
+                item.searchName.contains(query.toLowerCase()))
+            .take(30)
             .toList();
       }
     });
-
-    // Пересоздаем overlay для обновления списка
-    if (_isDropdownOpen && _overlayEntry != null) {
-      _hideOverlay();
-      _showOverlay();
+    if (_overlayEntry != null) {
+      _overlayEntry!.markNeedsBuild();
     }
   }
 
   void _showDropdownOnInput() {
-    if (!_isDropdownOpen) {
-      setState(() {
-        _isDropdownOpen = true;
-      });
-      _showOverlay();
-    }
+    if (_overlayEntry == null) _showOverlay();
   }
-
-  void _onFocusChange() {
-    if (!_searchFocusNode.hasFocus && _isDropdownOpen && !_isSelectingProduct) {
-      // Не закрываем overlay сразу, даем время на обработку клика
-      Future.delayed(const Duration(milliseconds: 150), () {
-        if (mounted && !_searchFocusNode.hasFocus && _isDropdownOpen && !_isSelectingProduct) {
-          _hideOverlay();
-        }
-      });
-    }
-  }
-
 
   void _showOverlay() {
     if (_overlayEntry != null) return;
-
     _overlayEntry = OverlayEntry(
-      builder: (context) => Positioned(
-        width: 200,
-        child: CompositedTransformFollower(
-          link: _layerLink,
-          showWhenUnlinked: false,
-          offset: const Offset(0, 44),
-          child: Material(
-            elevation: 4,
-            borderRadius: BorderRadius.circular(4),
-            child: Listener(
-              onPointerDown: (_) => _isSelectingProduct = true,
+      builder: (context) => Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _hideOverlay,
+            ),
+          ),
+          CompositedTransformFollower(
+            link: _layerLink,
+            showWhenUnlinked: false,
+            offset: const Offset(0, 44),
+            child: Material(
+              elevation: 8,
+              borderRadius: BorderRadius.circular(4),
               child: Container(
-                constraints: const BoxConstraints(maxHeight: 200),
+                constraints: const BoxConstraints(maxHeight: 220, minWidth: 180),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  border: Border.all(color: Colors.grey.shade400, width: 1),
+                  border: Border.all(color: Colors.grey.shade400),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: ListView.builder(
                   shrinkWrap: true,
+                  padding: EdgeInsets.zero,
                   itemCount: _filteredItems.length,
                   itemBuilder: (context, index) {
                     final item = _filteredItems[index];
                     return GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: () {
-                        _isSelectingProduct = true;
                         widget.onProductSelected(item);
                         _searchController.text = item.displayName;
                         _hideOverlay();
-                        Future.delayed(const Duration(milliseconds: 100), () {
-                          if (mounted) _isSelectingProduct = false;
-                        });
                       },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                        decoration: index < _filteredItems.length - 1
-                            ? const BoxDecoration(
-                                border: Border(bottom: BorderSide(color: Colors.grey, width: 0.2)),
-                              )
-                            : null,
-                        child: Text(
-                          item.displayName,
-                          style: const TextStyle(fontSize: 12),
-                        ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        child: Text(item.displayName, style: const TextStyle(fontSize: 13)),
                       ),
                     );
                   },
@@ -922,21 +895,16 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
-
     Overlay.of(context).insert(_overlayEntry!);
   }
 
   void _hideOverlay() {
     _overlayEntry?.remove();
     _overlayEntry = null;
-    if (mounted) {
-      setState(() {
-        _isDropdownOpen = false;
-      });
-    }
+    if (mounted) setState(() {});
   }
 
   @override
@@ -950,57 +918,21 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
           borderRadius: BorderRadius.circular(4),
           color: Colors.white,
         ),
-        child: Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _searchController,
-                focusNode: _searchFocusNode,
-                style: const TextStyle(fontSize: 12),
-                decoration: InputDecoration(
-                  hintText: 'Выберите продукт',
-                  hintStyle: const TextStyle(fontSize: 12, color: Colors.grey),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-                  border: InputBorder.none,
-                  isDense: true,
-                ),
-                onTap: () {
-                  if (!_isDropdownOpen) {
-                    setState(() {
-                      _isDropdownOpen = true;
-                    });
-                    _showOverlay();
-                  }
-                },
-                onChanged: (value) {
-                  if (!_isDropdownOpen && value.isNotEmpty) {
-                    setState(() {
-                      _isDropdownOpen = true;
-                    });
-                    _showOverlay();
-                  }
-                  _filterProducts();
-                },
-              ),
-            ),
-            GestureDetector(
-              onTap: () {
-                setState(() {
-                  _isDropdownOpen = !_isDropdownOpen;
-                });
-                if (_isDropdownOpen) {
-                  _showOverlay();
-                } else {
-                  _hideOverlay();
-                }
-              },
-              child: Icon(
-                _isDropdownOpen ? Icons.arrow_drop_up : Icons.arrow_drop_down,
-                size: 16,
-                color: Colors.grey,
-              ),
-            ),
-          ],
+        child: TextField(
+          controller: _searchController,
+          focusNode: _searchFocusNode,
+          style: const TextStyle(fontSize: 12),
+          decoration: InputDecoration(
+            hintText: 'Выберите продукт',
+            hintStyle: const TextStyle(fontSize: 12, color: Colors.grey),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+            border: InputBorder.none,
+            isDense: true,
+          ),
+          onTap: () {
+            if (_overlayEntry == null) _showOverlay();
+          },
+          onChanged: (_) => _filter(),
         ),
       ),
     );
