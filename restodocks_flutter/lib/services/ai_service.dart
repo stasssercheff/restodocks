@@ -129,7 +129,8 @@ class ProductVerificationResult {
 /// чтобы не хранить API-ключи в приложении. Текущая реализация — заглушка.
 abstract class AiService {
   /// Генерация чеклиста по запросу пользователя (название + пункты).
-  Future<GeneratedChecklist?> generateChecklistFromPrompt(String prompt);
+  /// [context] — опционально: продукты, сотрудники, ТТК, график (ИИ учитывает при генерации).
+  Future<GeneratedChecklist?> generateChecklistFromPrompt(String prompt, {Map<String, dynamic>? context});
 
   /// Распознавание чека по фото (OCR + структурирование).
   Future<ReceiptRecognitionResult?> recognizeReceipt(Uint8List imageBytes);
@@ -161,7 +162,7 @@ abstract class AiService {
 /// вызывающую ваши backend endpoints (Supabase Edge Functions или отдельный API).
 class AiServiceStub implements AiService {
   @override
-  Future<GeneratedChecklist?> generateChecklistFromPrompt(String prompt) async =>
+  Future<GeneratedChecklist?> generateChecklistFromPrompt(String prompt, {Map<String, dynamic>? context}) async =>
       null;
 
   @override

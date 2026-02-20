@@ -30,8 +30,10 @@ class AiServiceSupabase implements AiService {
   }
 
   @override
-  Future<GeneratedChecklist?> generateChecklistFromPrompt(String prompt) async {
-    final data = await invoke('ai-generate-checklist', {'prompt': prompt});
+  Future<GeneratedChecklist?> generateChecklistFromPrompt(String prompt, {Map<String, dynamic>? context}) async {
+    final body = <String, dynamic>{'prompt': prompt};
+    if (context != null) body['context'] = context;
+    final data = await invoke('ai-generate-checklist', body);
     if (data == null) return null;
     final name = data['name'] as String? ?? '';
     final list = data['itemTitles'];

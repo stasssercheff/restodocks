@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../models/models.dart';
+import '../services/schedule_storage_service.dart';
 import '../services/services.dart';
 
 /// Список чеклистов-шаблонов. Шеф может править и создавать по аналогии.
@@ -54,6 +55,28 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
+  Future<Map<String, dynamic>?> _gatherContext() async {
+    final acc = context.read<AccountManagerSupabase>();
+    final est = acc.establishment;
+    if (est == null) return null;
+    final store = context.read<ProductStoreSupabase>();
+    final techSvc = context.read<TechCardServiceSupabase>();
+    final lang = context.read<LocalizationService>().currentLanguageCode;
+    await store.ensureNomenclatureLoaded(est.id);
+    final products = store.getNomenclatureProducts(est.id);
+    final employees = await acc.getEmployeesForEstablishment(est.id);
+    final techCards = await techSvc.getTechCardsForEstablishment(est.id);
+    final schedule = await loadSchedule(est.id);
+    final sectionNames = schedule.sections.map((s) => s.nameKey.replaceFirst('section_', '')).join(', ');
+    final slotNames = schedule.slots.map((s) => s.name).join(', ');
+    return {
+      'items': products.map((p) => {'id': p.id, 'name': p.getLocalizedName(lang)}).toList(),
+      'recipes': techCards.map((t) => {'id': t.id, 'name': t.getDisplayNameInLists(lang)}).toList(),
+      'employees': employees.map((e) => e.fullName).toList(),
+      'scheduleSummary': 'Цеха: $sectionNames. Должности/слоты: $slotNames',
+    };
+  }
+
   Future<void> _generateByPrompt() async {
     final loc = context.read<LocalizationService>();
     final prompt = await showDialog<String>(
@@ -61,33 +84,55 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
       builder: (ctx) {
         final c = TextEditingController();
         return AlertDialog(
-          title: Text(loc.t('generate_checklist_by_prompt')),
-          content: TextField(
-            controller: c,
-            decoration: InputDecoration(
-              hintText: loc.t('generate_checklist_prompt_hint'),
-              border: const OutlineInputBorder(),
-            ),
-            maxLines: 2,
-            autofocus: true,
-            onSubmitted: (_) => Navigator.of(ctx).pop(c.text.trim()),
+          title: Row(
+            children: [
+              Icon(Icons.auto_awesome, color: Theme.of(ctx).colorScheme.primary),
+              const SizedBox(width: 8),
+              Expanded(child: Text(loc.t('checklist_with_ai') ?? 'Чеклист с ИИ')),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                loc.t('checklist_ai_context_hint') ?? 'ИИ учтёт ваши продукты, сотрудников, график и ТТК. Опишите, какой чеклист нужен:',
+                style: Theme.of(ctx).textTheme.bodySmall?.copyWith(color: Theme.of(ctx).colorScheme.onSurfaceVariant),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: c,
+                decoration: InputDecoration(
+                  hintText: loc.t('generate_checklist_prompt_hint'),
+                  border: const OutlineInputBorder(),
+                  alignLabelWithHint: true,
+                ),
+                maxLines: 4,
+                minLines: 2,
+                autofocus: true,
+                onSubmitted: (_) => Navigator.of(ctx).pop(c.text.trim()),
+              ),
+            ],
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
               child: Text(loc.t('cancel')),
             ),
-            FilledButton(
+            FilledButton.icon(
               onPressed: () => Navigator.of(ctx).pop(c.text.trim()),
-              child: Text(loc.t('save')),
+              icon: const Icon(Icons.auto_awesome, size: 18),
+              label: Text(loc.t('generate') ?? 'Создать'),
             ),
           ],
         );
       },
     );
     if (prompt == null || prompt.isEmpty || !mounted) return;
+    final contextMap = await _gatherContext();
+    if (!mounted) return;
     final ai = context.read<AiService>();
-    final generated = await ai.generateChecklistFromPrompt(prompt);
+    final generated = await ai.generateChecklistFromPrompt(prompt, context: contextMap);
     if (!mounted) return;
     if (generated == null || generated.itemTitles.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -253,7 +298,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
           ),
         ],
       ),
-      body: _body(loc),
+      body: _body(loc, canEdit),
       floatingActionButton: canEdit
           ? FloatingActionButton(
               onPressed: _loading ? null : _createNew,
@@ -264,7 +309,43 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
     );
   }
 
-  Widget _body(LocalizationService loc) {
+  Widget _buildAiChecklistButton(LocalizationService loc) {
+    return Card(
+      color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.5),
+      child: InkWell(
+        onTap: _loading ? null : _generateByPrompt,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Icon(Icons.auto_awesome, size: 32, color: Theme.of(context).colorScheme.primary),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      loc.t('checklist_with_ai') ?? 'Чеклист с ИИ',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      loc.t('checklist_ai_short_hint') ?? 'Опишите запрос — ИИ создаст чеклист с учётом продуктов, сотрудников, графика',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: Theme.of(context).colorScheme.primary),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _body(LocalizationService loc, bool canEdit) {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -308,6 +389,10 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                     ),
                 textAlign: TextAlign.center,
               ),
+              if (canEdit) ...[
+                const SizedBox(height: 24),
+                _buildAiChecklistButton(loc),
+              ],
             ],
           ),
         ),
@@ -317,9 +402,15 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
       onRefresh: _load,
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-        itemCount: _list.length,
+        itemCount: _list.length + (canEdit ? 1 : 0),
         itemBuilder: (context, i) {
-          final c = _list[i];
+          if (canEdit && i == 0) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _buildAiChecklistButton(loc),
+            );
+          }
+          final c = _list[canEdit ? i - 1 : i];
           return Card(
             margin: const EdgeInsets.only(bottom: 8),
             child: ListTile(
