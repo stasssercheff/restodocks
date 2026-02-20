@@ -485,14 +485,9 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         ? widget.productStore.getNomenclatureProducts(widget.establishmentId!)
         : <Product>[]; // Пустой список, если establishmentId null
 
-    print('TTK: establishmentId: ${widget.establishmentId}');
-    print('TTK: nomenclatureProducts length: ${nomenclatureProducts.length}');
-    print('TTK: allProducts length: ${widget.productStore.allProducts.length}');
-
     // Fallback: если номенклатурные продукты пустые, используем все продукты
     if (nomenclatureProducts.isEmpty) {
       nomenclatureProducts = List.from(widget.productStore.allProducts);
-      print('TTK: Using fallback allProducts, length: ${nomenclatureProducts.length}');
     }
 
     for (final product in nomenclatureProducts) {
@@ -503,8 +498,6 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         searchName: product.name.toLowerCase(),
       ));
     }
-
-    print('TTK: Created ${allItems.length} selectable items');
 
     // Добавляем ПФ
     if (widget.semiFinishedProducts != null) {
@@ -535,7 +528,6 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       items: allItems,
       loc: widget.loc,
       onProductSelected: (selectedItem) {
-        print('TTK: onProductSelected callback called with ${selectedItem.displayName}');
         if (selectedItem.type == 'product') {
           final product = selectedItem.item as Product;
           // Получаем цену за кг: establishment_products или product.basePrice
@@ -755,10 +747,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   }
 
   void _updateIngredient(int index, TTIngredient updated) {
-    print('TTK: _updateIngredient called for index $index, product: ${updated.productName}');
     widget.onUpdate(index, updated);
-    print('TTK: widget.onUpdate called');
-    if (mounted) setState(() {});
   }
 
   Widget _buildDeleteButton(int rowIndex) {
@@ -835,7 +824,6 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
   }
 
   Future<void> _openPicker() async {
-    print('TTK: Opening product picker');
     final searchCtrl = TextEditingController(text: _searchController.text);
     List<SelectableItem> filtered = _filterItems(_searchController.text);
 
@@ -880,10 +868,7 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
                           final item = filtered[i];
                           return ListTile(
                             title: Text(item.displayName, style: const TextStyle(fontSize: 14)),
-                            onTap: () {
-                              print('TTK: Product selected: ${item.displayName}');
-                              Navigator.of(ctx).pop(item);
-                            },
+                            onTap: () => Navigator.of(ctx).pop(item),
                           );
                         },
                       ),
@@ -907,12 +892,7 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
 
     searchCtrl.dispose();
     if (selected != null && mounted) {
-      print('TTK: Product selected: ${selected.displayName}, calling onProductSelected');
       widget.onProductSelected(selected);
-      print('TTK: onProductSelected called, setting state');
-      if (mounted) setState(() {});
-    } else {
-      print('TTK: No product selected or not mounted');
     }
   }
 

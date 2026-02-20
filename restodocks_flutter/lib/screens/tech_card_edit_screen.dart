@@ -1314,7 +1314,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                             isCook: isCook,
                             onAdd: _showAddIngredient,
                             onUpdate: (i, ing) {
-                              print('TechCardEdit: onUpdate called for index $i, product: ${ing.productName}');
                               setState(() {
                                 if (_ingredients.isEmpty && i == 0) {
                                   _ingredients = [ing];
@@ -1332,7 +1331,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                                 }
                                 _ingredients = next;
                               });
-                              print('TechCardEdit: onUpdate completed, ingredients length: ${_ingredients.length}');
                             },
                             onRemove: _removeIngredient,
                             onSuggestWaste: _suggestWasteForRow,
