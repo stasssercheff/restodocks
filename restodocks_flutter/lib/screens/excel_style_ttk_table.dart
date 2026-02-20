@@ -825,10 +825,11 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
   }
 
   Future<void> _openPicker() async {
+    final onSelect = widget.onProductSelected;
     final searchCtrl = TextEditingController(text: _searchController.text);
     List<SelectableItem> filtered = _filterItems(_searchController.text);
 
-    final sel = await showDialog<SelectableItem>(
+    await showDialog<void>(
       context: context,
       barrierDismissible: false,
       barrierColor: Colors.black54,
@@ -869,7 +870,10 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
                           final item = filtered[i];
                           return ListTile(
                             title: Text(item.displayName, style: const TextStyle(fontSize: 14)),
-                            onTap: () => Navigator.of(ctx).pop(item),
+                            onTap: () {
+                              onSelect(item);
+                              Navigator.of(ctx).pop();
+                            },
                           );
                         },
                       ),
@@ -892,9 +896,8 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
     );
 
     searchCtrl.dispose();
-    if (sel != null && mounted) {
-      widget.onProductSelected(sel);
-      if (mounted) _searchController.text = sel.displayName;
+    if (mounted) {
+      setState(() {}); // Обновить отображение после выбора
     }
   }
 
