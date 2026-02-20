@@ -96,7 +96,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final store = context.read<ProductStoreSupabase>();
+    final store = context.read<ProductStoreSupabase>();
     final account = context.read<AccountManagerSupabase>();
 
       // Временно отключаем проверку ТТК из-за ошибки в getAllTechCards
@@ -247,7 +247,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 usageMessage = 'Продукт используется в ТТК "${techCard['dish_name'] ?? techCard['name'] ?? 'Неизвестно'}"';
                 break;
               }
-            } catch (e) {
+      } catch (e) {
               // Игнорируем ошибки в отдельных ТТК
               continue;
             }
@@ -301,9 +301,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
             onPressed: () => Navigator.of(ctx).pop(true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('Удалить'),
-            ),
-          ],
-        ),
+          ),
+        ],
+      ),
     );
 
     if (confirmed != true) return;
@@ -384,8 +384,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Удалено дубликатов по названию: $deletedCount${skippedCount > 0 ? ', пропущено (используются): $skippedCount' : ''}')),
         );
-      }
-    } catch (e) {
+        }
+      } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -498,11 +498,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
                         IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadProducts,
-                        ),
-                    ],
                   ),
+              ],
+            ),
       body: Column(
-        children: [
+                      children: [
           // Поиск
           Padding(
             padding: const EdgeInsets.all(16),
@@ -525,13 +525,13 @@ class _ProductsScreenState extends State<ProductsScreen> {
             child: _isLoading
                 ? _buildSkeletonLoading()
                 : _filteredProducts.isEmpty
-                    ? Center(
-                        child: Text(
+                  ? Center(
+                      child: Text(
                           _query.isEmpty ? loc.t('no_products') : loc.t('no_products_found'),
                           style: theme.textTheme.bodyLarge,
-                        ),
-                      )
-                    : ListView.builder(
+                      ),
+                    )
+                  : ListView.builder(
                         itemCount: _filteredProducts.length,
                         itemBuilder: (context, index) {
                           final product = _filteredProducts[index];
@@ -571,7 +571,7 @@ class _ProductListItem extends StatelessWidget {
         title: Text(product.getLocalizedName(loc.currentLanguageCode)),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+                              children: [
             if (product.calories != null)
               Text('${product.calories!.round()} ${loc.t('kcal')}'),
             if (product.category != 'manual')
@@ -768,7 +768,7 @@ class _ProductDetailsDialogState extends State<_ProductDetailsDialog> {
       await store.deleteProduct(widget.product.id);
       if (mounted) {
         widget.onProductDeleted();
-        Navigator.of(context).pop();
+      Navigator.of(context).pop();
       }
     } catch (e) {
       if (mounted) {
