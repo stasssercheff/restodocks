@@ -70,24 +70,58 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.dishNameController != null) {
-      return ValueListenableBuilder<TextEditingValue>(
-        valueListenable: widget.dishNameController!,
-        builder: (context, value, child) {
-          return _buildTtkTable(context);
-        },
+    try {
+      // Проверяем обязательные поля widget
+      if (widget.loc == null) {
+        return const Text('LocalizationService is null', style: TextStyle(color: Colors.red));
+      }
+      if (widget.productStore == null) {
+        return const Text('ProductStore is null', style: TextStyle(color: Colors.red));
+      }
+      if (widget.onUpdate == null) {
+        return const Text('onUpdate callback is null', style: TextStyle(color: Colors.red));
+      }
+
+      if (widget.dishNameController != null) {
+        return ValueListenableBuilder<TextEditingValue>(
+          valueListenable: widget.dishNameController!,
+          builder: (context, value, child) {
+            return _buildTtkTable(context);
+          },
+        );
+      } else {
+        return _buildTtkTable(context);
+      }
+    } catch (e, stackTrace) {
+      // В случае ошибки в build показываем fallback
+      return Container(
+        color: Colors.red.shade100,
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Error in ExcelStyleTtkTable build', style: TextStyle(color: Colors.red)),
+            Text('Error: $e', style: const TextStyle(color: Colors.red, fontSize: 10)),
+          ],
+        ),
       );
-    } else {
-      return _buildTtkTable(context);
     }
   }
 
   Widget _buildTtkTable(BuildContext context) {
     try {
+      // Проверяем данные
+      if (widget.ingredients == null) {
+        return const Text('Ingredients is null', style: TextStyle(color: Colors.red));
+      }
+
       // Строки с сохранением индексов для onUpdate (индекс в widget.ingredients)
       final indexedRows = <MapEntry<int, TTIngredient>>[];
       for (var i = 0; i < widget.ingredients.length; i++) {
         var ing = widget.ingredients[i];
+        if (ing == null) {
+          return Text('Ingredient at index $i is null', style: const TextStyle(color: Colors.red));
+        }
         if (ing.productName.isNotEmpty && ing.outputWeight == 0) {
           ing = ing.copyWith(outputWeight: ing.netWeight * (1 - (ing.cookingLossPctOverride ?? 0) / 100));
         }
