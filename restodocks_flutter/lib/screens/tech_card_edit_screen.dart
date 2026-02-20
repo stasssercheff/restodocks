@@ -1355,55 +1355,56 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                 ),
               ),
             ),
-            // Блок технологии под таблицей — ширина как у таблицы (1000px), не на весь экран
-            SizedBox(
-              width: MediaQuery.of(context).size.width > 1000 ? 1000 : MediaQuery.of(context).size.width,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.25),
-                child: Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.only(top: 12),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Theme.of(context).colorScheme.outline),
-                    color: Theme.of(context).colorScheme.surfaceContainerLowest,
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                          border: const Border(bottom: BorderSide(color: Colors.grey, width: 1)),
-                        ),
-                        child: Text(loc.t('ttk_technology'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+            // Блок технологии под таблицей — ширина как у таблицы (1000px)
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.of(context).size.width > 1000 ? 1000 : MediaQuery.of(context).size.width,
+                maxHeight: MediaQuery.of(context).size.height * 0.25,
+              ),
+              child: Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(top: 12),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Theme.of(context).colorScheme.outline),
+                  color: Theme.of(context).colorScheme.surfaceContainerLowest,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        border: const Border(bottom: BorderSide(color: Colors.grey, width: 1)),
                       ),
-                      Flexible(
-                        child: SingleChildScrollView(
-                          padding: const EdgeInsets.all(12),
-                          child: canEdit
-                              ? TextField(
-                                  controller: _technologyController,
-                                  maxLines: null,
-                                  minLines: 2,
-                                  style: const TextStyle(fontSize: 13),
-                                  decoration: InputDecoration(
-                                    border: InputBorder.none,
-                                    isDense: true,
-                                    filled: false,
-                                    hintText: loc.t('ttk_technology'),
-                                  ),
-                                )
-                              : Text(
-                                  _technologyController.text.isEmpty ? '—' : _technologyController.text,
-                                  style: const TextStyle(fontSize: 13, height: 1.4),
+                      child: Text(loc.t('ttk_technology'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    ),
+                    Flexible(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(12),
+                        child: canEdit
+                            ? TextField(
+                                controller: _technologyController,
+                                maxLines: null,
+                                minLines: 2,
+                                style: const TextStyle(fontSize: 13),
+                                decoration: InputDecoration(
+                                  border: InputBorder.none,
+                                  isDense: true,
+                                  filled: false,
+                                  hintText: loc.t('ttk_technology'),
                                 ),
-                        ),
+                              )
+                            : Text(
+                                _technologyController.text.isEmpty ? '—' : _technologyController.text,
+                                style: const TextStyle(fontSize: 13, height: 1.4),
+                              ),
                       ),
-                  ),
-                ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
