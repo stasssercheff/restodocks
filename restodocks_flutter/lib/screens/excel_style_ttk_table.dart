@@ -291,7 +291,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
               ),
 
               // Поле технологии под таблицей на всю ширину (если не скрыто)
-              if (ingredients.isNotEmpty && !widget.hideTechnologyBlock)
+              if (widget.ingredients.isNotEmpty && !widget.hideTechnologyBlock)
                 Container(
                   width: double.infinity,
                   margin: const EdgeInsets.only(top: 16),
