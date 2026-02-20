@@ -82,16 +82,10 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         return const Text('onUpdate callback is null', style: TextStyle(color: Colors.red));
       }
 
-      if (widget.dishNameController != null) {
-        return ValueListenableBuilder<TextEditingValue>(
-          valueListenable: widget.dishNameController!,
-          builder: (context, value, child) {
-            return _buildTtkTable(context);
-          },
-        );
-      } else {
-        return _buildTtkTable(context);
-      }
+      // Не используем ValueListenableBuilder для всей таблицы — иначе при изменении
+      // ingredients таблица не перестраивается (слушает только dishNameController).
+      // ValueListenableBuilder для названия блюда — только в ячейке.
+      return _buildTtkTable(context);
     } catch (e, stackTrace) {
       // В случае ошибки в build показываем fallback
       return Container(
@@ -204,16 +198,26 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                       ),
                     ),
 
-                    // Название (в каждой строке)
+                    // Название (в каждой строке) — ValueListenableBuilder только здесь,
+                    // чтобы при вводе названия оно обновлялось в строке
                     Container(
                       height: 44,
                       alignment: Alignment.centerLeft,
                       padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Text(
-                        widget.dishNameController?.text ?? widget.dishName,
-                        style: const TextStyle(fontSize: 12),
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                      child: widget.dishNameController != null
+                          ? ValueListenableBuilder<TextEditingValue>(
+                              valueListenable: widget.dishNameController!,
+                              builder: (_, value, __) => Text(
+                                value.text,
+                                style: const TextStyle(fontSize: 12),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            )
+                          : Text(
+                              widget.dishName,
+                              style: const TextStyle(fontSize: 12),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                     ),
 
                     // Продукт
@@ -621,13 +625,10 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
             );
           }
           if (updated != null) {
-            final u = updated;
-            final isLast = idx == widget.ingredients.length - 1;
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (!mounted) return;
-              _updateIngredient(idx, u);
-              if (isLast) widget.onAdd();
-            });
+            _updateIngredient(idx, updated);
+            if (idx == widget.ingredients.length - 1) {
+              WidgetsBinding.instance.addPostFrameCallback((_) => widget.onAdd());
+            }
           }
         },
       );
