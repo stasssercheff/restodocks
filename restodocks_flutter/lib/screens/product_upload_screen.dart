@@ -737,18 +737,16 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         final p = parsed[i];
         final match = _findMatch(p.name, p.price, existingProducts, allProducts, est.id, store);
         if (match.existingId != null) {
-          if (match.priceDiff) {
-            moderationItems.add(ModerationItem(
-              name: p.name,
-              price: p.price,
-              unit: p.unit,
-              existingProductId: match.existingId,
-              existingProductName: match.existingName,
-              existingPrice: match.existingPrice,
-              existingPriceFromEstablishment: match.existingPriceFromEstablishment,
-              category: ModerationCategory.priceUpdate,
-            ));
-          }
+          moderationItems.add(ModerationItem(
+            name: p.name,
+            price: p.price,
+            unit: p.unit,
+            existingProductId: match.existingId,
+            existingProductName: match.existingName,
+            existingPrice: match.existingPrice,
+            existingPriceFromEstablishment: match.existingPriceFromEstablishment,
+            category: ModerationCategory.priceUpdate,
+          ));
         } else {
           newNames.add(p.name);
           newIndices.add(moderationItems.length);

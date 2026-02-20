@@ -81,6 +81,8 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
         }
       }
 
+      await store.loadNomenclature(est.id);
+
       if (mounted) {
         setState(() => _saving = false);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -203,16 +205,16 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
   Widget? _buildSubtitle(ModerationItem item, ThemeData theme) {
     final parts = <String>[];
     if (item.displayPrice != null) {
-      final showCurrent = item.existingProductId != null && item.existingPrice != null &&
+      final hasPriceChange = item.existingProductId != null && item.existingPrice != null &&
           item.existingPriceFromEstablishment &&
           (item.existingPrice! - item.displayPrice!).abs() > 0.01;
-      if (showCurrent) {
+      if (hasPriceChange) {
         parts.add('Новая цена: ${item.displayPrice} (сейчас: ${item.existingPrice})');
       } else {
         parts.add('Цена: ${item.displayPrice}');
       }
     } else if (item.existingProductId != null && item.existingPrice != null && item.existingPriceFromEstablishment) {
-      parts.add('В базе: ${item.existingPrice}');
+      parts.add('Цена: ${item.existingPrice}');
     }
     if (item.unit != null) parts.add(item.unit!);
     if (item.normalizedName != null && item.normalizedName != item.name) {

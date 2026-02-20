@@ -397,13 +397,14 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     );
   }
 
-  void _showEditProductForNomenclature(BuildContext context, Product p, ProductStoreSupabase store, LocalizationService loc, VoidCallback onRefresh) {
+  void _showEditProductForNomenclature(BuildContext context, Product p, ProductStoreSupabase store, LocalizationService loc, VoidCallback onRefresh, String estId) {
     showDialog<void>(
       context: context,
       builder: (ctx) => _ProductEditDialog(
         product: p,
         store: store,
         loc: loc,
+        establishmentId: estId,
         onSaved: onRefresh,
       ),
     );
@@ -751,7 +752,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
               onFilterTypeChanged: (f) => setState(() => _nomFilter = f),
               onRefresh: () => _ensureLoaded().then((_) => setState(() {})),
               onSwitchToCatalog: () {}, // Не используется
-              onEditProduct: (ctx, p) => _showEditProductForNomenclature(ctx, p, store, loc, () => _ensureLoaded().then((_) => setState(() {}))),
+              onEditProduct: (ctx, p) => _showEditProductForNomenclature(ctx, p, store, loc, () => _ensureLoaded().then((_) => setState(() {})), estId ?? ''),
               onRemoveProduct: (ctx, p) => _confirmRemoveForNomenclature(ctx, p, store, loc, () => _ensureLoaded().then((_) => setState(() {})), estId ?? ''),
               onLoadKbju: (ctx, list) => _loadKbjuForAll(ctx, list),
               onLoadTranslations: (ctx, list) => _loadTranslationsForAll(ctx, list),
@@ -2435,6 +2436,7 @@ class _CatalogTab extends StatelessWidget {
         product: p,
         store: store,
         loc: loc,
+        establishmentId: estId,
         onSaved: onRefresh,
       ),
     );
@@ -2508,12 +2510,14 @@ class _ProductEditDialog extends StatefulWidget {
     required this.product,
     required this.store,
     required this.loc,
+    this.establishmentId,
     required this.onSaved,
   });
 
   final Product product;
   final ProductStoreSupabase store;
   final LocalizationService loc;
+  final String? establishmentId;
   final VoidCallback onSaved;
 
   static const _currencies = ['RUB', 'USD', 'EUR', 'VND'];
@@ -2540,7 +2544,12 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
     super.initState();
     final p = widget.product;
     _nameController = TextEditingController(text: p.name);
-    _priceController = TextEditingController(text: p.basePrice?.toString() ?? '');
+    double? initialPrice = p.basePrice;
+    if (widget.establishmentId != null && widget.establishmentId!.isNotEmpty) {
+      final ep = widget.store.getEstablishmentPrice(p.id, widget.establishmentId);
+      if (ep?.$1 != null) initialPrice = ep!.$1;
+    }
+    _priceController = TextEditingController(text: initialPrice?.toString() ?? '');
     // Подставить адекватные калории при открытии карточки (грудка 0 → 165, авокадо 655 → 160)
     final saneCal = NutritionApiService.saneCaloriesForProduct(p.name, p.calories);
     final initialCal = saneCal ?? p.calories;
@@ -2604,6 +2613,17 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
     );
     try {
       await widget.store.updateProduct(updated);
+      if (widget.establishmentId != null && widget.establishmentId!.isNotEmpty) {
+        final price = _parseNum(_priceController.text);
+        if (price != null) {
+          await widget.store.setEstablishmentPrice(
+            widget.establishmentId!,
+            widget.product.id,
+            price,
+            _currency,
+          );
+        }
+      }
       if (!mounted) return;
       Navigator.of(context).pop();
       widget.onSaved();
