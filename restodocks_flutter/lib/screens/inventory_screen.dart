@@ -24,6 +24,9 @@ const String _pfUnitPcs = 'pcs';
 class _InventoryRow {
   final Product? product;
   final TechCard? techCard;
+  /// ID для восстановления из черновика (до загрузки номенклатуры).
+  final String? productId;
+  final String? techCardId;
   /// Свободная строка (распознанный чек): когда product и techCard оба null.
   final String? freeName;
   final String? freeUnit;
@@ -34,14 +37,16 @@ class _InventoryRow {
   _InventoryRow({
     this.product,
     this.techCard,
+    this.productId,
+    this.techCardId,
     this.freeName,
     this.freeUnit,
     required this.quantities,
     this.pfUnit,
-  })  : assert(product != null || techCard != null || (freeName != null && freeName.isNotEmpty)),
+  })  : assert(product != null || techCard != null || (freeName != null && freeName.isNotEmpty) || productId != null || techCardId != null),
         assert(product == null || techCard == null);
 
-  bool get isPf => techCard != null;
+  bool get isPf => techCard != null || techCardId != null;
   bool get isFree => product == null && techCard == null;
 
   String productName(String lang) {
@@ -71,9 +76,11 @@ class _InventoryRow {
 
   double get total => quantities.fold(0.0, (a, b) => a + b);
 
-  _InventoryRow copyWith({String? pfUnit}) => _InventoryRow(
-        product: product,
-        techCard: techCard,
+  _InventoryRow copyWith({Product? product, TechCard? techCard, String? pfUnit}) => _InventoryRow(
+        product: product ?? this.product,
+        techCard: techCard ?? this.techCard,
+        productId: product != null ? null : productId,
+        techCardId: techCard != null ? null : techCardId,
         freeName: freeName,
         freeUnit: freeUnit,
         quantities: quantities,
@@ -193,27 +200,37 @@ class _InventoryScreenState extends State<InventoryScreen>
       _nameFilter = data['nameFilter'] ?? '';
       _nameFilterCtrl.text = _nameFilter;
 
-      // Восстановить строки
+      // Восстановить строки (product/techCard будут подставлены в _loadNomenclature)
       final rowsData = data['rows'] as List<dynamic>? ?? [];
       _rows.clear();
       for (final rowData in rowsData) {
         final Map<String, dynamic> rowMap = rowData as Map<String, dynamic>;
         final quantities = (rowMap['quantities'] as List<dynamic>?)?.map((e) => (e as num).toDouble()).toList() ?? [0.0, 0.0];
+        final productId = rowMap['productId'] as String?;
+        final techCardId = rowMap['techCardId'] as String?;
 
-        // Нормализуем quantities для продуктов: всегда должна быть хотя бы одна пустая ячейка в конце
-        if (rowMap['freeName'] != null && quantities.isNotEmpty && quantities.last != 0.0) {
-          quantities.add(0.0);
-        } else if (rowMap['freeName'] != null && quantities.isEmpty) {
-          quantities.add(0.0);
-          quantities.add(0.0);
+        // Нормализуем quantities
+        List<double> qty = List.from(quantities);
+        if (rowMap['freeName'] != null && qty.isNotEmpty && qty.last != 0.0) {
+          qty.add(0.0);
+        } else if (rowMap['freeName'] != null && qty.isEmpty) {
+          qty.addAll([0.0, 0.0]);
+        }
+        if (!rowMap.containsKey('freeName') && productId == null && techCardId == null) {
+          // Пустая строка продукта/ПФ — оставляем как есть
+        } else if (productId != null || techCardId != null) {
+          if (qty.isEmpty) qty.addAll([0.0, 0.0]);
+          else if (techCardId != null && qty.length == 1) qty.add(0.0);
         }
 
         _rows.add(_InventoryRow(
-          product: null, // Продукты нужно будет загрузить отдельно
-          techCard: null, // ТТК нужно будет загрузить отдельно
+          product: null,
+          techCard: null,
+          productId: productId,
+          techCardId: techCardId,
           freeName: rowMap['freeName'],
           freeUnit: rowMap['freeUnit'],
-          quantities: quantities,
+          quantities: qty,
           pfUnit: rowMap['pfUnit'],
         ));
       }
@@ -278,13 +295,31 @@ class _InventoryScreenState extends State<InventoryScreen>
     if (!mounted) return;
     final products = store.getNomenclatureProducts(estId);
     final pfOnly = techCards.where((tc) => tc.isSemiFinished).toList();
+    final productMap = {for (final p in products) p.id: p};
+    final techCardMap = {for (final tc in pfOnly) tc.id: tc};
     setState(() {
+      // Сначала разрешаем productId/techCardId в восстановленных строках
+      for (var i = 0; i < _rows.length; i++) {
+        final row = _rows[i];
+        if (row.productId != null && row.product == null) {
+          final p = productMap[row.productId];
+          if (p != null) {
+            _rows[i] = row.copyWith(product: p);
+          }
+        } else if (row.techCardId != null && row.techCard == null) {
+          final tc = techCardMap[row.techCardId];
+          if (tc != null) {
+            _rows[i] = row.copyWith(techCard: tc);
+          }
+        }
+      }
+      // Добавляем недостающие продукты и ПФ
       for (final p in products) {
-        if (_rows.any((r) => r.product?.id == p.id)) continue;
+        if (_rows.any((r) => r.product?.id == p.id || r.productId == p.id)) continue;
         _rows.add(_InventoryRow(product: p, techCard: null, quantities: [0.0, 0.0]));
       }
       for (final tc in pfOnly) {
-        if (_rows.any((r) => r.techCard?.id == tc.id)) continue;
+        if (_rows.any((r) => r.techCard?.id == tc.id || r.techCardId == tc.id)) continue;
         _rows.add(_InventoryRow(product: null, techCard: tc, quantities: [0.0, 0.0], pfUnit: _pfUnitPcs));
       }
 
@@ -297,9 +332,11 @@ class _InventoryScreenState extends State<InventoryScreen>
           } else if (row.quantities.last != 0.0) {
             row.quantities.add(0.0);
           } else if (row.quantities.length == 1) {
-            // Если только одна ячейка и она пустая, добавляем еще одну
             row.quantities.add(0.0);
           }
+        } else if (row.isPf && row.quantities.length < 2) {
+          // ПФ: даём те же ячейки заполнения, что и продуктам
+          while (row.quantities.length < 2) row.quantities.add(0.0);
         }
       }
     });
@@ -406,12 +443,12 @@ class _InventoryScreenState extends State<InventoryScreen>
 
   int get _maxQuantityColumns {
     if (_rows.isEmpty) return 1;
-    return _rows.map((r) => r.isPf ? 1 : r.quantities.length).reduce((a, b) => a > b ? a : b);
+    return _rows.map((r) => r.quantities.length).reduce((a, b) => a > b ? a : b);
   }
 
   void _addQuantityToRow(int rowIndex) {
     if (rowIndex < 0 || rowIndex >= _rows.length) return;
-    if (_rows[rowIndex].isPf) return; // только продукты и свободные строки
+    if (_rows[rowIndex].isFree) return; // свободные строки — без добавления колонок
     setState(() {
       // Всегда добавляем пустую ячейку в конец
       _rows[rowIndex].quantities.add(0.0);
@@ -1515,7 +1552,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                 ),
               ),
             ),
-            if (!_completed && !row.isPf)
+            if (!_completed && !row.isFree)
               SizedBox(
                 width: 28,
                 child: IconButton.filledTonal(
@@ -1761,7 +1798,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     final theme = Theme.of(context);
     final row = _rows[actualIndex];
     final maxCols = _maxQuantityColumns;
-    final qtyCols = row.isPf ? 1 : row.quantities.length;
+    final qtyCols = row.quantities.length;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
@@ -1794,7 +1831,7 @@ class _InventoryScreenState extends State<InventoryScreen>
               ),
             ),
           ),
-          if (!_completed && !row.isPf)
+          if (!_completed && !row.isFree)
             SizedBox(
               width: 28,
               child: IconButton.filledTonal(

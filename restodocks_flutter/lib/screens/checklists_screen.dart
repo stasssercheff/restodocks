@@ -18,6 +18,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
   List<Checklist> _list = [];
   bool _loading = true;
   String? _error;
+  final ScrollController _scrollController = ScrollController();
 
   Future<void> _load() async {
     final acc = context.read<AccountManagerSupabase>();
@@ -53,6 +54,12 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Future<Map<String, dynamic>?> _gatherContext() async {
@@ -233,15 +240,17 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
     final acc = context.watch<AccountManagerSupabase>();
     final emp = acc.currentEmployee;
     final canEdit = emp?.canEditChecklistsAndTechCards ?? false;
-    final isKitchen = emp?.department == 'kitchen' ?? false;
-    // Шеф и су-шеф могут открывать и создавать чеклисты даже с отделом «Управление»
-    final canAccessChecklists = isKitchen || canEdit;
+    // Шеф, су-шеф, владелец и все руководство кухни — доступ к чеклистам как у линейных сотрудников
+    final canAccessChecklists = emp?.canViewDepartment('kitchen') ?? false;
 
     if (emp != null && !canAccessChecklists) {
       return Scaffold(
         appBar: AppBar(
           leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
-          title: Text(loc.t('checklists')),
+          title: GestureDetector(
+            onTap: () => _scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut),
+            child: Text(loc.t('checklists')),
+          ),
           actions: [
             IconButton(icon: const Icon(Icons.home), onPressed: () => context.go('/home'), tooltip: loc.t('home')),
           ],
@@ -278,7 +287,10 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
         ),
-        title: Text(loc.t('checklists')),
+        title: GestureDetector(
+          onTap: () => _scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut),
+          child: Text(loc.t('checklists')),
+        ),
         actions: [
           if (canEdit)
             IconButton(
@@ -298,7 +310,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
           ),
         ],
       ),
-      body: _body(loc, canEdit),
+      body: _body(loc, canEdit, _scrollController),
       floatingActionButton: canEdit
           ? FloatingActionButton(
               onPressed: _loading ? null : _createNew,
@@ -345,7 +357,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
     );
   }
 
-  Widget _body(LocalizationService loc, bool canEdit) {
+  Widget _body(LocalizationService loc, bool canEdit, ScrollController scrollController) {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -401,6 +413,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView.builder(
+        controller: scrollController,
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
         itemCount: _list.length + (canEdit ? 1 : 0),
         itemBuilder: (context, i) {

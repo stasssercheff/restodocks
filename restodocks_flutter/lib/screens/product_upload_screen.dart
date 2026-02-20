@@ -328,38 +328,8 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
             const SizedBox(height: 24),
 
-            // Краткая инструкция
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Формат данных:',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surfaceContainerLowest,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Text(
-                        'Авокадо\t99000\nБазилик\t267000\nМолоко\t38000',
-                        style: TextStyle(fontFamily: 'monospace', fontSize: 13),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Название и цена через Tab или пробелы. ИИ разберёт и другие форматы.',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            // Школа загрузки
+            _UploadSchoolCard(),
           ],
         ),
       ),
@@ -772,6 +742,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
               existingProductId: match.existingId,
               existingProductName: match.existingName,
               existingPrice: match.existingPrice,
+              existingPriceFromEstablishment: match.existingPriceFromEstablishment,
               category: ModerationCategory.priceUpdate,
             ));
           }
@@ -819,7 +790,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     }
   }
 
-  ({String? existingId, String? existingName, double? existingPrice, bool priceDiff}) _findMatch(
+  ({String? existingId, String? existingName, double? existingPrice, bool existingPriceFromEstablishment, bool priceDiff}) _findMatch(
     String name,
     double? price,
     List<Product> nomenclature,
@@ -834,13 +805,15 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         final nNorm = n.toLowerCase().replaceAll(RegExp(r'[^\w\s]'), '').replaceAll(RegExp(r'\s+'), ' ').trim();
         if (nNorm == normalized) {
           final ep = store.getEstablishmentPrice(p.id, establishmentId);
-          final existingPrice = ep?.$1;
+          double? existingPrice = ep?.$1;
+          final fromEstablishment = existingPrice != null;
+          if (existingPrice == null) existingPrice = p.basePrice;
           final priceDiff = price != null && existingPrice != null && (existingPrice - price).abs() > 0.01;
-          return (existingId: p.id, existingName: p.name, existingPrice: existingPrice, priceDiff: priceDiff);
+          return (existingId: p.id, existingName: p.name, existingPrice: existingPrice, existingPriceFromEstablishment: fromEstablishment, priceDiff: priceDiff);
         }
       }
     }
-    return (existingId: null, existingName: null, existingPrice: null, priceDiff: false);
+    return (existingId: null, existingName: null, existingPrice: null, existingPriceFromEstablishment: false, priceDiff: false);
   }
 
   Future<void> _uploadExcelSimple() async {
@@ -2273,6 +2246,73 @@ class _QuickActions extends StatelessWidget {
               ),
             ),
             Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[400]),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Раскрывающийся блок «Школа загрузки» с инструкциями
+class _UploadSchoolCard extends StatelessWidget {
+  const _UploadSchoolCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          leading: Icon(Icons.school, color: Theme.of(context).colorScheme.primary),
+          title: Text(
+            'Школа загрузки',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          subtitle: const Text('Формат данных, типы файлов, модерация'),
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Формат данных:', style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerLowest,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      'Авокадо\t99000\nБазилик\t267000\nМолоко\t38000',
+                      style: TextStyle(fontFamily: 'monospace', fontSize: 13),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Название и цена — через Tab или пробелы. ИИ распознаёт запятые, символы валюты.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+                  ),
+                  const SizedBox(height: 16),
+                  Text('Поддерживаемые файлы:', style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Excel (.xlsx, .xls), CSV, текст (.txt, .rtf), Word (.docx), Apple Pages, Numbers.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+                  ),
+                  const SizedBox(height: 16),
+                  Text('Модерация:', style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 4),
+                  Text(
+                    'После загрузки откроется экран проверки. Там можно:\n'
+                    '• Подтвердить или отклонить изменение цен\n'
+                    '• Добавить новые продукты в номенклатуру\n'
+                    '• Исправить названия, предложенные ИИ',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),

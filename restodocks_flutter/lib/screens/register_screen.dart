@@ -102,17 +102,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       final section = _department == 'kitchen' ? _section : null;
 
+      final password = _passwordController.text;
       final employee = await accountManager.createEmployeeForCompany(
         company: establishment,
         fullName: fullName,
         email: email,
-        password: _passwordController.text,
+        password: password,
         department: _department,
         section: section,
         roles: [_role],
       );
 
       await accountManager.login(employee, establishment);
+
+      // Отправка письма сотруднику
+      context.read<EmailService>().sendRegistrationEmail(
+        isOwner: false,
+        to: email,
+        companyName: establishment.name,
+        email: email,
+        password: password,
+      );
 
       if (!mounted) return;
       context.go('/home');

@@ -112,7 +112,26 @@ class ProductStoreSupabase {
 
   /// Найти продукт по ID
   Product? findProductById(String id) {
-    return _allProducts.where((product) => product.id == id).firstOrNull;
+    final idLower = id.trim().toLowerCase();
+    return _allProducts.where((p) => p.id.trim().toLowerCase() == idLower).firstOrNull;
+  }
+
+  /// Найти продукт для ингредиента: по productId, при неудаче — по productName (для совместимости с UUID-миграцией)
+  Product? findProductForIngredient(String? productId, String productName) {
+    if (productId != null && productId.isNotEmpty) {
+      final p = findProductById(productId);
+      if (p != null) return p;
+    }
+    final nameNorm = productName.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+    if (nameNorm.isEmpty) return null;
+    return _allProducts.where((p) {
+      final n = (p.name.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' '));
+      if (n == nameNorm) return true;
+      for (final v in p.names?.values ?? <String>[]) {
+        if (v.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ') == nameNorm) return true;
+      }
+      return false;
+    }).firstOrNull;
   }
 
   /// Добавить новый продукт

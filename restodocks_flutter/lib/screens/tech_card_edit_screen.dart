@@ -1277,6 +1277,53 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
             const SizedBox(height: 16),
             Text(loc.t('ttk_composition'), style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
+            // Блок технологии в рамке: фиксированная высота, не скроллится с таблицей
+            Container(
+              width: double.infinity,
+              constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.25),
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                border: Border.all(color: Theme.of(context).colorScheme.outline),
+                color: Theme.of(context).colorScheme.surfaceContainerLowest,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      border: const Border(bottom: BorderSide(color: Colors.grey, width: 1)),
+                    ),
+                    child: Text(loc.t('ttk_technology'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                  ),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(12),
+                      child: canEdit
+                          ? TextField(
+                              controller: _technologyController,
+                              maxLines: null,
+                              minLines: 2,
+                              style: const TextStyle(fontSize: 13),
+                              decoration: InputDecoration(
+                                border: InputBorder.none,
+                                isDense: true,
+                                filled: false,
+                                hintText: loc.t('ttk_technology'),
+                              ),
+                            )
+                          : Text(
+                              _technologyController.text.isEmpty ? '—' : _technologyController.text,
+                              style: const TextStyle(fontSize: 13, height: 1.4),
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             // Таблица на весь экран без ограничений
             Expanded(
               child: Scrollbar(
@@ -1321,12 +1368,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                             },
                             onRemove: _removeIngredient,
                             onSuggestWaste: _suggestWasteForRow,
+                            hideTechnologyBlock: true,
                           )
                             : _TtkCookTable(
                                 loc: loc,
                                 dishName: _nameController.text,
                                 ingredients: _ingredients.where((i) => !i.isPlaceholder || i.hasData).toList(),
                                 technology: _technologyController.text,
+                                hideTechnologyInTable: true,
                                 onIngredientsChanged: (list) {
                                   WidgetsBinding.instance.addPostFrameCallback((_) {
                                     if (!mounted) return;
@@ -1581,9 +1630,11 @@ class _TtkTableState extends State<_TtkTable> {
         ...ingredients.asMap().entries.map((e) {
           final i = e.key;
           final ing = e.value;
-          final product = ing.productId != null ? widget.productStore.allProducts.where((p) => p.id == ing.productId).firstOrNull : null;
+          final product = widget.productStore.findProductForIngredient(ing.productId, ing.productName);
           final proc = ing.cookingProcessId != null ? CookingProcess.findById(ing.cookingProcessId!) : null;
-          final pricePerUnit = product?.basePrice ?? (ing.netWeight > 0 ? ing.cost * 1000 / ing.netWeight : 0.0);
+          final estId = context.read<AccountManagerSupabase>().establishment?.id;
+          final estPrice = product != null && estId != null ? widget.productStore.getEstablishmentPrice(product.id, estId)?.$1 : null;
+          final pricePerUnit = estPrice ?? product?.basePrice ?? (ing.netWeight > 0 ? ing.cost * 1000 / ing.netWeight : 0.0);
           final isFirstRow = i == 0;
           return TableRow(
             decoration: BoxDecoration(color: cellBg),
@@ -2066,6 +2117,7 @@ class _TtkCookTable extends StatefulWidget {
     required this.ingredients,
     required this.technology,
     required this.onIngredientsChanged,
+    this.hideTechnologyInTable = false,
   });
 
   final LocalizationService loc;
@@ -2073,6 +2125,8 @@ class _TtkCookTable extends StatefulWidget {
   final List<TTIngredient> ingredients;
   final String technology;
   final void Function(List<TTIngredient> list) onIngredientsChanged;
+  /// Если true, технология не отображается в таблице (рендерится отдельно в родителе)
+  final bool hideTechnologyInTable;
 
   static const _cellPad = EdgeInsets.symmetric(horizontal: 6, vertical: 6);
 
@@ -2202,8 +2256,8 @@ class _TtkCookTableState extends State<_TtkCookTable> {
             ),
           ],
         ),
-        // Технология приготовления (только если есть текст)
-        if (widget.technology.trim().isNotEmpty) ...[
+        // Технология приготовления (только если есть текст и не скрыта)
+        if (!widget.hideTechnologyInTable && widget.technology.trim().isNotEmpty) ...[
           TableRow(
             children: [
               TableCell(

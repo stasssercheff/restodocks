@@ -50,17 +50,29 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
           ? ['owner', _selectedRole!]
           : ['owner'];
 
+      final email = _emailController.text.trim();
+      final password = _passwordController.text;
       final employee = await accountManager.createEmployeeForCompany(
         company: estab,
         fullName: _nameController.text.trim(),
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
+        email: email,
+        password: password,
         department: 'management',
         section: null,
         roles: roles,
       );
 
       await accountManager.login(employee, estab);
+
+      // Отправка письма владельцу
+      context.read<EmailService>().sendRegistrationEmail(
+        isOwner: true,
+        to: email,
+        companyName: estab.name,
+        email: email,
+        password: password,
+        pinCode: estab.pinCode,
+      );
 
       if (!mounted) return;
       context.go('/home');

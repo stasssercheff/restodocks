@@ -428,7 +428,8 @@ class AccountManagerSupabase {
     return msg.contains('payment_type') ||
         msg.contains('rate_per_shift') ||
         msg.contains('hourly_rate') ||
-        (msg.contains('column') && (msg.contains('exist') || msg.contains('found')));
+        msg.contains('pgrst204') ||
+        (msg.contains('column') && (msg.contains('exist') || msg.contains('found') || msg.contains('does not')));
   }
 
   /// Обновить данные заведения

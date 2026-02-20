@@ -232,9 +232,10 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
     final acc = context.watch<AccountManagerSupabase>();
     final emp = acc.currentEmployee;
     final canEdit = emp?.canEditChecklistsAndTechCards ?? false;
-    final isKitchen = emp?.department == 'kitchen' ?? false;
+    // Шеф, су-шеф, владелец и руководство кухни — доступ как у линейных сотрудников
+    final canAccessChecklists = emp?.canViewDepartment('kitchen') ?? false;
 
-    if (emp != null && !isKitchen) {
+    if (emp != null && !canAccessChecklists) {
       return Scaffold(
         appBar: AppBar(
           leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),

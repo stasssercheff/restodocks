@@ -70,6 +70,12 @@ class OwnerHomeContent extends StatelessWidget {
               color: Colors.red,
             ),
             _TileData(
+              icon: Icons.checklist,
+              title: loc.t('checklists'),
+              onTap: () => context.push('/checklists'),
+              color: Colors.orange,
+            ),
+            _TileData(
               icon: Icons.restaurant_menu,
               title: loc.t('dish_cards'),
               onTap: () => context.push('/products'),

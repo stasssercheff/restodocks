@@ -201,16 +201,24 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
 
   Widget? _buildSubtitle(ModerationItem item, ThemeData theme) {
     final parts = <String>[];
-    if (item.displayPrice != null) parts.add('${item.displayPrice}');
-    if (item.unit != null) parts.add(item.unit!);
-    if (item.existingProductId != null && item.existingPrice != null) {
-      parts.add('← ${item.existingPrice}');
+    if (item.displayPrice != null) {
+      final showCurrent = item.existingProductId != null && item.existingPrice != null &&
+          item.existingPriceFromEstablishment &&
+          (item.existingPrice! - item.displayPrice!).abs() > 0.01;
+      if (showCurrent) {
+        parts.add('Новая цена: ${item.displayPrice} (сейчас: ${item.existingPrice})');
+      } else {
+        parts.add('Цена: ${item.displayPrice}');
+      }
+    } else if (item.existingProductId != null && item.existingPrice != null && item.existingPriceFromEstablishment) {
+      parts.add('В базе: ${item.existingPrice}');
     }
+    if (item.unit != null) parts.add(item.unit!);
     if (item.normalizedName != null && item.normalizedName != item.name) {
       parts.add('(${item.name})');
     }
     if (parts.isEmpty) return null;
-    return Text(parts.join(' '), style: theme.textTheme.bodySmall);
+    return Text(parts.join(' • '), style: theme.textTheme.bodySmall);
   }
 
   Widget _categoryChip(ModerationCategory cat, ThemeData theme) {

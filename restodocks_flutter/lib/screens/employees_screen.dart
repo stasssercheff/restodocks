@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -370,10 +371,14 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
     } catch (e) {
       if (mounted) {
         final msg = e.toString();
-        final isSchemaError = msg.contains('hourly_rate') || msg.contains('PGRST204');
+        final isSchemaError = msg.contains('hourly_rate') ||
+            msg.contains('rate_per_shift') ||
+            msg.contains('payment_type') ||
+            msg.contains('PGRST204') ||
+            (msg.contains('column') && msg.contains('exist'));
         setState(() {
           _error = isSchemaError
-              ? (loc.t('employee_save_error_schema') ?? 'Не удалось сохранить. Выполните в Supabase SQL миграцию: supabase_migration_employee_payment.sql')
+              ? (loc.t('employee_save_error_schema') ?? 'Не удалось сохранить. В БД нет колонок оплаты. Выполните в Supabase SQL Editor миграцию из файла supabase_migration_employee_payment.sql')
               : msg;
           _saving = false;
         });
@@ -492,6 +497,20 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
                       if (_error != null) ...[
                         const SizedBox(height: 8),
                         Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
+                        if (_error!.contains('миграцию') || _error!.contains('migration')) ...[
+                          const SizedBox(height: 8),
+                          TextButton.icon(
+                            onPressed: () async {
+                              const sql = '''ALTER TABLE employees ADD COLUMN IF NOT EXISTS payment_type TEXT DEFAULT 'hourly';
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS rate_per_shift REAL;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS hourly_rate REAL;''';
+                              await Clipboard.setData(const ClipboardData(text: sql));
+                              if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('copied') ?? 'SQL скопирован в буфер')));
+                            },
+                            icon: const Icon(Icons.copy, size: 18),
+                            label: Text(loc.t('copy_migration_sql') ?? 'Скопировать SQL миграции'),
+                          ),
+                        ],
                       ],
                       const SizedBox(height: 24),
                       FilledButton(

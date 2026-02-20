@@ -1,6 +1,6 @@
 // Supabase Edge Function: генерация чеклиста по запросу (GigaChat или OpenAI)
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { chatText } from "../_shared/ai_provider.ts";
+import { chatText, getProvider } from "../_shared/ai_provider.ts";
 
 function corsHeaders(origin: string | null) {
   return {
@@ -30,6 +30,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    console.log("[ai-generate-checklist] Request received");
     const body = (await req.json()) as { prompt?: string; context?: Record<string, unknown> };
     const { prompt, context } = body;
     if (!prompt || typeof prompt !== "string") {
@@ -112,6 +113,11 @@ Examples:
 
     const systemPrompt = SYSTEM_PROMPT + contextBlock;
 
+    // Gemini быстрее из ap-northeast-1; GigaChat может быть недоступен
+    if (!Deno.env.get("AI_PROVIDER") && Deno.env.get("GEMINI_API_KEY")?.trim()) {
+      Deno.env.set("AI_PROVIDER", "gemini");
+    }
+    console.log("[ai-generate-checklist] Calling AI, provider:", getProvider());
     const content = await chatText({
       messages: [
         { role: "system", content: systemPrompt },
@@ -161,6 +167,66 @@ Examples:
       }
     }
 
+    if (itemTitles.length === 0 && content?.trim()) {
+      // AI returned something but we couldn't parse items — try fallback 1
+      try {
+        const fallbackContent = await chatText({
+          messages: [
+            { role: "system", content: "Return JSON only: {\"name\": string, \"items\": [\"task1\",\"task2\",...]}. Short task names. No markdown." },
+            { role: "user", content: `Checklist: ${prompt}` },
+          ],
+          temperature: 0.5,
+        });
+        if (fallbackContent?.trim()) {
+          let fs = fallbackContent.trim();
+          const cb = fs.match(/```(?:json)?\s*([\s\S]*?)```/);
+          if (cb) fs = cb[1].trim();
+          const p = JSON.parse(fs) as { name?: string; items?: unknown[] };
+          const n = typeof p.name === "string" ? p.name : "Checklist";
+          const its = Array.isArray(p.items) ? p.items.filter((x): x is string => typeof x === "string") : [];
+          if (its.length > 0) {
+            return new Response(JSON.stringify({ name: n, itemTitles: its }), {
+              headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+            });
+          }
+        }
+      } catch (_) {}
+    }
+
+    // Если после fallback всё ещё пусто — второй fallback с ещё более простым промптом
+    if (itemTitles.length === 0) {
+      try {
+        const fallbackContent = await chatText({
+          messages: [
+            { role: "system", content: "You return JSON only. {\"name\": string, \"items\": string[]}. No markdown." },
+            { role: "user", content: `${prompt}\n\nGenerate a checklist. Return JSON: {"name":"Checklist title","items":["item1","item2","item3",...]}. Items = short task names. Output ONLY valid JSON.` },
+          ],
+          temperature: 0.5,
+        });
+        if (fallbackContent?.trim()) {
+          let fs = fallbackContent.trim();
+          const cb = fs.match(/```(?:json)?\s*([\s\S]*?)```/);
+          if (cb) fs = cb[1].trim();
+          const p = JSON.parse(fs) as { name?: string; items?: unknown[] };
+          const n = typeof p.name === "string" ? p.name : "Checklist";
+          const its = Array.isArray(p.items) ? p.items.filter((x): x is string => typeof x === "string") : [];
+          if (its.length > 0) {
+            return new Response(JSON.stringify({ name: n, itemTitles: its }), {
+              headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+            });
+          }
+        }
+      } catch (_) {}
+    }
+
+    // Если всё ещё пусто — возвращаем ошибку вместо пустого результата
+    if (itemTitles.length === 0) {
+      return new Response(JSON.stringify({ error: "AI returned no valid checklist items" }), {
+        status: 502,
+        headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+      });
+    }
+
     return new Response(
       JSON.stringify({
         name,
@@ -170,10 +236,34 @@ Examples:
       {
       headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
     });
-  } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), {
-      status: 500,
-      headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
-    });
-  }
-});
+    } catch (e) {
+      // Fallback: retry with simpler prompt if structured parse failed
+      try {
+        const fallbackPrompt = `Generate a checklist. Return JSON: {"name":"Checklist title","items":["item1","item2",...]}. Items = short task names. Output ONLY valid JSON.`;
+        const fallbackContent = await chatText({
+          messages: [
+            { role: "system", content: "You return JSON only. {\"name\": string, \"items\": string[]}. No markdown." },
+            { role: "user", content: `${prompt}\n\n${fallbackPrompt}` },
+          ],
+          temperature: 0.5,
+        });
+        if (fallbackContent?.trim()) {
+          let fs = fallbackContent.trim();
+          const cb = fs.match(/```(?:json)?\s*([\s\S]*?)```/);
+          if (cb) fs = cb[1].trim();
+          const p = JSON.parse(fs) as { name?: string; items?: unknown[] };
+          const n = typeof p.name === "string" ? p.name : "Checklist";
+          const its = Array.isArray(p.items) ? p.items.filter((x): x is string => typeof x === "string") : [];
+          if (its.length > 0) {
+            return new Response(JSON.stringify({ name: n, itemTitles: its }), {
+              headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+            });
+          }
+        }
+      } catch (_) {}
+      return new Response(JSON.stringify({ error: String(e) }), {
+        status: 500,
+        headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+      });
+    }
+  });

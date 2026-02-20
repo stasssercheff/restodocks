@@ -22,6 +22,8 @@ class ModerationItem extends Equatable {
   final String? existingProductId;
   final String? existingProductName;
   final double? existingPrice;
+  /// true = из establishment_products, false = из product.base_price
+  final bool existingPriceFromEstablishment;
   final ModerationCategory category;
   final bool approved;
 
@@ -34,6 +36,7 @@ class ModerationItem extends Equatable {
     this.existingProductId,
     this.existingProductName,
     this.existingPrice,
+    this.existingPriceFromEstablishment = false,
     required this.category,
     this.approved = true,
   });
@@ -50,6 +53,7 @@ class ModerationItem extends Equatable {
     String? existingProductId,
     String? existingProductName,
     double? existingPrice,
+    bool? existingPriceFromEstablishment,
     ModerationCategory? category,
     bool? approved,
   }) {
@@ -59,10 +63,11 @@ class ModerationItem extends Equatable {
       unit: unit ?? this.unit,
       normalizedName: normalizedName ?? this.normalizedName,
       suggestedPrice: suggestedPrice ?? this.suggestedPrice,
-      existingProductId: existingProductId ?? this.existingProductId,
-      existingProductName: existingProductName ?? this.existingProductName,
-      existingPrice: existingPrice ?? this.existingPrice,
-      category: category ?? this.category,
+    existingProductId: existingProductId ?? this.existingProductId,
+    existingProductName: existingProductName ?? this.existingProductName,
+    existingPrice: existingPrice ?? this.existingPrice,
+    existingPriceFromEstablishment: existingPriceFromEstablishment ?? this.existingPriceFromEstablishment,
+    category: category ?? this.category,
       approved: approved ?? this.approved,
     );
   }
@@ -77,6 +82,7 @@ class ModerationItem extends Equatable {
         existingProductId,
         existingProductName,
         existingPrice,
+        existingPriceFromEstablishment,
         category,
         approved,
       ];

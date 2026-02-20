@@ -51,6 +51,9 @@ class AppProviders {
         Provider<NutritionApiService>(
           create: (_) => NutritionApiService(),
         ),
+        Provider<EmailService>(
+          create: (_) => EmailService(),
+        ),
 
         // Инициализация сервисов при запуске + загрузка продуктов после входа
         FutureProvider<void>(

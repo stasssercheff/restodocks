@@ -21,6 +21,8 @@ class ExcelStyleTtkTable extends StatefulWidget {
   final void Function(int)? onSuggestWaste;
   final void Function(int)? onSuggestCookingLoss;
   final bool isCook; // true для поваров - скрываем стоимость
+  /// Если true, блок технологии не отображается (рендерится отдельно в родителе)
+  final bool hideTechnologyBlock;
 
   ExcelStyleTtkTable({
     required this.loc,
@@ -39,6 +41,7 @@ class ExcelStyleTtkTable extends StatefulWidget {
     this.onSuggestWaste,
     this.onSuggestCookingLoss,
     this.isCook = false,
+    this.hideTechnologyBlock = false,
   });
 
   @override
@@ -289,8 +292,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                 ],
               ),
 
-              // Поле технологии под таблицей на всю ширину
-              if (ingredients.isNotEmpty)
+              // Поле технологии под таблицей на всю ширину (если не скрыто)
+              if (ingredients.isNotEmpty && !widget.hideTechnologyBlock)
                 Container(
                   width: double.infinity,
                   margin: const EdgeInsets.only(top: 16),
@@ -427,8 +430,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       );
     }
 
-    if (ingredient.productId != null) {
-      final product = widget.productStore.allProducts.where((p) => p.id == ingredient.productId).firstOrNull;
+    if (ingredient.productId != null || ingredient.productName.isNotEmpty) {
+      final product = widget.productStore.findProductForIngredient(ingredient.productId, ingredient.productName);
       return InkWell(
         onTap: () {
           // При клике на выбранный продукт открываем dropdown для изменения
@@ -691,17 +694,13 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   }
 
   Widget _buildCostCell(TTIngredient ingredient) {
-    // Цена за кг из номенклатуры (фиксированная)
+    // Цена за кг: из сохранённого pricePerKg, establishment_products или product.basePrice
     double pricePerKg = ingredient.pricePerKg ?? 0;
-
-    // Если цена не сохранена, но есть productId - получаем из ProductStore
-    if (pricePerKg == 0 && ingredient.productId != null) {
-      final establishmentPrice = widget.productStore?.getEstablishmentPrice(ingredient.productId!, widget.establishmentId);
-      pricePerKg = establishmentPrice?.$1 ?? 0;
-      // Для продуктов без establishment цены используем basePrice из кеша номенклатуры
-      if (pricePerKg == 0) {
-        // Здесь можно добавить логику для получения basePrice из номенклатуры
-        // Пока оставим 0
+    if (pricePerKg == 0 && (ingredient.productId != null || ingredient.productName.isNotEmpty)) {
+      final product = widget.productStore.findProductForIngredient(ingredient.productId, ingredient.productName);
+      if (product != null) {
+        final ep = widget.productStore.getEstablishmentPrice(product.id, widget.establishmentId);
+        pricePerKg = ep?.$1 ?? product.basePrice ?? 0;
       }
     }
 

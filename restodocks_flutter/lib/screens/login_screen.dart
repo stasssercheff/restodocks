@@ -140,6 +140,14 @@ class _LoginScreenState extends State<LoginScreen> {
           return null;
         },
       ),
+      const SizedBox(height: 4),
+      Align(
+        alignment: Alignment.centerRight,
+        child: TextButton(
+          onPressed: () => context.push('/forgot-password'),
+          child: Text(loc.t('forgot_password') ?? 'Забыли пароль?'),
+        ),
+      ),
       const SizedBox(height: 8),
       CheckboxListTile(
         value: _rememberCredentials,
