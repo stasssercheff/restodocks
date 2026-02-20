@@ -1368,9 +1368,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                     color: Theme.of(context).colorScheme.surfaceContainerLowest,
                   ),
                   child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
