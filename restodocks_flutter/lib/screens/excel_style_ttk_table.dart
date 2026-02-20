@@ -82,24 +82,22 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   }
 
   Widget _buildTtkTable(BuildContext context) {
-    // Подготавливаем данные
-    final ingredients = widget.ingredients.where((ing) => !ing.isPlaceholder).toList();
-    final allRows = [...ingredients];
-
-    // Инициализируем outputWeight для существующих ингредиентов
-    for (var i = 0; i < allRows.length; i++) {
-      if (allRows[i].productName.isNotEmpty && allRows[i].outputWeight == 0) {
-        final output = allRows[i].netWeight * (1 - (allRows[i].cookingLossPctOverride ?? 0) / 100);
-        allRows[i] = allRows[i].copyWith(outputWeight: output);
+    // Строки с сохранением индексов для onUpdate (индекс в widget.ingredients)
+    final indexedRows = <MapEntry<int, TTIngredient>>[];
+    for (var i = 0; i < widget.ingredients.length; i++) {
+      var ing = widget.ingredients[i];
+      if (ing.productName.isNotEmpty && ing.outputWeight == 0) {
+        ing = ing.copyWith(outputWeight: ing.netWeight * (1 - (ing.cookingLossPctOverride ?? 0) / 100));
       }
+      indexedRows.add(MapEntry(i, ing));
+    }
+    if (indexedRows.isEmpty) {
+      indexedRows.add(MapEntry(0, TTIngredient.emptyPlaceholder()));
     }
 
-    // Всегда добавляем пустую строку для нового ингредиента
-    allRows.add(TTIngredient.emptyPlaceholder());
-
     // Добавляем строку "Итого"
-    final totalOutput = allRows.where((ing) => ing.productName.isNotEmpty).fold<double>(0, (s, ing) => s + ing.outputWeight);
-    final totalCost = allRows.where((ing) => ing.productName.isNotEmpty).fold<double>(0, (s, ing) => s + ing.cost);
+    final totalOutput = indexedRows.map((e) => e.value).where((ing) => ing.productName.isNotEmpty).fold<double>(0, (s, ing) => s + ing.outputWeight);
+    final totalCost = indexedRows.map((e) => e.value).where((ing) => ing.productName.isNotEmpty).fold<double>(0, (s, ing) => s + ing.cost);
 
     // Расчет итоговой стоимости
     final costPerKgFinishedProduct = widget.isSemiFinished
@@ -155,7 +153,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                 ],
               ),
               // Строки с данными
-              ...allRows.asMap().entries.map((entry) {
+              ...indexedRows.map((entry) {
                 final rowIndex = entry.key;
                 final ingredient = entry.value;
                 return TableRow(
@@ -470,10 +468,9 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       );
     }
 
-    // Показываем searchable dropdown для выбора продукта
-    return Container(
-      height: 44, // Фиксированная высота для центровки
-      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+    // Показываем searchable dropdown для выбора продукта (по размеру ячейки)
+    return SizedBox(
+      height: 44,
       child: _buildSearchableProductDropdown(ingredient, rowIndex),
     );
   }
@@ -532,22 +529,22 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       onProductSelected: (selectedItem) {
         if (selectedItem.type == 'product') {
           final product = selectedItem.item as Product;
-          // Получаем цену за кг
-          final establishmentPrice = widget.productStore?.getEstablishmentPrice(product.id, widget.establishmentId);
-          final productPrice = establishmentPrice?.$1 ?? product.basePrice;
+          // Получаем цену за кг: establishment_products или product.basePrice
+          final establishmentPrice = widget.productStore.getEstablishmentPrice(product.id, widget.establishmentId);
+          final pricePerKg = establishmentPrice?.$1 ?? product.basePrice ?? 0.0;
+          // Стоимость = цена за кг * вес брутто в кг
+          final cost = pricePerKg * (ingredient.grossWeight / 1000);
 
-          // Сначала обновляем продукт, потом пересчитаем выход
           var updatedIngredient = ingredient.copyWith(
             productId: product.id,
             productName: product.name,
             unit: product.unit,
-            pricePerKg: productPrice, // Сохраняем цену за кг
-            cost: 0.0, // Пока cost = 0, будет пересчитан при вводе grossWeight
+            pricePerKg: pricePerKg,
+            cost: cost,
           );
 
           // Выход = нетто с учетом % ужарки
           final outputWeight = updatedIngredient.netWeight * (1 - (updatedIngredient.cookingLossPctOverride ?? 0) / 100);
-
           updatedIngredient = updatedIngredient.copyWith(outputWeight: outputWeight);
 
           _updateIngredient(rowIndex, updatedIngredient);
@@ -565,13 +562,15 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
             }
           }
 
+          final gross = ingredient.grossWeight;
+          final pfCost = (pfPricePerKg ?? 0) * (gross / 1000);
           var updatedIngredient = ingredient.copyWith(
             sourceTechCardId: pf.id,
             sourceTechCardName: pf.dishName,
             productName: pf.getDisplayNameInLists(widget.loc.currentLanguageCode),
             unit: 'г',
-            pricePerKg: pfPricePerKg, // Стоимость за кг ПФ
-            cost: 0.0, // Пока cost = 0, будет пересчитан при вводе grossWeight
+            pricePerKg: pfPricePerKg,
+            cost: pfCost,
           );
 
           _updateIngredient(rowIndex, updatedIngredient);
@@ -826,12 +825,15 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
   }
 
   Future<void> _openPicker() async {
+    final navigator = Navigator.of(context);
     final searchCtrl = TextEditingController(text: _searchController.text);
     List<SelectableItem> filtered = _filterItems(_searchController.text);
 
     final sel = await showDialog<SelectableItem>(
       context: context,
       barrierDismissible: true,
+      barrierColor: Colors.black54,
+      useRootNavigator: true,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) {
           return AlertDialog(
@@ -865,10 +867,24 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
                       itemCount: filtered.length,
                       itemBuilder: (_, i) {
                         final item = filtered[i];
-                        return ListTile(
-                          dense: true,
-                          title: Text(item.displayName, style: const TextStyle(fontSize: 13)),
-                          onTap: () => Navigator.of(ctx).pop(item),
+                        return Semantics(
+                          button: true,
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () {
+                              navigator.pop(item);
+                            },
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(minHeight: 48),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(item.displayName, style: const TextStyle(fontSize: 13)),
+                                ),
+                              ),
+                            ),
+                          ),
                         );
                       },
                     ),
@@ -884,32 +900,36 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
     searchCtrl.dispose();
     if (sel != null && mounted) {
       widget.onProductSelected(sel);
-      _searchController.text = sel.displayName;
+      if (mounted) _searchController.text = sel.displayName;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       height: 44,
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade400, width: 1),
-        borderRadius: BorderRadius.circular(4),
+      child: Material(
         color: Colors.white,
-      ),
-      child: TextField(
-        controller: _searchController,
-        focusNode: _searchFocusNode,
-        readOnly: true,
-        style: const TextStyle(fontSize: 12),
-        decoration: InputDecoration(
-          hintText: 'Выберите продукт',
-          hintStyle: const TextStyle(fontSize: 12, color: Colors.grey),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-          border: InputBorder.none,
-          isDense: true,
+        child: InkWell(
+          onTap: () => _openPicker(),
+          child: Container(
+            height: 44,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            alignment: Alignment.centerLeft,
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey.shade400, width: 1),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              _searchController.text.isEmpty ? 'Выберите продукт' : _searchController.text,
+              style: TextStyle(
+                fontSize: 12,
+                color: _searchController.text.isEmpty ? Colors.grey : Colors.black,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ),
-        onTap: () => _openPicker(),
       ),
     );
   }
