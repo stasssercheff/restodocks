@@ -487,9 +487,9 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         ? widget.productStore.getNomenclatureProducts(widget.establishmentId!)
         : <Product>[]; // Пустой список, если establishmentId null
 
-    // Fallback: если номенклатурные продукты пустые, используем все продукты с ценой
+    // Fallback: если номенклатурные продукты пустые, используем все продукты
     if (nomenclatureProducts.isEmpty) {
-      nomenclatureProducts = widget.productStore.allProducts.where((p) => p.basePrice != null && p.basePrice! > 0).toList();
+      nomenclatureProducts = List.from(widget.productStore.allProducts);
     }
 
     for (final product in nomenclatureProducts) {
@@ -879,43 +879,46 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
           child: Material(
             elevation: 4,
             borderRadius: BorderRadius.circular(4),
-            child: Container(
-              constraints: const BoxConstraints(maxHeight: 200),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border.all(color: Colors.grey.shade400, width: 1),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: _filteredItems.length,
-                itemBuilder: (context, index) {
-                  final item = _filteredItems[index];
-                  return InkWell(
-                    onTap: () {
-                      _isSelectingProduct = true;
-                      widget.onProductSelected(item);
-                      _searchController.text = item.displayName;
-                      _hideOverlay();
-                      // Сбрасываем флаг через короткое время
-                      Future.delayed(const Duration(milliseconds: 50), () {
-                        _isSelectingProduct = false;
-                      });
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                      decoration: index < _filteredItems.length - 1
-                          ? const BoxDecoration(
-                              border: Border(bottom: BorderSide(color: Colors.grey, width: 0.2)),
-                            )
-                          : null,
-                      child: Text(
-                        item.displayName,
-                        style: const TextStyle(fontSize: 12),
+            child: Listener(
+              onPointerDown: (_) => _isSelectingProduct = true,
+              child: Container(
+                constraints: const BoxConstraints(maxHeight: 200),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: Colors.grey.shade400, width: 1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _filteredItems.length,
+                  itemBuilder: (context, index) {
+                    final item = _filteredItems[index];
+                    return GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () {
+                        _isSelectingProduct = true;
+                        widget.onProductSelected(item);
+                        _searchController.text = item.displayName;
+                        _hideOverlay();
+                        Future.delayed(const Duration(milliseconds: 100), () {
+                          if (mounted) _isSelectingProduct = false;
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                        decoration: index < _filteredItems.length - 1
+                            ? const BoxDecoration(
+                                border: Border(bottom: BorderSide(color: Colors.grey, width: 0.2)),
+                              )
+                            : null,
+                        child: Text(
+                          item.displayName,
+                          style: const TextStyle(fontSize: 12),
+                        ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
             ),
           ),
