@@ -33,6 +33,8 @@ class _InventoryRow {
   final List<double> quantities;
   /// Для ПФ: единица в бланке — 'g' (граммы) или 'pcs' (порции/штуки). По умолчанию 'pcs'.
   final String? pfUnit;
+  /// Переопределение единицы для продукта (null = использовать product.unit).
+  final String? unitOverride;
 
   _InventoryRow({
     this.product,
@@ -43,6 +45,7 @@ class _InventoryRow {
     this.freeUnit,
     required this.quantities,
     this.pfUnit,
+    this.unitOverride,
   })  : assert(product != null || techCard != null || (freeName != null && freeName.isNotEmpty) || productId != null || techCardId != null),
         assert(product == null || techCard == null);
 
@@ -55,7 +58,12 @@ class _InventoryRow {
     return freeName ?? '';
   }
 
-  String get unit => product?.unit ?? freeUnit ?? 'g';
+  /// Единица для отображения: unitOverride (продукт) или product.unit/freeUnit/pfUnit.
+  String get unit {
+    if (product != null && unitOverride != null) return unitOverride!;
+    if (product != null) return product!.unit ?? 'g';
+    return freeUnit ?? 'g';
+  }
   /// Для ПФ используем pfUnit: g → гр/g, иначе порц./pcs.
   String unitDisplay(String lang) {
     if (isPf) {
@@ -76,7 +84,7 @@ class _InventoryRow {
 
   double get total => quantities.fold(0.0, (a, b) => a + b);
 
-  _InventoryRow copyWith({Product? product, TechCard? techCard, String? pfUnit}) => _InventoryRow(
+  _InventoryRow copyWith({Product? product, TechCard? techCard, String? pfUnit, String? unitOverride}) => _InventoryRow(
         product: product ?? this.product,
         techCard: techCard ?? this.techCard,
         productId: product != null ? null : productId,
@@ -85,6 +93,7 @@ class _InventoryRow {
         freeUnit: freeUnit,
         quantities: quantities,
         pfUnit: pfUnit ?? this.pfUnit,
+        unitOverride: unitOverride ?? this.unitOverride,
       );
 }
 
@@ -168,6 +177,7 @@ class _InventoryScreenState extends State<InventoryScreen>
         'freeUnit': row.freeUnit,
         'quantities': row.quantities,
         'pfUnit': row.pfUnit,
+        'unitOverride': row.unitOverride,
       }).toList(),
       'aggregatedFromFile': _aggregatedFromFile,
     };
@@ -220,7 +230,7 @@ class _InventoryScreenState extends State<InventoryScreen>
           // Пустая строка продукта/ПФ — оставляем как есть
         } else if (productId != null || techCardId != null) {
           if (qty.isEmpty) qty.addAll([0.0, 0.0]);
-          else if (techCardId != null && qty.length == 1) qty.add(0.0);
+          else while (qty.length < 2) qty.add(0.0);
         }
 
         _rows.add(_InventoryRow(
@@ -232,6 +242,7 @@ class _InventoryScreenState extends State<InventoryScreen>
           freeUnit: rowMap['freeUnit'],
           quantities: qty,
           pfUnit: rowMap['pfUnit'],
+          unitOverride: rowMap['unitOverride'],
         ));
       }
 
@@ -326,17 +337,14 @@ class _InventoryScreenState extends State<InventoryScreen>
       // Нормализуем существующие строки: добавляем пустые ячейки если необходимо
       for (var i = 0; i < _rows.length; i++) {
         final row = _rows[i];
-        if (!row.isPf) { // Только для продуктов и свободных строк
+        if (!row.isFree) {
           if (row.quantities.isEmpty) {
             row.quantities.addAll([0.0, 0.0]);
           } else if (row.quantities.last != 0.0) {
             row.quantities.add(0.0);
-          } else if (row.quantities.length == 1) {
-            row.quantities.add(0.0);
+          } else if (row.quantities.length < 2) {
+            while (row.quantities.length < 2) row.quantities.add(0.0);
           }
-        } else if (row.isPf && row.quantities.length < 2) {
-          // ПФ: даём те же ячейки заполнения, что и продуктам
-          while (row.quantities.length < 2) row.quantities.add(0.0);
         }
       }
     });
@@ -460,6 +468,15 @@ class _InventoryScreenState extends State<InventoryScreen>
     setState(() {
       _rows[rowIndex] = _rows[rowIndex].copyWith(pfUnit: unit);
     });
+    saveNow();
+  }
+
+  void _setProductUnit(int rowIndex, String unit) {
+    if (rowIndex < 0 || rowIndex >= _rows.length || _rows[rowIndex].product == null) return;
+    setState(() {
+      _rows[rowIndex] = _rows[rowIndex].copyWith(unitOverride: unit);
+    });
+    saveNow();
   }
 
   /// Перерасчёт ПФ в исходные продукты по ТТК (для третьей секции бланка).
@@ -520,14 +537,14 @@ class _InventoryScreenState extends State<InventoryScreen>
   void _addColumnToAll() {
     setState(() {
       for (final r in _rows) {
-        if (!r.isPf) r.quantities.add(0.0);
+        if (!r.isFree) r.quantities.add(0.0);
       }
     });
   }
 
   void _addProduct(Product p) {
     setState(() {
-      _rows.add(_InventoryRow(product: p, techCard: null, quantities: [0.0]));
+      _rows.add(_InventoryRow(product: p, techCard: null, quantities: [0.0, 0.0]));
     });
     saveNow(); // Сохранить немедленно при добавлении продукта
   }
@@ -544,7 +561,7 @@ class _InventoryScreenState extends State<InventoryScreen>
       row.quantities[colIndex] = value;
 
       // Если заполнили последнюю ячейку (которая была пустой), добавляем новую пустую
-      if (!row.isPf && colIndex == row.quantities.length - 1 && previousValue == 0.0 && value > 0.0) {
+      if (!row.isFree && colIndex == row.quantities.length - 1 && previousValue == 0.0 && value > 0.0) {
         row.quantities.add(0.0);
       }
     });
@@ -1462,7 +1479,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     final row = _rows[actualIndex];
     final nameW = _colNameWidth(context);
     final maxCols = _maxQuantityColumns;
-    final qtyCols = row.isPf ? 1 : (row.quantities.isEmpty ? 1 : row.quantities.length + (row.quantities.last == 0.0 ? 0 : 1));
+    final qtyCols = row.quantities.isEmpty ? 1 : row.quantities.length + (row.quantities.last == 0.0 ? 0 : 1);
     return InkWell(
       onLongPress: () {
         if (_completed) return;
@@ -1481,51 +1498,42 @@ class _InventoryScreenState extends State<InventoryScreen>
             SizedBox(width: _colGap),
             SizedBox(
               width: nameW,
-              child: row.isPf
-                  ? Text(
-                      row.productName(loc.currentLanguageCode),
-                      style: theme.textTheme.bodyMedium,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      softWrap: true,
-                    )
-                  : RichText(
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      text: TextSpan(
-                        style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface),
-                        children: [
-                          TextSpan(text: row.productName(loc.currentLanguageCode)),
-                          TextSpan(
-                            text: ' (${row.unitDisplayForBlank(loc.currentLanguageCode)})',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                              fontSize: (theme.textTheme.bodySmall?.fontSize ?? 12) * 0.85,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+              child: Text(
+                row.productName(loc.currentLanguageCode),
+                style: theme.textTheme.bodyMedium,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                softWrap: true,
+              ),
             ),
             SizedBox(width: _colGap),
             SizedBox(
               width: _colUnitWidth,
-              child: row.isPf && !_completed
-                  ? DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: row.pfUnit ?? _pfUnitPcs,
-                        isDense: true,
-                        isExpanded: true,
-                        items: [
-                          DropdownMenuItem(value: _pfUnitPcs, child: Text(loc.currentLanguageCode == 'ru' ? 'порц.' : 'pcs', style: theme.textTheme.bodyMedium, overflow: TextOverflow.ellipsis)),
-                          DropdownMenuItem(value: _pfUnitGrams, child: Text(loc.currentLanguageCode == 'ru' ? 'гр' : 'g', style: theme.textTheme.bodyMedium, overflow: TextOverflow.ellipsis)),
-                        ],
-                        onChanged: (v) => v != null ? _setPfUnit(actualIndex, v) : null,
-                      ),
-                    )
-                  : (row.isPf
-                      ? Text(row.unitDisplayForBlank(loc.currentLanguageCode), style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant), overflow: TextOverflow.ellipsis)
-                      : const SizedBox.shrink()),
+              child: !_completed
+                  ? (row.isPf
+                      ? DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: row.pfUnit ?? _pfUnitPcs,
+                            isDense: true,
+                            isExpanded: true,
+                            items: [
+                              DropdownMenuItem(value: _pfUnitPcs, child: Text(loc.currentLanguageCode == 'ru' ? 'порц.' : 'pcs', style: theme.textTheme.bodySmall, overflow: TextOverflow.ellipsis)),
+                              DropdownMenuItem(value: _pfUnitGrams, child: Text(loc.currentLanguageCode == 'ru' ? 'гр' : 'g', style: theme.textTheme.bodySmall, overflow: TextOverflow.ellipsis)),
+                            ],
+                            onChanged: (v) => v != null ? _setPfUnit(actualIndex, v) : null,
+                          ),
+                        )
+                      : _ProductUnitDropdown(
+                          value: row.unit,
+                          lang: loc.currentLanguageCode,
+                          onChanged: (v) => _setProductUnit(actualIndex, v),
+                          theme: theme,
+                        ))
+                  : Text(
+                      row.unitDisplayForBlank(loc.currentLanguageCode),
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                      overflow: TextOverflow.ellipsis,
+                    ),
             ),
             SizedBox(width: _colGap),
             Container(
@@ -1742,53 +1750,40 @@ class _InventoryScreenState extends State<InventoryScreen>
           SizedBox(width: _colNoWidth, child: Text('$rowNumber', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant))),
           SizedBox(width: _colGap),
           SizedBox(
-            width: _colNameWidth(context) + (row.isPf ? 0 : _colUnitWidth + _colGap),
-            child: row.isPf
-                ? Text(
-                    row.productName(loc.currentLanguageCode),
-                    style: theme.textTheme.bodyMedium,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    softWrap: true,
-                  )
-                : RichText(
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    text: TextSpan(
-                      style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface),
-                      children: [
-                        TextSpan(text: row.productName(loc.currentLanguageCode)),
-                        TextSpan(
-                          text: ' (${row.unitDisplayForBlank(loc.currentLanguageCode)})',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                            fontSize: (theme.textTheme.bodySmall?.fontSize ?? 12) * 0.85,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-          ),
-          if (row.isPf) ...[
-            SizedBox(width: _colGap),
-            SizedBox(
-              width: _colUnitWidth,
-              child: !_completed
-                  ? DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: row.pfUnit ?? _pfUnitPcs,
-                        isDense: true,
-                        isExpanded: true,
-                        items: [
-                          DropdownMenuItem(value: _pfUnitPcs, child: Text(loc.currentLanguageCode == 'ru' ? 'порц.' : 'pcs', style: theme.textTheme.bodyMedium, overflow: TextOverflow.ellipsis)),
-                          DropdownMenuItem(value: _pfUnitGrams, child: Text(loc.currentLanguageCode == 'ru' ? 'гр' : 'g', style: theme.textTheme.bodyMedium, overflow: TextOverflow.ellipsis)),
-                        ],
-                        onChanged: (v) => v != null ? _setPfUnit(actualIndex, v) : null,
-                      ),
-                    )
-                  : Text(row.unitDisplayForBlank(loc.currentLanguageCode), style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant), overflow: TextOverflow.ellipsis),
+            width: _colNameWidth(context),
+            child: Text(
+              row.productName(loc.currentLanguageCode),
+              style: theme.textTheme.bodyMedium,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              softWrap: true,
             ),
-          ],
+          ),
+          SizedBox(width: _colGap),
+          SizedBox(
+            width: _colUnitWidth,
+            child: !_completed
+                ? (row.isPf
+                    ? DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: row.pfUnit ?? _pfUnitPcs,
+                          isDense: true,
+                          isExpanded: true,
+                          items: [
+                            DropdownMenuItem(value: _pfUnitPcs, child: Text(loc.currentLanguageCode == 'ru' ? 'порц.' : 'pcs', style: theme.textTheme.bodySmall, overflow: TextOverflow.ellipsis)),
+                            DropdownMenuItem(value: _pfUnitGrams, child: Text(loc.currentLanguageCode == 'ru' ? 'гр' : 'g', style: theme.textTheme.bodySmall, overflow: TextOverflow.ellipsis)),
+                          ],
+                          onChanged: (v) => v != null ? _setPfUnit(actualIndex, v) : null,
+                        ),
+                      )
+                    : _ProductUnitDropdown(
+                        value: row.unit,
+                        lang: loc.currentLanguageCode,
+                        onChanged: (v) => _setProductUnit(actualIndex, v),
+                        theme: theme,
+                      ))
+                : Text(row.unitDisplayForBlank(loc.currentLanguageCode), style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant), overflow: TextOverflow.ellipsis),
+          ),
         ],
       ),
     );
@@ -1987,6 +1982,47 @@ class _InventoryScreenState extends State<InventoryScreen>
           _addProduct(p);
           Navigator.of(ctx).pop();
         },
+      ),
+    );
+  }
+}
+
+/// Выпадающий список единицы измерения для продукта (отдельно от названия).
+class _ProductUnitDropdown extends StatelessWidget {
+  const _ProductUnitDropdown({
+    required this.value,
+    required this.lang,
+    required this.onChanged,
+    required this.theme,
+  });
+
+  final String value;
+  final String lang;
+  final void Function(String) onChanged;
+  final ThemeData theme;
+
+  static const List<String> _commonUnits = ['g', 'kg', 'pcs', 'шт', 'ml', 'l'];
+
+  @override
+  Widget build(BuildContext context) {
+    final options = _commonUnits;
+    final normalized = value.trim().toLowerCase();
+    final match = options.where((u) => u.toLowerCase() == normalized).firstOrNull;
+    final displayValue = match ?? 'g';
+    return DropdownButtonHideUnderline(
+      child: DropdownButton<String>(
+        value: displayValue,
+        isDense: true,
+        isExpanded: true,
+        items: options.map((u) => DropdownMenuItem(
+          value: u,
+          child: Text(
+            CulinaryUnits.displayName(u, lang),
+            style: theme.textTheme.bodySmall,
+            overflow: TextOverflow.ellipsis,
+          ),
+        )).toList(),
+        onChanged: (v) => v != null ? onChanged(v) : null,
       ),
     );
   }
