@@ -37,13 +37,13 @@ class InboxScreen extends StatelessWidget {
           ),
           _InboxTile(
             icon: Icons.assignment,
-            title: loc.t('inventory_blank'),
-            onTap: () => context.push('/inventory'),
+            title: loc.t('inventory_received'),
+            onTap: () => context.push('/inventory-received'),
           ),
           _InboxTile(
             icon: Icons.shopping_cart,
             title: loc.t('product_order'),
-            onTap: () => context.push('/product-order'),
+            onTap: () => context.push('/product-order-received'),
           ),
         ],
       ),

@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 
 import '../models/models.dart';
 import '../services/inventory_download.dart';
+import '../services/order_document_service.dart';
 import '../services/services.dart';
 
 /// Просмотр/редактирование списка заказа: наименование, единица (редактируемая), количество. Комментарий. Сохранить список / Отправить (сохранить на устройство).
@@ -159,6 +160,51 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
     final dateStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
     final fileName = 'order_${_list!.name.replaceAll(RegExp(r'[^\w\-.]'), '_')}_$dateStr.txt';
     await saveFileBytes(fileName, bytes);
+
+    // Отправить шеф-повару во Входящие
+    final account = context.read<AccountManagerSupabase>();
+    final establishment = account.establishment;
+    final employee = account.currentEmployee;
+    if (establishment != null && employee != null) {
+      final chefs = await account.getExecutiveChefsForEstablishment(establishment.id);
+      if (chefs.isNotEmpty) {
+        final itemsWithQty = <Map<String, dynamic>>[];
+        for (var idx = 0; idx < _list!.items.length; idx++) {
+          final item = _list!.items[idx];
+          final q = idx < _qtyControllers.length
+              ? (double.tryParse(_qtyControllers[idx].text.replaceFirst(',', '.')) ?? item.quantity)
+              : item.quantity;
+          final productName = (item.productId != null
+                  ? store.findProductById(item.productId!)?.getLocalizedName(lang)
+                  : null) ??
+              item.productName;
+          itemsWithQty.add({
+            'productName': productName,
+            'unit': item.unit,
+            'quantity': q,
+          });
+        }
+        final payload = {
+          'header': {
+            'establishmentName': establishment.name,
+            'employeeName': employee.fullName,
+            'supplierName': _list!.supplierName,
+            'date': dateStr.replaceAll('-', '.'),
+            'listName': _list!.name,
+            'comment': _commentCtrl.text.trim(),
+          },
+          'rows': itemsWithQty,
+        };
+        await OrderDocumentService().save(
+          establishmentId: establishment.id,
+          createdByEmployeeId: employee.id,
+          recipientChefId: chefs.first.id,
+          recipientEmail: chefs.first.email,
+          payload: payload,
+        );
+      }
+    }
+
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${loc.t('order_list_save_to_device')}: $fileName')),

@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:excel/excel.dart' hide Border;
+import 'package:excel/excel.dart' hide Border, TextSpan;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -81,7 +81,7 @@ class _InventoryRow {
       );
 }
 
-enum _InventorySort { alphabet, lastAdded }
+enum _InventorySort { alphabetAsc, alphabetDesc, lastAdded }
 
 /// Фильтр по типу строк: все, только продукты, только ПФ.
 enum _InventoryBlockFilter { all, productsOnly, pfOnly }
@@ -108,6 +108,8 @@ class _InventoryScreenState extends State<InventoryScreen>
   bool _completed = false;
   _InventorySort _sortMode = _InventorySort.lastAdded;
   _InventoryBlockFilter _blockFilter = _InventoryBlockFilter.all;
+  final TextEditingController _nameFilterCtrl = TextEditingController();
+  String _nameFilter = '';
 
   /// Сохранить данные немедленно в локальное хранилище (SharedPreferences/localStorage)
   void saveNow() {
@@ -119,6 +121,11 @@ class _InventoryScreenState extends State<InventoryScreen>
     super.initState();
     _startTime = TimeOfDay.now();
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadNomenclature());
+    _nameFilterCtrl.addListener(() {
+      if (_nameFilter != _nameFilterCtrl.text) {
+        setState(() => _nameFilter = _nameFilterCtrl.text);
+      }
+    });
 
     // Настроить автосохранение - сохранять чаще
     setOnInputChanged(() {
@@ -146,6 +153,7 @@ class _InventoryScreenState extends State<InventoryScreen>
       'completed': _completed,
       'sortMode': _sortMode.name,
       'blockFilter': _blockFilter.name,
+      'nameFilter': _nameFilter,
       'rows': _rows.map((row) => {
         'productId': row.product?.id,
         'techCardId': row.techCard?.id,
@@ -172,7 +180,7 @@ class _InventoryScreenState extends State<InventoryScreen>
 
       final sortModeName = data['sortMode'] ?? 'lastAdded';
       _sortMode = _InventorySort.values.firstWhere(
-        (e) => e.name == sortModeName,
+        (e) => e.name == sortModeName || (sortModeName == 'alphabet' && e == _InventorySort.alphabetAsc),
         orElse: () => _InventorySort.lastAdded,
       );
 
@@ -181,6 +189,9 @@ class _InventoryScreenState extends State<InventoryScreen>
         (e) => e.name == blockFilterName,
         orElse: () => _InventoryBlockFilter.all,
       );
+
+      _nameFilter = data['nameFilter'] ?? '';
+      _nameFilterCtrl.text = _nameFilter;
 
       // Восстановить строки
       final rowsData = data['rows'] as List<dynamic>? ?? [];
@@ -214,24 +225,37 @@ class _InventoryScreenState extends State<InventoryScreen>
     await _loadNomenclature();
   }
 
-  /// Индексы строк-продуктов и свободных (номенклатура + с чека), отсортированы по выбранному режиму.
+  bool _matchesNameFilter(String name) {
+    if (_nameFilter.isEmpty) return true;
+    return name.toLowerCase().contains(_nameFilter.toLowerCase());
+  }
+
+  /// Индексы строк-продуктов и свободных (номенклатура + с чека), отсортированы и отфильтрованы.
   List<int> get _productIndices {
-    final indices = List.generate(_rows.length, (i) => i).where((i) => !_rows[i].isPf).toList();
-    if (_sortMode == _InventorySort.alphabet) {
-      final lang = context.read<LocalizationService>().currentLanguageCode;
+    final lang = context.read<LocalizationService>().currentLanguageCode;
+    var indices = List.generate(_rows.length, (i) => i)
+        .where((i) => !_rows[i].isPf && _matchesNameFilter(_rows[i].productName(lang)))
+        .toList();
+    if (_sortMode == _InventorySort.alphabetAsc) {
       indices.sort((a, b) => _rows[a].productName(lang).toLowerCase().compareTo(_rows[b].productName(lang).toLowerCase()));
+    } else if (_sortMode == _InventorySort.alphabetDesc) {
+      indices.sort((a, b) => _rows[b].productName(lang).toLowerCase().compareTo(_rows[a].productName(lang).toLowerCase()));
     } else {
       indices.sort((a, b) => b.compareTo(a));
     }
     return indices;
   }
 
-  /// Индексы строк-ПФ (из ТТК), отсортированы по выбранному режиму.
+  /// Индексы строк-ПФ (из ТТК), отсортированы и отфильтрованы.
   List<int> get _pfIndices {
-    final indices = List.generate(_rows.length, (i) => i).where((i) => _rows[i].isPf).toList();
-    if (_sortMode == _InventorySort.alphabet) {
-      final lang = context.read<LocalizationService>().currentLanguageCode;
+    final lang = context.read<LocalizationService>().currentLanguageCode;
+    var indices = List.generate(_rows.length, (i) => i)
+        .where((i) => _rows[i].isPf && _matchesNameFilter(_rows[i].productName(lang)))
+        .toList();
+    if (_sortMode == _InventorySort.alphabetAsc) {
       indices.sort((a, b) => _rows[a].productName(lang).toLowerCase().compareTo(_rows[b].productName(lang).toLowerCase()));
+    } else if (_sortMode == _InventorySort.alphabetDesc) {
+      indices.sort((a, b) => _rows[b].productName(lang).toLowerCase().compareTo(_rows[a].productName(lang).toLowerCase()));
     } else {
       indices.sort((a, b) => b.compareTo(a));
     }
@@ -325,6 +349,7 @@ class _InventoryScreenState extends State<InventoryScreen>
   @override
   void dispose() {
     _hScroll.dispose();
+    _nameFilterCtrl.dispose();
     _serverAutoSaveTimer?.cancel(); // Отменить таймер автосохранения на сервер
     super.dispose();
   }
@@ -888,6 +913,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     final header = {
       'establishmentName': establishment.name,
       'employeeName': employee.fullName,
+      'employeeRole': employee.roleDisplayName,
       'date': '${_date.year}-${_date.month.toString().padLeft(2, '0')}-${_date.day.toString().padLeft(2, '0')}',
       'timeStart': _startTime != null
           ? '${_startTime!.hour.toString().padLeft(2, '0')}:${_startTime!.minute.toString().padLeft(2, '0')}'
@@ -953,7 +979,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     );
   }
 
-  /// Шапка: Дата | Цех | Сотрудник
+  /// Шапка: дата_время начала_имя_должность_время завершения (компактно в 1 строку)
   Widget _buildHeader(
     LocalizationService loc,
     Establishment? establishment,
@@ -962,29 +988,17 @@ class _InventoryScreenState extends State<InventoryScreen>
     final theme = Theme.of(context);
     final narrow = MediaQuery.sizeOf(context).width < 420;
     final dateStr = '${_date.day.toString().padLeft(2, '0')}.${_date.month.toString().padLeft(2, '0')}.${_date.year}';
+    final startStr = _startTime != null ? '${_startTime!.hour.toString().padLeft(2, '0')}:${_startTime!.minute.toString().padLeft(2, '0')}' : '—';
+    final endStr = _endTime != null ? '${_endTime!.hour.toString().padLeft(2, '0')}:${_endTime!.minute.toString().padLeft(2, '0')}' : null;
+    final roleStr = employee?.roleDisplayName ?? '—';
+    final headerLine = '$dateStr ${startStr} ${employee?.fullName ?? '—'} ($roleStr)${endStr != null ? ' $endStr' : ''}';
     final headerRow = Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest,
         border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
       ),
-      child: Row(
-        children: [
-          Expanded(child: Text(loc.t('inbox_header_date') ?? 'Дата', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
-          Expanded(child: Text(loc.t('inbox_header_section') ?? 'Цех', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
-          Expanded(child: Text(loc.t('inbox_header_employee') ?? 'Сотрудник', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
-        ],
-      ),
-    );
-    final dataRow = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      child: Row(
-        children: [
-          Expanded(child: Text(dateStr, style: theme.textTheme.bodyMedium)),
-          Expanded(child: Text(establishment?.name ?? '—', style: theme.textTheme.bodyMedium, overflow: TextOverflow.ellipsis)),
-          Expanded(child: Text(employee?.fullName ?? '—', style: theme.textTheme.bodyMedium, overflow: TextOverflow.ellipsis)),
-        ],
-      ),
+      child: Text(headerLine, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis, maxLines: 1),
     );
     final filterDropdown = !_completed && _rows.isNotEmpty
         ? DropdownButtonHideUnderline(
@@ -1010,10 +1024,27 @@ class _InventoryScreenState extends State<InventoryScreen>
               isDense: true,
               icon: const Icon(Icons.sort, size: 18),
               items: [
-                DropdownMenuItem(value: _InventorySort.alphabet, child: Text(loc.t('inventory_sort_alphabet'), style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
+                DropdownMenuItem(value: _InventorySort.alphabetAsc, child: Text(loc.t('inventory_sort_az') ?? 'А–Я', style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
+                DropdownMenuItem(value: _InventorySort.alphabetDesc, child: Text(loc.t('inventory_sort_za') ?? 'Я–А', style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
                 DropdownMenuItem(value: _InventorySort.lastAdded, child: Text(loc.t('inventory_sort_last_added'), style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
               ],
               onChanged: (v) => setState(() => _sortMode = v ?? _InventorySort.lastAdded),
+            ),
+          )
+        : null;
+    final nameFilterField = !_completed && _rows.isNotEmpty
+        ? SizedBox(
+            width: narrow ? double.infinity : 160,
+            child: TextField(
+              controller: _nameFilterCtrl,
+              decoration: InputDecoration(
+                hintText: loc.t('inventory_filter_name') ?? 'По названию',
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                border: const OutlineInputBorder(),
+              ),
+              style: const TextStyle(fontSize: 12),
+              onChanged: (_) => setState(() {}),
             ),
           )
         : null;
@@ -1021,7 +1052,6 @@ class _InventoryScreenState extends State<InventoryScreen>
       mainAxisSize: MainAxisSize.min,
       children: [
         headerRow,
-        dataRow,
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
@@ -1066,6 +1096,8 @@ class _InventoryScreenState extends State<InventoryScreen>
                   ),
                   if (filterDropdown != null && sortDropdown != null) ...[
                     const SizedBox(height: 6),
+                    if (nameFilterField != null) nameFilterField,
+                    const SizedBox(height: 6),
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
@@ -1107,7 +1139,11 @@ class _InventoryScreenState extends State<InventoryScreen>
                     const SizedBox(width: 6),
                     SizedBox(width: 130, child: filterDropdown),
                     const SizedBox(width: 4),
-                    SizedBox(width: 120, child: sortDropdown),
+                    SizedBox(width: 110, child: sortDropdown),
+                    if (nameFilterField != null) ...[
+                      const SizedBox(width: 6),
+                      nameFilterField,
+                    ],
                   ],
                 ],
               ),
@@ -1152,7 +1188,11 @@ class _InventoryScreenState extends State<InventoryScreen>
                 const SizedBox(height: 8),
                 Text(loc.t('inventory_sort_label'), style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary)),
                 ..._InventorySort.values.map((v) {
-                  final label = v == _InventorySort.alphabet ? loc.t('inventory_sort_alphabet') : loc.t('inventory_sort_last_added');
+                  final label = v == _InventorySort.alphabetAsc
+                      ? (loc.t('inventory_sort_az') ?? 'А–Я')
+                      : v == _InventorySort.alphabetDesc
+                          ? (loc.t('inventory_sort_za') ?? 'Я–А')
+                          : loc.t('inventory_sort_last_added');
                   return ListTile(
                     dense: true,
                     title: Text(label, style: const TextStyle(fontSize: 14)),
@@ -1164,6 +1204,18 @@ class _InventoryScreenState extends State<InventoryScreen>
                     onTap: () => setState(() => _sortMode = v),
                   );
                 }),
+                const SizedBox(height: 12),
+                Text(loc.t('inventory_filter_name') ?? 'По названию', style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary)),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: _nameFilterCtrl,
+                  decoration: InputDecoration(
+                    hintText: loc.t('inventory_filter_name_hint') ?? 'Введите название продукта или ПФ',
+                    isDense: true,
+                    border: const OutlineInputBorder(),
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
                 const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
@@ -1392,13 +1444,31 @@ class _InventoryScreenState extends State<InventoryScreen>
             SizedBox(width: _colGap),
             SizedBox(
               width: nameW,
-              child: Text(
-                row.productName(loc.currentLanguageCode),
-                style: theme.textTheme.bodyMedium,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                softWrap: true,
-              ),
+              child: row.isPf
+                  ? Text(
+                      row.productName(loc.currentLanguageCode),
+                      style: theme.textTheme.bodyMedium,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      softWrap: true,
+                    )
+                  : RichText(
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      text: TextSpan(
+                        style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface),
+                        children: [
+                          TextSpan(text: row.productName(loc.currentLanguageCode)),
+                          TextSpan(
+                            text: ' (${row.unitDisplayForBlank(loc.currentLanguageCode)})',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              fontSize: (theme.textTheme.bodySmall?.fontSize ?? 12) * 0.85,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
             ),
             SizedBox(width: _colGap),
             SizedBox(
@@ -1416,7 +1486,9 @@ class _InventoryScreenState extends State<InventoryScreen>
                         onChanged: (v) => v != null ? _setPfUnit(actualIndex, v) : null,
                       ),
                     )
-                  : Text(row.unitDisplayForBlank(loc.currentLanguageCode), style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant), overflow: TextOverflow.ellipsis),
+                  : (row.isPf
+                      ? Text(row.unitDisplayForBlank(loc.currentLanguageCode), style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant), overflow: TextOverflow.ellipsis)
+                      : const SizedBox.shrink()),
             ),
             SizedBox(width: _colGap),
             Container(
@@ -1633,33 +1705,53 @@ class _InventoryScreenState extends State<InventoryScreen>
           SizedBox(width: _colNoWidth, child: Text('$rowNumber', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant))),
           SizedBox(width: _colGap),
           SizedBox(
-            width: _colNameWidth(context),
-            child: Text(
-              row.productName(loc.currentLanguageCode),
-              style: theme.textTheme.bodyMedium,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              softWrap: true,
-            ),
-          ),
-          SizedBox(width: _colGap),
-          SizedBox(
-            width: _colUnitWidth,
-            child: row.isPf && !_completed
-                ? DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: row.pfUnit ?? _pfUnitPcs,
-                      isDense: true,
-                      isExpanded: true,
-                      items: [
-                        DropdownMenuItem(value: _pfUnitPcs, child: Text(loc.currentLanguageCode == 'ru' ? 'порц.' : 'pcs', style: theme.textTheme.bodyMedium, overflow: TextOverflow.ellipsis)),
-                        DropdownMenuItem(value: _pfUnitGrams, child: Text(loc.currentLanguageCode == 'ru' ? 'гр' : 'g', style: theme.textTheme.bodyMedium, overflow: TextOverflow.ellipsis)),
-                      ],
-                      onChanged: (v) => v != null ? _setPfUnit(actualIndex, v) : null,
-                    ),
+            width: _colNameWidth(context) + (row.isPf ? 0 : _colUnitWidth + _colGap),
+            child: row.isPf
+                ? Text(
+                    row.productName(loc.currentLanguageCode),
+                    style: theme.textTheme.bodyMedium,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    softWrap: true,
                   )
-                : Text(row.unitDisplayForBlank(loc.currentLanguageCode), style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant), overflow: TextOverflow.ellipsis),
+                : RichText(
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    text: TextSpan(
+                      style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface),
+                      children: [
+                        TextSpan(text: row.productName(loc.currentLanguageCode)),
+                        TextSpan(
+                          text: ' (${row.unitDisplayForBlank(loc.currentLanguageCode)})',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontSize: (theme.textTheme.bodySmall?.fontSize ?? 12) * 0.85,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
           ),
+          if (row.isPf) ...[
+            SizedBox(width: _colGap),
+            SizedBox(
+              width: _colUnitWidth,
+              child: !_completed
+                  ? DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: row.pfUnit ?? _pfUnitPcs,
+                        isDense: true,
+                        isExpanded: true,
+                        items: [
+                          DropdownMenuItem(value: _pfUnitPcs, child: Text(loc.currentLanguageCode == 'ru' ? 'порц.' : 'pcs', style: theme.textTheme.bodyMedium, overflow: TextOverflow.ellipsis)),
+                          DropdownMenuItem(value: _pfUnitGrams, child: Text(loc.currentLanguageCode == 'ru' ? 'гр' : 'g', style: theme.textTheme.bodyMedium, overflow: TextOverflow.ellipsis)),
+                        ],
+                        onChanged: (v) => v != null ? _setPfUnit(actualIndex, v) : null,
+                      ),
+                    )
+                  : Text(row.unitDisplayForBlank(loc.currentLanguageCode), style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant), overflow: TextOverflow.ellipsis),
+            ),
+          ],
         ],
       ),
     );

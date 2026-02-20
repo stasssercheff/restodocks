@@ -178,6 +178,10 @@ class AppRouter {
         builder: (context, state) => const OrderListsScreen(),
       ),
       GoRoute(
+        path: '/product-order-received',
+        builder: (context, state) => const ProductOrderReceivedScreen(),
+      ),
+      GoRoute(
         path: '/product-order/new',
         builder: (context, state) => const OrderListCreateScreen(),
       ),

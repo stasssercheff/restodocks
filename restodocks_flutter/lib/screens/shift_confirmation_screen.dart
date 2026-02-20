@@ -152,7 +152,6 @@ class _ShiftConfirmationScreenState extends State<ShiftConfirmationScreen> {
             ),
             child: Row(
               children: [
-                Expanded(flex: 1, child: Text(loc.t('inbox_header_date') ?? 'Дата', style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
                 Expanded(flex: 2, child: Text(loc.t('inbox_header_section') ?? 'Цех', style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
                 Expanded(flex: 2, child: Text(loc.t('inbox_header_employee') ?? 'Сотрудник', style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
                 Expanded(flex: 1, child: Text(loc.t('inbox_header_confirmation') ?? 'Подтверждение', style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
@@ -220,7 +219,6 @@ class _ShiftConfirmationScreenState extends State<ShiftConfirmationScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           child: Row(
                             children: [
-                              Expanded(flex: 1, child: Text(dateStr, style: Theme.of(context).textTheme.bodySmall)),
                               Expanded(flex: 2, child: Text(sectionName, style: Theme.of(context).textTheme.bodyMedium, overflow: TextOverflow.ellipsis)),
                               Expanded(flex: 2, child: Text(slot.name, style: const TextStyle(fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis)),
                               Expanded(flex: 1, child: Checkbox(value: confirmed, onChanged: (v) => _setConfirmed(slot, v ?? false))),

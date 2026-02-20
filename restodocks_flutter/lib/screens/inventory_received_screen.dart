@@ -1,7 +1,10 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../services/inventory_download.dart';
 import '../services/services.dart';
 
 /// Кабинет шеф-повара: полученные документы инвентаризации.
@@ -102,17 +105,34 @@ class _InventoryReceivedScreenState extends State<InventoryReceivedScreen> {
     }
     return RefreshIndicator(
       onRefresh: _load,
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _docs.length,
-        itemBuilder: (_, i) {
-          final d = _docs[i];
-          return _DocCard(
-            doc: d,
-            loc: loc,
-            onTap: () => _openDetail(context, d, loc),
-          );
-        },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Row(
+              children: [
+                Expanded(flex: 1, child: Text(loc.t('inbox_header_date') ?? 'Дата', style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+                Expanded(flex: 2, child: Text(loc.t('inbox_header_section') ?? 'Цех', style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+                Expanded(flex: 2, child: Text(loc.t('inbox_header_employee') ?? 'Сотрудник', style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: _docs.length,
+              itemBuilder: (_, i) {
+                final d = _docs[i];
+                return _DocCard(
+                  doc: d,
+                  loc: loc,
+                  onTap: () => _openDetail(context, d, loc),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -137,21 +157,26 @@ class _DocCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final payload = doc['payload'] as Map<String, dynamic>?;
     final header = payload?['header'] as Map<String, dynamic>? ?? {};
-    final rows = payload?['rows'] as List<dynamic>? ?? [];
     final date = doc['created_at']?.toString().substring(0, 10) ?? '—';
     final establishmentName = header['establishmentName'] ?? '—';
     final employeeName = header['employeeName'] ?? '—';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: CircleAvatar(
-          child: Icon(Icons.description, color: Theme.of(context).colorScheme.onPrimary),
-        ),
-        title: Text(establishmentName),
-        subtitle: Text('$date · $employeeName · ${rows.length} ${loc.t('inventory_pos')}'),
-        trailing: const Icon(Icons.chevron_right),
+      child: InkWell(
         onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              Expanded(flex: 1, child: Text(date, style: Theme.of(context).textTheme.bodyMedium)),
+              Expanded(flex: 2, child: Text(establishmentName, style: Theme.of(context).textTheme.bodyMedium, overflow: TextOverflow.ellipsis)),
+              Expanded(flex: 2, child: Text(employeeName, style: Theme.of(context).textTheme.bodyMedium, overflow: TextOverflow.ellipsis)),
+              Icon(Icons.chevron_right, color: Theme.of(context).colorScheme.outline),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -163,6 +188,34 @@ class _InventoryDocumentDetailScreen extends StatelessWidget {
 
   final Map<String, dynamic> doc;
   final LocalizationService loc;
+
+  Future<void> _download(BuildContext context) async {
+    final payload = doc['payload'] as Map<String, dynamic>? ?? {};
+    final header = payload['header'] as Map<String, dynamic>? ?? {};
+    final rows = payload['rows'] as List<dynamic>? ?? [];
+    final lines = <String>[
+      'Инвентаризация',
+      'Дата: ${header['date'] ?? '—'}',
+      'Время начала: ${header['timeStart'] ?? '—'}',
+      'Время окончания: ${header['timeEnd'] ?? '—'}',
+      'Сотрудник: ${header['employeeName'] ?? '—'}',
+      'Заведение: ${header['establishmentName'] ?? '—'}',
+      '',
+      '№\tНаименование\tЕд.\tИтого',
+    ];
+    for (var i = 0; i < rows.length; i++) {
+      final r = rows[i] as Map<String, dynamic>;
+      lines.add('${i + 1}\t${r['productName'] ?? ''}\t${r['unit'] ?? ''}\t${_fmt(r['total'])}');
+    }
+    final bytes = utf8.encode(lines.join('\n'));
+    final date = header['date'] ?? DateTime.now().toIso8601String().split('T').first;
+    await saveFileBytes('inventory_$date.txt', bytes);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('inventory_excel_downloaded') ?? 'Файл сохранён')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -177,6 +230,13 @@ class _InventoryDocumentDetailScreen extends StatelessWidget {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(loc.t('inventory_blank_title')),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.download),
+            tooltip: loc.t('download') ?? 'Скачать',
+            onPressed: () => _download(context),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
