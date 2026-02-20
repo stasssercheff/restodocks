@@ -58,7 +58,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   // Предотвращает зависание интерфейса в состоянии загрузки
   void _startLoadingTimeout() {
     _loadingTimeoutTimer?.cancel();
-    _loadingTimeoutTimer = Timer(const Duration(seconds: 30), () {
+    _loadingTimeoutTimer = Timer(const Duration(seconds: 90), () {
       if (mounted && _isLoading) {
         _addDebugLog('Loading timeout reached, resetting loading state');
         setState(() => _isLoading = false);
@@ -293,272 +293,163 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Способы загрузки
+            // Два способа загрузки
             Text(
-              'Выберите способ загрузки:',
+              'Выберите способ:',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 16),
 
-            // Отладочные логи (только в debug режиме)
-            if (kDebugMode) ...[
-              Container(
-                padding: const EdgeInsets.all(12),
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey[300]!),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          'Отладочные логи (${_debugLogs.length}):',
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const Spacer(),
-                        TextButton.icon(
-                          onPressed: () async {
-                            final logs = _debugLogs.join('\n');
-                            await Clipboard.setData(ClipboardData(text: logs));
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Все логи скопированы в буфер обмена')),
-                              );
-                            }
-                          },
-                          icon: const Icon(Icons.copy, size: 16),
-                          label: const Text('Копировать все'),
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      height: 120,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: Colors.black,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: SingleChildScrollView(
-                        child: Padding(
-                          padding: const EdgeInsets.all(8),
-                          child: SelectableText(
-                            _debugLogs.join('\n'),
-                            style: const TextStyle(
-                              color: Colors.green,
-                              fontSize: 10,
-                              fontFamily: 'monospace',
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        TextButton(
-                          onPressed: () => setState(() => _debugLogs.clear()),
-                          child: const Text('Очистить'),
-                        ),
-                        TextButton(
-                          onPressed: () => _showDebugLogs(context),
-                          child: const Text('Показать все'),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-
-            // Импорт с отложенной модерацией (ТЗ)
+            // 1. Загрузить из текста
             _UploadMethodCard(
               icon: Icons.edit_note,
-              title: 'Импорт с модерацией',
-              description: 'Файл или текст → предпросмотр → подтверждение (без диалогов на каждую строку)',
-              color: Colors.deepPurple,
-              onTap: _isLoading ? null : () => _showImportWithModeration(),
+              title: '1. Загрузить из текста',
+              description: 'Вставьте список продуктов из Excel, мессенджера или заметок. '
+                  'ИИ распознает формат, найдёт дубликаты, предложит сверку цен.',
+              color: Colors.green,
+              onTap: _isLoading ? null : () => _showTextUploadDialog(),
             ),
             const SizedBox(height: 12),
 
-            // Карточка загрузки из файла
+            // 2. Загрузить из файла
             _UploadMethodCard(
               icon: Icons.file_upload,
-              title: 'Из файла',
-              description: 'Excel (.xlsx, .xls), CSV (.csv), Текст (.txt), RTF (.rtf)',
+              title: '2. Загрузить из файла',
+              description: 'Excel (.xlsx, .xls), CSV (.csv) или текст (.txt). '
+                  'Модерация, поиск дубликатов ИИ, сверка цен.',
               color: Colors.blue,
-              onTap: _isLoading ? null : () => _uploadFromFile(),
+              onTap: _isLoading ? null : () => _uploadFromFileUnified(),
             ),
-
-            const SizedBox(height: 12),
-
-            // Карточка вставки текста
-            _UploadMethodCard(
-              icon: Icons.content_paste,
-              title: 'Вставить текст',
-              description: 'Скопировать и вставить список продуктов',
-              color: Colors.green,
-              onTap: _isLoading ? null : () => _showPasteDialog(),
-            ),
-
-            const SizedBox(height: 12),
-
-            // Умная обработка текста с AI
-            _UploadMethodCard(
-              icon: Icons.smart_toy,
-              title: 'AI обработка текста',
-              description: 'ИИ разберет любой формат списка продуктов',
-              color: Colors.purple,
-              onTap: _isLoading ? null : () => _showSmartPasteDialog(),
-            ),
-
-            const SizedBox(height: 12),
-
-            // Интеллектуальный импорт Excel
-            _UploadMethodCard(
-              icon: Icons.analytics,
-              title: 'Интеллектуальный импорт Excel',
-              description: 'AI определение языка, fuzzy matching, авто-переводы на 5 языков',
-              color: Colors.indigo,
-              onTap: _isLoading ? null : () => _showIntelligentImportDialog(),
-            ),
-
-            const SizedBox(height: 12),
-
-            // Простой импорт Excel (альтернативный)
-            _UploadMethodCard(
-              icon: Icons.table_chart,
-              title: 'Простой импорт Excel',
-              description: 'Базовая обработка Excel файлов с улучшенной обработкой ошибок',
-              color: Colors.teal,
-              onTap: _isLoading ? null : () => _uploadExcelSimple(),
-            ),
-
-            const SizedBox(height: 12),
-
-            // Тестовая кнопка (только в debug режиме)
-            if (kDebugMode) ...[
-              _UploadMethodCard(
-                icon: Icons.bug_report,
-                title: 'Тест функций',
-                description: 'Проверить работу экрана загрузки',
-                color: Colors.red,
-                onTap: () {
-                  print('=== Test button pressed ===');
-                  _addDebugLog('Тестовая кнопка нажата');
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Тест пройден! Функции работают.')),
-                  );
-                },
-              ),
-            ],
 
             const SizedBox(height: 24),
 
-            // Пример формата
-            _FormatExample(),
-
-            const SizedBox(height: 16),
-
-            // Инструкция по конвертации Excel
+            // Краткая инструкция
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Icon(Icons.info_outline, color: Theme.of(context).colorScheme.primary),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Если Excel не загружается:',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    const Text('1. Откройте файл в Excel или Google Sheets'),
-                    const Text('2. Выделите данные (Ctrl+A)'),
-                    const Text('3. Скопируйте (Ctrl+C)'),
-                    const Text('4. Используйте "Вставить текст" вместо файла'),
-                    const SizedBox(height: 8),
                     Text(
-                      'Или сохраните как CSV и загрузите как файл',
-                      style: TextStyle(color: Theme.of(context).colorScheme.secondary),
+                      'Формат данных:',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
                     ),
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // Кнопка тестирования парсинга
-            if (kDebugMode) ElevatedButton.icon(
-              onPressed: () {
-                final testLine = 'Авокадо\t₫99,000';
-                final result = _parseLine(testLine);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Тест парсинга: "$testLine" -> "${result.name}" @ ${result.price}')),
-                );
-              },
-              icon: const Icon(Icons.bug_report),
-              label: const Text('Тест парсинга'),
-            ),
-
-            const SizedBox(height: 24),
-
-            // Тест парсинга
-            if (_isLoading) ...[
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline, color: Colors.blue[600]),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Показать логи отладки для диагностики проблем',
-                        style: Theme.of(context).textTheme.bodySmall,
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surfaceContainerLowest,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        'Авокадо\t99000\nБазилик\t267000\nМолоко\t38000',
+                        style: TextStyle(fontFamily: 'monospace', fontSize: 13),
                       ),
                     ),
-                    TextButton(
-                      onPressed: () => _showDebugLogs(context),
-                      child: const Text('Показать логи'),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Название и цена через Tab или пробелы. ИИ разберёт и другие форматы.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
                     ),
                   ],
                 ),
               ),
-            ],
-
-            // Советы
-            _TipsSection(),
-
-            const SizedBox(height: 24),
-
-            // Быстрые действия
-            _QuickActions(),
+            ),
           ],
         ),
       ),
     );
+  }
+
+  /// 1. Загрузить из текста — диалог вставки → _processWithDeferredModeration
+  Future<void> _showTextUploadDialog() async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Вставить список продуктов'),
+        content: SizedBox(
+          width: 500,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Вставьте список: из Excel (Ctrl+C), мессенджера, заметок. ИИ распознает формат.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                maxLines: 10,
+                decoration: const InputDecoration(
+                  hintText: 'Авокадо 99000\nБазилик 267000\nМолоко 38000',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Отмена')),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text),
+            child: const Text('Анализ'),
+          ),
+        ],
+      ),
+    );
+    if (result == null || result.trim().isEmpty || !mounted) return;
+    await _processWithDeferredModeration(text: result);
+  }
+
+  /// 2. Загрузить из файла — выбор файла → извлечение данных → _processWithDeferredModeration
+  Future<void> _uploadFromFileUnified() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['xlsx', 'xls', 'csv', 'txt'],
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty || result.files.single.bytes == null) return;
+
+    final bytes = result.files.single.bytes!;
+    final name = result.files.single.name.toLowerCase();
+    List<String> rows = [];
+
+    if (name.endsWith('.csv') || name.endsWith('.txt')) {
+      final text = utf8.decode(bytes, allowMalformed: true);
+      rows = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+    } else {
+      try {
+        final excel = Excel.decodeBytes(bytes);
+        for (final sheetName in excel.tables.keys) {
+          final sheet = excel.tables[sheetName]!;
+          for (final row in sheet.rows) {
+            if (row.isEmpty) continue;
+            final parts = row.map((c) => c?.value?.toString().trim() ?? '').toList();
+            if (parts.any((p) => p.isNotEmpty)) {
+              rows.add(parts.join('\t'));
+            }
+          }
+        }
+      } catch (_) {
+        final text = utf8.decode(bytes, allowMalformed: true);
+        rows = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+      }
+    }
+
+    if (rows.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Не удалось извлечь данные из файла')),
+        );
+      }
+      return;
+    }
+
+    await _processWithDeferredModeration(rows: rows);
   }
 
   Future<void> _showImportWithModeration() async {
@@ -667,26 +558,44 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     final acc = context.read<AccountManagerSupabase>();
     final est = acc.establishment;
     if (est == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Не найдено заведение')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Не найдено заведение')),
+        );
+      }
       return;
     }
 
     setState(() => _isLoading = true);
+    _startLoadingTimeout();
     _setLoadingMessage('Анализ данных ИИ...');
 
     try {
       final ai = context.read<AiService>();
-      final parsed = rows != null
+      List<ParsedProductItem> parsed = rows != null
           ? await ai.parseProductList(rows: rows)
           : await ai.parseProductList(text: text!);
 
       if (!mounted) return;
+
+      // Fallback: если ИИ вернул пусто — пробуем локальный парсинг
+      if (parsed.isEmpty && (rows != null && rows.isNotEmpty || text != null && text.trim().isNotEmpty)) {
+        _setLoadingMessage('Локальный разбор...');
+        final rawLines = rows ?? text!.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+        parsed = rawLines.map((line) {
+          final r = _parseLine(line);
+          return ParsedProductItem(name: r.name, price: r.price, unit: null);
+        }).where((p) => p.name.isNotEmpty).toList();
+      }
+
       if (parsed.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('ИИ не смог извлечь продукты')),
-        );
+        _cancelLoadingTimeout();
+        if (mounted) {
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Не удалось извлечь продукты. Проверьте формат данных.')),
+          );
+        }
         return;
       }
 
@@ -745,9 +654,11 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       }
 
       if (!mounted) return;
+      _cancelLoadingTimeout();
       context.push('/import-review', extra: moderationItems);
     } catch (e) {
       if (mounted) {
+        _cancelLoadingTimeout();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Ошибка: $e')),
         );
