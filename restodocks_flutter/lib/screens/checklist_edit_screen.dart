@@ -79,6 +79,8 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
         'id': item.id,
         'title': item.title,
         'sortOrder': item.sortOrder,
+        'cellType': item.cellType.value,
+        'dropdownOptions': item.dropdownOptions,
       }).toList(),
     };
   }
@@ -93,11 +95,14 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
       _items.clear();
       for (final itemData in itemsData) {
         final Map<String, dynamic> itemMap = itemData as Map<String, dynamic>;
+        final opts = itemMap['dropdownOptions'];
         _items.add(ChecklistItem(
           id: itemMap['id'] ?? '',
           checklistId: widget.checklistId,
           title: itemMap['title'] ?? '',
           sortOrder: itemMap['sortOrder'] ?? 0,
+          cellType: ChecklistCellTypeExt.fromString(itemMap['cellType'] as String?),
+          dropdownOptions: opts is List ? opts.map((e) => e.toString()).toList() : [],
         ));
       }
     });
@@ -128,6 +133,8 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                 checklistId: c.id,
                 title: e.title,
                 sortOrder: e.sortOrder,
+                cellType: e.cellType,
+                dropdownOptions: e.dropdownOptions,
               ))
           .toList(),
     );
@@ -208,22 +215,65 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
     }
   }
 
-  void _addItem() {
+  Future<void> _addItem() async {
     final t = _newItemController.text.trim();
     if (t.isEmpty) return;
+    final loc = context.read<LocalizationService>();
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (ctx) => _AddItemDialog(
+        title: t,
+        loc: loc,
+      ),
+    );
+    if (result == null || !mounted) return;
     setState(() {
       _items.add(ChecklistItem.template(
-        title: t,
+        title: result['title'] as String,
         sortOrder: _items.length,
+        cellType: result['cellType'] as ChecklistCellType,
+        dropdownOptions: result['dropdownOptions'] as List<String>,
       ));
       _newItemController.clear();
     });
-    scheduleSave(); // Автосохранение при добавлении элемента
+    scheduleSave();
   }
 
   void _removeItem(int i) {
     setState(() => _items.removeAt(i));
-    scheduleSave(); // Автосохранение при удалении элемента
+    scheduleSave();
+  }
+
+  String _cellTypeLabel(LocalizationService loc, ChecklistCellType t) {
+    switch (t) {
+      case ChecklistCellType.quantity: return loc.t('checklist_cell_quantity') ?? 'Количество';
+      case ChecklistCellType.checkbox: return loc.t('checklist_cell_checkbox') ?? 'Галочка';
+      case ChecklistCellType.dropdown: return loc.t('checklist_cell_dropdown') ?? 'Выпадающий список';
+    }
+  }
+
+  Future<void> _editItem(int i) async {
+    if (i < 0 || i >= _items.length) return;
+    final it = _items[i];
+    final loc = context.read<LocalizationService>();
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (ctx) => _AddItemDialog(
+        title: it.title,
+        loc: loc,
+        initialCellType: it.cellType,
+        initialDropdownOptions: it.dropdownOptions,
+      ),
+    );
+    if (result == null || !mounted) return;
+    setState(() {
+      _items[i] = it.copyWith(
+        title: result['title'] as String,
+        cellType: result['cellType'] as ChecklistCellType,
+        dropdownOptions: result['dropdownOptions'] as List<String>,
+      );
+    });
+    scheduleSave();
   }
 
   @override
@@ -363,15 +413,29 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
             const SizedBox(height: 16),
             ...List.generate(_items.length, (i) {
               final it = _items[i];
+              final cellLabel = _cellTypeLabel(loc, it.cellType);
               return Card(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: ListTile(
                   title: Text(it.title),
+                  subtitle: it.cellType == ChecklistCellType.dropdown && it.dropdownOptions.isNotEmpty
+                      ? Text(it.dropdownOptions.join(', '), maxLines: 1, overflow: TextOverflow.ellipsis)
+                      : Text(cellLabel, style: Theme.of(context).textTheme.bodySmall),
                   trailing: canEdit
-                      ? IconButton(
-                          icon: const Icon(Icons.remove_circle_outline),
-                          onPressed: () => _removeItem(i),
-                          tooltip: loc.t('delete'),
+                      ? Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit_outlined, size: 20),
+                              onPressed: () => _editItem(i),
+                              tooltip: loc.t('edit'),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.remove_circle_outline),
+                              onPressed: () => _removeItem(i),
+                              tooltip: loc.t('delete'),
+                            ),
+                          ],
                         )
                       : null,
                 ),
@@ -391,5 +455,164 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
     ],
   ),
 );
+  }
+}
+
+/// Диалог добавления/редактирования пункта с выбором типа ячейки.
+class _AddItemDialog extends StatefulWidget {
+  const _AddItemDialog({
+    required this.title,
+    required this.loc,
+    this.initialCellType = ChecklistCellType.checkbox,
+    this.initialDropdownOptions = const [],
+  });
+
+  final String title;
+  final LocalizationService loc;
+  final ChecklistCellType initialCellType;
+  final List<String> initialDropdownOptions;
+
+  @override
+  State<_AddItemDialog> createState() => _AddItemDialogState();
+}
+
+class _AddItemDialogState extends State<_AddItemDialog> {
+  late final TextEditingController _titleCtrl;
+  late ChecklistCellType _cellType;
+  late List<TextEditingController> _optionCtrls;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleCtrl = TextEditingController(text: widget.title);
+    _cellType = widget.initialCellType;
+    _optionCtrls = widget.initialDropdownOptions
+        .map((o) => TextEditingController(text: o))
+        .toList();
+    if (_optionCtrls.isEmpty && _cellType == ChecklistCellType.dropdown) {
+      _optionCtrls.add(TextEditingController());
+    }
+  }
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    for (final c in _optionCtrls) c.dispose();
+    super.dispose();
+  }
+
+  void _addOption() {
+    setState(() => _optionCtrls.add(TextEditingController()));
+  }
+
+  void _removeOption(int i) {
+    if (_optionCtrls.length <= 1) return;
+    setState(() {
+      _optionCtrls[i].dispose();
+      _optionCtrls.removeAt(i);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = widget.loc;
+    return AlertDialog(
+      title: Text(loc.t('add_item')),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              controller: _titleCtrl,
+              decoration: InputDecoration(
+                labelText: loc.t('checklist_item_hint'),
+                border: const OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(loc.t('checklist_cell_type') ?? 'Тип ячейки', style: Theme.of(context).textTheme.labelLarge),
+            const SizedBox(height: 8),
+            SegmentedButton<ChecklistCellType>(
+              segments: [
+                ButtonSegment(
+                  value: ChecklistCellType.quantity,
+                  label: Text(loc.t('checklist_cell_quantity') ?? 'Кол-во'),
+                  icon: const Icon(Icons.numbers, size: 18),
+                ),
+                ButtonSegment(
+                  value: ChecklistCellType.checkbox,
+                  label: Text(loc.t('checklist_cell_checkbox') ?? 'Галочка'),
+                  icon: const Icon(Icons.check_box, size: 18),
+                ),
+                ButtonSegment(
+                  value: ChecklistCellType.dropdown,
+                  label: Text(loc.t('checklist_cell_dropdown') ?? 'Список'),
+                  icon: const Icon(Icons.list, size: 18),
+                ),
+              ],
+              selected: {_cellType},
+              onSelectionChanged: (s) {
+                setState(() {
+                  _cellType = s.first;
+                  if (_cellType == ChecklistCellType.dropdown && _optionCtrls.isEmpty) {
+                    _optionCtrls.add(TextEditingController());
+                  }
+                });
+              },
+            ),
+            if (_cellType == ChecklistCellType.dropdown) ...[
+              const SizedBox(height: 16),
+              Text(loc.t('checklist_dropdown_options') ?? 'Варианты выбора', style: Theme.of(context).textTheme.labelLarge),
+              const SizedBox(height: 8),
+              ...List.generate(_optionCtrls.length, (i) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _optionCtrls[i],
+                        decoration: InputDecoration(
+                          hintText: '${loc.t('option') ?? 'Вариант'} ${i + 1}',
+                          border: const OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.remove_circle_outline, size: 20),
+                      onPressed: _optionCtrls.length > 1 ? () => _removeOption(i) : null,
+                    ),
+                  ],
+                ),
+              )),
+              TextButton.icon(
+                onPressed: _addOption,
+                icon: const Icon(Icons.add, size: 18),
+                label: Text(loc.t('checklist_add_option') ?? 'Добавить вариант'),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(loc.t('cancel'))),
+        FilledButton(
+          onPressed: () {
+            final title = _titleCtrl.text.trim();
+            if (title.isEmpty) return;
+            final opts = _cellType == ChecklistCellType.dropdown
+                ? _optionCtrls.map((c) => c.text.trim()).where((s) => s.isNotEmpty).toList()
+                : <String>[];
+            Navigator.of(context).pop(<String, dynamic>{
+              'title': title,
+              'cellType': _cellType,
+              'dropdownOptions': opts,
+            });
+          },
+          child: Text(loc.t('save')),
+        ),
+      ],
+    );
   }
 }

@@ -83,6 +83,11 @@ class _OrderListsScreenState extends State<OrderListsScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
+  void _onBack() {
+    FocusManager.instance.primaryFocus?.unfocus();
+    if (context.mounted) context.go('/home');
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
@@ -119,9 +124,14 @@ class _OrderListsScreenState extends State<OrderListsScreen> {
         ],
       ),
     );
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) _onBack();
+      },
+      child: Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.go('/home')),
+        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: _onBack),
         title: Text(loc.t('product_order')),
         actions: [
           IconButton(icon: const Icon(Icons.home), onPressed: () => context.go('/home'), tooltip: loc.t('home')),
@@ -233,6 +243,7 @@ class _OrderListsScreenState extends State<OrderListsScreen> {
         icon: const Icon(Icons.add),
         label: Text(loc.t('order_list_create')),
       ),
+    ),
     );
   }
 }

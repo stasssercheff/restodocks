@@ -18,6 +18,8 @@ export 'inventory_pf_screen.dart';
 export 'inventory_received_screen.dart';
 export 'checklists_screen.dart';
 export 'checklist_edit_screen.dart';
+export 'checklist_fill_screen.dart';
+export 'checklist_received_screen.dart';
 export 'tech_cards_list_screen.dart';
 export 'tech_card_edit_screen.dart';
 export 'employees_screen.dart';

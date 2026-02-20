@@ -45,6 +45,11 @@ class InboxScreen extends StatelessWidget {
             title: loc.t('product_order'),
             onTap: () => context.push('/product-order-received'),
           ),
+          _InboxTile(
+            icon: Icons.checklist,
+            title: loc.t('checklist_received'),
+            onTap: () => context.push('/checklists-received'),
+          ),
         ],
       ),
     );

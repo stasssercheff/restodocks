@@ -14,6 +14,8 @@ import '../../screens/home/department_placeholder_screen.dart';
 import '../../screens/supabase_test_screen.dart';
 import '../../screens/checklists_screen.dart';
 import '../../screens/checklist_edit_screen.dart';
+import '../../screens/checklist_fill_screen.dart';
+import '../../screens/checklist_received_screen.dart';
 import '../../screens/tech_cards_list_screen.dart';
 import '../../screens/tech_card_edit_screen.dart';
 import '../../screens/order_lists_screen.dart';
@@ -220,6 +222,10 @@ class AppRouter {
         builder: (context, state) => const ProductOrderReceivedScreen(),
       ),
       GoRoute(
+        path: '/checklists-received',
+        builder: (context, state) => const ChecklistReceivedScreen(),
+      ),
+      GoRoute(
         path: '/product-order/new',
         builder: (context, state) => const OrderListCreateScreen(),
       ),
@@ -245,6 +251,13 @@ class AppRouter {
       ),
       GoRoute(
         path: '/checklists/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id'] ?? '';
+          return ChecklistFillScreen(checklistId: id);
+        },
+      ),
+      GoRoute(
+        path: '/checklists/:id/edit',
         builder: (context, state) {
           final id = state.pathParameters['id'] ?? '';
           return ChecklistEditScreen(checklistId: id);

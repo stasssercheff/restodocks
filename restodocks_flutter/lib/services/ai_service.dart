@@ -10,10 +10,13 @@ import 'nutrition_api_service.dart';
 class GeneratedChecklist {
   final String name;
   final List<String> itemTitles;
+  /// Конфигурации виджетов (type: Status/Number/Selection/Scale, label, source, options).
+  final List<Map<String, dynamic>> itemWidgets;
 
   const GeneratedChecklist({
     required this.name,
     required this.itemTitles,
+    this.itemWidgets = const [],
   });
 }
 
