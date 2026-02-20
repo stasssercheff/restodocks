@@ -20,11 +20,11 @@ class ScheduleScreen extends StatefulWidget {
 class _ScheduleScreenState extends State<ScheduleScreen> {
   static const int _defaultWeeks = 12;
   static const double _slotColumnWidth = 120;
-  /// Ширина ячейки дня — увеличена, чтобы влезало время смены (09:00–18:00).
-  static const double _dayCellWidth = 52;
+  /// Ширина ячейки дня — чуть больше, чтобы влезало время смены (09:00–18:00).
+  static const double _dayCellWidth = 62;
   static const double _rowHeight = 44;
-  /// Высота строк даты и дня недели — компактнее.
-  static const double _headerRowHeight = 28;
+  /// Высота строк даты и дня недели — чуть выше текста.
+  static const double _headerRowHeight = 20;
 
   // Определяем, является ли устройство мобильным
   bool get isMobile => MediaQuery.of(context).size.width < 600;
@@ -367,21 +367,21 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     final leftCells = <Widget>[];
     final rightRows = <Widget>[];
 
-    Widget leftCell(Widget child, {double? height, BoxDecoration? decoration}) {
+    Widget leftCell(Widget child, {double? height, BoxDecoration? decoration, bool compact = false}) {
       return Container(
         height: height ?? _rowHeight,
         decoration: decoration != null ? BoxDecoration(border: Border(right: BorderSide(color: borderColor))) : null,
-        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+        padding: compact ? const EdgeInsets.symmetric(vertical: 2, horizontal: 8) : const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
         alignment: Alignment.centerLeft,
         child: child,
       );
     }
 
-    Widget rightCell(Widget child, {Color? bg, double? height}) {
+    Widget rightCell(Widget child, {Color? bg, double? height, bool compact = false}) {
       return Container(
         width: _dayCellWidth,
         height: height ?? _rowHeight,
-        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+        padding: compact ? const EdgeInsets.symmetric(horizontal: 2, vertical: 1) : const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: bg,
@@ -395,6 +395,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     leftCells.add(leftCell(
       Text(loc.t('schedule_date'), style: TextStyle(fontWeight: FontWeight.w600, color: headerFg, fontSize: 11)),
       height: _headerRowHeight,
+      compact: true,
       decoration: BoxDecoration(color: headerBg, border: Border(right: BorderSide(color: borderColor))),
     ));
     rightRows.add(Container(
@@ -410,6 +411,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             Text(DateFormat('dd.MM', localeStr).format(d), textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: fg)),
             bg: bg,
             height: _headerRowHeight,
+            compact: true,
           );
         }).toList(),
       ),
@@ -419,6 +421,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     leftCells.add(leftCell(
       Text(loc.t('schedule_day'), style: TextStyle(fontWeight: FontWeight.w600, color: headerFg, fontSize: 11)),
       height: _headerRowHeight,
+      compact: true,
       decoration: BoxDecoration(color: headerBg, border: Border(right: BorderSide(color: borderColor))),
     ));
     rightRows.add(Container(
@@ -434,6 +437,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             Text(weekdays[d.weekday - 1], textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: fg)),
             bg: bg,
             height: _headerRowHeight,
+            compact: true,
           );
         }).toList(),
       ),
