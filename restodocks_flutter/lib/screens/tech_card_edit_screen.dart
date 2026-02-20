@@ -1355,13 +1355,12 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                 ),
               ),
             ),
-            // Блок технологии под таблицей (ширина как у таблицы: min(1000, экран), не растягивается на весь экран)
-            ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width.clamp(0.0, 1000.0),
-                maxHeight: MediaQuery.of(context).size.height * 0.25,
-              ),
-              child: Container(
+            // Блок технологии под таблицей — ширина как у таблицы (1000px), не на весь экран
+            SizedBox(
+              width: MediaQuery.of(context).size.width > 1000 ? 1000 : MediaQuery.of(context).size.width,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.25),
+                child: Container(
               width: double.infinity,
               margin: const EdgeInsets.only(top: 12),
               decoration: BoxDecoration(
