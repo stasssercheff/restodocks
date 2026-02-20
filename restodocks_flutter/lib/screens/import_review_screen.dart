@@ -61,6 +61,7 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
 
         if (item.existingProductId != null) {
           if (item.displayPrice != null) {
+            await store.addToNomenclature(est.id, item.existingProductId!);
             await store.setEstablishmentPrice(est.id, item.existingProductId!, item.displayPrice!, defCur);
             updated++;
           }

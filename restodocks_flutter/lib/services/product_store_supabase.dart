@@ -247,23 +247,29 @@ class ProductStoreSupabase {
     print('🔍 ProductStore: Making query to establishment_products...');
     print('🔍 ProductStore: establishment_id = $establishmentId');
 
-    // Пробуем загрузить данные номенклатуры
-    final response = await _supabase.client
-        .from('establishment_products')
-        .select('product_id, price, currency')
-        .eq('establishment_id', establishmentId);
+    dynamic response;
+    try {
+      response = await _supabase.client
+          .from('establishment_products')
+          .select('product_id, price, currency')
+          .eq('establishment_id', establishmentId);
+    } catch (e) {
+      print('⚠️ ProductStore: Full select failed (price/currency columns may not exist), trying product_id only: $e');
+      response = await _supabase.client
+          .from('establishment_products')
+          .select('product_id')
+          .eq('establishment_id', establishmentId);
+    }
 
-    print('📊 ProductStore: Raw response received, length: ${response.length}');
-    print('📊 ProductStore: Response type: ${response.runtimeType}');
-    print('📊 ProductStore: Response: $response');
+    final list = response is List ? response : <dynamic>[];
+    print('📊 ProductStore: Raw response received, length: ${list.length}');
 
-    if (response.isEmpty) {
+    if (list.isEmpty) {
       print('ℹ️ ProductStore: No nomenclature data found for establishment $establishmentId');
       return;
     }
 
-    // Обрабатываем полученные данные
-    await _processNomenclatureResponse(response, establishmentId);
+    await _processNomenclatureResponse(list, establishmentId);
   }
 
   /// Альтернативный метод загрузки (если основной не работает)

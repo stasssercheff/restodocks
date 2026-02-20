@@ -722,7 +722,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
       _setLoadingMessage('Сопоставление с базой...');
       final store = context.read<ProductStoreSupabase>();
-      await store.ensureNomenclatureLoaded(est.id);
+      await store.loadNomenclature(est.id);
       final existingProducts = store.getNomenclatureProducts(est.id);
       final allProducts = store.allProducts;
 
