@@ -362,11 +362,10 @@ class ProductStoreSupabase {
     }
 
     try {
-      // Создаем запись в establishment_products
+      // Создаем запись в establishment_products (added_at есть DEFAULT NOW())
       final data = {
         'establishment_id': establishmentId,
         'product_id': productId,
-        'created_at': DateTime.now().toIso8601String(),
       };
 
       print('📝 ProductStore: Inserting data: $data');
