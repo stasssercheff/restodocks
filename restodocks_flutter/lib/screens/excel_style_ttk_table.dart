@@ -586,64 +586,48 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         items: allItems,
         loc: widget.loc,
         onProductSelected: (selectedItem) {
-          try {
-            if (selectedItem.type == 'product') {
-              final product = selectedItem.item as Product;
-              // Получаем цену за кг: establishment_products или product.basePrice
-              final establishmentPrice = widget.productStore.getEstablishmentPrice(product.id, widget.establishmentId);
-              final pricePerKg = establishmentPrice?.$1 ?? product.basePrice ?? 0.0;
-              // Стоимость = цена за кг * вес брутто в кг
-              final cost = pricePerKg * (ingredient.grossWeight / 1000);
-
-              var updatedIngredient = ingredient.copyWith(
-                productId: product.id,
-                productName: product.name,
-                unit: product.unit,
-                pricePerKg: pricePerKg,
-                cost: cost,
-              );
-
-              // Выход = нетто с учетом % ужарки
-              final outputWeight = updatedIngredient.netWeight * (1 - (updatedIngredient.cookingLossPctOverride ?? 0) / 100);
-              updatedIngredient = updatedIngredient.copyWith(outputWeight: outputWeight);
-
-              _updateIngredient(rowIndex, updatedIngredient);
-            } else if (selectedItem.type == 'pf') {
-              final pf = selectedItem.item as TechCard;
-              // Для ПФ создаем ингредиент с ссылкой на ТТК
-
-              // Рассчитываем стоимость за кг для ПФ
-              double? pfPricePerKg;
-              if (pf.ingredients.isNotEmpty) {
-                final totalCost = pf.ingredients.fold<double>(0, (sum, ing) => sum + ing.cost);
-                final totalOutput = pf.ingredients.fold<double>(0, (sum, ing) => sum + ing.outputWeight);
-                if (totalOutput > 0) {
-                  pfPricePerKg = (totalCost / totalOutput) * 1000;
-                }
-              }
-
-              final gross = ingredient.grossWeight;
-              final pfCost = (pfPricePerKg ?? 0) * (gross / 1000);
-              var updatedIngredient = ingredient.copyWith(
-                sourceTechCardId: pf.id,
-                sourceTechCardName: pf.dishName,
-                productName: pf.getDisplayNameInLists(widget.loc.currentLanguageCode),
-                unit: 'г',
-                pricePerKg: pfPricePerKg,
-                cost: pfCost,
-              );
-
-              _updateIngredient(rowIndex, updatedIngredient);
+          TTIngredient? updated;
+          final idx = rowIndex;
+          if (selectedItem.type == 'product') {
+            final product = selectedItem.item as Product;
+            final establishmentPrice = widget.productStore.getEstablishmentPrice(product.id, widget.establishmentId);
+            final pricePerKg = establishmentPrice?.$1 ?? product.basePrice ?? 0.0;
+            final cost = pricePerKg * (ingredient.grossWeight / 1000);
+            var ing = ingredient.copyWith(
+              productId: product.id,
+              productName: product.name,
+              unit: product.unit,
+              pricePerKg: pricePerKg,
+              cost: cost,
+            );
+            final outputWeight = ing.netWeight * (1 - (ing.cookingLossPctOverride ?? 0) / 100);
+            updated = ing.copyWith(outputWeight: outputWeight);
+          } else if (selectedItem.type == 'pf') {
+            final pf = selectedItem.item as TechCard;
+            double? pfPricePerKg;
+            if (pf.ingredients.isNotEmpty) {
+              final totalCost = pf.ingredients.fold<double>(0, (sum, i) => sum + i.cost);
+              final totalOutput = pf.ingredients.fold<double>(0, (sum, i) => sum + i.outputWeight);
+              if (totalOutput > 0) pfPricePerKg = (totalCost / totalOutput) * 1000;
             }
-
-            // Добавляем новую пустую строку только если это была последняя строка
-            if (rowIndex == widget.ingredients.length - 1) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                widget.onAdd();
-              });
-            }
-          } catch (e, stackTrace) {
-            // Игнорируем ошибки в callback
+            final gross = ingredient.grossWeight;
+            updated = ingredient.copyWith(
+              sourceTechCardId: pf.id,
+              sourceTechCardName: pf.dishName,
+              productName: pf.getDisplayNameInLists(widget.loc.currentLanguageCode),
+              unit: 'г',
+              pricePerKg: pfPricePerKg,
+              cost: (pfPricePerKg ?? 0) * (gross / 1000),
+            );
+          }
+          if (updated != null) {
+            final u = updated;
+            final isLast = idx == widget.ingredients.length - 1;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+              _updateIngredient(idx, u);
+              if (isLast) widget.onAdd();
+            });
           }
         },
       );
