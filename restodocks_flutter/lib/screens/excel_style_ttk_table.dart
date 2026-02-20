@@ -124,7 +124,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
             columnWidths: const {
               0: FixedColumnWidth(50),   // Тип ТТК
               1: FixedColumnWidth(120),  // Название
-              2: FixedColumnWidth(100),  // Продукт
+              2: FixedColumnWidth(160),  // Продукт
               3: FixedColumnWidth(80),   // Брутто
               4: FixedColumnWidth(80),   // % отхода
               5: FixedColumnWidth(80),   // Нетто
@@ -804,23 +804,22 @@ class _ProductSearchDropdown extends StatefulWidget {
 class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
-  final LayerLink _layerLink = LayerLink();
-  OverlayEntry? _overlayEntry;
+  final GlobalKey _cellKey = GlobalKey();
   List<SelectableItem> _filteredItems = [];
+
+  static const double _dropdownWidth = 240.0;
 
   @override
   void initState() {
     super.initState();
     _filteredItems = widget.items.take(50).toList();
     _searchController.addListener(_filter);
-    _searchController.addListener(_showDropdownOnInput);
   }
 
   @override
   void dispose() {
     _searchController.dispose();
     _searchFocusNode.dispose();
-    _hideOverlay();
     super.dispose();
   }
 
@@ -838,102 +837,58 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
             .toList();
       }
     });
-    if (_overlayEntry != null) {
-      _overlayEntry!.markNeedsBuild();
-    }
   }
 
-  void _showDropdownOnInput() {
-    if (_overlayEntry == null) _showOverlay();
-  }
-
-  void _showOverlay() {
-    if (_overlayEntry != null) return;
-    _overlayEntry = OverlayEntry(
-      builder: (context) => Stack(
-        children: [
-          Positioned.fill(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: _hideOverlay,
-            ),
-          ),
-          CompositedTransformFollower(
-            link: _layerLink,
-            showWhenUnlinked: false,
-            offset: const Offset(0, 44),
-            child: Material(
-              elevation: 8,
-              borderRadius: BorderRadius.circular(4),
-              child: Container(
-                constraints: const BoxConstraints(maxHeight: 220, minWidth: 180),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: Colors.grey.shade400),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  padding: EdgeInsets.zero,
-                  itemCount: _filteredItems.length,
-                  itemBuilder: (context, index) {
-                    final item = _filteredItems[index];
-                    return GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () {
-                        widget.onProductSelected(item);
-                        _searchController.text = item.displayName;
-                        _hideOverlay();
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        child: Text(item.displayName, style: const TextStyle(fontSize: 13)),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-          ),
-        ],
+  Future<void> _openMenu() async {
+    final box = _cellKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null) return;
+    final pos = box.localToGlobal(Offset.zero);
+    final sel = await showMenu<SelectableItem>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        pos.dx,
+        pos.dy + 44,
+        pos.dx + _dropdownWidth,
+        pos.dy + 44 + 200,
       ),
+      constraints: BoxConstraints(maxWidth: _dropdownWidth, maxHeight: 200),
+      items: _filteredItems.map((item) {
+        return PopupMenuItem<SelectableItem>(
+          value: item,
+          height: 40,
+          child: Text(item.displayName, style: const TextStyle(fontSize: 13), overflow: TextOverflow.ellipsis),
+        );
+      }).toList(),
     );
-    Overlay.of(context).insert(_overlayEntry!);
-  }
-
-  void _hideOverlay() {
-    _overlayEntry?.remove();
-    _overlayEntry = null;
-    if (mounted) setState(() {});
+    if (sel != null && mounted) {
+      widget.onProductSelected(sel);
+      _searchController.text = sel.displayName;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return CompositedTransformTarget(
-      link: _layerLink,
-      child: Container(
-        height: 44,
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.shade400, width: 1),
-          borderRadius: BorderRadius.circular(4),
-          color: Colors.white,
+    return Container(
+      key: _cellKey,
+      height: 44,
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade400, width: 1),
+        borderRadius: BorderRadius.circular(4),
+        color: Colors.white,
+      ),
+      child: TextField(
+        controller: _searchController,
+        focusNode: _searchFocusNode,
+        style: const TextStyle(fontSize: 12),
+        decoration: InputDecoration(
+          hintText: 'Выберите продукт',
+          hintStyle: const TextStyle(fontSize: 12, color: Colors.grey),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+          border: InputBorder.none,
+          isDense: true,
         ),
-        child: TextField(
-          controller: _searchController,
-          focusNode: _searchFocusNode,
-          style: const TextStyle(fontSize: 12),
-          decoration: InputDecoration(
-            hintText: 'Выберите продукт',
-            hintStyle: const TextStyle(fontSize: 12, color: Colors.grey),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-            border: InputBorder.none,
-            isDense: true,
-          ),
-          onTap: () {
-            if (_overlayEntry == null) _showOverlay();
-          },
-          onChanged: (_) => _filter(),
-        ),
+        onTap: () => _openMenu(),
+        onChanged: (_) => _filter(),
       ),
     );
   }

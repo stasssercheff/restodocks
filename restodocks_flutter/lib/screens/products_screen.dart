@@ -398,6 +398,22 @@ class _ProductsScreenState extends State<ProductsScreen> {
     }
   }
 
+  /// Ключ сортировки: соус/специя и т.п. идут по букве слова-типа (С), не по первому слову названия
+  static String _sortKeyForProduct(String name) {
+    const words = ['соус', 'специя', 'смесь', 'приправа', 'маринад', 'подлива', 'паста', 'масло'];
+    final lower = name.trim().toLowerCase();
+    for (final w in words) {
+      final idx = lower.indexOf(w);
+      if (idx >= 0) {
+        final before = idx > 0 ? lower.substring(0, idx).trim() : '';
+        final after = idx + w.length < lower.length ? lower.substring(idx + w.length).trim() : '';
+        final rest = [before, after].where((s) => s.isNotEmpty).join(' ');
+        return '$w ${rest.isEmpty ? '' : rest}'.trim();
+      }
+    }
+    return lower;
+  }
+
   List<Product> get _filteredProducts {
     var list = _products;
     if (_query.isNotEmpty) {
@@ -408,9 +424,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
       }).toList();
     }
     list = List<Product>.from(list);
-    list.sort((a, b) => _sort == _ProductSort.az
-        ? a.name.toLowerCase().compareTo(b.name.toLowerCase())
-        : b.name.toLowerCase().compareTo(a.name.toLowerCase()));
+    list.sort((a, b) {
+      final ka = _sortKeyForProduct(a.getLocalizedName('ru'));
+      final kb = _sortKeyForProduct(b.getLocalizedName('ru'));
+      return _sort == _ProductSort.az ? ka.compareTo(kb) : kb.compareTo(ka);
+    });
     return list;
   }
 
@@ -710,31 +728,23 @@ class _ProductDetailsDialogState extends State<_ProductDetailsDialog> {
     String usageMessage = '';
 
     try {
-      // Проверяем в номенклатуре текущего заведения
-      final establishment = account.establishment;
-      if (establishment != null) {
-        final nomenclatureIds = store.getNomenclatureIdsForEstablishment(establishment.id);
-        if (nomenclatureIds.contains(widget.product.id)) {
-          isUsed = true;
-          usageMessage = 'Продукт используется в номенклатуре заведения "${establishment.name}"';
+      // Проверяем в ТТК — блокируем удаление только если продукт используется в техкартах
+      {
+        try {
+          final allTechCards = await techCardService.getAllTechCards();
+          for (final techCard in allTechCards) {
+            if (techCard.ingredients.any((ing) => ing.productId == widget.product.id)) {
+              isUsed = true;
+              usageMessage = 'Продукт используется в технологической карте "${techCard.dishName}"';
+              break;
+            }
+          }
+        } catch (_) {
+          // Ошибка загрузки ТТК — не блокируем удаление, при FK-ошибке покажем её
         }
       }
-
-      // Проверяем в ТТК
-      if (!isUsed) {
-        final allTechCards = await techCardService.getAllTechCards();
-        for (final techCard in allTechCards) {
-          if (techCard.ingredients.any((ing) => ing.productId == widget.product.id)) {
-            isUsed = true;
-            usageMessage = 'Продукт используется в технологической карте "${techCard.dishName}"';
-            break;
-          }
-        }
-        }
-      } catch (e) {
-      // Если не удалось проверить, показываем предупреждение
-      isUsed = true;
-      usageMessage = 'Не удалось проверить использование продукта. Удаление запрещено для безопасности.';
+    } catch (e) {
+      // Ошибка при проверке номенклатуры — не блокируем
     }
 
     if (isUsed) {

@@ -410,6 +410,21 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
   }
 
   Future<void> _confirmRemoveForNomenclature(BuildContext context, Product p, ProductStoreSupabase store, LocalizationService loc, VoidCallback onRefresh, String estId) async {
+    // Проверяем, используется ли продукт в ТТК — блокируем удаление из номенклатуры
+    try {
+      final techCardService = context.read<TechCardServiceSupabase>();
+      final allTechCards = await techCardService.getAllTechCards();
+      for (final tc in allTechCards) {
+        if (tc.ingredients.any((ing) => ing.productId == p.id)) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Невозможно удалить: продукт используется в ТТК "${tc.dishName}"')),
+            );
+          }
+          return;
+        }
+      }
+    } catch (_) {}
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -728,7 +743,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
               items: nomItems,
               store: store,
               estId: estId ?? '',
-              canRemove: canEdit,
+              canRemove: true,
               loc: loc,
               sort: _nomSort,
               filterType: _nomFilter,
@@ -757,10 +772,10 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     final copy = List<Product>.from(list);
     switch (sort) {
       case _CatalogSort.nameAz:
-        copy.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+        copy.sort((a, b) => _sortKeyForName(a.getLocalizedName('ru')).compareTo(_sortKeyForName(b.getLocalizedName('ru'))));
         break;
       case _CatalogSort.nameZa:
-        copy.sort((a, b) => b.name.toLowerCase().compareTo(a.name.toLowerCase()));
+        copy.sort((a, b) => _sortKeyForName(b.getLocalizedName('ru')).compareTo(_sortKeyForName(a.getLocalizedName('ru'))));
         break;
       case _CatalogSort.priceAsc:
         copy.sort((a, b) => (a.basePrice ?? 0).compareTo(b.basePrice ?? 0));
@@ -772,19 +787,33 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     return copy;
   }
 
+  /// Ключ сортировки: соус/специя и т.п. идут по букве слова-типа (С)
+  static String _sortKeyForName(String name) {
+    const words = ['соус', 'специя', 'смесь', 'приправа', 'маринад', 'подлива', 'паста', 'масло'];
+    final lower = name.trim().toLowerCase();
+    for (final w in words) {
+      final idx = lower.indexOf(w);
+      if (idx >= 0) {
+        final before = idx > 0 ? lower.substring(0, idx).trim() : '';
+        final after = idx + w.length < lower.length ? lower.substring(idx + w.length).trim() : '';
+        final rest = [before, after].where((s) => s.isNotEmpty).join(' ');
+        return '$w ${rest.isEmpty ? '' : rest}'.trim();
+      }
+    }
+    return lower;
+  }
+
   List<NomenclatureItem> _sortNomenclatureItems(List<NomenclatureItem> list, _CatalogSort sort) {
-    // Разделяем продукты и ТТК ПФ
     final products = list.where((item) => item.isProduct).toList();
     final techCards = list.where((item) => item.isTechCard).toList();
 
-    // Сортируем каждую группу отдельно
     void sortGroup(List<NomenclatureItem> group) {
       switch (sort) {
         case _CatalogSort.nameAz:
-          group.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+          group.sort((a, b) => _sortKeyForName(a.getLocalizedName('ru')).compareTo(_sortKeyForName(b.getLocalizedName('ru'))));
           break;
         case _CatalogSort.nameZa:
-          group.sort((a, b) => b.name.toLowerCase().compareTo(a.name.toLowerCase()));
+          group.sort((a, b) => _sortKeyForName(b.getLocalizedName('ru')).compareTo(_sortKeyForName(a.getLocalizedName('ru'))));
           break;
         case _CatalogSort.priceAsc:
           group.sort((a, b) => (a.price ?? 0).compareTo(b.price ?? 0));
@@ -794,11 +823,8 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
           break;
       }
     }
-
     sortGroup(products);
     sortGroup(techCards);
-
-    // Объединяем: сначала продукты, потом ТТК ПФ
     return [...products, ...techCards];
   }
 
