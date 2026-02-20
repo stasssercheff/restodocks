@@ -170,9 +170,10 @@ class AppRouter {
       GoRoute(
         path: '/products/upload',
         builder: (context, state) {
-          print('=== Building ProductUploadScreen route ===');
+          final addToNom = state.queryParameters['addToNomenclature'];
+          final defaultAddToNomenclature = addToNom != 'false';
           try {
-            return const ProductUploadScreen();
+            return ProductUploadScreen(defaultAddToNomenclature: defaultAddToNomenclature);
           } catch (e) {
             print('=== Error building ProductUploadScreen: $e ===');
             return Scaffold(

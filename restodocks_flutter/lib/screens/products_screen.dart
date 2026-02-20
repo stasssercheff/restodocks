@@ -21,10 +21,13 @@ class ProductsScreen extends StatefulWidget {
   State<ProductsScreen> createState() => _ProductsScreenState();
 }
 
+enum _ProductSort { az, za }
+
 class _ProductsScreenState extends State<ProductsScreen> {
   String _query = '';
   List<Product> _products = [];
   bool _isLoading = true;
+  _ProductSort _sort = _ProductSort.az;
 
   @override
   void initState() {
@@ -396,12 +399,19 @@ class _ProductsScreenState extends State<ProductsScreen> {
   }
 
   List<Product> get _filteredProducts {
-    if (_query.isEmpty) return _products;
-    final query = _query.toLowerCase();
-    return _products.where((product) {
-      return product.name.toLowerCase().contains(query) ||
-             product.getLocalizedName('ru').toLowerCase().contains(query);
-    }).toList();
+    var list = _products;
+    if (_query.isNotEmpty) {
+      final query = _query.toLowerCase();
+      list = list.where((product) {
+        return product.name.toLowerCase().contains(query) ||
+               product.getLocalizedName('ru').toLowerCase().contains(query);
+      }).toList();
+    }
+    list = List<Product>.from(list);
+    list.sort((a, b) => _sort == _ProductSort.az
+        ? a.name.toLowerCase().compareTo(b.name.toLowerCase())
+        : b.name.toLowerCase().compareTo(a.name.toLowerCase()));
+    return list;
   }
 
   void _showProductDetails(Product product) {
@@ -453,7 +463,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
         ),
         title: Text(loc.t('products')),
         actions: [
-          // Счетчик продуктов
+          // 1. Количество
           Center(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -470,32 +480,34 @@ class _ProductsScreenState extends State<ProductsScreen> {
               ),
             ),
           ),
+          const SizedBox(width: 4),
+          // 3. Фильтр А–Я / Я–А (три полоски)
           IconButton(
-            icon: const Icon(Icons.delete_sweep),
-            tooltip: 'Удалить полные дубликаты',
-            onPressed: _removeDuplicates,
+            icon: Icon(_sort == _ProductSort.az ? Icons.filter_list : Icons.filter_list_alt),
+            tooltip: _sort == _ProductSort.az ? 'А–Я (нажмите для Я–А)' : 'Я–А (нажмите для А–Я)',
+            onPressed: () => setState(() => _sort = _sort == _ProductSort.az ? _ProductSort.za : _ProductSort.az),
           ),
+          // 4. Выявление дубликатов с ИИ
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.auto_awesome),
+            tooltip: 'Дубликаты с ИИ',
+            onSelected: (v) async {
+              if (v == 'by_name') await _removeDuplicatesByName();
+              else if (v == 'full') await _removeDuplicates();
+            },
+            itemBuilder: (ctx) => [
+              const PopupMenuItem(value: 'by_name', child: Text('Дубликаты по названию')),
+              const PopupMenuItem(value: 'full', child: Text('Полные дубликаты')),
+            ],
+          ),
+          // 5. Загрузка (без добавления в номенклатуру — пополнение базы)
           IconButton(
-            icon: const Icon(Icons.clear_all),
-            tooltip: 'Очистить ВСЕ продукты',
-            onPressed: _clearAllProducts,
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete_forever),
-            tooltip: 'Удалить дубликаты по названию',
-            onPressed: _removeDuplicatesByName,
-          ),
-          IconButton(
-            icon: const Icon(Icons.clear_all),
-            tooltip: 'Полное очищение списка',
-            onPressed: _clearAllProducts,
-          ),
-                      IconButton(
             icon: const Icon(Icons.upload_file),
-            tooltip: loc.t('upload_products'),
-            onPressed: () => context.push('/products/upload'),
+            tooltip: '${loc.t('upload_products')} (пополнение базы)',
+            onPressed: () => context.push('/products/upload?addToNomenclature=false'),
           ),
-                        IconButton(
+          // 6. Обновить
+          IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadProducts,
                   ),

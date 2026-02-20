@@ -39,7 +39,10 @@ void _addDebugLog(String message) {
 
 /// Экран для загрузки продуктов в номенклатуру
 class ProductUploadScreen extends StatefulWidget {
-  const ProductUploadScreen({super.key});
+  const ProductUploadScreen({super.key, this.defaultAddToNomenclature = true});
+
+  /// По умолчанию true — добавлять в номенклатуру. false — только пополнение базы.
+  final bool defaultAddToNomenclature;
 
   @override
   State<ProductUploadScreen> createState() => _ProductUploadScreenState();
@@ -866,10 +869,10 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     if (fileName.endsWith('.txt')) {
       print('Processing as TXT file');
       final text = utf8.decode(bytes, allowMalformed: true);
-      await _processText(text, loc, true);
+      await _processText(text, loc, widget.defaultAddToNomenclature);
     } else if (fileName.endsWith('.rtf')) {
       final text = _extractTextFromRtf(utf8.decode(bytes, allowMalformed: true));
-      await _processText(text, loc, true);
+      await _processText(text, loc, widget.defaultAddToNomenclature);
     } else if (fileName.endsWith('.csv')) {
       final text = utf8.decode(bytes, allowMalformed: true);
       final lines = text.split('\n').where((line) => line.trim().isNotEmpty).toList();
@@ -884,7 +887,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
           return line; // Уже в нужном формате
         }
       }).toList();
-      await _processText(convertedLines.join('\n'), loc, true);
+      await _processText(convertedLines.join('\n'), loc, widget.defaultAddToNomenclature);
     } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
       await _processExcel(bytes, loc);
     }
@@ -913,7 +916,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
       final loc = context.read<LocalizationService>();
       final controller = TextEditingController();
-      bool addToNomenclature = true; // По умолчанию добавлять в номенклатуру
+      bool addToNomenclature = widget.defaultAddToNomenclature;
 
       _addDebugLog('Showing paste dialog...');
       final result = await showDialog<({String text, bool addToNomenclature})>(
@@ -989,7 +992,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     print('=== _showSmartPasteDialog called ===');
     final controller = TextEditingController();
     final loc = context.read<LocalizationService>();
-    bool addToNomenclature = true; // По умолчанию добавлять в номенклатуру
+    bool addToNomenclature = widget.defaultAddToNomenclature;
 
     // Пример различных форматов
     controller.text = '''Возможные форматы:
@@ -1570,7 +1573,7 @@ ${text}
         _addDebugLog('Trying to process as text/CSV...');
         try {
           final textContent = String.fromCharCodes(bytes);
-          await _processText(textContent, loc, true);
+          await _processText(textContent, loc, widget.defaultAddToNomenclature);
           return;
         } catch (textError) {
           _addDebugLog('Text processing also failed: $textError');
@@ -1634,7 +1637,7 @@ ${text}
         // Пробуем обработать как текст
         try {
           final textContent = String.fromCharCodes(bytes);
-          await _processText(textContent, loc, true);
+          await _processText(textContent, loc, widget.defaultAddToNomenclature);
           return;
         } catch (textError) {
           _addDebugLog('Text processing fallback also failed: $textError');
@@ -1659,7 +1662,7 @@ ${text}
       final preview = lines.take(3).join('\n');
       _addDebugLog('Preview of extracted data:\n$preview');
 
-      await _processText(lines.join('\n'), loc, true); // Для файлов всегда добавляем в номенклатуру
+      await _processText(lines.join('\n'), loc, widget.defaultAddToNomenclature);
     } catch (e) {
       _addDebugLog('Standard Excel processing failed: $e');
 
@@ -1726,7 +1729,7 @@ ${text}
         throw Exception('Не удалось конвертировать данные');
       }
 
-      await _processText(convertedLines.join('\n'), loc, true);
+      await _processText(convertedLines.join('\n'), loc, widget.defaultAddToNomenclature);
 
     } catch (e) {
       _addDebugLog('CSV conversion failed: $e');

@@ -334,23 +334,25 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
                     onChanged: (_) => _updateComment(),
                   ),
                   const SizedBox(height: 24),
-                  FilledButton(
-                    onPressed: _saveWithQuantities,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: Text(loc.t('order_list_save_with_quantities')),
-                    ),
-                  ),
-                  if (list.isSavedWithQuantities) ...[
-                    const SizedBox(height: 12),
-                    FilledButton.tonal(
-                      onPressed: _sendSaveToDevice,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        child: Text(loc.t('order_list_send')),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      TextButton(
+                        onPressed: _saveWithQuantities,
+                        child: Text(loc.t('order_list_save_with_quantities')),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: _sendSaveToDevice,
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
+                          child: Text(loc.t('order_list_send')),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),

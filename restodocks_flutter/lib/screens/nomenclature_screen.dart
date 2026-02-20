@@ -1445,6 +1445,9 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
               return Card(
                 margin: const EdgeInsets.only(bottom: 6),
                 child: ListTile(
+                  onTap: item.isProduct
+                      ? () => widget.onEditProduct(context, item.product!)
+                      : null,
                   leading: CircleAvatar(
                     backgroundColor: Theme.of(context).colorScheme.primaryContainer,
                     child: Text(
@@ -1466,10 +1469,14 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (item.isProduct) ...[
-                        IconButton(
-                          icon: const Icon(Icons.edit_outlined),
-                          tooltip: widget.loc.t('edit_product'),
-                          onPressed: () => widget.onEditProduct(context, item.product!),
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => widget.onEditProduct(context, item.product!),
+                          child: IconButton(
+                            icon: const Icon(Icons.edit_outlined),
+                            tooltip: widget.loc.t('edit_product'),
+                            onPressed: () => widget.onEditProduct(context, item.product!),
+                          ),
                         ),
                         if (widget.canRemove)
                           IconButton(
