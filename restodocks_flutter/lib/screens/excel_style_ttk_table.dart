@@ -83,18 +83,19 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   }
 
   Widget _buildTtkTable(BuildContext context) {
-    // Строки с сохранением индексов для onUpdate (индекс в widget.ingredients)
-    final indexedRows = <MapEntry<int, TTIngredient>>[];
-    for (var i = 0; i < widget.ingredients.length; i++) {
-      var ing = widget.ingredients[i];
-      if (ing.productName.isNotEmpty && ing.outputWeight == 0) {
-        ing = ing.copyWith(outputWeight: ing.netWeight * (1 - (ing.cookingLossPctOverride ?? 0) / 100));
+    try {
+      // Строки с сохранением индексов для onUpdate (индекс в widget.ingredients)
+      final indexedRows = <MapEntry<int, TTIngredient>>[];
+      for (var i = 0; i < widget.ingredients.length; i++) {
+        var ing = widget.ingredients[i];
+        if (ing.productName.isNotEmpty && ing.outputWeight == 0) {
+          ing = ing.copyWith(outputWeight: ing.netWeight * (1 - (ing.cookingLossPctOverride ?? 0) / 100));
+        }
+        indexedRows.add(MapEntry(i, ing));
       }
-      indexedRows.add(MapEntry(i, ing));
-    }
-    if (indexedRows.isEmpty) {
-      indexedRows.add(MapEntry(0, TTIngredient.emptyPlaceholder()));
-    }
+      if (indexedRows.isEmpty) {
+        indexedRows.add(MapEntry(0, TTIngredient.emptyPlaceholder()));
+      }
 
     // Добавляем строку "Итого"
     final totalOutput = indexedRows.map((e) => e.value).where((ing) => ing.productName.isNotEmpty).fold<double>(0, (s, ing) => s + ing.outputWeight);
@@ -351,6 +352,20 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         ),
       ),
     );
+    } catch (e, stackTrace) {
+      // В случае ошибки показываем fallback
+      return Container(
+        color: Colors.red.shade100,
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Error in TTK table', style: TextStyle(color: Colors.red)),
+            Text('Error: $e', style: const TextStyle(color: Colors.red, fontSize: 10)),
+          ],
+        ),
+      );
+    }
   }
 
   // Вспомогательные методы для создания ячеек
