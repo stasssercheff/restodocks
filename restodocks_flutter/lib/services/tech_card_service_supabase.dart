@@ -45,7 +45,8 @@ class TechCardServiceSupabase {
     );
 
     final techCardData = Map<String, dynamic>.from(techCard.toJson())
-      ..remove('id');
+      ..remove('id')
+      ..remove('section'); // колонка section может отсутствовать в схеме БД
     final response = await _supabase.insertData('tech_cards', techCardData);
     final createdTechCard = TechCard.fromJson(response);
 
@@ -159,10 +160,11 @@ class TechCardServiceSupabase {
   /// Сохранение ТТК
   Future<void> saveTechCard(TechCard techCard) async {
     try {
-      // Обновляем ТТК
+      final payload = Map<String, dynamic>.from(techCard.toJson());
+      payload.remove('section'); // колонка section может отсутствовать в схеме БД
       await _supabase.updateData(
         'tech_cards',
-        techCard.toJson(),
+        payload,
         'id',
         techCard.id,
       );
