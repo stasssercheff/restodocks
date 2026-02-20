@@ -78,7 +78,7 @@ class AppRouter {
       GoRoute(
         path: '/login',
         builder: (context, state) {
-          final returnTo = state.uri.queryParameters['returnTo'];
+          final returnTo = state.queryParameters['returnTo'];
           return LoginScreen(returnTo: returnTo);
         },
       ),

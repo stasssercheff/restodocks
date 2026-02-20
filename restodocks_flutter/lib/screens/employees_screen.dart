@@ -88,7 +88,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
           IconButton(icon: const Icon(Icons.home), onPressed: () => context.go('/home'), tooltip: loc.t('home')),
         ],
       ),
-      body: _buildBody(loc, theme, canEdit, canConfirmShifts: _canConfirmShifts(acc.currentEmployee)),
+      body: _buildBody(loc, theme, canEdit, acc.currentEmployee?.id, canConfirmShifts: _canConfirmShifts(acc.currentEmployee)),
       floatingActionButton: canEdit
           ? FloatingActionButton.extended(
               onPressed: () => _openAddEmployee(context),
@@ -99,7 +99,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     );
   }
 
-  Widget _buildBody(LocalizationService loc, ThemeData theme, bool canEdit, {bool canConfirmShifts = false}) {
+  Widget _buildBody(LocalizationService loc, ThemeData theme, bool canEdit, String? currentEmployeeId, {bool canConfirmShifts = false}) {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
       return Center(
@@ -153,7 +153,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
         employee: _list[i],
         loc: loc,
         canEdit: canEdit,
-        currentEmployeeId: acc.currentEmployee?.id,
+        currentEmployeeId: currentEmployeeId,
         onUpdated: _load,
         onEdit: () => _openEditEmployee(context, _list[i]),
         onDelete: () => _deleteEmployee(context, _list[i]),
