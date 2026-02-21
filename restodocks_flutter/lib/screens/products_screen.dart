@@ -36,10 +36,13 @@ class _ProductsScreenState extends State<ProductsScreen> {
   }
 
   Future<void> _loadProducts() async {
+    print('🛒 ProductsScreen: Starting to load products...');
     setState(() => _isLoading = true);
     try {
     final store = context.read<ProductStoreSupabase>();
+      print('🛒 ProductsScreen: Calling store.loadProducts()...');
       await store.loadProducts();
+      print('🛒 ProductsScreen: store.loadProducts() completed');
       if (mounted) {
         // Проверяем на дубликаты перед установкой
         final uniqueProducts = <String, Product>{};
@@ -48,7 +51,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
         }
         final deduplicatedProducts = uniqueProducts.values.toList();
 
-        print('DEBUG: Loaded ${store.allProducts.length} products, deduplicated to ${deduplicatedProducts.length}');
+        print('🛒 ProductsScreen: Loaded ${store.allProducts.length} products, deduplicated to ${deduplicatedProducts.length}');
+        print('🛒 ProductsScreen: Sample products: ${deduplicatedProducts.take(3).map((p) => p.name).join(', ')}');
 
         setState(() {
           _products = deduplicatedProducts;

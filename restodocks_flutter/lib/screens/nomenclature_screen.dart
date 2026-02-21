@@ -308,22 +308,37 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
   }
 
   Future<void> _ensureLoaded() async {
+    print('📋 NomenclatureScreen: Starting _ensureLoaded...');
     final store = context.read<ProductStoreSupabase>();
     final account = context.read<AccountManagerSupabase>();
     final estId = account.establishment?.id;
-    if (estId == null) return;
+    print('📋 NomenclatureScreen: Establishment ID: $estId');
+
+    if (estId == null) {
+      print('📋 NomenclatureScreen: No establishment ID, returning');
+      return;
+    }
 
     final techCardService = context.read<TechCardServiceSupabase>();
 
     if (store.allProducts.isEmpty && !store.isLoading) {
+      print('📋 NomenclatureScreen: Loading products...');
       await store.loadProducts();
+      print('📋 NomenclatureScreen: Products loaded: ${store.allProducts.length}');
     }
+
+    print('📋 NomenclatureScreen: Loading nomenclature...');
     await store.loadNomenclature(estId);
 
     // Загружаем элементы номенклатуры (продукты + ТТК ПФ)
+    print('📋 NomenclatureScreen: Loading nomenclature items...');
     _nomenclatureItems = await store.getAllNomenclatureItems(estId, techCardService);
+    print('📋 NomenclatureScreen: Nomenclature items loaded: ${_nomenclatureItems.length}');
 
-    if (mounted) setState(() => _isLoading = false);
+    if (mounted) {
+      setState(() => _isLoading = false);
+      print('📋 NomenclatureScreen: UI updated, isLoading = false');
+    }
   }
 
   Future<void> _showDuplicates() async {
