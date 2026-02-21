@@ -115,12 +115,13 @@ class _ProductsScreenState extends State<ProductsScreen> {
       }
 
       // Показываем диалог выбора
+      final loc = context.read<LocalizationService>();
       await showDialog(
         context: context,
         builder: (ctx) => _SmartDuplicatesDialog(
           groups: duplicateGroups,
           mode: _DuplicateMode.full,
-          loc: widget.loc,
+          loc: loc,
           onRemove: (idsToRemove) async {
             final store = context.read<ProductStoreSupabase>();
             final account = context.read<AccountManagerSupabase>();
