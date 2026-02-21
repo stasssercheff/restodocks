@@ -129,7 +129,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
     } catch (e) {
       if (!mounted) return;
       final loc = context.read<LocalizationService>();
-      setState(() => _errorMessage = loc.t('register_error', args: {'error': e.toString()}));
+      final eStr = e.toString().toLowerCase();
+      if (eStr.contains('email_already_exists') ||
+          eStr.contains('email already exists') ||
+          eStr.contains('23505') ||
+          eStr.contains('duplicate') ||
+          eStr.contains('employees_email_key')) {
+        setState(() => _errorMessage = loc.t('email_already_registered'));
+      } else {
+        setState(() => _errorMessage = loc.t('register_error', args: {'error': e.toString()}));
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

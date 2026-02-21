@@ -92,7 +92,12 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
     } catch (e) {
       if (!mounted) return;
       final loc = context.read<LocalizationService>();
-      if (e.toString().contains('EMAIL_ALREADY_EXISTS')) {
+      final eStr = e.toString().toLowerCase();
+      if (eStr.contains('email_already_exists') ||
+          eStr.contains('email already exists') ||
+          eStr.contains('23505') ||
+          eStr.contains('duplicate') ||
+          eStr.contains('employees_email_key')) {
         setState(() => _errorMessage = loc.t('email_already_registered') ?? 'Этот email уже зарегистрирован в системе');
       } else {
         setState(() => _errorMessage = loc.t('register_error', args: {'error': e.toString()}));

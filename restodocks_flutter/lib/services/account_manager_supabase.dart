@@ -236,6 +236,9 @@ class AccountManagerSupabase {
       return createdEmployee;
     } catch (e) {
       // ОБРАБОТКА ОШИБКИ ДУБЛИРОВАНИЯ EMAIL
+      if (e is PostgrestException && e.code == '23505') {
+        throw Exception('EMAIL_ALREADY_EXISTS');
+      }
       final errorStr = e.toString().toLowerCase();
       if (errorStr.contains('23505') || errorStr.contains('duplicate') || errorStr.contains('unique') || errorStr.contains('email_key')) {
         throw Exception('EMAIL_ALREADY_EXISTS');
