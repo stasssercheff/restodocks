@@ -1881,23 +1881,56 @@ ${text}
         }
         idx++;
         try {
-        // Используем ИИ для улучшения данных продукта
+        // Используем ИИ для исправления опечаток и нормализации названия
         ProductVerificationResult? verification;
+        String normalizedName = item.name;
         try {
           final aiService = context.read<AiServiceSupabase>();
           verification = await aiService.verifyProduct(
             item.name,
             currentPrice: item.price,
           );
-          _addDebugLog('AI verification successful for "${item.name}": calories=${verification?.suggestedCalories}, protein=${verification?.suggestedProtein}');
+          _addDebugLog('AI verification successful for "${item.name}": normalized="${verification?.normalizedName}", calories=${verification?.suggestedCalories}');
+
+          // Используем нормализованное название от AI, если оно отличается
+          if (verification?.normalizedName != null && verification!.normalizedName!.isNotEmpty) {
+            normalizedName = verification!.normalizedName!;
+            _addDebugLog('Using AI-normalized name: "${item.name}" -> "${normalizedName}"');
+          }
         } catch (aiError) {
           _addDebugLog('AI verification failed for "${item.name}": $aiError');
           verification = null;
         }
 
-        // Используем проверенные ИИ данные или оригинальные
-        final normalizedName = verification?.normalizedName ?? item.name;
+        // Дополнительная локальная нормализация названий
+        normalizedName = _normalizeProductName(normalizedName);
         var names = <String, String>{for (final c in allLangs) c: normalizedName};
+
+        // ПРОВЕРКА НА СУЩЕСТВОВАНИЕ ПОХОЖЕГО ПРОДУКТА
+        Product? existingProduct = await _findSimilarProduct(normalizedName, store);
+        if (existingProduct != null) {
+          _addDebugLog('Found similar existing product: "${existingProduct.name}" (ID: ${existingProduct.id})');
+
+          // Если продукт найден, обновляем его цену вместо создания нового
+          if (item.price != null) {
+            try {
+              _addDebugLog('Updating price for existing product "${existingProduct.name}": ${existingProduct.basePrice} -> ${item.price}');
+              await store.setEstablishmentPrice(estId, existingProduct.id, item.price, defCur);
+
+              // Добавляем в номенклатуру если нужно
+              if (addToNomenclature) {
+                await store.addToNomenclature(estId, existingProduct.id, price: item.price, currency: defCur);
+              }
+
+              skipped++;
+              _addDebugLog('Successfully updated existing product price');
+              continue; // Пропускаем создание нового продукта
+            } catch (updateError) {
+              _addDebugLog('Failed to update existing product price: $updateError');
+              // Продолжаем с созданием нового продукта
+            }
+          }
+        }
 
         // Проверяем питательные данные от AI
         double? calories = verification?.suggestedCalories;
@@ -1961,14 +1994,6 @@ ${text}
                 supabase: context.read<SupabaseService>(),
               ),
             );
-
-            // ЛОКАЛЬНАЯ НОРМАЛИЗАЦИЯ НАЗВАНИЙ ПРОДУКТОВ
-            final normalizedName = _normalizeProductName(product.name);
-            if (normalizedName != product.name) {
-              print('Normalizing product name: "${product.name}" -> "${normalizedName}"');
-              // Обновить продукт с нормализованным названием
-              await store.updateProduct(product.copyWith(name: normalizedName));
-            }
 
             await translationManager.handleEntitySave(
               entityType: TranslationEntityType.product,
@@ -2145,6 +2170,98 @@ ${text}
     }
   }
 
+  /// Поиск похожего существующего продукта
+  Future<Product?> _findSimilarProduct(String productName, ProductStoreSupabase store) async {
+    try {
+      // Получаем все продукты
+      final allProducts = store.allProducts;
+
+      // Нормализуем искомое название для сравнения
+      final normalizedSearch = _normalizeForComparison(productName);
+
+      for (final product in allProducts) {
+        final normalizedExisting = _normalizeForComparison(product.name);
+
+        // Проверяем точное совпадение после нормализации
+        if (normalizedExisting == normalizedSearch) {
+          return product;
+        }
+
+        // Проверяем на высокую схожесть (расстояние Левенштейна или простые метрики)
+        final similarity = _calculateSimilarity(normalizedSearch, normalizedExisting);
+        if (similarity > 0.8) { // 80% схожести
+          _addDebugLog('High similarity found: "$normalizedSearch" vs "$normalizedExisting" (${(similarity * 100).round()}%)');
+          return product;
+        }
+      }
+
+      // Если не нашли с помощью простых методов, попробуем AI
+      try {
+        final aiService = context.read<AiServiceSupabase>();
+        final prompt = '''
+Проверь, есть ли в списке продуктов тот, который очень похож на "${productName}".
+
+Список продуктов:
+${allProducts.map((p) => p.name).join('\n')}
+
+Если найдешь очень похожий продукт (с опечатками, синонимами или небольшими отличиями), верни только его название.
+Если ничего похожего нет, верни пустую строку.
+
+Примеры:
+- "авокало" -> "Авокадо"
+- "картошка" -> "Картофель"
+- "говядина вырезка" -> "Говядина"
+''';
+
+        final result = await aiService.generateChecklistFromPrompt(prompt);
+        if (result != null && result.itemTitles.isNotEmpty) {
+          final aiSuggestion = result.itemTitles.first.trim();
+          if (aiSuggestion.isNotEmpty && aiSuggestion != productName) {
+            // Ищем продукт с таким названием
+            final aiProduct = allProducts.firstWhere(
+              (p) => p.name.toLowerCase() == aiSuggestion.toLowerCase(),
+              orElse: () => null as Product,
+            );
+            if (aiProduct != null) {
+              _addDebugLog('AI found similar product: "$productName" -> "$aiSuggestion"');
+              return aiProduct;
+            }
+          }
+        }
+      } catch (aiError) {
+        _addDebugLog('AI similarity check failed: $aiError');
+      }
+
+      return null;
+    } catch (e) {
+      _addDebugLog('Error in _findSimilarProduct: $e');
+      return null;
+    }
+  }
+
+  /// Нормализация названия для сравнения (убираем регистр, пробелы, пунктуацию)
+  String _normalizeForComparison(String name) {
+    return name
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^\w\sа-яё]'), '') // Убираем пунктуацию, оставляем буквы и пробелы
+        .replaceAll(RegExp(r'\s+'), ' ') // Нормализуем пробелы
+        .trim();
+  }
+
+  /// Простая метрика схожести строк (0.0 - 1.0)
+  double _calculateSimilarity(String str1, String str2) {
+    if (str1 == str2) return 1.0;
+    if (str1.isEmpty || str2.isEmpty) return 0.0;
+
+    // Простая метрика: общие слова / общее количество слов
+    final words1 = str1.split(' ').toSet();
+    final words2 = str2.split(' ').toSet();
+    final intersection = words1.intersection(words2).length;
+    final union = words1.union(words2).length;
+
+    return union > 0 ? intersection / union : 0.0;
+  }
+
   /// Локальная нормализация названий продуктов
   String _normalizeProductName(String name) {
     String normalized = name.trim();
@@ -2154,34 +2271,87 @@ ${text}
       // Фрукты и овощи
       'авокадо': 'Авокадо',
       'авокало': 'Авокадо',
+      'абокадо': 'Авокадо',
       'картошка': 'Картофель',
       'картофель': 'Картофель',
+      'картофель свежий': 'Картофель',
       'морковка': 'Морковь',
       'морковь': 'Морковь',
+      'морковь свежая': 'Морковь',
       'лук': 'Лук репчатый',
       'лук репка': 'Лук репчатый',
+      'лук репчатый': 'Лук репчатый',
       'томат': 'Томаты',
       'томаты': 'Томаты',
+      'помидоры': 'Томаты',
       'огурец': 'Огурцы',
       'огурцы': 'Огурцы',
+      'огурец свежий': 'Огурцы',
       'перец': 'Перец болгарский',
       'болгарский перец': 'Перец болгарский',
+      'перец болгарский': 'Перец болгарский',
+      'капуста': 'Капуста',
+      'брокколи': 'Капуста брокколи',
+      'капуста брокколи': 'Капуста брокколи',
+      'зелень': 'Зелень',
+      'укроп': 'Укроп',
+      'петрушка': 'Петрушка',
+      'кинза': 'Кинза',
+      'базилик': 'Базилик',
+      'розмарин': 'Розмарин',
+      'тимьян': 'Тимьян',
+      'чеснок': 'Чеснок',
+      'имбирь': 'Имбирь',
 
       // Молочные продукты
       'молоко': 'Молоко',
+      'молоко цельное': 'Молоко',
       'сыр': 'Сыр',
       'масло': 'Масло сливочное',
       'сливочное масло': 'Масло сливочное',
+      'масло сливочное': 'Масло сливочное',
       'йогурт': 'Йогурт',
       'кефир': 'Кефир',
+      'творог': 'Творог',
+      'сметана': 'Сметана',
+      'сливки': 'Сливки',
 
       // Мясо и рыба
       'курица': 'Курица',
+      'курица грудка': 'Кура грудка филе',
+      'кура грудка': 'Кура грудка филе',
       'говядина': 'Говядина',
+      'говядина вырезка': 'Говядина',
       'свинина': 'Свинина',
       'рыба': 'Рыба',
       'лосось': 'Лосось',
       'семга': 'Семга',
+      'форель': 'Форель',
+      'тунец': 'Тунец',
+      'креветки': 'Креветки',
+      'осьминог': 'Осьминог',
+      'кальмары': 'Кальмары',
+
+      // Крупы и зерновые
+      'рис': 'Рис',
+      'гречка': 'Крупа гречневая',
+      'овсянка': 'Каша овсянная',
+      'пшенка': 'Каша пшенная',
+      'перловка': 'Крупа перловая',
+      'манка': 'Крупа манная',
+
+      // Напитки и специи
+      'соль': 'Соль',
+      'перец черный': 'Перец черный молотый',
+      'сахар': 'Сахар',
+      'мед': 'Мед',
+      'уксус': 'Уксус',
+      'соус': 'Соус',
+
+      // Хлебобулочные
+      'хлеб': 'Хлеб',
+      'батон': 'Батон',
+      'багет': 'Багет',
     };
 
     // Применить исправления
