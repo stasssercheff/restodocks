@@ -11,6 +11,7 @@ import '../services/product_store_supabase.dart';
 import '../services/localization_service.dart';
 import '../services/account_manager_supabase.dart';
 import '../services/tech_card_service_supabase.dart';
+import '../services/ai_service_supabase.dart';
 
 /// Экран базы продуктов: просмотр и управление продуктами с КБЖУ
 /// Поддерживает интеллектуальный импорт и защиту от удаления используемых продуктов
@@ -116,9 +117,10 @@ class _ProductsScreenState extends State<ProductsScreen> {
       // Показываем диалог выбора
       await showDialog(
         context: context,
-        builder: (ctx) => _ProductDuplicatesDialog(
+        builder: (ctx) => _SmartDuplicatesDialog(
           groups: duplicateGroups,
           mode: _DuplicateMode.full,
+          loc: widget.loc,
           onRemove: (idsToRemove) async {
             final store = context.read<ProductStoreSupabase>();
             final account = context.read<AccountManagerSupabase>();

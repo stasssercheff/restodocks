@@ -423,21 +423,8 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         _addDebugLog('RTF row $i: "${rows[i]}"');
       }
 
-      // Если RTF обработка не дала результатов или дала мало строк,
-      // пробуем обработать как обычный текст через AI
-      if (rows.length < 2) {
-        _addDebugLog('RTF extraction gave poor results (${rows.length} rows), trying AI processing');
-        try {
-          final text = _extractTextFromRtf(rtfContent);
-          if (text.isNotEmpty) {
-            _addDebugLog('Processing RTF as text with AI');
-            await _processTextWithAI(text, loc, widget.defaultAddToNomenclature);
-            return []; // Возвращаем пустой список, так как AI уже обработал
-          }
-        } catch (e) {
-          _addDebugLog('AI processing of RTF failed: $e');
-        }
-      }
+      // Если RTF обработка не дала результатов, вернем то что есть
+      // AI обработка будет выполнена позже в вызывающем коде
 
       return rows;
     }
@@ -2671,7 +2658,7 @@ ${allProducts.map((p) => p.name).join('\n')}
            RegExp(r'\d+[,.]\d+').hasMatch(line) || // Десятичные числа
            RegExp(r'\d{3,}').hasMatch(line) || // Большие числа (цены)
            line.contains('₫') ||
-           line.contains('$') ||
+           line.contains('\$') ||
            line.contains('руб') ||
            line.contains('€');
   }
