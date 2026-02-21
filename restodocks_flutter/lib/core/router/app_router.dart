@@ -1,3 +1,4 @@
+import 'dart:html' as html;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -45,8 +46,26 @@ String _getInitialLocation() {
 
 /// Настройка маршрутизации приложения
 class AppRouter {
+  static String _getCurrentBrowserPath() {
+    // В веб-приложении при F5 сохраняем текущий URL
+    if (kIsWeb) {
+      try {
+        final currentPath = html.window.location.pathname;
+        final currentSearch = html.window.location.search;
+        final fullPath = currentPath + currentSearch;
+        // Проверяем что это валидный маршрут приложения
+        if (fullPath.startsWith('/') && fullPath != '/' && fullPath != '/splash') {
+          return fullPath;
+        }
+      } catch (e) {
+        // Игнорируем ошибки чтения URL
+      }
+    }
+    return _getInitialLocation();
+  }
+
   static final GoRouter router = GoRouter(
-    initialLocation: _getInitialLocation(),
+    initialLocation: _getCurrentBrowserPath(),
     redirect: (context, state) async {
       final loc = state.matchedLocation;
       if (_isPublicPath(loc)) return null;
