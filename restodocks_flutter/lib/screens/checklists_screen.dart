@@ -153,38 +153,11 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
     if (est == null || emp == null) return;
     try {
       final svc = context.read<ChecklistServiceSupabase>();
-      final items = <ChecklistItem>[];
-      for (var i = 0; i < generated.itemTitles.length; i++) {
-        final title = generated.itemTitles[i];
-        ChecklistCellType cellType = ChecklistCellType.checkbox;
-        List<String> dropdownOptions = [];
-        if (i < generated.itemWidgets.length) {
-          final w = generated.itemWidgets[i];
-          final t = (w['type'] as String?)?.toString().toLowerCase() ?? '';
-          if (t == 'number') {
-            cellType = ChecklistCellType.quantity;
-          } else if (t == 'selection' && w['source'] != null) {
-            cellType = ChecklistCellType.dropdown;
-            final src = w['source'] as String? ?? '';
-            if (src == 'Items' && contextMap?['items'] is List) {
-              final list = (contextMap!['items'] as List).map((x) => x is Map ? (x['name'] ?? '').toString() : '').where((s) => s.isNotEmpty).toList();
-              dropdownOptions = list;
-            } else if (src == 'Recipes' && contextMap?['recipes'] is List) {
-              final list = (contextMap!['recipes'] as List).map((x) => x is Map ? (x['name'] ?? '').toString() : '').where((s) => s.isNotEmpty).toList();
-              dropdownOptions = list;
-            }
-          } else if (t == 'scale') {
-            cellType = ChecklistCellType.dropdown;
-            dropdownOptions = ['1', '2', '3', '4', '5'];
-          }
-        }
-        items.add(ChecklistItem.template(
-          title: title,
-          sortOrder: i,
-          cellType: cellType,
-          dropdownOptions: dropdownOptions,
-        ));
-      }
+      final items = generated.itemTitles
+          .asMap()
+          .entries
+          .map((e) => ChecklistItem.template(title: e.value, sortOrder: e.key))
+          .toList();
       final created = await svc.createChecklist(
         establishmentId: est.id,
         createdBy: emp.id,
@@ -193,7 +166,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
       );
       if (mounted) {
         await _load();
-        context.push('/checklists/${created.id}/edit');
+        context.push('/checklists/${created.id}');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('${loc.t('generate_checklist_by_prompt')} ✓')),
         );
@@ -250,7 +223,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
       );
       if (mounted) {
         await _load();
-        context.push('/checklists/${created.id}/edit');
+        context.push('/checklists/${created.id}');
       }
     } catch (e) {
       if (mounted) {

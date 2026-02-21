@@ -57,22 +57,12 @@ class _OrderListCreateScreenState extends State<OrderListCreateScreen> {
     context.push('/product-order/new/products', extra: draft);
   }
 
-  void _onBack() {
-    FocusManager.instance.primaryFocus?.unfocus();
-    if (context.mounted) context.pop();
-  }
-
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) {
-        if (!didPop) _onBack();
-      },
-      child: Scaffold(
+    return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: _onBack),
+        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
         title: Text(loc.t('order_list_create')),
       ),
       body: SingleChildScrollView(
@@ -163,7 +153,6 @@ class _OrderListCreateScreenState extends State<OrderListCreateScreen> {
           ],
         ),
       ),
-    ),
     );
   }
 }

@@ -79,8 +79,6 @@ class ChecklistServiceSupabase {
         'checklist_id': c.id,
         'title': items[i].title,
         'sort_order': i,
-        'cell_type': items[i].cellType.value,
-        'dropdown_options': items[i].dropdownOptions,
       });
     }
     return (await getChecklistById(c.id)) ?? c;
@@ -105,8 +103,6 @@ class ChecklistServiceSupabase {
         'checklist_id': checklist.id,
         'title': checklist.items[i].title,
         'sort_order': i,
-        'cell_type': checklist.items[i].cellType.value,
-        'dropdown_options': checklist.items[i].dropdownOptions,
       });
     }
   }
@@ -122,60 +118,8 @@ class ChecklistServiceSupabase {
       createdBy: createdBy,
       name: '${source.name} (копия)',
       items: source.items
-          .map((e) => ChecklistItem.template(
-                title: e.title,
-                sortOrder: e.sortOrder,
-                cellType: e.cellType,
-                dropdownOptions: e.dropdownOptions,
-              ))
+          .map((e) => ChecklistItem.template(title: e.title, sortOrder: e.sortOrder))
           .toList(),
     );
-  }
-
-  /// Отправить заполненный чеклист шеф-повару.
-  Future<ChecklistSubmission?> submitChecklist({
-    required String establishmentId,
-    required String checklistId,
-    required String checklistName,
-    required String filledByEmployeeId,
-    required String filledByName,
-    String? filledByRole,
-    required Map<String, dynamic> payload,
-    required String recipientChefId,
-  }) async {
-    try {
-      final data = {
-        'establishment_id': establishmentId,
-        'checklist_id': checklistId,
-        'filled_by_employee_id': filledByEmployeeId,
-        'recipient_chef_id': recipientChefId,
-        'payload': {
-          ...payload,
-          'checklist_name': checklistName,
-          'filled_by_name': filledByName,
-          'filled_by_role': filledByRole,
-        },
-      };
-      final res = await _supabase.insertData('checklist_submissions', data);
-      return ChecklistSubmission.fromJson(res);
-    } catch (e) {
-      print('Ошибка отправки чеклиста: $e');
-      return null;
-    }
-  }
-
-  /// Список отправленных чеклистов для шеф-повара.
-  Future<List<ChecklistSubmission>> listSubmissionsForChef(String chefId) async {
-    try {
-      final data = await _supabase.client
-          .from('checklist_submissions')
-          .select()
-          .eq('recipient_chef_id', chefId)
-          .order('created_at', ascending: false);
-      return (data as List).map((e) => ChecklistSubmission.fromJson(e)).toList();
-    } catch (e) {
-      print('Ошибка загрузки отправленных чеклистов: $e');
-      return [];
-    }
   }
 }

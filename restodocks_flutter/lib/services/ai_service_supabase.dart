@@ -83,11 +83,7 @@ class AiServiceSupabase implements AiService {
     final name = data['name'] as String? ?? '';
     final list = data['itemTitles'];
     final items = list is List ? list.map((e) => e.toString()).toList() : <String>[];
-    final rawWidgets = data['itemWidgets'];
-    final widgets = rawWidgets is List
-        ? rawWidgets.map((e) => e is Map ? Map<String, dynamic>.from(e as Map) : <String, dynamic>{}).toList()
-        : <Map<String, dynamic>>[];
-    return GeneratedChecklist(name: name, itemTitles: items, itemWidgets: widgets);
+    return GeneratedChecklist(name: name, itemTitles: items);
   }
 
   @override

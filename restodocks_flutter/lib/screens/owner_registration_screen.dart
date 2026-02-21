@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 
 import '../services/services.dart';
 import '../models/models.dart';
-import '../core/config/roles_config.dart';
 
 /// Регистрация владельца после создания компании. PIN подставлен с предыдущего шага.
 class OwnerRegistrationScreen extends StatefulWidget {
@@ -36,8 +35,6 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
     super.dispose();
   }
 
-  String _roleKey(String code) => 'role_$code';
-
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -55,29 +52,6 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
 
       final email = _emailController.text.trim();
       final password = _passwordController.text;
-<<<<<<< HEAD
-
-      print('DEBUG: Raw email from controller: "${_emailController.text}"');
-      print('DEBUG: Trimmed email: "$email"');
-      print('DEBUG: Email is empty: ${email.isEmpty}');
-      print('Owner registration: Checking email globally: $email');
-
-      // ПРОВЕРКА НА ДУБЛИРОВАНИЕ EMAIL (глобально, так как establishment только что создан)
-      final taken = await accountManager.isEmailTakenGlobally(email);
-      print('Owner registration: Email taken result: $taken');
-      print('DEBUG: taken is bool: ${taken is bool}, value: $taken');
-      if (taken && mounted) {
-        print('DEBUG: Email is taken, showing error message');
-        final loc = context.read<LocalizationService>();
-        setState(() => _errorMessage = loc.t('email_already_registered') ?? 'Этот email уже зарегистрирован в системе');
-        setState(() => _isLoading = false);
-        return;
-      }
-
-      print('DEBUG: Email check passed, proceeding with registration');
-=======
->>>>>>> cf105ca (Добавлена отладка для поиска ошибки при регистрации)
-      print('Owner registration: Creating employee for company...');
       final employee = await accountManager.createEmployeeForCompany(
         company: estab,
         fullName: _nameController.text.trim(),
@@ -88,17 +62,7 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
         roles: roles,
       );
 
-<<<<<<< HEAD
-      print('DEBUG: Employee created successfully: ${employee?.fullName}, ${employee?.email}');
       await accountManager.login(employee, estab);
-=======
-      print('Owner registration: Employee created successfully: ${employee.fullName}, ID: ${employee.id}');
->>>>>>> cf105ca (Добавлена отладка для поиска ошибки при регистрации)
-
-      // ВХОД В СИСТЕМУ
-      print('Owner registration: Logging in...');
-      await accountManager.login(employee, estab);
-      print('Owner registration: Login successful, current employee: ${accountManager.currentEmployee?.fullName}');
 
       // Отправка письма владельцу
       context.read<EmailService>().sendRegistrationEmail(
@@ -114,23 +78,8 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
       context.go('/home');
     } catch (e) {
       if (!mounted) return;
-      print('DEBUG: Owner registration error: $e');
-      print('DEBUG: Owner registration error type: ${e.runtimeType}');
-      print('DEBUG: Owner registration error stack trace: ${StackTrace.current}');
       final loc = context.read<LocalizationService>();
-      final eStr = e.toString().toLowerCase();
-      print('DEBUG: Owner registration error string: $eStr');
-      if (eStr.contains('email_already_exists') ||
-          eStr.contains('email already exists') ||
-          eStr.contains('23505') ||
-          eStr.contains('duplicate') ||
-          eStr.contains('employees_email_key')) {
-        print('DEBUG: Setting email already registered message');
-        setState(() => _errorMessage = loc.t('email_already_registered') ?? 'Этот email уже зарегистрирован в системе');
-      } else {
-        print('DEBUG: Setting generic register error message');
-        setState(() => _errorMessage = loc.t('register_error', args: {'error': e.toString()}));
-      }
+      setState(() => _errorMessage = loc.t('register_error', args: {'error': e.toString()}));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -259,12 +208,9 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
                   ),
                   items: [
                     DropdownMenuItem(value: null, child: Text(loc.t('role_optional'))),
-                    ...RolesConfig.allRoles().map((role) =>
-                      DropdownMenuItem(
-                        value: role.roleCode,
-                        child: Text(loc.t(_roleKey(role.roleCode))),
-                      ),
-                    ),
+                    DropdownMenuItem(value: 'executive_chef', child: Text(loc.t('executive_chef'))),
+                    DropdownMenuItem(value: 'sous_chef', child: Text(loc.t('sous_chef'))),
+                    DropdownMenuItem(value: 'manager', child: Text(loc.t('manager'))),
                   ],
                   onChanged: (v) => setState(() => _selectedRole = v),
                 ),

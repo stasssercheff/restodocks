@@ -20,33 +20,6 @@ class _OrderListsScreenState extends State<OrderListsScreen> {
   bool _loading = true;
   String? _establishmentId;
 
-  Future<void> _deleteList(OrderList list) async {
-    final loc = context.read<LocalizationService>();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.t('delete') ?? 'Удалить'),
-        content: Text('${loc.t('order_list_delete_confirm') ?? 'Удалить список'} «${list.name}»?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(loc.t('cancel') ?? 'Отмена')),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Theme.of(ctx).colorScheme.error),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(loc.t('delete') ?? 'Удалить'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || _establishmentId == null || !mounted) return;
-    final lists = await loadOrderLists(_establishmentId!);
-    final filtered = lists.where((l) => l.id != list.id).toList();
-    await saveOrderLists(_establishmentId!, filtered);
-    if (mounted) {
-      setState(() => _lists = filtered);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('order_list_deleted') ?? 'Список удалён')));
-    }
-  }
-
   Future<void> _load() async {
     final acc = context.read<AccountManagerSupabase>();
     final est = acc.establishment;
@@ -81,11 +54,6 @@ class _OrderListsScreenState extends State<OrderListsScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
-  }
-
-  void _onBack() {
-    FocusManager.instance.primaryFocus?.unfocus();
-    if (context.mounted) context.go('/home');
   }
 
   @override
@@ -124,14 +92,9 @@ class _OrderListsScreenState extends State<OrderListsScreen> {
         ],
       ),
     );
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) {
-        if (!didPop) _onBack();
-      },
-      child: Scaffold(
+    return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: _onBack),
+        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
         title: Text(loc.t('product_order')),
         actions: [
           IconButton(icon: const Icon(Icons.home), onPressed: () => context.go('/home'), tooltip: loc.t('home')),
@@ -212,17 +175,7 @@ class _OrderListsScreenState extends State<OrderListsScreen> {
                             list.supplierName + (dateStr != null ? ' · $dateStr' : ''),
                             overflow: TextOverflow.ellipsis,
                           ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error),
-                                onPressed: () => _deleteList(list),
-                                tooltip: loc.t('delete') ?? 'Удалить',
-                              ),
-                              const Icon(Icons.chevron_right),
-                            ],
-                          ),
+                          trailing: const Icon(Icons.chevron_right),
                           onTap: () async {
                             await context.push('/product-order/${list.id}');
                             if (mounted) _load();
@@ -243,7 +196,6 @@ class _OrderListsScreenState extends State<OrderListsScreen> {
         icon: const Icon(Icons.add),
         label: Text(loc.t('order_list_create')),
       ),
-    ),
     );
   }
 }

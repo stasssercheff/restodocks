@@ -111,23 +111,13 @@ class _OrderListProductsScreenState extends State<OrderListProductsScreen> {
     }
   }
 
-  void _onBack() {
-    FocusManager.instance.primaryFocus?.unfocus();
-    if (context.mounted) context.pop();
-  }
-
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
     final lang = loc.currentLanguageCode;
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) {
-        if (!didPop) _onBack();
-      },
-      child: Scaffold(
+    return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: _onBack),
+        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
         title: Text(loc.t('order_list_add_products')),
         actions: [
           if (_list.items.isNotEmpty)
@@ -239,7 +229,6 @@ class _OrderListProductsScreenState extends State<OrderListProductsScreen> {
           ),
         ],
       ),
-    ),
     );
   }
 }

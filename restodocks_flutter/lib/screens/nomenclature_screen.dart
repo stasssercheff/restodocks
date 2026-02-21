@@ -55,21 +55,9 @@ class NomenclatureScreen extends StatefulWidget {
 enum _CatalogSort { nameAz, nameZa, priceAsc, priceDesc }
 enum _NomenclatureFilter { all, products, semiFinished }
 
-/// Единица измерения для отображения в номенклатуре.
+/// Единица измерения для отображения в номенклатуре: кг, шт, г, л и т.д. (не сырой "pcs"/"kg" из БД).
 String _unitDisplay(String? unit, String lang) {
   return CulinaryUnits.displayName((unit ?? 'g').trim().toLowerCase(), lang);
-}
-
-/// Единица для отображения цены: цена всегда за кг (для веса) или за шт (для штучных), не за грамм.
-String _priceUnitDisplay(String? unit, String lang) {
-  final u = (unit ?? 'g').trim().toLowerCase();
-  if (u == 'pcs' || u == 'шт' || u == 'piece' || u == 'штука') {
-    return lang == 'ru' ? 'шт' : 'pcs';
-  }
-  if (u == 'ml' || u == 'мл' || u == 'l' || u == 'л') {
-    return lang == 'ru' ? 'л' : 'L';
-  }
-  return lang == 'ru' ? 'кг' : 'kg';
 }
 
 /// Диалог с прогрессом загрузки продуктов
@@ -308,37 +296,22 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
   }
 
   Future<void> _ensureLoaded() async {
-    print('📋 NomenclatureScreen: Starting _ensureLoaded...');
     final store = context.read<ProductStoreSupabase>();
     final account = context.read<AccountManagerSupabase>();
     final estId = account.establishment?.id;
-    print('📋 NomenclatureScreen: Establishment ID: $estId');
-
-    if (estId == null) {
-      print('📋 NomenclatureScreen: No establishment ID, returning');
-      return;
-    }
+    if (estId == null) return;
 
     final techCardService = context.read<TechCardServiceSupabase>();
 
     if (store.allProducts.isEmpty && !store.isLoading) {
-      print('📋 NomenclatureScreen: Loading products...');
       await store.loadProducts();
-      print('📋 NomenclatureScreen: Products loaded: ${store.allProducts.length}');
     }
-
-    print('📋 NomenclatureScreen: Loading nomenclature...');
     await store.loadNomenclature(estId);
 
     // Загружаем элементы номенклатуры (продукты + ТТК ПФ)
-    print('📋 NomenclatureScreen: Loading nomenclature items...');
     _nomenclatureItems = await store.getAllNomenclatureItems(estId, techCardService);
-    print('📋 NomenclatureScreen: Nomenclature items loaded: ${_nomenclatureItems.length}');
 
-    if (mounted) {
-      setState(() => _isLoading = false);
-      print('📋 NomenclatureScreen: UI updated, isLoading = false');
-    }
+    if (mounted) setState(() => _isLoading = false);
   }
 
   Future<void> _showDuplicates() async {
@@ -487,7 +460,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     final price = establishmentPrice?.$1 ?? p.basePrice;
     final currency = establishmentPrice?.$2 ?? 'RUB';
 
-    final priceText = price != null ? '${price.toStringAsFixed(0)} ₽/${_priceUnitDisplay(p.unit, loc.currentLanguageCode)}' : 'Цена не установлена';
+    final priceText = price != null ? '${price.toStringAsFixed(0)} ₽/${_unitDisplay(p.unit, loc.currentLanguageCode)}' : 'Цена не установлена';
 
     // Проверяем подписку для отображения КБЖУ
     final account = context.read<AccountManagerSupabase>();
@@ -800,10 +773,10 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     final copy = List<Product>.from(list);
     switch (sort) {
       case _CatalogSort.nameAz:
-        copy.sort((a, b) => _sortKeyForName(a.getLocalizedName('ru')).toLowerCase().compareTo(_sortKeyForName(b.getLocalizedName('ru')).toLowerCase()));
+        copy.sort((a, b) => _sortKeyForName(a.getLocalizedName('ru')).compareTo(_sortKeyForName(b.getLocalizedName('ru'))));
         break;
       case _CatalogSort.nameZa:
-        copy.sort((a, b) => _sortKeyForName(b.getLocalizedName('ru')).toLowerCase().compareTo(_sortKeyForName(a.getLocalizedName('ru')).toLowerCase()));
+        copy.sort((a, b) => _sortKeyForName(b.getLocalizedName('ru')).compareTo(_sortKeyForName(a.getLocalizedName('ru'))));
         break;
       case _CatalogSort.priceAsc:
         copy.sort((a, b) => (a.basePrice ?? 0).compareTo(b.basePrice ?? 0));
@@ -838,10 +811,10 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     void sortGroup(List<NomenclatureItem> group) {
       switch (sort) {
         case _CatalogSort.nameAz:
-          group.sort((a, b) => _sortKeyForName(a.getLocalizedName('ru')).toLowerCase().compareTo(_sortKeyForName(b.getLocalizedName('ru')).toLowerCase()));
+          group.sort((a, b) => _sortKeyForName(a.getLocalizedName('ru')).compareTo(_sortKeyForName(b.getLocalizedName('ru'))));
           break;
         case _CatalogSort.nameZa:
-          group.sort((a, b) => _sortKeyForName(b.getLocalizedName('ru')).toLowerCase().compareTo(_sortKeyForName(a.getLocalizedName('ru')).toLowerCase()));
+          group.sort((a, b) => _sortKeyForName(b.getLocalizedName('ru')).compareTo(_sortKeyForName(a.getLocalizedName('ru'))));
           break;
         case _CatalogSort.priceAsc:
           group.sort((a, b) => (a.price ?? 0).compareTo(b.price ?? 0));
@@ -1431,14 +1404,6 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
             runSpacing: 8,
             alignment: WrapAlignment.start,
             children: [
-              Tooltip(
-                message: widget.loc.t('verify_with_ai_tooltip'),
-                child: FilledButton.tonalIcon(
-                  onPressed: () => widget.onVerifyWithAi(context, widget.items.where((item) => item.isProduct).map((item) => item.product!).toList()),
-                  icon: const Icon(Icons.auto_awesome, size: 20),
-                  label: Text(widget.loc.t('verify_with_ai').replaceAll('%s', '${widget.items.length}')),
-                ),
-              ),
               PopupMenuButton<_CatalogSort>(
                 icon: const Icon(Icons.sort),
                 tooltip: widget.loc.t('sort_name_az').split(' ').take(2).join(' '),
@@ -1465,21 +1430,39 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
                 selected: widget.filterType == _NomenclatureFilter.all,
                 onSelected: (_) => widget.onFilterTypeChanged(_NomenclatureFilter.all),
               ),
-              if (needsKbju.isNotEmpty && widget.onCanShowNutrition(context))
-                FilledButton.tonalIcon(
-                  onPressed: () => widget.onLoadKbju(context, needsKbju.where((item) => item.isProduct).map((item) => item.product!).toList()),
-                  icon: const Icon(Icons.cloud_download, size: 20),
-                  label: Text(widget.loc.t('load_kbju_for_all').replaceAll('%s', '${needsKbju.length}')),
-                ),
-              if (needsTranslation.isNotEmpty)
-                FilledButton.tonalIcon(
-                  onPressed: () => widget.onLoadTranslations(context, needsTranslation.where((item) => item.isProduct).map((item) => item.product!).toList()),
-                  icon: const Icon(Icons.translate, size: 20),
-                  label: Text(widget.loc.t('translate_names_for_all').replaceAll('%s', '${needsTranslation.length}')),
-                ),
             ],
           ),
         ),
+        if (needsKbju.isNotEmpty || needsTranslation.isNotEmpty || widget.items.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (needsKbju.isNotEmpty && widget.onCanShowNutrition(context))
+                  FilledButton.tonalIcon(
+                    onPressed: () => widget.onLoadKbju(context, needsKbju.where((item) => item.isProduct).map((item) => item.product!).toList()),
+                    icon: const Icon(Icons.cloud_download, size: 20),
+                    label: Text(widget.loc.t('load_kbju_for_all').replaceAll('%s', '${needsKbju.length}')),
+                  ),
+                if (needsTranslation.isNotEmpty)
+                  FilledButton.tonalIcon(
+                    onPressed: () => widget.onLoadTranslations(context, needsTranslation.where((item) => item.isProduct).map((item) => item.product!).toList()),
+                    icon: const Icon(Icons.translate, size: 20),
+                    label: Text(widget.loc.t('translate_names_for_all').replaceAll('%s', '${needsTranslation.length}')),
+                  ),
+                Tooltip(
+                  message: widget.loc.t('verify_with_ai_tooltip'),
+                  child: FilledButton.tonalIcon(
+                    onPressed: () => widget.onVerifyWithAi(context, widget.items.where((item) => item.isProduct).map((item) => item.product!).toList()),
+                    icon: const Icon(Icons.auto_awesome, size: 20),
+                    label: Text(widget.loc.t('verify_with_ai').replaceAll('%s', '${widget.items.length}')),
+                  ),
+                ),
+              ],
+            ),
+          ),
         Expanded(
           child: ListView.builder(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),

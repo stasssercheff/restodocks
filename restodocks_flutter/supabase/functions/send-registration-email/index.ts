@@ -38,11 +38,9 @@ Deno.serve(async (req: Request) => {
       email: string;
       password: string;
       pinCode?: string;
-      loginUrl?: string;
     };
 
-    const { type, to, companyName, email, password, pinCode, loginUrl } = body;
-    const siteUrl = loginUrl?.trim() || Deno.env.get("APP_URL")?.trim() || "https://restodocks.com";
+    const { type, to, companyName, email, password, pinCode } = body;
 
     if (!type || !to || !companyName || !email || !password) {
       return new Response(JSON.stringify({ error: "type, to, companyName, email, password required" }), {
@@ -69,10 +67,8 @@ Deno.serve(async (req: Request) => {
       subject = `Доступ к корпоративному пространству ${escapeHtml(companyName)}`;
       html = `
 <p>Здравствуйте!</p>
-<p>Ваша учетная запись привязана к системе управления заведением <strong>${escapeHtml(companyName)}</strong>.</p>
-<p><strong>Ссылка на сайт:</strong> <a href="${escapeHtml(siteUrl)}">${escapeHtml(siteUrl)}</a></p>
-<p><strong>Логин:</strong> ${escapeHtml(email)}<br><strong>Временный пароль:</strong> ${escapeHtml(password)}</p>
-<p>Рекомендуем сменить пароль после первого входа в личном кабинете.</p>
+<p>Ваша учетная запись успешно привязана к системе управления заведением <strong>${escapeHtml(companyName)}</strong>.</p>
+<p>Ваш логин — ${escapeHtml(email)}<br>Ваш пароль — ${escapeHtml(password)}</p>
 <p>С уважением,<br>Команда Restodocks</p>
       `.trim();
     }

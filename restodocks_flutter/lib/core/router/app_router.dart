@@ -14,8 +14,6 @@ import '../../screens/home/department_placeholder_screen.dart';
 import '../../screens/supabase_test_screen.dart';
 import '../../screens/checklists_screen.dart';
 import '../../screens/checklist_edit_screen.dart';
-import '../../screens/checklist_fill_screen.dart';
-import '../../screens/checklist_received_screen.dart';
 import '../../screens/tech_cards_list_screen.dart';
 import '../../screens/tech_card_edit_screen.dart';
 import '../../screens/order_lists_screen.dart';
@@ -26,22 +24,20 @@ import '../../models/order_list.dart';
 import '../../services/ai_service.dart';
 import '../../services/services.dart';
 
-/// Публичные пути (без проверки авторизации).
+/// Публичные пути (без проверки авторизации). Не использовать startsWith('/') — иначе все пути считаются публичными.
 bool _isPublicPath(String loc) {
   if (loc == '/' || loc == '/splash') return true;
   if (loc.startsWith('/login') || loc.startsWith('/register') ||
-      loc.startsWith('/register-company') || loc.startsWith('/register-owner') ||
       loc.startsWith('/forgot-password') || loc.startsWith('/reset-password')) return true;
   return false;
 }
 
-/// Начальный путь: при обновлении страницы (web) используем текущий URL — пользователь остаётся там, где был.
+/// Начальный путь: при обновлении страницы (web) сохраняем текущий URL.
 String _getInitialLocation() {
   if (kIsWeb) {
     try {
-      var path = Uri.base.path;
-      if (path.isEmpty) path = '/';
-      if (path != '/') return path;
+      final path = Uri.base.path;
+      if (path.isNotEmpty && path != '/') return path;
     } catch (_) {}
   }
   return '/';
@@ -53,22 +49,11 @@ class AppRouter {
     initialLocation: _getInitialLocation(),
     redirect: (context, state) async {
       final loc = state.matchedLocation;
-      print('DEBUG: Router redirect - location: $loc, isPublic: ${_isPublicPath(loc)}');
       if (_isPublicPath(loc)) return null;
-
-      // Сессия восстановлена в main() — при F5 остаёмся на текущем URL
+      // Сессия уже восстановлена в main() — при F5 остаёмся на текущем URL, данные перезагружаются экраном
       final account = context.read<AccountManagerSupabase>();
-      print('DEBUG: Router redirect - isLoggedInSync before init: ${account.isLoggedInSync}');
-      if (!account.isLoggedInSync) {
-        await account.initialize();
-        print('DEBUG: Router redirect - isLoggedInSync after init: ${account.isLoggedInSync}');
-      }
-      if (!account.isLoggedInSync) {
-        print('DEBUG: Router redirect - not logged in, redirecting to login');
-        final returnTo = loc.isNotEmpty ? Uri.encodeComponent(loc) : '';
-        return returnTo.isNotEmpty ? '/login?returnTo=$returnTo' : '/login';
-      }
-      print('DEBUG: Router redirect - logged in, allowing access to $loc');
+      if (!account.isLoggedInSync) await account.initialize();
+      if (!account.isLoggedInSync) return '/login';
       return null;
     },
     routes: [
@@ -84,13 +69,10 @@ class AppRouter {
         builder: (context, state) => const SplashScreen(),
       ),
 
-      // Экран входа (returnTo — куда вернуться после входа)
+      // Экран входа
       GoRoute(
         path: '/login',
-        builder: (context, state) {
-          final returnTo = state.queryParameters['returnTo'];
-          return LoginScreen(returnTo: returnTo);
-        },
+        builder: (context, state) => const LoginScreen(),
       ),
 
       // Регистрация компании
@@ -230,10 +212,6 @@ class AppRouter {
         builder: (context, state) => const ProductOrderReceivedScreen(),
       ),
       GoRoute(
-        path: '/checklists-received',
-        builder: (context, state) => const ChecklistReceivedScreen(),
-      ),
-      GoRoute(
         path: '/product-order/new',
         builder: (context, state) => const OrderListCreateScreen(),
       ),
@@ -259,13 +237,6 @@ class AppRouter {
       ),
       GoRoute(
         path: '/checklists/:id',
-        builder: (context, state) {
-          final id = state.pathParameters['id'] ?? '';
-          return ChecklistFillScreen(checklistId: id);
-        },
-      ),
-      GoRoute(
-        path: '/checklists/:id/edit',
         builder: (context, state) {
           final id = state.pathParameters['id'] ?? '';
           return ChecklistEditScreen(checklistId: id);
@@ -351,13 +322,13 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFAD292C), // Цвет бренда вместо белого фона
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Center(
         child: Image.asset(
           'assets/images/logo.png',
           fit: BoxFit.contain,
-          width: 240, // Увеличен с 160 до 240
-          height: 240, // Увеличен с 160 до 240
+          width: 160,
+          height: 160,
         ),
       ),
     );

@@ -68,31 +68,20 @@ class CountriesCitiesData {
 
   static Future<List<CountryItem>> loadCountries() async {
     if (_countries != null) return _countries!;
-    try {
-      final raw = await rootBundle.loadString('assets/data/countries.json');
-      final list = jsonDecode(raw) as List<dynamic>;
-      _countries = list.map((e) {
-        final m = e as Map<String, dynamic>;
-        return CountryItem(
-          code: m['code'] as String? ?? '',
-          ru: m['ru'] as String? ?? '',
-          en: m['en'] as String? ?? '',
-          es: m['es'] as String? ?? '',
-          de: m['de'] as String? ?? '',
-          fr: m['fr'] as String? ?? '',
-        );
-      }).toList();
-      print('CountriesCitiesData: loaded ${_countries!.length} countries');
-      return _countries!;
-    } catch (e) {
-      print('CountriesCitiesData: Error loading countries: $e');
-      // Возвращаем пустой список или дефолтные страны
-      _countries = [
-        CountryItem(code: 'RU', ru: 'Россия', en: 'Russia', es: 'Rusia', de: 'Russland', fr: 'Russie'),
-        CountryItem(code: 'US', ru: 'США', en: 'United States', es: 'Estados Unidos', de: 'Vereinigte Staaten', fr: 'États-Unis'),
-      ];
-      return _countries!;
-    }
+    final raw = await rootBundle.loadString('assets/data/countries.json');
+    final list = jsonDecode(raw) as List<dynamic>;
+    _countries = list.map((e) {
+      final m = e as Map<String, dynamic>;
+      return CountryItem(
+        code: m['code']! as String,
+        ru: m['ru']! as String,
+        en: m['en']! as String,
+        es: m['es']! as String,
+        de: m['de']! as String,
+        fr: m['fr']! as String,
+      );
+    }).toList();
+    return _countries!;
   }
 
   static Future<Map<String, List<CityItem>>> loadCities() async {

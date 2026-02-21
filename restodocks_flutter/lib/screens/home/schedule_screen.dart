@@ -20,11 +20,9 @@ class ScheduleScreen extends StatefulWidget {
 class _ScheduleScreenState extends State<ScheduleScreen> {
   static const int _defaultWeeks = 12;
   static const double _slotColumnWidth = 120;
-  /// Ширина ячейки дня — чуть больше, чтобы влезало время смены (09:00–18:00).
-  static const double _dayCellWidth = 62;
+  /// Ширина ячейки дня: 7 дней влезают на экран телефона (7 × 36 ≈ 252px).
+  static const double _dayCellWidth = 36;
   static const double _rowHeight = 44;
-  /// Высота строк даты и дня недели — чуть выше текста.
-  static const double _headerRowHeight = 20;
 
   // Определяем, является ли устройство мобильным
   bool get isMobile => MediaQuery.of(context).size.width < 600;
@@ -367,21 +365,21 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     final leftCells = <Widget>[];
     final rightRows = <Widget>[];
 
-    Widget leftCell(Widget child, {double? height, BoxDecoration? decoration, bool compact = false}) {
+    Widget leftCell(Widget child, {double? height, BoxDecoration? decoration}) {
       return Container(
         height: height ?? _rowHeight,
         decoration: decoration != null ? BoxDecoration(border: Border(right: BorderSide(color: borderColor))) : null,
-        padding: compact ? const EdgeInsets.symmetric(vertical: 2, horizontal: 8) : const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
         alignment: Alignment.centerLeft,
         child: child,
       );
     }
 
-    Widget rightCell(Widget child, {Color? bg, double? height, bool compact = false}) {
+    Widget rightCell(Widget child, {Color? bg}) {
       return Container(
         width: _dayCellWidth,
-        height: height ?? _rowHeight,
-        padding: compact ? const EdgeInsets.symmetric(horizontal: 2, vertical: 1) : const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+        height: _rowHeight,
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: bg,
@@ -391,15 +389,14 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       );
     }
 
-    // Строка 1: заголовок «Дата» + даты (компактная высота)
+    // Строка 1: заголовок «Дата» + даты
     leftCells.add(leftCell(
-      Text(loc.t('schedule_date'), style: TextStyle(fontWeight: FontWeight.w600, color: headerFg, fontSize: 11)),
-      height: _headerRowHeight,
-      compact: true,
+      Text(loc.t('schedule_date'), style: TextStyle(fontWeight: FontWeight.w600, color: headerFg, fontSize: 12)),
+      height: _rowHeight,
       decoration: BoxDecoration(color: headerBg, border: Border(right: BorderSide(color: borderColor))),
     ));
     rightRows.add(Container(
-      height: _headerRowHeight,
+      height: _rowHeight,
       decoration: BoxDecoration(color: headerBg),
       child: Row(
         children: dates.map((d) {
@@ -410,8 +407,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           return rightCell(
             Text(DateFormat('dd.MM', localeStr).format(d), textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: fg)),
             bg: bg,
-            height: _headerRowHeight,
-            compact: true,
           );
         }).toList(),
       ),
@@ -420,12 +415,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     // Строка 2: «День» + Пн, Вт, ...
     leftCells.add(leftCell(
       Text(loc.t('schedule_day'), style: TextStyle(fontWeight: FontWeight.w600, color: headerFg, fontSize: 11)),
-      height: _headerRowHeight,
-      compact: true,
+      height: _rowHeight,
       decoration: BoxDecoration(color: headerBg, border: Border(right: BorderSide(color: borderColor))),
     ));
     rightRows.add(Container(
-      height: _headerRowHeight,
+      height: _rowHeight,
       decoration: BoxDecoration(color: headerBg),
       child: Row(
         children: dates.map((d) {
@@ -436,8 +430,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           return rightCell(
             Text(weekdays[d.weekday - 1], textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: fg)),
             bg: bg,
-            height: _headerRowHeight,
-            compact: true,
           );
         }).toList(),
       ),

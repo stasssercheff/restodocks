@@ -6,9 +6,6 @@ import 'package:provider/provider.dart';
 import '../models/models.dart';
 import '../services/inventory_download.dart';
 import '../services/services.dart';
-import '../mixins/auto_save_mixin.dart';
-import '../mixins/input_change_listener_mixin.dart';
-import '../widgets/data_safety_indicator.dart';
 
 /// Строка: полуфабрикат (ТТК) + количество порций
 class _PfRow {
@@ -42,12 +39,9 @@ class InventoryPfScreen extends StatefulWidget {
   State<InventoryPfScreen> createState() => _InventoryPfScreenState();
 }
 
-class _InventoryPfScreenState extends State<InventoryPfScreen>
-    with AutoSaveMixin<InventoryPfScreen>, InputChangeListenerMixin<InventoryPfScreen> {
+class _InventoryPfScreenState extends State<InventoryPfScreen> {
   final ScrollController _hScroll = ScrollController();
   final List<_PfRow> _rows = [];
-  /// Данные черновика для восстановления после загрузки техкарт
-  List<Map<String, dynamic>>? _draftRows;
   DateTime _date = DateTime.now();
   TimeOfDay? _startTime;
   TimeOfDay? _endTime;
@@ -58,49 +52,7 @@ class _InventoryPfScreenState extends State<InventoryPfScreen>
   void initState() {
     super.initState();
     _startTime = TimeOfDay.now();
-
-    // Настроить автосохранение
-    setOnInputChanged(scheduleSave);
-
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadTechCards());
-  }
-
-  @override
-  String get draftKey => 'inventory_pf';
-
-  @override
-  Map<String, dynamic> getCurrentState() {
-    return {
-      'date': _date.toIso8601String(),
-      'startTime': _startTime?.format(context) ?? '',
-      'endTime': _endTime?.format(context) ?? '',
-      'completed': _completed,
-      'rows': _rows.map((r) => {
-        'techCardId': r.techCard.id,
-        'quantity': r.quantity,
-      }).toList(),
-    };
-  }
-
-  @override
-  Future<void> restoreState(Map<String, dynamic> data) async {
-    setState(() {
-      _date = DateTime.parse(data['date'] ?? DateTime.now().toIso8601String());
-      _startTime = data['startTime'] != null && data['startTime'].isNotEmpty
-          ? TimeOfDay.fromDateTime(DateTime.parse('2023-01-01 ${data['startTime']}'))
-          : TimeOfDay.now();
-      _endTime = data['endTime'] != null && data['endTime'].isNotEmpty
-          ? TimeOfDay.fromDateTime(DateTime.parse('2023-01-01 ${data['endTime']}'))
-          : null;
-      _completed = data['completed'] ?? false;
-
-      // Восстановить строки (техкарты загрузятся позже в _loadTechCards)
-      final rowsData = data['rows'] as List<dynamic>? ?? [];
-      _draftRows = rowsData.map((r) => {
-        'techCardId': r['techCardId'],
-        'quantity': r['quantity'] ?? 0.0,
-      }).toList();
-    });
   }
 
   Future<void> _loadTechCards() async {
@@ -117,19 +69,6 @@ class _InventoryPfScreenState extends State<InventoryPfScreen>
         if (_rows.any((r) => r.techCard.id == tc.id)) continue;
         _rows.add(_PfRow(techCard: tc, quantity: 0));
       }
-
-      // Восстановить данные из черновика
-      if (_draftRows != null) {
-        for (final draft in _draftRows!) {
-          final techCardId = draft['techCardId'] as String?;
-          final quantity = (draft['quantity'] as num?)?.toDouble() ?? 0.0;
-          final rowIndex = _rows.indexWhere((r) => r.techCard.id == techCardId);
-          if (rowIndex >= 0) {
-            _rows[rowIndex].quantity = quantity;
-          }
-        }
-        _draftRows = null; // Очистить после восстановления
-      }
     });
   }
 
@@ -142,7 +81,6 @@ class _InventoryPfScreenState extends State<InventoryPfScreen>
   void _setQuantity(int index, double value) {
     if (index < 0 || index >= _rows.length) return;
     setState(() => _rows[index].quantity = value.clamp(0.0, 99999.0));
-    scheduleSave(); // Автосохранение при изменении количества
   }
 
   /// Обратный перерасчёт: агрегированные продукты по всем выбранным ПФ
@@ -206,10 +144,7 @@ class _InventoryPfScreenState extends State<InventoryPfScreen>
       lastDate: DateTime(2030),
       locale: Locale(loc.currentLanguageCode),
     );
-    if (picked != null) {
-      setState(() => _date = picked);
-      scheduleSave(); // Автосохранение при изменении даты
-    }
+    if (picked != null) setState(() => _date = picked);
   }
 
   Future<void> _complete(BuildContext context) async {
@@ -261,7 +196,6 @@ class _InventoryPfScreenState extends State<InventoryPfScreen>
         _endTime = endTime;
         _completed = true;
       });
-      scheduleSave(); // Автосохранение при завершении
     }
 
     try {
@@ -372,28 +306,23 @@ class _InventoryPfScreenState extends State<InventoryPfScreen>
     final establishment = account.establishment;
     final employee = account.currentEmployee;
 
-    return Stack(
-      children: [
-        Scaffold(
-          appBar: AppBar(
-            leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
-            title: Text(loc.t('inventory_pf_title')),
-          ),
-          body: _loading
-              ? const Center(child: CircularProgressIndicator())
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildHeader(loc, establishment, employee),
-                    const Divider(height: 1),
-                    Expanded(child: _buildTable(loc)),
-                    const Divider(height: 1),
-                    _buildFooter(loc),
-                  ],
-                ),
-        ),
-        DataSafetyIndicator(isVisible: !_loading),
-      ],
+    return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        title: Text(loc.t('inventory_pf_title')),
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildHeader(loc, establishment, employee),
+                const Divider(height: 1),
+                Expanded(child: _buildTable(loc)),
+                const Divider(height: 1),
+                _buildFooter(loc),
+              ],
+            ),
     );
   }
 

@@ -39,11 +39,7 @@ class AccountManagerSupabase {
   bool get hasProSubscription => _establishment?.subscriptionType == 'pro' || _establishment?.subscriptionType == 'premium';
 
   /// Авторизован ли пользователь (своя сессия employees или восстановленная из хранилища)
-  bool get isLoggedInSync {
-    final result = _currentEmployee != null && _establishment != null;
-    print('DEBUG: isLoggedInSync - currentEmployee: ${_currentEmployee?.fullName}, establishment: ${_establishment?.name}, result: $result');
-    return result;
-  }
+  bool get isLoggedInSync => _currentEmployee != null && _establishment != null;
 
   /// Инициализация сервиса
   Future<void> initialize() async {
@@ -180,41 +176,6 @@ class AccountManagerSupabase {
     }
   }
 
-  /// Проверка: занят ли email глобально (во всей системе)
-  Future<bool> isEmailTakenGlobally(String email) async {
-    try {
-      final trimmedEmail = email.trim().toLowerCase(); // Приводим к нижнему регистру
-      print('DEBUG: Checking if email taken globally: "$trimmedEmail"');
-      print('DEBUG: Original email: "$email"');
-
-      // Попробуем два запроса: с учетом регистра и без
-      final listExact = await _supabase.client
-          .from('employees')
-          .select('id, email')
-          .eq('email', trimmedEmail)
-          .limit(5); // Увеличиваем лимит чтобы увидеть больше
-
-      print('DEBUG: Exact match query result: $listExact');
-
-      final listILike = await _supabase.client
-          .from('employees')
-          .select('id, email')
-          .ilike('email', trimmedEmail)
-          .limit(5);
-
-      print('DEBUG: Case-insensitive query result: $listILike');
-
-      final isTaken = (listExact != null && (listExact as List).isNotEmpty) ||
-                     (listILike != null && (listILike as List).isNotEmpty);
-      print('DEBUG: isEmailTakenGlobally returning: $isTaken');
-      return isTaken;
-    } catch (e) {
-      print('DEBUG: isEmailTakenGlobally error: $e');
-      print('DEBUG: Error type: ${e.runtimeType}');
-      return false;
-    }
-  }
-
   /// Регистрация сотрудника в компании
   Future<Employee> createEmployeeForCompany({
     required Establishment company,
@@ -244,40 +205,20 @@ class AccountManagerSupabase {
     employeeData.remove('updated_at');
     _stripAvatarFromPayload(employeeData);
 
-    try {
-      final response = await _supabase.insertData('employees', employeeData);
-      final createdEmployee = Employee.fromJson(response);
+    final response = await _supabase.insertData('employees', employeeData);
+    final createdEmployee = Employee.fromJson(response);
 
-      // Обновляем establishment с ownerId, если это владелец
-      if (roles.contains('owner')) {
-        await _supabase.updateData(
-          'establishments',
-          {'owner_id': createdEmployee.id},
-          'id',
-          company.id,
-        );
-      }
-
-      return createdEmployee;
-    } catch (e) {
-      // ОБРАБОТКА ОШИБКИ ДУБЛИРОВАНИЯ EMAIL
-      print('DEBUG: createEmployeeForCompany error: $e');
-      print('DEBUG: error type: ${e.runtimeType}');
-      if (e is PostgrestException) {
-        print('DEBUG: PostgrestException code: ${e.code}');
-        if (e.code == '23505') {
-          print('DEBUG: Throwing EMAIL_ALREADY_EXISTS for PostgrestException 23505');
-          throw Exception('EMAIL_ALREADY_EXISTS');
-        }
-      }
-      final errorStr = e.toString().toLowerCase();
-      print('DEBUG: error string: $errorStr');
-      if (errorStr.contains('23505') || errorStr.contains('duplicate') || errorStr.contains('unique') || errorStr.contains('email_key')) {
-        print('DEBUG: Throwing EMAIL_ALREADY_EXISTS for string match');
-        throw Exception('EMAIL_ALREADY_EXISTS');
-      }
-      rethrow;
+    // Обновляем establishment с ownerId, если это владелец
+    if (roles.contains('owner')) {
+      await _supabase.updateData(
+        'establishments',
+        {'owner_id': createdEmployee.id},
+        'id',
+        company.id,
+      );
     }
+
+    return createdEmployee;
   }
 
   /// Поиск сотрудника по email и паролю (без PIN — по всем заведениям)
@@ -372,10 +313,8 @@ class AccountManagerSupabase {
     String? email,
     String? password,
   }) async {
-    print('DEBUG: Login called for employee: ${employee.fullName}, establishment: ${establishment.name}');
     _currentEmployee = employee;
     _establishment = establishment;
-    print('DEBUG: Current employee set to: ${_currentEmployee?.fullName}, establishment: ${_establishment?.name}');
 
     await _secureStorage.set(_keyEmployeeId, employee.id);
     await _secureStorage.set(_keyEstablishmentId, establishment.id);
@@ -411,32 +350,19 @@ class AccountManagerSupabase {
     return isLoggedInSync;
   }
 
-  /// Получить всех сотрудников компании (только активные)
+  /// Получить всех сотрудников компании
   Future<List<Employee>> getEmployeesForEstablishment(String establishmentId) async {
     try {
       final data = await _supabase.client
           .from('employees')
           .select()
-          .eq('establishment_id', establishmentId)
-          .eq('is_active', true);
+          .eq('establishment_id', establishmentId);
 
       return (data as List).map((json) => Employee.fromJson(json)).toList();
     } catch (e) {
       print('Ошибка получения сотрудников: $e');
       return [];
     }
-  }
-
-  /// Удалить сотрудника (деактивация: is_active = false).
-  /// Владельца удалять нельзя.
-  Future<void> deleteEmployee(Employee employee) async {
-    if (employee.roles.contains('owner')) {
-      throw Exception('Нельзя удалить владельца');
-    }
-    await _supabase.client
-        .from('employees')
-        .update({'is_active': false})
-        .eq('id', employee.id);
   }
 
   /// Шеф-повара заведения (для инвентаризации: кабинет + email).
@@ -456,36 +382,7 @@ class AccountManagerSupabase {
     }
   }
 
-  /// Смена пароля (для текущего пользователя). Проверяет текущий пароль.
-  Future<void> changePassword({
-    required String currentPassword,
-    required String newPassword,
-  }) async {
-    final emp = _currentEmployee;
-    if (emp == null) throw Exception('Нет текущего пользователя');
-    if (newPassword.length < 6) throw Exception('Новый пароль не менее 6 символов');
-
-    final data = await _supabase.client
-        .from('employees')
-        .select('password_hash')
-        .eq('id', emp.id)
-        .limit(1)
-        .single();
-    final hash = data['password_hash'] as String?;
-    if (hash == null || hash.isEmpty) throw Exception('Ошибка проверки пароля');
-
-    if (!BCrypt.checkpw(currentPassword, hash) && hash != currentPassword) {
-      throw Exception('Неверный текущий пароль');
-    }
-
-    final newHash = BCrypt.hashpw(newPassword, BCrypt.gensalt());
-    await _supabase.client
-        .from('employees')
-        .update({'password_hash': newHash})
-        .eq('id', emp.id);
-  }
-
-  /// Обновить данные сотрудника (пароль не обновляется — используйте changePassword).
+  /// Обновить данные сотрудника (пароль не обновляется — используйте отдельный поток смены пароля).
   Future<void> updateEmployee(Employee employee) async {
     try {
       var employeeData = employee.toJson()

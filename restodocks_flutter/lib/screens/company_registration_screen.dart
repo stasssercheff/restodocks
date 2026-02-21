@@ -65,21 +65,11 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
 
     for (var attempt = 0; attempt < maxRetries; attempt++) {
       try {
-        // Проверяем, что страна и город выбраны
-        if (_selectedCountry == null || _selectedCity == null) {
-          errorMsg = loc.t('country_and_city_required') ?? 'Выберите страну и город';
-          break;
-        }
-
-        print('Registration: Starting with country ${_selectedCountry!.code}, city: ${_selectedCity!.id}');
-
         final accountManager = context.read<AccountManagerSupabase>();
         final name = _nameController.text.trim();
         final country = _selectedCountry!;
         final city = _selectedCity!;
         final address = '${city.name(lang)}, ${country.name(lang)}';
-
-        print('Registration: Creating establishment with name: $name, address: $address');
 
         final establishment = await accountManager.createEstablishment(
           name: name,
@@ -87,19 +77,11 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
           address: address,
         );
 
-        print('Registration: Establishment created successfully');
-
         if (!mounted) return;
         context.push('/register-owner', extra: establishment);
         return;
       } catch (e) {
         if (!mounted) return;
-        print('Registration error: $e');
-        print('Error type: ${e.runtimeType}');
-        if (e.toString().contains('Bad state: No element')) {
-          errorMsg = 'Ошибка загрузки данных. Попробуйте перезагрузить страницу.';
-          break;
-        }
         if (attempt < maxRetries - 1 && _isDuplicatePinError(e)) {
           setState(() => _pinCode = Establishment.generatePinCode());
           continue;
@@ -199,19 +181,10 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
                     ),
                   ),
                   items: (filter, loadProps) async {
-                    try {
-                      final list = await CountriesCitiesData.loadCountries();
-                      if (list.isEmpty) {
-                        print('CompanyRegistration: Countries list is empty!');
-                        return [];
-                      }
-                      if (filter.trim().isEmpty) return list;
-                      final f = filter.trim().toLowerCase();
-                      return list.where((c) => c.name(lang).toLowerCase().contains(f)).toList();
-                    } catch (e) {
-                      print('CompanyRegistration: Error loading countries: $e');
-                      return [];
-                    }
+                    final list = await CountriesCitiesData.loadCountries();
+                    if (filter.trim().isEmpty) return list;
+                    final f = filter.trim().toLowerCase();
+                    return list.where((c) => c.name(lang).toLowerCase().contains(f)).toList();
                   },
                   itemAsString: (c) => c.name(lang),
                   compareFn: (a, b) => a?.code == b?.code,
@@ -243,18 +216,10 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
                   ),
                   items: (filter, loadProps) async {
                     if (_selectedCountry == null) return <CityItem>[];
-                    try {
-                      final list = await CountriesCitiesData.citiesForCountry(_selectedCountry!.code);
-                      if (list.isEmpty) {
-                        print('CompanyRegistration: Cities list is empty for ${_selectedCountry!.code}');
-                      }
-                      if (filter.trim().isEmpty) return list;
-                      final f = filter.trim().toLowerCase();
-                      return list.where((c) => c.name(lang).toLowerCase().contains(f)).toList();
-                    } catch (e) {
-                      print('CompanyRegistration: Error loading cities: $e');
-                      return [];
-                    }
+                    final list = await CountriesCitiesData.citiesForCountry(_selectedCountry!.code);
+                    if (filter.trim().isEmpty) return list;
+                    final f = filter.trim().toLowerCase();
+                    return list.where((c) => c.name(lang).toLowerCase().contains(f)).toList();
                   },
                   itemAsString: (c) => c.name(lang),
                   compareFn: (a, b) => a?.id == b?.id,
