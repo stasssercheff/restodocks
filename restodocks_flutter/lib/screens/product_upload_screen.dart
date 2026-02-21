@@ -416,8 +416,30 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       return text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
     }
     if (name.endsWith('.rtf')) {
-      final text = _extractTextFromRtf(utf8.decode(bytes, allowMalformed: true));
-      return text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+      final rtfContent = utf8.decode(bytes, allowMalformed: true);
+      final rows = _extractRowsFromRtf(rtfContent);
+      _addDebugLog('RTF processing: extracted ${rows.length} rows');
+      for (var i = 0; i < min(5, rows.length); i++) {
+        _addDebugLog('RTF row $i: "${rows[i]}"');
+      }
+
+      // Если RTF обработка не дала результатов или дала мало строк,
+      // пробуем обработать как обычный текст через AI
+      if (rows.length < 2) {
+        _addDebugLog('RTF extraction gave poor results (${rows.length} rows), trying AI processing');
+        try {
+          final text = _extractTextFromRtf(rtfContent);
+          if (text.isNotEmpty) {
+            _addDebugLog('Processing RTF as text with AI');
+            await _processTextWithAI(text, loc, widget.defaultAddToNomenclature);
+            return []; // Возвращаем пустой список, так как AI уже обработал
+          }
+        } catch (e) {
+          _addDebugLog('AI processing of RTF failed: $e');
+        }
+      }
+
+      return rows;
     }
     if (name.endsWith('.pages')) return _extractRowsFromPages(bytes);
     if (name.endsWith('.numbers')) return _extractRowsFromNumbers(bytes);
@@ -2429,6 +2451,117 @@ ${allProducts.map((p) => p.name).join('\n')}
     return (name: name, price: price);
   }
 
+  List<String> _extractRowsFromRtf(String rtfContent) {
+    _addDebugLog('Starting RTF processing, content length: ${rtfContent.length}');
+
+    // Сначала пробуем извлечь данные из таблиц RTF
+    final tableRows = _extractTableDataFromRtf(rtfContent);
+    if (tableRows.isNotEmpty) {
+      _addDebugLog('Found ${tableRows.length} table rows in RTF');
+      return tableRows;
+    }
+
+    // Если таблиц нет, используем обычную обработку текста
+    final text = _extractTextFromRtf(rtfContent);
+    _addDebugLog('Extracted text from RTF: "${text.substring(0, min(200, text.length))}"');
+
+    // Разбиваем на строки и фильтруем
+    final lines = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+
+    // Дополнительная обработка для поиска паттернов продукт-цена
+    final processedLines = <String>[];
+
+    for (final line in lines) {
+      // Ищем строки, которые выглядят как "Название\tЦена" или "Название Цена"
+      if (_looksLikeProductLine(line)) {
+        processedLines.add(line);
+      } else {
+        // Разбиваем сложные строки на отдельные продукты
+        final subLines = _splitComplexLine(line);
+        processedLines.addAll(subLines);
+      }
+    }
+
+    _addDebugLog('Processed RTF into ${processedLines.length} product lines');
+    return processedLines;
+  }
+
+  List<String> _extractTableDataFromRtf(String rtf) {
+    final rows = <String>[];
+
+    // Ищем RTF таблицы (группы \trowd)
+    final tablePattern = RegExp(r'\\trowd.*?\\row', dotAll: true);
+    final tables = tablePattern.allMatches(rtf);
+
+    for (final tableMatch in tables) {
+      final tableContent = tableMatch.group(0) ?? '';
+
+      // Извлекаем ячейки из таблицы
+      final cellPattern = RegExp(r'\\cell\s*([^\\]*(?:\\[^c][^e][^l][^l][^\\]*)*)');
+      final cells = cellPattern.allMatches(tableContent);
+
+      if (cells.length >= 2) {
+        // Берем первые две ячейки (название и цена)
+        final nameCell = _cleanRtfCell(cells.first.group(1) ?? '');
+        final priceCell = cells.length > 1 ? _cleanRtfCell(cells.elementAt(1).group(1) ?? '') : '';
+
+        if (nameCell.isNotEmpty) {
+          final row = priceCell.isNotEmpty ? '$nameCell\t$priceCell' : nameCell;
+          rows.add(row);
+        }
+      }
+    }
+
+    return rows;
+  }
+
+  bool _looksLikeProductLine(String line) {
+    // Проверяем, выглядит ли строка как продукт с ценой
+    return line.contains('\t') ||
+           RegExp(r'\d+[,.]\d+').hasMatch(line) || // Десятичные числа
+           RegExp(r'\d{3,}').hasMatch(line) || // Большие числа (цены)
+           line.contains('₫') ||
+           line.contains('$') ||
+           line.contains('руб') ||
+           line.contains('€');
+  }
+
+  List<String> _splitComplexLine(String line) {
+    final result = <String>[];
+
+    // Разбиваем по запятым, если это список продуктов
+    if (line.contains(',') && !line.contains('\t')) {
+      final parts = line.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty);
+      for (final part in parts) {
+        if (_looksLikeProductLine(part)) {
+          result.add(part);
+        }
+      }
+    }
+
+    // Если не смогли разбить, возвращаем оригинальную строку
+    if (result.isEmpty && _looksLikeProductLine(line)) {
+      result.add(line);
+    }
+
+    return result;
+  }
+
+  String _cleanRtfCell(String cellContent) {
+    // Очищаем содержимое ячейки RTF от команд
+    var cleaned = cellContent
+        .replaceAll(RegExp(r'\\[a-z]+\d*'), '') // RTF команды
+        .replaceAll(RegExp(r'\{[^}]*\}'), '') // Группы
+        .replaceAll('\\cell', '') // Команды ячеек
+        .replaceAll('\\row', '') // Команды строк
+        .trim();
+
+    // Нормализуем пробелы
+    cleaned = cleaned.replaceAll(RegExp(r'\s+'), ' ');
+
+    return cleaned;
+  }
+
   String _extractTextFromRtf(String rtf) {
     // Удаляем заголовок RTF
     final rtfHeaderEnd = rtf.indexOf('\\viewkind');
@@ -2441,6 +2574,9 @@ ${allProducts.map((p) => p.name).join('\n')}
 
     // Удаляем оставшиеся RTF команды (начинаются с \)
     rtf = rtf.replaceAll(RegExp(r'\\[a-z]+\d*'), '');
+
+    // Очищаем специальные символы
+    rtf = rtf.replaceAll('\\\'', '\'');
 
     // Удаляем лишние пробелы и переносы строк
     rtf = rtf.replaceAll(RegExp(r'\s+'), ' ').trim();
