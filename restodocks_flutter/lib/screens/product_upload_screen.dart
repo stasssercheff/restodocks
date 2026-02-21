@@ -1894,6 +1894,9 @@ ${text}
       int failed = 0;
       int idx = 0;
 
+      // Детальная информация о результатах обработки
+      final processingResults = <Map<String, dynamic>>[];
+
       for (final item in items) {
         if (mounted) {
           setState(() {
@@ -1936,7 +1939,8 @@ ${text}
           // Если продукт найден, обновляем его цену вместо создания нового
           if (item.price != null) {
             try {
-              _addDebugLog('Updating price for existing product "${existingProduct.name}": ${existingProduct.basePrice} -> ${item.price}');
+              final oldPrice = existingProduct.basePrice;
+              _addDebugLog('Updating price for existing product "${existingProduct.name}": $oldPrice -> ${item.price}');
               await store.setEstablishmentPrice(estId, existingProduct.id, item.price, defCur);
 
               // Добавляем в номенклатуру если нужно
@@ -1946,6 +1950,16 @@ ${text}
 
               skipped++;
               _addDebugLog('Successfully updated existing product price');
+
+              // Сохраняем результат обработки
+              processingResults.add({
+                'name': normalizedName,
+                'status': 'updated',
+                'oldPrice': oldPrice,
+                'newPrice': item.price,
+                'productId': existingProduct.id,
+              });
+
               continue; // Пропускаем создание нового продукта
             } catch (updateError) {
               _addDebugLog('Failed to update existing product price: $updateError');
@@ -2044,7 +2058,7 @@ ${text}
             }
           }
 
-          // Добавляем в номенклатуру только если выбрана эта опция
+            // Добавляем в номенклатуру только если выбрана эта опция
           if (addToNomenclature) {
             try {
               print('DEBUG: Adding product "${product.name}" to nomenclature...');
@@ -2056,6 +2070,15 @@ ${text}
               );
               added++;
               print('DEBUG: Successfully added "${product.name}" to nomenclature');
+
+              // Сохраняем результат обработки
+              processingResults.add({
+                'name': normalizedName,
+                'status': 'added',
+                'oldPrice': null,
+                'newPrice': product.basePrice,
+                'productId': product.id,
+              });
             } catch (e) {
               print('DEBUG: Failed to add "${product.name}" to nomenclature: $e');
               if (e.toString().contains('duplicate key') ||
@@ -2072,6 +2095,15 @@ ${text}
             // Продукт добавлен только в базу
             added++;
             print('DEBUG: Product "${product.name}" added to database only');
+
+            // Сохраняем результат обработки
+            processingResults.add({
+              'name': normalizedName,
+              'status': 'added_db_only',
+              'oldPrice': null,
+              'newPrice': product.basePrice,
+              'productId': product.id,
+            });
           }
 
           // Небольшая задержка
@@ -2158,10 +2190,128 @@ ${text}
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('Загрузка завершена'),
-            content: Text(
-              failed == 0
-                  ? 'Успешно добавлено: ${added + skipped} продуктов.'
-                  : 'Добавлено: ${added + skipped}.\nОшибок при добавлении: $failed.',
+            content: SizedBox(
+              width: double.maxFinite,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    failed == 0
+                        ? 'Успешно обработано: ${added + skipped} продуктов.'
+                        : 'Обработано: ${added + skipped}.\nОшибок: $failed.',
+                  ),
+                  const SizedBox(height: 16),
+                  if (processingResults.isNotEmpty) ...[
+                    const Text(
+                      'Детальные результаты:',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      height: 200,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: ListView.builder(
+                        itemCount: processingResults.length,
+                        itemBuilder: (context, index) {
+                          final result = processingResults[index];
+                          final status = result['status'] as String;
+                          final name = result['name'] as String;
+                          final oldPrice = result['oldPrice'] as double?;
+                          final newPrice = result['newPrice'] as double?;
+
+                          String statusText;
+                          Color statusColor;
+                          String priceText = '';
+
+                          switch (status) {
+                            case 'added':
+                              statusText = 'Добавлен';
+                              statusColor = Colors.green;
+                              priceText = newPrice != null ? '${newPrice.toStringAsFixed(0)} ${defCur}' : '';
+                              break;
+                            case 'added_db_only':
+                              statusText = 'Добавлен (только в БД)';
+                              statusColor = Colors.blue;
+                              priceText = newPrice != null ? '${newPrice.toStringAsFixed(0)} ${defCur}' : '';
+                              break;
+                            case 'updated':
+                              statusText = 'Цена обновлена';
+                              statusColor = Colors.orange;
+                              if (oldPrice != null && newPrice != null) {
+                                priceText = '${oldPrice.toStringAsFixed(0)} → ${newPrice.toStringAsFixed(0)} ${defCur}';
+                              } else if (newPrice != null) {
+                                priceText = '${newPrice.toStringAsFixed(0)} ${defCur}';
+                              }
+                              break;
+                            default:
+                              statusText = 'Неизвестно';
+                              statusColor = Colors.grey;
+                          }
+
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  flex: 3,
+                                  child: Text(
+                                    name,
+                                    style: const TextStyle(fontSize: 14),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: statusColor.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    statusText,
+                                    style: TextStyle(
+                                      color: statusColor,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  flex: 2,
+                                  child: Text(
+                                    priceText,
+                                    style: const TextStyle(fontSize: 12),
+                                    textAlign: TextAlign.right,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ] else ...[
+                    const Text(
+                      'Результаты:',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    Text('• Новые продукты: $added'),
+                    Text('• Обновлены цены: $skipped'),
+                    if (failed > 0) Text('• Ошибок: $failed'),
+                  ],
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Примечание: Для обновленных продуктов цены были изменены в соответствии с данными из файла.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ],
+              ),
             ),
             actions: [
               TextButton(
