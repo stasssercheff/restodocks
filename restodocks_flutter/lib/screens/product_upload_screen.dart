@@ -1884,16 +1884,24 @@ ${text}
               ),
             );
 
+            // ЛОКАЛЬНАЯ НОРМАЛИЗАЦИЯ НАЗВАНИЙ ПРОДУКТОВ
+            final normalizedName = _normalizeProductName(product.name);
+            if (normalizedName != product.name) {
+              print('Normalizing product name: "${product.name}" -> "${normalizedName}"');
+              // Обновить продукт с нормализованным названием
+              await store.updateProduct(product.copyWith(name: normalizedName));
+            }
+
             await translationManager.handleEntitySave(
               entityType: TranslationEntityType.product,
               entityId: product.id,
               textFields: {
-                'name': product.name,
+                'name': normalizedName,
                 if (product.names != null)
                   for (final entry in product.names!.entries)
                     'name_${entry.key}': entry.value,
               },
-              sourceLanguage: 'ru', // TODO: определить язык из контекста
+              sourceLanguage: 'ru',
               userId: context.read<AccountManagerSupabase>().currentEmployee?.id,
             );
           } catch (e) {
@@ -2057,6 +2065,62 @@ ${text}
         });
       }
     }
+  }
+
+  /// Локальная нормализация названий продуктов
+  String _normalizeProductName(String name) {
+    String normalized = name.trim();
+
+    // Исправить распространенные опечатки и стандартизировать
+    final corrections = {
+      // Фрукты и овощи
+      'авокадо': 'Авокадо',
+      'авокало': 'Авокадо',
+      'картошка': 'Картофель',
+      'картофель': 'Картофель',
+      'морковка': 'Морковь',
+      'морковь': 'Морковь',
+      'лук': 'Лук репчатый',
+      'лук репка': 'Лук репчатый',
+      'томат': 'Томаты',
+      'томаты': 'Томаты',
+      'огурец': 'Огурцы',
+      'огурцы': 'Огурцы',
+      'перец': 'Перец болгарский',
+      'болгарский перец': 'Перец болгарский',
+
+      // Молочные продукты
+      'молоко': 'Молоко',
+      'сыр': 'Сыр',
+      'масло': 'Масло сливочное',
+      'сливочное масло': 'Масло сливочное',
+      'йогурт': 'Йогурт',
+      'кефир': 'Кефир',
+
+      // Мясо и рыба
+      'курица': 'Курица',
+      'говядина': 'Говядина',
+      'свинина': 'Свинина',
+      'рыба': 'Рыба',
+      'лосось': 'Лосось',
+      'семга': 'Семга',
+    };
+
+    // Применить исправления
+    for (final entry in corrections.entries) {
+      if (normalized.toLowerCase().contains(entry.key)) {
+        normalized = entry.value;
+        break;
+      }
+    }
+
+    // Убрать лишние пробелы и заглавные буквы
+    normalized = normalized.split(' ').map((word) {
+      if (word.isEmpty) return '';
+      return word[0].toUpperCase() + word.substring(1).toLowerCase();
+    }).join(' ');
+
+    return normalized;
   }
 
   ({String name, double? price}) _parseLine(String line) {

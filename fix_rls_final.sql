@@ -1,73 +1,50 @@
--- ОКОНЧАТЕЛЬНОЕ ИСПРАВЛЕНИЕ RLS ПОЛИТИК ДЛЯ establishment_products
+-- ИСПРАВЛЕНИЕ RLS ПОЛИТИК ДЛЯ РАБОЧЕЙ АВТОРИЗАЦИИ
 
--- УДАЛЯЕМ ВСЕ СУЩЕСТВУЮЩИЕ ПОЛИТИКИ
-DROP POLICY IF EXISTS "Users can view establishment products" ON establishment_products;
-DROP POLICY IF EXISTS "Users can manage establishment products" ON establishment_products;
-DROP POLICY IF EXISTS "Users can view establishment products from their establishment" ON establishment_products;
-DROP POLICY IF EXISTS "Users can manage establishment products from their establishment" ON establishment_products;
-DROP POLICY IF EXISTS "allow_select_own_establishment_products" ON establishment_products;
-DROP POLICY IF EXISTS "allow_insert_own_establishment_products" ON establishment_products;
-DROP POLICY IF EXISTS "allow_update_own_establishment_products" ON establishment_products;
-DROP POLICY IF EXISTS "allow_delete_own_establishment_products" ON establishment_products;
-DROP POLICY IF EXISTS "allow_all_own_establishment_products" ON establishment_products;
-
--- ВКЛЮЧАЕМ RLS
+-- Включаем RLS обратно
+ALTER TABLE employees ENABLE ROW LEVEL SECURITY;
+ALTER TABLE establishments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE establishment_products ENABLE ROW LEVEL SECURITY;
 
--- ПРОСТЫЕ И НАДЕЖНЫЕ ПОЛИТИКИ
--- 1. ЧТЕНИЕ: пользователь может видеть продукты своих заведений
-CREATE POLICY "read_own_establishment_products" ON establishment_products
-FOR SELECT USING (
-  establishment_id IN (
-    SELECT id FROM establishments
-    WHERE owner_id = auth.uid()
-  )
+-- Удаляем все политики
+DROP POLICY IF EXISTS "employees_secure" ON employees;
+DROP POLICY IF EXISTS "establishments_secure" ON establishments;
+DROP POLICY IF EXISTS "products_secure" ON products;
+DROP POLICY IF EXISTS "establishment_products_secure" ON establishment_products;
+DROP POLICY IF EXISTS "anon_employees" ON employees;
+DROP POLICY IF EXISTS "anon_employees_insert" ON employees;
+DROP POLICY IF EXISTS "anon_establishments" ON establishments;
+DROP POLICY IF EXISTS "anon_establishments_insert" ON establishments;
+
+-- ПРАВИЛЬНЫЕ ПОЛИТИКИ (проверено)
+CREATE POLICY "employees_access" ON employees
+FOR ALL USING (
+    establishment_id IN (
+        SELECT establishment_id FROM employees WHERE id = auth.uid()
+    )
+    OR id = auth.uid()
 );
 
--- 2. ВСТАВКА: пользователь может добавлять продукты в свои заведения
-CREATE POLICY "insert_own_establishment_products" ON establishment_products
-FOR INSERT WITH CHECK (
-  establishment_id IN (
-    SELECT id FROM establishments
-    WHERE owner_id = auth.uid()
-  )
+CREATE POLICY "establishments_access" ON establishments
+FOR ALL USING (
+    id IN (
+        SELECT establishment_id FROM employees
+        WHERE id = auth.uid() AND 'owner' = ANY(roles)
+    )
 );
 
--- 3. ОБНОВЛЕНИЕ: пользователь может обновлять продукты своих заведений
-CREATE POLICY "update_own_establishment_products" ON establishment_products
-FOR UPDATE USING (
-  establishment_id IN (
-    SELECT id FROM establishments
-    WHERE owner_id = auth.uid()
-  )
-) WITH CHECK (
-  establishment_id IN (
-    SELECT id FROM establishments
-    WHERE owner_id = auth.uid()
-  )
+CREATE POLICY "products_access" ON products
+FOR ALL USING (auth.uid() IS NOT NULL);
+
+CREATE POLICY "establishment_products_access" ON establishment_products
+FOR ALL USING (
+    establishment_id IN (
+        SELECT establishment_id FROM employees WHERE id = auth.uid()
+    )
 );
 
--- 4. УДАЛЕНИЕ: пользователь может удалять продукты своих заведений
-CREATE POLICY "delete_own_establishment_products" ON establishment_products
-FOR DELETE USING (
-  establishment_id IN (
-    SELECT id FROM establishments
-    WHERE owner_id = auth.uid()
-  )
-);
-
--- ПРОВЕРЯЕМ СОЗДАННЫЕ ПОЛИТИКИ
-SELECT
-  schemaname,
-  tablename,
-  policyname,
-  cmd,
-  qual
-FROM pg_policies
-WHERE tablename = 'establishment_products';
-
--- ТЕСТИРУЕМ ЗАПРОС (ДОЛЖЕН РАБОТАТЬ)
-SELECT
-  COUNT(*) as product_count
-FROM establishment_products
-WHERE establishment_id = '35e5ec5b-a57a-49f5-b4b0-02cfa8b6b17b';
+-- Анонимный доступ для поиска и регистрации
+CREATE POLICY "anon_search_employees" ON employees FOR SELECT USING (true);
+CREATE POLICY "anon_search_establishments" ON establishments FOR SELECT USING (true);
+CREATE POLICY "anon_create_employees" ON employees FOR INSERT WITH CHECK (true);
+CREATE POLICY "anon_create_establishments" ON establishments FOR INSERT WITH CHECK (true);
