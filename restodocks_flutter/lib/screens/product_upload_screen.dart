@@ -1357,25 +1357,43 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
       // Создаем запрос к AI для извлечения списка продуктов
       final prompt = '''
-Извлеки список продуктов из этого текста. Для каждого продукта укажи:
-- Название продукта
-- Цену (если указана, число без валюты)
-- Валюту (если указана)
+Ты - эксперт по обработке списков продуктов. Проанализируй этот текст и извлеки все продукты.
 
-Формат ответа: каждая строка "Название|Цена|Валюта"
-Если цена или валюта не указаны, оставь пустым.
+ПРАВИЛА ОБРАБОТКИ:
+1. Ищи строки формата: "Название\t₫Цена" или "Название\tЦена₫" или "Название\tЦена"
+2. Символ ₫ означает вьетнамские донги (VND)
+3. Цены могут содержать запятые как разделители тысяч: 110,000 = 110000
+4. Игнорируй пустые строки и заголовки
 
-Примеры:
-Авокадо|99000|VND
-Базилик|267000|
+ФОРМАТ ВЫВОДА:
+Каждая строка ровно в формате: "Название|ЦенаЧисло|Валюта"
+- Название: точное название продукта
+- ЦенаЧисло: число без запятых, точек и валюты (например: 110000)
+- Валюта: VND для ₫, или пустое если не указано
+
+ПРИМЕРЫ:
+Авокадо|110000|VND
+Базилик|267000|VND
 Молоко||
 
-Текст для обработки:
+Если цена содержит запятую (110,000) - преобразуй в число (110000).
+Если валюта ₫ - укажи VND.
+
+ТЕКСТ ДЛЯ ОБРАБОТКИ:
 ${text}
 ''';
 
       _addDebugLog('Sending AI request...');
-      final checklistResult = await aiService.generateChecklistFromPrompt(prompt);
+
+      // Добавляем таймаут для AI запроса (30 секунд)
+      final checklistResult = await aiService.generateChecklistFromPrompt(prompt).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          _addDebugLog('AI request timed out after 30 seconds');
+          throw Exception('AI processing timed out');
+        },
+      );
+
       _addDebugLog('AI response received');
 
       if (checklistResult == null || checklistResult.itemTitles.isEmpty) {
@@ -1384,27 +1402,48 @@ ${text}
 
       // Парсим результат - itemTitles содержит строки в формате "Название|Цена|Валюта"
       final rawItems = checklistResult.itemTitles;
+      _addDebugLog('AI returned ${rawItems.length} items');
 
       final items = <({String name, double? price})>[];
       for (final rawItem in rawItems) {
         try {
           if (rawItem is String && rawItem.contains('|')) {
             final parts = rawItem.split('|').map((s) => s.trim()).toList();
+            _addDebugLog('Processing AI item: "$rawItem" -> parts: $parts');
+
             if (parts.length >= 1 && parts[0].isNotEmpty) {
               final name = parts[0];
               double? price;
 
               if (parts.length >= 2 && parts[1].isNotEmpty) {
-                // Пробуем разные форматы чисел
-                final priceStr = parts[1].replaceAll(RegExp(r'[^\d.,]'), '').replaceAll(',', '.');
+                // Обрабатываем цену: убираем запятые, точки, пробелы
+                final priceStr = parts[1]
+                    .replaceAll(',', '')  // Убираем разделители тысяч
+                    .replaceAll('.', '')  // Убираем десятичные точки
+                    .replaceAll(' ', '')  // Убираем пробелы
+                    .trim();
+
                 price = double.tryParse(priceStr);
+                _addDebugLog('Parsed price: "$priceStr" -> $price');
               }
 
-              items.add((name: name, price: price));
+              // Проверяем валюту - если VND и цена больше 1000, делим на 1000 (предполагаем копейки)
+              if (parts.length >= 3 && parts[2] == 'VND' && price != null && price > 1000) {
+                // Если цена слишком большая для VND (обычно до 1 млн), возможно это копейки
+                if (price > 1000000) {
+                  price = price / 1000; // Конвертируем из копеек в рубли/донги
+                  _addDebugLog('Converted VND price from kopecks: $price');
+                }
+              }
+
+              if (name.isNotEmpty) {
+                items.add((name: name, price: price));
+                _addDebugLog('Added item: "$name" @ $price');
+              }
             }
           }
         } catch (e) {
-          // Игнорируем ошибки парсинга
+          _addDebugLog('Error parsing AI item "$rawItem": $e');
         }
       }
 
@@ -1481,34 +1520,43 @@ ${text}
 
     List<({String name, double? price})> items;
 
+    // Если формат требует AI обработки
     if (format == 'ai_needed') {
-      // Используем AI для сложных форматов
       return await _processTextWithAI(text, loc, addToNomenclature);
+    }
+
+    // Обычный парсинг
+    _setLoadingMessage('Разбираем текст...');
+    final lines = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+    _addDebugLog('=== PARSING ${lines.length} LINES ===');
+    for (var i = 0; i < min(3, lines.length); i++) {
+      _addDebugLog('Raw line ${i}: "${lines[i]}"');
+    }
+
+    final parsedResults = lines.map(_parseLine).toList();
+    _addDebugLog('Parsed ${parsedResults.length} lines:');
+    for (var i = 0; i < min(5, parsedResults.length); i++) {
+      _addDebugLog('  Line ${i}: "${lines[i]}" -> name="${parsedResults[i].name}", price=${parsedResults[i].price}');
+    }
+
+    items = parsedResults.where((r) => r.name.isNotEmpty).toList();
+    _addDebugLog('After filtering empty names: ${items.length} items remain (from ${parsedResults.length} parsed)');
+
+    // Проверяем, есть ли товары с VND ценами - если да, но парсинг не сработал, используем AI
+    final hasVNDInOriginal = text.contains('₫');
+    final hasVNDParsed = items.any((item) => item.price != null && item.price! > 1000); // VND цены обычно > 1000
+
+    if (hasVNDInOriginal && !hasVNDParsed) {
+      _addDebugLog('WARNING: Text contains VND prices but parsing failed, switching to AI');
+      return await _processTextWithAI(text, loc, addToNomenclature);
+    }
+
+    if (items.isEmpty) {
+      _addDebugLog('ERROR: All items were filtered out! Check _parseLine logic.');
     } else {
-      // Обычный парсинг
-      _setLoadingMessage('Разбираем текст...');
-      final lines = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
-      _addDebugLog('=== PARSING ${lines.length} LINES ===');
-      for (var i = 0; i < min(3, lines.length); i++) {
-        _addDebugLog('Raw line ${i}: "${lines[i]}"');
-      }
-
-      final parsedResults = lines.map(_parseLine).toList();
-      _addDebugLog('Parsed ${parsedResults.length} lines:');
-      for (var i = 0; i < min(5, parsedResults.length); i++) {
-        _addDebugLog('  Line ${i}: "${lines[i]}" -> name="${parsedResults[i].name}", price=${parsedResults[i].price}');
-      }
-
-      items = parsedResults.where((r) => r.name.isNotEmpty).toList();
-      _addDebugLog('After filtering empty names: ${items.length} items remain (from ${parsedResults.length} parsed)');
-
-      if (items.isEmpty) {
-        _addDebugLog('ERROR: All items were filtered out! Check _parseLine logic.');
-      } else {
-        _addDebugLog('First 3 valid items:');
-        for (var i = 0; i < min(3, items.length); i++) {
-          _addDebugLog('  ${i}: "${items[i].name}" @ ${items[i].price}');
-        }
+      _addDebugLog('First 3 valid items:');
+      for (var i = 0; i < min(3, items.length); i++) {
+        _addDebugLog('  ${i}: "${items[i].name}" @ ${items[i].price}');
       }
     }
 
@@ -1536,8 +1584,9 @@ ${text}
     final lines = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).take(5);
     print('DEBUG: Detecting format for ${lines.length} sample lines');
 
-    // Проверяем на сложные форматы
+    // Проверяем на сложные форматы или форматы требующие AI
     bool hasComplexFormat = false;
+    bool hasVNDPrices = false;
 
     for (final line in lines) {
       // Ищем признаки сложных форматов
@@ -1547,11 +1596,17 @@ ${text}
           line.contains('(') && line.contains(')') ||
           RegExp(r'\d+\s*[a-zA-Zа-яА-Я]+\s*\d').hasMatch(line)) {
         hasComplexFormat = true;
-        break;
+      }
+
+      // Проверяем на VND цены (₫)
+      if (line.contains('₫')) {
+        hasVNDPrices = true;
+        hasComplexFormat = true; // VND форматы отправляем на AI
       }
     }
 
     if (hasComplexFormat) {
+      _addDebugLog('Detected complex format (or VND prices), using AI processing');
       return 'ai_needed';
     }
 
