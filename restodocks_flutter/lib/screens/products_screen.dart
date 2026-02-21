@@ -23,6 +23,8 @@ class ProductsScreen extends StatefulWidget {
 
 enum _ProductSort { az, za }
 
+enum _DuplicateMode { full, byName }
+
 class _ProductsScreenState extends State<ProductsScreen> {
   String _query = '';
   List<Product> _products = [];
@@ -75,36 +77,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
   }
 
   Future<void> _removeDuplicates() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Удалить полные дубликаты'),
-        content: const Text('Будут удалены продукты с одинаковым названием, ценой и характеристиками. Продукты, используемые в номенклатуре, не будут удалены. Продолжить?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Отмена'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Удалить'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) return;
-
     setState(() => _isLoading = true);
 
     try {
-    final store = context.read<ProductStoreSupabase>();
-    final account = context.read<AccountManagerSupabase>();
-
-      // Временно отключаем проверку ТТК из-за ошибки в getAllTechCards
-      // final techCardService = context.read<TechCardServiceSupabase>();
-      // final allTechCards = await techCardService.getAllTechCards();
+      final store = context.read<ProductStoreSupabase>();
+      final account = context.read<AccountManagerSupabase>();
 
       // Группируем продукты по ключевым характеристикам
       final Map<String, List<Product>> groupedProducts = {};
@@ -123,62 +100,70 @@ class _ProductsScreenState extends State<ProductsScreen> {
         groupedProducts.putIfAbsent(key, () => []).add(product);
       }
 
-      int deletedCount = 0;
-      int skippedCount = 0;
+      // Находим группы с дубликатами
+      final duplicateGroups = groupedProducts.values.where((group) => group.length > 1).toList();
 
-      // Для каждой группы оставляем только первый продукт, остальные удаляем
-      for (final products in groupedProducts.values) {
-        if (products.length > 1) {
-          for (int i = 1; i < products.length; i++) {
-            final product = products[i];
-
-            // Проверяем, используется ли продукт в номенклатуре или ТТК
-            bool isUsed = false;
-            String usageMessage = '';
-
-            // Проверяем в номенклатуре текущего заведения
-            final establishment = account.establishment;
-            if (establishment != null) {
-              final nomenclatureIds = store.getNomenclatureIdsForEstablishment(establishment.id);
-              if (nomenclatureIds.contains(product.id)) {
-                isUsed = true;
-                usageMessage = 'Продукт используется в номенклатуре заведения "${establishment.name}"';
-              }
-            }
-
-            // Временно отключаем проверку ТТК из-за ошибки getAllTechCards
-            // if (!isUsed) {
-            //   for (final techCard in allTechCards) {
-            //     if (techCard.ingredients.any((ing) => ing.productId == product.id)) {
-            //       isUsed = true;
-            //       break;
-            //     }
-            //   }
-            // }
-
-            if (isUsed) {
-              skippedCount++;
-              continue;
-            }
-
-            await store.deleteProduct(product.id);
-            deletedCount++;
-          }
+      if (duplicateGroups.isEmpty) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Полных дубликатов не найдено')),
+          );
         }
+        return;
       }
 
-      if (mounted) {
-        await _loadProducts(); // Перезагружаем список
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Удалено дубликатов: $deletedCount${skippedCount > 0 ? ', пропущено (используются): $skippedCount' : ''}')),
-        );
-      }
+      // Показываем диалог выбора
+      await showDialog(
+        context: context,
+        builder: (ctx) => _ProductDuplicatesDialog(
+          groups: duplicateGroups,
+          mode: _DuplicateMode.full,
+          onRemove: (idsToRemove) async {
+            final store = context.read<ProductStoreSupabase>();
+            final account = context.read<AccountManagerSupabase>();
+
+            int deletedCount = 0;
+            int skippedCount = 0;
+
+            for (final productId in idsToRemove) {
+              // Проверяем, используется ли продукт в номенклатуре
+              bool isUsed = false;
+              final establishment = account.establishment;
+              if (establishment != null) {
+                final nomenclatureIds = store.getNomenclatureIdsForEstablishment(establishment.id);
+                if (nomenclatureIds.contains(productId)) {
+                  isUsed = true;
+                }
+              }
+
+              if (isUsed) {
+                skippedCount++;
+                continue;
+              }
+
+              await store.deleteProduct(productId);
+              deletedCount++;
+            }
+
+            if (mounted) {
+              await _loadProducts(); // Перезагружаем список
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Удалено дубликатов: $deletedCount${skippedCount > 0 ? ', пропущено (используются): $skippedCount' : ''}')),
+              );
+            }
+          },
+        ),
+      );
     } catch (e) {
       if (mounted) {
-        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка удаления дубликатов: $e')),
+          SnackBar(content: Text('Ошибка поиска дубликатов: $e')),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
       }
     }
   }
@@ -398,6 +383,221 @@ class _ProductsScreenState extends State<ProductsScreen> {
     }
   }
 
+  /// Умный поиск дубликатов с помощью ИИ
+  Future<void> _findDuplicatesWithAI(_DuplicateMode mode) async {
+    if (_products.length < 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Нужно минимум 2 продукта для поиска дубликатов')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final loc = context.read<LocalizationService>();
+      List<List<Product>> duplicateGroups = [];
+
+      if (mode == _DuplicateMode.full) {
+        // Полные дубликаты - группируем по всем полям
+        final Map<String, List<Product>> groupedProducts = {};
+        for (final product in _products) {
+          final key = '${product.name}_${product.basePrice}_${product.currency}_${product.calories}_${product.protein}_${product.fat}_${product.carbs}';
+          groupedProducts.putIfAbsent(key, () => []).add(product);
+        }
+        duplicateGroups = groupedProducts.values.where((group) => group.length > 1).toList();
+      } else {
+        // Умный поиск дубликатов по названию с помощью ИИ
+        duplicateGroups = await _findDuplicateGroupsWithAI();
+      }
+
+      if (duplicateGroups.isEmpty) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(mode == _DuplicateMode.full ? 'Полных дубликатов не найдено' : 'Дубликатов не найдено')),
+          );
+        }
+        return;
+      }
+
+      // Показываем диалог согласования
+      await showDialog(
+        context: context,
+        builder: (ctx) => _SmartDuplicatesDialog(
+          groups: duplicateGroups,
+          mode: mode,
+          loc: loc,
+          onRemove: (idsToRemove) async {
+            final store = context.read<ProductStoreSupabase>();
+            final account = context.read<AccountManagerSupabase>();
+            final techCardService = context.read<TechCardServiceSupabase>();
+
+            int deletedCount = 0;
+            int skippedCount = 0;
+
+            // Проверяем использование в ТТК
+            List<TechCard> allTechCards = [];
+            try {
+              allTechCards = await techCardService.getAllTechCards();
+            } catch (e) {
+              print('Warning: Could not load tech cards for duplicate removal: $e');
+            }
+
+            for (final productId in idsToRemove) {
+              final product = _products.firstWhere((p) => p.id == productId);
+              if (product == null) continue;
+
+              // Проверяем использование в номенклатуре
+              bool isUsed = false;
+              String usageMessage = '';
+
+              final establishment = account.establishment;
+              if (establishment != null) {
+                final nomenclatureIds = store.getNomenclatureIdsForEstablishment(establishment.id);
+                if (nomenclatureIds.contains(productId)) {
+                  isUsed = true;
+                  usageMessage = 'Продукт используется в номенклатуре';
+                }
+              }
+
+              // Проверяем использование в ТТК
+              if (!isUsed) {
+                for (final techCard in allTechCards) {
+                  if (techCard.ingredients.any((ing) => ing.productId == productId)) {
+                    isUsed = true;
+                    usageMessage = 'Продукт используется в ТТК';
+                    break;
+                  }
+                }
+              }
+
+              if (isUsed) {
+                print('Skipping product ${product.name}: $usageMessage');
+                skippedCount++;
+                continue;
+              }
+
+              try {
+                await store.deleteProduct(productId);
+                deletedCount++;
+                print('Deleted duplicate product: ${product.name}');
+              } catch (e) {
+                print('Error deleting product ${product.name}: $e');
+              }
+            }
+
+            if (mounted) {
+              await _loadProducts(); // Перезагружаем список
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Удалено дубликатов: $deletedCount${skippedCount > 0 ? ', пропущено (используются): $skippedCount' : ''}')),
+              );
+            }
+          },
+        ),
+      );
+
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка поиска дубликатов: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  /// Поиск групп дубликатов с помощью ИИ
+  Future<List<List<Product>>> _findDuplicateGroupsWithAI() async {
+    final groups = <List<Product>>[];
+    final processedIds = <String>{};
+
+    try {
+      final aiService = context.read<AiServiceSupabase>();
+
+      for (final product in _products) {
+        if (processedIds.contains(product.id)) continue;
+
+        // Ищем похожие продукты
+        final similarProducts = <Product>[product];
+
+        for (final otherProduct in _products) {
+          if (otherProduct.id == product.id || processedIds.contains(otherProduct.id)) continue;
+
+          // Используем ИИ для определения схожести названий
+          try {
+            final prompt = '''
+Проанализируй два названия продуктов и определи, являются ли они дубликатами:
+
+Продукт 1: "${product.name}"
+Продукт 2: "${otherProduct.name}"
+
+Дубликаты если:
+- Названия идентичны или почти идентичны
+- Один является опечаткой другого
+- Разные формы написания одного продукта (молоко/молоко цельное)
+- Синонимы (говядина/говядина вырезка)
+
+Ответь только "YES" или "NO".
+''';
+
+            final result = await aiService.generateChecklistFromPrompt(prompt);
+            if (result != null && result.itemTitles.isNotEmpty) {
+              final response = result.itemTitles.first.toString().toUpperCase().trim();
+              if (response == 'YES') {
+                similarProducts.add(otherProduct);
+                processedIds.add(otherProduct.id);
+              }
+            }
+          } catch (e) {
+            print('AI similarity check failed for "${product.name}" vs "${otherProduct.name}": $e');
+            // Fallback: простая проверка
+            final similarity = _calculateSimilarity(product.name, otherProduct.name);
+            if (similarity > 0.7) {
+              similarProducts.add(otherProduct);
+              processedIds.add(otherProduct.id);
+            }
+          }
+        }
+
+        if (similarProducts.length > 1) {
+          groups.add(similarProducts);
+        }
+
+        processedIds.add(product.id);
+      }
+
+    } catch (e) {
+      print('Error in AI duplicate detection: $e');
+    }
+
+    return groups;
+  }
+
+  /// Простая метрика схожести строк (0.0 - 1.0)
+  double _calculateSimilarity(String str1, String str2) {
+    if (str1 == str2) return 1.0;
+    if (str1.isEmpty || str2.isEmpty) return 0.0;
+
+    // Нормализуем строки
+    final normalized1 = str1.toLowerCase().replaceAll(RegExp(r'[^\w\s]'), '').trim();
+    final normalized2 = str2.toLowerCase().replaceAll(RegExp(r'[^\w\s]'), '').trim();
+
+    if (normalized1 == normalized2) return 1.0;
+
+    // Проверяем общие слова
+    final words1 = normalized1.split(' ').toSet();
+    final words2 = normalized2.split(' ').toSet();
+    final intersection = words1.intersection(words2).length;
+    final union = words1.union(words2).length;
+
+    return union > 0 ? intersection / union : 0.0;
+  }
+
   /// Ключ сортировки: соус/специя и т.п. идут по букве слова-типа (С), не по первому слову названия
   static String _sortKeyForProduct(String name) {
     const words = ['соус', 'специя', 'смесь', 'приправа', 'маринад', 'подлива', 'паста', 'масло'];
@@ -510,11 +710,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
             icon: const Icon(Icons.auto_awesome),
             tooltip: 'Дубликаты с ИИ',
             onSelected: (v) async {
-              if (v == 'by_name') await _removeDuplicatesByName();
-              else if (v == 'full') await _removeDuplicates();
+              if (v == 'by_name_ai') await _findDuplicatesWithAI(_DuplicateMode.byName);
+              else if (v == 'full') await _findDuplicatesWithAI(_DuplicateMode.full);
             },
             itemBuilder: (ctx) => [
-              const PopupMenuItem(value: 'by_name', child: Text('Дубликаты по названию')),
+              const PopupMenuItem(value: 'by_name_ai', child: Text('Умный поиск дубликатов')),
               const PopupMenuItem(value: 'full', child: Text('Полные дубликаты')),
             ],
           ),
@@ -961,6 +1161,174 @@ class _ProductSkeletonItem extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+
+class _SmartDuplicatesDialog extends StatefulWidget {
+  final List<List<Product>> groups;
+  final _DuplicateMode mode;
+  final LocalizationService loc;
+  final Function(List<String> idsToRemove) onRemove;
+
+  const _SmartDuplicatesDialog({
+    required this.groups,
+    required this.mode,
+    required this.loc,
+    required this.onRemove,
+  });
+
+  @override
+  State<_SmartDuplicatesDialog> createState() => _SmartDuplicatesDialogState();
+}
+
+class _SmartDuplicatesDialogState extends State<_SmartDuplicatesDialog> {
+  final Set<String> _selectedToRemove = {};
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // По умолчанию отмечаем все кроме первого в каждой группе
+    for (final group in widget.groups) {
+      for (int i = 1; i < group.length; i++) {
+        _selectedToRemove.add(group[i].id);
+      }
+    }
+  }
+
+  void _selectAllExceptFirst() {
+    setState(() {
+      _selectedToRemove.clear();
+      for (final group in widget.groups) {
+        for (int i = 1; i < group.length; i++) {
+          _selectedToRemove.add(group[i].id);
+        }
+      }
+    });
+  }
+
+  void _toggleSelection(String productId) {
+    setState(() {
+      if (_selectedToRemove.contains(productId)) {
+        _selectedToRemove.remove(productId);
+      } else {
+        _selectedToRemove.add(productId);
+      }
+    });
+  }
+
+  Future<void> _applyRemoval() async {
+    setState(() => _saving = true);
+
+    try {
+      await widget.onRemove(_selectedToRemove.toList());
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Ошибка удаления: $e")),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return AlertDialog(
+      title: Text(widget.mode == _DuplicateMode.full ? "Полные дубликаты" : "Умный поиск дубликатов"),
+      content: SizedBox(
+        width: 600,
+        height: 500,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              widget.mode == _DuplicateMode.full
+                  ? "Найдены продукты с полностью идентичными данными. Выберите, какие удалить."
+                  : "ИИ нашел похожие названия продуктов. Выберите, какие удалить.",
+              style: theme.textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: ListView.builder(
+                itemCount: widget.groups.length,
+                itemBuilder: (context, groupIndex) {
+                  final group = widget.groups[groupIndex];
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "Группа ${groupIndex + 1}",
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              color: theme.colorScheme.primary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          ...group.map((product) => CheckboxListTile(
+                                value: _selectedToRemove.contains(product.id),
+                                onChanged: _saving ? null : (selected) => _toggleSelection(product.id),
+                                title: Text(
+                                  product.getLocalizedName(widget.loc.currentLanguageCode),
+                                  style: TextStyle(
+                                    decoration: _selectedToRemove.contains(product.id)
+                                        ? TextDecoration.lineThrough
+                                        : null,
+                                    color: _selectedToRemove.contains(product.id)
+                                        ? theme.colorScheme.onSurface.withOpacity(0.6)
+                                        : null,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  "Цена: ${product.basePrice ?? "не указана"} ${product.currency ?? ""} • "
+                                  "${product.calories != null ? "${product.calories!.round()} ккал" : "без КБЖУ"}",
+                                  style: theme.textTheme.bodySmall,
+                                ),
+                                dense: true,
+                                controlAffinity: ListTileControlAffinity.leading,
+                              )),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.of(context).pop(),
+          child: const Text("Отмена"),
+        ),
+        TextButton(
+          onPressed: _saving ? null : _selectAllExceptFirst,
+          style: TextButton.styleFrom(foregroundColor: Colors.orange),
+          child: const Text("Оставить первый в каждой группе"),
+        ),
+        FilledButton(
+          onPressed: _saving || _selectedToRemove.isEmpty ? null : _applyRemoval,
+          style: FilledButton.styleFrom(backgroundColor: Colors.red),
+          child: _saving
+              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+              : Text("Удалить ${_selectedToRemove.length} дубликатов"),
+        ),
+      ],
     );
   }
 }
