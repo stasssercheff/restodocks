@@ -324,26 +324,29 @@ class _InventoryScreenState extends State<InventoryScreen>
           }
         }
       }
+      // Определяем количество колонок на основе существующих строк или минимум 2
+      final qtyCount = _rows.isEmpty ? 2 : _rows.map((r) => r.quantities.length).reduce((a, b) => a > b ? a : b);
+
       // Добавляем недостающие продукты и ПФ
       for (final p in products) {
         if (_rows.any((r) => r.product?.id == p.id || r.productId == p.id)) continue;
-        _rows.add(_InventoryRow(product: p, techCard: null, quantities: [0.0, 0.0]));
+        _rows.add(_InventoryRow(product: p, techCard: null, quantities: List<double>.filled(qtyCount, 0.0)));
       }
       for (final tc in pfOnly) {
         if (_rows.any((r) => r.techCard?.id == tc.id || r.techCardId == tc.id)) continue;
-        _rows.add(_InventoryRow(product: null, techCard: tc, quantities: [0.0, 0.0], pfUnit: _pfUnitPcs));
+        _rows.add(_InventoryRow(product: null, techCard: tc, quantities: List<double>.filled(qtyCount, 0.0), pfUnit: _pfUnitPcs));
       }
 
-      // Нормализуем существующие строки: добавляем пустые ячейки если необходимо
-      for (var i = 0; i < _rows.length; i++) {
-        final row = _rows[i];
-        if (!row.isFree) {
-          if (row.quantities.isEmpty) {
-            row.quantities.addAll([0.0, 0.0]);
-          } else if (row.quantities.last != 0.0) {
-            row.quantities.add(0.0);
-          } else if (row.quantities.length < 2) {
-            while (row.quantities.length < 2) row.quantities.add(0.0);
+      // Нормализуем существующие строки: гарантируем одинаковое количество колонок
+      if (_rows.isNotEmpty) {
+        final maxQtyCount = _rows.map((r) => r.quantities.length).reduce((a, b) => a > b ? a : b);
+        for (var i = 0; i < _rows.length; i++) {
+          final row = _rows[i];
+          if (!row.isFree) {
+            // Добавляем недостающие колонки
+            while (row.quantities.length < maxQtyCount) {
+              row.quantities.add(0.0);
+            }
           }
         }
       }
@@ -543,8 +546,11 @@ class _InventoryScreenState extends State<InventoryScreen>
   }
 
   void _addProduct(Product p) {
+    // Создаем строку с правильным количеством колонок (минимум 2, максимум текущий максимум)
+    final qtyCount = _rows.isEmpty ? 2 : _rows.map((r) => r.quantities.length).reduce((a, b) => a > b ? a : b);
+    final quantities = List<double>.filled(qtyCount, 0.0);
     setState(() {
-      _rows.add(_InventoryRow(product: p, techCard: null, quantities: [0.0, 0.0]));
+      _rows.add(_InventoryRow(product: p, techCard: null, quantities: quantities));
     });
     saveNow(); // Сохранить немедленно при добавлении продукта
   }
@@ -1330,9 +1336,14 @@ class _InventoryScreenState extends State<InventoryScreen>
     final screenW = MediaQuery.of(context).size.width;
     final rightW = _colTotalWidth + _colGap + _maxQuantityColumns * (_colQtyWidth + _colGap) + 48;
     final totalW = (leftW + rightW).clamp(screenW, double.infinity);
-    // Use fixed column layout when there are many quantity columns
-    if (_maxQuantityColumns > 3) {
-      return _buildTableWithFixedColumn(loc);
+    // Use fixed column layout when there are many quantity columns or screen is narrow
+    // Добавляем плавный transition при переключении режимов
+    final useFixedColumn = _maxQuantityColumns > 3 || totalW > screenW * 1.2;
+    if (useFixedColumn) {
+      return AnimatedSwitcher(
+        duration: const Duration(milliseconds: 300),
+        child: _buildTableWithFixedColumn(loc),
+      );
     }
 
     // Original scrollable table for few columns
@@ -1605,7 +1616,7 @@ class _InventoryScreenState extends State<InventoryScreen>
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 controller: _hScroll,
-                physics: const NeverScrollableScrollPhysics(),
+                physics: const AlwaysScrollableScrollPhysics(),
                 child: SizedBox(
                   width: rightW.clamp(screenW - leftW, double.infinity),
                   child: _buildScrollableHeaderRow(loc),
@@ -1653,8 +1664,14 @@ class _InventoryScreenState extends State<InventoryScreen>
               // Scrollable right column (quantities)
               Expanded(
                 child: SingleChildScrollView(
-                  physics: const ClampingScrollPhysics(),
-                  child: Column(
+                  scrollDirection: Axis.horizontal,
+                  controller: _hScroll,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: SizedBox(
+                    width: rightW.clamp(screenW - leftW, double.infinity),
+                    child: SingleChildScrollView(
+                      physics: const ClampingScrollPhysics(),
+                      child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [

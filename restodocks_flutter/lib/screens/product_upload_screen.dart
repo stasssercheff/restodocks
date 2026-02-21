@@ -794,7 +794,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     }
   }
 
-  ({String? existingId, String? existingName, double? existingPrice, bool existingPriceFromEstablishment, bool priceDiff}) _findMatch(
+  Future<({String? existingId, String? existingName, double? existingPrice, bool existingPriceFromEstablishment, bool priceDiff})> _findMatch(
     String name,
     double? price,
     List<Product> nomenclature,
@@ -1520,7 +1520,6 @@ ${text}
     }
 
     // ОБНОВЛЯЕМ НОМЕНКЛАТУРУ ПЕРЕД ОБРАБОТКОЙ - КРИТИЧНО ДЛЯ ПРАВИЛЬНЫХ ЦЕН!
-    final account = context.read<AccountManagerSupabase>();
     final store = context.read<ProductStoreSupabase>();
     final est = account.establishment;
     if (est != null) {
