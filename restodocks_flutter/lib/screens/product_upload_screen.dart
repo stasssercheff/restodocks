@@ -801,17 +801,21 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     List<Product> allProducts,
     String establishmentId,
     ProductStoreSupabase store,
-  ) {
+  ) async {
     final normalized = name.toLowerCase().replaceAll(RegExp(r'[^\w\s]'), '').replaceAll(RegExp(r'\s+'), ' ').trim();
     for (final p in nomenclature) {
       final pNames = [p.name, ...(p.names?.values ?? [])];
       for (final n in pNames) {
         final nNorm = n.toLowerCase().replaceAll(RegExp(r'[^\w\s]'), '').replaceAll(RegExp(r'\s+'), ' ').trim();
         if (nNorm == normalized) {
+          // Получаем актуальную цену ТОЛЬКО из establishment_products
           final ep = store.getEstablishmentPrice(p.id, establishmentId);
           double? existingPrice = ep?.$1;
           final fromEstablishment = existingPrice != null;
-          if (existingPrice == null) existingPrice = p.basePrice;
+
+          // Если цены нет в establishment_products, значит продукт есть в номенклатуре без цены
+          // existingPrice остается null, что правильно - нет текущей цены для сравнения
+
           final priceDiff = price != null && existingPrice != null && (existingPrice - price).abs() > 0.01;
           return (existingId: p.id, existingName: p.name, existingPrice: existingPrice, existingPriceFromEstablishment: fromEstablishment, priceDiff: priceDiff);
         }
@@ -1405,6 +1409,16 @@ ${text}
       }
 
       if (items.isNotEmpty) {
+        // ОБНОВЛЯЕМ НОМЕНКЛАТУРУ ПЕРЕД ОБРАБОТКОЙ - КРИТИЧНО ДЛЯ ПРАВИЛЬНЫХ ЦЕН!
+        final account = context.read<AccountManagerSupabase>();
+        final store = context.read<ProductStoreSupabase>();
+        final est = account.establishment;
+        if (est != null) {
+          _addDebugLog('Loading nomenclature before AI processing...');
+          await store.loadNomenclature(est.id);
+          _addDebugLog('Nomenclature loaded for AI processing, products: ${store.nomenclatureProductIds.length}');
+        }
+
         await _addProductsToNomenclature(items, loc, addToNomenclature);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1503,6 +1517,16 @@ ${text}
       _setLoadingMessage('Обычный парсинг не сработал, пробуем ИИ...');
       // Если обычный парсинг не сработал, пробуем AI
       return await _processTextWithAI(text, loc, addToNomenclature);
+    }
+
+    // ОБНОВЛЯЕМ НОМЕНКЛАТУРУ ПЕРЕД ОБРАБОТКОЙ - КРИТИЧНО ДЛЯ ПРАВИЛЬНЫХ ЦЕН!
+    final account = context.read<AccountManagerSupabase>();
+    final store = context.read<ProductStoreSupabase>();
+    final est = account.establishment;
+    if (est != null) {
+      _addDebugLog('Loading nomenclature before text processing...');
+      await store.loadNomenclature(est.id);
+      _addDebugLog('Nomenclature loaded for text processing, products: ${store.nomenclatureProductIds.length}');
     }
 
     _setLoadingMessage('Сохраняем ${items.length} продуктов...');
