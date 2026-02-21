@@ -84,6 +84,20 @@ class RolesConfig {
   static List<SectionRole> barRoles() => bar;
   static List<SectionRole> hallRoles() => hall;
   static List<SectionRole> managementRoles() => management;
+
+  /// Все возможные роли для всех отделов (для владельца)
+  static List<SectionRole> allRoles() {
+    final all = <SectionRole>[];
+    // Добавляем все роли из кухни
+    for (final section in kitchen.values) {
+      all.addAll(section);
+    }
+    // Добавляем роли из других отделов
+    all.addAll(bar);
+    all.addAll(hall);
+    all.addAll(management);
+    return all;
+  }
 }
 
 class SectionRole {

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../services/services.dart';
 import '../models/models.dart';
+import '../core/config/roles_config.dart';
 
 /// Регистрация владельца после создания компании. PIN подставлен с предыдущего шага.
 class OwnerRegistrationScreen extends StatefulWidget {
@@ -34,6 +35,8 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
     _confirmController.dispose();
     super.dispose();
   }
+
+  String _roleKey(String code) => 'role_$code';
 
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
@@ -82,6 +85,7 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
         roles: roles,
       );
 
+      print('DEBUG: Employee created successfully: ${employee?.fullName}, ${employee?.email}');
       await accountManager.login(employee, estab);
 
       // Отправка письма владельцу
@@ -100,6 +104,7 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
       if (!mounted) return;
       print('DEBUG: Owner registration error: $e');
       print('DEBUG: Owner registration error type: ${e.runtimeType}');
+      print('DEBUG: Owner registration error stack trace: ${StackTrace.current}');
       final loc = context.read<LocalizationService>();
       final eStr = e.toString().toLowerCase();
       print('DEBUG: Owner registration error string: $eStr');
@@ -242,9 +247,12 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
                   ),
                   items: [
                     DropdownMenuItem(value: null, child: Text(loc.t('role_optional'))),
-                    DropdownMenuItem(value: 'executive_chef', child: Text(loc.t('executive_chef'))),
-                    DropdownMenuItem(value: 'sous_chef', child: Text(loc.t('sous_chef'))),
-                    DropdownMenuItem(value: 'manager', child: Text(loc.t('manager'))),
+                    ...RolesConfig.allRoles().map((role) =>
+                      DropdownMenuItem(
+                        value: role.roleCode,
+                        child: Text(loc.t(_roleKey(role.roleCode))),
+                      ),
+                    ),
                   ],
                   onChanged: (v) => setState(() => _selectedRole = v),
                 ),
