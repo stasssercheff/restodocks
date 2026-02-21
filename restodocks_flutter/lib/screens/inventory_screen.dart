@@ -343,6 +343,9 @@ class _InventoryScreenState extends State<InventoryScreen>
         for (var i = 0; i < _rows.length; i++) {
           final row = _rows[i];
           if (!row.isFree) {
+            while (row.quantities.length < maxQtyCount) {
+              row.quantities.add(0.0);
+            }
             // Добавляем недостающие колонки
             while (row.quantities.length < maxQtyCount) {
               row.quantities.add(0.0);
@@ -542,7 +545,13 @@ class _InventoryScreenState extends State<InventoryScreen>
       for (final r in _rows) {
         if (!r.isFree) r.quantities.add(0.0);
       }
+      // Обновляем максимальное количество колонок для layout
+      _updateMaxQuantityColumns();
     });
+  }
+
+  void _updateMaxQuantityColumns() {
+    _maxQuantityColumns = _rows.isEmpty ? 2 : _rows.map((r) => r.quantities.length).reduce((a, b) => a > b ? a : b);
   }
 
   void _addProduct(Product p) {
@@ -950,6 +959,7 @@ class _InventoryScreenState extends State<InventoryScreen>
         _rows.addAll(newRows);
         _aggregatedFromFile = aggregated;
         _completed = false;
+        _updateMaxQuantityColumns();
       });
       if (mounted) {
         final msg = loc.t('inventory_loaded').replaceAll('%s', '${newRows.length}');
@@ -1332,35 +1342,9 @@ class _InventoryScreenState extends State<InventoryScreen>
         ),
       );
     }
-    final leftW = _leftWidth(context);
-    final screenW = MediaQuery.of(context).size.width;
-    final rightW = _colTotalWidth + _colGap + _maxQuantityColumns * (_colQtyWidth + _colGap) + 48;
-    final totalW = (leftW + rightW).clamp(screenW, double.infinity);
-    // Use fixed column layout when there are many quantity columns or screen is narrow
-    // Добавляем плавный transition при переключении режимов
-    final useFixedColumn = _maxQuantityColumns > 3 || totalW > screenW * 1.2;
-    if (useFixedColumn) {
-      return AnimatedSwitcher(
-        duration: const Duration(milliseconds: 300),
-        child: _buildTableWithFixedColumn(loc),
-      );
-    }
-
-    // Original scrollable table for few columns
-    return Scrollbar(
-      thumbVisibility: true,
-      controller: _hScroll,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        controller: _hScroll,
-        physics: const AlwaysScrollableScrollPhysics(),
-        child: SingleChildScrollView(
-          physics: const ClampingScrollPhysics(),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minWidth: totalW),
-            child: SizedBox(
-              width: totalW,
-              child: Column(
+    // Всегда используем fixed column layout для стабильности
+    // Левая колонка с продуктами закреплена, правая часть скроллится горизонтально
+    return _buildTableWithFixedColumn(loc);
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -1600,6 +1584,17 @@ class _InventoryScreenState extends State<InventoryScreen>
     final leftW = _leftWidth(context);
     final screenW = MediaQuery.of(context).size.width;
     final rightW = _colTotalWidth + _colGap + _maxQuantityColumns * (_colQtyWidth + _colGap) + 48;
+
+    // Используем ключ на основе количества колонок для плавного обновления
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 200),
+      child: _buildTableContent(loc, leftW, screenW, rightW, Key('inventory_table_${_maxQuantityColumns}')),
+    );
+  }
+
+  Widget _buildTableContent(LocalizationService loc, double leftW, double screenW, double rightW, Key key) {
+    return SizedBox(
+      key: key,
 
     return Column(
       children: [
