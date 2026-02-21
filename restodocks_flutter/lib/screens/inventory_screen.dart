@@ -324,17 +324,19 @@ class _InventoryScreenState extends State<InventoryScreen>
           }
         }
       }
-      // Определяем количество колонок на основе существующих строк или минимум 2
-      final qtyCount = _rows.isEmpty ? 2 : _rows.map((r) => r.quantities.length).reduce((a, b) => a > b ? a : b);
+      // Определяем количество колонок: минимум 2 + 1 запасная = 3
+      final qtyCount = _rows.isEmpty ? 3 : _rows.map((r) => r.quantities.length).reduce((a, b) => a > b ? a : b);
+      // Гарантируем минимум 3 колонки (2 основных + 1 запасная)
+      final minQtyCount = qtyCount < 3 ? 3 : qtyCount;
 
       // Добавляем недостающие продукты и ПФ
       for (final p in products) {
         if (_rows.any((r) => r.product?.id == p.id || r.productId == p.id)) continue;
-        _rows.add(_InventoryRow(product: p, techCard: null, quantities: List<double>.filled(qtyCount, 0.0)));
+        _rows.add(_InventoryRow(product: p, techCard: null, quantities: List<double>.filled(minQtyCount, 0.0)));
       }
       for (final tc in pfOnly) {
         if (_rows.any((r) => r.techCard?.id == tc.id || r.techCardId == tc.id)) continue;
-        _rows.add(_InventoryRow(product: null, techCard: tc, quantities: List<double>.filled(qtyCount, 0.0), pfUnit: _pfUnitPcs));
+        _rows.add(_InventoryRow(product: null, techCard: tc, quantities: List<double>.filled(minQtyCount, 0.0), pfUnit: _pfUnitPcs));
       }
 
       // Нормализуем существующие строки: гарантируем одинаковое количество колонок
@@ -546,9 +548,10 @@ class _InventoryScreenState extends State<InventoryScreen>
   }
 
   void _addProduct(Product p) {
-    // Создаем строку с правильным количеством колонок (минимум 2, максимум текущий максимум)
-    final qtyCount = _rows.isEmpty ? 2 : _rows.map((r) => r.quantities.length).reduce((a, b) => a > b ? a : b);
-    final quantities = List<double>.filled(qtyCount, 0.0);
+    // Создаем строку с правильным количеством колонок (минимум 3, максимум текущий максимум)
+    final qtyCount = _rows.isEmpty ? 3 : _rows.map((r) => r.quantities.length).reduce((a, b) => a > b ? a : b);
+    final minQtyCount = qtyCount < 3 ? 3 : qtyCount;
+    final quantities = List<double>.filled(minQtyCount, 0.0);
     setState(() {
       _rows.add(_InventoryRow(product: p, techCard: null, quantities: quantities));
     });
@@ -1571,20 +1574,6 @@ class _InventoryScreenState extends State<InventoryScreen>
                 ),
               ),
             ),
-            if (!_completed && !row.isFree)
-              SizedBox(
-                width: 28,
-                child: IconButton.filledTonal(
-                  icon: const Icon(Icons.add, size: 18),
-                  onPressed: () => _addQuantityToRow(actualIndex),
-                  tooltip: loc.t('inventory_add_column_hint'),
-                  style: IconButton.styleFrom(
-                    padding: EdgeInsets.zero,
-                    minimumSize: const Size(28, 28),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                ),
-              ),
           ],
         ),
       ),
@@ -1845,20 +1834,6 @@ class _InventoryScreenState extends State<InventoryScreen>
               ),
             ),
           ),
-          if (!_completed && !row.isFree)
-            SizedBox(
-              width: 28,
-              child: IconButton.filledTonal(
-                icon: const Icon(Icons.add, size: 18),
-                onPressed: () => _addQuantityToRow(actualIndex),
-                tooltip: loc.t('inventory_add_column_hint'),
-                style: IconButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  minimumSize: const Size(28, 28),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-              ),
-            ),
         ],
       ),
     );
