@@ -1947,37 +1947,73 @@ ${text}
         if (existingProduct != null) {
           _addDebugLog('Found similar existing product: "${existingProduct.name}" (ID: ${existingProduct.id})');
 
-          // Если продукт найден, обновляем его цену вместо создания нового
+          // Если продукт найден, проверяем нужно ли обновлять цену
           if (item.price != null) {
-            try {
-              final oldPrice = existingProduct.basePrice;
-              _addDebugLog('Updating price for existing product "${existingProduct.name}": $oldPrice -> ${item.price}');
-              await store.setEstablishmentPrice(estId, existingProduct.id, item.price, defCur);
+            final oldPrice = existingProduct.basePrice;
+            final newPrice = item.price;
 
-              // Добавляем в номенклатуру если нужно
+            // Проверяем, отличается ли цена (с учетом округления до 2 знаков)
+            final oldPriceRounded = (oldPrice ?? 0).roundToDouble();
+            final newPriceRounded = newPrice.roundToDouble();
+
+            if ((oldPrice == null && newPrice != null) || (oldPrice != null && (oldPriceRounded - newPriceRounded).abs() > 0.01)) {
+              // Цена изменилась или была null - обновляем
+              try {
+                _addDebugLog('Updating price for existing product "${existingProduct.name}": $oldPrice -> $newPrice');
+                await store.setEstablishmentPrice(estId, existingProduct.id, newPrice, defCur);
+
+                // Добавляем в номенклатуру если нужно
+                if (addToNomenclature) {
+                  await store.addToNomenclature(estId, existingProduct.id, price: newPrice, currency: defCur);
+                }
+
+                skipped++;
+                _addDebugLog('Successfully updated existing product price');
+
+                // Находим и обновляем соответствующий продукт в результатах
+                final existingResult = processingResults.firstWhere(
+                  (r) => _normalizeForComparison(r['name'] as String) == _normalizeForComparison(item.name),
+                  orElse: () => <String, dynamic>{},
+                );
+                if (existingResult.isNotEmpty) {
+                  existingResult['status'] = 'updated';
+                  existingResult['oldPrice'] = oldPrice;
+                  existingResult['newPrice'] = newPrice;
+                  existingResult['productId'] = existingProduct.id;
+                }
+
+                continue; // Пропускаем создание нового продукта
+              } catch (updateError) {
+                _addDebugLog('Failed to update existing product price: $updateError');
+                // Продолжаем с созданием нового продукта
+              }
+            } else {
+              // Цена не изменилась - отмечаем как пропущенный и не показываем в результатах
+              _addDebugLog('Price unchanged for "${existingProduct.name}": $oldPrice (keeping existing)');
+
+              // Добавляем в номенклатуру если нужно (без изменения цены)
               if (addToNomenclature) {
-                await store.addToNomenclature(estId, existingProduct.id, price: item.price, currency: defCur);
+                try {
+                  await store.addToNomenclature(estId, existingProduct.id, price: oldPrice, currency: defCur);
+                } catch (e) {
+                  _addDebugLog('Failed to add to nomenclature: $e');
+                }
               }
 
-              skipped++;
-              _addDebugLog('Successfully updated existing product price');
-
-              // Находим и обновляем соответствующий продукт в результатах
+              // Отмечаем как успешно обработанный, но без изменений
               final existingResult = processingResults.firstWhere(
                 (r) => _normalizeForComparison(r['name'] as String) == _normalizeForComparison(item.name),
                 orElse: () => <String, dynamic>{},
               );
               if (existingResult.isNotEmpty) {
-                existingResult['status'] = 'updated';
+                existingResult['status'] = 'no_change';
                 existingResult['oldPrice'] = oldPrice;
-                existingResult['newPrice'] = item.price;
+                existingResult['newPrice'] = newPrice;
                 existingResult['productId'] = existingProduct.id;
               }
 
+              skipped++;
               continue; // Пропускаем создание нового продукта
-            } catch (updateError) {
-              _addDebugLog('Failed to update existing product price: $updateError');
-              // Продолжаем с созданием нового продукта
             }
           }
         }
@@ -2249,8 +2285,17 @@ ${text}
                         ? 'Успешно обработано: ${added + skipped} продуктов.'
                         : 'Обработано: ${added + skipped}.\nОшибок: $failed.',
                   ),
+                  if (processingResults.where((r) => r['status'] == 'no_change').isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      '${processingResults.where((r) => r['status'] == 'no_change').length} продуктов без изменений цен',
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ],
                   const SizedBox(height: 16),
-                  if (processingResults.isNotEmpty) ...[
+                  // Фильтруем результаты - показываем только те, где произошли изменения
+                  final changedResults = processingResults.where((r) => r['status'] != 'no_change').toList();
+                  if (changedResults.isNotEmpty) ...[
                     const Text(
                       'Детальные результаты:',
                       style: TextStyle(fontWeight: FontWeight.bold),
@@ -2263,9 +2308,9 @@ ${text}
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: ListView.builder(
-                        itemCount: processingResults.length,
+                        itemCount: changedResults.length,
                         itemBuilder: (context, index) {
-                          final result = processingResults[index];
+                          final result = changedResults[index];
                           final status = result['status'] as String;
                           final name = result['name'] as String;
                           final oldPrice = result['oldPrice'] as double?;
