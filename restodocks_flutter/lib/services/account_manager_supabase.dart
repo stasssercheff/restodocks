@@ -176,6 +176,20 @@ class AccountManagerSupabase {
     }
   }
 
+  /// Проверка: занят ли email глобально (во всей системе)
+  Future<bool> isEmailTakenGlobally(String email) async {
+    try {
+      final list = await _supabase.client
+          .from('employees')
+          .select('id')
+          .eq('email', email.trim())
+          .limit(1);
+      return list != null && (list as List).isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Регистрация сотрудника в компании
   Future<Employee> createEmployeeForCompany({
     required Establishment company,

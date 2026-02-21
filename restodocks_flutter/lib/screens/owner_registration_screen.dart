@@ -53,14 +53,17 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
       final email = _emailController.text.trim();
       final password = _passwordController.text;
 
-      // ПРОВЕРКА НА ДУБЛИРОВАНИЕ EMAIL
-      final taken = await accountManager.isEmailTakenInEstablishment(email, estab.id);
+      print('Owner registration: Checking email globally: $email');
+      // ПРОВЕРКА НА ДУБЛИРОВАНИЕ EMAIL (глобально, так как establishment только что создан)
+      final taken = await accountManager.isEmailTakenGlobally(email);
+      print('Owner registration: Email taken result: $taken');
       if (taken && mounted) {
         setState(() => _errorMessage = loc.t('email_already_registered') ?? 'Этот email уже зарегистрирован в системе');
         setState(() => _isLoading = false);
         return;
       }
 
+      print('Owner registration: Creating employee for company...');
       final employee = await accountManager.createEmployeeForCompany(
         company: estab,
         fullName: _nameController.text.trim(),
