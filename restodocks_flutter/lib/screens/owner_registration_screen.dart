@@ -88,6 +88,9 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
       print('DEBUG: Employee created successfully: ${employee?.fullName}, ${employee?.email}');
       await accountManager.login(employee, estab);
 
+      // ВХОД В СИСТЕМУ
+      await accountManager.login(employee, estab);
+
       // Отправка письма владельцу
       context.read<EmailService>().sendRegistrationEmail(
         isOwner: true,
