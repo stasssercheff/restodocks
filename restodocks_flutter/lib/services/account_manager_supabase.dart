@@ -47,10 +47,14 @@ class AccountManagerSupabase {
     await _secureStorage.initialize();
 
     // 1. Восстановление сессии из безопасного хранилища (iOS/Android) или SharedPreferences (Web)
+    print('🔐 AccountManager: Initializing secure storage...');
+    await _secureStorage.initialize();
+    print('🔐 AccountManager: Secure storage initialized');
+
     final employeeId = await _secureStorage.get(_keyEmployeeId);
     final establishmentId = await _secureStorage.get(_keyEstablishmentId);
 
-    print('🔐 AccountManager: Stored IDs - employee: $employeeId, establishment: $establishmentId');
+    print('🔐 AccountManager: Retrieved from storage - employee: $employeeId, establishment: $establishmentId');
 
     if (employeeId != null && establishmentId != null) {
       print('🔐 AccountManager: Restoring session from storage...');
@@ -331,11 +335,14 @@ class AccountManagerSupabase {
     String? email,
     String? password,
   }) async {
+    print('🔐 AccountManager: Setting current user - employee: ${employee.id}, establishment: ${establishment.id}');
     _currentEmployee = employee;
     _establishment = establishment;
 
+    print('🔐 AccountManager: Saving to secure storage...');
     await _secureStorage.set(_keyEmployeeId, employee.id);
     await _secureStorage.set(_keyEstablishmentId, establishment.id);
+    print('🔐 AccountManager: Data saved to secure storage');
 
     if (rememberCredentials && email != null && password != null) {
       await _secureStorage.set(_keyRememberEmail, email);
