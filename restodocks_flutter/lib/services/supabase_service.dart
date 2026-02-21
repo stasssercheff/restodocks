@@ -75,6 +75,14 @@ class SupabaseService {
       return response.first;
     } catch (e) {
       print('DEBUG SupabaseService: Insert failed: $e');
+      print('DEBUG SupabaseService: Error type: ${e.runtimeType}');
+
+      // Обработка ошибки дублирования ключа
+      if (e is PostgrestException && e.code == '23505') {
+        print('DEBUG SupabaseService: Rethrowing 23505 error');
+        rethrow;
+      }
+
       // Если insert().select() не работает, пробуем просто insert
       if (e.toString().contains('permission') || e.toString().contains('RLS')) {
         print('DEBUG SupabaseService: Retrying with insert only...');

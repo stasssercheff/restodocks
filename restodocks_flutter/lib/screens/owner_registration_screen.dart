@@ -91,15 +91,20 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
       context.go('/home');
     } catch (e) {
       if (!mounted) return;
+      print('DEBUG: Owner registration error: $e');
+      print('DEBUG: Owner registration error type: ${e.runtimeType}');
       final loc = context.read<LocalizationService>();
       final eStr = e.toString().toLowerCase();
+      print('DEBUG: Owner registration error string: $eStr');
       if (eStr.contains('email_already_exists') ||
           eStr.contains('email already exists') ||
           eStr.contains('23505') ||
           eStr.contains('duplicate') ||
           eStr.contains('employees_email_key')) {
+        print('DEBUG: Setting email already registered message');
         setState(() => _errorMessage = loc.t('email_already_registered') ?? 'Этот email уже зарегистрирован в системе');
       } else {
+        print('DEBUG: Setting generic register error message');
         setState(() => _errorMessage = loc.t('register_error', args: {'error': e.toString()}));
       }
     } finally {

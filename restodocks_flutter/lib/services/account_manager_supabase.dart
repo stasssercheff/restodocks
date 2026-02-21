@@ -179,13 +179,19 @@ class AccountManagerSupabase {
   /// Проверка: занят ли email глобально (во всей системе)
   Future<bool> isEmailTakenGlobally(String email) async {
     try {
+      final trimmedEmail = email.trim();
+      print('DEBUG: Checking if email taken globally: "$trimmedEmail"');
       final list = await _supabase.client
           .from('employees')
           .select('id')
-          .eq('email', email.trim())
+          .eq('email', trimmedEmail)
           .limit(1);
-      return list != null && (list as List).isNotEmpty;
-    } catch (_) {
+      print('DEBUG: isEmailTakenGlobally result: $list');
+      final isTaken = list != null && (list as List).isNotEmpty;
+      print('DEBUG: isEmailTakenGlobally returning: $isTaken');
+      return isTaken;
+    } catch (e) {
+      print('DEBUG: isEmailTakenGlobally error: $e');
       return false;
     }
   }
@@ -236,11 +242,19 @@ class AccountManagerSupabase {
       return createdEmployee;
     } catch (e) {
       // ОБРАБОТКА ОШИБКИ ДУБЛИРОВАНИЯ EMAIL
-      if (e is PostgrestException && e.code == '23505') {
-        throw Exception('EMAIL_ALREADY_EXISTS');
+      print('DEBUG: createEmployeeForCompany error: $e');
+      print('DEBUG: error type: ${e.runtimeType}');
+      if (e is PostgrestException) {
+        print('DEBUG: PostgrestException code: ${e.code}');
+        if (e.code == '23505') {
+          print('DEBUG: Throwing EMAIL_ALREADY_EXISTS for PostgrestException 23505');
+          throw Exception('EMAIL_ALREADY_EXISTS');
+        }
       }
       final errorStr = e.toString().toLowerCase();
+      print('DEBUG: error string: $errorStr');
       if (errorStr.contains('23505') || errorStr.contains('duplicate') || errorStr.contains('unique') || errorStr.contains('email_key')) {
+        print('DEBUG: Throwing EMAIL_ALREADY_EXISTS for string match');
         throw Exception('EMAIL_ALREADY_EXISTS');
       }
       rethrow;
