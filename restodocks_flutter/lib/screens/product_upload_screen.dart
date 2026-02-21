@@ -1954,7 +1954,7 @@ ${text}
 
             // Проверяем, отличается ли цена (с учетом округления до 2 знаков)
             final oldPriceRounded = (oldPrice ?? 0).roundToDouble();
-            final newPriceRounded = newPrice.roundToDouble();
+            final newPriceRounded = (newPrice ?? 0).roundToDouble();
 
             if ((oldPrice == null && newPrice != null) || (oldPrice != null && (oldPriceRounded - newPriceRounded).abs() > 0.01)) {
               // Цена изменилась или была null - обновляем
@@ -2293,8 +2293,6 @@ ${text}
                     ),
                   ],
                   const SizedBox(height: 16),
-                  // Фильтруем результаты - показываем только те, где произошли изменения
-                  final changedResults = processingResults.where((r) => r['status'] != 'no_change').toList();
                   if (changedResults.isNotEmpty) ...[
                     const Text(
                       'Детальные результаты:',
