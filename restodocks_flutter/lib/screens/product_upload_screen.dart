@@ -695,21 +695,6 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     _setLoadingMessage('Анализ данных ИИ...');
 
     try {
-      // ВРЕМЕННО ОТКЛЮЧАЕМ ИИ - ИСПОЛЬЗУЕМ ТОЛЬКО ЛОКАЛЬНЫЙ ПАРСИНГ
-      List<ParsedProductItem> parsed = [];
-
-      _setLoadingMessage('Локальный разбор...');
-      final rawLines = rows ?? text!.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
-      parsed = rawLines.map((line) {
-        final r = _parseLine(line);
-        print('DEBUG: Parsed line "${line}" -> name: "${r.name}", price: ${r.price}');
-        return ParsedProductItem(name: r.name, price: r.price, unit: null);
-      }).where((p) => p.name.isNotEmpty).toList();
-
-      print('DEBUG: Total parsed items: ${parsed.length}');
-
-      // Старая логика с ИИ закомментирована
-      /*
       final ai = context.read<AiService>();
       List<ParsedProductItem> parsed = rows != null
           ? await ai.parseProductList(rows: rows)
@@ -726,7 +711,6 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
           return ParsedProductItem(name: r.name, price: r.price, unit: null);
         }).where((p) => p.name.isNotEmpty).toList();
       }
-      */
 
       if (parsed.isEmpty) {
         _cancelLoadingTimeout();
@@ -775,8 +759,6 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         }
       }
 
-      // ВРЕМЕННО ОТКЛЮЧАЕМ ИИ НОРМАЛИЗАЦИЮ НАЗВАНИЙ
-      /*
       if (newNames.isNotEmpty) {
         _setLoadingMessage('Исправление названий...');
         final ai = context.read<AiService>();
@@ -794,7 +776,6 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
           }
         }
       }
-      */
 
       if (!mounted) return;
       _cancelLoadingTimeout();
