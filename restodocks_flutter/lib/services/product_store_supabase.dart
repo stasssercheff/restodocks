@@ -387,16 +387,15 @@ class ProductStoreSupabase {
     }
 
     try {
-      // Создаем запись в establishment_products (с ценой если указана)
+      // Сначала создаем/обновляем запись в establishment_products
       final data = <String, dynamic>{
         'establishment_id': establishmentId,
         'product_id': productId,
       };
-      if (price != null) data['price'] = price;
-      if (currency != null) data['currency'] = currency;
 
-      print('📝 ProductStore: Inserting data: $data');
+      print('📝 ProductStore: Inserting/updating nomenclature record: $data');
 
+      // Используем upsert для создания записи если её нет
       final response = await _supabase.client
           .from('establishment_products')
           .upsert(
@@ -405,17 +404,16 @@ class ProductStoreSupabase {
           )
           .select();
 
-      print('✅ ProductStore: Nomenclature upsert successful, response: $response');
+      print('✅ ProductStore: Nomenclature record upsert successful, response: $response');
+
+      // Теперь всегда устанавливаем цену, если она указана (даже если запись уже существовала)
+      if (price != null) {
+        print('💰 ProductStore: Setting price for product $productId: $price $currency');
+        await setEstablishmentPrice(establishmentId, productId, price, currency);
+      }
 
       // Добавляем в локальный кэш
       _nomenclatureIds.add(productId);
-      // Обновляем кэш цен
-      final cacheKey = '${establishmentId}_$productId';
-      if (price != null && currency != null) {
-        _priceCache[cacheKey] = (price, currency);
-      } else if (price != null) {
-        _priceCache[cacheKey] = (price, currency ?? 'RUB');
-      }
 
       print('✅ ProductStore: Product $productId added to nomenclature successfully');
 
@@ -470,15 +468,21 @@ class ProductStoreSupabase {
 
   /// Установить цену продукта в номенклатуре заведения
   Future<void> setEstablishmentPrice(String establishmentId, String productId, double? price, String? currency) async {
-    await _supabase.client.from('establishment_products').upsert(
-      {
-        'establishment_id': establishmentId,
-        'product_id': productId,
-        'price': price,
-        'currency': currency,
-      },
-      onConflict: 'establishment_id,product_id',
-    );
+    print('💰 ProductStore: Setting price for $productId in establishment $establishmentId: $price $currency');
+
+    // Всегда обновляем цену, даже если запись уже существует
+    final updateData = <String, dynamic>{};
+    if (price != null) updateData['price'] = price;
+    if (currency != null) updateData['currency'] = currency;
+
+    if (updateData.isNotEmpty) {
+      await _supabase.client
+          .from('establishment_products')
+          .update(updateData)
+          .eq('establishment_id', establishmentId)
+          .eq('product_id', productId);
+      print('✅ ProductStore: Price updated successfully');
+    }
 
     // Обновить кэш
     final cacheKey = '${establishmentId}_$productId';
