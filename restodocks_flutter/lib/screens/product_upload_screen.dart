@@ -695,22 +695,24 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     _setLoadingMessage('Анализ данных ИИ...');
 
     try {
-      final ai = context.read<AiService>();
-      List<ParsedProductItem> parsed = rows != null
-          ? await ai.parseProductList(rows: rows)
-          : await ai.parseProductList(text: text!);
+      // Используем локальный парсинг - надежный и быстрый
+      List<ParsedProductItem> parsed = [];
+      _setLoadingMessage('Разбор данных...');
 
-      if (!mounted) return;
+      final rawLines = rows ?? text!.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
 
-      // Fallback: если ИИ вернул пусто — пробуем локальный парсинг
-      if (parsed.isEmpty && (rows != null && rows.isNotEmpty || text != null && text.trim().isNotEmpty)) {
-        _setLoadingMessage('Локальный разбор...');
-        final rawLines = rows ?? text!.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
-        parsed = rawLines.map((line) {
-          final r = _parseLine(line);
-          return ParsedProductItem(name: r.name, price: r.price, unit: null);
-        }).where((p) => p.name.isNotEmpty).toList();
+      print('DEBUG: Processing ${rawLines.length} lines');
+      for (var i = 0; i < rawLines.length; i++) {
+        final line = rawLines[i];
+        final r = _parseLine(line);
+        print('DEBUG: Line $i: "$line" -> name: "${r.name}", price: ${r.price}');
+
+        if (r.name.isNotEmpty) {
+          parsed.add(ParsedProductItem(name: r.name, price: r.price, unit: null));
+        }
       }
+
+      print('DEBUG: Successfully parsed ${parsed.length} products');
 
       if (parsed.isEmpty) {
         _cancelLoadingTimeout();
