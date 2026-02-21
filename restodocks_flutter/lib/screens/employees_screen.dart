@@ -86,13 +86,6 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
         ],
       ),
       body: _buildBody(loc, theme, canEdit, canConfirmShifts: _canConfirmShifts(acc.currentEmployee)),
-      floatingActionButton: canEdit
-          ? FloatingActionButton.extended(
-              onPressed: () => _openAddEmployee(context),
-              icon: const Icon(Icons.person_add),
-              label: Text(loc.t('add_employee')),
-            )
-          : null,
     );
   }
 
@@ -152,9 +145,51 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
         canEdit: canEdit,
         onUpdated: _load,
         onEdit: () => _openEditEmployee(context, _list[i]),
+        onDelete: () => _deleteEmployee(context, _list[i]),
       )),
       ],
     );
+  }
+
+  void _deleteEmployee(BuildContext context, Employee employee) async {
+    final loc = context.read<LocalizationService>();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('delete_employee') ?? 'Удалить сотрудника'),
+        content: Text('Вы уверены, что хотите удалить сотрудника "${employee.fullName}"? Это действие нельзя отменить.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(loc.t('cancel') ?? 'Отмена'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: Text(loc.t('delete') ?? 'Удалить'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        final acc = context.read<AccountManagerSupabase>();
+        await acc.deleteEmployee(employee.id);
+        await _load();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Сотрудник "${employee.fullName}" удален')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Ошибка удаления: $e')),
+          );
+        }
+      }
+    }
   }
 
   void _openEditEmployee(BuildContext context, Employee employee) {
@@ -196,6 +231,7 @@ class _EmployeeCard extends StatelessWidget {
     required this.canEdit,
     required this.onUpdated,
     required this.onEdit,
+    required this.onDelete,
   });
 
   final Employee employee;
@@ -203,6 +239,7 @@ class _EmployeeCard extends StatelessWidget {
   final bool canEdit;
   final VoidCallback onUpdated;
   final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   static String roleDisplay(Employee e) {
     const roleKeys = {
@@ -258,12 +295,18 @@ class _EmployeeCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  if (canEdit)
+                  if (canEdit) ...[
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, color: Colors.red),
+                      onPressed: onDelete,
+                      tooltip: loc.t('delete'),
+                    ),
                     IconButton(
                       icon: const Icon(Icons.edit_outlined),
                       onPressed: onEdit,
                       tooltip: loc.t('edit'),
                     ),
+                  ],
                 ],
               ),
               const Divider(height: 24),

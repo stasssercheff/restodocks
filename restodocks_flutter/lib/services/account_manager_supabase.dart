@@ -448,6 +448,21 @@ class AccountManagerSupabase {
     }
   }
 
+  /// Удаление сотрудника
+  Future<void> deleteEmployee(String employeeId) async {
+    try {
+      print('🗑️ AccountManager: Deleting employee $employeeId...');
+      await _supabase.client
+          .from('employees')
+          .delete()
+          .eq('id', employeeId);
+      print('✅ AccountManager: Employee deleted successfully');
+    } catch (e) {
+      print('❌ AccountManager: Failed to delete employee: $e');
+      rethrow;
+    }
+  }
+
   bool _isPaymentColumnError(Object e) {
     final msg = e.toString().toLowerCase();
     return msg.contains('payment_type') ||
