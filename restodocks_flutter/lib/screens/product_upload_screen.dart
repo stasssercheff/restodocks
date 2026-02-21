@@ -737,7 +737,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
       for (var i = 0; i < parsed.length; i++) {
         final p = parsed[i];
-        final match = _findMatch(p.name, p.price, existingProducts, allProducts, est.id, store);
+        final match = await _findMatch(p.name, p.price, existingProducts, allProducts, est.id, store);
         if (match.existingId != null) {
           moderationItems.add(ModerationItem(
             name: p.name,
