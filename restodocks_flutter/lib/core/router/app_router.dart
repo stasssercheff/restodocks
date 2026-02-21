@@ -50,8 +50,8 @@ class AppRouter {
     // В веб-приложении при F5 сохраняем текущий URL
     if (kIsWeb) {
       try {
-        final currentPath = html.window.location.pathname;
-        final currentSearch = html.window.location.search;
+        final currentPath = html.window.location.pathname ?? '';
+        final currentSearch = html.window.location.search ?? '';
         final fullPath = currentPath + currentSearch;
         // Проверяем что это валидный маршрут приложения
         if (fullPath.startsWith('/') && fullPath != '/' && fullPath != '/splash') {
