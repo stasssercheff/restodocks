@@ -55,6 +55,7 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
 
       final email = _emailController.text.trim();
       final password = _passwordController.text;
+<<<<<<< HEAD
 
       print('DEBUG: Raw email from controller: "${_emailController.text}"');
       print('DEBUG: Trimmed email: "$email"');
@@ -74,6 +75,8 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
       }
 
       print('DEBUG: Email check passed, proceeding with registration');
+=======
+>>>>>>> cf105ca (Добавлена отладка для поиска ошибки при регистрации)
       print('Owner registration: Creating employee for company...');
       final employee = await accountManager.createEmployeeForCompany(
         company: estab,
@@ -85,11 +88,17 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
         roles: roles,
       );
 
+<<<<<<< HEAD
       print('DEBUG: Employee created successfully: ${employee?.fullName}, ${employee?.email}');
       await accountManager.login(employee, estab);
+=======
+      print('Owner registration: Employee created successfully: ${employee.fullName}, ID: ${employee.id}');
+>>>>>>> cf105ca (Добавлена отладка для поиска ошибки при регистрации)
 
       // ВХОД В СИСТЕМУ
+      print('Owner registration: Logging in...');
       await accountManager.login(employee, estab);
+      print('Owner registration: Login successful, current employee: ${accountManager.currentEmployee?.fullName}');
 
       // Отправка письма владельцу
       context.read<EmailService>().sendRegistrationEmail(

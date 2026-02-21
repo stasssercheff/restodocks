@@ -39,7 +39,11 @@ class AccountManagerSupabase {
   bool get hasProSubscription => _establishment?.subscriptionType == 'pro' || _establishment?.subscriptionType == 'premium';
 
   /// Авторизован ли пользователь (своя сессия employees или восстановленная из хранилища)
-  bool get isLoggedInSync => _currentEmployee != null && _establishment != null;
+  bool get isLoggedInSync {
+    final result = _currentEmployee != null && _establishment != null;
+    print('DEBUG: isLoggedInSync - currentEmployee: ${_currentEmployee?.fullName}, establishment: ${_establishment?.name}, result: $result');
+    return result;
+  }
 
   /// Инициализация сервиса
   Future<void> initialize() async {
@@ -368,8 +372,10 @@ class AccountManagerSupabase {
     String? email,
     String? password,
   }) async {
+    print('DEBUG: Login called for employee: ${employee.fullName}, establishment: ${establishment.name}');
     _currentEmployee = employee;
     _establishment = establishment;
+    print('DEBUG: Current employee set to: ${_currentEmployee?.fullName}, establishment: ${_establishment?.name}');
 
     await _secureStorage.set(_keyEmployeeId, employee.id);
     await _secureStorage.set(_keyEstablishmentId, establishment.id);

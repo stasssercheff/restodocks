@@ -53,14 +53,22 @@ class AppRouter {
     initialLocation: _getInitialLocation(),
     redirect: (context, state) async {
       final loc = state.matchedLocation;
+      print('DEBUG: Router redirect - location: $loc, isPublic: ${_isPublicPath(loc)}');
       if (_isPublicPath(loc)) return null;
+
       // Сессия восстановлена в main() — при F5 остаёмся на текущем URL
       final account = context.read<AccountManagerSupabase>();
-      if (!account.isLoggedInSync) await account.initialize();
+      print('DEBUG: Router redirect - isLoggedInSync before init: ${account.isLoggedInSync}');
       if (!account.isLoggedInSync) {
+        await account.initialize();
+        print('DEBUG: Router redirect - isLoggedInSync after init: ${account.isLoggedInSync}');
+      }
+      if (!account.isLoggedInSync) {
+        print('DEBUG: Router redirect - not logged in, redirecting to login');
         final returnTo = loc.isNotEmpty ? Uri.encodeComponent(loc) : '';
         return returnTo.isNotEmpty ? '/login?returnTo=$returnTo' : '/login';
       }
+      print('DEBUG: Router redirect - logged in, allowing access to $loc');
       return null;
     },
     routes: [
