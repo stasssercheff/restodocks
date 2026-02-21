@@ -52,6 +52,15 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
 
       final email = _emailController.text.trim();
       final password = _passwordController.text;
+
+      // ПРОВЕРКА НА ДУБЛИРОВАНИЕ EMAIL
+      final taken = await accountManager.isEmailTakenInEstablishment(email, estab.id);
+      if (taken && mounted) {
+        setState(() => _errorMessage = loc.t('email_already_registered') ?? 'Этот email уже зарегистрирован в системе');
+        setState(() => _isLoading = false);
+        return;
+      }
+
       final employee = await accountManager.createEmployeeForCompany(
         company: estab,
         fullName: _nameController.text.trim(),
@@ -79,7 +88,11 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
     } catch (e) {
       if (!mounted) return;
       final loc = context.read<LocalizationService>();
-      setState(() => _errorMessage = loc.t('register_error', args: {'error': e.toString()}));
+      if (e.toString().contains('EMAIL_ALREADY_EXISTS')) {
+        setState(() => _errorMessage = loc.t('email_already_registered') ?? 'Этот email уже зарегистрирован в системе');
+      } else {
+        setState(() => _errorMessage = loc.t('register_error', args: {'error': e.toString()}));
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

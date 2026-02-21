@@ -205,8 +205,17 @@ class AccountManagerSupabase {
     employeeData.remove('updated_at');
     _stripAvatarFromPayload(employeeData);
 
-    final response = await _supabase.insertData('employees', employeeData);
-    final createdEmployee = Employee.fromJson(response);
+    try {
+      final response = await _supabase.insertData('employees', employeeData);
+      final createdEmployee = Employee.fromJson(response);
+    } catch (e) {
+      // ОБРАБОТКА ОШИБКИ ДУБЛИРОВАНИЯ EMAIL
+      final errorStr = e.toString().toLowerCase();
+      if (errorStr.contains('23505') || errorStr.contains('duplicate') || errorStr.contains('unique') || errorStr.contains('email_key')) {
+        throw Exception('EMAIL_ALREADY_EXISTS');
+      }
+      rethrow;
+    }
 
     // Обновляем establishment с ownerId, если это владелец
     if (roles.contains('owner')) {

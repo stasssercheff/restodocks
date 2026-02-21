@@ -65,6 +65,12 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
 
     for (var attempt = 0; attempt < maxRetries; attempt++) {
       try {
+        // Проверяем, что страна и город выбраны
+        if (_selectedCountry == null || _selectedCity == null) {
+          errorMsg = loc.t('country_and_city_required') ?? 'Выберите страну и город';
+          break;
+        }
+
         final accountManager = context.read<AccountManagerSupabase>();
         final name = _nameController.text.trim();
         final country = _selectedCountry!;
@@ -82,6 +88,7 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
         return;
       } catch (e) {
         if (!mounted) return;
+        print('Ошибка при регистрации компании: $e'); // Для отладки
         if (attempt < maxRetries - 1 && _isDuplicatePinError(e)) {
           setState(() => _pinCode = Establishment.generatePinCode());
           continue;
