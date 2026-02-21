@@ -43,25 +43,36 @@ class AccountManagerSupabase {
 
   /// Инициализация сервиса
   Future<void> initialize() async {
+    print('🔐 AccountManager: Starting initialization...');
     await _secureStorage.initialize();
 
     // 1. Восстановление сессии из безопасного хранилища (iOS/Android) или SharedPreferences (Web)
     final employeeId = await _secureStorage.get(_keyEmployeeId);
     final establishmentId = await _secureStorage.get(_keyEstablishmentId);
 
+    print('🔐 AccountManager: Stored IDs - employee: $employeeId, establishment: $establishmentId');
+
     if (employeeId != null && establishmentId != null) {
+      print('🔐 AccountManager: Restoring session from storage...');
       await _restoreSession(employeeId, establishmentId);
+      print('🔐 AccountManager: Session restored, logged in: $isLoggedInSync');
       return;
     }
 
     // 2. Supabase Auth (если когда‑нибудь понадобится)
+    print('🔐 AccountManager: Checking Supabase auth...');
     if (_supabase.isAuthenticated) {
+      print('🔐 AccountManager: Supabase authenticated, loading user data...');
       await _loadCurrentUserData();
+      print('🔐 AccountManager: User data loaded, logged in: $isLoggedInSync');
+    } else {
+      print('🔐 AccountManager: No stored session and not authenticated in Supabase');
     }
   }
 
   Future<void> _restoreSession(String employeeId, String establishmentId) async {
     try {
+      print('🔐 AccountManager: Loading employee data for ID: $employeeId');
       final employeeDataRaw = await _supabase.client
           .from('employees')
           .select()
@@ -70,19 +81,26 @@ class AccountManagerSupabase {
           .limit(1)
           .single();
 
+      print('🔐 AccountManager: Employee data loaded successfully');
       final empData = Map<String, dynamic>.from(employeeDataRaw);
       empData['password'] = empData['password_hash'] ?? '';
       _currentEmployee = Employee.fromJson(empData);
 
+      print('🔐 AccountManager: Loading establishment data for ID: $establishmentId');
       final estData = await _supabase.client
           .from('establishments')
           .select()
           .eq('id', establishmentId)
           .limit(1)
           .single();
+
+      print('🔐 AccountManager: Establishment data loaded successfully');
       _establishment = Establishment.fromJson(estData);
+
+      print('🔐 AccountManager: Session restored successfully');
     } catch (e) {
-      print('Ошибка восстановления сессии: $e');
+      print('❌ AccountManager: Error restoring session: $e');
+      print('🔍 AccountManager: This might be RLS policy issue');
       await _clearStoredSession();
       _currentEmployee = null;
       _establishment = null;
