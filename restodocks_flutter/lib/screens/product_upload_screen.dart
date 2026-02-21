@@ -775,8 +775,11 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         }
       }
 
+      // ВРЕМЕННО ОТКЛЮЧАЕМ ИИ НОРМАЛИЗАЦИЮ НАЗВАНИЙ
+      /*
       if (newNames.isNotEmpty) {
         _setLoadingMessage('Исправление названий...');
+        final ai = context.read<AiService>();
         final normalized = await ai.normalizeProductNames(newNames);
         if (mounted && normalized.length == newNames.length) {
           for (var j = 0; j < newIndices.length; j++) {
@@ -791,6 +794,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
           }
         }
       }
+      */
 
       if (!mounted) return;
       _cancelLoadingTimeout();
