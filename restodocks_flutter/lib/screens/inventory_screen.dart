@@ -122,6 +122,7 @@ class _InventoryScreenState extends State<InventoryScreen>
   TimeOfDay? _startTime;
   TimeOfDay? _endTime;
   bool _completed = false;
+  bool _isInputMode = false; // Режим ввода количества (клавиатура открыта)
   _InventorySort _sortMode = _InventorySort.lastAdded;
   _InventoryBlockFilter _blockFilter = _InventoryBlockFilter.all;
   final TextEditingController _nameFilterCtrl = TextEditingController();
@@ -1014,8 +1015,26 @@ class _InventoryScreenState extends State<InventoryScreen>
     final establishment = account.establishment;
     final employee = account.currentEmployee;
 
+    // Определяем режим ввода (клавиатура открыта или активно поле ввода)
+    final viewInsets = MediaQuery.viewInsetsOf(context);
+    final isKeyboardOpen = viewInsets.bottom > 0;
+    _isInputMode = isKeyboardOpen;
+
     return Scaffold(
-      appBar: AppBar(
+      appBar: _isInputMode ? AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.pop(),
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+        ),
+        title: Text(
+          loc.t('inventory_blank_title'),
+          style: const TextStyle(fontSize: 16),
+        ),
+        toolbarHeight: 48,
+        elevation: 0,
+      ) : AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
@@ -1027,16 +1046,16 @@ class _InventoryScreenState extends State<InventoryScreen>
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _buildHeader(loc, establishment, employee),
-              const Divider(height: 1),
+              if (!_isInputMode) _buildHeader(loc, establishment, employee),
+              if (!_isInputMode) const Divider(height: 1),
               Expanded(
                 child: _buildTable(loc),
               ),
-              const Divider(height: 1),
+              if (!_isInputMode) const Divider(height: 1),
               _buildFooter(loc),
             ],
           ),
-          DataSafetyIndicator(isVisible: true),
+          if (!_isInputMode) DataSafetyIndicator(isVisible: true),
         ],
       ),
     );
@@ -1048,6 +1067,10 @@ class _InventoryScreenState extends State<InventoryScreen>
     Establishment? establishment,
     Employee? employee,
   ) {
+    // В режиме ввода скрываем верхний информационный блок
+    if (_isInputMode) {
+      return const SizedBox.shrink();
+    }
     final theme = Theme.of(context);
     final narrow = MediaQuery.sizeOf(context).width < 420;
     final dateStr = '${_date.day.toString().padLeft(2, '0')}.${_date.month.toString().padLeft(2, '0')}.${_date.year}';
@@ -1369,21 +1392,21 @@ class _InventoryScreenState extends State<InventoryScreen>
                 children: [
                   _buildHeaderRow(loc),
                   if (_blockFilter != _InventoryBlockFilter.pfOnly && _productIndices.isNotEmpty) ...[
-                    _buildSectionHeader(loc, loc.t('inventory_block_products')),
-                    ..._productIndices.asMap().entries.map((e) => _buildDataRow(loc, e.value, e.key + 1)),
+                    if (!_isInputMode) _buildSectionHeader(loc, loc.t('inventory_block_products')),
+                    ..._productIndices.asMap().entries.map((e) => _buildDataRow(loc, e.value, e.key + 1, compact: _isInputMode)),
                   ],
                   if (_blockFilter != _InventoryBlockFilter.productsOnly && _pfIndices.isNotEmpty) ...[
-                    _buildSectionHeader(loc, loc.t('inventory_block_pf')),
+                    if (!_isInputMode) _buildSectionHeader(loc, loc.t('inventory_block_pf')),
                     ..._pfIndices.asMap().entries.map((e) {
                       final rowNum = _blockFilter == _InventoryBlockFilter.pfOnly ? e.key + 1 : _productIndices.length + e.key + 1;
-                      return _buildDataRow(loc, e.value, rowNum);
+                      return _buildDataRow(loc, e.value, rowNum, compact: _isInputMode);
                     }),
                   ],
                   if (_aggregatedFromFile != null && _aggregatedFromFile!.isNotEmpty) ...[
-                    const Divider(height: 24),
-                    _buildSectionHeader(loc, loc.t('inventory_pf_products_title')),
-                    _buildAggregatedHeaderRow(loc),
-                    ..._aggregatedFromFile!.asMap().entries.map((e) => _buildAggregatedDataRow(loc, e.value, e.key + 1)),
+                    if (!_isInputMode) const Divider(height: 24),
+                    if (!_isInputMode) _buildSectionHeader(loc, loc.t('inventory_pf_products_title')),
+                    if (!_isInputMode) _buildAggregatedHeaderRow(loc),
+                    ..._aggregatedFromFile!.asMap().entries.map((e) => _buildAggregatedDataRow(loc, e.value, e.key + 1, compact: _isInputMode)),
                   ],
                 ],
               ),
@@ -1397,7 +1420,7 @@ class _InventoryScreenState extends State<InventoryScreen>
   Widget _buildAggregatedHeaderRow(LocalizationService loc) {
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      padding: _isInputMode ? const EdgeInsets.symmetric(horizontal: 6, vertical: 3) : const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: theme.dividerColor)),
         color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
@@ -1416,13 +1439,13 @@ class _InventoryScreenState extends State<InventoryScreen>
     );
   }
 
-  Widget _buildAggregatedDataRow(LocalizationService loc, Map<String, dynamic> p, int rowNumber) {
+  Widget _buildAggregatedDataRow(LocalizationService loc, Map<String, dynamic> p, int rowNumber, {bool compact = false}) {
     final theme = Theme.of(context);
     final name = p['productName'] as String? ?? '';
     final gross = ((p['grossGrams'] as num?)?.toDouble() ?? 0).round();
     final net = ((p['netGrams'] as num?)?.toDouble() ?? 0).round();
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      padding: compact ? const EdgeInsets.symmetric(horizontal: 6, vertical: 2) : const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
         color: theme.colorScheme.surface,
@@ -1467,7 +1490,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     final nameW = _colNameWidth(context);
     final qtyColsW = _maxQuantityColumns * (_colQtyWidth + _colGap) + 28;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+      padding: _isInputMode ? const EdgeInsets.symmetric(horizontal: 6, vertical: 4) : const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
       decoration: BoxDecoration(
         color: theme.colorScheme.primaryContainer.withOpacity(0.3),
         border: Border(bottom: BorderSide(color: theme.colorScheme.outline.withOpacity(0.3))),
@@ -1488,7 +1511,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     );
   }
 
-  Widget _buildDataRow(LocalizationService loc, int actualIndex, int rowNumber) {
+  Widget _buildDataRow(LocalizationService loc, int actualIndex, int rowNumber, {bool compact = false}) {
     final theme = Theme.of(context);
     final row = _rows[actualIndex];
     final nameW = _colNameWidth(context);
@@ -1500,7 +1523,7 @@ class _InventoryScreenState extends State<InventoryScreen>
         _removeRow(actualIndex);
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+        padding: compact ? const EdgeInsets.symmetric(horizontal: 6, vertical: 2) : const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
         decoration: BoxDecoration(
           border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
           color: rowNumber.isEven ? theme.colorScheme.surface : theme.colorScheme.surfaceContainerLowest.withOpacity(0.5),
@@ -1926,7 +1949,7 @@ class _InventoryScreenState extends State<InventoryScreen>
   Widget _buildFooter(LocalizationService loc) {
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: _isInputMode ? const EdgeInsets.symmetric(horizontal: 10, vertical: 4) : const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerLow,
         border: Border(top: BorderSide(color: theme.dividerColor)),
@@ -1938,8 +1961,14 @@ class _InventoryScreenState extends State<InventoryScreen>
             Expanded(
               child: FilledButton(
                 onPressed: _completed ? null : () => _complete(context),
-                style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 10)),
-                child: Text(loc.t('inventory_complete')),
+                style: FilledButton.styleFrom(
+                  padding: _isInputMode ? const EdgeInsets.symmetric(vertical: 6) : const EdgeInsets.symmetric(vertical: 10),
+                  minimumSize: _isInputMode ? const Size(0, 36) : null,
+                ),
+                child: Text(
+                  loc.t('inventory_complete'),
+                  style: _isInputMode ? const TextStyle(fontSize: 14) : null,
+                ),
               ),
             ),
           ],
