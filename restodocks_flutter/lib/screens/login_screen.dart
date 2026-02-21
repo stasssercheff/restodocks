@@ -24,30 +24,33 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _isLoading = false;
   String? _errorMessage;
-  bool _rememberCredentials = true;
+  // Функциональность запоминания учетных данных убрана
+  // bool _rememberCredentials = true;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Future.delayed(const Duration(milliseconds: 300), () {
-        if (mounted) _loadRememberedCredentials();
-      });
-    });
+    // Функциональность запоминания учетных данных убрана
+    // WidgetsBinding.instance.addPostFrameCallback((_) {
+    //   Future.delayed(const Duration(milliseconds: 300), () {
+    //     if (mounted) _loadRememberedCredentials();
+    //   });
+    // });
   }
 
-  Future<void> _loadRememberedCredentials() async {
-    final account = context.read<AccountManagerSupabase>();
-    final saved = await account.loadRememberedCredentials();
-    if (!mounted) return;
-    if (saved.email != null && saved.email!.isNotEmpty) {
-      _emailController.text = saved.email!;
-    }
-    if (saved.password != null && saved.password!.isNotEmpty) {
-      _passwordController.text = saved.password!;
-    }
-    setState(() {});
-  }
+  // Метод устарел - функциональность запоминания учетных данных убрана
+  // Future<void> _loadRememberedCredentials() async {
+  //   final account = context.read<AccountManagerSupabase>();
+  //   final saved = await account.loadRememberedCredentials();
+  //   if (!mounted) return;
+  //   if (saved.email != null && saved.email!.isNotEmpty) {
+  //     _emailController.text = saved.email!;
+  //   }
+  //   if (saved.password != null && saved.password!.isNotEmpty) {
+  //     _passwordController.text = saved.password!;
+  //   }
+  //   setState(() {});
+  // }
 
   @override
   void dispose() {
@@ -152,18 +155,20 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       ),
       const SizedBox(height: 8),
-      CheckboxListTile(
-        value: _rememberCredentials,
-        onChanged: (v) => setState(() => _rememberCredentials = v ?? true),
-        title: Text(loc.t('remember_credentials'), style: Theme.of(context).textTheme.bodyMedium),
-        contentPadding: EdgeInsets.zero,
-        controlAffinity: ListTileControlAffinity.leading,
-      ),
-      TextButton.icon(
-        onPressed: _loadRememberedCredentials,
-        icon: const Icon(Icons.restore, size: 18),
-        label: Text(loc.t('fill_saved_credentials')),
-      ),
+      // Функциональность запоминания учетных данных убрана
+      // CheckboxListTile(
+      //   value: _rememberCredentials,
+      //   onChanged: (v) => setState(() => _rememberCredentials = v ?? true),
+      //   title: Text(loc.t('remember_credentials'), style: Theme.of(context).textTheme.bodyMedium),
+      //   contentPadding: EdgeInsets.zero,
+      //   controlAffinity: ListTileControlAffinity.leading,
+      // ),
+      // Кнопка "Заполнить сохранённые" убрана по запросу пользователя
+      // TextButton.icon(
+      //   onPressed: _loadRememberedCredentials,
+      //   icon: const Icon(Icons.restore, size: 18),
+      //   label: Text(loc.t('fill_saved_credentials')),
+      // ),
       const SizedBox(height: 16),
       if (_errorMessage != null)
         Container(
@@ -223,7 +228,8 @@ class _LoginScreenState extends State<LoginScreen> {
       await accountManager.login(
         result.employee,
         result.establishment,
-        rememberCredentials: _rememberCredentials,
+        // Функциональность запоминания учетных данных убрана
+        // rememberCredentials: _rememberCredentials,
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
