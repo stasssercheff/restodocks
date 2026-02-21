@@ -1264,6 +1264,22 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                                 ),
                         ),
                         const SizedBox(width: 8),
+                        SizedBox(
+                          width: 140,
+                          child: canEdit
+                              ? DropdownButtonFormField<String>(
+                                  value: _selectedSection,
+                                  decoration: InputDecoration(labelText: 'Цех', isDense: true, contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                                  items: _getAvailableSections(context.read<AccountManagerSupabase>().hasProSubscription).entries.map((entry) =>
+                                    DropdownMenuItem(value: entry.key, child: Text(entry.value))).toList(),
+                                  onChanged: (v) => setState(() => _selectedSection = v),
+                                )
+                              : _selectedSection != null ? InputDecorator(
+                                  decoration: InputDecoration(labelText: 'Цех', isDense: true),
+                                  child: Text(_sectionOptions[_selectedSection!] ?? _selectedSection!),
+                                ) : const SizedBox.shrink(),
+                        ),
+                        const SizedBox(width: 8),
                         if (canEdit)
                           Tooltip(
                             message: loc.t('tt_type_hint'),
