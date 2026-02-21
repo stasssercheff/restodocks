@@ -325,10 +325,8 @@ class _InventoryScreenState extends State<InventoryScreen>
           }
         }
       }
-      // Определяем количество колонок: минимум 2
-      final qtyCount = _rows.isEmpty ? 2 : _rows.map((r) => r.quantities.length).reduce((a, b) => a > b ? a : b);
-      // Гарантируем минимум 2 колонки
-      final minQtyCount = qtyCount < 2 ? 2 : qtyCount;
+      // Все новые строки всегда начинаются с 2 колонок
+      final minQtyCount = 2;
 
       // Добавляем недостающие продукты и ПФ
       for (final p in products) {
@@ -340,16 +338,13 @@ class _InventoryScreenState extends State<InventoryScreen>
         _rows.add(_InventoryRow(product: null, techCard: tc, quantities: List<double>.filled(minQtyCount, 0.0), pfUnit: _pfUnitPcs));
       }
 
-      // Нормализуем существующие строки: гарантируем одинаковое количество колонок
-      if (_rows.isNotEmpty) {
-        final maxQtyCount = _rows.map((r) => r.quantities.length).reduce((a, b) => a > b ? a : b);
-        for (var i = 0; i < _rows.length; i++) {
-          final row = _rows[i];
-          if (!row.isFree) {
-            // Добавляем недостающие колонки
-            while (row.quantities.length < maxQtyCount) {
-              row.quantities.add(0.0);
-            }
+      // Нормализуем существующие строки: гарантируем минимум 2 колонки для каждой строки
+      for (var i = 0; i < _rows.length; i++) {
+        final row = _rows[i];
+        if (!row.isFree) {
+          // Гарантируем минимум 2 колонки
+          while (row.quantities.length < 2) {
+            row.quantities.add(0.0);
           }
         }
       }
@@ -549,10 +544,8 @@ class _InventoryScreenState extends State<InventoryScreen>
   }
 
   void _addProduct(Product p) {
-    // Создаем строку с правильным количеством колонок (минимум 2, максимум текущий максимум)
-    final qtyCount = _rows.isEmpty ? 2 : _rows.map((r) => r.quantities.length).reduce((a, b) => a > b ? a : b);
-    final minQtyCount = qtyCount < 2 ? 2 : qtyCount;
-    final quantities = List<double>.filled(minQtyCount, 0.0);
+    // Все новые продукты начинаются с 2 колонок
+    final quantities = List<double>.filled(2, 0.0);
     setState(() {
       _rows.add(_InventoryRow(product: p, techCard: null, quantities: quantities));
     });
@@ -570,8 +563,12 @@ class _InventoryScreenState extends State<InventoryScreen>
     setState(() {
       row.quantities[colIndex] = value;
 
+      // Если заполнили вторую колонку (индекс 1), сразу добавляем третью пустую колонку
+      if (!row.isFree && colIndex == 1 && previousValue == 0.0 && value > 0.0 && row.quantities.length == 2) {
+        row.quantities.add(0.0);
+      }
       // Если заполнили последнюю ячейку (которая была пустой), добавляем новую пустую
-      if (!row.isFree && colIndex == row.quantities.length - 1 && previousValue == 0.0 && value > 0.0) {
+      else if (!row.isFree && colIndex == row.quantities.length - 1 && previousValue == 0.0 && value > 0.0) {
         row.quantities.add(0.0);
       }
     });
@@ -1516,7 +1513,8 @@ class _InventoryScreenState extends State<InventoryScreen>
     final row = _rows[actualIndex];
     final nameW = _colNameWidth(context);
     final maxCols = _maxQuantityColumns;
-    final qtyCols = row.quantities.isEmpty ? 1 : row.quantities.length + (row.quantities.last == 0.0 ? 0 : 1);
+    // Всегда показываем минимум 2 колонки, и добавляем +1 если пользователь заполнил вторую колонку
+    final qtyCols = row.quantities.length + (row.quantities.length >= 2 && row.quantities[1] > 0 ? 1 : 0);
     return InkWell(
       onLongPress: () {
         if (_completed) return;
