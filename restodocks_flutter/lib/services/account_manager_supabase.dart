@@ -179,19 +179,34 @@ class AccountManagerSupabase {
   /// Проверка: занят ли email глобально (во всей системе)
   Future<bool> isEmailTakenGlobally(String email) async {
     try {
-      final trimmedEmail = email.trim();
+      final trimmedEmail = email.trim().toLowerCase(); // Приводим к нижнему регистру
       print('DEBUG: Checking if email taken globally: "$trimmedEmail"');
-      final list = await _supabase.client
+      print('DEBUG: Original email: "$email"');
+
+      // Попробуем два запроса: с учетом регистра и без
+      final listExact = await _supabase.client
           .from('employees')
-          .select('id')
+          .select('id, email')
           .eq('email', trimmedEmail)
-          .limit(1);
-      print('DEBUG: isEmailTakenGlobally result: $list');
-      final isTaken = list != null && (list as List).isNotEmpty;
+          .limit(5); // Увеличиваем лимит чтобы увидеть больше
+
+      print('DEBUG: Exact match query result: $listExact');
+
+      final listILike = await _supabase.client
+          .from('employees')
+          .select('id, email')
+          .ilike('email', trimmedEmail)
+          .limit(5);
+
+      print('DEBUG: Case-insensitive query result: $listILike');
+
+      final isTaken = (listExact != null && (listExact as List).isNotEmpty) ||
+                     (listILike != null && (listILike as List).isNotEmpty);
       print('DEBUG: isEmailTakenGlobally returning: $isTaken');
       return isTaken;
     } catch (e) {
       print('DEBUG: isEmailTakenGlobally error: $e');
+      print('DEBUG: Error type: ${e.runtimeType}');
       return false;
     }
   }
