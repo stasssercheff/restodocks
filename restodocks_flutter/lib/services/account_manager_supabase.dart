@@ -222,6 +222,18 @@ class AccountManagerSupabase {
     try {
       final response = await _supabase.insertData('employees', employeeData);
       final createdEmployee = Employee.fromJson(response);
+
+      // Обновляем establishment с ownerId, если это владелец
+      if (roles.contains('owner')) {
+        await _supabase.updateData(
+          'establishments',
+          {'owner_id': createdEmployee.id},
+          'id',
+          company.id,
+        );
+      }
+
+      return createdEmployee;
     } catch (e) {
       // ОБРАБОТКА ОШИБКИ ДУБЛИРОВАНИЯ EMAIL
       final errorStr = e.toString().toLowerCase();
@@ -230,18 +242,6 @@ class AccountManagerSupabase {
       }
       rethrow;
     }
-
-    // Обновляем establishment с ownerId, если это владелец
-    if (roles.contains('owner')) {
-      await _supabase.updateData(
-        'establishments',
-        {'owner_id': createdEmployee.id},
-        'id',
-        company.id,
-      );
-    }
-
-    return createdEmployee;
   }
 
   /// Поиск сотрудника по email и паролю (без PIN — по всем заведениям)

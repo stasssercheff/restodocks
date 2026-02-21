@@ -58,6 +58,7 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
       final taken = await accountManager.isEmailTakenGlobally(email);
       print('Owner registration: Email taken result: $taken');
       if (taken && mounted) {
+        final loc = context.read<LocalizationService>();
         setState(() => _errorMessage = loc.t('email_already_registered') ?? 'Этот email уже зарегистрирован в системе');
         setState(() => _isLoading = false);
         return;
