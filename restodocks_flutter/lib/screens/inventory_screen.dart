@@ -324,10 +324,10 @@ class _InventoryScreenState extends State<InventoryScreen>
           }
         }
       }
-      // Определяем количество колонок: минимум 2 + 1 запасная = 3
-      final qtyCount = _rows.isEmpty ? 3 : _rows.map((r) => r.quantities.length).reduce((a, b) => a > b ? a : b);
-      // Гарантируем минимум 3 колонки (2 основных + 1 запасная)
-      final minQtyCount = qtyCount < 3 ? 3 : qtyCount;
+      // Определяем количество колонок: минимум 2
+      final qtyCount = _rows.isEmpty ? 2 : _rows.map((r) => r.quantities.length).reduce((a, b) => a > b ? a : b);
+      // Гарантируем минимум 2 колонки
+      final minQtyCount = qtyCount < 2 ? 2 : qtyCount;
 
       // Добавляем недостающие продукты и ПФ
       for (final p in products) {
@@ -548,9 +548,9 @@ class _InventoryScreenState extends State<InventoryScreen>
   }
 
   void _addProduct(Product p) {
-    // Создаем строку с правильным количеством колонок (минимум 3, максимум текущий максимум)
-    final qtyCount = _rows.isEmpty ? 3 : _rows.map((r) => r.quantities.length).reduce((a, b) => a > b ? a : b);
-    final minQtyCount = qtyCount < 3 ? 3 : qtyCount;
+    // Создаем строку с правильным количеством колонок (минимум 2, максимум текущий максимум)
+    final qtyCount = _rows.isEmpty ? 2 : _rows.map((r) => r.quantities.length).reduce((a, b) => a > b ? a : b);
+    final minQtyCount = qtyCount < 2 ? 2 : qtyCount;
     final quantities = List<double>.filled(minQtyCount, 0.0);
     setState(() {
       _rows.add(_InventoryRow(product: p, techCard: null, quantities: quantities));
