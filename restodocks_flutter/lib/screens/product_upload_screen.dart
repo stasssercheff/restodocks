@@ -1467,7 +1467,20 @@ ${text}
           _addDebugLog('Nomenclature loaded for AI processing, products: ${store.nomenclatureProductIds.length}');
         }
 
-        await _addProductsToNomenclature(items, loc, addToNomenclature);
+        // Инициализируем processingResults для всех продуктов
+        final processingResults = <Map<String, dynamic>>[];
+        for (final item in items) {
+          processingResults.add({
+            'name': item.name,
+            'originalPrice': item.price,
+            'oldPrice': null,
+            'newPrice': item.price,
+            'status': 'pending',
+            'productId': null,
+          });
+        }
+
+        await _addProductsToNomenclature(items, loc, addToNomenclature, processingResults);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('AI не смог извлечь продукты из текста')),
@@ -1586,7 +1599,21 @@ ${text}
     }
 
     _setLoadingMessage('Сохраняем ${items.length} продуктов...');
-    await _addProductsToNomenclature(items, loc, addToNomenclature);
+
+    // Инициализируем processingResults для всех продуктов
+    final processingResults = <Map<String, dynamic>>[];
+    for (final item in items) {
+      processingResults.add({
+        'name': item.name,
+        'originalPrice': item.price,
+        'oldPrice': null,
+        'newPrice': item.price,
+        'status': 'pending',
+        'productId': null,
+      });
+    }
+
+    await _addProductsToNomenclature(items, loc, addToNomenclature, processingResults);
   }
 
   String _detectTextFormat(String text) {
@@ -1830,7 +1857,7 @@ ${text}
     }
   }
 
-  Future<void> _addProductsToNomenclature(List<({String name, double? price})> items, LocalizationService loc, bool addToNomenclature) async {
+  Future<void> _addProductsToNomenclature(List<({String name, double? price})> items, LocalizationService loc, bool addToNomenclature, List<Map<String, dynamic>> processingResults) async {
     _addDebugLog('=== STARTING PRODUCT CREATION ===');
     _addDebugLog('Items to process: ${items.length}');
     _addDebugLog('Add to nomenclature: $addToNomenclature');
@@ -1880,9 +1907,6 @@ ${text}
       int skipped = 0;
       int failed = 0;
       int idx = 0;
-
-      // Детальная информация о результатах обработки
-      final processingResults = <Map<String, dynamic>>[];
 
       for (final item in items) {
         if (mounted) {
@@ -1938,14 +1962,17 @@ ${text}
               skipped++;
               _addDebugLog('Successfully updated existing product price');
 
-              // Сохраняем результат обработки
-              processingResults.add({
-                'name': normalizedName,
-                'status': 'updated',
-                'oldPrice': oldPrice,
-                'newPrice': item.price,
-                'productId': existingProduct.id,
-              });
+              // Находим и обновляем соответствующий продукт в результатах
+              final existingResult = processingResults.firstWhere(
+                (r) => _normalizeForComparison(r['name'] as String) == _normalizeForComparison(item.name),
+                orElse: () => <String, dynamic>{},
+              );
+              if (existingResult.isNotEmpty) {
+                existingResult['status'] = 'updated';
+                existingResult['oldPrice'] = oldPrice;
+                existingResult['newPrice'] = item.price;
+                existingResult['productId'] = existingProduct.id;
+              }
 
               continue; // Пропускаем создание нового продукта
             } catch (updateError) {
@@ -2058,14 +2085,17 @@ ${text}
               added++;
               print('DEBUG: Successfully added "${product.name}" to nomenclature');
 
-              // Сохраняем результат обработки
-              processingResults.add({
-                'name': normalizedName,
-                'status': 'added',
-                'oldPrice': null,
-                'newPrice': product.basePrice,
-                'productId': product.id,
-              });
+              // Находим и обновляем соответствующий продукт в результатах
+              final existingResult = processingResults.firstWhere(
+                (r) => _normalizeForComparison(r['name'] as String) == _normalizeForComparison(item.name),
+                orElse: () => <String, dynamic>{},
+              );
+              if (existingResult.isNotEmpty) {
+                existingResult['status'] = 'added';
+                existingResult['oldPrice'] = null;
+                existingResult['newPrice'] = product.basePrice;
+                existingResult['productId'] = product.id;
+              }
             } catch (e) {
               print('DEBUG: Failed to add "${product.name}" to nomenclature: $e');
               if (e.toString().contains('duplicate key') ||
@@ -2073,9 +2103,27 @@ ${text}
                   e.toString().contains('unique constraint')) {
                 print('DEBUG: Product "${product.name}" already in nomenclature, skipping');
                 skipped++;
+                // Обновляем статус продукта в результатах
+                final existingResult = processingResults.firstWhere(
+                  (r) => _normalizeForComparison(r['name'] as String) == _normalizeForComparison(item.name),
+                  orElse: () => <String, dynamic>{},
+                );
+                if (existingResult.isNotEmpty) {
+                  existingResult['status'] = 'skipped';
+                  existingResult['reason'] = 'already_exists';
+                }
               } else {
                 print('DEBUG: Unexpected error adding "${product.name}" to nomenclature: $e');
                 failed++;
+                // Обновляем статус продукта в результатах
+                final existingResult = processingResults.firstWhere(
+                  (r) => _normalizeForComparison(r['name'] as String) == _normalizeForComparison(item.name),
+                  orElse: () => <String, dynamic>{},
+                );
+                if (existingResult.isNotEmpty) {
+                  existingResult['status'] = 'error';
+                  existingResult['error'] = e.toString();
+                }
               }
             }
           } else {
@@ -2083,14 +2131,17 @@ ${text}
             added++;
             print('DEBUG: Product "${product.name}" added to database only');
 
-            // Сохраняем результат обработки
-            processingResults.add({
-              'name': normalizedName,
-              'status': 'added_db_only',
-              'oldPrice': null,
-              'newPrice': product.basePrice,
-              'productId': product.id,
-            });
+            // Находим и обновляем соответствующий продукт в результатах
+            final existingResult = processingResults.firstWhere(
+              (r) => _normalizeForComparison(r['name'] as String) == _normalizeForComparison(item.name),
+              orElse: () => <String, dynamic>{},
+            );
+            if (existingResult.isNotEmpty) {
+              existingResult['status'] = 'added_db_only';
+              existingResult['oldPrice'] = null;
+              existingResult['newPrice'] = product.basePrice;
+              existingResult['productId'] = product.id;
+            }
           }
 
           // Небольшая задержка
@@ -2098,6 +2149,16 @@ ${text}
 
         } catch (e) {
           failed++;
+          // Обновляем статус продукта в результатах
+          final existingResult = processingResults.firstWhere(
+            (r) => _normalizeForComparison(r['name'] as String) == _normalizeForComparison(item.name),
+            orElse: () => <String, dynamic>{},
+          );
+          if (existingResult.isNotEmpty) {
+            existingResult['status'] = 'error';
+            existingResult['error'] = e.toString();
+          }
+          _addDebugLog('Error processing product "${item.name}": $e');
         }
       }
 
@@ -2233,6 +2294,21 @@ ${text}
                               } else if (newPrice != null) {
                                 priceText = '${newPrice.toStringAsFixed(0)} ${defCur}';
                               }
+                              break;
+                            case 'skipped':
+                              statusText = 'Пропущен';
+                              statusColor = Colors.blue;
+                              priceText = newPrice != null ? '${newPrice.toStringAsFixed(0)} ${defCur}' : '';
+                              break;
+                            case 'error':
+                              statusText = 'Ошибка';
+                              statusColor = Colors.red;
+                              priceText = newPrice != null ? '${newPrice.toStringAsFixed(0)} ${defCur}' : '';
+                              break;
+                            case 'pending':
+                              statusText = 'Ожидает';
+                              statusColor = Colors.grey;
+                              priceText = newPrice != null ? '${newPrice.toStringAsFixed(0)} ${defCur}' : '';
                               break;
                             default:
                               statusText = 'Неизвестно';
@@ -2685,40 +2761,112 @@ ${allProducts.map((p) => p.name).join('\n')}
   }
 
   String _cleanRtfCell(String cellContent) {
-    // Очищаем содержимое ячейки RTF от команд
-    var cleaned = cellContent
-        .replaceAll(RegExp(r'\\[a-z]+\d*'), '') // RTF команды
-        .replaceAll(RegExp(r'\{[^}]*\}'), '') // Группы
-        .replaceAll('\\cell', '') // Команды ячеек
-        .replaceAll('\\row', '') // Команды строк
-        .trim();
+    try {
+      // Очищаем содержимое ячейки RTF от команд
+      var cleaned = cellContent;
 
-    // Нормализуем пробелы
-    cleaned = cleaned.replaceAll(RegExp(r'\s+'), ' ');
+      // Обрабатываем специальные символы
+      cleaned = cleaned.replaceAll('\\\'', '\'');
+      cleaned = cleaned.replaceAll('\\~', ' ');
+      cleaned = cleaned.replaceAll('\\-', '');
+      cleaned = cleaned.replaceAll('\\_', '_');
+      cleaned = cleaned.replaceAll('\\tab', '\t');
 
-    return cleaned;
+      // Удаляем RTF команды, но сохраняем текст
+      cleaned = cleaned.replaceAllMapped(RegExp(r'\\[a-z]+\d*'), (match) {
+        final cmd = match.group(0)!;
+        // Специальные случаи
+        if (cmd == '\\tab') return '\t';
+        if (cmd == '\\par' || cmd == '\\line') return '\n';
+        return '';
+      });
+
+      // Удаляем пустые группы, сохраняя содержимое
+      cleaned = cleaned.replaceAllMapped(RegExp(r'\{([^{}]*)\}'), (match) {
+        final content = match.group(1)!;
+        // Если контент содержит текст, сохраняем его
+        if (content.contains(RegExp(r'[а-яёa-z0-9]', caseSensitive: false))) {
+          return content;
+        }
+        return '';
+      });
+
+      // Удаляем оставшиеся скобки и команды
+      cleaned = cleaned.replaceAll(RegExp(r'[{}]+'), '');
+      cleaned = cleaned.replaceAll('\\cell', '');
+      cleaned = cleaned.replaceAll('\\row', '');
+
+      // Нормализуем пробелы и очищаем
+      cleaned = cleaned.replaceAll(RegExp(r'\s+'), ' ').trim();
+
+      return cleaned;
+    } catch (e) {
+      _addDebugLog('Error cleaning RTF cell: $e');
+      return cellContent.replaceAll(RegExp(r'\\[^{]*'), '').replaceAll(RegExp(r'[{}]'), '').trim();
+    }
   }
 
   String _extractTextFromRtf(String rtf) {
-    // Удаляем заголовок RTF
-    final rtfHeaderEnd = rtf.indexOf('\\viewkind');
-    if (rtfHeaderEnd != -1) {
-      rtf = rtf.substring(rtfHeaderEnd);
+    try {
+      _addDebugLog('Starting RTF text extraction, length: ${rtf.length}');
+
+      // Сначала попробуем найти основной текстовый контент
+      // Ищем паттерн \viewkind4 или другие индикаторы основного текста
+      final viewkindIndex = rtf.indexOf('\\viewkind');
+      if (viewkindIndex != -1) {
+        rtf = rtf.substring(viewkindIndex);
+      }
+
+      // Удаляем шрифтовые таблицы и другие служебные группы
+      rtf = rtf.replaceAll(RegExp(r'\\fonttbl\{[^}]*\}', caseSensitive: false), '');
+      rtf = rtf.replaceAll(RegExp(r'\\colortbl\{[^}]*\}', caseSensitive: false), '');
+      rtf = rtf.replaceAll(RegExp(r'\\stylesheet\{[^}]*\}', caseSensitive: false), '');
+      rtf = rtf.replaceAll(RegExp(r'\\info\{[^}]*\}', caseSensitive: false), '');
+
+      // Обрабатываем специальные символы
+      rtf = rtf.replaceAll('\\\'', '\'');
+      rtf = rtf.replaceAll('\\~', ' ');
+      rtf = rtf.replaceAll('\\-', '');
+      rtf = rtf.replaceAll('\\_', '_');
+
+      // Заменяем \par и \line на переносы строк
+      rtf = rtf.replaceAll('\\par', '\n');
+      rtf = rtf.replaceAll('\\line', '\n');
+      rtf = rtf.replaceAll('\\tab', '\t');
+
+      // Удаляем оставшиеся RTF команды, но сохраняем текст между ними
+      // Используем более аккуратный подход
+      final commandPattern = RegExp(r'\\[a-z]+\d*');
+      rtf = rtf.replaceAllMapped(commandPattern, (match) {
+        final cmd = match.group(0)!;
+        // Сохраняем пробелы после некоторых команд
+        if (cmd.startsWith('\\ ') || cmd == '\\tab') {
+          return '\t';
+        }
+        return '';
+      });
+
+      // Удаляем пустые группы, но сохраняем их содержимое
+      rtf = rtf.replaceAllMapped(RegExp(r'\{([^{}]*)\}'), (match) {
+        final content = match.group(1)!;
+        // Если контент содержит текст, сохраняем его
+        if (content.contains(RegExp(r'[а-яёa-z]', caseSensitive: false))) {
+          return content;
+        }
+        return '';
+      });
+
+      // Финальная очистка
+      rtf = rtf.replaceAll(RegExp(r'[{}]+'), '');
+      rtf = rtf.replaceAll(RegExp(r'\s+'), ' ').trim();
+
+      _addDebugLog('RTF extraction result: "${rtf.substring(0, min(100, rtf.length))}"');
+      return rtf;
+    } catch (e) {
+      _addDebugLog('Error extracting text from RTF: $e');
+      // Fallback: простое извлечение
+      return rtf.replaceAll(RegExp(r'\\[^{]*'), '').replaceAll(RegExp(r'[{}]'), '').trim();
     }
-
-    // Удаляем все команды в фигурных скобках (группы)
-    rtf = rtf.replaceAll(RegExp(r'\{[^}]*\}'), '');
-
-    // Удаляем оставшиеся RTF команды (начинаются с \)
-    rtf = rtf.replaceAll(RegExp(r'\\[a-z]+\d*'), '');
-
-    // Очищаем специальные символы
-    rtf = rtf.replaceAll('\\\'', '\'');
-
-    // Удаляем лишние пробелы и переносы строк
-    rtf = rtf.replaceAll(RegExp(r'\s+'), ' ').trim();
-
-    return rtf;
   }
 
   void _showDebugLogs(BuildContext context) {
