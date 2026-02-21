@@ -63,11 +63,17 @@ class TechCardServiceSupabase {
   /// Получение всех ТТК для заведения
   Future<List<TechCard>> getTechCardsForEstablishment(String establishmentId) async {
     try {
+      print('🍽️ TechCardService: Loading tech cards for establishment: $establishmentId');
+      print('👤 TechCardService: Current user: ${Supabase.instance.client.auth.currentUser?.email}');
+
       final data = await _supabase.client
           .from('tech_cards')
           .select()
           .eq('establishment_id', establishmentId)
           .order('created_at', ascending: false);
+
+      print('🍽️ TechCardService: Query returned ${data?.length ?? 0} tech cards');
+      print('🍽️ TechCardService: Raw data sample: ${data?.take(1) ?? 'null'}');
 
       final techCards = <TechCard>[];
 

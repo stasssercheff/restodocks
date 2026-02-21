@@ -31,12 +31,16 @@ class ProductStoreSupabase {
 
     try {
       print('DEBUG ProductStore: Loading products from database...');
+      print('DEBUG ProductStore: Current user: ${Supabase.instance.client.auth.currentUser?.email}');
+      print('DEBUG ProductStore: User ID: ${Supabase.instance.client.auth.currentUser?.id}');
+
       final data = await _supabase.client
           .from('products')
           .select()
           .order('name');
 
-      print('DEBUG ProductStore: Loaded ${data.length} products from database');
+      print('DEBUG ProductStore: Loaded ${data?.length ?? 0} products from database');
+      print('DEBUG ProductStore: Raw data sample: ${data?.take(2) ?? 'null'}');
       _allProducts = (data as List)
           .map((json) => Product.fromJson(json))
           .toList();
@@ -213,6 +217,8 @@ class ProductStoreSupabase {
   /// Загрузить номенклатуру заведения (ID продуктов и цены)
   Future<void> loadNomenclature(String establishmentId) async {
     print('🔄 ProductStore: Loading nomenclature for establishment $establishmentId...');
+    print('👤 ProductStore: Current user: ${Supabase.instance.client.auth.currentUser?.email}');
+    print('👤 ProductStore: User ID: ${Supabase.instance.client.auth.currentUser?.id}');
 
     // Очищаем текущие данные
     _nomenclatureIds.clear();
@@ -246,6 +252,7 @@ class ProductStoreSupabase {
   Future<void> _loadNomenclatureDirect(String establishmentId) async {
     print('🔍 ProductStore: Making query to establishment_products...');
     print('🔍 ProductStore: establishment_id = $establishmentId');
+    print('🔍 ProductStore: User authenticated: ${Supabase.instance.client.auth.currentUser != null}');
 
     dynamic response;
     try {
@@ -253,7 +260,11 @@ class ProductStoreSupabase {
           .from('establishment_products')
           .select('product_id, price, currency')
           .eq('establishment_id', establishmentId);
+
+      print('🔍 ProductStore: Query response type: ${response.runtimeType}');
+      print('🔍 ProductStore: Query response: $response');
     } catch (e) {
+      print('❌ ProductStore: Query failed with error: $e');
       print('⚠️ ProductStore: Full select failed (price/currency columns may not exist), trying product_id only: $e');
       response = await _supabase.client
           .from('establishment_products')
