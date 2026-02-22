@@ -563,13 +563,23 @@ class _InventoryScreenState extends State<InventoryScreen>
     setState(() {
       row.quantities[colIndex] = value;
 
-      // Если начали заполнять вторую колонку (индекс 1), сразу добавляем третью пустую колонку
+      // Если начали заполнять вторую колонку (индекс 1) и всего 2 колонки, добавляем третью
       if (!row.isFree && colIndex == 1 && row.quantities.length == 2) {
         row.quantities.add(0.0);
       }
-      // Если начали заполнять последнюю ячейку (которая была пустой), добавляем новую пустую
-      else if (!row.isFree && colIndex == row.quantities.length - 1 && previousValue != 0.0) {
-        row.quantities.add(0.0);
+      // Если заполнили последнюю ячейку и она была последней, добавляем новую пустую
+      else if (!row.isFree && colIndex == row.quantities.length - 1 && value > 0.0) {
+        // Убеждаемся, что после текущей ячейки нет других заполненных ячеек
+        bool hasEmptyAfter = false;
+        for (int i = colIndex + 1; i < row.quantities.length; i++) {
+          if (row.quantities[i] == 0.0) {
+            hasEmptyAfter = true;
+            break;
+          }
+        }
+        if (!hasEmptyAfter) {
+          row.quantities.add(0.0);
+        }
       }
     });
 
