@@ -42,27 +42,13 @@ void main() async {
   String supabaseUrl = '';
   String supabaseAnonKey = '';
 
-  // 1. Пробуем config.json (Vercel подставляет при сборке)
-  try {
-    final json = await rootBundle.loadString('assets/config.json');
-    final map = jsonDecode(json) as Map<String, dynamic>;
-    supabaseUrl = ((map['SUPABASE_URL'] as String?) ?? '').replaceAll(RegExp(r'[\n\r\t]'), '').trim();
-    supabaseAnonKey = ((map['SUPABASE_ANON_KEY'] as String?) ?? '').replaceAll(RegExp(r'[\n\r\t]'), '').trim();
-    // Исправление опечатки supabase.con -> supabase.co
-    if (supabaseUrl.contains('supabase.con')) {
-      supabaseUrl = supabaseUrl.replaceAll('supabase.con', 'supabase.co');
-    }
-    // config.json loaded
-    print('=== CONFIG.JSON LOADED SUCCESSFULLY ===');
-    print('SUPABASE_URL: $supabaseUrl');
-    print('SUPABASE_ANON_KEY: ${supabaseAnonKey.length > 20 ? '${supabaseAnonKey.substring(0, 20)}...' : '${supabaseAnonKey.length} chars'}');
-  } catch (e) {
-    print('=== CONFIG.JSON ERROR: $e ===');
-    // config.json error - fallback to hardcoded for testing
-    supabaseUrl = 'https://osglfptwbuqqmqunttha.supabase.co';
-    supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zZ2xmcHR3YnVxcW1xdW50dGhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUwNTk0MDQsImV4cCI6MjA4MDYzNTQwNH0.Jy7yi2TNdSrmoBdILXBGRYB_vxGtq8scCZ9eCA9vfTE';
-    print('=== USING HARDCODED KEYS AS FALLBACK ===');
-  }
+  // Используем жестко прописанные ключи для надежности
+  const String supabaseUrl = 'https://osglfptwbuqqmqunttha.supabase.co';
+  const String supabaseAnonKey = 'sb_publishable_VLi05Njkuzk_SBkLB_8j0A_00jr73Im';
+
+  print('=== USING HARDCODED SUPABASE KEYS ===');
+  print('SUPABASE_URL: $supabaseUrl');
+  print('SUPABASE_ANON_KEY: ${supabaseAnonKey.substring(0, 10)}...');
 
   // 2. Локальная разработка: .env
   if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
@@ -77,23 +63,6 @@ void main() async {
     }
   }
 
-  // 2. Локальная разработка: .env
-  if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
-    try {
-      // Loading .env
-      await dotenv.load(fileName: ".env");
-      supabaseUrl = dotenv.env['SUPABASE_URL'] ?? '';
-      supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'] ?? '';
-      // .env loaded
-    } catch (e) {
-      print('DEBUG: .env error: $e');
-    }
-  }
-
-  // Финальная очистка URL (опечатка supabase.con -> supabase.co) — всегда
-  if (supabaseUrl.contains('supabase.con')) {
-    supabaseUrl = supabaseUrl.replaceAll('supabase.con', 'supabase.co');
-  }
 
   // Обработка ошибок инициализации
   try {
