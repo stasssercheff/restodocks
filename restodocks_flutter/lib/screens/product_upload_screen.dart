@@ -2293,7 +2293,7 @@ ${text}
                     ),
                   ],
                   const SizedBox(height: 16),
-                  if (changedResults.isNotEmpty) ...[
+                  if (processingResults.where((r) => r['status'] != 'no_change').isNotEmpty) ...[
                     const Text(
                       'Детальные результаты:',
                       style: TextStyle(fontWeight: FontWeight.bold),
@@ -2306,9 +2306,10 @@ ${text}
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: ListView.builder(
-                        itemCount: changedResults.length,
+                        itemCount: processingResults.where((r) => r['status'] != 'no_change').length,
                         itemBuilder: (context, index) {
-                          final result = changedResults[index];
+                          final _changedResults = processingResults.where((r) => r['status'] != 'no_change').toList();
+                          final result = _changedResults[index];
                           final status = result['status'] as String;
                           final name = result['name'] as String;
                           final oldPrice = result['oldPrice'] as double?;
