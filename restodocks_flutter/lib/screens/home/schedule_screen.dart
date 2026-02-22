@@ -306,10 +306,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         initialStart: startStr,
         initialEnd: endStr,
         loc: loc,
-        onSave: (value, start, end) {
+        onSave: (value, start, end, showTime) {
           setState(() {
             _model = _model.setAssignment(slotId, date, value.isEmpty ? null : value);
-            if (value == '1' && start.isNotEmpty && end.isNotEmpty) {
+            if (value == '1' && showTime && start.isNotEmpty && end.isNotEmpty) {
               _model = _model.setTimeRange(slotId, date, start, end);
             } else {
               _model = _model.setTimeRange(slotId, date, null, null);
@@ -590,7 +590,7 @@ class _ScheduleCellDialog extends StatefulWidget {
   final String initialStart;
   final String initialEnd;
   final LocalizationService loc;
-  final void Function(String value, String start, String end) onSave;
+  final void Function(String value, String start, String end, bool showTime) onSave;
 
   @override
   State<_ScheduleCellDialog> createState() => _ScheduleCellDialogState();
@@ -600,6 +600,7 @@ class _ScheduleCellDialogState extends State<_ScheduleCellDialog> {
   late String _selectedValue;
   late TextEditingController _startCtrl;
   late TextEditingController _endCtrl;
+  late bool _showTime;
 
   @override
   void initState() {
@@ -607,6 +608,7 @@ class _ScheduleCellDialogState extends State<_ScheduleCellDialog> {
     _selectedValue = widget.initialValue.isEmpty ? '1' : widget.initialValue;
     _startCtrl = TextEditingController(text: widget.initialStart);
     _endCtrl = TextEditingController(text: widget.initialEnd);
+    _showTime = widget.initialStart.isNotEmpty && widget.initialEnd.isNotEmpty;
   }
 
   @override
@@ -619,63 +621,119 @@ class _ScheduleCellDialogState extends State<_ScheduleCellDialog> {
   @override
   Widget build(BuildContext context) {
     final loc = widget.loc;
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
+    if (isMobile) {
+      return Dialog(
+        insetPadding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 16,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+        ),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  loc.t('schedule_edit_shift'),
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const SizedBox(height: 16),
+                ..._buildDialogContent(loc),
+                const SizedBox(height: 16),
+                ..._buildDialogActions(loc),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return AlertDialog(
-      title: Text(loc.t('schedule_who_works')),
+      title: Text(loc.t('schedule_edit_shift')),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              DateFormat('EEEE, d MMM', Localizations.localeOf(context).toString().replaceAll('_', '-')).format(widget.date),
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 12),
-            Text(loc.t('schedule_shift_or_day_off'), style: Theme.of(context).textTheme.labelMedium),
-            const SizedBox(height: 4),
-            SegmentedButton<String>(
-              segments: [
-                ButtonSegment(value: '1', label: Text(loc.t('schedule_shift')), icon: const Icon(Icons.watch_later, size: 18)),
-                ButtonSegment(value: '0', label: Text(loc.t('schedule_day_off')), icon: const Icon(Icons.event_busy, size: 18)),
-              ],
-              selected: {_selectedValue},
-              onSelectionChanged: (s) => setState(() => _selectedValue = s.first),
-            ),
-            const SizedBox(height: 16),
-            Text(loc.t('schedule_time_range'), style: Theme.of(context).textTheme.labelMedium),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _startCtrl,
-                    decoration: InputDecoration(labelText: loc.t('schedule_time_start'), border: const OutlineInputBorder(), isDense: true),
-                    keyboardType: TextInputType.datetime,
-                  ),
-                ),
-                const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('–')),
-                Expanded(
-                  child: TextField(
-                    controller: _endCtrl,
-                    decoration: InputDecoration(labelText: loc.t('schedule_time_end'), border: const OutlineInputBorder(), isDense: true),
-                    keyboardType: TextInputType.datetime,
-                  ),
-                ),
-              ],
-            ),
-          ],
+          children: _buildDialogContent(loc),
         ),
       ),
-      actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(MaterialLocalizations.of(context).cancelButtonLabel)),
-        FilledButton(
-          onPressed: () {
-            widget.onSave(_selectedValue, _startCtrl.text.trim(), _endCtrl.text.trim());
-            Navigator.of(context).pop();
-          },
-          child: Text(loc.t('save')),
-        ),
-      ],
+      actions: _buildDialogActions(loc).map((w) => w).toList(),
     );
+  }
+
+  List<Widget> _buildDialogContent(LocalizationService loc) {
+    return [
+      Text(
+        DateFormat('EEEE, d MMM', Localizations.localeOf(context).toString().replaceAll('_', '-')).format(widget.date),
+        style: Theme.of(context).textTheme.bodyMedium,
+      ),
+      const SizedBox(height: 12),
+      Text(loc.t('schedule_shift_or_day_off'), style: Theme.of(context).textTheme.labelMedium),
+      const SizedBox(height: 4),
+      SegmentedButton<String>(
+        segments: [
+          ButtonSegment(value: '1', label: Text(loc.t('schedule_shift')), icon: const Icon(Icons.watch_later, size: 18)),
+          ButtonSegment(value: '0', label: Text(loc.t('schedule_day_off')), icon: const Icon(Icons.event_busy, size: 18)),
+        ],
+        selected: {_selectedValue},
+        onSelectionChanged: (s) => setState(() => _selectedValue = s.first),
+      ),
+      const SizedBox(height: 16),
+      Row(
+        children: [
+          Expanded(
+            child: Text(loc.t('schedule_time_range'), style: Theme.of(context).textTheme.labelMedium),
+          ),
+          Switch(
+            value: _showTime,
+            onChanged: (value) => setState(() => _showTime = value),
+          ),
+        ],
+      ),
+      const SizedBox(height: 4),
+      if (_showTime) ...[
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _startCtrl,
+                decoration: InputDecoration(labelText: loc.t('schedule_time_start'), border: const OutlineInputBorder(), isDense: true),
+                keyboardType: TextInputType.datetime,
+              ),
+            ),
+            const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('–')),
+            Expanded(
+              child: TextField(
+                controller: _endCtrl,
+                decoration: InputDecoration(labelText: loc.t('schedule_time_end'), border: const OutlineInputBorder(), isDense: true),
+                keyboardType: TextInputType.datetime,
+              ),
+            ),
+          ],
+        )
+      ] else Text(
+        loc.t('schedule_show_time'),
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+        textAlign: TextAlign.center,
+      ),
+    ];
+  }
+
+  List<Widget> _buildDialogActions(LocalizationService loc) {
+    return [
+      TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(MaterialLocalizations.of(context).cancelButtonLabel)),
+      FilledButton(
+        onPressed: () {
+          widget.onSave(_selectedValue, _startCtrl.text.trim(), _endCtrl.text.trim(), _showTime);
+          Navigator.of(context).pop();
+        },
+        child: Text(loc.t('save')),
+      ),
+    ];
   }
 }
