@@ -156,11 +156,6 @@ class _LoginScreenState extends State<LoginScreen> {
         contentPadding: EdgeInsets.zero,
         controlAffinity: ListTileControlAffinity.leading,
       ),
-      TextButton.icon(
-        onPressed: _loadRememberedCredentials,
-        icon: const Icon(Icons.restore, size: 18),
-        label: Text(loc.t('fill_saved_credentials')),
-      ),
       const SizedBox(height: 16),
       if (_errorMessage != null)
         Container(

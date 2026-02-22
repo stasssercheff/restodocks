@@ -457,26 +457,48 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
   String _buildProductSubtitle(BuildContext context, Product p, ProductStoreSupabase store, String estId, LocalizationService loc) {
     final loc = context.read<LocalizationService>();
     final establishmentPrice = store.getEstablishmentPrice(p.id, estId);
-    final price = establishmentPrice?.$1 ?? p.basePrice;
-    final currency = establishmentPrice?.$2 ?? 'RUB';
+    final rawPrice = establishmentPrice?.$1 ?? p.basePrice;
+    final currency = establishmentPrice?.$2 ?? p.currency ?? 'VND';
+    final currencySymbol = _currencySymbol(currency);
 
-    final priceText = price != null ? '${price.toStringAsFixed(0)} ₽/${_unitDisplay(p.unit, loc.currentLanguageCode)}' : 'Цена не установлена';
+    // Если unit = g, показываем цену за кг (умножаем на 1000)
+    String priceText;
+    if (rawPrice != null) {
+      final unit = (p.unit ?? 'g').trim().toLowerCase();
+      if (unit == 'g' || unit == 'грамм') {
+        final pricePerKg = rawPrice * 1000;
+        priceText = '${pricePerKg.toStringAsFixed(0)} $currencySymbol/кг';
+      } else {
+        priceText = '${rawPrice.toStringAsFixed(0)} $currencySymbol/${_unitDisplay(p.unit, loc.currentLanguageCode)}';
+      }
+    } else {
+      priceText = 'Цена не установлена';
+    }
+
+    final hideCategory = p.category == 'misc' || p.category == 'manual' || p.category == 'imported';
 
     // Проверяем подписку для отображения КБЖУ
     final account = context.read<AccountManagerSupabase>();
     final hasPro = account.currentEmployee?.hasProSubscription ?? false;
 
     if (!hasPro) {
-      // Без PRO подписки показываем только категорию и цену
-      return (p.category == 'misc' || p.category == 'manual')
-          ? '$priceText'
-          : '${_categoryLabel(p.category)} · $priceText';
+      return hideCategory ? priceText : '${_categoryLabel(p.category)} · $priceText';
     }
 
-    // С PRO подпиской показываем КБЖУ
-    return (p.category == 'misc' || p.category == 'manual')
+    return hideCategory
         ? '${p.calories?.round() ?? 0} ккал · $priceText'
         : '${_categoryLabel(p.category)} · ${p.calories?.round() ?? 0} ккал · $priceText';
+  }
+
+  String _currencySymbol(String currency) {
+    switch (currency.toUpperCase()) {
+      case 'RUB': return '₽';
+      case 'USD': return '\$';
+      case 'EUR': return '€';
+      case 'GBP': return '£';
+      case 'VND': return '₫';
+      default: return currency;
+    }
   }
 
   String _buildTechCardSubtitle(TechCard tc) {
@@ -834,7 +856,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       'vegetables': 'Овощи', 'fruits': 'Фрукты', 'meat': 'Мясо', 'seafood': 'Рыба',
       'dairy': 'Молочное', 'grains': 'Крупы', 'bakery': 'Выпечка', 'pantry': 'Бакалея',
       'spices': 'Специи', 'beverages': 'Напитки', 'eggs': 'Яйца', 'legumes': 'Бобовые',
-      'nuts': 'Орехи', 'misc': 'Разное', 'manual': 'Добавлено вручную',
+      'nuts': 'Орехи', 'misc': '', 'manual': '', 'imported': '',
     };
     return map[c] ?? c;
   }
@@ -1373,7 +1395,7 @@ class _NomenclatureTab extends StatefulWidget {
       'vegetables': 'Овощи', 'fruits': 'Фрукты', 'meat': 'Мясо', 'seafood': 'Рыба',
       'dairy': 'Молочное', 'grains': 'Крупы', 'bakery': 'Выпечка', 'pantry': 'Бакалея',
       'spices': 'Специи', 'beverages': 'Напитки', 'eggs': 'Яйца', 'legumes': 'Бобовые',
-      'nuts': 'Орехи', 'misc': 'Разное',
+      'nuts': 'Орехи', 'misc': '', 'manual': '', 'imported': '',
     };
     return map[c] ?? c;
   }
@@ -2151,7 +2173,7 @@ class _CatalogTab extends StatelessWidget {
       'vegetables': 'Овощи', 'fruits': 'Фрукты', 'meat': 'Мясо', 'seafood': 'Рыба',
       'dairy': 'Молочное', 'grains': 'Крупы', 'bakery': 'Выпечка', 'pantry': 'Бакалея',
       'spices': 'Специи', 'beverages': 'Напитки', 'eggs': 'Яйца', 'legumes': 'Бобовые',
-      'nuts': 'Орехи', 'misc': 'Разное', 'manual': 'Добавлено вручную',
+      'nuts': 'Орехи', 'misc': '', 'manual': '', 'imported': '',
     };
     return map[c] ?? c;
   }
@@ -2395,9 +2417,12 @@ class _CatalogTab extends StatelessWidget {
                             ),
                             title: Text(p.getLocalizedName(loc.currentLanguageCode)),
                             subtitle: Text(
-                              p.category == 'misc'
-                                  ? '${p.calories?.round() ?? 0} ккал · ${_unitDisplay(p.unit, loc.currentLanguageCode)}'
-                                  : '${_categoryLabel(p.category)} · ${p.calories?.round() ?? 0} ккал · ${_unitDisplay(p.unit, loc.currentLanguageCode)}',
+                              () {
+                                final cat = _categoryLabel(p.category);
+                                final kcal = '${p.calories?.round() ?? 0} ккал';
+                                final unit = _unitDisplay(p.unit, loc.currentLanguageCode);
+                                return cat.isEmpty ? '$kcal · $unit' : '$cat · $kcal · $unit';
+                              }(),
                               style: Theme.of(context).textTheme.bodySmall,
                             ),
                             trailing: Row(
