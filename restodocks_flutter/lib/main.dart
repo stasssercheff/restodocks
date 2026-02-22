@@ -1,16 +1,14 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'core/core.dart';
 import 'services/services.dart';
-import 'services/domain_validation_service.dart';
 import 'screens/screens.dart';
+
+const String _supabaseUrl = 'https://osglfptwbuqqmqunttha.supabase.co';
+const String _supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zZ2xmcHR3YnVxcW1xdW50dGhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUwNTk0MDQsImV4cCI6MjA4MDYzNTQwNH0.Jy7yi2TNdSrmoBdILXBGRYB_vxGtq8scCZ9eCA9vfTE';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,156 +16,15 @@ void main() async {
     debugPrint('FlutterError: ${details.exception}');
     debugPrint('Stack: ${details.stack}');
   };
-  // Domain validation — disabled temporarily for debugging white screen
-  // try {
-  //   if (!DomainValidationService.isDomainAllowed()) {
-  //     DomainValidationService.reportSuspiciousDomain();
-  //     DomainValidationService.showDomainWarning();
-  //     return;
-  //   }
-  // } catch (e, st) { debugPrint('DomainValidation: $e'); }
 
-  // Temporary loading screen
-  runApp(
-    const MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      ),
-    ),
-  );
+  print('=== SUPABASE INIT: url=${_supabaseUrl.substring(0, 20)}... key=${_supabaseAnonKey.substring(0, 15)}... ===');
 
-  String supabaseUrl = '';
-  String supabaseAnonKey = '';
-
-  // Используем жестко прописанные ключи для надежности
-  const String supabaseUrl = 'https://osglfptwbuqqmqunttha.supabase.co';
-  const String supabaseAnonKey = 'sb_publishable_VLi05Njkuzk_SBkLB_8j0A_00jr73Im';
-
-  print('=== USING HARDCODED SUPABASE KEYS ===');
-  print('SUPABASE_URL: $supabaseUrl');
-  print('SUPABASE_ANON_KEY: ${supabaseAnonKey.substring(0, 10)}...');
-
-  // 2. Локальная разработка: .env
-  if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
-    try {
-      // Loading .env
-      await dotenv.load(fileName: ".env");
-      supabaseUrl = dotenv.env['SUPABASE_URL'] ?? '';
-      supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'] ?? '';
-      // .env loaded
-    } catch (e) {
-      print('DEBUG: .env error: $e');
-    }
-  }
-
-
-  // Обработка ошибок инициализации
-  try {
-    if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
-      // Config missing, showing error screen
-      runApp(
-        MaterialApp(
-          home: Scaffold(
-            body: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(20.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.error_outline, size: 64, color: Colors.red),
-                    const SizedBox(height: 20),
-                    const Text(
-                      'Ошибка конфигурации',
-                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 10),
-                    const Text(
-                      'SUPABASE_URL и SUPABASE_ANON_KEY должны быть заданы.',
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      'URL: ${supabaseUrl.isEmpty ? "не задан" : "задан"}',
-                      style: const TextStyle(fontSize: 12, color: Colors.grey),
-                    ),
-                    Text(
-                      'Key: ${supabaseAnonKey.isEmpty ? "не задан" : "задан"}',
-                      style: const TextStyle(fontSize: 12, color: Colors.grey),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-      return;
-    }
-
-    // Initializing Supabase...
-    await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
-    // Supabase initialized
-
-    // Восстановление сессии ДО старта приложения — при обновлении страницы (F5)
-    // пользователь остаётся залогиненным, данные просто перезагружаются как по кнопке «Обновить»
-    await AccountManagerSupabase().initialize();
-
-    // Initializing LocalizationService...
-    await LocalizationService.initialize();
-    // LocalizationService initialized
-
-    // Initializing ThemeService...
-    await ThemeService().initialize();
-    // ThemeService initialized
-
-    await HomeButtonConfigService().initialize();
-    // HomeButtonConfigService initialized
-
-    // Starting RestodocksApp...
-    runApp(const RestodocksApp());
-  } catch (e, stackTrace) {
-    // Initialization error
-    // Показываем ошибку пользователю вместо белого экрана
-    runApp(
-      MaterialApp(
-        home: Scaffold(
-          body: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error_outline, size: 64, color: Colors.red),
-                  const SizedBox(height: 20),
-                  const Text(
-                    'Ошибка инициализации',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    e.toString(),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.red),
-                  ),
-                  const SizedBox(height: 20),
-                  const Text(
-                    'Проверьте консоль браузера (F12) для подробностей',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-    // Выводим в консоль для отладки
-    print('Error: $e');
-    print('Stack: $stackTrace');
-  }
+  await Supabase.initialize(url: _supabaseUrl, anonKey: _supabaseAnonKey);
+  await AccountManagerSupabase().initialize();
+  await LocalizationService.initialize();
+  await ThemeService().initialize();
+  await HomeButtonConfigService().initialize();
+  runApp(const RestodocksApp());
 }
 
 class RestodocksApp extends StatelessWidget {
