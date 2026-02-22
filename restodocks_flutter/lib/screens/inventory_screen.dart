@@ -563,12 +563,12 @@ class _InventoryScreenState extends State<InventoryScreen>
     setState(() {
       row.quantities[colIndex] = value;
 
-      // Если заполнили вторую колонку (индекс 1), сразу добавляем третью пустую колонку
-      if (!row.isFree && colIndex == 1 && previousValue == 0.0 && value > 0.0 && row.quantities.length == 2) {
+      // Если начали заполнять вторую колонку (индекс 1), сразу добавляем третью пустую колонку
+      if (!row.isFree && colIndex == 1 && row.quantities.length == 2) {
         row.quantities.add(0.0);
       }
-      // Если заполнили последнюю ячейку (которая была пустой), добавляем новую пустую
-      else if (!row.isFree && colIndex == row.quantities.length - 1 && previousValue == 0.0 && value > 0.0) {
+      // Если начали заполнять последнюю ячейку (которая была пустой), добавляем новую пустую
+      else if (!row.isFree && colIndex == row.quantities.length - 1 && previousValue != 0.0) {
         row.quantities.add(0.0);
       }
     });
@@ -1053,6 +1053,37 @@ class _InventoryScreenState extends State<InventoryScreen>
             ],
           ),
           if (!_isInputMode) DataSafetyIndicator(isVisible: true),
+          // Зафиксированная кнопка "Завершить" над клавиатурой в режиме ввода
+          if (_isInputMode)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: viewInsets.bottom + 8,
+              child: Builder(builder: (context) {
+                final theme = Theme.of(context);
+                return Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: theme.colorScheme.shadow.withOpacity(0.2),
+                        blurRadius: 8,
+                        offset: const Offset(0, -2),
+                      ),
+                    ],
+                  ),
+                  child: FilledButton(
+                    onPressed: _completed ? null : () => _complete(context),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 44),
+                    ),
+                    child: Text(loc.t('inventory_complete')),
+                  ),
+                );
+              }),
+            ),
         ],
       ),
     );
@@ -1149,7 +1180,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
+                  if (!_isInputMode) Row(
                     children: [
                       Icon(Icons.store, size: 16, color: theme.colorScheme.primary),
                       const SizedBox(width: 4),
@@ -1177,7 +1208,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                       ),
                     ],
                   ),
-                  if (filterDropdown != null && sortDropdown != null) ...[
+                  if (filterDropdown != null && sortDropdown != null && !_isInputMode) ...[
                     const SizedBox(height: 6),
                     if (nameFilterField != null) nameFilterField,
                     const SizedBox(height: 6),
@@ -1194,15 +1225,18 @@ class _InventoryScreenState extends State<InventoryScreen>
               )
             : Row(
                 children: [
-                  Icon(Icons.store, size: 16, color: theme.colorScheme.primary),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      establishment?.name ?? '—',
-                      style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
-                      overflow: TextOverflow.ellipsis,
+                  if (!_isInputMode) ...[
+                    Icon(Icons.store, size: 16, color: theme.colorScheme.primary),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        establishment?.name ?? '—',
+                        style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ),
+                  ],
+                  if (_isInputMode) const Spacer(),
                   InkWell(
                     onTap: () => _pickDate(context),
                     child: Padding(
@@ -1218,7 +1252,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                     '${_startTime?.hour.toString().padLeft(2, '0') ?? '—'}:${_startTime?.minute.toString().padLeft(2, '0') ?? '—'}',
                     style: theme.textTheme.bodySmall,
                   ),
-                  if (filterDropdown != null) ...[
+                  if (filterDropdown != null && !_isInputMode) ...[
                     const SizedBox(width: 6),
                     SizedBox(width: 130, child: filterDropdown),
                     const SizedBox(width: 4),
@@ -1946,8 +1980,13 @@ class _InventoryScreenState extends State<InventoryScreen>
   /// Компактный нижний блок: не перекрывает таблицу, минимум высоты.
   Widget _buildFooter(LocalizationService loc) {
     final theme = Theme.of(context);
+    // В режиме ввода кнопка "Завершить" фиксируется над клавиатурой
+    if (_isInputMode) {
+      return const SizedBox.shrink();
+    }
+
     return Container(
-      padding: _isInputMode ? const EdgeInsets.symmetric(horizontal: 10, vertical: 4) : const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerLow,
         border: Border(top: BorderSide(color: theme.dividerColor)),
@@ -1960,8 +1999,7 @@ class _InventoryScreenState extends State<InventoryScreen>
               child: FilledButton(
                 onPressed: _completed ? null : () => _complete(context),
                 style: FilledButton.styleFrom(
-                  padding: _isInputMode ? const EdgeInsets.symmetric(vertical: 6) : const EdgeInsets.symmetric(vertical: 10),
-                  minimumSize: _isInputMode ? const Size(0, 36) : null,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
                 ),
                 child: Text(
                   loc.t('inventory_complete'),
