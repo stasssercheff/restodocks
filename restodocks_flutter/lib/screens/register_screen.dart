@@ -88,8 +88,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
       }
 
       final email = _emailController.text.trim();
-      final emailTaken = await accountManager.isEmailTakenInEstablishment(email, establishment.id);
-      if (emailTaken) {
+
+      // Проверяем, занят ли email глобально (email должен быть уникальным во всех заведениях)
+      final emailTakenGlobally = await accountManager.isEmailTakenGlobally(email);
+      if (emailTakenGlobally) {
+        if (!mounted) return;
+        final loc = context.read<LocalizationService>();
+        setState(() => _errorMessage = loc.t('email_already_registered_globally'));
+        return;
+      }
+
+      // Также проверяем в рамках заведения (на всякий случай)
+      final emailTakenInEstablishment = await accountManager.isEmailTakenInEstablishment(email, establishment.id);
+      if (emailTakenInEstablishment) {
         if (!mounted) return;
         final loc = context.read<LocalizationService>();
         setState(() => _errorMessage = loc.t('email_already_registered'));
