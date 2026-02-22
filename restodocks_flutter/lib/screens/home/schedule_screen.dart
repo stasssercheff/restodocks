@@ -36,6 +36,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   bool _loading = true;
   String? _establishmentId;
   List<Employee> _employees = [];
+  bool _showTimeInCells = false; // Показывать время в ячейках графика
 
   @override
   void initState() {
@@ -329,6 +330,56 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     });
   }
 
+  void _showCopyRangeDialog() {
+    final loc = context.read<LocalizationService>();
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => _CopyRangeDialog(
+        dates: _model.dates,
+        slots: _model.slots,
+        loc: loc,
+        onCopy: (sourceStart, sourceEnd, targetStart, targetEnd, selectedSlots) {
+          setState(() {
+            // Копируем данные из исходного диапазона в целевой
+            for (final slotId in selectedSlots) {
+              final sourceDates = _getDatesInRange(sourceStart, sourceEnd);
+              final targetDates = _getDatesInRange(targetStart, targetEnd);
+
+              if (sourceDates.length == targetDates.length) {
+                for (var i = 0; i < sourceDates.length; i++) {
+                  final sourceDate = sourceDates[i];
+                  final targetDate = targetDates[i];
+
+                  final assignment = _model.getAssignment(slotId, sourceDate);
+                  final timeRange = _model.getTimeRange(slotId, sourceDate);
+
+                  _model = _model.setAssignment(slotId, targetDate, assignment);
+                  if (timeRange != null) {
+                    final parts = timeRange.split('|');
+                    if (parts.length >= 2) {
+                      _model = _model.setTimeRange(slotId, targetDate, parts[0].trim(), parts[1].trim());
+                    }
+                  }
+                }
+              }
+            }
+            _save();
+          });
+        },
+      ),
+    );
+  }
+
+  List<DateTime> _getDatesInRange(DateTime start, DateTime end) {
+    final dates = <DateTime>[];
+    var current = start;
+    while (current.isBefore(end) || current.isAtSameMomentAs(end)) {
+      dates.add(current);
+      current = current.add(const Duration(days: 1));
+    }
+    return dates;
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
@@ -489,12 +540,22 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                 final base = bg ?? theme.colorScheme.surface;
                 bg = Color.lerp(base, todayHighlightBg, 0.6) ?? base;
               }
-              final content = Column(
+              final content = _showTimeInCells && timeDisplay.isNotEmpty ? Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: timeDisplay.split('–').map((time) => Text(
+                  time.trim(),
+                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.w500, color: theme.colorScheme.onSurface),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                )).toList(),
+              ) : Column(
                 mainAxisSize: MainAxisSize.min,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(val ?? '—', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: val != null ? theme.colorScheme.onSurface : theme.colorScheme.onSurfaceVariant), textAlign: TextAlign.center),
-                  if (timeDisplay.isNotEmpty) Text(timeDisplay, style: TextStyle(fontSize: 9, color: theme.colorScheme.onSurface.withOpacity(0.8)), textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  if (timeDisplay.isNotEmpty && !_showTimeInCells) Text(timeDisplay, style: TextStyle(fontSize: 9, color: theme.colorScheme.onSurface.withOpacity(0.8)), textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis),
                 ],
               );
               return rightCell(
@@ -524,6 +585,18 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
         title: Text(loc.t('schedule')),
         actions: [
+          if (canEdit) ...[
+            IconButton(
+              icon: const Icon(Icons.copy),
+              onPressed: _showCopyRangeDialog,
+              tooltip: 'Копировать диапазон',
+            ),
+            IconButton(
+              icon: Icon(_showTimeInCells ? Icons.access_time : Icons.access_time_outlined),
+              onPressed: () => setState(() => _showTimeInCells = !_showTimeInCells),
+              tooltip: _showTimeInCells ? 'Скрыть время' : 'Показать время',
+            ),
+          ],
           IconButton(icon: const Icon(Icons.home), onPressed: () => context.go('/home'), tooltip: loc.t('home')),
         ],
       ),
@@ -735,5 +808,204 @@ class _ScheduleCellDialogState extends State<_ScheduleCellDialog> {
         child: Text(loc.t('save')),
       ),
     ];
+  }
+}
+
+class _CopyRangeDialog extends StatefulWidget {
+  const _CopyRangeDialog({
+    required this.dates,
+    required this.slots,
+    required this.loc,
+    required this.onCopy,
+  });
+
+  final List<DateTime> dates;
+  final List<ScheduleSlot> slots;
+  final LocalizationService loc;
+  final void Function(DateTime sourceStart, DateTime sourceEnd, DateTime targetStart, DateTime targetEnd, List<String> selectedSlots) onCopy;
+
+  @override
+  State<_CopyRangeDialog> createState() => _CopyRangeDialogState();
+}
+
+class _CopyRangeDialogState extends State<_CopyRangeDialog> {
+  DateTime? _sourceStart;
+  DateTime? _sourceEnd;
+  DateTime? _targetStart;
+  DateTime? _targetEnd;
+  final Set<String> _selectedSlots = {};
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('Копировать диапазон графика'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Выберите диапазон для копирования:', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: _DatePickerButton(
+                    label: 'От',
+                    selectedDate: _sourceStart,
+                    dates: widget.dates,
+                    onChanged: (date) => setState(() => _sourceStart = date),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _DatePickerButton(
+                    label: 'До',
+                    selectedDate: _sourceEnd,
+                    dates: widget.dates,
+                    onChanged: (date) => setState(() => _sourceEnd = date),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text('Выберите диапазон для вставки:', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: _DatePickerButton(
+                    label: 'От',
+                    selectedDate: _targetStart,
+                    dates: widget.dates,
+                    onChanged: (date) => setState(() => _targetStart = date),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _DatePickerButton(
+                    label: 'До',
+                    selectedDate: _targetEnd,
+                    dates: widget.dates,
+                    onChanged: (date) => setState(() => _targetEnd = date),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text('Выберите сотрудников:', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: widget.slots.map((slot) => FilterChip(
+                label: Text(slot.name),
+                selected: _selectedSlots.contains(slot.id),
+                onSelected: (selected) {
+                  setState(() {
+                    if (selected) {
+                      _selectedSlots.add(slot.id);
+                    } else {
+                      _selectedSlots.remove(slot.id);
+                    }
+                  });
+                },
+              )).toList(),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
+        ),
+        FilledButton(
+          onPressed: _canCopy ? _copy : null,
+          child: const Text('Копировать'),
+        ),
+      ],
+    );
+  }
+
+  bool get _canCopy =>
+      _sourceStart != null &&
+      _sourceEnd != null &&
+      _targetStart != null &&
+      _targetEnd != null &&
+      _selectedSlots.isNotEmpty &&
+      _sourceStart!.isBefore(_sourceEnd!) &&
+      _targetStart!.isBefore(_targetEnd!);
+
+  void _copy() {
+    if (!_canCopy) return;
+    widget.onCopy(_sourceStart!, _sourceEnd!, _targetStart!, _targetEnd!, _selectedSlots.toList());
+    Navigator.of(context).pop();
+  }
+}
+
+class _DatePickerButton extends StatelessWidget {
+  const _DatePickerButton({
+    required this.label,
+    required this.selectedDate,
+    required this.dates,
+    required this.onChanged,
+  });
+
+  final String label;
+  final DateTime? selectedDate;
+  final List<DateTime> dates;
+  final ValueChanged<DateTime> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton(
+      onPressed: () async {
+        final result = await showDialog<DateTime>(
+          context: context,
+          builder: (ctx) => _DatePickerDialog(dates: dates, initialDate: selectedDate),
+        );
+        if (result != null) {
+          onChanged(result);
+        }
+      },
+      child: Text(selectedDate != null
+          ? DateFormat('d MMM', Localizations.localeOf(context).toString().replaceAll('_', '-')).format(selectedDate!)
+          : label),
+    );
+  }
+}
+
+class _DatePickerDialog extends StatelessWidget {
+  const _DatePickerDialog({required this.dates, this.initialDate});
+
+  final List<DateTime> dates;
+  final DateTime? initialDate;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Выберите дату'),
+      content: SizedBox(
+        width: double.maxFinite,
+        height: 300,
+        child: ListView.builder(
+          itemCount: dates.length,
+          itemBuilder: (context, index) {
+            final date = dates[index];
+            final isSelected = initialDate != null && date.isAtSameMomentAs(initialDate!);
+            return ListTile(
+              title: Text(DateFormat('EEEE, d MMMM', Localizations.localeOf(context).toString().replaceAll('_', '-')).format(date)),
+              selected: isSelected,
+              onTap: () => Navigator.of(context).pop(date),
+            );
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
+        ),
+      ],
+    );
   }
 }
