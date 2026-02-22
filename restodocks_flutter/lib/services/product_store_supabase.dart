@@ -470,21 +470,36 @@ class ProductStoreSupabase {
   Future<void> setEstablishmentPrice(String establishmentId, String productId, double? price, String? currency) async {
     print('💰 ProductStore: Setting price for $productId in establishment $establishmentId: $price $currency');
 
-    // Всегда обновляем цену, даже если запись уже существует
-    final updateData = <String, dynamic>{};
-    if (price != null) updateData['price'] = price;
-    if (currency != null) updateData['currency'] = currency;
-
-    if (updateData.isNotEmpty) {
+    if (price != null) {
+      // upsert — создаёт запись если нет, обновляет если есть
       await _supabase.client
           .from('establishment_products')
-          .update(updateData)
-          .eq('establishment_id', establishmentId)
-          .eq('product_id', productId);
-      print('✅ ProductStore: Price updated successfully');
+          .upsert(
+            {
+              'establishment_id': establishmentId,
+              'product_id': productId,
+              'price': price,
+              'currency': currency,
+            },
+            onConflict: 'establishment_id,product_id',
+          );
+      print('✅ ProductStore: Price upserted in establishment_products');
+
+      // Также обновляем basePrice в таблице products
+      await _supabase.client
+          .from('products')
+          .update({'base_price': price, 'currency': currency})
+          .eq('id', productId);
+      print('✅ ProductStore: basePrice updated in products table');
+
+      // Обновляем локальный кэш продукта
+      final idx = _allProducts.indexWhere((p) => p.id == productId);
+      if (idx != -1) {
+        _allProducts[idx] = _allProducts[idx].copyWith(basePrice: price, currency: currency);
+      }
     }
 
-    // Обновить кэш
+    // Обновить кэш цены
     final cacheKey = '${establishmentId}_$productId';
     if (price != null) {
       _priceCache[cacheKey] = (price, currency ?? 'RUB');
