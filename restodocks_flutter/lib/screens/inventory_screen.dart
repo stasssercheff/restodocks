@@ -1015,7 +1015,17 @@ class _InventoryScreenState extends State<InventoryScreen>
     // Определяем режим ввода (клавиатура открыта или активно поле ввода)
     final viewInsets = MediaQuery.viewInsetsOf(context);
     final isKeyboardOpen = viewInsets.bottom > 0;
-    _isInputMode = isKeyboardOpen;
+    // Не меняем _isInputMode слишком часто, чтобы не сбивать фокус
+    if (isKeyboardOpen && !_isInputMode) {
+      _isInputMode = true;
+    } else if (!isKeyboardOpen && _isInputMode) {
+      // Задержка перед выключением режима ввода
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (mounted && MediaQuery.viewInsetsOf(context).bottom == 0) {
+          setState(() => _isInputMode = false);
+        }
+      });
+    }
 
     return Scaffold(
       appBar: _isInputMode ? AppBar(
@@ -1053,37 +1063,6 @@ class _InventoryScreenState extends State<InventoryScreen>
             ],
           ),
           if (!_isInputMode) DataSafetyIndicator(isVisible: true),
-          // Зафиксированная кнопка "Завершить" над клавиатурой в режиме ввода
-          if (_isInputMode)
-            Positioned(
-              left: 16,
-              right: 16,
-              bottom: viewInsets.bottom + 8,
-              child: Builder(builder: (context) {
-                final theme = Theme.of(context);
-                return Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    borderRadius: BorderRadius.circular(8),
-                    boxShadow: [
-                      BoxShadow(
-                        color: theme.colorScheme.shadow.withOpacity(0.2),
-                        blurRadius: 8,
-                        offset: const Offset(0, -2),
-                      ),
-                    ],
-                  ),
-                  child: FilledButton(
-                    onPressed: _completed ? null : () => _complete(context),
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 44),
-                    ),
-                    child: Text(loc.t('inventory_complete')),
-                  ),
-                );
-              }),
-            ),
         ],
       ),
     );
@@ -1221,6 +1200,11 @@ class _InventoryScreenState extends State<InventoryScreen>
                       ),
                     ),
                   ],
+                  // В режиме ввода показываем только поле поиска
+                  if (_isInputMode && narrow && nameFilterField != null) ...[
+                    const SizedBox(height: 6),
+                    nameFilterField,
+                  ],
                 ],
               )
             : Row(
@@ -1261,6 +1245,11 @@ class _InventoryScreenState extends State<InventoryScreen>
                       const SizedBox(width: 6),
                       nameFilterField,
                     ],
+                  ],
+                  // В режиме ввода на desktop показываем поле поиска
+                  if (_isInputMode && !narrow && nameFilterField != null) ...[
+                    if (filterDropdown != null && !_isInputMode) const SizedBox(width: 6),
+                    nameFilterField,
                   ],
                 ],
               ),
