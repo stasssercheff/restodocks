@@ -51,6 +51,16 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
           : ['owner'];
 
       final email = _emailController.text.trim();
+
+      // Проверяем, занят ли email глобально (email должен быть уникальным во всех заведениях)
+      final emailTakenGlobally = await accountManager.isEmailTakenGlobally(email);
+      if (emailTakenGlobally) {
+        if (!mounted) return;
+        final loc = context.read<LocalizationService>();
+        setState(() => _errorMessage = loc.t('email_already_registered_globally'));
+        return;
+      }
+
       final password = _passwordController.text;
       final employee = await accountManager.createEmployeeForCompany(
         company: estab,
@@ -65,7 +75,8 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
       await accountManager.login(employee, estab);
 
       // Отправка письма владельцу
-      context.read<EmailService>().sendRegistrationEmail(
+      final emailService = EmailService();
+      emailService.sendRegistrationEmail(
         isOwner: true,
         to: email,
         companyName: estab.name,
