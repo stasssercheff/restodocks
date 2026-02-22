@@ -116,7 +116,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       await accountManager.login(employee, establishment);
 
       // Отправка письма сотруднику
-      context.read<EmailService>().sendRegistrationEmail(
+      final emailService = EmailService();
+      emailService.sendRegistrationEmail(
         isOwner: false,
         to: email,
         companyName: establishment.name,
@@ -261,7 +262,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 const SizedBox(height: 16),
 
                 DropdownButtonFormField<String>(
-                  value: _department,
+                  initialValue: _department,
                   decoration: InputDecoration(
                     labelText: loc.t('department'),
                     prefixIcon: const Icon(Icons.work),
@@ -288,7 +289,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 if (_department == 'kitchen') ...[
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
-                    value: _section,
+                    initialValue: _section,
                     decoration: InputDecoration(
                       labelText: loc.t('kitchen_section'),
                       prefixIcon: const Icon(Icons.restaurant),
@@ -310,8 +311,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ],
 
                 const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  value: _role,
+                  DropdownButtonFormField<String>(
+                    initialValue: _role,
                   decoration: InputDecoration(
                     labelText: loc.t('role'),
                     prefixIcon: const Icon(Icons.badge),
