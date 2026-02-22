@@ -85,6 +85,11 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
       try {
         final accountManager = context.read<AccountManagerSupabase>();
         final name = _nameController.text.trim();
+
+        if (_selectedCountry == null || _selectedCity == null) {
+          throw Exception('Страна и город должны быть выбраны');
+        }
+
         final country = _selectedCountry!;
         final city = _selectedCity!;
         final address = '${city.name(lang)}, ${country.name(lang)}';
