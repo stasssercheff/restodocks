@@ -212,6 +212,24 @@ class AccountManagerSupabase {
     }
   }
 
+  /// Удалить тестовые записи сотрудников (использовать только для разработки!)
+  Future<void> deleteTestEmployees() async {
+    try {
+      // Удаляем сотрудников, у которых нет ролей 'owner' и establishment_id указывает на несуществующие заведения
+      // Или сотрудников с email содержащими 'test', 'demo', etc.
+      await _supabase.client
+          .from('employees')
+          .delete()
+          .or('email.ilike.%test%,email.ilike.%demo%,email.ilike.%example%')
+          .neq('roles', ['owner']); // Не удаляем владельцев
+
+      print('Test employees deleted successfully');
+    } catch (e) {
+      print('Error deleting test employees: $e');
+      rethrow;
+    }
+  }
+
   /// Регистрация сотрудника в компании
   Future<Employee> createEmployeeForCompany({
     required Establishment company,

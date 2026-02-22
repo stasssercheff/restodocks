@@ -45,6 +45,24 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
     );
   }
 
+  void _clearTestData() async {
+    try {
+      final accountManager = context.read<AccountManagerSupabase>();
+      await accountManager.deleteTestEmployees();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Тестовые данные удалены')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка очистки: $e')),
+        );
+      }
+    }
+  }
+
   static bool _isDuplicatePinError(Object e) {
     final s = e.toString().toLowerCase();
     return s.contains('duplicate') || s.contains('unique') || s.contains('23505');
@@ -113,6 +131,34 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
         ),
         title: Text(loc.t('register_company')),
         actions: [
+          // Кнопка очистки тестовых данных (только для разработки)
+          IconButton(
+            icon: const Icon(Icons.cleaning_services),
+            onPressed: () async {
+              final confirmed = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Очистка тестовых данных'),
+                  content: const Text('Это удалит всех тестовых сотрудников из базы данных. Продолжить?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(false),
+                      child: const Text('Отмена'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(true),
+                      child: const Text('Удалить'),
+                      style: TextButton.styleFrom(foregroundColor: Colors.red),
+                    ),
+                  ],
+                ),
+              );
+              if (confirmed == true) {
+                _clearTestData();
+              }
+            },
+            tooltip: 'Очистить тестовые данные',
+          ),
           IconButton(
             icon: const Icon(Icons.home),
             onPressed: () => context.go('/home'),

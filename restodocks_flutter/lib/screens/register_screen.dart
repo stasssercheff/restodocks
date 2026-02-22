@@ -51,16 +51,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final roles = RolesConfig.kitchenRolesForSection(_section);
       if (roles.isNotEmpty && !roles.any((r) => r.roleCode == _role)) {
         _role = roles.first.roleCode;
+      } else if (roles.isEmpty) {
+        _role = 'cook'; // fallback role
       }
     } else if (_department == 'bar') {
       final roles = RolesConfig.barRoles();
-      if (roles.isNotEmpty) _role = roles.first.roleCode;
+      if (roles.isNotEmpty) {
+        _role = roles.first.roleCode;
+      } else {
+        _role = 'bartender'; // fallback role
+      }
     } else if (_department == 'dining_room') {
       final roles = RolesConfig.hallRoles();
-      if (roles.isNotEmpty) _role = roles.first.roleCode;
+      if (roles.isNotEmpty) {
+        _role = roles.first.roleCode;
+      } else {
+        _role = 'waiter'; // fallback role
+      }
     } else if (_department == 'management') {
       final roles = RolesConfig.managementRoles();
-      if (roles.isNotEmpty) _role = roles.first.roleCode;
+      if (roles.isNotEmpty) {
+        _role = roles.first.roleCode;
+      } else {
+        _role = 'manager'; // fallback role
+      }
     }
   }
 
