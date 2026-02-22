@@ -1395,7 +1395,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     final totalW = (leftW + rightW).clamp(screenW, double.infinity);
     // Use fixed column layout when there are many quantity columns or screen is narrow
     // Добавляем плавный transition при переключении режимов
-    final useFixedColumn = _maxQuantityColumns > 3 || totalW > screenW * 1.2;
+    final useFixedColumn = totalW > screenW * 1.2; // Убрал условие _maxQuantityColumns > 3 чтобы избежать переключения при добавлении колонок
     if (useFixedColumn) {
       return AnimatedSwitcher(
         duration: const Duration(milliseconds: 300),
