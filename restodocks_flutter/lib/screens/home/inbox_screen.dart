@@ -217,7 +217,7 @@ class _InboxScreenState extends State<InboxScreen> {
             ),
 
             // Документы отдела
-            ...docs.map((doc) => _DocumentTile(document: doc)),
+            ...docs.map((doc) => _DocumentTile(document: doc, onDownload: _downloadDocument)),
 
             if (index < groupedDocuments.length - 1) const SizedBox(height: 16),
           ],
@@ -230,9 +230,11 @@ class _InboxScreenState extends State<InboxScreen> {
 class _DocumentTile extends StatelessWidget {
   const _DocumentTile({
     required this.document,
+    required this.onDownload,
   });
 
   final InboxDocument document;
+  final Future<void> Function(InboxDocument) onDownload;
 
   @override
   Widget build(BuildContext context) {
@@ -328,7 +330,7 @@ class _DocumentTile extends StatelessWidget {
             ElevatedButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                _downloadDocument(context);
+                onDownload(document);
               },
               child: const Text('Сохранить'),
             ),
@@ -337,16 +339,20 @@ class _DocumentTile extends StatelessWidget {
     );
   }
 
-  void _downloadDocument(BuildContext context) async {
+  Future<void> _downloadDocument(InboxDocument document) async {
     try {
       await _inboxService.downloadDocument(document);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Документ "${document.title}" сохранен')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Документ "${document.title}" сохранен')),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка сохранения: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка сохранения: $e')),
+        );
+      }
     }
   }
 }
