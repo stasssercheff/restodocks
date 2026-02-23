@@ -24,24 +24,37 @@ class ScheduleSlot {
   final String id;
   final String name;
   final String sectionId;
+  final String? employeeId; // ID сотрудника, если слот привязан к реальному сотруднику
 
-  const ScheduleSlot({required this.id, required this.name, this.sectionId = ''});
+  const ScheduleSlot({
+    required this.id,
+    required this.name,
+    this.sectionId = '',
+    this.employeeId,
+  });
 
-  Map<String, dynamic> toJson() => {'id': id, 'name': name, 'sectionId': sectionId};
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'sectionId': sectionId,
+    'employeeId': employeeId,
+  };
 
   factory ScheduleSlot.fromJson(Map<String, dynamic> json) {
     return ScheduleSlot(
       id: json['id'] as String? ?? '',
       name: json['name'] as String? ?? '',
       sectionId: json['sectionId'] as String? ?? '',
+      employeeId: json['employeeId'] as String?,
     );
   }
 
-  ScheduleSlot copyWith({String? id, String? name, String? sectionId}) {
+  ScheduleSlot copyWith({String? id, String? name, String? sectionId, String? employeeId}) {
     return ScheduleSlot(
       id: id ?? this.id,
       name: name ?? this.name,
       sectionId: sectionId ?? this.sectionId,
+      employeeId: employeeId ?? this.employeeId,
     );
   }
 }

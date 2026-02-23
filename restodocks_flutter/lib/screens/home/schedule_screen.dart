@@ -76,6 +76,29 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     return list.where((e) => seen.add(e.id)).toList();
   }
 
+  /// Определяем секцию (цех) для сотрудника на основе его отдела
+  String _getSectionIdForEmployee(Employee employee, List<ScheduleSection> sections) {
+    if (sections.isEmpty) return '';
+
+    // Маппинг отделов сотрудников на секции графика
+    final departmentToSection = {
+      'kitchen': 'hot_kitchen', // Горячий цех
+      'bar': 'bar',
+      'hall': 'hall', // Зал
+      'management': 'management',
+    };
+
+    final sectionKey = departmentToSection[employee.department] ?? 'hot_kitchen';
+
+    // Ищем секцию по ключу
+    final section = sections.firstWhere(
+      (s) => s.id == sectionKey,
+      orElse: () => sections.first, // Если секция не найдена, используем первую
+    );
+
+    return section.id;
+  }
+
   Future<void> _load() async {
     final acc = context.read<AccountManagerSupabase>();
     final est = acc.establishment;
@@ -96,37 +119,62 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             _model = _model.copyWith(sections: ScheduleModel.defaultSections);
           }
           final firstSectionId = _model.sections.isNotEmpty ? _model.sections.first.id : '';
-          if (_model.slots.isEmpty && _model.sections.isNotEmpty) {
-            final slots = _employees.isNotEmpty
-                ? _employees.map((e) => ScheduleSlot(
-                      id: const Uuid().v4(),
-                      name: e.fullName.trim().isEmpty ? 'Повар' : e.fullName.trim(),
-                      sectionId: firstSectionId,
-                    )).toList()
-                : [
-                    ScheduleSlot(
-                      id: const Uuid().v4(),
-                      name: 'Повар',
-                      sectionId: firstSectionId,
-                    ),
-                  ];
+          if (_model.slots.isEmpty && _model.sections.isNotEmpty && _employees.isNotEmpty) {
+            // Создаем слоты только на основе реальных зарегистрированных сотрудников
+            final slots = _employees.map((e) => ScheduleSlot(
+                  id: const Uuid().v4(),
+                  name: e.fullName.trim().isEmpty ? 'Сотрудник' : e.fullName.trim(),
+                  sectionId: _getSectionIdForEmployee(e, _model.sections),
+                )).toList();
             _model = _model.copyWith(slots: slots);
             saveSchedule(est.id, _model);
           } else if (_model.sections.isNotEmpty && _employees.isNotEmpty) {
-            final existingNames = _model.slots.map((s) => s.name.trim().toLowerCase()).toSet();
+            // Синхронизируем слоты с сотрудниками: добавляем новых сотрудников, удаляем слоты для уволенных
+            final existingEmployeeIds = _model.slots
+                .where((s) => s.employeeId != null)
+                .map((s) => s.employeeId!)
+                .toSet();
+
+            final currentEmployeeIds = _employees.map((e) => e.id).toSet();
+
+            // Добавляем новых сотрудников
             final toAdd = _employees
-                .where((e) {
-                  final name = e.fullName.trim().isEmpty ? 'Повар' : e.fullName.trim();
-                  return !existingNames.contains(name.toLowerCase());
-                })
+                .where((e) => !existingEmployeeIds.contains(e.id))
                 .map((e) => ScheduleSlot(
                       id: const Uuid().v4(),
-                      name: e.fullName.trim().isEmpty ? 'Повар' : e.fullName.trim(),
-                      sectionId: firstSectionId,
+                      name: e.fullName.trim().isEmpty ? 'Сотрудник' : e.fullName.trim(),
+                      sectionId: _getSectionIdForEmployee(e, _model.sections),
+                      employeeId: e.id, // Связываем слот с сотрудником
                     ))
                 .toList();
-            if (toAdd.isNotEmpty) {
-              _model = _model.copyWith(slots: [..._model.slots, ...toAdd]);
+
+            // Удаляем слоты для уволенных сотрудников
+            final toKeep = _model.slots.where((s) {
+              if (s.employeeId == null) return true; // Оставляем слоты без привязки к сотруднику
+              return currentEmployeeIds.contains(s.employeeId!);
+            }).toList();
+
+            final updatedSlots = [...toKeep, ...toAdd];
+
+            // Обновляем секции для существующих слотов, если изменился отдел сотрудника
+            final finalSlots = updatedSlots.map((slot) {
+              if (slot.employeeId != null) {
+                final employee = _employees.firstWhere(
+                  (e) => e.id == slot.employeeId,
+                  orElse: () => Employee.create(fullName: '', email: '', password: '', establishmentId: '', roles: []),
+                );
+                if (employee.id.isNotEmpty) {
+                  final correctSectionId = _getSectionIdForEmployee(employee, _model.sections);
+                  if (slot.sectionId != correctSectionId) {
+                    return slot.copyWith(sectionId: correctSectionId);
+                  }
+                }
+              }
+              return slot;
+            }).toList();
+
+            if (finalSlots.length != _model.slots.length || toAdd.isNotEmpty) {
+              _model = _model.copyWith(slots: finalSlots);
               saveSchedule(est.id, _model);
             }
           }
@@ -147,10 +195,29 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   }
 
   void _addSlot() {
-    if (_model.sections.isEmpty) return;
+    if (_model.sections.isEmpty || _employees.isEmpty) return;
     final loc = context.read<LocalizationService>();
+    String? selectedEmployeeId;
     String selectedSectionId = _model.sections.first.id;
-    final nameCtrl = TextEditingController(text: 'Повар');
+
+    // Фильтруем сотрудников, которые еще не добавлены в график
+    final existingEmployeeIds = _model.slots
+        .where((s) => s.employeeId != null)
+        .map((s) => s.employeeId!)
+        .toSet();
+
+    final availableEmployees = _employees
+        .where((e) => !existingEmployeeIds.contains(e.id))
+        .toList();
+
+    if (availableEmployees.isEmpty) {
+      // Все сотрудники уже в графике
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Все зарегистрированные сотрудники уже добавлены в график')),
+      );
+      return;
+    }
+
     showDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -160,37 +227,63 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(loc.t('schedule_section'), style: Theme.of(ctx).textTheme.labelLarge),
+              Text(loc.t('schedule_pick_employee'), style: Theme.of(ctx).textTheme.labelLarge),
               const SizedBox(height: 4),
               DropdownButtonFormField<String>(
-                value: selectedSectionId,
+                value: selectedEmployeeId,
+                hint: Text(loc.t('schedule_assign_name_hint')),
                 decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
-                items: _model.sections.map((s) {
-                  final label = loc.translate(s.nameKey);
-                  return DropdownMenuItem(value: s.id, child: Text(label == s.nameKey ? s.id : label));
+                items: availableEmployees.map((e) {
+                  return DropdownMenuItem(
+                    value: e.id,
+                    child: Text(e.fullName.isEmpty ? 'Без имени' : e.fullName),
+                  );
                 }).toList(),
-                onChanged: (v) => setDialogState(() => selectedSectionId = v ?? selectedSectionId),
+                onChanged: (v) {
+                  setDialogState(() => selectedEmployeeId = v);
+                  if (v != null) {
+                    final employee = availableEmployees.firstWhere((e) => e.id == v);
+                    final correctSectionId = _getSectionIdForEmployee(employee, _model.sections);
+                    setDialogState(() => selectedSectionId = correctSectionId);
+                  }
+                },
               ),
               const SizedBox(height: 12),
-              TextField(
-                controller: nameCtrl,
-                decoration: InputDecoration(
-                  labelText: loc.t('schedule_slot_name'),
-                  border: const OutlineInputBorder(),
+              Text('${loc.t('schedule_section')}:', style: Theme.of(ctx).textTheme.labelLarge),
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Theme.of(ctx).dividerColor),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  _model.sections
+                      .firstWhere((s) => s.id == selectedSectionId,
+                          orElse: () => ScheduleSection(id: selectedSectionId, nameKey: selectedSectionId))
+                      .nameKey,
+                  style: Theme.of(ctx).textTheme.bodyMedium,
                 ),
               ),
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel)),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+            ),
             FilledButton(
-              onPressed: () {
-                final name = nameCtrl.text.trim();
-                if (name.isEmpty) return;
+              onPressed: selectedEmployeeId == null ? null : () {
+                final employee = availableEmployees.firstWhere((e) => e.id == selectedEmployeeId);
                 Navigator.of(ctx).pop();
                 setState(() {
                   _model = _model.copyWith(
-                    slots: [..._model.slots, ScheduleSlot(id: const Uuid().v4(), name: name, sectionId: selectedSectionId)],
+                    slots: [..._model.slots, ScheduleSlot(
+                      id: const Uuid().v4(),
+                      name: employee.fullName.isEmpty ? 'Сотрудник' : employee.fullName,
+                      sectionId: selectedSectionId,
+                      employeeId: employee.id,
+                    )],
                   );
                   _save();
                 });
