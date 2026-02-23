@@ -5,6 +5,10 @@ import 'package:intl/intl.dart';
 
 import '../../services/services.dart';
 import '../../models/models.dart';
+import '../../services/inbox_service.dart';
+
+import '../../services/services.dart';
+import '../../models/models.dart';
 import '../../models/inbox_document.dart';
 import '../../services/inbox_service.dart';
 
@@ -225,6 +229,23 @@ class _InboxScreenState extends State<InboxScreen> {
       },
     );
   }
+
+  Future<void> _downloadDocument(InboxDocument document) async {
+    try {
+      await _inboxService.downloadDocument(document);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Документ "${document.title}" сохранен')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка сохранения: $e')),
+        );
+      }
+    }
+  }
 }
 
 class _DocumentTile extends StatelessWidget {
@@ -268,7 +289,7 @@ class _DocumentTile extends StatelessWidget {
           onSelected: (value) {
             switch (value) {
               case 'download':
-                _downloadDocument(context);
+                onDownload(document);
                 break;
               case 'view':
                 _viewDocument(context);
@@ -337,22 +358,5 @@ class _DocumentTile extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  Future<void> _downloadDocument(InboxDocument document) async {
-    try {
-      await _inboxService.downloadDocument(document);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Документ "${document.title}" сохранен')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка сохранения: $e')),
-        );
-      }
-    }
   }
 }
