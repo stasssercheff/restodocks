@@ -128,6 +128,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final section = _department == 'kitchen' ? _section : null;
 
       final password = _passwordController.text;
+
+      // Регистрация в Supabase Auth (для привязки auth_user_id)
+      String? authUserId;
+      try {
+        authUserId = await accountManager.signUpToSupabaseAuth(email, password);
+      } catch (_) {
+        // Если signUp не удался (подтверждение email и т.п.), продолжаем без auth
+      }
+
       final employee = await accountManager.createEmployeeForCompany(
         company: establishment,
         fullName: fullName,
@@ -136,6 +145,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         department: _department,
         section: section,
         roles: [_role],
+        authUserId: authUserId,
       );
 
       await accountManager.login(employee, establishment);

@@ -72,6 +72,7 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
         roles: roles,
       );
 
+      await accountManager.signUpAndLinkAuthUser(email, password);
       await accountManager.login(employee, estab);
 
       // Отправка письма владельцу

@@ -46,16 +46,22 @@ class AccountManagerSupabase {
     print('🔐 AccountManager: Starting initialization...');
     await _secureStorage.initialize();
 
-    // 1. Восстановление сессии из безопасного хранилища (iOS/Android) или SharedPreferences (Web)
-    print('🔐 AccountManager: Initializing secure storage...');
-    await _secureStorage.initialize();
     print('🔐 AccountManager: Secure storage initialized');
-
     final employeeId = await _secureStorage.get(_keyEmployeeId);
     final establishmentId = await _secureStorage.get(_keyEstablishmentId);
-
     print('🔐 AccountManager: Retrieved from storage - employee: $employeeId, establishment: $establishmentId');
 
+    // 1. Сначала проверяем Supabase Auth — приоритет для пользователей с auth
+    if (_supabase.isAuthenticated) {
+      print('🔐 AccountManager: Supabase Auth session found, loading user data...');
+      final ok = await _loadCurrentUserFromAuth();
+      if (ok) {
+        print('🔐 AccountManager: User data loaded from Auth, logged in: $isLoggedInSync');
+        return;
+      }
+    }
+
+    // 2. Иначе — восстановление из хранилища (legacy)
     if (employeeId != null && establishmentId != null) {
       print('🔐 AccountManager: Restoring session from storage...');
       await _restoreSession(employeeId, establishmentId);
@@ -63,15 +69,7 @@ class AccountManagerSupabase {
       return;
     }
 
-    // 2. Supabase Auth (если когда‑нибудь понадобится)
-    print('🔐 AccountManager: Checking Supabase auth...');
-    if (_supabase.isAuthenticated) {
-      print('🔐 AccountManager: Supabase authenticated, loading user data...');
-      await _loadCurrentUserData();
-      print('🔐 AccountManager: User data loaded, logged in: $isLoggedInSync');
-    } else {
-      print('🔐 AccountManager: No stored session and not authenticated in Supabase');
-    }
+    print('🔐 AccountManager: No stored session and not authenticated');
   }
 
   Future<void> _restoreSession(String employeeId, String establishmentId) async {
@@ -231,6 +229,7 @@ class AccountManagerSupabase {
   }
 
   /// Регистрация сотрудника в компании
+  /// [authUserId] — ID из Supabase Auth. Если задан или owner — пароль только в Auth, password_hash не сохраняем.
   Future<Employee> createEmployeeForCompany({
     required Establishment company,
     required String fullName,
@@ -239,12 +238,15 @@ class AccountManagerSupabase {
     required String department,
     String? section,
     required List<String> roles,
+    String? authUserId,
   }) async {
-    final passwordHash = BCrypt.hashpw(password, BCrypt.gensalt());
+    final useSupabaseAuth = authUserId != null || roles.contains('owner');
+    final passwordHash = useSupabaseAuth ? null : BCrypt.hashpw(password, BCrypt.gensalt());
+
     final employee = Employee.create(
       fullName: fullName,
       email: email,
-      password: passwordHash,
+      password: passwordHash ?? '',
       department: department,
       section: section,
       roles: roles,
@@ -258,6 +260,7 @@ class AccountManagerSupabase {
     employeeData.remove('created_at');
     employeeData.remove('updated_at');
     _stripAvatarFromPayload(employeeData);
+    if (authUserId != null) employeeData['auth_user_id'] = authUserId;
 
     final response = await _supabase.insertData('employees', employeeData);
     final createdEmployee = Employee.fromJson(response);
@@ -275,16 +278,117 @@ class AccountManagerSupabase {
     return createdEmployee;
   }
 
-  /// Поиск сотрудника по email и паролю (без PIN — по всем заведениям)
-  /// Возвращает (Employee, Establishment) при успехе
-  /// Использует ilike для email — регистронезависимый поиск (Stassser@gmail.com = stassser@gmail.com)
+  /// Регистрация в Supabase Auth (для сотрудников). Возвращает auth.uid() при успехе.
+  Future<String?> signUpToSupabaseAuth(String email, String password) async {
+    await _supabase.signUpWithEmail(email.trim(), password);
+    return _supabase.currentUser?.id;
+  }
+
+  /// Регистрация в Supabase Auth и привязка auth_user_id к employee (для владельца)
+  Future<void> signUpAndLinkAuthUser(String email, String password) async {
+    await _supabase.signUpWithEmail(email.trim(), password);
+    final authUserId = _supabase.currentUser?.id;
+    if (authUserId != null) {
+      await _supabase.client
+          .from('employees')
+          .update({'auth_user_id': authUserId})
+          .eq('email', email.trim());
+    }
+  }
+
+  /// Вход по email и паролю: сначала Supabase Auth, при отсутствии — legacy (employees.password_hash)
   Future<({Employee employee, Establishment establishment})?> findEmployeeByEmailAndPasswordGlobal({
     required String email,
     required String password,
   }) async {
+    final emailTrim = email.trim();
+    if (emailTrim.isEmpty) return null;
+
+    // 1. Пробуем Supabase Auth (для новых учёток)
     try {
-      final emailTrim = email.trim();
-      if (emailTrim.isEmpty) return null;
+      await _supabase.signInWithEmail(emailTrim, password);
+      if (_supabase.isAuthenticated) {
+        final authUserId = _supabase.currentUser!.id;
+        final list = await _supabase.client
+            .from('employees')
+            .select()
+            .eq('auth_user_id', authUserId)
+            .eq('is_active', true)
+            .limit(1);
+
+        if (list != null && (list as List).isNotEmpty) {
+          final empData = Map<String, dynamic>.from((list as List).first);
+          empData['password'] = empData['password_hash'] ?? '';
+          final employee = Employee.fromJson(empData);
+          final estData = await _supabase.client
+              .from('establishments')
+              .select()
+              .eq('id', employee.establishmentId)
+              .limit(1)
+              .single();
+          final establishment = Establishment.fromJson(estData);
+          return (employee: employee, establishment: establishment);
+        }
+
+        // Employee не привязан к auth (подтверждение email только что прошло) — привязываем
+        final linked = await _linkAuthUserToEmployeeByEmail(emailTrim, authUserId);
+        if (linked != null) return linked;
+
+        await _supabase.signOut();
+      }
+    } catch (_) {
+      await _supabase.signOut();
+    }
+
+    // 2. Legacy: поиск по employees и проверка password_hash
+    return _findEmployeeByPasswordHash(emailTrim, password);
+  }
+
+  /// Привязка auth_user_id к employee по email (после подтверждения письма)
+  Future<({Employee employee, Establishment establishment})?> _linkAuthUserToEmployeeByEmail(
+    String emailTrim,
+    String authUserId,
+  ) async {
+    try {
+      final list = await _supabase.client
+          .from('employees')
+          .select()
+          .ilike('email', emailTrim)
+          .eq('is_active', true)
+          .limit(1);
+
+      if (list == null || (list as List).isEmpty) return null;
+
+      final empData = Map<String, dynamic>.from((list as List).first);
+      if (empData['auth_user_id'] != null) return null;
+
+      await _supabase.client
+          .from('employees')
+          .update({'auth_user_id': authUserId})
+          .eq('email', emailTrim);
+
+      empData['auth_user_id'] = authUserId;
+      empData['password'] = empData['password_hash'] ?? '';
+      final employee = Employee.fromJson(empData);
+      final estData = await _supabase.client
+          .from('establishments')
+          .select()
+          .eq('id', employee.establishmentId)
+          .limit(1)
+          .single();
+      final establishment = Establishment.fromJson(estData);
+      return (employee: employee, establishment: establishment);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Legacy: поиск по employees.password_hash (BCrypt или plain)
+  Future<({Employee employee, Establishment establishment})?> _findEmployeeByPasswordHash(
+    String emailTrim,
+    String password,
+  ) async {
+    try {
       final empList = await _supabase.client
           .from('employees')
           .select()
@@ -525,39 +629,40 @@ class AccountManagerSupabase {
     }
   }
 
-  /// Загрузка данных текущего пользователя
-  Future<void> _loadCurrentUserData() async {
+  /// Загрузка employee и establishment по Supabase Auth (auth_user_id = auth.uid())
+  Future<bool> _loadCurrentUserFromAuth() async {
     try {
-      final userId = _supabase.currentUser?.id;
-      if (userId == null) return;
+      final authUserId = _supabase.currentUser?.id;
+      if (authUserId == null) return false;
 
-      // Загружаем сотрудника
-      final employeeDataRaw = await _supabase.client
+      final list = await _supabase.client
           .from('employees')
           .select()
-          .eq('id', userId)
+          .eq('auth_user_id', authUserId)
+          .eq('is_active', true)
+          .limit(1);
+
+      if (list == null || (list as List).isEmpty) return false;
+
+      final employeeData = Map<String, dynamic>.from((list as List).first);
+      employeeData['password'] = employeeData['password_hash'] ?? '';
+      _currentEmployee = Employee.fromJson(employeeData);
+
+      final estData = await _supabase.client
+          .from('establishments')
+          .select()
+          .eq('id', _currentEmployee!.establishmentId)
           .limit(1)
           .single();
 
-      // Маппим password_hash обратно в password для модели
-      final employeeData = Map<String, dynamic>.from(employeeDataRaw);
-      employeeData['password'] = employeeData['password_hash'] ?? '';
+      _establishment = Establishment.fromJson(estData);
 
-      _currentEmployee = Employee.fromJson(employeeData);
-
-      // Загружаем заведение
-      if (_currentEmployee != null) {
-        final establishmentData = await _supabase.client
-            .from('establishments')
-            .select()
-            .eq('id', _currentEmployee!.establishmentId)
-            .limit(1)
-            .single();
-
-        _establishment = Establishment.fromJson(establishmentData);
-      }
+      await _secureStorage.set(_keyEmployeeId, _currentEmployee!.id);
+      await _secureStorage.set(_keyEstablishmentId, _establishment!.id);
+      return true;
     } catch (e) {
-      print('Ошибка загрузки данных пользователя: $e');
+      print('🔐 AccountManager: _loadCurrentUserFromAuth error: $e');
+      return false;
     }
   }
 }

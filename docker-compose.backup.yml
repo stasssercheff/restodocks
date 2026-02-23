@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  restodocks-backup:
+    image: postgres:15-alpine
+    container_name: restodocks-backup
+    environment:
+      - POSTGRES_PASSWORD=${SUPABASE_DB_PASSWORD}
+      - POSTGRES_DB=backup_db
+    volumes:
+      - ./backups:/backups
+      - ./backup_config.env:/app/backup_config.env:ro
+      - ./automated_backup.sh:/app/automated_backup.sh:ro
+    command: >
+      sh -c "
+        apk add --no-cache postgresql-client curl git &&
+        chmod +x /app/automated_backup.sh &&
+        /app/automated_backup.sh
+      "
+    networks:
+      - backup-network
+
+  supabase-backup:
+    image: supabase/cli:latest
+    container_name: restodocks-supabase-backup
+    environment:
+      - SUPABASE_PROJECT_REF=${SUPABASE_PROJECT_REF}
+      - SUPABASE_ACCESS_TOKEN=${SUPABASE_ACCESS_TOKEN}
+    volumes:
+      - ./backups:/backups
+      - ./backup_config.env:/app/backup_config.env:ro
+    command: >
+      sh -c "
+        cd /backups &&
+        echo 'Starting Supabase backup...' &&
+        supabase db dump --db-url '${SUPABASE_DB_URL}' > database_backup.sql &&
+        gzip database_backup.sql &&
+        echo 'Database backup completed'
+      "
+    networks:
+      - backup-network
+
+  storage-backup:
+    image: python:3.11-slim
+    container_name: restodocks-storage-backup
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+    volumes:
+      - ./backups:/backups
+      - ./storage_backup.py:/app/storage_backup.py:ro
+    command: >
+      sh -c "
+        pip install supabase &&
+        python /app/storage_backup.py
+      "
+    networks:
+      - backup-network
+
+networks:
+  backup-network:
+    driver: bridge
+
+volumes:
+  backups:
+    driver: local

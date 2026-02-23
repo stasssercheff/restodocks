@@ -93,12 +93,27 @@ class SupabaseService {
     String column,
     dynamic value,
   ) async {
-    final response = await client
-        .from(tableName)
-        .update(data)
-        .eq(column, value)
-        .select();
-    return response.first;
+    try {
+      final response = await client
+          .from(tableName)
+          .update(data)
+          .eq(column, value)
+          .select();
+      final list = response is List ? response as List : <dynamic>[];
+      if (list.isNotEmpty) {
+        final first = list.first;
+        return first is Map<String, dynamic> ? Map<String, dynamic>.from(first) : {...data, column: value};
+      }
+    } catch (e) {
+      print('DEBUG SupabaseService: updateData error: $e');
+    }
+    try {
+      await client.from(tableName).update(data).eq(column, value);
+    } catch (e) {
+      print('DEBUG SupabaseService: updateData (no select) failed: $e');
+      rethrow;
+    }
+    return {...data, column: value};
   }
 
   /// Удаление данных из таблицы
