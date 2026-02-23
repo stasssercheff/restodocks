@@ -11,16 +11,39 @@ class OwnerHomeContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
+    final account = context.watch<AccountManagerSupabase>();
 
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        _SectionTitle(title: loc.t('schedule')),
+        // ГРАФИК (все сотрудники)
         _Tile(
           icon: Icons.calendar_month,
           title: loc.t('schedule'),
-          subtitle: loc.t('manage_schedule'),
+          subtitle: loc.t('all_employees_schedule'),
           onTap: () => context.push('/schedule'),
+        ),
+
+        // ВХОДЯЩИЕ
+        _Tile(
+          icon: Icons.inbox,
+          title: loc.t('inbox'),
+          onTap: () => context.push('/notifications'),
+        ),
+
+        const SizedBox(height: 16),
+
+        // КУХНЯ
+        _SectionTitle(title: loc.t('kitchen')),
+        _Tile(
+          icon: Icons.schedule,
+          title: loc.t('schedule'),
+          onTap: () => context.push('/department/kitchen'),
+        ),
+        _Tile(
+          icon: Icons.restaurant_menu,
+          title: loc.t('menu'),
+          onTap: () => context.push('/products'),
         ),
         _Tile(
           icon: Icons.description,
@@ -28,35 +51,102 @@ class OwnerHomeContent extends StatelessWidget {
           onTap: () => context.push('/tech-cards'),
         ),
         _Tile(
-          icon: Icons.library_books,
-          title: loc.t('products'),
-          subtitle: loc.t('product_database'),
+          icon: Icons.assignment,
+          title: loc.t('nomenclature'),
+          onTap: () => context.push('/nomenclature'),
+        ),
+
+        const SizedBox(height: 16),
+
+        // БАР (pro)
+        _SectionTitle(title: '${loc.t('bar')} (${loc.t('pro')})'),
+        _Tile(
+          icon: Icons.schedule,
+          title: loc.t('schedule'),
+          onTap: () => context.push('/department/bar'),
+        ),
+        _Tile(
+          icon: Icons.wine_bar,
+          title: loc.t('menu'),
           onTap: () => context.push('/products'),
+        ),
+        _Tile(
+          icon: Icons.description,
+          title: loc.t('tech_cards'),
+          onTap: () => context.push('/tech-cards'),
         ),
         _Tile(
           icon: Icons.assignment,
           title: loc.t('nomenclature'),
-          subtitle: loc.t('nomenclature_desc'),
-          onTap: () => context.push('/nomenclature'),
+          subtitle: loc.t('bar_nomenclature'),
+          onTap: () => context.push('/nomenclature/bar'),
         ),
+
+        const SizedBox(height: 16),
+
+        // ЗАЛ
+        _SectionTitle(title: loc.t('dining_room')),
         _Tile(
-          icon: Icons.upload_file,
-          title: loc.t('upload_products'),
-          subtitle: loc.t('upload_products_desc'),
-          onTap: () => context.push('/products/upload'),
+          icon: Icons.schedule,
+          title: loc.t('schedule'),
+          onTap: () => context.push('/department/hall'),
         ),
         _Tile(
           icon: Icons.assignment,
+          title: loc.t('nomenclature'),
+          subtitle: loc.t('hall_nomenclature'),
+          onTap: () => context.push('/nomenclature/hall'),
+        ),
+
+        const SizedBox(height: 16),
+
+        // УПРАВЛЕНИЕ
+        _SectionTitle(title: loc.t('management')),
+        _Tile(
+          icon: Icons.people,
+          title: loc.t('employees'),
+          onTap: () => context.push('/employees'),
+        ),
+
+        // РАСХОДЫ (pro)
+        _SectionTitle(title: '${loc.t('expenses')} (${loc.t('pro')})'),
+        _Tile(
+          icon: Icons.payments,
+          title: 'ФЗП',
+          subtitle: loc.t('salary_expenses'),
+          onTap: () => context.push('/expenses/salary'),
+        ),
+        _Tile(
+          icon: Icons.business,
+          title: 'Аренда',
+          subtitle: loc.t('rent_expenses'),
+          onTap: () => context.push('/expenses/rent'),
+        ),
+        _Tile(
+          icon: Icons.shopping_cart,
+          title: 'Закупка',
+          subtitle: loc.t('purchase_expenses'),
+          onTap: () => context.push('/expenses/purchase'),
+        ),
+        _Tile(
+          icon: Icons.settings,
+          title: loc.t('custom_expense'),
+          subtitle: loc.t('configurable_expense_name'),
+          onTap: () => context.push('/expenses/custom'),
+        ),
+
+        // ДОПОЛНИТЕЛЬНЫЕ ФУНКЦИИ
+        const SizedBox(height: 16),
+        _SectionTitle(title: loc.t('additional')),
+        _Tile(
+          icon: Icons.upload_file,
+          title: loc.t('upload_products'),
+          onTap: () => context.push('/products/upload'),
+        ),
+        _Tile(
+          icon: Icons.inventory,
           title: loc.t('inventory_blank'),
           onTap: () => context.push('/inventory'),
-        ),
-        const SizedBox(height: 16),
-        _SectionTitle(title: loc.t('kitchen')),
-        _Tile(
-          icon: Icons.restaurant,
-          title: loc.t('schedule'),
-          subtitle: loc.t('payroll_kitchen'),
-          onTap: () => context.push('/department/kitchen'),
         ),
         _Tile(
           icon: Icons.checklist,
@@ -64,78 +154,8 @@ class OwnerHomeContent extends StatelessWidget {
           onTap: () => context.push('/checklists'),
         ),
         _Tile(
-          icon: Icons.restaurant_menu,
-          title: loc.t('dish_cards'),
-          onTap: () => context.push('/products'),
-        ),
-        const SizedBox(height: 16),
-        _SectionTitle(title: loc.t('bar')),
-        _Tile(
-          icon: Icons.local_bar,
-          title: loc.t('schedule'),
-          subtitle: loc.t('payroll_bar'),
-          onTap: () => context.push('/department/bar'),
-        ),
-        _Tile(
-          icon: Icons.wine_bar,
-          title: loc.t('drink_cards'),
-          onTap: () => context.push('/products'),
-        ),
-        const SizedBox(height: 16),
-        _SectionTitle(title: loc.t('dining_room')),
-        _Tile(
-          icon: Icons.table_restaurant,
-          title: loc.t('schedule'),
-          subtitle: loc.t('payroll_hall'),
-          onTap: () => context.push('/department/hall'),
-        ),
-        const SizedBox(height: 16),
-        _SectionTitle(title: loc.t('management')),
-        _Tile(
-          icon: Icons.admin_panel_settings,
-          title: loc.t('schedule'),
-          subtitle: loc.t('payroll_management'),
-          onTap: () => context.push('/department/management'),
-        ),
-        const SizedBox(height: 16),
-        _SectionTitle(title: loc.t('inbox')),
-        _Tile(
-          icon: Icons.inbox,
-          title: loc.t('inbox'),
-          onTap: () => context.push('/notifications'),
-        ),
-        const SizedBox(height: 16),
-        _SectionTitle(title: '${loc.t('expenses')} (${loc.t('pro')})'),
-        _Tile(
-          icon: Icons.savings,
-          title: loc.t('expenses'),
-          subtitle: '${loc.t('payroll_plan')}, ${loc.t('rent_plan')}, ...',
-          onTap: () => context.push('/expenses'),
-        ),
-        const SizedBox(height: 16),
-        _SectionTitle(title: loc.t('management')),
-        _Tile(
-          icon: Icons.notifications,
-          title: loc.t('notifications'),
-          subtitle: loc.t('system_notifications'),
-          onTap: () => context.push('/notifications'),
-        ),
-        _Tile(
-          icon: Icons.attach_money,
-          title: loc.t('expenses'),
-          subtitle: loc.t('manage_expenses'),
-          onTap: () => context.push('/expenses'),
-        ),
-        _Tile(
-          icon: Icons.people,
-          title: loc.t('employees'),
-          subtitle: loc.t('manage_employees'),
-          onTap: () => context.push('/employees'),
-        ),
-        _Tile(
           icon: Icons.settings,
           title: loc.t('settings'),
-          subtitle: loc.t('system_settings'),
           onTap: () => context.push('/settings'),
         ),
       ],
