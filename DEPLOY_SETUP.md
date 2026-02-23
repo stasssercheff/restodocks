@@ -1,5 +1,15 @@
 # Настройка автодеплоя Restodocks
 
+## Вариант A: Vercel + GitHub (рекомендуется)
+
+1. [Vercel Dashboard](https://vercel.com) → Add New Project → Import Git Repository
+2. Выберите репозиторий `stasssercheff/restodocks`
+3. **Root Directory:** `restodocks_flutter`
+4. **Environment Variables:** `SUPABASE_URL`, `SUPABASE_ANON_KEY`
+5. Deploy — при каждом push в main будет автосборка и деплой
+
+## Вариант B: GitHub Actions
+
 Деплой выполняется через GitHub Actions при push в `main` или `master`.
 
 ## Секреты в GitHub

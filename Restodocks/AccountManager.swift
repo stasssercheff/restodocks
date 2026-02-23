@@ -40,8 +40,36 @@ final class AccountManager: ObservableObject {
         }
     }
 
+    // MARK: - MIGRATION TO SUPABASE
+    func clearAllLocalData() {
+        // Очистить все локальные данные Core Data
+        let fetchRequest: NSFetchRequest<NSFetchRequestResult> = EmployeeEntity.fetchRequest()
+        let deleteRequest = NSBatchDeleteRequest(fetchRequest: fetchRequest)
+
+        let establishmentFetchRequest: NSFetchRequest<NSFetchRequestResult> = EstablishmentEntity.fetchRequest()
+        let establishmentDeleteRequest = NSBatchDeleteRequest(fetchRequest: establishmentFetchRequest)
+
+        do {
+            try context.execute(deleteRequest)
+            try context.execute(establishmentDeleteRequest)
+            try context.save()
+
+            // Очистить UserDefaults
+            UserDefaults.standard.removeObject(forKey: "is_company_created")
+            UserDefaults.standard.removeObject(forKey: "company_selected")
+            UserDefaults.standard.removeObject(forKey: "company_pin_code")
+            UserDefaults.standard.removeObject(forKey: "is_logged_in")
+
+            print("✅ All local data cleared for Supabase migration")
+        } catch {
+            print("❌ Failed to clear local data: \(error)")
+        }
+    }
+
     // MARK: - COMPANY
     func createEstablishment(name: String) -> String {
+        // ⚠️ ВРЕМЕННО: сохраняем в Core Data для обратной совместимости
+        // TODO: Перевести на Supabase
 
         let entity = EstablishmentEntity(context: context)
         entity.id = UUID()

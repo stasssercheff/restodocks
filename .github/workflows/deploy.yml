@@ -1,7 +1,4 @@
-# Сборка Flutter web и деплой в Vercel
-# Секреты: VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID, SUPABASE_URL, SUPABASE_ANON_KEY
-
-name: Build and Deploy to Vercel
+name: Deploy to Vercel
 
 on:
   push:
@@ -10,55 +7,6 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: restodocks_flutter
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: "3.38.7"
-          channel: "stable"
-          cache: true
-
-      - name: Create config.json
-        run: |
-          python3 -c "
-          import os, json
-          p = 'assets/config.json'
-          d = {
-            'SUPABASE_URL': os.environ.get('SUPABASE_URL', '').strip(),
-            'SUPABASE_ANON_KEY': os.environ.get('SUPABASE_ANON_KEY', '').strip(),
-          }
-          with open(p, 'w') as f:
-            json.dump(d, f)
-          print('config.json written')
-          "
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-
-      - name: Flutter pub get
-        run: flutter pub get
-
-      - name: Flutter build web
-        run: flutter build web --release
-
-      - name: Prepare .vercel/output
-        run: |
-          mkdir -p .vercel/output/static
-          cp -r build/web/* .vercel/output/static/
-          echo '{"version":3,"routes":[{"handle":"filesystem"},{"handle":"rewrite"},{"src":"/(.*)","dest":"/index.html"}]}' > .vercel/output/config.json
-
-      - name: Deploy to Vercel
-        run: |
-          npm i -g vercel@latest
-          vercel pull --yes --environment=production --token="${{ secrets.VERCEL_TOKEN }}"
-          vercel deploy --prebuilt --prod --token="${{ secrets.VERCEL_TOKEN }}" --archive=tgz
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      - name: Trigger Vercel Deploy
+        run: curl -sSf -X POST "https://api.vercel.com/v1/integrations/deploy/prj_4FMDqFFqx73cJSoap5uMyO6QSuG2/mmzEGXWRmk"
