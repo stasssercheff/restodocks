@@ -1,12 +1,64 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 
 import '../../services/services.dart';
+import '../../models/models.dart';
+import '../../services/inbox_service.dart';
 
-/// Входящие: Подтверждение смен, Инвентаризация, Заказ продуктов
-class InboxScreen extends StatelessWidget {
+/// Входящие: Документы по отделам (Инвентаризация, Заказы продуктов, Подтверждения смен)
+class InboxScreen extends StatefulWidget {
   const InboxScreen({super.key});
+
+  @override
+  State<InboxScreen> createState() => _InboxScreenState();
+}
+
+class _InboxScreenState extends State<InboxScreen> {
+  late InboxService _inboxService;
+  List<InboxDocument> _documents = [];
+  bool _loading = true;
+  String _selectedDepartment = 'all'; // all, kitchen, bar, hall, management
+
+  @override
+  void initState() {
+    super.initState();
+    // Инициализируем сервис позже, когда контекст будет доступен
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _inboxService = InboxService(context.read<AccountManagerSupabase>().supabase);
+      _loadDocuments();
+    });
+  }
+
+  Future<void> _loadDocuments() async {
+    final accountManager = context.read<AccountManagerSupabase>();
+    final establishment = accountManager.establishment;
+
+    if (establishment == null) {
+      setState(() => _loading = false);
+      return;
+    }
+
+    try {
+      final documents = await _inboxService.getInboxDocuments(establishment.id);
+      if (mounted) {
+        setState(() {
+          _documents = documents;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading inbox documents: $e');
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+  List<InboxDocument> get _filteredDocuments {
+    return _inboxService.filterByDepartment(_documents, _selectedDepartment);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,57 +73,279 @@ class InboxScreen extends StatelessWidget {
         title: Text(loc.t('inbox')),
         actions: [
           IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadDocuments,
+            tooltip: 'Обновить',
+          ),
+          IconButton(
             icon: const Icon(Icons.home),
             onPressed: () => context.go('/home'),
             tooltip: loc.t('home'),
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
+      body: Column(
         children: [
-          _InboxTile(
-            icon: Icons.how_to_reg,
-            title: loc.t('shift_confirmation'),
-            onTap: () => context.push('/shift-confirmation'),
-          ),
-          _InboxTile(
-            icon: Icons.assignment,
-            title: loc.t('inventory_received'),
-            onTap: () => context.push('/inventory-received'),
-          ),
-          _InboxTile(
-            icon: Icons.shopping_cart,
-            title: loc.t('product_order'),
-            onTap: () => context.push('/product-order-received'),
+          // Фильтр по отделам
+          _buildDepartmentFilter(loc),
+
+          // Список документов
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _filteredDocuments.isEmpty
+                    ? _buildEmptyState(loc)
+                    : _buildDocumentsList(),
           ),
         ],
       ),
     );
   }
+
+  Widget _buildDepartmentFilter(LocalizationService loc) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        border: Border(
+          bottom: BorderSide(
+            color: Theme.of(context).dividerColor,
+            width: 1,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Text(
+            '${loc.t('department') ?? 'Отдел'}:',
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildDepartmentChip('all', loc.t('all') ?? 'Все'),
+                  _buildDepartmentChip('kitchen', loc.t('kitchen')),
+                  _buildDepartmentChip('bar', loc.t('bar')),
+                  _buildDepartmentChip('hall', loc.t('dining_room')),
+                  _buildDepartmentChip('management', loc.t('management')),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDepartmentChip(String department, String label) {
+    final isSelected = _selectedDepartment == department;
+    return Container(
+      margin: const EdgeInsets.only(right: 8),
+      child: FilterChip(
+        label: Text(label),
+        selected: isSelected,
+        onSelected: (selected) {
+          setState(() => _selectedDepartment = department);
+        },
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        selectedColor: Theme.of(context).colorScheme.primaryContainer,
+        checkmarkColor: Theme.of(context).colorScheme.onPrimaryContainer,
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(LocalizationService loc) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.inbox,
+            size: 64,
+            color: Theme.of(context).colorScheme.outline,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Нет документов',
+            style: Theme.of(context).textTheme.headlineSmall,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Документы появятся здесь после проведения инвентаризаций и получения заказов',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDocumentsList() {
+    // Группируем документы по отделам
+    final groupedDocuments = <String, List<InboxDocument>>{};
+    for (final doc in _filteredDocuments) {
+      final department = doc.department;
+      groupedDocuments.putIfAbsent(department, () => []).add(doc);
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: groupedDocuments.length,
+      itemBuilder: (context, index) {
+        final department = groupedDocuments.keys.elementAt(index);
+        final docs = groupedDocuments[department]!;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Заголовок отдела
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                docs.first.departmentName,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+            ),
+
+            // Документы отдела
+            ...docs.map((doc) => _DocumentTile(document: doc)),
+
+            if (index < groupedDocuments.length - 1) const SizedBox(height: 16),
+          ],
+        );
+      },
+    );
+  }
 }
 
-class _InboxTile extends StatelessWidget {
-  const _InboxTile({
-    required this.icon,
-    required this.title,
-    required this.onTap,
+class _DocumentTile extends StatelessWidget {
+  const _DocumentTile({
+    required this.document,
   });
 
-  final IconData icon;
-  final String title;
-  final VoidCallback onTap;
+  final InboxDocument document;
 
   @override
   Widget build(BuildContext context) {
+    final dateFormat = DateFormat('dd.MM.yyyy HH:mm', 'ru');
+
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
-        leading: Icon(icon),
-        title: Text(title),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: onTap,
+        leading: CircleAvatar(
+          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+          child: Icon(
+            document.icon,
+            color: Theme.of(context).colorScheme.onPrimaryContainer,
+          ),
+        ),
+        title: Text(document.title),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(document.description),
+            const SizedBox(height: 2),
+            Text(
+              '${document.employeeName} • ${dateFormat.format(document.createdAt)}',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+        trailing: PopupMenuButton<String>(
+          onSelected: (value) {
+            switch (value) {
+              case 'download':
+                _downloadDocument(context);
+                break;
+              case 'view':
+                _viewDocument(context);
+                break;
+            }
+          },
+          itemBuilder: (context) => [
+            const PopupMenuItem(
+              value: 'view',
+              child: Row(
+                children: [
+                  Icon(Icons.visibility),
+                  SizedBox(width: 8),
+                  Text('Просмотреть'),
+                ],
+              ),
+            ),
+            const PopupMenuItem(
+              value: 'download',
+              child: Row(
+                children: [
+                  Icon(Icons.download),
+                  SizedBox(width: 8),
+                  Text('Сохранить'),
+                ],
+              ),
+            ),
+          ],
+        ),
+        onTap: () => _viewDocument(context),
       ),
     );
+  }
+
+  void _viewDocument(BuildContext context) {
+    // Показать детали документа
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(document.title),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Тип: ${document.typeName}'),
+            Text('Отдел: ${document.departmentName}'),
+            Text('Сотрудник: ${document.employeeName}'),
+            Text('Дата: ${DateFormat('dd.MM.yyyy HH:mm').format(document.createdAt)}'),
+            const SizedBox(height: 8),
+            Text(document.description),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Закрыть'),
+          ),
+          if (document.fileUrl != null)
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _downloadDocument(context);
+              },
+              child: const Text('Сохранить'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _downloadDocument(BuildContext context) async {
+    try {
+      await _inboxService.downloadDocument(document);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Документ "${document.title}" сохранен')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ошибка сохранения: $e')),
+      );
+    }
   }
 }
