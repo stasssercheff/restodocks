@@ -16,7 +16,9 @@ import '../services/ai_service_supabase.dart';
 /// Экран базы продуктов: просмотр и управление продуктами с КБЖУ
 /// Поддерживает интеллектуальный импорт и защиту от удаления используемых продуктов
 class ProductsScreen extends StatefulWidget {
-  const ProductsScreen({super.key});
+  const ProductsScreen({super.key, this.department = 'kitchen'});
+
+  final String department;
 
   @override
   State<ProductsScreen> createState() => _ProductsScreenState();

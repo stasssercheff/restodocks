@@ -16,7 +16,9 @@ import '../services/excel_export_service.dart';
 
 /// Список ТТК заведения. Создание и переход к редактированию.
 class TechCardsListScreen extends StatefulWidget {
-  const TechCardsListScreen({super.key});
+  const TechCardsListScreen({super.key, this.department = 'kitchen'});
+
+  final String department;
 
   @override
   State<TechCardsListScreen> createState() => _TechCardsListScreenState();

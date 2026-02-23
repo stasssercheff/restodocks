@@ -133,6 +133,13 @@ class AppRouter {
         builder: (context, state) => const ScheduleScreen(),
       ),
       GoRoute(
+        path: '/schedule/:department',
+        builder: (context, state) {
+          final department = state.pathParameters['department'] ?? 'all';
+          return ScheduleScreen(department: department);
+        },
+      ),
+      GoRoute(
         path: '/inbox',
         builder: (context, state) => const InboxScreen(),
       ),
@@ -175,6 +182,13 @@ class AppRouter {
       GoRoute(
         path: '/products',
         builder: (context, state) => const ProductsScreen(),
+      ),
+      GoRoute(
+        path: '/menu/:department',
+        builder: (context, state) {
+          final department = state.pathParameters['department'] ?? 'kitchen';
+          return ProductsScreen(department: department);
+        },
       ),
       GoRoute(
         path: '/nomenclature',
@@ -259,6 +273,13 @@ class AppRouter {
       GoRoute(
         path: '/tech-cards',
         builder: (context, state) => const TechCardsListScreen(),
+      ),
+      GoRoute(
+        path: '/tech-cards/:department',
+        builder: (context, state) {
+          final department = state.pathParameters['department'] ?? 'kitchen';
+          return TechCardsListScreen(department: department);
+        },
       ),
       GoRoute(
         path: '/tech-cards/new',

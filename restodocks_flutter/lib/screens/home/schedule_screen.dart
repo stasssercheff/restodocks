@@ -11,7 +11,9 @@ import '../../services/services.dart';
 /// График: слоты (должности/имена) задаются вручную, можно выбрать сотрудника из списка или вписать имя.
 /// Один график на заведение, прокрутка по неделям (неделя влезает на экран, ограничений нет).
 class ScheduleScreen extends StatefulWidget {
-  const ScheduleScreen({super.key});
+  const ScheduleScreen({super.key, this.department = 'all'});
+
+  final String department;
 
   @override
   State<ScheduleScreen> createState() => _ScheduleScreenState();

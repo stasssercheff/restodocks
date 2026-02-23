@@ -37,23 +37,23 @@ class OwnerHomeContent extends StatelessWidget {
         _SectionTitle(title: 'Кухня'),
         _Tile(
           icon: Icons.schedule,
-          title: loc.t('schedule'),
-          onTap: () => context.push('/department/kitchen'),
+          title: 'График',
+          onTap: () => context.push('/schedule/kitchen'),
         ),
         _Tile(
           icon: Icons.restaurant_menu,
-          title: loc.t('menu'),
-          onTap: () => context.push('/products'),
+          title: 'Меню',
+          onTap: () => context.push('/menu/kitchen'),
         ),
         _Tile(
           icon: Icons.description,
-          title: loc.t('tech_cards'),
-          onTap: () => context.push('/tech-cards'),
+          title: 'Технологические карты',
+          onTap: () => context.push('/tech-cards/kitchen'),
         ),
         _Tile(
           icon: Icons.assignment,
-          title: loc.t('nomenclature'),
-          onTap: () => context.push('/nomenclature'),
+          title: 'Номенклатура',
+          onTap: () => context.push('/nomenclature/kitchen'),
         ),
 
         const SizedBox(height: 16),
@@ -62,23 +62,22 @@ class OwnerHomeContent extends StatelessWidget {
         _SectionTitle(title: 'Бар (pro)'),
         _Tile(
           icon: Icons.schedule,
-          title: loc.t('schedule'),
-          onTap: () => context.push('/department/bar'),
+          title: 'График',
+          onTap: () => context.push('/schedule/bar'),
         ),
         _Tile(
           icon: Icons.wine_bar,
-          title: loc.t('menu'),
-          onTap: () => context.push('/products'),
+          title: 'Меню',
+          onTap: () => context.push('/menu/bar'),
         ),
         _Tile(
           icon: Icons.description,
-          title: loc.t('tech_cards'),
-          onTap: () => context.push('/tech-cards'),
+          title: 'Технологические карты',
+          onTap: () => context.push('/tech-cards/bar'),
         ),
         _Tile(
           icon: Icons.assignment,
-          title: loc.t('nomenclature'),
-          subtitle: loc.t('bar_nomenclature'),
+          title: 'Номенклатура',
           onTap: () => context.push('/nomenclature/bar'),
         ),
 
@@ -88,13 +87,12 @@ class OwnerHomeContent extends StatelessWidget {
         _SectionTitle(title: 'Зал'),
         _Tile(
           icon: Icons.schedule,
-          title: loc.t('schedule'),
-          onTap: () => context.push('/department/hall'),
+          title: 'График',
+          onTap: () => context.push('/schedule/hall'),
         ),
         _Tile(
           icon: Icons.assignment,
-          title: loc.t('nomenclature'),
-          subtitle: loc.t('hall_nomenclature'),
+          title: 'Номенклатура',
           onTap: () => context.push('/nomenclature/hall'),
         ),
 
@@ -102,6 +100,11 @@ class OwnerHomeContent extends StatelessWidget {
 
         // УПРАВЛЕНИЕ
         _SectionTitle(title: 'Управление'),
+        _Tile(
+          icon: Icons.schedule,
+          title: 'График',
+          onTap: () => context.push('/schedule/management'),
+        ),
         _Tile(
           icon: Icons.people,
           title: 'Сотрудники',
