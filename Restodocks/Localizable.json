@@ -482,6 +482,20 @@
       "de": "Inhaber",
       "fr": "Propriétaire"
     },
+    "view_mode": {
+      "ru": "Режим просмотра",
+      "en": "View mode",
+      "es": "Modo de vista",
+      "de": "Anzeigemodus",
+      "fr": "Mode d'affichage"
+    },
+    "interface": {
+      "ru": "Интерфейс",
+      "en": "Interface",
+      "es": "Interfaz",
+      "de": "Oberfläche",
+      "fr": "Interface"
+    },
     "company_pin": {
       "ru": "PIN компании",
       "en": "Company PIN",
@@ -516,6 +530,13 @@
       "es": "Empleados",
       "de": "Mitarbeiter",
       "fr": "Employés"
+    },
+    "additional_position": {
+      "ru": "Дополнительная должность",
+      "en": "Additional position",
+      "es": "Cargo adicional",
+      "de": "Zusätzliche Position",
+      "fr": "Poste supplémentaire"
     },
     "add_employee": {
       "ru": "Добавить сотрудника",
@@ -1391,6 +1412,20 @@
     "es": "Chef Ejecutivo",
     "de": "Küchenchef",
     "fr": "Chef exécutif"
+  },
+  "sous_chef": {
+    "ru": "Су-шеф",
+    "en": "Sous Chef",
+    "es": "Sous Chef",
+    "de": "Sous Chef",
+    "fr": "Sous-chef"
+  },
+  "dining_manager": {
+    "ru": "Менеджер зала",
+    "en": "Dining Manager",
+    "es": "Gerente de comedor",
+    "de": "Saalmanager",
+    "fr": "Responsable salle"
   },
   "general_manager": {
     "ru": "Генеральный менеджер",
@@ -2412,6 +2447,90 @@
     "es": "Costo",
     "de": "Kosten",
     "fr": "Coût"
+  },
+  "payroll": {
+    "ru": "ФЗП",
+    "en": "Payroll",
+    "es": "Nómina",
+    "de": "Gehaltsabrechnung",
+    "fr": "Paie"
+  },
+  "cost_per_shift": {
+    "ru": "Стоимость смены",
+    "en": "Cost per shift",
+    "es": "Costo por turno",
+    "de": "Kosten pro Schicht",
+    "fr": "Coût par shift"
+  },
+  "cost_per_hour": {
+    "ru": "Стоимость часа",
+    "en": "Cost per hour",
+    "es": "Costo por hora",
+    "de": "Kosten pro Stunde",
+    "fr": "Coût par heure"
+  },
+  "total_for_month": {
+    "ru": "Итого за месяц",
+    "en": "Total for month",
+    "es": "Total del mes",
+    "de": "Gesamt pro Monat",
+    "fr": "Total du mois"
+  },
+  "total": {
+    "ru": "Итого",
+    "en": "Total",
+    "es": "Total",
+    "de": "Gesamt",
+    "fr": "Total"
+  },
+  "total_payroll": {
+    "ru": "Общая сумма ФЗП",
+    "en": "Total payroll",
+    "es": "Total nómina",
+    "de": "Gehaltssumme",
+    "fr": "Total paie"
+  },
+  "month": {
+    "ru": "Месяц",
+    "en": "Month",
+    "es": "Mes",
+    "de": "Monat",
+    "fr": "Mois"
+  },
+  "calculation_mode": {
+    "ru": "Режим расчёта",
+    "en": "Calculation mode",
+    "es": "Modo de cálculo",
+    "de": "Berechnungsmodus",
+    "fr": "Mode de calcul"
+  },
+  "per_shift": {
+    "ru": "За смену",
+    "en": "Per shift",
+    "es": "Por turno",
+    "de": "Pro Schicht",
+    "fr": "Par shift"
+  },
+  "per_hour": {
+    "ru": "За час",
+    "en": "Per hour",
+    "es": "Por hora",
+    "de": "Pro Stunde",
+    "fr": "Par heure"
+  },
+  "cost_per_unit": {
+    "ru": "Стоимость (за смену/час)",
+    "en": "Cost (per shift/hour)",
+    "es": "Costo (por turno/hora)",
+    "de": "Kosten (pro Schicht/Stunde)",
+    "fr": "Coût (par shift/heure)"
+  },
+  "edit_payroll": {
+    "ru": "Редактировать ФЗП",
+    "en": "Edit payroll",
+    "es": "Editar nómina",
+    "de": "Gehalt bearbeiten",
+    "fr": "Modifier paie"
   },
   "processed": {
     "ru": "Обработано",

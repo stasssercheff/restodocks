@@ -10,8 +10,14 @@ struct AdministrativeView: View {
 
     var body: some View {
         List {
-            Text(lang.t("administrative_section"))
-                .foregroundColor(.secondary)
+            NavigationLink {
+                PayrollView()
+            } label: {
+                HStack {
+                    Image(systemName: "banknote")
+                    Text(lang.t("payroll"))
+                }
+            }
         }
         .navigationTitle(lang.t("administrative"))
     }

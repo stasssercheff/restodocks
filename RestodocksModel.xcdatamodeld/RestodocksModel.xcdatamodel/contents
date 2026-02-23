@@ -10,6 +10,8 @@
         <attribute name="password" optional="YES" attributeType="String"/>
         <attribute name="pinCode" optional="YES" attributeType="String"/>
         <attribute name="roles" optional="YES" attributeType="Transformable" valueTransformerName="NSSecureUnarchiveFromDataTransformerName"/>
+        <attribute name="costPerUnit" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="payrollCountingMode" optional="YES" attributeType="String" defaultValueString="shift"/>
         <relationship name="establishment" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="EstablishmentEntity" inverseName="employees" inverseEntity="EstablishmentEntity"/>
         <relationship name="shifts" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="ShiftEntity" inverseName="employee" inverseEntity="ShiftEntity"/>
     </entity>

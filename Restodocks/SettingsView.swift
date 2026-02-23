@@ -3,11 +3,32 @@ import SwiftUI
 struct SettingsView: View {
 
     @EnvironmentObject var lang: LocalizationManager
+    @EnvironmentObject var pro: ProAccess
+    @EnvironmentObject var accounts: AccountManager
+    @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) private var dismiss
+
+    private var currentEmployee: EmployeeEntity? {
+        accounts.currentEmployee ?? appState.currentEmployee
+    }
 
     var body: some View {
         NavigationStack {
             List {
+
+                // Переключатель: собственник ↔ должность (только если собственник с должностью)
+                if let emp = currentEmployee, emp.isOwnerWithPosition, let position = emp.jobPosition {
+                    Section(header: Text(lang.t("view_mode"))) {
+                        Picker(lang.t("interface"), selection: Binding(
+                            get: { appState.ownerViewMode },
+                            set: { appState.ownerViewMode = $0 }
+                        )) {
+                            Text(lang.t("owner")).tag("owner")
+                            Text(getPositionDisplayName(position)).tag("position")
+                        }
+                        .pickerStyle(.segmented)
+                    }
+                }
 
                 Section(header: Text(lang.t("language"))) {
                     languageRow(title: lang.t("russian"), code: "ru")
@@ -17,14 +38,14 @@ struct SettingsView: View {
                     languageRow(title: "Français", code: "fr")
                 }
 
-                Section {
+                Section(header: Text("PRO")) {
                     NavigationLink {
-                        Text("PRO")
+                        ProSettingsView()
                     } label: {
                         HStack {
                             Text("PRO")
                             Spacer()
-                            Text(lang.t("pro_active"))
+                            Text(pro.isPro ? lang.t("pro_active") : lang.t("pro_not_active"))
                                 .foregroundColor(.secondary)
                         }
                     }
@@ -40,6 +61,18 @@ struct SettingsView: View {
                     }
                 }
             }
+        }
+    }
+
+    private func getPositionDisplayName(_ position: String) -> String {
+        switch position {
+        case "executive_chef": return lang.t("executive_chef")
+        case "sous_chef": return lang.t("sous_chef")
+        case "manager": return lang.t("manager")
+        case "director": return lang.t("director")
+        case "dining_manager": return lang.t("dining_manager")
+        case "bar_manager": return "Бар-менеджер"
+        default: return position.capitalized
         }
     }
 

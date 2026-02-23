@@ -66,6 +66,15 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Режим отображения для собственника с должностью: "owner" = интерфейс владельца, "position" = интерфейс выбранной должности
+    var ownerViewMode: String {
+        get { userDefaults.string(forKey: "owner_view_mode") ?? "owner" }
+        set {
+            userDefaults.set(newValue, forKey: "owner_view_mode")
+            objectWillChange.send()
+        }
+    }
+
     init() {
         // Загружаем сохраненные значения при инициализации
         isCompanyCreated = userDefaults.bool(forKey: "is_company_created")
