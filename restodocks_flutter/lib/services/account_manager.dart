@@ -90,6 +90,7 @@ class AccountManager {
   Future<Employee> createEmployeeForCompany({
     required Establishment company,
     required String fullName,
+    String? surname,
     required String email,
     required String password,
     required String department,
@@ -98,6 +99,7 @@ class AccountManager {
   }) async {
     final employee = Employee.create(
       fullName: fullName,
+      surname: surname,
       email: email,
       password: password,
       department: department,

@@ -68,6 +68,9 @@ class Employee extends Equatable {
   @JsonKey(name: 'full_name')
   final String fullName;
 
+  @JsonKey(name: 'surname')
+  final String? surname;
+
   @JsonKey(name: 'email')
   final String email;
 
@@ -122,6 +125,7 @@ class Employee extends Equatable {
   const Employee({
     required this.id,
     required this.fullName,
+    this.surname,
     required this.email,
     required this.password,
     required this.department,
@@ -144,6 +148,7 @@ class Employee extends Equatable {
   Employee copyWith({
     String? id,
     String? fullName,
+    String? surname,
     String? email,
     String? password,
     String? department,
@@ -163,6 +168,7 @@ class Employee extends Equatable {
     return Employee(
       id: id ?? this.id,
       fullName: fullName ?? this.fullName,
+      surname: surname ?? this.surname,
       email: email ?? this.email,
       password: password ?? this.password,
       department: department ?? this.department,
@@ -330,6 +336,7 @@ class Employee extends Equatable {
   /// Создание нового сотрудника
   factory Employee.create({
     required String fullName,
+    String? surname,
     required String email,
     required String password,
     required String department,
@@ -342,6 +349,7 @@ class Employee extends Equatable {
     return Employee(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       fullName: fullName,
+      surname: surname,
       email: email,
       password: password,
       department: department,

@@ -35,6 +35,9 @@ class Establishment extends Equatable {
   @JsonKey(name: 'subscription_type')
   final String? subscriptionType;
 
+  // Alias for subscriptionType for backward compatibility
+  String? get subscriptionPlan => subscriptionType;
+
   @JsonKey(name: 'created_at')
   final DateTime createdAt;
 

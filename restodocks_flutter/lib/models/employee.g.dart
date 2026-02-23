@@ -9,6 +9,7 @@ part of 'employee.dart';
 Employee _$EmployeeFromJson(Map<String, dynamic> json) => Employee(
       id: json['id'] as String,
       fullName: json['full_name'] as String,
+      surname: json['surname'] as String?,
       email: json['email'] as String,
       password: json['password_hash'] as String? ?? '',
       department: json['department'] as String,
@@ -30,6 +31,7 @@ Employee _$EmployeeFromJson(Map<String, dynamic> json) => Employee(
 Map<String, dynamic> _$EmployeeToJson(Employee instance) => <String, dynamic>{
       'id': instance.id,
       'full_name': instance.fullName,
+      'surname': instance.surname,
       'email': instance.email,
       'password_hash': instance.password,
       'department': instance.department,

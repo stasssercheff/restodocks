@@ -143,6 +143,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final employee = await accountManager.createEmployeeForCompany(
         company: establishment,
         fullName: fullName,
+        surname: _surnameController.text.trim().isEmpty ? null : _surnameController.text.trim(),
         email: email,
         password: password,
         department: _department,

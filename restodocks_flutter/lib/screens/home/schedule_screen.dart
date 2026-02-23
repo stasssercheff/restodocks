@@ -161,7 +161,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               if (slot.employeeId != null) {
                 final employee = _employees.firstWhere(
                   (e) => e.id == slot.employeeId,
-                  orElse: () => Employee.create(fullName: '', email: '', password: '', department: 'general', establishmentId: '', roles: []),
+                  orElse: () => Employee.create(fullName: '', surname: '', email: '', password: '', department: 'general', establishmentId: '', roles: []),
                 );
                 if (employee.id.isNotEmpty) {
                   final correctSectionId = _getSectionIdForEmployee(employee, _model.sections);

@@ -21,6 +21,7 @@ import '../../screens/order_lists_screen.dart';
 import '../../screens/order_list_create_screen.dart';
 import '../../screens/order_list_products_screen.dart';
 import '../../screens/order_list_detail_screen.dart';
+import '../../screens/accept_co_owner_invitation_screen.dart';
 import '../../models/order_list.dart';
 import '../../services/ai_service.dart';
 import '../../services/services.dart';
@@ -130,6 +131,10 @@ class AppRouter {
       GoRoute(
         path: '/schedule',
         builder: (context, state) => const ScheduleScreen(),
+      ),
+      GoRoute(
+        path: '/inbox',
+        builder: (context, state) => const InboxScreen(),
       ),
       GoRoute(
         path: '/employees',
@@ -282,6 +287,20 @@ class AppRouter {
       GoRoute(
         path: '/supabase-test',
         builder: (context, state) => const SupabaseTestScreen(),
+      ),
+
+      // Принятие приглашения соучредителем
+      GoRoute(
+        path: '/accept-co-owner-invitation',
+        builder: (context, state) {
+          final token = state.queryParameters['token'];
+          if (token == null || token.isEmpty) {
+            return const Scaffold(
+              body: Center(child: Text('Invalid invitation link')),
+            );
+          }
+          return AcceptCoOwnerInvitationScreen(token: token);
+        },
       ),
     ],
   );

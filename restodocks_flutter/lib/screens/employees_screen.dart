@@ -587,6 +587,7 @@ class _EmployeeAddSheet extends StatefulWidget {
 
 class _EmployeeAddSheetState extends State<_EmployeeAddSheet> {
   final _nameController = TextEditingController();
+  final _surnameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   String _department = 'kitchen';
@@ -598,6 +599,7 @@ class _EmployeeAddSheetState extends State<_EmployeeAddSheet> {
   @override
   void dispose() {
     _nameController.dispose();
+    _surnameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -634,6 +636,7 @@ class _EmployeeAddSheetState extends State<_EmployeeAddSheet> {
       await acc.createEmployeeForCompany(
         company: widget.establishment,
         fullName: name,
+        surname: _surnameController.text.trim().isEmpty ? null : _surnameController.text.trim(),
         email: email,
         password: password,
         department: _department,
@@ -678,6 +681,15 @@ class _EmployeeAddSheetState extends State<_EmployeeAddSheet> {
                         controller: _nameController,
                         decoration: InputDecoration(
                           labelText: loc.t('full_name') ?? 'ФИО',
+                          border: const OutlineInputBorder(),
+                          filled: true,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _surnameController,
+                        decoration: InputDecoration(
+                          labelText: loc.t('surname') ?? 'Фамилия',
                           border: const OutlineInputBorder(),
                           filled: true,
                         ),

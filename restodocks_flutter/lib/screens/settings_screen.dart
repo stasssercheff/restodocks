@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../models/models.dart';
 import '../services/services.dart';
 
 /// Экран только настроек: язык, тема, валюта и т.д. Без данных профиля (профиль — отдельная кнопка).
@@ -69,6 +70,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  String _getRoleDisplayName(EmployeeRole? role, LocalizationService loc) {
+    if (role == null) return loc.t('owner');
+    switch (role.code) {
+      case 'executive_chef':
+        return loc.t('executive_chef');
+      case 'sous_chef':
+        return loc.t('sous_chef');
+      case 'bartender':
+        return loc.t('bartender');
+      case 'waiter':
+        return loc.t('waiter');
+      default:
+        return loc.t('owner');
+    }
+  }
+
   void _showProRequiredDialog(BuildContext context, LocalizationService loc) {
     showDialog<void>(
       context: context,
@@ -81,6 +98,180 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showInviteCoOwnerDialog(BuildContext context, LocalizationService loc, AccountManagerSupabase accountManager) {
+    final emailController = TextEditingController();
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('invite_co_owner')),
+        content: TextField(
+          controller: emailController,
+          decoration: InputDecoration(
+            labelText: loc.t('email'),
+            hintText: loc.t('enter_email'),
+          ),
+          keyboardType: TextInputType.emailAddress,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final email = emailController.text.trim();
+              if (email.isEmpty || !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(loc.t('invalid_email'))),
+                );
+                return;
+              }
+
+              final establishment = accountManager.establishment;
+              if (establishment == null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(loc.t('establishment_not_found'))),
+                );
+                return;
+              }
+
+              try {
+                await accountManager.inviteCoOwner(email, establishment.id);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('${loc.t('invitation_sent')} $email')),
+                );
+                Navigator.of(ctx).pop();
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('${loc.t('error')}: $e')),
+                );
+              }
+            },
+            child: Text(loc.t('send_invitation')),
+          ),
+        ],
+      ),
+    ).then((_) => emailController.dispose());
+  }
+
+  void _showProDialog(BuildContext context, LocalizationService loc, AccountManagerSupabase accountManager) {
+    final hasPro = accountManager.hasProSubscription;
+    final establishment = accountManager.establishment;
+
+    if (hasPro) {
+      // Показать данные о подписке
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(loc.t('pro')),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('${loc.t('subscription_status')}: ${loc.t('active')}'),
+              if (establishment?.subscriptionPlan != null)
+                Text('${loc.t('subscription_plan')}: ${establishment!.subscriptionPlan}'),
+              // Здесь можно добавить больше деталей о подписке
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
+            ),
+          ],
+        ),
+      );
+    } else {
+      // Показать окно ввода кода
+      final codeController = TextEditingController();
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text('${loc.t('pro')} - ${loc.t('enter_code')}'),
+          content: TextField(
+            controller: codeController,
+            decoration: InputDecoration(
+              labelText: loc.t('activation_code'),
+              hintText: loc.t('enter_activation_code'),
+            ),
+            textCapitalization: TextCapitalization.characters,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+            ),
+            FilledButton(
+              onPressed: () async {
+                final code = codeController.text.trim();
+                if (code.isEmpty) return;
+
+                // Здесь должна быть логика активации кода
+                // Пока просто показываем сообщение
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('${loc.t('code_activated')}: $code')),
+                );
+                Navigator.of(ctx).pop();
+              },
+              child: Text(loc.t('activate')),
+            ),
+          ],
+        ),
+      ).then((_) => codeController.dispose());
+    }
+  }
+
+  void _showRolePicker(BuildContext context, LocalizationService loc, Employee currentEmployee, AccountManagerSupabase accountManager) {
+    final availableRoles = [
+      {'code': 'owner', 'name': loc.t('owner')},
+      {'code': 'executive_chef', 'name': loc.t('executive_chef')},
+      {'code': 'sous_chef', 'name': loc.t('sous_chef')},
+      {'code': 'bartender', 'name': loc.t('bartender')},
+      {'code': 'waiter', 'name': loc.t('waiter')},
+    ];
+
+    final currentRoleCode = currentEmployee.primaryRole?.code ?? 'owner';
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('select_role')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: availableRoles.map((role) {
+            final isSelected = role['code'] == currentRoleCode;
+            return ListTile(
+              title: Text(role['name']!),
+              trailing: isSelected ? const Icon(Icons.check, color: Colors.green) : null,
+              onTap: () async {
+                if (isSelected) {
+                  Navigator.of(ctx).pop();
+                  return;
+                }
+
+                // Обновляем роли сотрудника
+                final newRoles = ['owner']; // Всегда сохраняем роль owner
+                if (role['code'] != 'owner') {
+                  newRoles.add(role['code']!);
+                }
+
+                final updatedEmployee = currentEmployee.copyWith(
+                  roles: newRoles,
+                  updatedAt: DateTime.now(),
+                );
+
+                await accountManager.updateEmployee(updatedEmployee);
+                if (ctx.mounted) Navigator.of(ctx).pop();
+              },
+            );
+          }).toList(),
+        ),
       ),
     );
   }
@@ -370,12 +561,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 );
               },
             ),
-            if (currentEmployee.hasRole('owner'))
+            if (currentEmployee.hasRole('owner')) ...[
+              ListTile(
+                leading: const Icon(Icons.work),
+                title: Text(localization.t('role')),
+                subtitle: Text(_getRoleDisplayName(currentEmployee.primaryRole, localization)),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _showRolePicker(context, localization, currentEmployee, accountManager),
+              ),
+              ListTile(
+                leading: const Icon(Icons.person_add),
+                title: Text(localization.t('invite_co_owner')),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _showInviteCoOwnerDialog(context, localization, accountManager),
+              ),
               ListTile(
                 leading: const Icon(Icons.star),
-                title: Text(localization.t('pro_purchase')),
+                title: Text(localization.t('pro')),
                 trailing: const Icon(Icons.chevron_right),
+                onTap: () => _showProDialog(context, localization, accountManager),
               ),
+            ],
             const Divider(),
             ListTile(
               leading: const Icon(Icons.logout, color: Colors.red),

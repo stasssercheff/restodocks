@@ -214,6 +214,31 @@ class AccountManagerSupabase {
     }
   }
 
+  /// Отправка приглашения соучредителю
+  Future<void> inviteCoOwner(String email, String establishmentId) async {
+    final currentEmployee = this.currentEmployee;
+    if (currentEmployee == null || !currentEmployee.hasRole('owner')) {
+      throw Exception('Only owners can send co-owner invitations');
+    }
+
+    final token = DateTime.now().millisecondsSinceEpoch.toString();
+    final invitationData = {
+      'establishment_id': establishmentId,
+      'invited_email': email,
+      'invited_by': currentEmployee.id,
+      'invitation_token': token,
+      'status': 'pending',
+    };
+
+    await _supabase.insertData('co_owner_invitations', invitationData);
+
+    // Отправка email с ссылкой (здесь должна быть интеграция с email сервисом)
+    final invitationLink = 'https://yourapp.com/accept-co-owner-invitation?token=$token';
+    print('Invitation link: $invitationLink'); // Временно выводим в консоль
+
+    // TODO: Интегрировать с email сервисом для отправки приглашения
+  }
+
   /// Удалить тестовые записи сотрудников (использовать только для разработки!)
   Future<void> deleteTestEmployees() async {
     try {
@@ -237,6 +262,7 @@ class AccountManagerSupabase {
   Future<Employee> createEmployeeForCompany({
     required Establishment company,
     required String fullName,
+    String? surname,
     required String email,
     required String password,
     required String department,
@@ -249,6 +275,7 @@ class AccountManagerSupabase {
 
     final employee = Employee.create(
       fullName: fullName,
+      surname: surname,
       email: email,
       password: passwordHash ?? '',
       department: department,

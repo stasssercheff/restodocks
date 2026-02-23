@@ -18,6 +18,7 @@ class OwnerRegistrationScreen extends StatefulWidget {
 class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
+  final _surnameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
@@ -29,6 +30,7 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
   @override
   void dispose() {
     _nameController.dispose();
+    _surnameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmController.dispose();
@@ -65,6 +67,7 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
       final employee = await accountManager.createEmployeeForCompany(
         company: estab,
         fullName: _nameController.text.trim(),
+        surname: _surnameController.text.trim().isEmpty ? null : _surnameController.text.trim(),
         email: email,
         password: password,
         department: 'management',
@@ -142,6 +145,16 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
                     if (v == null || v.trim().isEmpty) return loc.t('name_required');
                     return null;
                   },
+                ),
+                const SizedBox(height: 16),
+
+                TextFormField(
+                  controller: _surnameController,
+                  decoration: InputDecoration(
+                    labelText: loc.t('surname'),
+                    hintText: loc.t('enter_surname'),
+                    prefixIcon: const Icon(Icons.person_outline),
+                  ),
                 ),
                 const SizedBox(height: 16),
 

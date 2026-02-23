@@ -27,14 +27,14 @@ class OwnerHomeContent extends StatelessWidget {
         // ВХОДЯЩИЕ
         _Tile(
           icon: Icons.inbox,
-          title: loc.t('inbox'),
-          onTap: () => context.push('/notifications'),
+          title: 'Входящие',
+          onTap: () => context.push('/inbox'),
         ),
 
         const SizedBox(height: 16),
 
         // КУХНЯ
-        _SectionTitle(title: loc.t('kitchen')),
+        _SectionTitle(title: 'Кухня'),
         _Tile(
           icon: Icons.schedule,
           title: loc.t('schedule'),
@@ -59,7 +59,7 @@ class OwnerHomeContent extends StatelessWidget {
         const SizedBox(height: 16),
 
         // БАР (pro)
-        _SectionTitle(title: '${loc.t('bar')} (${loc.t('pro')})'),
+        _SectionTitle(title: 'Бар (pro)'),
         _Tile(
           icon: Icons.schedule,
           title: loc.t('schedule'),
@@ -85,7 +85,7 @@ class OwnerHomeContent extends StatelessWidget {
         const SizedBox(height: 16),
 
         // ЗАЛ
-        _SectionTitle(title: loc.t('dining_room')),
+        _SectionTitle(title: 'Зал'),
         _Tile(
           icon: Icons.schedule,
           title: loc.t('schedule'),
@@ -101,15 +101,15 @@ class OwnerHomeContent extends StatelessWidget {
         const SizedBox(height: 16),
 
         // УПРАВЛЕНИЕ
-        _SectionTitle(title: loc.t('management')),
+        _SectionTitle(title: 'Управление'),
         _Tile(
           icon: Icons.people,
-          title: loc.t('employees'),
+          title: 'Сотрудники',
           onTap: () => context.push('/employees'),
         ),
 
         // РАСХОДЫ (pro)
-        _SectionTitle(title: '${loc.t('expenses')} (${loc.t('pro')})'),
+        _SectionTitle(title: 'Расходы (pro)'),
         _Tile(
           icon: Icons.payments,
           title: 'ФЗП',
@@ -135,29 +135,6 @@ class OwnerHomeContent extends StatelessWidget {
           onTap: () => context.push('/expenses/custom'),
         ),
 
-        // ДОПОЛНИТЕЛЬНЫЕ ФУНКЦИИ
-        const SizedBox(height: 16),
-        _SectionTitle(title: loc.t('additional')),
-        _Tile(
-          icon: Icons.upload_file,
-          title: loc.t('upload_products'),
-          onTap: () => context.push('/products/upload'),
-        ),
-        _Tile(
-          icon: Icons.inventory,
-          title: loc.t('inventory_blank'),
-          onTap: () => context.push('/inventory'),
-        ),
-        _Tile(
-          icon: Icons.checklist,
-          title: loc.t('checklists'),
-          onTap: () => context.push('/checklists'),
-        ),
-        _Tile(
-          icon: Icons.settings,
-          title: loc.t('settings'),
-          onTap: () => context.push('/settings'),
-        ),
       ],
     );
   }
