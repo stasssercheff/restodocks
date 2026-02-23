@@ -299,7 +299,12 @@ class AccountManagerSupabase {
         if (hash == null || hash.isEmpty) continue;
         employeeData['password'] = hash;
         final employee = Employee.fromJson(employeeData);
-        final ok = BCrypt.checkpw(password, hash) || (hash == password);
+        bool ok = false;
+        if (hash.startsWith(r'$2a$') || hash.startsWith(r'$2b$')) {
+          ok = BCrypt.checkpw(password, hash);
+        } else {
+          ok = (hash == password);
+        }
         if (!ok) continue;
 
         final estId = employee.establishmentId;
@@ -341,7 +346,7 @@ class AccountManagerSupabase {
       employeeData['password'] = hash;
 
       final employee = Employee.fromJson(employeeData);
-      if (BCrypt.checkpw(password, hash)) return employee;
+      if ((hash.startsWith(r'$2a$') || hash.startsWith(r'$2b$')) && BCrypt.checkpw(password, hash)) return employee;
       // Миграция: раньше пароли хранились в открытом виде
       if (hash == password) {
         try {
