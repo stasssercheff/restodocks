@@ -46,7 +46,9 @@ import '../services/translation_service.dart';
 
 /// Экран номенклатуры: продукты и ПФ заведения с ценами
 class NomenclatureScreen extends StatefulWidget {
-  const NomenclatureScreen({super.key});
+  const NomenclatureScreen({super.key, this.department = 'general'});
+
+  final String department;
 
   @override
   State<NomenclatureScreen> createState() => _NomenclatureScreenState();

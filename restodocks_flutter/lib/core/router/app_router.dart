@@ -176,6 +176,13 @@ class AppRouter {
         builder: (context, state) => const NomenclatureScreen(),
       ),
       GoRoute(
+        path: '/nomenclature/:department',
+        builder: (context, state) {
+          final department = state.pathParameters['department'] ?? 'general';
+          return NomenclatureScreen(department: department);
+        },
+      ),
+      GoRoute(
         path: '/products/upload',
         builder: (context, state) {
           final addToNom = state.queryParameters['addToNomenclature'];
