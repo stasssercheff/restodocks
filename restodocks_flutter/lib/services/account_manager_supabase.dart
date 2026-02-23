@@ -283,8 +283,15 @@ class AccountManagerSupabase {
 
   /// Регистрация в Supabase Auth (для сотрудников). Возвращает auth.uid() при успехе.
   Future<String?> signUpToSupabaseAuth(String email, String password) async {
-    await _supabase.signUpWithEmail(email.trim(), password);
-    return _supabase.currentUser?.id;
+    print('DEBUG: signUpToSupabaseAuth called with email: $email');
+    try {
+      await _supabase.signUpWithEmail(email.trim(), password);
+      print('DEBUG: signUpWithEmail completed, currentUser: ${_supabase.currentUser?.id}');
+      return _supabase.currentUser?.id;
+    } catch (e) {
+      print('DEBUG: signUpWithEmail failed with error: $e');
+      rethrow;
+    }
   }
 
   /// Регистрация в Supabase Auth и привязка auth_user_id к employee (для владельца)

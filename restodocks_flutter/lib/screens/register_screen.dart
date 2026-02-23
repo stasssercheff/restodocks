@@ -132,8 +132,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
       // Регистрация в Supabase Auth (для привязки auth_user_id)
       String? authUserId;
       try {
+        print('DEBUG: Attempting Supabase Auth signUp for email: $email');
         authUserId = await accountManager.signUpToSupabaseAuth(email, password);
-      } catch (_) {
+        print('DEBUG: Supabase Auth signUp successful, authUserId: $authUserId');
+      } catch (e) {
+        print('DEBUG: Supabase Auth signUp failed: $e');
         // Если signUp не удался (подтверждение email и т.п.), продолжаем без auth
       }
 
