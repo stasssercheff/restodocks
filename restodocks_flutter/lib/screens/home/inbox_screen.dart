@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../services/services.dart';
 import '../../models/models.dart';
+import '../../models/inbox_document.dart';
 import '../../services/inbox_service.dart';
 
 /// Входящие: Документы по отделам (Инвентаризация, Заказы продуктов, Подтверждения смен)

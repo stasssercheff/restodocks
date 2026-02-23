@@ -14,6 +14,7 @@ export 'product_import_result.dart';
 export 'moderation_item.dart';
 export 'translation.dart';
 export 'nomenclature_item.dart';
+export 'inbox_document.dart';
 
 // Виджеты
 export '../widgets/data_safety_indicator.dart';

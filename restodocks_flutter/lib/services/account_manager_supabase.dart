@@ -22,6 +22,9 @@ class AccountManagerSupabase {
   Establishment? _establishment;
   Employee? _currentEmployee;
 
+  /// Доступ к SupabaseService
+  SupabaseService get supabase => _supabase;
+
   /// Убираем avatar_url из payload — колонки может не быть в схеме employees (PGRST204).
   static void _stripAvatarFromPayload(Map<String, dynamic> data) {
     data.remove('avatar_url');
