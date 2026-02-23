@@ -71,7 +71,7 @@ class Employee extends Equatable {
   @JsonKey(name: 'email')
   final String email;
 
-  @JsonKey(name: 'password_hash')
+  @JsonKey(name: 'password_hash', defaultValue: '')
   final String password;
 
   @JsonKey(name: 'department')
@@ -298,7 +298,12 @@ class Employee extends Equatable {
   }
 
   /// JSON сериализация
-  factory Employee.fromJson(Map<String, dynamic> json) => _$EmployeeFromJson(json);
+  factory Employee.fromJson(Map<String, dynamic> json) {
+    final m = Map<String, dynamic>.from(json);
+    final ph = m['password_hash'];
+    m['password_hash'] = (ph == null || ph is! String) ? '' : ph;
+    return _$EmployeeFromJson(m);
+  }
   Map<String, dynamic> toJson() => _$EmployeeToJson(this);
 
   @override

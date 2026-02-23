@@ -136,7 +136,8 @@ class AccountManagerSupabase {
       ..remove('id')
       ..remove('created_at')
       ..remove('updated_at')
-      ..remove('owner_id');
+      ..remove('owner_id')
+      ..remove('subscription_type');
     final raw = await _supabase.insertData('establishments', data);
     final response = Map<String, dynamic>.from(raw);
     response['owner_id'] = response['owner_id']?.toString() ?? '';
@@ -263,7 +264,9 @@ class AccountManagerSupabase {
     if (authUserId != null) employeeData['auth_user_id'] = authUserId;
 
     final response = await _supabase.insertData('employees', employeeData);
-    final createdEmployee = Employee.fromJson(response);
+    final resp = Map<String, dynamic>.from(response);
+    resp['password_hash'] = resp['password_hash'] ?? '';
+    final createdEmployee = Employee.fromJson(resp);
 
     // Обновляем establishment с ownerId, если это владелец
     if (roles.contains('owner')) {
