@@ -283,13 +283,45 @@ class AccountManagerSupabase {
 
   /// Регистрация в Supabase Auth (для сотрудников). Возвращает auth.uid() при успехе.
   Future<String?> signUpToSupabaseAuth(String email, String password) async {
-    print('DEBUG: signUpToSupabaseAuth called with email: $email');
+    final emailTrim = email.trim();
+    print('DEBUG: signUpToSupabaseAuth called with email: $emailTrim');
+
+    // Сначала попробуем войти - вдруг пользователь уже существует
     try {
-      await _supabase.signUpWithEmail(email.trim(), password);
+      print('DEBUG: Attempting signIn first...');
+      await _supabase.signInWithEmail(emailTrim, password);
+      if (_supabase.currentUser != null) {
+        print('DEBUG: User already exists, signed in successfully: ${_supabase.currentUser!.id}');
+        return _supabase.currentUser!.id;
+      }
+    } catch (signInError) {
+      print('DEBUG: signIn failed (user doesn\'t exist or wrong password): $signInError');
+      // Продолжаем к signUp
+    }
+
+    // Если вход не удался, пробуем зарегистрировать нового пользователя
+    try {
+      print('DEBUG: Attempting signUp...');
+      await _supabase.signUpWithEmail(emailTrim, password);
       print('DEBUG: signUpWithEmail completed, currentUser: ${_supabase.currentUser?.id}');
       return _supabase.currentUser?.id;
-    } catch (e) {
-      print('DEBUG: signUpWithEmail failed with error: $e');
+    } catch (signUpError) {
+      print('DEBUG: signUpWithEmail failed: $signUpError');
+
+      // Если signUp тоже не удался из-за "user already exists", попробуем войти еще раз
+      if (signUpError.toString().contains('already') || signUpError.toString().contains('exists')) {
+        try {
+          print('DEBUG: signUp failed with "already exists", trying signIn again...');
+          await _supabase.signInWithEmail(emailTrim, password);
+          if (_supabase.currentUser != null) {
+            print('DEBUG: Successfully signed in existing user: ${_supabase.currentUser!.id}');
+            return _supabase.currentUser!.id;
+          }
+        } catch (finalSignInError) {
+          print('DEBUG: Final signIn also failed: $finalSignInError');
+        }
+      }
+
       rethrow;
     }
   }
