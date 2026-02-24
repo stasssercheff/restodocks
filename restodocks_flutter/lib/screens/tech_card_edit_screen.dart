@@ -1868,7 +1868,11 @@ class _TtkTableState extends State<_TtkTable> {
                               _EditableShrinkageCell(
                                 value: product != null ? ing.weightLossPercentage : (ing.cookingLossPctOverride ?? 0),
                                 onChanged: (pct) {
-                                  if (pct != null) widget.onUpdate(i, ing.copyWith(cookingLossPctOverride: pct.clamp(0.0, 99.9)));
+                                  if (pct != null) {
+                                    final eff = ing.effectiveGrossWeight;
+                                    final output = eff > 0 ? eff * (1.0 - pct.clamp(0.0, 99.9) / 100.0) : 0.0;
+                                    widget.onUpdate(i, ing.copyWith(cookingLossPctOverride: pct.clamp(0.0, 99.9), outputWeight: output));
+                                  }
                                 },
                               ),
                             ],
@@ -1884,15 +1888,23 @@ class _TtkTableState extends State<_TtkTable> {
                         child: Padding(
                           padding: _cellPad,
                           child: _EditableNetCell(
-                            value: ing.netWeight,
+                            value: ing.outputWeight > 0 ? ing.outputWeight : (ing.effectiveGrossWeight * (1.0 - (ing.cookingLossPctOverride ?? ing.weightLossPercentage) / 100.0)),
                             onChanged: (v) {
-                              if (v != null && v >= 0) widget.onUpdate(i, ing.copyWith(netWeight: v));
+                              if (v != null && v >= 0) {
+                                final eff = ing.effectiveGrossWeight;
+                                if (eff > 0) {
+                                  final lossPct = (1.0 - v / eff) * 100.0;
+                                  widget.onUpdate(i, ing.copyWith(outputWeight: v, cookingLossPctOverride: lossPct.clamp(0.0, 99.9)));
+                                } else {
+                                  widget.onUpdate(i, ing.copyWith(outputWeight: v));
+                                }
+                              }
                             },
                           ),
                         ),
                       )),
                     )
-                  : _cell('${ing.netWeight.toStringAsFixed(0)}'),
+                  : _cell('${(ing.outputWeight > 0 ? ing.outputWeight : ing.effectiveGrossWeight * (1.0 - (ing.cookingLossPctOverride ?? ing.weightLossPercentage) / 100.0)).toStringAsFixed(0)}'),
               widget.canEdit
                   ? TableCell(
                       child: wrapCell(ConstrainedBox(
@@ -1911,7 +1923,7 @@ class _TtkTableState extends State<_TtkTable> {
                     )
                   : _cell(ing.cost.toStringAsFixed(2)),
               // Цена за 1 кг/шт блюда (по ингредиенту: стоимость за кг при выходе)
-              _cell(ing.netWeight > 0 ? (ing.cost * 1000 / ing.netWeight).toStringAsFixed(2) : ''),
+              _cell(_outputForPrice(ing) > 0 ? (ing.cost * 1000 / _outputForPrice(ing)).toStringAsFixed(2) : ''),
               // Колонка «Технология» — только в первой строке контент, в остальных пустая ячейка
               isFirstRow && widget.technologyController != null
                   ? TableCell(
@@ -2100,6 +2112,12 @@ class _TtkTableState extends State<_TtkTable> {
         ],
       ),
     );
+  }
+
+  /// Выход для расчёта цены за кг: сохранённый outputWeight или вычисленный из нетто и % ужарки.
+  double _outputForPrice(TTIngredient ing) {
+    if (ing.outputWeight > 0) return ing.outputWeight;
+    return ing.effectiveGrossWeight * (1.0 - (ing.cookingLossPctOverride ?? ing.weightLossPercentage) / 100.0);
   }
 
   /// Ячейка данных: тот же wrapCell (границы, мин. высота). Пустая строка — невидимый символ, чтобы ячейка не схлопывалась.

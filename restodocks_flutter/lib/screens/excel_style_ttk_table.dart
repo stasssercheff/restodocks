@@ -289,19 +289,30 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                       ((ingredient.cookingLossPctOverride ?? 0) == 0 ? '' : (ingredient.cookingLossPctOverride ?? 0).toString()),
                       (value) {
                       final loss = double.tryParse(value) ?? 0;
-                      final clampedLoss = loss.clamp(0, 100);
+                      final clampedLoss = loss.clamp(0.0, 99.9);
+                      // При изменении % ужарки пересчитываем выход по той же логике, что нетто от отхода: выход = нетто × (1 − ужарка/100)
+                      final net = ingredient.netWeight;
+                      final output = net > 0 ? net * (1.0 - clampedLoss / 100.0) : 0.0;
                       _updateIngredient(rowIndex, ingredient.copyWith(
                         cookingLossPctOverride: clampedLoss,
+                        outputWeight: output,
                       ));
                     }, 'cooking_loss_$rowIndex'),
 
-                    // Выход (всегда равен нетто)
+                    // Выход: при изменении пересчитываем % ужарки по той же логике, что % отхода при вводе нетто: ужарка = (1 − выход/нетто)×100
                     _buildNumericCell(ingredient.outputWeight == 0 ? '' : ingredient.outputWeight.toStringAsFixed(0), (value) {
                       final output = double.tryParse(value) ?? 0;
-                      _updateIngredient(rowIndex, ingredient.copyWith(
-                        outputWeight: output,
-                        isNetWeightManual: true, // Помечаем что выход изменен вручную
-                      ));
+                      final net = ingredient.netWeight;
+                      if (net > 0 && output >= 0) {
+                        final lossPct = (1.0 - output / net) * 100.0;
+                        final clampedLoss = lossPct.clamp(0.0, 99.9);
+                        _updateIngredient(rowIndex, ingredient.copyWith(
+                          outputWeight: output,
+                          cookingLossPctOverride: clampedLoss,
+                        ));
+                      } else {
+                        _updateIngredient(rowIndex, ingredient.copyWith(outputWeight: output));
+                      }
                     }, 'output_$rowIndex'),
 
                     // вес прц — пусто в строках продукта
