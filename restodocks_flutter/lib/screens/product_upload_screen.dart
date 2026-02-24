@@ -398,6 +398,14 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     List<String> rows = _extractRowsFromFile(bytes, name);
 
     if (rows.isEmpty) {
+      // Fallback: Numbers/Pages — извлекаем сырой текст и передаём в ИИ
+      if (name.endsWith('.numbers') || name.endsWith('.pages')) {
+        final rawText = _extractRawTextFromZipForAI(bytes);
+        if (rawText.trim().length >= 30) {
+          await _processWithDeferredModeration(text: rawText);
+          return;
+        }
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -476,30 +484,68 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     try {
       final archive = ZipDecoder().decodeBytes(bytes);
       for (final f in archive.files) {
-        if (f.name.contains('Data') && f.name.endsWith('.xml') || f.name.contains('table') && f.name.endsWith('.xml')) {
-          final xml = XmlDocument.parse(utf8.decode(f.content as List<int>));
-          final rows = <String>[];
-          for (final row in xml.findAllElements('row')) {
-            final cells = row.findElements('cell').map((c) => c.innerText.trim()).toList();
-            final line = cells.join('\t').trim();
-            if (line.isNotEmpty && !_looksLikeGarbage(line)) rows.add(line);
-          }
-          if (rows.isNotEmpty) return rows;
+        if ((f.name.contains('Data') || f.name.contains('table')) && f.name.endsWith('.xml')) {
+          try {
+            final xml = XmlDocument.parse(utf8.decode(f.content as List<int>));
+            final rows = <String>[];
+            for (final row in xml.findAllElements('row')) {
+              final cells = row.findElements('cell').map((c) => c.innerText.trim()).toList();
+              final line = cells.join('\t').trim();
+              if (line.isNotEmpty && !_looksLikeGarbage(line)) rows.add(line);
+            }
+            if (rows.isNotEmpty) return rows;
+          } catch (_) {}
         }
       }
-      final anyXml = archive.files.where((f) => f.name.endsWith('.xml'));
-      for (final f in anyXml) {
-        try {
-          final xml = XmlDocument.parse(utf8.decode(f.content as List<int>));
-          final text = xml.descendants.where((n) => n is XmlText).map((n) => (n as XmlText).text.trim()).where((s) => s.isNotEmpty).join('\n');
-          final lines = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
-          if (lines.length >= 2) return lines;
-        } catch (_) {}
+      for (final f in archive.files) {
+        if (f.name.endsWith('.xml')) {
+          try {
+            final xml = XmlDocument.parse(utf8.decode(f.content as List<int>));
+            final text = xml.descendants.where((n) => n is XmlText).map((n) => (n as XmlText).text.trim()).where((s) => s.isNotEmpty).join('\n');
+            final lines = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+            if (lines.length >= 2) return lines;
+          } catch (_) {}
+        }
+      }
+      // Fallback: извлечь сырой текст из IWA и прочих файлов (для передачи в AI)
+      final rawText = _extractRawTextFromZipForAI(bytes);
+      if (rawText.trim().length >= 20) {
+        return rawText.split(RegExp(r'[\r\n\t]+')).map((s) => s.trim()).where((s) => s.length >= 2 && !_looksLikeGarbage(s)).toList();
       }
     } catch (e) {
       _addDebugLog('Numbers extract error: $e');
     }
     return [];
+  }
+
+  /// Извлекает сырой текст из zip (Numbers, Pages) — для fallback на AI при неудачном парсинге
+  String _extractRawTextFromZipForAI(Uint8List bytes) {
+    try {
+      final archive = ZipDecoder().decodeBytes(bytes);
+      final buffer = StringBuffer();
+      for (final f in archive.files) {
+        if (f.content == null || f.content!.isEmpty) continue;
+        try {
+          final decoded = utf8.decode(f.content as List<int>, allowMalformed: true);
+          for (final part in decoded.split(RegExp(r'[\r\n\x00\uFFFD]{2,}'))) {
+            for (final line in part.split(RegExp(r'[\r\n\t]+'))) {
+              final t = line.trim();
+              if (t.length >= 2 && t.length < 400) {
+                if (!t.contains('<?xml') && !t.startsWith('<') && !t.contains('/Index/') &&
+                    !t.contains('TSP.') && !t.contains('protobuf') &&
+                    RegExp(r'[a-zA-Zа-яА-ЯёЁ0-9]').hasMatch(t) &&
+                    !RegExp(r'^[\x00-\x1f\x7f-\x9f]+$').hasMatch(t)) {
+                  buffer.writeln(t);
+                }
+              }
+            }
+          }
+        } catch (_) {}
+      }
+      return buffer.toString();
+    } catch (_) {
+      return '';
+    }
   }
 
   List<String> _extractRowsFromDocx(Uint8List bytes) {
@@ -684,7 +730,14 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       if (result == null || result.files.isEmpty || result.files.single.bytes == null) return;
       final bytes = result.files.single.bytes!;
       final name = result.files.single.name.toLowerCase();
-      final rows = _extractRowsFromFile(bytes, name);
+      List<String> rows = _extractRowsFromFile(bytes, name);
+      if (rows.isEmpty && (name.endsWith('.numbers') || name.endsWith('.pages'))) {
+        final rawText = _extractRawTextFromZipForAI(bytes);
+        if (rawText.trim().length >= 30) {
+          await _processWithDeferredModeration(text: rawText);
+          return;
+        }
+      }
       if (rows.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Не удалось извлечь данные из файла')),

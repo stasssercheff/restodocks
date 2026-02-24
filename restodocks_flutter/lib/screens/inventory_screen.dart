@@ -156,8 +156,8 @@ class _InventoryScreenState extends State<InventoryScreen>
       saveNow();
     });
 
-    // Настроить автоматическую отправку на сервер каждые 30 секунд
-    _serverAutoSaveTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+    // Тихая отправка на сервер каждые 15 секунд — данные не теряются при обрыве
+    _serverAutoSaveTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
       if (mounted && !_completed) {
         _autoSaveToServer();
       }

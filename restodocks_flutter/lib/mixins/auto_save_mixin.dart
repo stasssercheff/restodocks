@@ -1,9 +1,12 @@
 import 'dart:async';
 import 'dart:ui';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
 import '../services/draft_storage_service.dart';
+import '../services/web_lifecycle_saver_stub.dart'
+    if (dart.library.html) '../services/web_lifecycle_saver_web.dart' as web_lifecycle;
 
 /// Mixin для автосохранения состояния экрана
 mixin AutoSaveMixin<T extends StatefulWidget> on State<T> {
@@ -40,11 +43,13 @@ mixin AutoSaveMixin<T extends StatefulWidget> on State<T> {
 
   /// Инициализировать автосохранение
   void _initializeAutoSave() {
-    // Слушатель жизненного цикла приложения
     WidgetsBinding.instance.addObserver(_LifecycleObserver(
       onPaused: _handleAppPaused,
       onResumed: _handleAppResumed,
     ));
+    if (kIsWeb) {
+      web_lifecycle.registerWebLifecycleSaver(() => _saveDraft());
+    }
   }
 
   /// Восстановить черновик

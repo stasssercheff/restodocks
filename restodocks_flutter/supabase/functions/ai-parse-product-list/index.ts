@@ -11,12 +11,15 @@ function corsHeaders(origin: string | null) {
   };
 }
 
-const SYSTEM_PROMPT = `You are a product list parser for a restaurant. Given raw rows (from Excel, CSV, or pasted text from messengers/notes), extract product items.
+const SYSTEM_PROMPT = `You are a product list parser for a restaurant. Given raw rows (from Excel, CSV, Numbers, Pages, or pasted text), extract product items.
 
-INPUT: Array of raw text rows. Each row can be:
-- Tab/coma/semicolon-separated columns
+INPUT: Raw text or array of rows. Can be:
+- Tab/comma/semicolon-separated columns
 - Inline text like "картофель 50р кг" or "лук репка - 120 - шт"
+- Text extracted from Apple Numbers (.numbers) or Pages (.pages) — may contain fragments, metadata, mixed with product rows. Focus on lines with product names and prices.
 - Mixed formats with prices, quantities, units
+
+For Numbers/Pages: ignore XML-like fragments, file paths, binary garbage. Extract every line that looks like a product (name + optional price/unit).
 
 OUTPUT: JSON array of objects, each with:
 - name (string, required): product name, cleaned and normalized

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+
+import 'core/url_strategy_stub.dart'
+    if (dart.library.html) 'core/url_strategy_web.dart' as url_strategy;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -12,6 +15,7 @@ const String _supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOi
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  url_strategy.initUrlStrategy();
   FlutterError.onError = (details) {
     debugPrint('FlutterError: ${details.exception}');
     debugPrint('Stack: ${details.stack}');
