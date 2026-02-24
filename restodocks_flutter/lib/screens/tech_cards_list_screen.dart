@@ -502,15 +502,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     );
   }
 
+  /// Компактный список везде: одна колонка, без горизонтального скролла (широкая таблица на телефоне требовала 3 экрана вправо).
   Widget _buildTechCardsTable(List<TechCard> techCards, LocalizationService loc) {
     final lang = loc.currentLanguageCode;
-    final isNarrow = MediaQuery.of(context).size.width < 600;
-
     return RefreshIndicator(
       onRefresh: _load,
-      child: isNarrow
-          ? _buildCompactList(techCards, loc, lang)
-          : _buildWideTable(techCards, loc, lang),
+      child: _buildCompactList(techCards, loc, lang),
     );
   }
 

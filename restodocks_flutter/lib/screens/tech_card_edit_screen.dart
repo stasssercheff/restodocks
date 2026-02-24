@@ -1307,26 +1307,20 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
             const SizedBox(height: 16),
             Text(loc.t('ttk_composition'), style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            // Таблица ТТК с продуктами (SizedBox — Expanded внутри SingleChildScrollView даёт unbounded height)
-            LayoutBuilder(
-              builder: (context, c) {
-                final screenH = MediaQuery.of(context).size.height;
-                final rowCount = 1 + (_ingredients.isEmpty ? 1 : _ingredients.length) + 1;
-                const rowHeight = 44.0;
-                final maxH = (screenH * 0.65).clamp(300.0, 800.0);
-                final desiredH = (rowCount * rowHeight).clamp(220.0, maxH);
-                return SizedBox(
-                  height: desiredH,
-                  child: Scrollbar(
-                    thumbVisibility: true,
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.vertical,
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(minWidth: MediaQuery.of(context).size.width),
-                          child: canEdit
-                            ? ExcelStyleTtkTable(
+            // Таблица ТТК на странице: без «окна», при росте числа продуктов страница скроллится, технология остаётся ниже
+            Scrollbar(
+              thumbVisibility: true,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.vertical,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minWidth: MediaQuery.of(context).size.width,
+                      minHeight: 220,
+                    ),
+                    child: canEdit
+                        ? ExcelStyleTtkTable(
                             loc: loc,
                             dishName: _nameController.text,
                             isSemiFinished: _isSemiFinished,
@@ -1363,39 +1357,33 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                             onSuggestWaste: _suggestWasteForRow,
                             hideTechnologyBlock: true,
                           )
-                            : _TtkCookTable(
-                                loc: loc,
-                                dishName: _nameController.text,
-                                ingredients: _ingredients.where((i) => !i.isPlaceholder || i.hasData).toList(),
-                                technology: _technologyController.text,
-                                hideTechnologyInTable: true,
-                                onIngredientsChanged: (list) {
-                                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                                    if (!mounted) return;
-                                    setState(() {
-                                      _ingredients.clear();
-                                      _ingredients.addAll(list);
-                                    });
-                                  });
-                                },
-                              ),
-                        ),
-                      ),
-                    ),
+                        : _TtkCookTable(
+                            loc: loc,
+                            dishName: _nameController.text,
+                            ingredients: _ingredients.where((i) => !i.isPlaceholder || i.hasData).toList(),
+                            technology: _technologyController.text,
+                            hideTechnologyInTable: true,
+                            onIngredientsChanged: (list) {
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                if (!mounted) return;
+                                setState(() {
+                                  _ingredients.clear();
+                                  _ingredients.addAll(list);
+                                });
+                              });
+                            },
+                          ),
                   ),
-                );
-              },
+                ),
+              ),
             ),
-            // Блок технологии — ширина ровно как у таблицы ТТК (1000px), не шире; на узких экранах — по ширине
+            // Блок технологии сразу под таблицей, на странице (без ограничения по высоте «окном»)
             Align(
               alignment: Alignment.centerLeft,
               child: SizedBox(
                 width: MediaQuery.of(context).size.width > 1000 ? 1000 : MediaQuery.of(context).size.width,
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxHeight: MediaQuery.of(context).size.height * 0.25,
-                  ),
-                  child: Container(
+                child: Container(
+                child: Container(
                 margin: const EdgeInsets.only(top: 12),
                 decoration: BoxDecoration(
                   border: Border.all(color: Theme.of(context).colorScheme.outline),
@@ -1414,10 +1402,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                       ),
                       child: Text(loc.t('ttk_technology'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                     ),
-                    Flexible(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(12),
-                        child: canEdit
+                    SingleChildScrollView(
+                      padding: const EdgeInsets.all(12),
+                      child: canEdit
                             ? TextField(
                                 controller: _technologyController,
                                 maxLines: null,
@@ -1434,7 +1421,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                                 _technologyController.text.isEmpty ? '—' : _technologyController.text,
                                 style: const TextStyle(fontSize: 13, height: 1.4),
                               ),
-                      ),
                     ),
                   ],
                 ),

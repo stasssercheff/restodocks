@@ -312,18 +312,17 @@ class AppRouter {
           return TechCardsImportReviewScreen(cards: cards);
         },
       ),
+      // Маршрут :id должен быть до :department, иначе uuid открывается как «список с department=uuid».
+      // По одному сегменту различаем: если это известный цех — список по цеху, иначе — редактирование ТТК по id.
       GoRoute(
-        path: '/tech-cards/:department',
+        path: '/tech-cards/:segment',
         builder: (context, state) {
-          final department = state.pathParameters['department'] ?? 'kitchen';
-          return TechCardsListScreen(department: department);
-        },
-      ),
-      GoRoute(
-        path: '/tech-cards/:id',
-        builder: (context, state) {
-          final id = state.pathParameters['id'] ?? '';
-          return TechCardEditScreen(techCardId: id);
+          final segment = state.pathParameters['segment'] ?? '';
+          const knownDepartments = ['kitchen', 'bar', 'dining_room'];
+          if (knownDepartments.contains(segment)) {
+            return TechCardsListScreen(department: segment);
+          }
+          return TechCardEditScreen(techCardId: segment);
         },
       ),
 
