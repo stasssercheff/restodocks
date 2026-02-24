@@ -93,7 +93,7 @@ class OrderExportSheet extends StatelessWidget {
   Future<void> _sendEmail(BuildContext context) async {
     final to = list.email!.trim();
     final content = _buildText();
-    final subject = '${_t('product_order')}: ${list.name} — $companyName';
+    final subject = '${_t('product_order')}: $companyName';
     final htmlBody = '<pre style="font-family: sans-serif; white-space: pre-wrap;">${_escapeHtml(content)}</pre>';
     final dateStr = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
     final safeCompany = companyName.replaceAll(RegExp(r'[^\w\-.\s]'), '_');
