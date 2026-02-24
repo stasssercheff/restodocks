@@ -30,6 +30,13 @@ struct SettingsView: View {
                     }
                 }
 
+                Section(header: Text("График")) {
+                    Toggle("Показывать время в сменах", isOn: Binding(
+                        get: { appState.showTimeInShifts },
+                        set: { appState.showTimeInShifts = $0 }
+                    ))
+                }
+
                 Section(header: Text(lang.t("language"))) {
                     languageRow(title: lang.t("russian"), code: "ru")
                     languageRow(title: "English", code: "en")

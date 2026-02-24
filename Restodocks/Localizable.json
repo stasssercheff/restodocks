@@ -3075,5 +3075,12 @@
     "es": "Aceites",
     "de": "Öle",
     "fr": "Huiles"
+  },
+  "смена": {
+    "ru": "смена",
+    "en": "shift",
+    "es": "turno",
+    "de": "Schicht",
+    "fr": "équipe"
   }
 }

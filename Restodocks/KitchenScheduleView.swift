@@ -169,6 +169,7 @@ struct DayScheduleCard: View {
 
 struct ShiftCard: View {
     @EnvironmentObject var lang: LocalizationManager
+    @EnvironmentObject var appState: AppState
     let shift: Shift
     let employeeName: String
     let employeePosition: String
@@ -192,8 +193,10 @@ struct ShiftCard: View {
     var timeString: String {
         if shift.fullDay {
             return lang.t("full_day_text")
-        } else {
+        } else if appState.showTimeInShifts {
             return "\(shift.startHour):00 - \(shift.endHour):00"
+        } else {
+            return lang.t("смена")
         }
     }
 
