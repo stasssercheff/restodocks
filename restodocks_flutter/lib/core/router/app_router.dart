@@ -40,6 +40,12 @@ String _getInitialLocation() {
   if (kIsWeb) {
     final loc = initial_loc.getInitialLocation();
     if (loc.isNotEmpty && loc != '/') return loc;
+    try {
+      final uri = Uri.base;
+      if (uri.path.isNotEmpty && uri.path != '/') {
+        return uri.hasQuery ? '${uri.path}?${uri.query}' : uri.path;
+      }
+    } catch (_) {}
   }
   return '/';
 }
