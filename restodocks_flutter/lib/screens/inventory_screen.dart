@@ -129,7 +129,7 @@ class _InventoryScreenState extends State<InventoryScreen>
   TimeOfDay? _endTime;
   bool _completed = false;
   bool _isInputMode = false; // Режим ввода количества (клавиатура открыта)
-  _InventorySort _sortMode = _InventorySort.lastAdded;
+  _InventorySort _sortMode = _InventorySort.alphabetAsc;
   _InventoryBlockFilter _blockFilter = _InventoryBlockFilter.all;
   final TextEditingController _nameFilterCtrl = TextEditingController();
   String _nameFilter = '';
@@ -202,11 +202,12 @@ class _InventoryScreenState extends State<InventoryScreen>
           : null;
       _completed = data['completed'] ?? false;
 
-      final sortModeName = data['sortMode'] ?? 'lastAdded';
+      final sortModeName = data['sortMode'] ?? 'alphabetAsc';
       _sortMode = _InventorySort.values.firstWhere(
         (e) => e.name == sortModeName || (sortModeName == 'alphabet' && e == _InventorySort.alphabetAsc),
-        orElse: () => _InventorySort.lastAdded,
+        orElse: () => _InventorySort.alphabetAsc,
       );
+      if (_sortMode == _InventorySort.lastAdded) _sortMode = _InventorySort.alphabetAsc;
 
       final blockFilterName = data['blockFilter'] ?? 'all';
       _blockFilter = _InventoryBlockFilter.values.firstWhere(
@@ -273,10 +274,8 @@ class _InventoryScreenState extends State<InventoryScreen>
         .toList();
     if (_sortMode == _InventorySort.alphabetAsc) {
       indices.sort((a, b) => _rows[a].productName(lang).toLowerCase().compareTo(_rows[b].productName(lang).toLowerCase()));
-    } else if (_sortMode == _InventorySort.alphabetDesc) {
-      indices.sort((a, b) => _rows[b].productName(lang).toLowerCase().compareTo(_rows[a].productName(lang).toLowerCase()));
     } else {
-      indices.sort((a, b) => b.compareTo(a));
+      indices.sort((a, b) => _rows[b].productName(lang).toLowerCase().compareTo(_rows[a].productName(lang).toLowerCase()));
     }
     return indices;
   }
@@ -289,10 +288,8 @@ class _InventoryScreenState extends State<InventoryScreen>
         .toList();
     if (_sortMode == _InventorySort.alphabetAsc) {
       indices.sort((a, b) => _rows[a].productName(lang).toLowerCase().compareTo(_rows[b].productName(lang).toLowerCase()));
-    } else if (_sortMode == _InventorySort.alphabetDesc) {
-      indices.sort((a, b) => _rows[b].productName(lang).toLowerCase().compareTo(_rows[a].productName(lang).toLowerCase()));
     } else {
-      indices.sort((a, b) => b.compareTo(a));
+      indices.sort((a, b) => _rows[b].productName(lang).toLowerCase().compareTo(_rows[a].productName(lang).toLowerCase()));
     }
     return indices;
   }
@@ -1088,36 +1085,18 @@ class _InventoryScreenState extends State<InventoryScreen>
       ),
       child: Text(headerLine, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis, maxLines: 1),
     );
-    final filterDropdown = !_completed && _rows.isNotEmpty
-        ? DropdownButtonHideUnderline(
-            child: DropdownButton<_InventoryBlockFilter>(
-              value: _blockFilter,
-              isExpanded: narrow,
-              isDense: true,
-              icon: const Icon(Icons.filter_list, size: 18),
-              items: [
-                DropdownMenuItem(value: _InventoryBlockFilter.all, child: Text(loc.t('inventory_filter_all'), style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
-                DropdownMenuItem(value: _InventoryBlockFilter.productsOnly, child: Text(loc.t('inventory_block_products'), style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
-                DropdownMenuItem(value: _InventoryBlockFilter.pfOnly, child: Text(loc.t('inventory_block_pf'), style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
-              ],
-              onChanged: (v) => setState(() => _blockFilter = v ?? _InventoryBlockFilter.all),
-            ),
-          )
-        : null;
-    final sortDropdown = !_completed && _rows.isNotEmpty
-        ? DropdownButtonHideUnderline(
-            child: DropdownButton<_InventorySort>(
-              value: _sortMode,
-              isExpanded: narrow,
-              isDense: true,
-              icon: const Icon(Icons.sort, size: 18),
-              items: [
-                DropdownMenuItem(value: _InventorySort.alphabetAsc, child: Text(loc.t('inventory_sort_az') ?? 'А–Я', style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
-                DropdownMenuItem(value: _InventorySort.alphabetDesc, child: Text(loc.t('inventory_sort_za') ?? 'Я–А', style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
-                DropdownMenuItem(value: _InventorySort.lastAdded, child: Text(loc.t('inventory_sort_last_added'), style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
-              ],
-              onChanged: (v) => setState(() => _sortMode = v ?? _InventorySort.lastAdded),
-            ),
+    /// Кнопка переключения алфавитного порядка А–Я ↔ Я–А.
+    final sortAlphabetButton = !_completed && _rows.isNotEmpty
+        ? IconButton(
+            icon: Icon(Icons.sort_by_alpha, size: 22),
+            tooltip: _sortMode == _InventorySort.alphabetAsc
+                ? (loc.t('inventory_sort_az') ?? 'А–Я')
+                : (loc.t('inventory_sort_za') ?? 'Я–А'),
+            onPressed: () => setState(() {
+              _sortMode = _sortMode == _InventorySort.alphabetAsc
+                  ? _InventorySort.alphabetDesc
+                  : _InventorySort.alphabetAsc;
+            }),
           )
         : null;
     final nameFilterField = !_completed && _rows.isNotEmpty
@@ -1182,17 +1161,14 @@ class _InventoryScreenState extends State<InventoryScreen>
                       ),
                     ],
                   ),
-                  if (filterDropdown != null && sortDropdown != null && !_isInputMode) ...[
+                  if (sortAlphabetButton != null && nameFilterField != null && !_isInputMode) ...[
                     const SizedBox(height: 6),
-                    if (nameFilterField != null) nameFilterField,
-                    const SizedBox(height: 6),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: () => _showFiltersSortSheet(context, loc),
-                        icon: const Icon(Icons.filter_list, size: 18),
-                        label: Text(loc.t('inventory_filters_sort'), style: const TextStyle(fontSize: 13)),
-                      ),
+                    Row(
+                      children: [
+                        sortAlphabetButton,
+                        const SizedBox(width: 8),
+                        Expanded(child: nameFilterField),
+                      ],
                     ),
                   ],
                   // В режиме ввода показываем только поле поиска
@@ -1231,11 +1207,9 @@ class _InventoryScreenState extends State<InventoryScreen>
                     '${_startTime?.hour.toString().padLeft(2, '0') ?? '—'}:${_startTime?.minute.toString().padLeft(2, '0') ?? '—'}',
                     style: theme.textTheme.bodySmall,
                   ),
-                  if (filterDropdown != null && !_isInputMode) ...[
+                  if (sortAlphabetButton != null && !_isInputMode) ...[
                     const SizedBox(width: 6),
-                    SizedBox(width: 130, child: filterDropdown),
-                    const SizedBox(width: 4),
-                    SizedBox(width: 110, child: sortDropdown),
+                    sortAlphabetButton,
                     if (nameFilterField != null) ...[
                       const SizedBox(width: 6),
                       nameFilterField,
@@ -1243,7 +1217,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                   ],
                   // В режиме ввода на desktop показываем поле поиска
                   if (_isInputMode && !narrow && nameFilterField != null) ...[
-                    if (filterDropdown != null && !_isInputMode) const SizedBox(width: 6),
+                    const SizedBox(width: 6),
                     nameFilterField,
                   ],
                 ],
@@ -1251,85 +1225,6 @@ class _InventoryScreenState extends State<InventoryScreen>
           ),
         ),
       ],
-    );
-  }
-
-  void _showFiltersSortSheet(BuildContext context, LocalizationService loc) {
-    final theme = Theme.of(context);
-    showModalBottomSheet<void>(
-      context: context,
-      builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(loc.t('inventory_filters_sort'), style: theme.textTheme.titleMedium),
-                const SizedBox(height: 12),
-                Text(loc.t('inventory_filter_label'), style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary)),
-                ..._InventoryBlockFilter.values.map((v) {
-                  final label = v == _InventoryBlockFilter.all
-                      ? loc.t('inventory_filter_all')
-                      : v == _InventoryBlockFilter.productsOnly
-                          ? loc.t('inventory_block_products')
-                          : loc.t('inventory_block_pf');
-                  return ListTile(
-                    dense: true,
-                    title: Text(label, style: const TextStyle(fontSize: 14)),
-                    leading: Radio<_InventoryBlockFilter>(
-                      value: v,
-                      groupValue: _blockFilter,
-                      onChanged: (val) => setState(() => _blockFilter = val ?? _blockFilter),
-                    ),
-                    onTap: () => setState(() => _blockFilter = v),
-                  );
-                }),
-                const SizedBox(height: 8),
-                Text(loc.t('inventory_sort_label'), style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary)),
-                ..._InventorySort.values.map((v) {
-                  final label = v == _InventorySort.alphabetAsc
-                      ? (loc.t('inventory_sort_az') ?? 'А–Я')
-                      : v == _InventorySort.alphabetDesc
-                          ? (loc.t('inventory_sort_za') ?? 'Я–А')
-                          : loc.t('inventory_sort_last_added');
-                  return ListTile(
-                    dense: true,
-                    title: Text(label, style: const TextStyle(fontSize: 14)),
-                    leading: Radio<_InventorySort>(
-                      value: v,
-                      groupValue: _sortMode,
-                      onChanged: (val) => setState(() => _sortMode = val ?? _sortMode),
-                    ),
-                    onTap: () => setState(() => _sortMode = v),
-                  );
-                }),
-                const SizedBox(height: 12),
-                Text(loc.t('inventory_filter_name') ?? 'По названию', style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary)),
-                const SizedBox(height: 4),
-                TextField(
-                  controller: _nameFilterCtrl,
-                  decoration: InputDecoration(
-                    hintText: loc.t('inventory_filter_name_hint') ?? 'Введите название продукта или ПФ',
-                    isDense: true,
-                    border: const OutlineInputBorder(),
-                  ),
-                  onChanged: (_) => setState(() {}),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: () => Navigator.of(ctx).pop(),
-                    child: Text(loc.t('close')),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
 
