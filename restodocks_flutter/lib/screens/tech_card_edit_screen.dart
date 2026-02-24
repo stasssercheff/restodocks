@@ -1305,17 +1305,25 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
             const SizedBox(height: 16),
             Text(loc.t('ttk_composition'), style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            // Таблица ТТК с продуктами
-            Expanded(
-              child: Scrollbar(
-                thumbVisibility: true,
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.vertical,
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(minWidth: MediaQuery.of(context).size.width),
-                      child: canEdit
+            // Таблица ТТК с продуктами (SizedBox — Expanded внутри SingleChildScrollView даёт unbounded height)
+            LayoutBuilder(
+              builder: (context, c) {
+                final screenH = MediaQuery.of(context).size.height;
+                final rowCount = 1 + (_ingredients.isEmpty ? 1 : _ingredients.length) + 1;
+                const rowHeight = 44.0;
+                final maxH = (screenH * 0.65).clamp(300.0, 800.0);
+                final desiredH = (rowCount * rowHeight).clamp(220.0, maxH);
+                return SizedBox(
+                  height: desiredH,
+                  child: Scrollbar(
+                    thumbVisibility: true,
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.vertical,
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(minWidth: MediaQuery.of(context).size.width),
+                          child: canEdit
                             ? ExcelStyleTtkTable(
                             loc: loc,
                             dishName: _nameController.text,
@@ -1369,10 +1377,12 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                                   });
                                 },
                               ),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
             // Блок технологии — ширина ровно как у таблицы ТТК (1000px), не шире; на узких экранах — по ширине
             Align(
