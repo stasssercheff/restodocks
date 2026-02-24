@@ -21,11 +21,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final account = context.read<AccountManagerSupabase>();
     final emp = account.currentEmployee;
     if (emp == null) return;
-    showModalBottomSheet<void>(
+    showDialog<void>(
       context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (ctx) => _ProfileEditSheet(
+      barrierDismissible: false,
+      builder: (ctx) => _ProfileEditDialog(
         employee: emp,
         onSaved: (updated) async {
           await account.updateEmployee(updated);
@@ -34,6 +33,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             setState(() {});
           }
         },
+        onCancel: () => Navigator.of(ctx).pop(),
       ),
     );
   }
@@ -188,7 +188,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Card(
               child: Column(
                 children: [
-                  ListTile(leading: const Icon(Icons.person), title: Text(localization.t('name')), subtitle: Text(currentEmployee.fullName), trailing: const Icon(Icons.chevron_right), onTap: () => _showEditProfile(context)),
+                    ListTile(leading: const Icon(Icons.person), title: Text(localization.t('name')), subtitle: Text(currentEmployee.fullName), trailing: const Icon(Icons.chevron_right), onTap: () => _showEditProfile(context)),
                   ListTile(leading: const Icon(Icons.email), title: Text(localization.t('email')), subtitle: Text(currentEmployee.email)),
                   ListTile(leading: const Icon(Icons.photo_camera), title: Text(localization.t('photo')), subtitle: Text(currentEmployee.avatarUrl != null ? localization.t('photo_set') : localization.t('photo_not_set')), trailing: const Icon(Icons.chevron_right), onTap: () => _showEditProfile(context)),
                 ],
@@ -260,19 +260,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
-/// Редактирование профиля: имя, фото
-class _ProfileEditSheet extends StatefulWidget {
-  const _ProfileEditSheet({required this.employee, required this.onSaved});
+/// Редактирование профиля: имя, фамилия, фото — виджет по центру экрана
+class _ProfileEditDialog extends StatefulWidget {
+  const _ProfileEditDialog({required this.employee, required this.onSaved, required this.onCancel});
 
   final Employee employee;
   final Future<void> Function(Employee) onSaved;
+  final VoidCallback onCancel;
 
   @override
-  State<_ProfileEditSheet> createState() => _ProfileEditSheetState();
+  State<_ProfileEditDialog> createState() => _ProfileEditDialogState();
 }
 
-class _ProfileEditSheetState extends State<_ProfileEditSheet> {
+class _ProfileEditDialogState extends State<_ProfileEditDialog> {
   late TextEditingController _nameController;
+  late TextEditingController _surnameController;
   String? _avatarUrl;
   bool _isLoading = false;
   String? _error;
@@ -280,13 +282,19 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: widget.employee.fullName);
+    final fn = widget.employee.fullName;
+    final parts = fn.split(' ');
+    _nameController = TextEditingController(text: parts.isNotEmpty ? parts.first : fn);
+    _surnameController = TextEditingController(
+      text: widget.employee.surname ?? (parts.length > 1 ? parts.sublist(1).join(' ') : ''),
+    );
     _avatarUrl = widget.employee.avatarUrl;
   }
 
   @override
   void dispose() {
     _nameController.dispose();
+    _surnameController.dispose();
     super.dispose();
   }
 
@@ -342,12 +350,18 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
       setState(() => _error = context.read<LocalizationService>().t('name_required'));
       return;
     }
+    final surname = _surnameController.text.trim();
+    final fullName = surname.isEmpty ? name : '$name $surname';
     setState(() {
       _isLoading = true;
       _error = null;
     });
     try {
-      final updated = widget.employee.copyWith(fullName: name, avatarUrl: _avatarUrl ?? widget.employee.avatarUrl);
+      final updated = widget.employee.copyWith(
+        fullName: fullName,
+        surname: surname.isEmpty ? '' : surname,
+        avatarUrl: _avatarUrl ?? widget.employee.avatarUrl,
+      );
       await widget.onSaved(updated);
     } catch (e) {
       if (mounted) setState(() {
@@ -364,69 +378,94 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final loc = context.read<LocalizationService>();
-    return DraggableScrollableSheet(
-      initialChildSize: 0.6,
-      minChildSize: 0.4,
-      maxChildSize: 0.9,
-      expand: false,
-      builder: (_, scrollController) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(loc.t('edit_profile'), style: theme.textTheme.titleLarge),
-            const SizedBox(height: 24),
-            Center(
-              child: GestureDetector(
-                onTap: _isLoading ? null : _pickPhoto,
-                child: Stack(
+    return Dialog(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 400, maxHeight: 520),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _avatarUrl != null
-                        ? ClipOval(
-                            child: CachedNetworkImage(
-                              imageUrl: _avatarUrl!,
-                              width: 120,
-                              height: 120,
-                              fit: BoxFit.cover,
-                              placeholder: (_, __) => _avatarPlaceholder(120),
-                              errorWidget: (_, __, ___) => _avatarPlaceholder(120),
-                            ),
-                          )
-                        : _avatarPlaceholder(120),
-                    Positioned(
-                      right: 0,
-                      bottom: 0,
-                      child: CircleAvatar(
-                        radius: 18,
-                        backgroundColor: theme.colorScheme.primary,
-                        child: Icon(Icons.camera_alt, color: theme.colorScheme.onPrimary, size: 20),
+                    Text(loc.t('edit_profile'), style: theme.textTheme.titleLarge),
+                    IconButton(icon: const Icon(Icons.close), onPressed: widget.onCancel),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                Center(
+                  child: GestureDetector(
+                    onTap: _isLoading ? null : _pickPhoto,
+                    child: Stack(
+                      children: [
+                        _avatarUrl != null
+                            ? ClipOval(
+                                child: CachedNetworkImage(
+                                  imageUrl: _avatarUrl!,
+                                  width: 120,
+                                  height: 120,
+                                  fit: BoxFit.cover,
+                                  placeholder: (_, __) => _avatarPlaceholder(120),
+                                  errorWidget: (_, __, ___) => _avatarPlaceholder(120),
+                                ),
+                              )
+                            : _avatarPlaceholder(120),
+                        Positioned(
+                          right: 0,
+                          bottom: 0,
+                          child: CircleAvatar(
+                            radius: 18,
+                            backgroundColor: theme.colorScheme.primary,
+                            child: Icon(Icons.camera_alt, color: theme.colorScheme.onPrimary, size: 20),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Center(child: Text(loc.t('tap_to_change_photo'), style: theme.textTheme.bodySmall)),
+                const SizedBox(height: 24),
+                TextField(
+                  controller: _nameController,
+                  decoration: InputDecoration(
+                    labelText: loc.t('name'),
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.person),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _surnameController,
+                  decoration: InputDecoration(
+                    labelText: loc.t('surname'),
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.badge),
+                  ),
+                ),
+                if (_error != null) ...[
+                  const SizedBox(height: 8),
+                  Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
+                ],
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(child: OutlinedButton(onPressed: widget.onCancel, child: Text(loc.t('cancel') ?? 'Отмена'))),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: _isLoading ? null : _save,
+                        child: _isLoading ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2)) : Text(loc.t('save')),
                       ),
                     ),
                   ],
                 ),
-              ),
+              ],
             ),
-            const SizedBox(height: 8),
-            Center(child: Text(loc.t('tap_to_change_photo'), style: theme.textTheme.bodySmall)),
-            const SizedBox(height: 24),
-            TextField(
-              controller: _nameController,
-              decoration: InputDecoration(
-                labelText: loc.t('full_name'),
-                border: const OutlineInputBorder(),
-                prefixIcon: const Icon(Icons.person),
-              ),
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 8),
-              Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
-            ],
-            const Spacer(),
-            FilledButton(
-              onPressed: _isLoading ? null : _save,
-              child: _isLoading ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2)) : Text(loc.t('save')),
-            ),
-          ],
+          ),
         ),
       ),
     );
