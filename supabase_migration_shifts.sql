@@ -24,6 +24,12 @@ CREATE INDEX IF NOT EXISTS idx_shifts_date ON shifts(date);
 -- RLS
 ALTER TABLE shifts ENABLE ROW LEVEL SECURITY;
 
+-- Удаляем существующие политики перед созданием новых
+DROP POLICY IF EXISTS "Users can view shifts of their establishment" ON shifts;
+DROP POLICY IF EXISTS "Users can insert shifts for their establishment" ON shifts;
+DROP POLICY IF EXISTS "Users can update shifts of their establishment" ON shifts;
+DROP POLICY IF EXISTS "Users can delete shifts of their establishment" ON shifts;
+
 CREATE POLICY "Users can view shifts of their establishment"
   ON shifts FOR SELECT
   USING (
