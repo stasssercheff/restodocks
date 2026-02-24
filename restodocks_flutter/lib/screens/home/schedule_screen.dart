@@ -73,10 +73,27 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     _horizontalScrollController.jumpTo(scrollOffset.clamp(0.0, maxScroll));
   }
 
-  /// Убираем дубликаты сотрудников по id (один человек — один слот в графике).
+  /// Убираем дубликаты: один человек (учётная запись) = один слот. По id, затем по email.
+  /// Если один email в нескольких записях — оставляем одну (приоритет: с ролью owner, иначе первая).
   static List<Employee> _dedupeEmployeesById(List<Employee> list) {
-    final seen = <String>{};
-    return list.where((e) => seen.add(e.id)).toList();
+    final byId = <String, Employee>{};
+    final byEmail = <String, Employee>{};
+    for (final e in list) {
+      if (byId.containsKey(e.id)) continue;
+      final emailLower = e.email.trim().toLowerCase();
+      if (byEmail.containsKey(emailLower)) {
+        final existing = byEmail[emailLower]!;
+        if (e.hasRole('owner') && !existing.hasRole('owner')) {
+          byEmail[emailLower] = e;
+          byId.remove(existing.id);
+          byId[e.id] = e;
+        }
+        continue;
+      }
+      byId[e.id] = e;
+      byEmail[emailLower] = e;
+    }
+    return byId.values.toList();
   }
 
   String _slotDisplayName(ScheduleSlot slot) {
@@ -95,7 +112,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     if (sections.isEmpty) return '';
 
     String sectionKey;
-    if (employee.hasRole('owner') && employee.hasRole('executive_chef')) {
+    if (employee.hasRole('owner')) {
       sectionKey = 'management';
     } else {
       final departmentToSection = {
@@ -135,7 +152,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             _model = _model.copyWith(sections: ScheduleModel.defaultSections);
           }
           final needsManagement = _employees.any((e) =>
-              (e.hasRole('owner') && e.hasRole('executive_chef')) || e.department == 'management');
+              e.hasRole('owner') || e.department == 'management');
           if (needsManagement && !_model.sections.any((s) => s.id == 'management')) {
             _model = _model.copyWith(sections: [
               ..._model.sections,
@@ -143,52 +160,66 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             ]);
             saveSchedule(est.id, _model);
           }
-          final firstSectionId = _model.sections.isNotEmpty ? _model.sections.first.id : '';
           if (_model.slots.isEmpty && _model.sections.isNotEmpty && _employees.isNotEmpty) {
-            // Создаем слоты только на основе реальных зарегистрированных сотрудников
+            // Создаем слоты только на основе реальных зарегистрированных сотрудников (включая собственника)
             final slots = _employees.map((e) => ScheduleSlot(
                   id: const Uuid().v4(),
                   name: e.fullName.trim().isEmpty ? 'Сотрудник' : e.fullName.trim(),
                   sectionId: _getSectionIdForEmployee(e, _model.sections),
+                  employeeId: e.id,
                 )).toList();
             _model = _model.copyWith(slots: slots);
             saveSchedule(est.id, _model);
           } else if (_model.sections.isNotEmpty && _employees.isNotEmpty) {
-            // Синхронизируем слоты с сотрудниками: добавляем новых сотрудников, удаляем слоты для уволенных
-            final existingEmployeeIds = _model.slots
+            // Синхронизируем слоты с сотрудниками: добавляем новых, удаляем уволенных, снимаем дубликаты
+            final currentEmployeeIds = _employees.map((e) => e.id).toSet();
+
+            // Связываем слоты без employeeId с сотрудниками по имени (точное совпадение)
+            final slotsWithEmployeeId = _model.slots.map((slot) {
+              if (slot.employeeId != null) return slot;
+              final slotName = slot.name.trim().toLowerCase();
+              if (slotName.isEmpty) return slot;
+              for (final e in _employees) {
+                if (e.fullName.trim().toLowerCase() == slotName) {
+                  return slot.copyWith(employeeId: e.id);
+                }
+              }
+              return slot;
+            }).toList();
+
+            final existingEmployeeIds = slotsWithEmployeeId
                 .where((s) => s.employeeId != null)
                 .map((s) => s.employeeId!)
                 .toSet();
 
-            final currentEmployeeIds = _employees.map((e) => e.id).toSet();
+            // Удаляем слоты для уволенных и дубликаты (один сотрудник — один слот)
+            final seenEmployeeIds = <String>{};
+            final toKeep = slotsWithEmployeeId.where((s) {
+              if (s.employeeId == null) return true;
+              if (!currentEmployeeIds.contains(s.employeeId!)) return false;
+              if (seenEmployeeIds.contains(s.employeeId!)) return false;
+              seenEmployeeIds.add(s.employeeId!);
+              return true;
+            }).toList();
 
-            // Добавляем новых сотрудников
+            // Добавляем новых сотрудников (без слотов)
             final toAdd = _employees
                 .where((e) => !existingEmployeeIds.contains(e.id))
                 .map((e) => ScheduleSlot(
                       id: const Uuid().v4(),
                       name: e.fullName.trim().isEmpty ? 'Сотрудник' : e.fullName.trim(),
                       sectionId: _getSectionIdForEmployee(e, _model.sections),
-                      employeeId: e.id, // Связываем слот с сотрудником
+                      employeeId: e.id,
                     ))
                 .toList();
-
-            // Удаляем слоты для уволенных сотрудников
-            final toKeep = _model.slots.where((s) {
-              if (s.employeeId == null) return true; // Оставляем слоты без привязки к сотруднику
-              return currentEmployeeIds.contains(s.employeeId!);
-            }).toList();
 
             final updatedSlots = [...toKeep, ...toAdd];
 
             // Обновляем секции для существующих слотов, если изменился отдел сотрудника
             final finalSlots = updatedSlots.map((slot) {
               if (slot.employeeId != null) {
-                final employee = _employees.firstWhere(
-                  (e) => e.id == slot.employeeId,
-                  orElse: () => Employee.create(fullName: '', surname: '', email: '', password: '', department: 'general', establishmentId: '', roles: []),
-                );
-                if (employee.id.isNotEmpty) {
+                final employee = _employees.where((e) => e.id == slot.employeeId).firstOrNull;
+                if (employee != null) {
                   final correctSectionId = _getSectionIdForEmployee(employee, _model.sections);
                   if (slot.sectionId != correctSectionId) {
                     return slot.copyWith(sectionId: correctSectionId);
