@@ -15,6 +15,8 @@ struct EmployeeLoginView: View {
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var isLoading = false
+    @State private var isEmailNotConfirmed = false
+    @State private var isResendingConfirmation = false
 
     var body: some View {
         ZStack {
@@ -68,6 +70,14 @@ struct EmployeeLoginView: View {
                             .multilineTextAlignment(.center)
                     }
 
+                    if isEmailNotConfirmed {
+                        SecondaryButton(title: getResendConfirmationTitle(),
+                                      isDisabled: isResendingConfirmation) {
+                            resendConfirmation()
+                        }
+                        .padding(.top, 8)
+                    }
+
                     PrimaryButton(title: getLoginButtonTitle(),
                                 isDisabled: !isFormValid || isLoading) {
                         login()
@@ -91,12 +101,19 @@ struct EmployeeLoginView: View {
     private func login() {
         isLoading = true
         showError = false
+        isEmailNotConfirmed = false
 
         Task { @MainActor in
             do {
                 try await accounts.signIn(email: email, password: password)
             } catch {
-                showErrorMessage(getInvalidCredentialsText())
+                if let nsError = error as NSError?, nsError.code == 401 {
+                    // Email not confirmed error
+                    isEmailNotConfirmed = true
+                    showErrorMessage(getEmailNotConfirmedText())
+                } else {
+                    showErrorMessage(getInvalidCredentialsText())
+                }
             }
             isLoading = false
         }
@@ -105,6 +122,21 @@ struct EmployeeLoginView: View {
     private func showErrorMessage(_ message: String) {
         errorMessage = message
         showError = true
+    }
+
+    private func resendConfirmation() {
+        isResendingConfirmation = true
+        showError = false
+
+        Task { @MainActor in
+            do {
+                try await accounts.resendConfirmationEmail(email: email)
+                showErrorMessage(getConfirmationSentText())
+            } catch {
+                showErrorMessage(getResendErrorText())
+            }
+            isResendingConfirmation = false
+        }
     }
 
     // Localized text methods
@@ -182,6 +214,50 @@ struct EmployeeLoginView: View {
         case "de": return "Ungültige E-Mail oder Passwort"
         case "fr": return "Email ou mot de passe invalide"
         default: return "Invalid email or password"
+        }
+    }
+
+    private func getEmailNotConfirmedText() -> String {
+        switch lang.currentLang {
+        case "ru": return "Email не подтвержден. Проверьте почту и перейдите по ссылке подтверждения."
+        case "en": return "Email not confirmed. Please check your email and click the confirmation link."
+        case "es": return "Email no confirmado. Revisa tu correo y haz clic en el enlace de confirmación."
+        case "de": return "E-Mail nicht bestätigt. Bitte überprüfen Sie Ihre E-Mail und klicken Sie auf den Bestätigungslink."
+        case "fr": return "Email non confirmé. Vérifiez votre email et cliquez sur le lien de confirmation."
+        default: return "Email not confirmed. Please check your email and click the confirmation link."
+        }
+    }
+
+    private func getResendConfirmationTitle() -> String {
+        switch lang.currentLang {
+        case "ru": return "Отправить подтверждение повторно"
+        case "en": return "Resend confirmation"
+        case "es": return "Reenviar confirmación"
+        case "de": return "Bestätigung erneut senden"
+        case "fr": return "Renvoyer la confirmation"
+        default: return "Resend confirmation"
+        }
+    }
+
+    private func getConfirmationSentText() -> String {
+        switch lang.currentLang {
+        case "ru": return "Письмо с подтверждением отправлено"
+        case "en": return "Confirmation email sent"
+        case "es": return "Correo de confirmación enviado"
+        case "de": return "Bestätigungs-E-Mail gesendet"
+        case "fr": return "Email de confirmation envoyé"
+        default: return "Confirmation email sent"
+        }
+    }
+
+    private func getResendErrorText() -> String {
+        switch lang.currentLang {
+        case "ru": return "Ошибка при отправке письма"
+        case "en": return "Error sending email"
+        case "es": return "Error al enviar el correo"
+        case "de": return "Fehler beim Senden der E-Mail"
+        case "fr": return "Erreur lors de l'envoi de l'email"
+        default: return "Error sending email"
         }
     }
 }

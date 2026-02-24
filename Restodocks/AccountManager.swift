@@ -25,6 +25,7 @@ final class AccountManager: ObservableObject {
     @Published var shifts: [Shift] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
+    @Published var emailConfirmed: Bool = false
 
     init() {
         Task {
@@ -64,6 +65,7 @@ final class AccountManager: ObservableObject {
                     .execute()
                     .value
                 establishment = establishments.first
+                emailConfirmed = session.user?.emailConfirmedAt != nil
                 appState?.isCompanyCreated = true
                 appState?.isLoggedIn = true
                 if let pin = establishment?.pinCode {
@@ -386,6 +388,14 @@ final class AccountManager: ObservableObject {
         return req.first
     }
 
+    // MARK: - EMAIL CONFIRMATION
+    func resendConfirmationEmail(email: String) async throws {
+        try await client.auth.resend(
+            email: email,
+            type: .signup
+        )
+    }
+
     // MARK: - EMPLOYEE LOGIN (email + password)
     @MainActor
     func signIn(email: String, password: String) async throws {
@@ -393,6 +403,13 @@ final class AccountManager: ObservableObject {
             email: email,
             password: password
         )
+
+        // Check if email is confirmed
+        guard let user = session.user, user.emailConfirmedAt != nil else {
+            try? await client.auth.signOut()
+            throw NSError(domain: "AccountManager", code: 401, userInfo: [NSLocalizedDescriptionKey: "Email not confirmed. Please check your email and click the confirmation link."])
+        }
+
         let userId = session.user.id
 
         let employees: [Employee] = try await client
@@ -423,6 +440,7 @@ final class AccountManager: ObservableObject {
 
         currentEmployee = emp
         establishment = company
+        emailConfirmed = session.user?.emailConfirmedAt != nil
         appState?.currentEmployee = emp
         appState?.isLoggedIn = true
         appState?.isCompanySelected = true
