@@ -2,6 +2,10 @@
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS cost_per_unit REAL DEFAULT 0;
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS payroll_counting_mode TEXT DEFAULT 'shift';
 
+-- Дополнительные поля для продуктов и ТТК по подразделениям
+ALTER TABLE products ADD COLUMN IF NOT EXISTS department TEXT DEFAULT 'kitchen';
+ALTER TABLE tech_cards ADD COLUMN IF NOT EXISTS department TEXT DEFAULT 'kitchen';
+
 -- Таблица смен для Restodocks (миграция из Core Data)
 CREATE TABLE IF NOT EXISTS shifts (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,

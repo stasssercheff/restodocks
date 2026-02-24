@@ -4,9 +4,22 @@ struct ScheduleView: View {
     @EnvironmentObject var lang: LocalizationManager
     @EnvironmentObject var accounts: AccountManager
 
+    let department: String? // nil = все, иначе фильтр по department
+
+    init(department: String? = nil) {
+        self.department = department
+    }
+
+    var filteredShifts: [Shift] {
+        if let dept = department {
+            return accounts.shifts.filter { $0.department == dept }
+        }
+        return accounts.shifts
+    }
+
     var body: some View {
         List {
-            ForEach(accounts.shifts) { shift in
+            ForEach(filteredShifts) { shift in
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(accounts.employeeName(for: shift.employeeId))
@@ -56,7 +69,7 @@ struct ScheduleView: View {
 
     private func deleteShift(at offsets: IndexSet) {
         for index in offsets {
-            let shift = accounts.shifts[index]
+            let shift = filteredShifts[index]
             Task {
                 await accounts.deleteShift(shift)
             }

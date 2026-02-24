@@ -5,8 +5,17 @@ struct KitchenScheduleView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var accounts: AccountManager
 
+    let department: String? // nil = все, иначе фильтр по department
     @State private var selectedDepartment: Department = .all
     @State private var showingAddShift = false
+    @State private var showingCopyDialog = false
+
+    init(department: String? = nil) {
+        self.department = department
+        if let dept = department {
+            _selectedDepartment = State(initialValue: Department(rawValue: dept) ?? .all)
+        }
+    }
 
     enum Department: String, CaseIterable, Identifiable {
         case all = "all"
@@ -133,6 +142,13 @@ struct KitchenScheduleView: View {
             .sheet(isPresented: $showingAddShift) {
                 CreateShiftView()
             }
+            .sheet(isPresented: $showingCopyDialog) {
+                ScheduleCopyView(department: department, onCopy: { copyRange, pasteRange, selectedEmployee in
+                    Task {
+                        await copySchedule(from: copyRange, to: pasteRange, for: selectedEmployee, department: department)
+                    }
+                })
+            }
     }
 }
 
@@ -233,5 +249,51 @@ struct ShiftCard: View {
         .background(Color(.systemGray6))
         .cornerRadius(8)
         .padding(.horizontal)
+    }
+
+    private func copySchedule(from copyRange: (Date, Date), to pasteRange: (Date, Date), for employee: Employee, department: String?) async {
+        let calendar = Calendar.current
+        let copyDays = calendar.dateComponents([.day], from: copyRange.0, to: copyRange.1).day! + 1
+        let pasteDays = calendar.dateComponents([.day], from: pasteRange.0, to: pasteRange.1).day! + 1
+
+        var currentPasteDate = pasteRange.0
+
+        for pasteIndex in 0..<pasteDays {
+            // Циклически берём дату из копируемого диапазона
+            let copyIndex = pasteIndex % copyDays
+            let sourceDate = calendar.date(byAdding: .day, value: copyIndex, to: copyRange.0)!
+
+            // Находим смены сотрудника на sourceDate
+            let shiftsOnSourceDate = accounts.shifts.filter { shift in
+                calendar.isDate(shift.date, inSameDayAs: sourceDate) &&
+                shift.employeeId == employee.id &&
+                (department == nil || shift.department == department)
+            }
+
+            // Удаляем существующие смены сотрудника на текущей дате вставки
+            let existingShiftsOnPasteDate = accounts.shifts.filter { shift in
+                calendar.isDate(shift.date, inSameDayAs: currentPasteDate) &&
+                shift.employeeId == employee.id &&
+                (department == nil || shift.department == department)
+            }
+            for shift in existingShiftsOnPasteDate {
+                await accounts.deleteShift(shift)
+            }
+
+            // Копируем смены на новую дату
+            for shift in shiftsOnSourceDate {
+                let newDate = calendar.date(byAdding: .day, value: pasteIndex, to: pasteRange.0)!
+                try? await accounts.createShift(
+                    employeeId: employee.id,
+                    date: newDate,
+                    department: shift.department,
+                    startHour: shift.startHour,
+                    endHour: shift.endHour,
+                    fullDay: shift.fullDay
+                )
+            }
+
+            currentPasteDate = calendar.date(byAdding: .day, value: 1, to: currentPasteDate)!
+        }
     }
 }

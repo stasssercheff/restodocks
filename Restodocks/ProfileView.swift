@@ -126,9 +126,39 @@ struct ProfileView: View {
                     }
                 }
 
-                // 3. Личный график (только для сотрудников)
+                // 3. Панель собственника (только для owner)
                 if let employee = accounts.currentEmployee,
-                   !employee.rolesArray.contains("owner") {
+                   employee.rolesArray.contains("owner") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Управление заведением")
+                            .font(.headline)
+
+                        NavigationLink {
+                            OwnerDashboardView()
+                        } label: {
+                            HStack {
+                                Image(systemName: "building.2")
+                                    .foregroundColor(AppTheme.primary)
+                                Text("Панель собственника")
+                                    .foregroundColor(AppTheme.textPrimary)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .foregroundColor(AppTheme.primary)
+                            }
+                            .padding()
+                            .background(AppTheme.cardBackground)
+                            .cornerRadius(12)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(AppTheme.border, lineWidth: 1)
+                            )
+                        }
+                    }
+                }
+
+                // 4. Личный график (только для сотрудников, не owner)
+                else if let employee = accounts.currentEmployee,
+                        !employee.rolesArray.contains("owner") {
                     VStack(alignment: .leading, spacing: 12) {
                         Text(lang.t("my_schedule"))
                             .font(.headline)

@@ -4,6 +4,7 @@ struct ScheduleCopyView: View {
     @EnvironmentObject var accounts: AccountManager
     @Environment(\.dismiss) private var dismiss
 
+    let department: String? // nil = все departments
     let onCopy: ((Date, Date), (Date, Date), Employee) -> Void
 
     @State private var copyFromDate = Date()
@@ -11,6 +12,18 @@ struct ScheduleCopyView: View {
     @State private var pasteFromDate = Date()
     @State private var pasteToDate = Date()
     @State private var selectedEmployee: Employee?
+
+    init(department: String? = nil, onCopy: @escaping ((Date, Date), (Date, Date), Employee) -> Void) {
+        self.department = department
+        self.onCopy = onCopy
+    }
+
+    var filteredEmployees: [Employee] {
+        if let dept = department {
+            return accounts.employees.filter { $0.department == dept }
+        }
+        return accounts.employees
+    }
 
     var body: some View {
         NavigationStack {
@@ -27,7 +40,7 @@ struct ScheduleCopyView: View {
 
                 Section(header: Text("Сотрудник")) {
                     Picker("Выберите сотрудника", selection: $selectedEmployee) {
-                        ForEach(accounts.employees) { employee in
+                        ForEach(filteredEmployees) { employee in
                             Text(employee.fullName).tag(employee as Employee?)
                         }
                     }
