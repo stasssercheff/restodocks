@@ -957,7 +957,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   void _addProductIngredient(Product p, double value, CookingProcess? cookingProcess, double primaryWastePct, String unit, double? gramsPerPiece, {int? replaceIndex, double? cookingLossPctOverride, bool popNavigator = true}) {
     if (popNavigator) Navigator.of(context).pop();
     final loc = context.read<LocalizationService>();
-    final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'RUB';
+    final accountManager = context.read<AccountManagerSupabase>();
+    final currency = accountManager.currentEmployee?.currency ?? accountManager.establishment?.defaultCurrency ?? 'RUB';
     final productStore = context.read<ProductStoreSupabase>();
     final establishmentId = context.read<AccountManagerSupabase>().establishment?.id;
     final hasProSubscription = context.read<AccountManagerSupabase>().currentEmployee?.hasProSubscription ?? false;
@@ -995,7 +996,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final loc = context.read<LocalizationService>();
-      final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'RUB';
+      final accountManager = context.read<AccountManagerSupabase>();
+    final currency = accountManager.currentEmployee?.currency ?? accountManager.establishment?.defaultCurrency ?? 'RUB';
       final productStore = context.read<ProductStoreSupabase>();
       final establishmentId = context.read<AccountManagerSupabase>().establishment?.id;
       final hasProSubscription = context.read<AccountManagerSupabase>().currentEmployee?.hasProSubscription ?? false;
@@ -1558,7 +1560,8 @@ class _TtkTableState extends State<_TtkTable> {
     final totalProtein = ingredients.fold<double>(0, (s, ing) => s + ing.finalProtein);
     final totalFat = ingredients.fold<double>(0, (s, ing) => s + ing.finalFat);
     final totalCarbs = ingredients.fold<double>(0, (s, ing) => s + ing.finalCarbs);
-    final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'RUB';
+    final accountManager = context.read<AccountManagerSupabase>();
+    final currency = accountManager.currentEmployee?.currency ?? accountManager.establishment?.defaultCurrency ?? 'RUB';
     final sym = currency == 'RUB' ? '₽' : currency == 'VND' ? '₫' : currency == 'USD' ? '\$' : currency;
     final hasProSubscription = context.read<AccountManagerSupabase>().currentEmployee?.hasProSubscription ?? false;
 
@@ -2231,7 +2234,8 @@ class _TtkCookTableState extends State<_TtkCookTable> {
   Widget build(BuildContext context) {
     final lang = widget.loc.currentLanguageCode;
     final totalCost = _ingredients.fold<double>(0, (s, i) => s + i.cost);
-    final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'RUB';
+    final accountManager = context.read<AccountManagerSupabase>();
+    final currency = accountManager.currentEmployee?.currency ?? accountManager.establishment?.defaultCurrency ?? 'RUB';
     final sym = currency == 'RUB' ? '₽' : currency == 'VND' ? '₫' : currency == 'USD' ? '\$' : currency;
 
     return Table(

@@ -166,7 +166,8 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
     final theme = Theme.of(context);
-    final currency = context.read<AccountManagerSupabase>().establishment?.currencySymbol ?? '₽';
+    final accountManager = context.read<AccountManagerSupabase>();
+    final currency = accountManager.currentEmployee?.currencySymbol ?? accountManager.establishment?.currencySymbol ?? '₽';
     final dateFormat = DateFormat('dd.MM.yyyy');
 
     return Scaffold(

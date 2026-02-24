@@ -55,7 +55,7 @@ class _MenuScreenState extends State<MenuScreen> {
       await productStore.loadNomenclature(est.id);
       final tcs = await techCardService.getTechCardsForEstablishment(est.id);
       if (!mounted) return;
-      final currency = acc.establishment?.defaultCurrency ?? 'RUB';
+      final currency = acc.currentEmployee?.currency ?? acc.establishment?.defaultCurrency ?? 'RUB';
       // Пересчитываем стоимость ингредиентов по актуальным ценам номенклатуры
       final enriched = <TechCard>[];
       for (final tc in tcs) {
@@ -99,8 +99,9 @@ class _MenuScreenState extends State<MenuScreen> {
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
-    final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'RUB';
-    final sym = currency == 'RUB' ? '₽' : currency == 'VND' ? '₫' : currency == 'USD' ? '\$' : currency;
+    final accountManager = context.read<AccountManagerSupabase>();
+    final currency = accountManager.currentEmployee?.currency ?? accountManager.establishment?.defaultCurrency ?? 'RUB';
+    final sym = accountManager.currentEmployee?.currencySymbol ?? accountManager.establishment?.currencySymbol ?? '₽';
 
     return Scaffold(
       appBar: AppBar(

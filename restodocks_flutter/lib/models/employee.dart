@@ -101,6 +101,9 @@ class Employee extends Equatable {
   @JsonKey(name: 'preferred_language')
   final String preferredLanguage; // 'ru', 'en', 'de', 'fr', 'es'
 
+  @JsonKey(name: 'preferred_currency')
+  final String? preferredCurrency; // 'RUB', 'USD', 'VND', 'EUR', etc.
+
   /// Тип оплаты: 'per_shift' — за смену, 'hourly' — почасовая.
   @JsonKey(name: 'payment_type')
   final String? paymentType;
@@ -136,6 +139,7 @@ class Employee extends Equatable {
     this.avatarUrl,
     this.subscriptionPlan,
     this.preferredLanguage = 'ru',
+    this.preferredCurrency,
     this.paymentType,
     this.ratePerShift,
     this.hourlyRate,
@@ -158,6 +162,7 @@ class Employee extends Equatable {
     String? personalPin,
     String? avatarUrl,
     String? preferredLanguage,
+    String? preferredCurrency,
     String? paymentType,
     double? ratePerShift,
     double? hourlyRate,
@@ -178,6 +183,7 @@ class Employee extends Equatable {
       personalPin: personalPin ?? this.personalPin,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       preferredLanguage: preferredLanguage ?? this.preferredLanguage,
+      preferredCurrency: preferredCurrency ?? this.preferredCurrency,
       paymentType: paymentType ?? this.paymentType,
       ratePerShift: ratePerShift ?? this.ratePerShift,
       hourlyRate: hourlyRate ?? this.hourlyRate,
@@ -297,6 +303,33 @@ class Employee extends Equatable {
     if (dept != null) {
       return dept.displayName;
     }
+    return department;
+  }
+
+  /// Предпочитаемая валюта сотрудника (с fallback на RUB)
+  String get currency => preferredCurrency ?? 'RUB';
+
+  /// Символ валюты для отображения
+  String get currencySymbol {
+    switch (currency) {
+      case 'RUB':
+        return '₽';
+      case 'USD':
+        return '\$';
+      case 'EUR':
+        return '€';
+      case 'VND':
+        return '₫';
+      case 'GBP':
+        return '£';
+      case 'JPY':
+        return '¥';
+      case 'CNY':
+        return '¥';
+      default:
+        return currency; // Возвращаем код валюты если символ неизвестен
+    }
+  }
     return department;
   }
 

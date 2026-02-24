@@ -461,7 +461,9 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     final establishmentPrice = store.getEstablishmentPrice(p.id, estId);
     final rawPrice = establishmentPrice?.$1 ?? p.basePrice;
     final currency = establishmentPrice?.$2 ?? p.currency ?? 'VND';
-    final currencySymbol = _currencySymbol(currency);
+    final accountManager = context.read<AccountManagerSupabase>();
+    final userCurrencySymbol = accountManager.currentEmployee?.currencySymbol ?? _currencySymbol(currency);
+    final currencySymbol = userCurrencySymbol;
 
     // Если unit = g, показываем цену за кг (умножаем на 1000)
     String priceText;

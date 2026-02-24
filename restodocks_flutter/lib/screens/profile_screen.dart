@@ -221,7 +221,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildScheduleAndSalarySection(Employee employee, Establishment establishment, LocalizationService localization) {
-    final currencySymbol = establishment.currencySymbol;
+    final currencySymbol = employee.currencySymbol;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -359,11 +359,65 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _showCurrencySettings(BuildContext context) {
-    // TODO: Реализовать выбор валюты
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Выбор валюты будет добавлен')),
+  void _showCurrencySettings(BuildContext context) async {
+    final accountManager = context.read<AccountManagerSupabase>();
+    final currentEmployee = accountManager.currentEmployee;
+    if (currentEmployee == null) return;
+
+    final currencies = {
+      'RUB': '₽ Российский рубль',
+      'USD': '\$ Доллар США',
+      'EUR': '€ Евро',
+      'VND': '₫ Вьетнамский донг',
+      'GBP': '£ Фунт стерлингов',
+      'JPY': '¥ Японская йена',
+      'CNY': '¥ Китайский юань',
+    };
+
+    String? selectedCurrency = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Выберите валюту'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: currencies.entries.map((entry) {
+              return RadioListTile<String>(
+                title: Text(entry.value),
+                value: entry.key,
+                groupValue: currentEmployee.currency,
+                onChanged: (value) => Navigator.of(context).pop(value),
+              );
+            }).toList(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Отмена'),
+          ),
+        ],
+      ),
     );
+
+    if (selectedCurrency != null && selectedCurrency != currentEmployee.currency) {
+      try {
+        final updatedEmployee = currentEmployee.copyWith(preferredCurrency: selectedCurrency);
+        await accountManager.updateEmployee(updatedEmployee);
+        setState(() {}); // Обновить UI
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Валюта изменена на ${currencies[selectedCurrency]}')),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Ошибка при сохранении валюты')),
+          );
+        }
+      }
+    }
   }
 
   void _showProSettings(BuildContext context) {
