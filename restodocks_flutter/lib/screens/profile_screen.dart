@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../services/services.dart';
+import '../services/profile_service.dart';
 import '../models/models.dart';
 
 /// Экран профиля пользователя
@@ -17,6 +18,50 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  double? _earnedSalary;
+  double? _currentMonthSalary;
+  bool _loadingSalary = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSalaryData();
+  }
+
+  Future<void> _loadSalaryData() async {
+    final account = context.read<AccountManagerSupabase>();
+    final employee = account.currentEmployee;
+    final establishment = account.establishment;
+
+    if (employee == null || establishment == null) {
+      setState(() => _loadingSalary = false);
+      return;
+    }
+
+    // Рассчитываем зарплату только если у сотрудника есть должность
+    if (employee.hasRole('owner') && employee.jobPosition == null) {
+      setState(() => _loadingSalary = false);
+      return;
+    }
+
+    try {
+      final earned = await ProfileService.calculateEarnedSalary(employee, establishment.id);
+      final currentMonth = await ProfileService.calculateCurrentMonthSalary(employee, establishment.id);
+
+      if (mounted) {
+        setState(() {
+          _earnedSalary = earned;
+          _currentMonthSalary = currentMonth;
+          _loadingSalary = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _loadingSalary = false);
+      }
+    }
+  }
+
   void _showEditProfile(BuildContext context) {
     final account = context.read<AccountManagerSupabase>();
     final emp = account.currentEmployee;
@@ -45,11 +90,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final establishment = accountManager.establishment;
     final localization = context.watch<LocalizationService>();
 
-    if (currentEmployee == null) {
+    if (currentEmployee == null || establishment == null) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );
     }
+
+    final isOwner = currentEmployee.hasRole('owner');
+    final hasPosition = currentEmployee.jobPosition != null;
 
     return Scaffold(
       appBar: AppBar(
@@ -75,153 +123,269 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Информация о профиле
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    // Фото профиля
-                    Center(
-                      child: _buildAvatar(currentEmployee, 100),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Имя
-                    Text(
-                      currentEmployee.fullName,
-                      style: Theme.of(context).textTheme.headlineSmall,
-                      textAlign: TextAlign.center,
-                    ),
-
-                    // Должность и отдел
-                    Text(
-                      '${localization.t('role')}: ${currentEmployee.rolesDisplayText}',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Theme.of(context).colorScheme.primary,
-                            fontWeight: FontWeight.w500,
-                          ),
-                      textAlign: TextAlign.center,
-                    ),
-                    Text(
-                      '${localization.t('department')}: ${currentEmployee.departmentDisplayName}',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.grey[600],
-                          ),
-                      textAlign: TextAlign.center,
-                    ),
-
-                    // Email
-                    Text(
-                      currentEmployee.email,
-                      style: Theme.of(context).textTheme.bodySmall,
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            // Компания
+            _buildCompanySection(establishment, localization),
 
             const SizedBox(height: 24),
 
-            // Информация о компании
-            if (establishment != null) ...[
-              Text(
-                localization.t('company_info'),
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 8),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        establishment.name,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 8),
-                      Text('${context.read<LocalizationService>().t('pin_label')}: ${establishment.pinCode}'),
-                      if (establishment.phone != null) ...[
-                        const SizedBox(height: 4),
-                        Text('${context.read<LocalizationService>().t('phone_label')}: ${establishment.phone}'),
-                      ],
-                      if (establishment.email != null) ...[
-                        const SizedBox(height: 4),
-                        Text('${context.read<LocalizationService>().t('email_label')}: ${establishment.email}'),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            ],
+            // Основная информация профиля
+            _buildProfileInfo(currentEmployee, establishment, localization, isOwner),
 
             const SizedBox(height: 24),
 
-            if (!currentEmployee.hasRole('owner')) ...[
-              Text(
-                localization.t('schedule'),
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 8),
-              ListTile(
-                leading: const Icon(Icons.calendar_month),
-                title: Text(localization.t('schedule')),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => context.push('/schedule'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.numbers),
-                title: Text(localization.t('shift_count')),
-                subtitle: Text(context.read<LocalizationService>().t('zero')),
-                trailing: const Icon(Icons.chevron_right),
-              ),
+            // Личный график и ЗП (если есть должность)
+            if (hasPosition) ...[
+              _buildScheduleAndSalarySection(currentEmployee, establishment, localization),
               const SizedBox(height: 24),
             ],
 
-            Text(
-              localization.t('data'),
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 8),
-            Card(
-              child: Column(
-                children: [
-                    ListTile(leading: const Icon(Icons.person), title: Text(localization.t('name')), subtitle: Text(currentEmployee.fullName), trailing: const Icon(Icons.chevron_right), onTap: () => _showEditProfile(context)),
-                  ListTile(leading: const Icon(Icons.email), title: Text(localization.t('email')), subtitle: Text(currentEmployee.email)),
-                  ListTile(leading: const Icon(Icons.photo_camera), title: Text(localization.t('photo')), subtitle: Text(currentEmployee.avatarUrl != null ? localization.t('photo_set') : localization.t('photo_not_set')), trailing: const Icon(Icons.chevron_right), onTap: () => _showEditProfile(context)),
-                ],
-              ),
-            ),
+            // Настройки
+            _buildSettingsSection(localization),
+
             const SizedBox(height: 24),
 
-            Text(
-              localization.t('inbox'),
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 8),
-            ListTile(
-              leading: const Icon(Icons.inbox),
-              title: Text(localization.t('inbox')),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => context.push('/notifications'),
-            ),
-            const SizedBox(height: 20),
-            const Divider(),
+            // Специальные разделы для собственников
+            if (isOwner) ...[
+              _buildOwnerSections(localization),
+              const SizedBox(height: 24),
+            ],
 
             // Выход
-            ListTile(
-              leading: const Icon(Icons.logout, color: Colors.red),
-              title: Text(
-                localization.t('logout'),
-                style: const TextStyle(color: Colors.red),
-              ),
-              onTap: () => _logout(context),
+            _buildLogoutSection(localization),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCompanySection(Establishment establishment, LocalizationService localization) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              localization.t('company'),
+              style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              establishment.name,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildProfileInfo(Employee employee, Establishment establishment, LocalizationService localization, bool isOwner) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            // Фото профиля
+            Center(
+              child: _buildAvatar(employee, 80),
+            ),
+            const SizedBox(height: 16),
+
+            // Имя и фамилия
+            Text(
+              employee.fullName,
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+              textAlign: TextAlign.center,
+            ),
+
+            // Должность
+            if (employee.jobPosition != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                employee.jobPosition!,
+                style: const TextStyle(fontSize: 16, color: Colors.grey),
+                textAlign: TextAlign.center,
+              ),
+            ],
+
+            // Email
+            const SizedBox(height: 8),
+            Text(
+              employee.email,
+              style: const TextStyle(fontSize: 14, color: Colors.grey),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildScheduleAndSalarySection(Employee employee, Establishment establishment, LocalizationService localization) {
+    final currencySymbol = establishment.currencySymbol;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Личный график
+        ListTile(
+          leading: const Icon(Icons.calendar_month),
+          title: const Text('Личный график'),
+          subtitle: const Text('График непосредственно этого сотрудника'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => context.push('/schedule'),
+        ),
+
+        // ЗП за отработанный период
+        ListTile(
+          leading: const Icon(Icons.payments),
+          title: const Text('ЗП за отработанный период'),
+          subtitle: _loadingSalary
+              ? const Text('Загрузка...')
+              : Text(_earnedSalary != null
+                  ? ProfileService.formatSalary(_earnedSalary!, currencySymbol)
+                  : 'Недоступно'),
+        ),
+
+        // ЗП за текущий календарный месяц
+        ListTile(
+          leading: const Icon(Icons.account_balance_wallet),
+          title: const Text('ЗП за текущий календарный месяц'),
+          subtitle: _loadingSalary
+              ? const Text('Загрузка...')
+              : Text(_currentMonthSalary != null
+                  ? ProfileService.formatSalary(_currentMonthSalary!, currencySymbol)
+                  : 'Недоступно'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSettingsSection(LocalizationService localization) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            'Настройки',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+          ),
+        ),
+        const SizedBox(height: 8),
+
+        // Тема оформления
+        ListTile(
+          leading: const Icon(Icons.brightness_6),
+          title: const Text('Тема оформления'),
+          subtitle: const Text('Темная / Светлая'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => _showThemeSettings(context),
+        ),
+
+        // Язык
+        ListTile(
+          leading: const Icon(Icons.language),
+          title: const Text('Язык'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => _showLanguageSettings(context),
+        ),
+
+        // Валюта
+        ListTile(
+          leading: const Icon(Icons.currency_ruble),
+          title: const Text('Валюта'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => _showCurrencySettings(context),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildOwnerSections(LocalizationService localization) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Настройки Pro
+        ListTile(
+          leading: const Icon(Icons.star, color: Colors.amber),
+          title: const Text('Настройки Pro'),
+          subtitle: const Text('Ввод промокода, управление подпиской'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => _showProSettings(context),
+        ),
+
+        // Выбор роли
+        ListTile(
+          leading: const Icon(Icons.admin_panel_settings),
+          title: const Text('Выбор роли'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => _showRoleSelection(context),
+        ),
+
+        // Пригласить соучредителя
+        ListTile(
+          leading: const Icon(Icons.person_add),
+          title: const Text('Пригласить соучредителя'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => _showInviteCoOwner(context),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLogoutSection(LocalizationService localization) {
+    return ListTile(
+      leading: const Icon(Icons.logout, color: Colors.red),
+      title: const Text(
+        'Выход',
+        style: TextStyle(color: Colors.red),
+      ),
+      onTap: () => _logout(context),
+    );
+  }
+
+  // Методы для показа настроек (заглушки)
+  void _showThemeSettings(BuildContext context) {
+    // TODO: Реализовать переключение темы
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Настройки темы будут добавлены')),
+    );
+  }
+
+  void _showLanguageSettings(BuildContext context) {
+    // TODO: Реализовать выбор языка
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Выбор языка будет добавлен')),
+    );
+  }
+
+  void _showCurrencySettings(BuildContext context) {
+    // TODO: Реализовать выбор валюты
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Выбор валюты будет добавлен')),
+    );
+  }
+
+  void _showProSettings(BuildContext context) {
+    // TODO: Реализовать Pro настройки
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Pro настройки будут добавлены')),
+    );
+  }
+
+  void _showRoleSelection(BuildContext context) {
+    // TODO: Реализовать выбор роли
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Выбор роли будет добавлен')),
+    );
+  }
+
+  void _showInviteCoOwner(BuildContext context) {
+    // TODO: Реализовать приглашение соучредителя
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Приглашение соучредителя будет добавлено')),
     );
   }
 
