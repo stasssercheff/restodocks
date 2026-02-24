@@ -194,7 +194,7 @@ class AppRouter {
         path: '/menu/:department',
         builder: (context, state) {
           final department = state.pathParameters['department'] ?? 'kitchen';
-          return ProductsScreen(department: department);
+          return MenuScreen(department: department);
         },
       ),
       GoRoute(

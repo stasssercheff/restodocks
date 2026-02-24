@@ -3009,7 +3009,7 @@ class _QuickActions extends StatelessWidget {
               context,
               'Создать меню',
               'Добавить блюда в меню ресторана',
-              () => GoRouter.of(context).push('/menu'),
+              () => GoRouter.of(context).push('/menu/kitchen'),
             ),
           ],
         ),

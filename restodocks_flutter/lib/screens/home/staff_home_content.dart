@@ -32,7 +32,7 @@ class StaffHomeContent extends StatelessWidget {
         _Tile(
           icon: Icons.restaurant_menu,
           title: loc.t('menu'),
-          onTap: () => context.push('/products'),
+          onTap: () => context.push('/menu/${employee.department}'),
         ),
         _Tile(
           icon: Icons.description,
