@@ -23,6 +23,9 @@ class ExcelStyleTtkTable extends StatefulWidget {
   final bool isCook; // true для поваров - скрываем стоимость
   /// Если true, блок технологии не отображается (рендерится отдельно в родителе)
   final bool hideTechnologyBlock;
+  /// Вес порции (г) — вносится в итого, столбец «вес прц». При изменении вызывается callback.
+  final double weightPerPortion;
+  final void Function(double)? onWeightPerPortionChanged;
 
   ExcelStyleTtkTable({
     super.key,
@@ -43,6 +46,8 @@ class ExcelStyleTtkTable extends StatefulWidget {
     this.onSuggestCookingLoss,
     this.isCook = false,
     this.hideTechnologyBlock = false,
+    this.weightPerPortion = 100,
+    this.onWeightPerPortionChanged,
   });
 
   @override
@@ -141,7 +146,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       child: SingleChildScrollView(
         scrollDirection: Axis.vertical,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(minWidth: 1000), // Минимальная ширина для всех столбцов - уменьшена
+          constraints: const BoxConstraints(minWidth: 1145), // Минимальная ширина: 2 новых столбца (вес прц, порций)
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -159,9 +164,11 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
               6: FixedColumnWidth(80),   // Способ
               7: FixedColumnWidth(80),   // % ужарки
               8: FixedColumnWidth(60),   // Выход
-              9: FixedColumnWidth(70),   // Стоимость
-              10: FixedColumnWidth(70),  // Цена за кг
-              11: FixedColumnWidth(40),  // Удаление
+              9: FixedColumnWidth(70),   // вес прц
+              10: FixedColumnWidth(75),  // порций(шт)
+              11: FixedColumnWidth(70), // Стоимость
+              12: FixedColumnWidth(70), // Цена за кг
+              13: FixedColumnWidth(40), // Удаление
             },
             children: [
               // Шапка
@@ -177,6 +184,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   _buildHeaderCell('Способ'),
                   _buildHeaderCell('% ужарки'),
                   _buildHeaderCell('Выход'),
+                  _buildHeaderCell('вес прц'),
+                  _buildHeaderCell('порций(шт)'),
                   _buildHeaderCell('Цена'),
                   _buildHeaderCell('Стоимость (за кг/прц)'),
                   _buildHeaderCell(''), // Столбец удаления
@@ -295,6 +304,12 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                       ));
                     }, 'output_$rowIndex'),
 
+                    // вес прц — пусто в строках продукта
+                    _buildReadOnlyCell(''),
+
+                    // порций(шт) — рассчитывается: outputWeight * (weightPerPortion / totalOutput)
+                    _buildReadOnlyCell(_portionsPerOne(totalOutput, ingredient)),
+
                     // Стоимость
                     _buildCostCell(ingredient),
 
@@ -320,6 +335,18 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   const SizedBox.shrink(), // Нетто
                   const SizedBox.shrink(), // Способ
                   _buildTotalCell('${totalOutput.toStringAsFixed(0)}г'), // Выход
+                  // вес прц — редактируемое поле в итого
+                  widget.canEdit && widget.onWeightPerPortionChanged != null
+                      ? _buildNumericCell(
+                          widget.weightPerPortion == 0 ? '' : widget.weightPerPortion.toStringAsFixed(0),
+                          (value) {
+                            final v = double.tryParse(value) ?? 0;
+                            widget.onWeightPerPortionChanged?.call(v);
+                          },
+                          'weight_per_portion',
+                        )
+                      : _buildTotalCell(widget.weightPerPortion == 0 ? '' : widget.weightPerPortion.toStringAsFixed(0)),
+                  _buildTotalCell('1'), // порций(шт) в итого всегда 1
                   const SizedBox.shrink(), // Стоимость (пусто)
                   widget.isCook
                       ? const SizedBox.shrink() // Скрываем стоимость для поваров
@@ -810,6 +837,13 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         ),
       ),
     );
+  }
+
+  /// Количество продукта на 1 порцию (г) = outputWeight * (weightPerPortion / totalOutput).
+  String _portionsPerOne(double totalOutput, TTIngredient ingredient) {
+    if (ingredient.productName.isEmpty || totalOutput <= 0) return '';
+    final val = ingredient.outputWeight * (widget.weightPerPortion / totalOutput);
+    return val == val.truncateToDouble() ? val.toInt().toString() : val.toStringAsFixed(1);
   }
 
   void _updateIngredient(int index, TTIngredient updated) {

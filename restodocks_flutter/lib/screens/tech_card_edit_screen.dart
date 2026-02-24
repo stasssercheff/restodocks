@@ -472,6 +472,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   final List<TTIngredient> _ingredients = [];
   List<TechCard> _pickerTechCards = [];
   List<TechCard> _semiFinishedProducts = [];
+  double _portionWeight = 100; // вес порции (г), вносится в столбец «вес прц» в итого
 
   bool get _isNew => widget.techCardId.isEmpty || widget.techCardId == 'new';
 
@@ -585,6 +586,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           _techCard = tc;
           _loading = false;
           if (tc != null) {
+            _portionWeight = tc.portionWeight;
             _nameController.text = tc.dishName;
             _selectedCategory = _categoryOptions.contains(tc.category) ? tc.category : 'misc';
             _selectedSection = tc.section;
@@ -642,7 +644,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('dish_name_required_ttk'))));
       return;
     }
-    const portion = 100.0; // порция — в карточках блюд
     final toSaveIngredients = _ingredients.where((i) => !i.isPlaceholder).toList();
     final yieldVal = toSaveIngredients.isEmpty ? 0.0 : toSaveIngredients.fold(0.0, (s, i) => s + i.netWeight);
     final category = _selectedCategory;
@@ -665,14 +666,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           establishmentId: est.id,
           createdBy: emp.id,
         );
-        var updated = _applyEdits(created, portionWeight: portion, yieldGrams: yieldVal, technologyLocalized: techMap, ingredients: toSaveIngredients);
+        var updated = _applyEdits(created, portionWeight: _portionWeight, yieldGrams: yieldVal, technologyLocalized: techMap, ingredients: toSaveIngredients);
         await svc.saveTechCard(updated);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('tech_card_created'))));
           context.go('/tech-cards');
         }
       } else {
-        final updated = _applyEdits(tc, dishName: name, category: category, section: _selectedSection, isSemiFinished: _isSemiFinished, portionWeight: portion, yieldGrams: yieldVal, technologyLocalized: techMap, ingredients: toSaveIngredients);
+        final updated = _applyEdits(tc, dishName: name, category: category, section: _selectedSection, isSemiFinished: _isSemiFinished, portionWeight: _portionWeight, yieldGrams: yieldVal, technologyLocalized: techMap, ingredients: toSaveIngredients);
         await svc.saveTechCard(updated);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.read<LocalizationService>().t('save') + ' ✓')));
@@ -1304,17 +1305,25 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
             const SizedBox(height: 16),
             Text(loc.t('ttk_composition'), style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            // Таблица ТТК с продуктами
-            Expanded(
-              child: Scrollbar(
-                thumbVisibility: true,
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.vertical,
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(minWidth: MediaQuery.of(context).size.width),
-                      child: canEdit
+            // Таблица ТТК с продуктами (SizedBox — Expanded внутри SingleChildScrollView даёт unbounded height)
+            LayoutBuilder(
+              builder: (context, c) {
+                final screenH = MediaQuery.of(context).size.height;
+                final rowCount = 1 + (_ingredients.isEmpty ? 1 : _ingredients.length) + 1;
+                const rowHeight = 44.0;
+                final maxH = (screenH * 0.65).clamp(300.0, 800.0);
+                final desiredH = (rowCount * rowHeight).clamp(220.0, maxH);
+                return SizedBox(
+                  height: desiredH,
+                  child: Scrollbar(
+                    thumbVisibility: true,
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.vertical,
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(minWidth: MediaQuery.of(context).size.width),
+                          child: canEdit
                             ? ExcelStyleTtkTable(
                             loc: loc,
                             dishName: _nameController.text,
@@ -1327,6 +1336,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                             establishmentId: context.read<AccountManagerSupabase>().establishment?.id,
                             semiFinishedProducts: _semiFinishedProducts,
                             isCook: isCook,
+                            weightPerPortion: _portionWeight,
+                            onWeightPerPortionChanged: (v) => setState(() => _portionWeight = v),
                             onAdd: _showAddIngredient,
                             onUpdate: (i, ing) {
                               setState(() {
@@ -1366,10 +1377,12 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                                   });
                                 },
                               ),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
             // Блок технологии — ширина ровно как у таблицы ТТК (1000px), не шире; на узких экранах — по ширине
             Align(
