@@ -59,6 +59,7 @@ class AppRouter {
       // Web: если роутер показал корень/splash, но в адресной строке другой путь — восстанавливаем его (F5)
       if (kIsWeb && (loc == '/' || loc == '/splash')) {
         final browserPath = initial_loc.getCurrentBrowserPath();
+        if (kDebugMode) debugPrint('[Restodocks] redirect: loc=$loc, browserPath=$browserPath');
         if (browserPath != null) return browserPath;
       }
       if (_isPublicPath(loc)) return null;
@@ -383,7 +384,10 @@ class _SplashScreenState extends State<SplashScreen> {
 
     // Принудительно вызываем refresh маршрутизации
     if (accountManager.isLoggedInSync) {
-      context.go('/home');
+      // Web: при F5 мог оказаться splash при глубокой ссылке — идём по URL из адресной строки
+      final bp = kIsWeb ? initial_loc.getCurrentBrowserPath() : null;
+      final target = (bp != null && bp != '/splash') ? bp : '/home';
+      context.go(target);
     } else {
       context.go('/login');
     }
