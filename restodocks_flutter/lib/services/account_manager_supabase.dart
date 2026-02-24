@@ -45,6 +45,7 @@ class AccountManagerSupabase {
   bool get isLoggedInSync => _currentEmployee != null && _establishment != null;
 
   /// Инициализация сервиса
+  /// Supabase восстанавливает сессию из localStorage при Supabase.initialize() в main()
   Future<void> initialize() async {
     print('🔐 AccountManager: Starting initialization...');
     await _secureStorage.initialize();

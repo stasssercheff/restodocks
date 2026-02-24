@@ -8,7 +8,10 @@ import '../models/models.dart';
 
 /// Экран входа в систему
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({super.key, this.redirectAfterLogin});
+
+  /// URL для перехода после успешного входа (при обновлении страницы)
+  final String? redirectAfterLogin;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -221,7 +224,12 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (mounted) {
-        context.go('/home');
+        // Возврат на страницу, где был пользователь до выхода (после F5)
+        final redirect = widget.redirectAfterLogin;
+        final target = (redirect != null && redirect.isNotEmpty)
+            ? Uri.decodeComponent(redirect)
+            : '/home';
+        context.go(target.startsWith('/') ? target : '/$target');
       }
     } catch (e) {
       if (!mounted) return;

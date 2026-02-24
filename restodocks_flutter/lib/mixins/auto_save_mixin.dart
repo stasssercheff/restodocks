@@ -74,12 +74,12 @@ mixin AutoSaveMixin<T extends StatefulWidget> on State<T> {
     }
   }
 
-  /// Запланировать сохранение с задержкой
+  /// Запланировать сохранение с задержкой (данные намертво в localStorage)
   void scheduleSave() {
     if (!_isInitialized) return;
 
     _saveTimer?.cancel();
-    _saveTimer = Timer(const Duration(milliseconds: 500), () {
+    _saveTimer = Timer(const Duration(milliseconds: 300), () {
       if (mounted) {
         _saveDraft();
       }

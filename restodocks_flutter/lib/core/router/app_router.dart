@@ -55,10 +55,14 @@ class AppRouter {
     redirect: (context, state) async {
       final loc = state.matchedLocation;
       if (_isPublicPath(loc)) return null;
-      // Сессия уже восстановлена в main() — при F5 остаёмся на текущем URL, данные перезагружаются экраном
+      // Сессия восстановлена в main() — при F5 остаёмся на текущем URL
       final account = context.read<AccountManagerSupabase>();
       if (!account.isLoggedInSync) await account.initialize();
-      if (!account.isLoggedInSync) return '/login';
+      if (!account.isLoggedInSync) {
+        // Сохраняем URL для возврата после входа
+        final redirect = loc.isNotEmpty && loc != '/' ? Uri.encodeComponent(loc) : null;
+        return redirect != null ? '/login?redirect=$redirect' : '/login';
+      }
       return null;
     },
     routes: [
@@ -74,10 +78,13 @@ class AppRouter {
         builder: (context, state) => const SplashScreen(),
       ),
 
-      // Экран входа
+      // Экран входа (redirect — URL для возврата после входа при F5)
       GoRoute(
         path: '/login',
-        builder: (context, state) => const LoginScreen(),
+        builder: (context, state) {
+          final redirect = state.queryParameters['redirect'];
+          return LoginScreen(redirectAfterLogin: redirect);
+        },
       ),
 
       // Регистрация компании
