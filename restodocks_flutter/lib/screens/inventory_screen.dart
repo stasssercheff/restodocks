@@ -84,7 +84,11 @@ class _InventoryRow {
       isWeightInKg ? quantities[i] * 1000 : quantities[i];
   double get totalDisplay => isWeightInKg ? total * 1000 : total;
 
-  double get total => quantities.fold(0.0, (a, b) => a + b);
+  double get total {
+    if (quantities.isEmpty) return 0.0;
+    if (quantities.length == 1) return quantities[0];
+    return quantities.sublist(0, quantities.length - 1).fold(0.0, (a, b) => a + b);
+  }
 
   _InventoryRow copyWith({Product? product, TechCard? techCard, String? pfUnit, String? unitOverride}) => _InventoryRow(
         product: product ?? this.product,
@@ -340,14 +344,10 @@ class _InventoryScreenState extends State<InventoryScreen>
         _rows.add(_InventoryRow(product: null, techCard: tc, quantities: List<double>.filled(minQtyCount, 0.0), pfUnit: _pfUnitPcs));
       }
 
-      // Нормализуем существующие строки: гарантируем минимум 2 колонки для каждой строки
       for (var i = 0; i < _rows.length; i++) {
         final row = _rows[i];
-        if (!row.isFree) {
-          // Гарантируем минимум 2 колонки
-          while (row.quantities.length < 2) {
-            row.quantities.add(0.0);
-          }
+        while (row.quantities.length < 2) {
+          row.quantities.add(0.0);
         }
       }
     });
@@ -562,13 +562,7 @@ class _InventoryScreenState extends State<InventoryScreen>
 
     setState(() {
       row.quantities[colIndex] = value;
-
-      // При заполнении 2-й ячейки (индекс 1) — сразу добавляем пустую справа
-      if (!row.isFree && colIndex == 1 && row.quantities.length <= 2) {
-        row.quantities.add(0.0);
-      }
-      // При заполнении последней ячейки — добавляем ещё одну пустую справа (всегда крайняя пустая)
-      else if (!row.isFree && colIndex == row.quantities.length - 1) {
+      if (colIndex == row.quantities.length - 1) {
         row.quantities.add(0.0);
       }
     });
@@ -1609,18 +1603,17 @@ class _InventoryScreenState extends State<InventoryScreen>
             ),
           ],
         ),
-        // Scrollable content
         Expanded(
-          child: Row(
-            children: [
-              // Fixed left column (product info)
-              Container(
-                width: leftW,
-                decoration: BoxDecoration(
-                  border: Border(right: BorderSide(color: Theme.of(context).dividerColor.withOpacity(0.3))),
-                ),
-                child: SingleChildScrollView(
-                  physics: const ClampingScrollPhysics(),
+          child: SingleChildScrollView(
+            physics: const ClampingScrollPhysics(),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: leftW,
+                  decoration: BoxDecoration(
+                    border: Border(right: BorderSide(color: Theme.of(context).dividerColor.withOpacity(0.3))),
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
@@ -1644,43 +1637,38 @@ class _InventoryScreenState extends State<InventoryScreen>
                     ],
                   ),
                 ),
-              ),
-              // Scrollable right column (quantities)
-              Expanded(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  controller: _hScroll,
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  child: SizedBox(
-                    width: rightW.clamp(screenW - leftW, double.infinity),
-                    child: SingleChildScrollView(
-                      physics: const ClampingScrollPhysics(),
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    controller: _hScroll,
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: SizedBox(
+                      width: rightW.clamp(screenW - leftW, double.infinity),
                       child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Empty space to align with fixed headers
-                      SizedBox(height: _completed ? 56 : 48),
-                      if (_blockFilter != _InventoryBlockFilter.pfOnly && _productIndices.isNotEmpty) ...[
-                        SizedBox(height: 32), // Section header space
-                        ..._productIndices.asMap().entries.map((e) => _buildScrollableDataRow(loc, e.value)),
-                      ],
-                      if (_blockFilter != _InventoryBlockFilter.productsOnly && _pfIndices.isNotEmpty) ...[
-                        SizedBox(height: 32), // Section header space
-                        ..._pfIndices.asMap().entries.map((e) => _buildScrollableDataRow(loc, e.value)),
-                      ],
-                      if (_aggregatedFromFile != null && _aggregatedFromFile!.isNotEmpty) ...[
-                        SizedBox(height: 32), // Section header space
-                        _buildScrollableAggregatedHeaderRow(loc),
-                        ..._aggregatedFromFile!.asMap().entries.map((e) => _buildScrollableAggregatedDataRow(loc, e.value)),
-                      ],
-                    ],
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(height: _completed ? 56 : 48),
+                          if (_blockFilter != _InventoryBlockFilter.pfOnly && _productIndices.isNotEmpty) ...[
+                            SizedBox(height: 32),
+                            ..._productIndices.asMap().entries.map((e) => _buildScrollableDataRow(loc, e.value)),
+                          ],
+                          if (_blockFilter != _InventoryBlockFilter.productsOnly && _pfIndices.isNotEmpty) ...[
+                            SizedBox(height: 32),
+                            ..._pfIndices.asMap().entries.map((e) => _buildScrollableDataRow(loc, e.value)),
+                          ],
+                          if (_aggregatedFromFile != null && _aggregatedFromFile!.isNotEmpty) ...[
+                            SizedBox(height: 32),
+                            _buildScrollableAggregatedHeaderRow(loc),
+                            ..._aggregatedFromFile!.asMap().entries.map((e) => _buildScrollableAggregatedDataRow(loc, e.value)),
+                          ],
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-              ),
-              ),
+              ],
             ),
-            ],
           ),
         ),
       ],
