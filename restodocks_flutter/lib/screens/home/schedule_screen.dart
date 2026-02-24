@@ -311,8 +311,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   }
 
   List<DateTime> get _visibleDates {
-    final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
-    return _model.dates.where((d) => !d.isAfter(today)).toList();
+    final yesterday = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day - 1);
+    return _model.dates.where((d) => !d.isAfter(yesterday)).toList();
   }
 
   void _showCopyRangeDialog() {
