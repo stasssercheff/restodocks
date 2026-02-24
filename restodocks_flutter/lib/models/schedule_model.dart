@@ -93,6 +93,7 @@ class ScheduleModel {
     ScheduleSection(id: 'pastry', nameKey: 'section_pastry'),
     ScheduleSection(id: 'prep', nameKey: 'section_prep'),
     ScheduleSection(id: 'cleaning', nameKey: 'section_cleaning'),
+    ScheduleSection(id: 'management', nameKey: 'management'),
   ];
 
   static String _dateKey(DateTime d) {

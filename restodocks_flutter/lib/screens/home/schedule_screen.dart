@@ -79,26 +79,27 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     return list.where((e) => seen.add(e.id)).toList();
   }
 
-  /// Определяем секцию (цех) для сотрудника на основе его отдела
   String _getSectionIdForEmployee(Employee employee, List<ScheduleSection> sections) {
     if (sections.isEmpty) return '';
 
-    // Маппинг отделов сотрудников на секции графика
-    final departmentToSection = {
-      'kitchen': 'hot_kitchen', // Горячий цех
-      'bar': 'bar',
-      'hall': 'hall', // Зал
-      'management': 'management',
-    };
+    String sectionKey;
+    if (employee.hasRole('owner') && employee.hasRole('executive_chef')) {
+      sectionKey = 'management';
+    } else {
+      final departmentToSection = {
+        'kitchen': 'hot_kitchen',
+        'bar': 'bar',
+        'dining_room': 'hall',
+        'hall': 'hall',
+        'management': 'management',
+      };
+      sectionKey = departmentToSection[employee.department] ?? 'hot_kitchen';
+    }
 
-    final sectionKey = departmentToSection[employee.department] ?? 'hot_kitchen';
-
-    // Ищем секцию по ключу
     final section = sections.firstWhere(
       (s) => s.id == sectionKey,
-      orElse: () => sections.first, // Если секция не найдена, используем первую
+      orElse: () => sections.first,
     );
-
     return section.id;
   }
 
@@ -120,6 +121,15 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           _model = model;
           if (_model.sections.isEmpty) {
             _model = _model.copyWith(sections: ScheduleModel.defaultSections);
+          }
+          final needsManagement = _employees.any((e) =>
+              (e.hasRole('owner') && e.hasRole('executive_chef')) || e.department == 'management');
+          if (needsManagement && !_model.sections.any((s) => s.id == 'management')) {
+            _model = _model.copyWith(sections: [
+              ..._model.sections,
+              const ScheduleSection(id: 'management', nameKey: 'management'),
+            ]);
+            saveSchedule(est.id, _model);
           }
           final firstSectionId = _model.sections.isNotEmpty ? _model.sections.first.id : '';
           if (_model.slots.isEmpty && _model.sections.isNotEmpty && _employees.isNotEmpty) {
