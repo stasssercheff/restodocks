@@ -334,8 +334,12 @@ class _ProfileEditDialogState extends State<_ProfileEditDialog> {
       if (mounted) setState(() => _avatarUrl = '$url?t=${DateTime.now().millisecondsSinceEpoch}');
     } catch (e) {
       if (mounted) {
+        final errStr = e.toString();
+        final isBucketNotFound = errStr.contains('Bucket not found') || errStr.contains('404');
         setState(() {
-          _error = '${context.read<LocalizationService>().t('photo_upload_error')}: $e';
+          _error = isBucketNotFound
+              ? '${context.read<LocalizationService>().t('photo_upload_error')}: bucket "avatars" не найден. Создайте его в Supabase Dashboard: Storage → New bucket → имя "avatars" → Public bucket.'
+              : '${context.read<LocalizationService>().t('photo_upload_error')}: $e';
           _isLoading = false;
         });
       }
