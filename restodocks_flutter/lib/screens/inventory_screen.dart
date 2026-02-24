@@ -563,11 +563,12 @@ class _InventoryScreenState extends State<InventoryScreen>
     // Обновляем значение напрямую
     row.quantities[colIndex] = value;
 
+    // Всегда вызываем setState для обновления UI (итогов)
+    setState(() {});
+
     // Если это последняя ячейка и значение > 0, добавляем новую ячейку для этой строки
     if (colIndex == row.quantities.length - 1 && value > 0) {
-      setState(() {
-        row.quantities.add(0.0);
-      });
+      row.quantities.add(0.0);
     }
 
     saveNow();
@@ -1780,7 +1781,6 @@ class _QtyCellState extends State<_QtyCell> {
   late TextEditingController _controller;
   final FocusNode _focus = FocusNode();
   bool _wasFocused = false;
-  Timer? _updateTimer;
   late double _currentValue;
 
   double get _displayValueRaw => widget.useGrams ? widget.value * 1000 : widget.value;
@@ -1826,7 +1826,6 @@ class _QtyCellState extends State<_QtyCell> {
 
   @override
   void dispose() {
-    _updateTimer?.cancel();
     _focus.removeListener(_onFocusChanged);
     _controller.dispose();
     _focus.dispose();
@@ -1853,15 +1852,13 @@ class _QtyCellState extends State<_QtyCell> {
         fillColor: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
       ),
       onChanged: (s) {
-        // Обновляем локальное значение
+        // Обновляем значение сразу для синхронного обновления итогов
         final v = double.tryParse(s.replaceFirst(',', '.')) ?? 0;
-        _currentValue = widget.useGrams ? v / 1000 : v;
+        final actualValue = widget.useGrams ? v / 1000 : v;
+        _currentValue = actualValue;
 
-        // Используем короткий таймер для обновления итогов с задержкой
-        _updateTimer?.cancel();
-        _updateTimer = Timer(const Duration(milliseconds: 100), () {
-          widget.onChanged(_currentValue);
-        });
+        // Вызываем callback сразу
+        widget.onChanged(actualValue);
       },
     );
   }
