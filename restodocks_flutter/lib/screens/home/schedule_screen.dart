@@ -55,7 +55,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
   void _scrollToCenterToday() {
     if (!_horizontalScrollController.hasClients) return;
-    final dates = _model.dates;
+    final dates = _visibleDates;
     final today = DateTime.now();
     final todayDate = DateTime(today.year, today.month, today.day);
     int? todayIndex;
@@ -306,12 +306,17 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     });
   }
 
+  List<DateTime> get _visibleDates {
+    final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    return _model.dates.where((d) => !d.isAfter(today)).toList();
+  }
+
   void _showCopyRangeDialog() {
     final loc = context.read<LocalizationService>();
     showDialog<void>(
       context: context,
       builder: (ctx) => _CopyRangeDialog(
-        dates: _model.dates,
+        dates: _visibleDates,
         slots: _model.slots,
         loc: loc,
         onCopy: (sourceStart, sourceEnd, targetStart, targetEnd, selectedSlots) {
@@ -379,7 +384,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       );
     }
 
-    final dates = _model.dates;
+    final dates = _visibleDates;
     final todayDate = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
     final headerBg = theme.colorScheme.primary;
     final headerFg = theme.colorScheme.onPrimary;
@@ -794,11 +799,23 @@ class _CopyRangeDialog extends StatefulWidget {
 }
 
 class _CopyRangeDialogState extends State<_CopyRangeDialog> {
-  DateTime? _sourceStart;
-  DateTime? _sourceEnd;
-  DateTime? _targetStart;
-  DateTime? _targetEnd;
+  static DateTime get _today =>
+      DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+
+  late DateTime? _sourceStart;
+  late DateTime? _sourceEnd;
+  late DateTime? _targetStart;
+  late DateTime? _targetEnd;
   final Set<String> _selectedSlots = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _sourceStart = _today;
+    _sourceEnd = _today;
+    _targetStart = _today;
+    _targetEnd = _today;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -818,6 +835,7 @@ class _CopyRangeDialogState extends State<_CopyRangeDialog> {
                     label: 'От',
                     selectedDate: _sourceStart,
                     dates: widget.dates,
+                    initialDate: _today,
                     onChanged: (date) => setState(() => _sourceStart = date),
                   ),
                 ),
@@ -827,6 +845,7 @@ class _CopyRangeDialogState extends State<_CopyRangeDialog> {
                     label: 'До',
                     selectedDate: _sourceEnd,
                     dates: widget.dates,
+                    initialDate: _today,
                     onChanged: (date) => setState(() => _sourceEnd = date),
                   ),
                 ),
@@ -842,6 +861,7 @@ class _CopyRangeDialogState extends State<_CopyRangeDialog> {
                     label: 'От',
                     selectedDate: _targetStart,
                     dates: widget.dates,
+                    initialDate: _today,
                     onChanged: (date) => setState(() => _targetStart = date),
                   ),
                 ),
@@ -851,6 +871,7 @@ class _CopyRangeDialogState extends State<_CopyRangeDialog> {
                     label: 'До',
                     selectedDate: _targetEnd,
                     dates: widget.dates,
+                    initialDate: _today,
                     onChanged: (date) => setState(() => _targetEnd = date),
                   ),
                 ),
@@ -897,8 +918,8 @@ class _CopyRangeDialogState extends State<_CopyRangeDialog> {
       _targetStart != null &&
       _targetEnd != null &&
       _selectedSlots.isNotEmpty &&
-      _sourceStart!.isBefore(_sourceEnd!) &&
-      _targetStart!.isBefore(_targetEnd!);
+      !_sourceStart!.isAfter(_sourceEnd!) &&
+      !_targetStart!.isAfter(_targetEnd!);
 
   void _copy() {
     if (!_canCopy) return;
@@ -912,12 +933,14 @@ class _DatePickerButton extends StatelessWidget {
     required this.label,
     required this.selectedDate,
     required this.dates,
+    required this.initialDate,
     required this.onChanged,
   });
 
   final String label;
   final DateTime? selectedDate;
   final List<DateTime> dates;
+  final DateTime initialDate;
   final ValueChanged<DateTime> onChanged;
 
   @override
@@ -926,7 +949,10 @@ class _DatePickerButton extends StatelessWidget {
       onPressed: () async {
         final result = await showDialog<DateTime>(
           context: context,
-          builder: (ctx) => _DatePickerDialog(dates: dates, initialDate: selectedDate),
+          builder: (ctx) => _DatePickerDialog(
+            dates: dates,
+            initialDate: selectedDate ?? initialDate,
+          ),
         );
         if (result != null) {
           onChanged(result);
@@ -939,24 +965,63 @@ class _DatePickerButton extends StatelessWidget {
   }
 }
 
-class _DatePickerDialog extends StatelessWidget {
+class _DatePickerDialog extends StatefulWidget {
   const _DatePickerDialog({required this.dates, this.initialDate});
 
   final List<DateTime> dates;
   final DateTime? initialDate;
 
   @override
+  State<_DatePickerDialog> createState() => _DatePickerDialogState();
+}
+
+class _DatePickerDialogState extends State<_DatePickerDialog> {
+  final ScrollController _scrollController = ScrollController();
+  static const double _itemHeight = 56;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      final initial = widget.initialDate;
+      if (initial != null) {
+        final idx = widget.dates.indexWhere((d) =>
+            d.year == initial.year && d.month == initial.month && d.day == initial.day);
+        if (idx >= 0) {
+          final offset = (idx * _itemHeight) - 100;
+          final maxExtent = _scrollController.position.maxScrollExtent;
+          _scrollController.jumpTo(offset.clamp(0.0, maxExtent));
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final dates = widget.dates;
+    final initialDate = widget.initialDate;
     return AlertDialog(
       title: const Text('Выберите дату'),
       content: SizedBox(
         width: double.maxFinite,
         height: 300,
         child: ListView.builder(
+          controller: _scrollController,
+          itemExtent: _itemHeight,
           itemCount: dates.length,
           itemBuilder: (context, index) {
             final date = dates[index];
-            final isSelected = initialDate != null && date.isAtSameMomentAs(initialDate!);
+            final isSelected = initialDate != null &&
+                date.year == initialDate.year &&
+                date.month == initialDate.month &&
+                date.day == initialDate.day;
             return ListTile(
               title: Text(DateFormat('EEEE, d MMMM', Localizations.localeOf(context).toString().replaceAll('_', '-')).format(date)),
               selected: isSelected,
