@@ -157,13 +157,43 @@ struct ProfileView: View {
                 }
 
                 // 4. Личный график (только для сотрудников, не owner)
-                else if let employee = accounts.currentEmployee,
-                        !employee.rolesArray.contains("owner") {
+                if let employee = accounts.currentEmployee,
+                   !employee.rolesArray.contains("owner") {
                     VStack(alignment: .leading, spacing: 12) {
                         Text(lang.t("my_schedule"))
                             .font(.headline)
 
                         personalScheduleView
+                    }
+
+                    // 5. Просмотр ТТК (для всех сотрудников)
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Технологические карты")
+                            .font(.headline)
+
+                        NavigationLink {
+                            KitchenRootView()
+                        } label: {
+                            HStack {
+                                Image(systemName: "doc.text.magnifyingglass")
+                                    .foregroundColor(AppTheme.primary)
+                                Text(lang.t("view_ttk"))
+                                    .foregroundColor(AppTheme.textPrimary)
+                                Text("(\(lang.t("view_only")))")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .foregroundColor(AppTheme.primary)
+                            }
+                            .padding()
+                            .background(AppTheme.cardBackground)
+                            .cornerRadius(12)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(AppTheme.border, lineWidth: 1)
+                            )
+                        }
                     }
                 }
 

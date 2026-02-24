@@ -59,6 +59,21 @@ struct ManagementView: View {
                     Text(lang.t("general_manager"))
                 }
             }
+
+            // Кнопка просмотра ТТК для сотрудников управления
+            if appState.canManageSchedule {
+                NavigationLink {
+                    KitchenRootView()
+                } label: {
+                    HStack {
+                        Image(systemName: "doc.text.magnifyingglass")
+                        Text(lang.t("view_ttk"))
+                        Text("(\(lang.t("view_only")))")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
         }
     }
 }

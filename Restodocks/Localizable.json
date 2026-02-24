@@ -3082,5 +3082,12 @@
     "es": "turno",
     "de": "Schicht",
     "fr": "équipe"
+  },
+  "view_ttk": {
+    "ru": "Просмотр ТТК",
+    "en": "View TTK",
+    "es": "Ver TTK",
+    "de": "TTK ansehen",
+    "fr": "Voir TTK"
   }
 }
