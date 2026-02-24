@@ -13,13 +13,25 @@ function corsHeaders(origin: string | null) {
 const SYSTEM_PROMPT = `You are a product name normalizer for a restaurant. Given a list of product names (possibly with typos, slang, abbreviations), return corrected standard names.
 
 RULES:
-- Fix typos: "картофан" -> "Картофель", "лук репка" -> "Лук репчатый"
-- Expand abbreviations: "лук репч." -> "Лук репчатый"
-- Remove extra words like "(заказ)", "кг" if redundant
-- Keep the first letter capitalized for each significant word
-- Output language: same as input (if Russian -> Russian, etc.)
+- Fix typos: "картофан" -> "Картофель", "помидор" -> "Томат", "лук репка" -> "Лук репчатый", "морков" -> "Морковь"
+- Handle colloquial names: "болгарка" -> "Перец сладкий", "батат" -> "Сладкий картофель", "зелень" -> "Зелень свежая"
+- Expand abbreviations: "л. репч." -> "Лук репчатый", "пом." -> "Помидоры", "карт." -> "Картофель"
+- Remove extra words: "(заказ)", "кг", "шт", "упаковка", "пачка" if redundant
+- Handle quantity indicators: "1кг картофель" -> "Картофель", "5шт лук" -> "Лук"
+- Keep proper capitalization for product names
+- Use standard Russian restaurant terminology
+- Output language: same as input (Russian -> Russian)
 - Return ONLY a JSON array of strings in the SAME ORDER as input. One string per input name.
-- If a name is already correct, return it unchanged.`;
+- If a name is already correct, return it unchanged.
+
+EXAMPLES:
+- "картофан" -> "Картофель"
+- "помидор черри" -> "Томат черри"
+- "лук репка" -> "Лук репчатый"
+- "морков свежая" -> "Морковь свежая"
+- "болгарка красная" -> "Перец сладкий красный"
+- "батат" -> "Сладкий картофель"
+- "зелень укроп" -> "Укроп свежий"`;
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {

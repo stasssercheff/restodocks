@@ -16,21 +16,29 @@ const SYSTEM_PROMPT = `You are a product list parser for a restaurant. Given raw
 INPUT: Array of raw text rows. Each row can be:
 - Tab/coma/semicolon-separated columns
 - Inline text like "картофель 50р кг" or "лук репка - 120 - шт"
-- Mixed formats
+- Mixed formats with prices, quantities, units
 
 OUTPUT: JSON array of objects, each with:
-- name (string, required): product name, cleaned
+- name (string, required): product name, cleaned and normalized
 - price (number|null): price per kg or unit if detectable
-- unit (string|null): "g", "kg", "ml", "l", "pcs" or similar
+- unit (string|null): "g", "kg", "ml", "l", "pcs", "portion" or similar
 
 RULES:
-- Infer columns by content meaning. Names can be in any column.
-- Ignore formatting errors, use raw values.
-- Handle comma as decimal separator (50,5 = 50.5).
-- Handle spaces in numbers (1 000 = 1000).
+- Infer columns by content meaning. Product names can be in any column.
+- Extract and normalize product names: fix typos, use standard terminology
+- Handle various price formats: "50р", "50 руб", "50.5", "50,5"
+- Recognize units: кг, г, шт, л, мл, порция, упаковка
+- Handle comma as decimal separator (50,5 = 50.5) and dots (50.5 = 50.5)
+- Handle spaces in numbers (1 000 = 1000)
+- Skip rows without product names (headers, totals, empty rows)
+- Normalize product names: "картофан" -> "Картофель", "помидор" -> "Томат"
 - Return ONLY valid JSON array, no markdown, no extra text.
-- If a row has no product name, skip it.
-- Max 500 items. If more rows, take first 500.`;
+- Max 500 items. If more rows, take first 500.
+
+EXAMPLES:
+- "Картофель 45р кг" -> {"name": "Картофель", "price": 45, "unit": "kg"}
+- "Лук репчатый;120;шт" -> {"name": "Лук репчатый", "price": 120, "unit": "pcs"}
+- "Помидоры черри 250 руб/кг" -> {"name": "Томат черри", "price": 250, "unit": "kg"}`;
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {

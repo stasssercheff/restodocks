@@ -244,7 +244,9 @@ ${sampleTexts.take(5).join('\n')}
     List<Product> allProducts,
     String establishmentId,
   ) async {
-    final normalizedFileName = _normalizeText(fileName);
+    // Сначала нормализуем название через AI для исправления опечаток
+    final aiNormalizedName = await _aiNormalizeProductName(fileName);
+    final normalizedFileName = _normalizeText(aiNormalizedName ?? fileName);
 
     // Ищем точные совпадения
     final exactMatches = allProducts.where((product) {
@@ -278,12 +280,13 @@ ${sampleTexts.take(5).join('\n')}
       );
     }
 
-    // Ищем нечеткие совпадения
+    // Ищем нечеткие совпадения (понижаем порог для лучшего распознавания)
     final fuzzyMatches = <Product>[];
     for (final product in allProducts) {
       final productNames = [product.name, ...(product.names?.values ?? [])];
       for (final productName in productNames) {
-        if (_calculateSimilarity(normalizedFileName, _normalizeText(productName)) > 0.8) {
+        final similarity = _calculateSimilarity(normalizedFileName, _normalizeText(productName));
+        if (similarity > 0.7) { // Понижаем порог с 0.8 до 0.7 для лучшего распознавания
           fuzzyMatches.add(product);
           break; // Нашли соответствие для этого продукта
         }
@@ -321,6 +324,9 @@ ${sampleTexts.take(5).join('\n')}
         .toLowerCase()
         .replaceAll(RegExp(r'[^\w\s]'), '') // Удаляем пунктуацию
         .replaceAll(RegExp(r'\s+'), ' ') // Нормализуем пробелы
+        .replaceAll(RegExp(r'\bкг\b|\bг\b|\bшт\b|\bл\b|\bмл\b|\bуп\b|\bпач\b'), '') // Удаляем единицы измерения
+        .replaceAll(RegExp(r'\bзаказ\b|\bпоставка\b|\bпартия\b'), '') // Удаляем служебные слова
+        .replaceAll(RegExp(r'\s+'), ' ') // Повторно нормализуем пробелы
         .trim();
   }
 
@@ -335,6 +341,23 @@ ${sampleTexts.take(5).join('\n')}
 
     final distance = _levenshteinDistance(longer, shorter);
     return (longer.length - distance) / longer.length.toDouble();
+  }
+
+  /// Нормализовать название продукта через AI
+  Future<String?> _aiNormalizeProductName(String productName) async {
+    try {
+      final result = await _aiService.callFunction('ai-recognize-product', {
+        'userInput': productName,
+      });
+
+      if (result['normalizedName'] != null) {
+        return result['normalizedName'] as String;
+      }
+    } catch (e) {
+      // Если AI недоступен, возвращаем null
+      return null;
+    }
+    return null;
   }
 
   /// Расстояние Левенштейна

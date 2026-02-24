@@ -388,7 +388,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   Future<void> _uploadFromFileUnified() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['xlsx', 'xls', 'csv', 'txt', 'rtf', 'pages', 'numbers', 'docx'],
+      allowedExtensions: ['xlsx', 'xls', 'csv', 'txt', 'rtf', 'pages', 'numbers', 'docx', 'doc', 'excel'],
       withData: true,
     );
     if (result == null || result.files.isEmpty || result.files.single.bytes == null) return;
@@ -434,7 +434,8 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     if (name.endsWith('.pages')) return _extractRowsFromPages(bytes);
     if (name.endsWith('.numbers')) return _extractRowsFromNumbers(bytes);
     if (name.endsWith('.docx')) return _extractRowsFromDocx(bytes);
-    if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
+    if (name.endsWith('.doc')) return _extractRowsFromDoc(bytes);
+    if (name.endsWith('.xlsx') || name.endsWith('.xls') || name.endsWith('.excel')) {
       final rows = _extractRowsFromExcel(bytes);
       if (rows.isNotEmpty) return rows;
       final csvFallback = _tryCsvFallback(bytes);
@@ -521,6 +522,39 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       return lines;
     } catch (e) {
       _addDebugLog('Docx extract error: $e');
+      return [];
+    }
+  }
+
+  /// Извлекает строки из старого Word документа (.doc)
+  List<String> _extractRowsFromDoc(Uint8List bytes) {
+    try {
+      // .doc - бинарный формат, сложно парсить без специальной библиотеки
+      // Попробуем найти текстовые фрагменты в файле
+      final text = utf8.decode(bytes, allowMalformed: true);
+
+      // Ищем текст между разделителями или после определенных маркеров
+      final lines = text.split(RegExp(r'[\r\n]+'))
+          .map((line) => line.trim())
+          .where((line) => line.isNotEmpty && line.length > 2)
+          .where((line) => !line.contains(RegExp(r'[\x00-\x1F\x80-\x9F]'))) // Убираем бинарные символы
+          .toList();
+
+      if (lines.isEmpty) {
+        // Альтернативный подход: поиск текста между маркерами Word
+        final altText = text.replaceAll(RegExp(r'[^\x20-\x7E\r\n\t]'), ' ');
+        final altLines = altText.split(RegExp(r'\s+'))
+            .where((word) => word.length > 3 && word.length < 100)
+            .toList();
+
+        if (altLines.isNotEmpty) {
+          return altLines;
+        }
+      }
+
+      return lines;
+    } catch (e) {
+      _addDebugLog('Doc extract error: $e');
       return [];
     }
   }
@@ -644,7 +678,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     if (choice == 'file') {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['xlsx', 'xls', 'csv', 'txt', 'rtf', 'pages', 'numbers', 'docx'],
+        allowedExtensions: ['xlsx', 'xls', 'csv', 'txt', 'rtf', 'pages', 'numbers', 'docx', 'doc', 'excel'],
         withData: true,
       );
       if (result == null || result.files.isEmpty || result.files.single.bytes == null) return;

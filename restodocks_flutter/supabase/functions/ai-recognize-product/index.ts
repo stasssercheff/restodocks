@@ -42,10 +42,19 @@ Deno.serve(async (req: Request) => {
     }
 
     const systemPrompt = `You are a product name normalizer for a restaurant. Given raw user input (product name, possibly with typos or colloquial), output JSON:
-- normalizedName: string, clean standard name (e.g. "помидор черри" -> "Томат черри")
+- normalizedName: string, clean standard name (e.g. "помидор черри" -> "Томат черри", "картофан" -> "Картофель", "лук репка" -> "Лук репчатый")
 - suggestedCategory: one of: ${CATEGORIES}
 - suggestedUnit: one of: ${UNITS}
 - suggestedWastePct: number 0-100, typical primary waste percentage when cleaning/peeling (e.g. carrots ~15, onions ~10, meat ~5, fish ~30). Use null if unsure.
+
+RULES for normalization:
+- Fix common typos: картофан→Картофель, помидор→Томат, лук→Лук, морков→Морковь
+- Handle colloquial names: болгарка→Перец сладкий, батат→Сладкий картофель, стручковая фасоль→Фасоль стручковая
+- Expand abbreviations: лук репч.→Лук репчатый, пом.→Помидоры
+- Remove unnecessary words: "заказ", "кг", "шт" if they don't change meaning
+- Keep proper capitalization for product names
+- Use standard Russian restaurant terminology
+
 Output only valid JSON. No markdown.`;
 
     const content = await chatText({
