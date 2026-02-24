@@ -30,10 +30,11 @@ class AiServiceSupabase implements AiService {
   }
 
   @override
-  Future<List<ParsedProductItem>> parseProductList({List<String>? rows, String? text}) async {
+  Future<List<ParsedProductItem>> parseProductList({List<String>? rows, String? text, String? source}) async {
     final body = <String, dynamic>{};
     if (rows != null && rows.isNotEmpty) body['rows'] = rows;
     if (text != null && text.trim().isNotEmpty) body['text'] = text;
+    if (source != null && source.isNotEmpty) body['source'] = source;
     final data = await invoke('ai-parse-product-list', body);
     if (data == null) return [];
     final raw = data['items'];

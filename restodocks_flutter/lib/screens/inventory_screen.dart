@@ -560,11 +560,15 @@ class _InventoryScreenState extends State<InventoryScreen>
     if (colIndex < 0 || colIndex >= row.quantities.length) return;
 
     setState(() {
+      // Обновляем значение
       row.quantities[colIndex] = value;
-      if (colIndex == row.quantities.length - 1) {
+
+      // Если это последняя ячейка и значение > 0, добавляем новую колонку
+      if (colIndex == row.quantities.length - 1 && value > 0) {
         _addColumnToAll();
       }
     });
+
     saveNow();
   }
 

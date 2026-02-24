@@ -141,8 +141,9 @@ abstract class AiService {
   /// [context] — опционально: продукты, сотрудники, ТТК, график (ИИ учитывает при генерации).
   Future<GeneratedChecklist?> generateChecklistFromPrompt(String prompt, {Map<String, dynamic>? context});
 
-  /// Всеядный парсинг списка продуктов из сырых строк (Excel/CSV/текст).
-  Future<List<ParsedProductItem>> parseProductList({List<String>? rows, String? text});
+  /// Всеядный парсинг списка продуктов из сырых строк (Excel/CSV/Numbers/RTF/текст).
+  /// [source] — подсказка для ИИ: "numbers", "rtf", "text", "csv" и т.п.
+  Future<List<ParsedProductItem>> parseProductList({List<String>? rows, String? text, String? source});
 
   /// Батч-исправление названий продуктов (опечатки, сленг).
   Future<List<String>> normalizeProductNames(List<String> names);
@@ -184,7 +185,7 @@ class AiServiceStub implements AiService {
       null;
 
   @override
-  Future<List<ParsedProductItem>> parseProductList({List<String>? rows, String? text}) async => [];
+  Future<List<ParsedProductItem>> parseProductList({List<String>? rows, String? text, String? source}) async => [];
 
   @override
   Future<List<String>> normalizeProductNames(List<String> names) async => names;

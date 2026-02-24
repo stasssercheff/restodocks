@@ -11,15 +11,19 @@ function corsHeaders(origin: string | null) {
   };
 }
 
-const SYSTEM_PROMPT = `You are a product list parser for a restaurant. Given raw rows (from Excel, CSV, Numbers, Pages, or pasted text), extract product items.
+const SYSTEM_PROMPT = `Ты — парсер списка продуктов для ресторана. ОБЯЗАТЕЛЬНО выполняй ВСЕ пункты.
 
-INPUT: Raw text or array of rows. Can be:
-- Tab/comma/semicolon-separated columns
-- Inline text like "картофель 50р кг" or "лук репка - 120 - шт"
-- Text extracted from Apple Numbers (.numbers) or Pages (.pages) — may contain fragments, metadata, mixed with product rows. Focus on lines with product names and prices.
-- Mixed formats with prices, quantities, units
+ИСТОЧНИКИ ДАННЫХ (принимай и обрабатывай ВСЕ):
+- Excel, CSV, текст (.txt)
+- Apple Numbers (.numbers) — игнорировать XML, пути, мусор. Извлекать только строки с названием продукта и ценой
+- Apple Pages (.pages)
+- RTF (.rtf) — каждая строка часто имеет формат Название\\tЦена. Извлекать ОБА. Никогда не возвращать строки только с ценой
+- Word (.docx), вставленный текст из мессенджеров
 
-For Numbers/Pages: ignore XML-like fragments, file paths, binary garbage. Extract every line that looks like a product (name + optional price/unit).
+КРИТИЧЕСКИ ВАЖНО — ИСПРАВЛЕНИЕ ОПЕЧАТОК:
+- Прогоняй каждое название через проверку. Исправляй ВСЕ опечатки
+- Примеры: "Авокало"->"Авокадо", "Анчоусм"->"Анчоусы", "АпельсмН"->"Апельсин", "картофан"->"Картофель", "морков"->"Морковь"
+- Используй стандартную кулинарную терминологию. Нет названий с опечатками в результате
 
 OUTPUT: JSON array of objects, each with:
 - name (string, required): product name, cleaned and normalized
@@ -74,8 +78,9 @@ Deno.serve(async (req: Request) => {
     if (!Deno.env.get("AI_PROVIDER") && Deno.env.get("GEMINI_API_KEY")?.trim()) {
       Deno.env.set("AI_PROVIDER", "gemini");
     }
-    const body = (await req.json()) as { rows?: string[]; text?: string };
+    const body = (await req.json()) as { rows?: string[]; text?: string; source?: string };
     let rows: string[] = [];
+    const source = typeof body.source === "string" ? body.source : "";
 
     if (Array.isArray(body.rows) && body.rows.length > 0) {
       rows = body.rows
@@ -86,6 +91,7 @@ Deno.serve(async (req: Request) => {
         .split(/\r?\n/)
         .map((r) => r.trim())
         .filter((r) => r.length > 0);
+      if (rows.length === 0) rows = [body.text.trim()];
     }
 
     if (rows.length === 0) {
@@ -94,9 +100,9 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Limit to avoid token overflow
+    const sourceHint = source ? `\n\nИсточник: ${source}. Обработай соответственно.` : "";
     const toSend = rows.slice(0, 500);
-    const userContent = `Parse these ${toSend.length} rows into product list:\n\n${toSend.map((r, i) => `${i + 1}. ${r}`).join("\n")}`;
+    const userContent = `Распарси в список продуктов. Обязательно исправь ВСЕ опечатки в названиях.${sourceHint}\n\nСтрок: ${toSend.length}\n\n${toSend.map((r, i) => `${i + 1}. ${r}`).join("\n")}`;
 
     const content = await chatText({
       messages: [

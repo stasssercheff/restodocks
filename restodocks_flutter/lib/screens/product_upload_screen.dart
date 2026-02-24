@@ -402,7 +402,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       if (name.endsWith('.numbers') || name.endsWith('.pages')) {
         final rawText = _extractRawTextFromZipForAI(bytes);
         if (rawText.trim().length >= 30) {
-          await _processWithDeferredModeration(text: rawText);
+          await _processWithDeferredModeration(text: rawText, source: _sourceFromFileName(name));
           return;
         }
       }
@@ -418,7 +418,17 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       return;
     }
 
-    await _processWithDeferredModeration(rows: rows);
+    await _processWithDeferredModeration(rows: rows, source: _sourceFromFileName(name));
+  }
+
+  String _sourceFromFileName(String name) {
+    if (name.endsWith('.numbers')) return 'Apple Numbers (.numbers)';
+    if (name.endsWith('.pages')) return 'Apple Pages (.pages)';
+    if (name.endsWith('.rtf')) return 'RTF (.rtf)';
+    if (name.endsWith('.docx') || name.endsWith('.doc')) return 'Word';
+    if (name.endsWith('.xlsx') || name.endsWith('.xls') || name.endsWith('.csv')) return 'Excel/CSV';
+    if (name.endsWith('.txt')) return 'Текст';
+    return 'файл';
   }
 
   List<String> _extractRowsFromFile(Uint8List bytes, String name) {
@@ -433,10 +443,9 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       for (var i = 0; i < min(5, rows.length); i++) {
         _addDebugLog('RTF row $i: "${rows[i]}"');
       }
-      // Если одна длинная строка (всё в кучу) — разбить по табу/запятой
-      if (rows.length == 1 && rows.single.length > 200) {
-        final parts = rows.single.split(RegExp(r'[\t;,]+')).map((s) => s.trim()).where((s) => s.length >= 2).toList();
-        if (parts.length >= 2) rows = parts;
+      // Одна длинная строка (всё в кучу) — передаём как текст, ИИ разберёт структуру
+      if (rows.length == 1 && rows.single.length > 100) {
+        return [rows.single]; // ИИ получит весь блок и извлечёт название+цена
       }
       return rows;
     }
@@ -480,8 +489,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   }
 
   List<String> _extractRowsFromNumbers(Uint8List bytes) {
-    final excelRows = _extractRowsFromExcel(bytes);
-    if (excelRows.isNotEmpty) return excelRows;
+    // Numbers — НЕ Excel. Не вызывать Excel.decodeBytes (выдаст ошибку).
     try {
       final archive = ZipDecoder().decodeBytes(bytes);
       for (final f in archive.files) {
@@ -748,7 +756,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       if (rows.isEmpty && (name.endsWith('.numbers') || name.endsWith('.pages'))) {
         final rawText = _extractRawTextFromZipForAI(bytes);
         if (rawText.trim().length >= 30) {
-          await _processWithDeferredModeration(text: rawText);
+          await _processWithDeferredModeration(text: rawText, source: _sourceFromFileName(name));
           return;
         }
       }
@@ -791,7 +799,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     }
   }
 
-  Future<void> _processWithDeferredModeration({List<String>? rows, String? text}) async {
+  Future<void> _processWithDeferredModeration({List<String>? rows, String? text, String? source}) async {
     final acc = context.read<AccountManagerSupabase>();
     final est = acc.establishment;
     if (est == null) {
@@ -811,11 +819,11 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       List<ParsedProductItem> parsed = [];
       final ai = context.read<AiService>();
 
-      // ИИ обрабатывает входящие данные (текст или файл) — корректно определяет названия и цены
+      // ИИ обрабатывает входящие данные (текст или файл) — корректно определяет названия, цены, исправляет опечатки
       if (rows != null && rows.isNotEmpty) {
-        parsed = await ai.parseProductList(rows: rows);
+        parsed = await ai.parseProductList(rows: rows, source: source ?? 'строки');
       } else if (text != null && text.trim().isNotEmpty) {
-        parsed = await ai.parseProductList(text: text);
+        parsed = await ai.parseProductList(text: text, source: source ?? 'вставленный текст');
       }
 
       // Fallback: локальный парсинг, если ИИ недоступен или вернул пустой результат
