@@ -79,6 +79,18 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     return list.where((e) => seen.add(e.id)).toList();
   }
 
+  String _slotDisplayName(ScheduleSlot slot) {
+    if (slot.employeeId == null) return slot.name;
+    final emp = _employees.where((e) => e.id == slot.employeeId).firstOrNull;
+    if (emp == null) return slot.name;
+    final parts = emp.fullName.trim().split(RegExp(r'\s+'));
+    final first = parts.isNotEmpty ? parts.first : emp.fullName;
+    final surnameLetter = emp.surname?.trim().isNotEmpty == true
+        ? ' ${emp.surname!.trim()[0].toUpperCase()}.'
+        : (parts.length > 1 ? ' ${parts.last[0].toUpperCase()}.' : '');
+    return '$first$surnameLetter'.trim();
+  }
+
   String _getSectionIdForEmployee(Employee employee, List<ScheduleSection> sections) {
     if (sections.isEmpty) return '';
 
@@ -205,182 +217,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   Future<void> _save() async {
     if (_establishmentId == null) return;
     await saveSchedule(_establishmentId!, _model);
-  }
-
-  void _addSlot() {
-    if (_model.sections.isEmpty || _employees.isEmpty) return;
-    final loc = context.read<LocalizationService>();
-    String? selectedEmployeeId;
-    String selectedSectionId = _model.sections.first.id;
-
-    // Фильтруем сотрудников, которые еще не добавлены в график
-    final existingEmployeeIds = _model.slots
-        .where((s) => s.employeeId != null)
-        .map((s) => s.employeeId!)
-        .toSet();
-
-    final availableEmployees = _employees
-        .where((e) => !existingEmployeeIds.contains(e.id))
-        .toList();
-
-    if (availableEmployees.isEmpty) {
-      // Все сотрудники уже в графике
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Все зарегистрированные сотрудники уже добавлены в график')),
-      );
-      return;
-    }
-
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: Text(loc.t('schedule_add_slot')),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(loc.t('schedule_pick_employee'), style: Theme.of(ctx).textTheme.labelLarge),
-              const SizedBox(height: 4),
-              DropdownButtonFormField<String>(
-                value: selectedEmployeeId,
-                hint: Text(loc.t('schedule_assign_name_hint')),
-                decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
-                items: availableEmployees.map((e) {
-                  return DropdownMenuItem(
-                    value: e.id,
-                    child: Text(e.fullName.isEmpty ? 'Без имени' : e.fullName),
-                  );
-                }).toList(),
-                onChanged: (v) {
-                  setDialogState(() => selectedEmployeeId = v);
-                  if (v != null) {
-                    final employee = availableEmployees.firstWhere((e) => e.id == v);
-                    final correctSectionId = _getSectionIdForEmployee(employee, _model.sections);
-                    setDialogState(() => selectedSectionId = correctSectionId);
-                  }
-                },
-              ),
-              const SizedBox(height: 12),
-              Text('${loc.t('schedule_section')}:', style: Theme.of(ctx).textTheme.labelLarge),
-              const SizedBox(height: 4),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Theme.of(ctx).dividerColor),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  _model.sections
-                      .firstWhere((s) => s.id == selectedSectionId,
-                          orElse: () => ScheduleSection(id: selectedSectionId, nameKey: selectedSectionId))
-                      .nameKey,
-                  style: Theme.of(ctx).textTheme.bodyMedium,
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
-            ),
-            FilledButton(
-              onPressed: selectedEmployeeId == null ? null : () {
-                final employee = availableEmployees.firstWhere((e) => e.id == selectedEmployeeId);
-                Navigator.of(ctx).pop();
-                setState(() {
-                  _model = _model.copyWith(
-                    slots: [..._model.slots, ScheduleSlot(
-                      id: const Uuid().v4(),
-                      name: employee.fullName.isEmpty ? 'Сотрудник' : employee.fullName,
-                      sectionId: selectedSectionId,
-                      employeeId: employee.id,
-                    )],
-                  );
-                  _save();
-                });
-              },
-              child: Text(loc.t('save')),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _editSlot(ScheduleSlot slot) {
-    final idx = _model.slots.indexWhere((s) => s.id == slot.id);
-    if (idx < 0) return;
-    final loc = context.read<LocalizationService>();
-    final ctrl = TextEditingController(text: slot.name);
-    String? selectedSectionId = slot.sectionId;
-    if (selectedSectionId == null || selectedSectionId.isEmpty) selectedSectionId = _model.sections.isNotEmpty ? _model.sections.first.id : null;
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: Text(loc.t('schedule_slot_name')),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              DropdownButtonFormField<String>(
-                value: selectedSectionId,
-                decoration: InputDecoration(labelText: loc.t('schedule_section'), border: const OutlineInputBorder(), isDense: true),
-                items: _model.sections.map((s) {
-                  final label = loc.translate(s.nameKey);
-                  return DropdownMenuItem(value: s.id, child: Text(label == s.nameKey ? s.id : label));
-                }).toList(),
-                onChanged: (v) => setDialogState(() => selectedSectionId = v),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: ctrl,
-                autofocus: true,
-                decoration: InputDecoration(
-                  labelText: loc.t('schedule_slot_name'),
-                  border: const OutlineInputBorder(),
-                ),
-                onSubmitted: (_) => Navigator.of(ctx).pop(true),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
-            ),
-            if (_model.slots.length > 1)
-              TextButton(
-                onPressed: () {
-                  Navigator.of(ctx).pop(false);
-                  setState(() {
-                    final newSlots = List<ScheduleSlot>.from(_model.slots)..removeAt(idx);
-                    _model = _model.copyWith(slots: newSlots);
-                    _save();
-                  });
-                },
-                child: Text(loc.t('delete'), style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
-              ),
-            FilledButton(
-              onPressed: () {
-                final name = ctrl.text.trim();
-                if (name.isEmpty) return;
-                Navigator.of(ctx).pop(true);
-                setState(() {
-                  final newSlots = List<ScheduleSlot>.from(_model.slots);
-                  newSlots[idx] = newSlots[idx].copyWith(name: name, sectionId: selectedSectionId ?? slot.sectionId);
-                  _model = _model.copyWith(slots: newSlots);
-                  _save();
-                });
-              },
-              child: Text(loc.t('save')),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   /// Значение ячейки для отображения: "1" (смена), "0" (выходной) или null (не указано). Устаревшее (имя) считаем сменой.
@@ -620,15 +456,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
       for (final slot in sectionSlots) {
         leftCells.add(leftCell(
-          GestureDetector(
-            onTap: canEdit ? () => _editSlot(slot) : null,
-            child: Row(
-              children: [
-                Expanded(child: Text(slot.name, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
-                if (canEdit) Icon(Icons.edit, size: 14, color: theme.colorScheme.primary),
-              ],
-            ),
-          ),
+          Text(_slotDisplayName(slot), style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
           decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3), border: Border(right: BorderSide(color: borderColor))),
         ));
         rightRows.add(Container(
@@ -649,24 +477,28 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                 final base = bg ?? theme.colorScheme.surface;
                 bg = Color.lerp(base, todayHighlightBg, 0.6) ?? base;
               }
-              final content = _showTimeInCells && timeDisplay.isNotEmpty ? Column(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: timeDisplay.split('–').map((time) => Text(
-                  time.trim(),
-                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.w500, color: theme.colorScheme.onSurface),
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                )).toList(),
-              ) : Column(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(val ?? '—', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: val != null ? theme.colorScheme.onSurface : theme.colorScheme.onSurfaceVariant), textAlign: TextAlign.center),
-                  if (timeDisplay.isNotEmpty && !_showTimeInCells) Text(timeDisplay, style: TextStyle(fontSize: 9, color: theme.colorScheme.onSurface.withOpacity(0.8)), textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis),
-                ],
-              );
+              final content = _showTimeInCells && isShift
+                  ? (timeDisplay.isNotEmpty
+                      ? Column(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: timeDisplay.split('–').map((time) => Text(
+                            time.trim(),
+                            style: TextStyle(fontSize: 9, fontWeight: FontWeight.w500, color: theme.colorScheme.onSurface),
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          )).toList(),
+                        )
+                      : Text('—', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: theme.colorScheme.onSurfaceVariant), textAlign: TextAlign.center))
+                  : Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(val ?? '—', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: val != null ? theme.colorScheme.onSurface : theme.colorScheme.onSurfaceVariant), textAlign: TextAlign.center),
+                        if (timeDisplay.isNotEmpty && !_showTimeInCells) Text(timeDisplay, style: TextStyle(fontSize: 9, color: theme.colorScheme.onSurface.withOpacity(0.8)), textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis),
+                      ],
+                    );
               return rightCell(
                 canEdit
                     ? GestureDetector(
@@ -712,12 +544,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: canEdit
-                ? Text(loc.t('schedule_tap_hint'), style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant))
-                : Text(loc.t('schedule_view_only_hint') ?? 'Редактирование графика доступно шеф-повару и су-шефу.', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-          ),
+          if (!canEdit)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Text(loc.t('schedule_view_only_hint') ?? 'Редактирование графика доступно шеф-повару и су-шефу.', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+            ),
           Expanded(
             child: SingleChildScrollView(
               scrollDirection: Axis.vertical,
@@ -742,15 +573,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               ),
             ),
           ),
-          if (canEdit)
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: FilledButton.icon(
-                onPressed: _addSlot,
-                icon: const Icon(Icons.add, size: 20),
-                label: Text(loc.t('schedule_add_slot')),
-              ),
-            ),
         ],
       ),
     );
