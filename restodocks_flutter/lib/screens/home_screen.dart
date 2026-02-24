@@ -44,13 +44,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ? IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop())
             : null,
         title: Text(_appBarTitle(loc, isOwner)),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () => _logout(context),
-            tooltip: loc.t('logout'),
-          ),
-        ],
       ),
       body: IndexedStack(
         index: _selectedIndex,
@@ -150,11 +143,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _logout(BuildContext context) async {
-    final accountManager = context.read<AccountManagerSupabase>();
-    await accountManager.logout();
-    if (context.mounted) context.go('/login');
-  }
 }
 
 class _MiddleTabBody extends StatelessWidget {
