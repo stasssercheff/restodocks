@@ -135,6 +135,7 @@ class _InventoryScreenState extends State<InventoryScreen>
   final TextEditingController _nameFilterCtrl = TextEditingController();
   String _nameFilter = '';
 
+
   /// Сохранить данные немедленно в локальное хранилище (SharedPreferences/localStorage)
   void saveNow() {
     saveImmediately(); // Немедленно, без debounce — данные не потеряются при закрытии/падении
@@ -559,7 +560,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     final row = _rows[rowIndex];
     if (colIndex < 0 || colIndex >= row.quantities.length) return;
 
-    // Обновляем значение напрямую (без setState для избежания потери фокуса)
+    // Обновляем значение напрямую
     row.quantities[colIndex] = value;
 
     // Если это последняя ячейка и значение > 0, добавляем новую ячейку для этой строки
@@ -1852,16 +1853,14 @@ class _QtyCellState extends State<_QtyCell> {
         fillColor: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
       ),
       onChanged: (s) {
-        // Обновляем значение в реальном времени для расчета итогов
+        // Обновляем локальное значение
         final v = double.tryParse(s.replaceFirst(',', '.')) ?? 0;
-        final actualValue = widget.useGrams ? v / 1000 : v;
+        _currentValue = widget.useGrams ? v / 1000 : v;
 
-        _currentValue = actualValue;
-
-        // Откладываем вызов callback для избежания слишком частых обновлений
+        // Используем короткий таймер для обновления итогов с задержкой
         _updateTimer?.cancel();
-        _updateTimer = Timer(const Duration(milliseconds: 300), () {
-          widget.onChanged(actualValue);
+        _updateTimer = Timer(const Duration(milliseconds: 100), () {
+          widget.onChanged(_currentValue);
         });
       },
     );
