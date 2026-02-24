@@ -31,6 +31,15 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   String? _error;
   Set<String> _selectedTechCards = {}; // ID выбранных карточек
   bool _selectionMode = false;
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
+  }
 
   String _categoryLabel(String c, LocalizationService loc) {
     final lang = loc.currentLanguageCode;
@@ -475,9 +484,16 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       );
     }
 
-    // Разделяем список на ПФ и Блюда
-    final semiFinishedCards = _list.where((tc) => tc.isSemiFinished).toList();
-    final dishCards = _list.where((tc) => !tc.isSemiFinished).toList();
+    // Разделяем список на ПФ и Блюда и фильтруем по поиску
+    final query = _searchController.text.trim().toLowerCase();
+    List<TechCard> filterBySearch(List<TechCard> list) {
+      if (query.isEmpty) return list;
+      final loc = context.read<LocalizationService>();
+      final lang = loc.currentLanguageCode;
+      return list.where((tc) => tc.getDisplayNameInLists(lang).toLowerCase().contains(query)).toList();
+    }
+    final semiFinishedCards = filterBySearch(_list.where((tc) => tc.isSemiFinished).toList());
+    final dishCards = filterBySearch(_list.where((tc) => !tc.isSemiFinished).toList());
 
     return DefaultTabController(
       length: 2,
@@ -488,6 +504,31 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
               Tab(text: 'ПФ'),
               Tab(text: 'Блюда'),
             ],
+          ),
+          // Поиск по названию
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+            child: TextField(
+              controller: _searchController,
+              focusNode: _searchFocusNode,
+              decoration: InputDecoration(
+                hintText: 'Поиск по названию',
+                isDense: true,
+                prefixIcon: const Icon(Icons.search, size: 20),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 20),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() {});
+                        },
+                      )
+                    : null,
+                border: const OutlineInputBorder(),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
           ),
           Expanded(
             child: TabBarView(
@@ -502,54 +543,97 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     );
   }
 
-  /// Компактный список везде: одна колонка, без горизонтального скролла (широкая таблица на телефоне требовала 3 экрана вправо).
+  /// Компактная таблица с шапкой: влезает в экран телефона, без горизонтального скролла.
   Widget _buildTechCardsTable(List<TechCard> techCards, LocalizationService loc) {
     final lang = loc.currentLanguageCode;
+    const colCatWidth = 52.0;
+    const colCostWidth = 48.0;
     return RefreshIndicator(
       onRefresh: _load,
-      child: _buildCompactList(techCards, loc, lang),
-    );
-  }
-
-  /// Компактный список для телефона: узкие строки, влезает много ТТК без горизонтального скролла.
-  Widget _buildCompactList(List<TechCard> techCards, LocalizationService loc, String lang) {
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 80),
-      itemCount: techCards.length,
-      itemBuilder: (context, i) {
-        final tc = techCards[i];
-        final selected = _selectedTechCards.contains(tc.id);
-        return ListTile(
-          dense: true,
-          selected: selected,
-          selectedTileColor: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.5),
-          title: Text(
-            tc.getDisplayNameInLists(lang),
-            style: const TextStyle(fontSize: 15),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+      child: CustomScrollView(
+        slivers: [
+          // Липкая шапка таблицы
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _TableHeaderDelegate(
+              colCatWidth: colCatWidth,
+              colCostWidth: colCostWidth,
+              color: Theme.of(context).colorScheme.primaryContainer,
+              onColor: Theme.of(context).colorScheme.onPrimaryContainer,
+            ),
           ),
-          subtitle: Text(
-            '${_categoryLabel(tc.category, loc)} · ${_calculateCostPerKg(tc).toStringAsFixed(0)}/кг',
-            style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+          SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, i) {
+                final tc = techCards[i];
+                final selected = _selectedTechCards.contains(tc.id);
+                final name = tc.getDisplayNameInLists(lang);
+                final cat = _categoryLabel(tc.category, loc);
+                final cost = _calculateCostPerKg(tc).toStringAsFixed(0);
+                return Material(
+                  color: selected
+                      ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.5)
+                      : null,
+                  child: InkWell(
+                    onTap: () {
+                      if (_selectionMode) {
+                        _toggleTechCardSelection(tc.id);
+                      } else {
+                        context.push('/tech-cards/${tc.id}');
+                      }
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              name,
+                              style: const TextStyle(fontSize: 14),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          SizedBox(
+                            width: colCatWidth,
+                            child: Text(
+                              cat.length > 6 ? '${cat.substring(0, 5)}…' : cat,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          SizedBox(
+                            width: colCostWidth,
+                            child: Text(
+                              cost,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                          _selectionMode
+                              ? Checkbox(
+                                  value: selected,
+                                  onChanged: (_) => _toggleTechCardSelection(tc.id),
+                                )
+                              : Icon(Icons.chevron_right, size: 20, color: Theme.of(context).colorScheme.outline),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+              childCount: techCards.length,
+            ),
           ),
-          trailing: _selectionMode
-              ? Checkbox(
-                  value: selected,
-                  onChanged: (_) => _toggleTechCardSelection(tc.id),
-                )
-              : const Icon(Icons.chevron_right, color: Colors.grey),
-          onTap: () {
-            if (_selectionMode) {
-              _toggleTechCardSelection(tc.id);
-            } else {
-              context.push('/tech-cards/${tc.id}');
-            }
-          },
-        );
-      },
+          const SliverPadding(padding: EdgeInsets.only(bottom: 80)),
+        ],
+      ),
     );
   }
 
@@ -585,5 +669,62 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         ),
       ),
     );
+  }
+}
+
+/// Делегат для липкой шапки таблицы ТТК (Название | Кат. | ₽/кг).
+class _TableHeaderDelegate extends SliverPersistentHeaderDelegate {
+  _TableHeaderDelegate({
+    required this.colCatWidth,
+    required this.colCostWidth,
+    required this.color,
+    required this.onColor,
+  });
+
+  final double colCatWidth;
+  final double colCostWidth;
+  final Color color;
+  final Color onColor;
+
+  @override
+  double get minExtent => 40;
+
+  @override
+  double get maxExtent => 40;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Container(
+      color: color,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      alignment: Alignment.centerLeft,
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              'Название',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: onColor),
+            ),
+          ),
+          SizedBox(
+            width: colCatWidth,
+            child: Text('Кат.', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: onColor)),
+          ),
+          SizedBox(
+            width: colCostWidth,
+            child: Text('₽/кг', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: onColor)),
+          ),
+          const SizedBox(width: 24),
+        ],
+      ),
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant _TableHeaderDelegate oldDelegate) {
+    return oldDelegate.colCatWidth != colCatWidth ||
+        oldDelegate.colCostWidth != colCostWidth ||
+        oldDelegate.color != color ||
+        oldDelegate.onColor != onColor;
   }
 }
