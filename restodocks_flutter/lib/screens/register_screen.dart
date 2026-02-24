@@ -295,6 +295,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 16),
 
+                // Временно: только кухня
                 DropdownButtonFormField<String>(
                   initialValue: _department,
                   decoration: InputDecoration(
@@ -303,9 +304,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   items: [
                     _deptItem(loc, 'kitchen', loc.t('kitchen')),
-                    _deptItem(loc, 'bar', loc.t('bar')),
-                    _deptItem(loc, 'dining_room', loc.t('dining_room')),
-                    _deptItem(loc, 'management', loc.t('management')),
+                    // bar, dining_room, management — скрыты временно
                   ],
                   onChanged: (v) {
                     if (v == null) return;

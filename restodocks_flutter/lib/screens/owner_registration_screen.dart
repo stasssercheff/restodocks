@@ -235,11 +235,7 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
                     DropdownMenuItem(value: null, child: Text(loc.t('owner_only'))),
                     DropdownMenuItem(value: 'executive_chef', child: Text(loc.t('executive_chef'))),
                     DropdownMenuItem(value: 'sous_chef', child: Text(loc.t('sous_chef'))),
-                    DropdownMenuItem(value: 'bartender', child: Text(loc.t('bartender'))),
-                    DropdownMenuItem(value: 'waiter', child: Text(loc.t('waiter'))),
-                    DropdownMenuItem(value: 'bar_manager', child: Text(loc.t('bar_manager'))),
-                    DropdownMenuItem(value: 'floor_manager', child: Text(loc.t('floor_manager'))),
-                    DropdownMenuItem(value: 'general_manager', child: Text(loc.t('general_manager'))),
+                    // bartender, waiter, bar_manager, floor_manager, general_manager — временно скрыты
                   ],
                   onChanged: (v) => setState(() => _selectedRole = v),
                 ),

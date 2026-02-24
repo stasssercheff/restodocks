@@ -16,40 +16,27 @@ class OwnerHomeContent extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        _SectionTitle(title: loc.t('schedule')),
-        _Tile(icon: Icons.calendar_month, title: loc.t('schedule'), subtitle: loc.t('all_employees_schedule'), onTap: () => context.push('/schedule')),
-        _Tile(icon: Icons.inbox, title: 'Входящие', onTap: () => context.push('/inbox')),
+        // Управление — сверху, с входящими
+        _SectionTitle(title: loc.t('management')),
+        _Tile(icon: Icons.inbox, title: loc.t('inbox'), onTap: () => context.push('/inbox')),
+        _Tile(icon: Icons.people, title: loc.t('employees'), onTap: () => context.push('/employees')),
 
         const SizedBox(height: 16),
-        _SectionTitle(title: 'Кухня'),
-        _Tile(icon: Icons.schedule, title: 'График', onTap: () => context.push('/schedule/kitchen')),
-        _Tile(icon: Icons.restaurant_menu, title: 'Меню', onTap: () => context.push('/menu/kitchen')),
-        _Tile(icon: Icons.description, title: 'Технологические карты', onTap: () => context.push('/tech-cards/kitchen')),
-        _Tile(icon: Icons.assignment, title: 'Номенклатура', onTap: () => context.push('/nomenclature/kitchen')),
+        _SectionTitle(title: loc.t('kitchen')),
+        _Tile(icon: Icons.schedule, title: loc.t('schedule'), onTap: () => context.push('/schedule/kitchen')),
+        _Tile(icon: Icons.restaurant_menu, title: loc.t('menu'), onTap: () => context.push('/menu/kitchen')),
+        _Tile(icon: Icons.description, title: loc.t('ttk_kitchen'), onTap: () => context.push('/tech-cards/kitchen')),
+        _Tile(icon: Icons.assignment, title: loc.t('nomenclature'), onTap: () => context.push('/nomenclature/kitchen')),
+
+        // Бар (pro), Зал — временно скрыты
+        // const SizedBox(height: 16),
+        // _SectionTitle(title: 'Бар (pro)'), ...
+        // _SectionTitle(title: 'Зал'), ...
 
         const SizedBox(height: 16),
-        _SectionTitle(title: 'Бар (pro)'),
-        _Tile(icon: Icons.schedule, title: 'График', onTap: () => context.push('/schedule/bar')),
-        _Tile(icon: Icons.wine_bar, title: 'Меню', onTap: () => context.push('/menu/bar')),
-        _Tile(icon: Icons.description, title: 'Технологические карты', onTap: () => context.push('/tech-cards/bar')),
-        _Tile(icon: Icons.assignment, title: 'Номенклатура', onTap: () => context.push('/nomenclature/bar')),
-
-        const SizedBox(height: 16),
-        _SectionTitle(title: 'Зал'),
-        _Tile(icon: Icons.schedule, title: 'График', onTap: () => context.push('/schedule/hall')),
-        _Tile(icon: Icons.assignment, title: 'Номенклатура', onTap: () => context.push('/nomenclature/hall')),
-
-        const SizedBox(height: 16),
-        _SectionTitle(title: 'Управление'),
-        _Tile(icon: Icons.schedule, title: 'График', onTap: () => context.push('/schedule/management')),
-        _Tile(icon: Icons.people, title: 'Сотрудники', onTap: () => context.push('/employees')),
-
-        const SizedBox(height: 16),
-        _SectionTitle(title: 'Расходы (pro)'),
-        _Tile(icon: Icons.payments, title: 'ФЗП', subtitle: loc.t('salary_expenses'), onTap: () => context.push('/expenses/salary')),
-        _Tile(icon: Icons.business, title: 'Аренда', subtitle: loc.t('rent_expenses'), onTap: () => context.push('/expenses/rent')),
-        _Tile(icon: Icons.shopping_cart, title: 'Закупка', subtitle: loc.t('purchase_expenses'), onTap: () => context.push('/expenses/purchase')),
-        _Tile(icon: Icons.settings, title: loc.t('custom_expense'), subtitle: loc.t('configurable_expense_name'), onTap: () => context.push('/expenses/custom')),
+        _SectionTitle(title: '${loc.t('expenses')} (${loc.t('pro')})'),
+        _Tile(icon: Icons.payments, title: loc.t('salary_expenses'), subtitle: loc.t('salary_period_hint'), onTap: () => context.push('/expenses/salary')),
+        // Аренда, Закупка, Свой вариант — временно скрыты
       ],
     );
   }
