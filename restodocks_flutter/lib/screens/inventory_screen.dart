@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:excel/excel.dart' hide Border, TextSpan;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -1611,6 +1612,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                       ? (_completed
                           ? Text(_formatQty(row.quantityDisplayAt(colIndex)), style: theme.textTheme.bodyMedium)
                           : _QtyCell(
+                              key: ValueKey('qty_${actualIndex}_$colIndex'),
                               value: row.quantities[colIndex],
                               useGrams: row.isWeightInKg,
                               onChanged: (v) => _setQuantity(actualIndex, colIndex, v),
@@ -1872,6 +1874,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                     ? (_completed
                         ? Text(_formatQty(row.quantityDisplayAt(colIndex)), style: theme.textTheme.bodyMedium)
                         : _QtyCell(
+                            key: ValueKey('qty_${actualIndex}_$colIndex'),
                             value: row.quantities[colIndex],
                             useGrams: row.isWeightInKg,
                             onChanged: (v) => _setQuantity(actualIndex, colIndex, v),
@@ -2084,7 +2087,7 @@ class _QtyCell extends StatefulWidget {
   final bool useGrams;
   final void Function(double) onChanged;
 
-  const _QtyCell({required this.value, this.useGrams = false, required this.onChanged});
+  const _QtyCell({super.key, required this.value, this.useGrams = false, required this.onChanged});
 
   @override
   State<_QtyCell> createState() => _QtyCellState();
@@ -2130,6 +2133,9 @@ class _QtyCellState extends State<_QtyCell> {
       controller: _controller,
       focusNode: _focus,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      inputFormatters: [
+        FilteringTextInputFormatter.allow(RegExp(r'[\d,.]')),
+      ],
       textAlign: TextAlign.center,
       style: theme.textTheme.bodyMedium,
       decoration: InputDecoration(

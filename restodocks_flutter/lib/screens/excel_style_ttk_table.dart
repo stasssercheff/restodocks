@@ -839,15 +839,6 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     );
   }
 
-  Widget _buildReadOnlyCell(String text) {
-    return Container(
-      height: 44,
-      child: Center(
-        child: Text(text, style: const TextStyle(fontSize: 12)),
-      ),
-    );
-  }
-
   /// Количество продукта на 1 порцию (г) = outputWeight * (weightPerPortion / totalOutput).
   String _portionsPerOne(double totalOutput, TTIngredient ingredient) {
     if (ingredient.productName.isEmpty || totalOutput <= 0) return '';
