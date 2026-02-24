@@ -12,7 +12,6 @@ struct EmployeeLoginView: View {
 
     @State private var email = ""
     @State private var password = ""
-    @State private var companyPin = ""
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var isLoading = false
@@ -62,20 +61,6 @@ struct EmployeeLoginView: View {
                                 .stroke(AppTheme.border, lineWidth: 1)
                         )
 
-                    TextField(getCompanyPinPlaceholder(), text: $companyPin)
-                        .keyboardType(.default)
-                        .textInputAutocapitalization(.never)
-                    .onChange(of: companyPin) { _, newValue in
-                        companyPin = newValue.uppercased()
-                    }
-                        .padding()
-                        .background(AppTheme.cardBackground)
-                        .cornerRadius(12)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(AppTheme.border, lineWidth: 1)
-                        )
-
                     if showError {
                         Text(errorMessage)
                             .foregroundColor(AppTheme.error)
@@ -100,7 +85,7 @@ struct EmployeeLoginView: View {
     }
 
     private var isFormValid: Bool {
-        !email.isEmpty && !password.isEmpty && !companyPin.isEmpty
+        !email.isEmpty && !password.isEmpty
     }
 
     private func login() {
@@ -109,13 +94,9 @@ struct EmployeeLoginView: View {
 
         Task { @MainActor in
             do {
-                try await accounts.signIn(email: email, password: password, companyPin: companyPin)
+                try await accounts.signIn(email: email, password: password)
             } catch {
-                if (error as NSError).code == 404 {
-                    showErrorMessage(getCompanyNotFoundText())
-                } else {
-                    showErrorMessage(getInvalidCredentialsText())
-                }
+                showErrorMessage(getInvalidCredentialsText())
             }
             isLoading = false
         }
@@ -171,17 +152,6 @@ struct EmployeeLoginView: View {
         }
     }
 
-    private func getCompanyPinPlaceholder() -> String {
-        switch lang.currentLang {
-        case "ru": return "PIN код компании (8 символов)"
-        case "en": return "Company PIN code (8 characters)"
-        case "es": return "Código PIN de empresa (8 caracteres)"
-        case "de": return "Firmen-PIN-Code (8 Zeichen)"
-        case "fr": return "Code PIN entreprise (8 caractères)"
-        default: return "Company PIN code (8 characters)"
-        }
-    }
-
     private func getLoginButtonTitle() -> String {
         switch lang.currentLang {
         case "ru": return "Войти"
@@ -212,17 +182,6 @@ struct EmployeeLoginView: View {
         case "de": return "Ungültige E-Mail oder Passwort"
         case "fr": return "Email ou mot de passe invalide"
         default: return "Invalid email or password"
-        }
-    }
-
-    private func getCompanyNotFoundText() -> String {
-        switch lang.currentLang {
-        case "ru": return "Компания с таким PIN кодом не найдена"
-        case "en": return "Company with this PIN code not found"
-        case "es": return "Empresa con este código PIN no encontrada"
-        case "de": return "Unternehmen mit diesem PIN-Code nicht gefunden"
-        case "fr": return "Entreprise avec ce code PIN introuvable"
-        default: return "Company with this PIN code not found"
         }
     }
 }

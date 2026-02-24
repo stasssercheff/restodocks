@@ -383,15 +383,13 @@ final class AccountManager: ObservableObject {
 
     // MARK: - EMPLOYEE LOGIN (email + password)
     @MainActor
-    func signIn(email: String, password: String, companyPin: String) async throws {
-        // 1. Supabase Auth signIn
+    func signIn(email: String, password: String) async throws {
         let session = try await client.auth.signIn(
             email: email,
             password: password
         )
         let userId = session.user.id
 
-        // 2. Получить employee и establishment
         let employees: [Employee] = try await client
             .from("employees")
             .select()
@@ -416,13 +414,6 @@ final class AccountManager: ObservableObject {
         guard let company = establishments.first else {
             try? await client.auth.signOut()
             throw NSError(domain: "AccountManager", code: 404, userInfo: [NSLocalizedDescriptionKey: "Establishment not found"])
-        }
-
-        // 3. Проверить PIN компании
-        let trimmedPin = companyPin.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-        guard company.pinCode == trimmedPin else {
-            try? await client.auth.signOut()
-            throw NSError(domain: "AccountManager", code: 403, userInfo: [NSLocalizedDescriptionKey: "Invalid company PIN"])
         }
 
         currentEmployee = emp
