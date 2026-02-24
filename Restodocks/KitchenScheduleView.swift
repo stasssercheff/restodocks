@@ -78,13 +78,13 @@ struct KitchenScheduleView: View {
         Dictionary(grouping: filteredShifts) { Calendar.current.startOfDay(for: $0.date) }
     }
 
-    /// Диапазон дат для графика: от 30 дней назад до конца текущего года (чтобы не подлагивало)
+    /// Диапазон дат для графика: 90 дней (лёгкий скролл). При необходимости можно расширить.
     private var scheduleDateRange: (start: Date, end: Date) {
         let cal = Calendar.current
         let today = cal.startOfDay(for: Date())
-        let start = cal.date(byAdding: .day, value: -30, to: today)!
-        let endOfYear = cal.date(from: DateComponents(year: cal.component(.year, from: today), month: 12, day: 31))!
-        return (start, endOfYear)
+        let start = cal.date(byAdding: .day, value: -14, to: today)!
+        let end = cal.date(byAdding: .day, value: 76, to: today)!
+        return (start, end)
     }
 
     /// Все даты от начала до конца диапазона (график «вечный»)
@@ -192,11 +192,15 @@ struct DayScheduleCard: View {
     let employeeName: (UUID) -> String
     let employeePosition: (UUID) -> String
 
+    private static let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "ru_RU")
+        f.dateFormat = "EEEE, d MMMM"
+        return f
+    }()
+
     var formattedDate: String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ru_RU")
-        formatter.dateFormat = "EEEE, d MMMM"
-        return formatter.string(from: date).capitalized
+        Self.dateFormatter.string(from: date).capitalized
     }
 
     var body: some View {

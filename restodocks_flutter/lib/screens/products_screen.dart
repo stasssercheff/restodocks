@@ -125,15 +125,16 @@ class _ProductsScreenState extends State<ProductsScreen> {
           groups: duplicateGroups,
           mode: _DuplicateMode.full,
           loc: loc,
-          onRemove: (idsToRemove) async {
+          onRemove: (idsToRemove, onProgress) async {
             final store = context.read<ProductStoreSupabase>();
             final account = context.read<AccountManagerSupabase>();
 
             int deletedCount = 0;
             int skippedCount = 0;
+            final total = idsToRemove.length;
+            int processed = 0;
 
             for (final productId in idsToRemove) {
-              // Проверяем, используется ли продукт в номенклатуре
               bool isUsed = false;
               final establishment = account.establishment;
               if (establishment != null) {
@@ -145,15 +146,16 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
               if (isUsed) {
                 skippedCount++;
-                continue;
+              } else {
+                await store.deleteProduct(productId);
+                deletedCount++;
               }
-
-              await store.deleteProduct(productId);
-              deletedCount++;
+              processed++;
+              onProgress?.call(processed, total);
             }
 
             if (mounted) {
-              await _loadProducts(); // Перезагружаем список
+              await _loadProducts();
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text('Удалено дубликатов: $deletedCount${skippedCount > 0 ? ', пропущено (используются): $skippedCount' : ''}')),
               );
@@ -405,6 +407,35 @@ class _ProductsScreenState extends State<ProductsScreen> {
       List<List<Product>> duplicateGroups = [];
 
       if (mode == _DuplicateMode.full) {
+        // Показываем прогресс поиска (вычисление может занять время на больших списках)
+        if (mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (ctx) => PopScope(
+              canPop: false,
+              child: AlertDialog(
+                content: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    const SizedBox(width: 16),
+                    Text(mode == _DuplicateMode.full ? 'Поиск полных дубликатов…' : 'Поиск дубликатов…'),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 100)); // даём показаться диалогу
+
+        if (!mounted) return;
+        Navigator.of(context).pop(); // закрываем "Поиск…"
+
         // Полные дубликаты - группируем по всем полям
         final Map<String, List<Product>> groupedProducts = {};
         for (final product in _products) {
@@ -434,15 +465,16 @@ class _ProductsScreenState extends State<ProductsScreen> {
           groups: duplicateGroups,
           mode: mode,
           loc: loc,
-          onRemove: (idsToRemove) async {
+          onRemove: (idsToRemove, onProgress) async {
             final store = context.read<ProductStoreSupabase>();
             final account = context.read<AccountManagerSupabase>();
             final techCardService = context.read<TechCardServiceSupabase>();
 
             int deletedCount = 0;
             int skippedCount = 0;
+            final total = idsToRemove.length;
+            int processed = 0;
 
-            // Проверяем использование в ТТК
             List<TechCard> allTechCards = [];
             try {
               allTechCards = await techCardService.getAllTechCards();
@@ -451,50 +483,52 @@ class _ProductsScreenState extends State<ProductsScreen> {
             }
 
             for (final productId in idsToRemove) {
-              final product = _products.firstWhere((p) => p.id == productId);
-              if (product == null) continue;
+              Product product;
+              try {
+                product = _products.firstWhere((p) => p.id == productId);
+              } catch (_) {
+                processed++;
+                onProgress?.call(processed, total);
+                continue;
+              }
 
-              // Проверяем использование в номенклатуре
               bool isUsed = false;
-              String usageMessage = '';
 
               final establishment = account.establishment;
               if (establishment != null) {
                 final nomenclatureIds = store.getNomenclatureIdsForEstablishment(establishment.id);
                 if (nomenclatureIds.contains(productId)) {
                   isUsed = true;
-                  usageMessage = 'Продукт используется в номенклатуре';
                 }
               }
 
-              // Проверяем использование в ТТК
               if (!isUsed) {
                 for (final techCard in allTechCards) {
                   if (techCard.ingredients.any((ing) => ing.productId == productId)) {
                     isUsed = true;
-                    usageMessage = 'Продукт используется в ТТК';
                     break;
                   }
                 }
               }
 
               if (isUsed) {
-                print('Skipping product ${product.name}: $usageMessage');
+                print('Skipping product ${product.name}: used in nomenclature or tech card');
                 skippedCount++;
-                continue;
+              } else {
+                try {
+                  await store.deleteProduct(productId);
+                  deletedCount++;
+                  print('Deleted duplicate product: ${product.name}');
+                } catch (e) {
+                  print('Error deleting product ${product.name}: $e');
+                }
               }
-
-              try {
-                await store.deleteProduct(productId);
-                deletedCount++;
-                print('Deleted duplicate product: ${product.name}');
-              } catch (e) {
-                print('Error deleting product ${product.name}: $e');
-              }
+              processed++;
+              onProgress?.call(processed, total);
             }
 
             if (mounted) {
-              await _loadProducts(); // Перезагружаем список
+              await _loadProducts();
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text('Удалено дубликатов: $deletedCount${skippedCount > 0 ? ', пропущено (используются): $skippedCount' : ''}')),
               );
@@ -1177,7 +1211,11 @@ class _SmartDuplicatesDialog extends StatefulWidget {
   final List<List<Product>> groups;
   final _DuplicateMode mode;
   final LocalizationService loc;
-  final Function(List<String> idsToRemove) onRemove;
+  /// [onProgress] вызывается при удалении: (текущий индекс, всего).
+  final Future<void> Function(
+    List<String> idsToRemove,
+    void Function(int current, int total)? onProgress,
+  ) onRemove;
 
   const _SmartDuplicatesDialog({
     required this.groups,
@@ -1193,14 +1231,24 @@ class _SmartDuplicatesDialog extends StatefulWidget {
 class _SmartDuplicatesDialogState extends State<_SmartDuplicatesDialog> {
   final Set<String> _selectedToRemove = {};
   bool _saving = false;
+  int _removalCurrent = 0;
+  int _removalTotal = 0;
+
+  /// Сортируем группу по id, чтобы первый элемент был «оригиналом» (оставляем его).
+  static List<Product> _sortedGroup(List<Product> group) {
+    final list = List<Product>.from(group);
+    list.sort((a, b) => a.id.compareTo(b.id));
+    return list;
+  }
 
   @override
   void initState() {
     super.initState();
-    // По умолчанию отмечаем все кроме первого в каждой группе
+    // По умолчанию удаляем все кроме первого (оригинала) в каждой группе
     for (final group in widget.groups) {
-      for (int i = 1; i < group.length; i++) {
-        _selectedToRemove.add(group[i].id);
+      final sorted = _sortedGroup(group);
+      for (int i = 1; i < sorted.length; i++) {
+        _selectedToRemove.add(sorted[i].id);
       }
     }
   }
@@ -1209,8 +1257,9 @@ class _SmartDuplicatesDialogState extends State<_SmartDuplicatesDialog> {
     setState(() {
       _selectedToRemove.clear();
       for (final group in widget.groups) {
-        for (int i = 1; i < group.length; i++) {
-          _selectedToRemove.add(group[i].id);
+        final sorted = _sortedGroup(group);
+        for (int i = 1; i < sorted.length; i++) {
+          _selectedToRemove.add(sorted[i].id);
         }
       }
     });
@@ -1227,10 +1276,24 @@ class _SmartDuplicatesDialogState extends State<_SmartDuplicatesDialog> {
   }
 
   Future<void> _applyRemoval() async {
-    setState(() => _saving = true);
+    setState(() {
+      _saving = true;
+      _removalTotal = _selectedToRemove.length;
+      _removalCurrent = 0;
+    });
 
     try {
-      await widget.onRemove(_selectedToRemove.toList());
+      await widget.onRemove(
+        _selectedToRemove.toList(),
+        (current, total) {
+          if (mounted) {
+            setState(() {
+              _removalCurrent = current;
+              _removalTotal = total;
+            });
+          }
+        },
+      );
       if (mounted) {
         Navigator.of(context).pop();
       }
@@ -1242,7 +1305,11 @@ class _SmartDuplicatesDialogState extends State<_SmartDuplicatesDialog> {
       }
     } finally {
       if (mounted) {
-        setState(() => _saving = false);
+        setState(() {
+          _saving = false;
+          _removalCurrent = 0;
+          _removalTotal = 0;
+        });
       }
     }
   }
@@ -1266,11 +1333,30 @@ class _SmartDuplicatesDialogState extends State<_SmartDuplicatesDialog> {
               style: theme.textTheme.bodyMedium,
             ),
             const SizedBox(height: 16),
+            if (_saving && _removalTotal > 0)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Удаление: $_removalCurrent из $_removalTotal',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 4),
+                    LinearProgressIndicator(
+                      value: _removalCurrent / _removalTotal,
+                      minHeight: 6,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ],
+                ),
+              ),
             Expanded(
               child: ListView.builder(
                 itemCount: widget.groups.length,
                 itemBuilder: (context, groupIndex) {
-                  final group = widget.groups[groupIndex];
+                  final group = _SmartDuplicatesDialogState._sortedGroup(widget.groups[groupIndex]);
                   return Card(
                     margin: const EdgeInsets.only(bottom: 8),
                     child: Padding(
@@ -1279,7 +1365,7 @@ class _SmartDuplicatesDialogState extends State<_SmartDuplicatesDialog> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            "Группа ${groupIndex + 1}",
+                            "Группа ${groupIndex + 1} (оригинал — первый, остальные дубликаты)",
                             style: theme.textTheme.labelLarge?.copyWith(
                               color: theme.colorScheme.primary,
                               fontWeight: FontWeight.bold,

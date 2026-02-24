@@ -7,6 +7,7 @@ struct CreateShiftView: View {
 
     @State private var selectedEmployee: Employee?
     @State private var date = Date()
+    /// По умолчанию выключен — отображается выбор времени смены.
     @State private var fullDay = false
     @State private var startHour: Int = 9
     @State private var endHour: Int = 18

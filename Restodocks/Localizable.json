@@ -630,13 +630,125 @@
       "fr": "Gestionnaire"
   },
   "suppliers": {
-        "ru": "Поставщики",
-        "en": "Suppliers",
-        "es": "Proveedores",
-        "de": "Lieferanten",
-        "fr": "Fournisseurs"
-      },
-      "product_list": {
+    "ru": "Поставщики",
+    "en": "Suppliers",
+    "es": "Proveedores",
+    "de": "Lieferanten",
+    "fr": "Fournisseurs"
+  },
+  "suppliers_empty_hint": {
+    "ru": "Добавьте поставщика по кнопке +",
+    "en": "Add a supplier using the + button",
+    "es": "Añada un proveedor con el botón +",
+    "de": "Lieferant über + hinzufügen",
+    "fr": "Ajoutez un fournisseur avec le bouton +"
+  },
+  "supplier_name": {
+    "ru": "Название",
+    "en": "Name",
+    "es": "Nombre",
+    "de": "Name",
+    "fr": "Nom"
+  },
+  "supplier_name_placeholder": {
+    "ru": "Название поставщика",
+    "en": "Supplier name",
+    "es": "Nombre del proveedor",
+    "de": "Lieferantenname",
+    "fr": "Nom du fournisseur"
+  },
+  "supplier_contacts": {
+    "ru": "Контактные данные",
+    "en": "Contact details",
+    "es": "Datos de contacto",
+    "de": "Kontaktdaten",
+    "fr": "Coordonnées"
+  },
+  "phone": {
+    "ru": "Телефон",
+    "en": "Phone",
+    "es": "Teléfono",
+    "de": "Telefon",
+    "fr": "Téléphone"
+  },
+  "address": {
+    "ru": "Адрес",
+    "en": "Address",
+    "es": "Dirección",
+    "de": "Adresse",
+    "fr": "Adresse"
+  },
+  "address_placeholder": {
+    "ru": "Адрес",
+    "en": "Address",
+    "es": "Dirección",
+    "de": "Adresse",
+    "fr": "Adresse"
+  },
+  "comment_optional": {
+    "ru": "Комментарий (необязательно)",
+    "en": "Comment (optional)",
+    "es": "Comentario (opcional)",
+    "de": "Kommentar (optional)",
+    "fr": "Commentaire (facultatif)"
+  },
+  "comment_placeholder": {
+    "ru": "Заметки",
+    "en": "Notes",
+    "es": "Notas",
+    "de": "Notizen",
+    "fr": "Notes"
+  },
+  "add_supplier": {
+    "ru": "Добавить поставщика",
+    "en": "Add supplier",
+    "es": "Añadir proveedor",
+    "de": "Lieferant hinzufügen",
+    "fr": "Ajouter un fournisseur"
+  },
+  "edit_supplier": {
+    "ru": "Изменить поставщика",
+    "en": "Edit supplier",
+    "es": "Editar proveedor",
+    "de": "Lieferant bearbeiten",
+    "fr": "Modifier le fournisseur"
+  },
+  "delete": {
+    "ru": "Удалить",
+    "en": "Delete",
+    "es": "Eliminar",
+    "de": "Löschen",
+    "fr": "Supprimer"
+  },
+  "saved_orders": {
+    "ru": "Сохранённые заказы",
+    "en": "Saved orders",
+    "es": "Pedidos guardados",
+    "de": "Gespeicherte Bestellungen",
+    "fr": "Commandes enregistrées"
+  },
+  "no_saved_orders": {
+    "ru": "Нет сохранённых заказов",
+    "en": "No saved orders",
+    "es": "Sin pedidos guardados",
+    "de": "Keine gespeicherten Bestellungen",
+    "fr": "Aucune commande enregistrée"
+  },
+  "new_order": {
+    "ru": "Новый заказ",
+    "en": "New order",
+    "es": "Nuevo pedido",
+    "de": "Neue Bestellung",
+    "fr": "Nouvelle commande"
+  },
+  "order": {
+    "ru": "Заказ",
+    "en": "Order",
+    "es": "Pedido",
+    "de": "Bestellung",
+    "fr": "Commande"
+  },
+  "product_list": {
         "ru": "Список продуктов",
         "en": "Product List",
         "es": "Lista de productos",
@@ -1244,6 +1356,13 @@
     "es": "Cerrar",
     "de": "Schließen",
     "fr": "Fermer"
+  },
+  "clear": {
+    "ru": "Очистить",
+    "en": "Clear",
+    "es": "Borrar",
+    "de": "Löschen",
+    "fr": "Effacer"
   },
   "employee_login": {
     "ru": "Вход для сотрудника",

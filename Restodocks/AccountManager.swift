@@ -23,6 +23,8 @@ final class AccountManager: ObservableObject {
     @Published var currentEmployee: Employee?
     @Published var employees: [Employee] = []
     @Published var shifts: [Shift] = []
+    @Published var suppliers: [Supplier] = []
+    @Published var savedOrders: [SavedOrder] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var emailConfirmed: Bool = false
@@ -176,6 +178,150 @@ final class AccountManager: ObservableObject {
             await fetchShifts()
         } catch {
             print("❌ Delete shift error:", error)
+        }
+    }
+
+    // MARK: - SUPPLIERS
+    @MainActor
+    func fetchSuppliers() async {
+        guard let estId = establishment?.id else { suppliers = []; return }
+        do {
+            let list: [Supplier] = try await client
+                .from("suppliers")
+                .select()
+                .eq("establishment_id", value: estId.uuidString)
+                .order("name", ascending: true)
+                .execute()
+                .value
+            suppliers = list
+        } catch {
+            suppliers = []
+        }
+    }
+
+    @MainActor
+    func createSupplier(name: String, phone: String?, email: String?, address: String?, comment: String?) async throws {
+        guard let estId = establishment?.id else {
+            throw NSError(domain: "AccountManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "No establishment"])
+        }
+        struct Insert: Encodable {
+            let establishment_id: String
+            let name: String
+            let phone: String?
+            let email: String?
+            let address: String?
+            let comment: String?
+        }
+        try await client.from("suppliers")
+            .insert(Insert(
+                establishment_id: estId.uuidString,
+                name: name,
+                phone: phone?.isEmpty == true ? nil : phone,
+                email: email?.isEmpty == true ? nil : email,
+                address: address?.isEmpty == true ? nil : address,
+                comment: comment?.isEmpty == true ? nil : comment
+            ))
+            .execute()
+        await fetchSuppliers()
+    }
+
+    @MainActor
+    func updateSupplier(_ supplier: Supplier) async throws {
+        struct Update: Encodable {
+            let name: String
+            let phone: String?
+            let email: String?
+            let address: String?
+            let comment: String?
+        }
+        try await client.from("suppliers")
+            .update(Update(
+                name: supplier.name,
+                phone: supplier.phone?.isEmpty == true ? nil : supplier.phone,
+                email: supplier.email?.isEmpty == true ? nil : supplier.email,
+                address: supplier.address?.isEmpty == true ? nil : supplier.address,
+                comment: supplier.comment?.isEmpty == true ? nil : supplier.comment
+            ))
+            .eq("id", value: supplier.id.uuidString)
+            .execute()
+        await fetchSuppliers()
+    }
+
+    @MainActor
+    func deleteSupplier(_ supplier: Supplier) async {
+        do {
+            try await client.from("suppliers").delete().eq("id", value: supplier.id.uuidString).execute()
+            await fetchSuppliers()
+        } catch {
+            print("❌ Delete supplier error:", error)
+        }
+    }
+
+    // MARK: - SAVED ORDERS (order_history)
+    @MainActor
+    func fetchSavedOrders() async {
+        guard let estId = establishment?.id else { savedOrders = []; return }
+        do {
+            let list: [SavedOrder] = try await client
+                .from("order_history")
+                .select()
+                .eq("establishment_id", value: estId.uuidString)
+                .order("created_at", ascending: false)
+                .execute()
+                .value
+            savedOrders = list
+        } catch {
+            savedOrders = []
+        }
+    }
+
+    @MainActor
+    func createSavedOrder(lines: [OrderLinePayload]) async throws {
+        guard let estId = establishment?.id, let empId = currentEmployee?.id else {
+            throw NSError(domain: "AccountManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "No establishment or employee"])
+        }
+        struct Insert: Encodable {
+            let establishment_id: String
+            let employee_id: String
+            let order_data: [OrderLinePayload]
+            let status: String
+        }
+        try await client.from("order_history")
+            .insert(Insert(
+                establishment_id: estId.uuidString,
+                employee_id: empId.uuidString,
+                order_data: lines,
+                status: "saved"
+            ))
+            .execute()
+        await fetchSavedOrders()
+    }
+
+    @MainActor
+    func updateSavedOrder(_ order: SavedOrder) async throws {
+        struct Update: Encodable {
+            let order_data: [OrderLinePayload]
+            let updated_at: String
+        }
+        let fmt = ISO8601DateFormatter()
+        fmt.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        try await client.from("order_history")
+            .update(Update(
+                order_data: order.orderData,
+                updated_at: fmt.string(from: Date())
+            ))
+            .eq("id", value: order.id.uuidString)
+            .execute()
+        await fetchSavedOrders()
+    }
+
+    @MainActor
+    func deleteSavedOrder(_ order: SavedOrder) async {
+        do {
+            try await client.from("order_history").delete().eq("id", value: order.id.uuidString).execute()
+            await fetchSavedOrders()
+        } catch {
+            print("❌ Delete order error:", error)
         }
     }
 
