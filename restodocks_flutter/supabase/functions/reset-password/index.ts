@@ -63,6 +63,16 @@ Deno.serve(async (req: Request) => {
 
     const hash = bcrypt.hashSync(password, bcrypt.genSaltSync(10));
 
+    const { data: emp } = await supabase
+      .from("employees")
+      .select("auth_user_id")
+      .eq("id", row.employee_id)
+      .single();
+
+    if (emp?.auth_user_id) {
+      await supabase.auth.admin.updateUserById(emp.auth_user_id, { password });
+    }
+
     await supabase
       .from("employees")
       .update({ password_hash: hash, updated_at: new Date().toISOString() })

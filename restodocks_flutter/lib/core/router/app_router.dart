@@ -34,12 +34,15 @@ bool _isPublicPath(String loc) {
   return false;
 }
 
-/// Начальный путь: при обновлении страницы (web) сохраняем текущий URL.
+/// Начальный путь: при обновлении страницы (web) сохраняем текущий URL и query (токен сброса пароля и т.д.).
 String _getInitialLocation() {
   if (kIsWeb) {
     try {
-      final path = Uri.base.path;
-      if (path.isNotEmpty && path != '/') return path;
+      final uri = Uri.base;
+      final path = uri.path;
+      if (path.isNotEmpty && path != '/') {
+        return uri.hasQuery ? '$path?${uri.query}' : path;
+      }
     } catch (_) {}
   }
   return '/';

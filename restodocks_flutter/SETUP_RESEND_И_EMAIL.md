@@ -20,7 +20,24 @@
 3. Настройте DNS-записи
 4. Укажите в секретах: `RESEND_FROM_EMAIL` = `Restodocks <noreply@ваш-домен.com>`
 
-## 3. Миграция базы данных
+## 3. Письмо после подтверждения email
+
+При подтверждении email пользователем (клик по ссылке из Supabase) автоматически отправляется письмо «Регистрация подтверждена».
+
+**Настройка (один раз):** добавьте anon key в Vault, чтобы триггер мог вызывать Edge Function:
+
+**Supabase** → **SQL Editor**:
+```sql
+SELECT vault.create_secret(
+  'ВАШ_ANON_KEY',  -- из Project Settings → API
+  'supabase_anon_key',
+  'Edge Function auth from triggers'
+);
+```
+
+**Миграция:** `supabase/migrations/20260223200000_send_email_on_email_confirmed.sql`
+
+## 4. Миграция базы данных
 
 Выполните миграцию для таблицы токенов сброса пароля:
 
@@ -30,7 +47,7 @@
 restodocks_flutter/supabase/migrations/20260220000001_password_reset_tokens.sql
 ```
 
-## 4. Деплой Edge Functions
+## 5. Деплой Edge Functions
 
 ```bash
 cd restodocks_flutter
@@ -45,7 +62,7 @@ npx supabase functions deploy reset-password
 npx supabase functions deploy ai-generate-checklist
 ```
 
-## 5. AI чеклист — предпочтение Gemini
+## 6. AI чеклист — предпочтение Gemini
 
 Если GigaChat недоступен из региона Supabase (EarlyDrop в логах), установите в секретах:
 

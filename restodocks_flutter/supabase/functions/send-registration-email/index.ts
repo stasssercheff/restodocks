@@ -32,15 +32,53 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body = (await req.json()) as {
-      type: "owner" | "employee";
+      type: "owner" | "employee" | "registration_confirmed";
       to: string;
-      companyName: string;
-      email: string;
-      password: string;
+      companyName?: string;
+      email?: string;
+      password?: string;
       pinCode?: string;
     };
 
     const { type, to, companyName, email, password, pinCode } = body;
+
+    // Письмо о завершении регистрации (после подтверждения email)
+    if (type === "registration_confirmed") {
+      if (!to) {
+        return new Response(JSON.stringify({ error: "to required" }), {
+          status: 400,
+          headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+        });
+      }
+      const subject = "Регистрация подтверждена — Restodocks";
+      const companyText = companyName ? ` в заведении <strong>${escapeHtml(companyName)}</strong>` : "";
+      const html = `
+<p>Здравствуйте!</p>
+<p>Ваша регистрация${companyText} успешно подтверждена.</p>
+<p>Теперь вы можете войти в приложение Restodocks, используя указанный при регистрации email и пароль.</p>
+<p>С уважением,<br>Команда Restodocks</p>
+      `.trim();
+
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ from, to: [to], subject, html }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        return new Response(JSON.stringify({ error: data?.message || res.statusText }), {
+          status: res.status,
+          headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ id: data?.id, ok: true }), {
+        headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+      });
+    }
 
     if (!type || !to || !companyName || !email || !password) {
       return new Response(JSON.stringify({ error: "type, to, companyName, email, password required" }), {
