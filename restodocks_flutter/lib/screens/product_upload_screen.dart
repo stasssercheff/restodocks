@@ -707,20 +707,26 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     _setLoadingMessage('Анализ данных ИИ...');
 
     try {
-      // Используем локальный парсинг - надежный и быстрый
       List<ParsedProductItem> parsed = [];
-      _setLoadingMessage('Разбор данных...');
+      final ai = context.read<AiService>();
 
-      final rawLines = rows ?? text!.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+      // ИИ обрабатывает входящие данные (текст или файл) — корректно определяет названия и цены
+      if (rows != null && rows.isNotEmpty) {
+        parsed = await ai.parseProductList(rows: rows);
+      } else if (text != null && text.trim().isNotEmpty) {
+        parsed = await ai.parseProductList(text: text);
+      }
 
-      print('DEBUG: Processing ${rawLines.length} lines');
-      for (var i = 0; i < rawLines.length; i++) {
-        final line = rawLines[i];
-        final r = _parseLine(line);
-        print('DEBUG: Line $i: "$line" -> name: "${r.name}", price: ${r.price}');
-
-        if (r.name.isNotEmpty) {
-          parsed.add(ParsedProductItem(name: r.name, price: r.price, unit: null));
+      // Fallback: локальный парсинг, если ИИ недоступен или вернул пустой результат
+      if (parsed.isEmpty) {
+        _setLoadingMessage('Разбор данных (локально)...');
+        final rawLines = rows ?? text!.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+        for (var i = 0; i < rawLines.length; i++) {
+          final line = rawLines[i];
+          final r = _parseLine(line);
+          if (r.name.isNotEmpty) {
+            parsed.add(ParsedProductItem(name: r.name, price: r.price, unit: null));
+          }
         }
       }
 

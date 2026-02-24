@@ -20,6 +20,8 @@ class ImportReviewScreen extends StatefulWidget {
 class _ImportReviewScreenState extends State<ImportReviewScreen> {
   late List<ModerationItem> _items;
   bool _saving = false;
+  int _saveProgress = 0;
+  int _saveTotal = 0;
 
   @override
   void initState() {
@@ -52,13 +54,18 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
     final loc = context.read<LocalizationService>();
     final defCur = est.defaultCurrency ?? 'RUB';
 
-    setState(() => _saving = true);
+    final toSave = _items.where((i) => i.approved).toList();
+    setState(() {
+      _saving = true;
+      _saveTotal = toSave.length;
+      _saveProgress = 0;
+    });
     var created = 0;
     var updated = 0;
 
     try {
-      for (final item in _items) {
-        if (!item.approved) continue;
+      for (final item in toSave) {
+        if (!mounted) return;
 
         if (item.existingProductId != null) {
           if (item.displayPrice != null) {
@@ -81,12 +88,20 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
           );
           created++;
         }
+
+        if (mounted) {
+          setState(() => _saveProgress++);
+        }
       }
 
       await store.loadNomenclature(est.id);
 
       if (mounted) {
-        setState(() => _saving = false);
+        setState(() {
+          _saving = false;
+          _saveProgress = 0;
+          _saveTotal = 0;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -100,7 +115,11 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _saving = false);
+        setState(() {
+          _saving = false;
+          _saveProgress = 0;
+          _saveTotal = 0;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))),
         );
@@ -190,15 +209,35 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: FilledButton(
-            onPressed: _saving || approved == 0 ? null : _save,
-            child: _saving
-                ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                  )
-                : Text(loc.t('save') ?? 'Сохранить'),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_saving && _saveTotal > 0) ...[
+                LinearProgressIndicator(
+                  value: _saveProgress / _saveTotal,
+                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                  valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '$_saveProgress / $_saveTotal',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+              FilledButton(
+                onPressed: _saving || approved == 0 ? null : _save,
+                child: _saving
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : Text(loc.t('save') ?? 'Сохранить'),
+              ),
+            ],
           ),
         ),
       ),
