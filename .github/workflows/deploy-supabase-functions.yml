@@ -1,0 +1,27 @@
+name: Deploy Supabase Edge Functions
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'restodocks_flutter/supabase/functions/**'
+      - 'supabase/functions/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: osglfptwbuqqmqunttha
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy Edge Functions
+        run: supabase functions deploy --project-ref $PROJECT_REF
+        working-directory: .

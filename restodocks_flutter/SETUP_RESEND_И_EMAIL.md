@@ -49,17 +49,11 @@ restodocks_flutter/supabase/migrations/20260220000001_password_reset_tokens.sql
 
 ## 5. Деплой Edge Functions
 
+**Автоматически:** при push в `main` с изменениями в `restodocks_flutter/supabase/functions/` GitHub Action деплоит все функции. Добавьте секрет: GitHub → Settings → Secrets → New repository secret, имя `SUPABASE_ACCESS_TOKEN`, значение — токен из https://supabase.com/dashboard/account/tokens
+
+**Вручную** (из корня репо):
 ```bash
-cd restodocks_flutter
-
-# Деплой всех функций
-npx supabase functions deploy send-email
-npx supabase functions deploy send-registration-email
-npx supabase functions deploy request-password-reset
-npx supabase functions deploy reset-password
-
-# Обновить ai-generate-checklist
-npx supabase functions deploy ai-generate-checklist
+npx supabase functions deploy --project-ref osglfptwbuqqmqunttha
 ```
 
 ## 6. AI чеклист — предпочтение Gemini
