@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -7,10 +5,10 @@ import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/models.dart';
-import '../services/inventory_download.dart';
 import '../services/order_document_service.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
+import '../widgets/order_export_sheet.dart';
 
 /// Просмотр/редактирование списка заказа: наименование, единица (редактируемая), количество. Комментарий. Сохранить список / Отправить (сохранить на устройство).
 class OrderListDetailScreen extends StatefulWidget {
@@ -111,106 +109,46 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
     }
   }
 
-  Future<void> _sendSaveToDevice() async {
+  List<OrderListItem> _getItemsWithQuantities() {
+    if (_list == null) return [];
+    return _list!.items.asMap().entries.map((e) {
+      final q = e.key < _qtyControllers.length
+          ? (double.tryParse(_qtyControllers[e.key].text.replaceFirst(',', '.')) ?? 0)
+          : e.value.quantity;
+      return e.value.copyWith(quantity: q);
+    }).toList();
+  }
+
+  List<OrderListItem> _getItemsWithLocalizedNames(String lang) {
+    final store = context.read<ProductStoreSupabase>();
+    return _getItemsWithQuantities().map((item) {
+      final name = item.productId != null
+          ? (store.findProductById(item.productId!)?.getLocalizedName(lang) ?? item.productName)
+          : item.productName;
+      return item.copyWith(productName: name);
+    }).toList();
+  }
+
+  void _showExportSheet() {
     if (_list == null) return;
+    final account = context.read<AccountManagerSupabase>();
+    final companyName = account.establishment?.name ?? '—';
     final loc = context.read<LocalizationService>();
-    final lang = await showDialog<String>(
+    final store = context.read<ProductStoreSupabase>();
+    if (store.allProducts.isEmpty) store.loadProducts();
+    final itemsWithNames = _getItemsWithLocalizedNames(loc.currentLanguageCode);
+
+    showModalBottomSheet<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.t('order_list_save_language')),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: LocalizationService.supportedLocales.map((locale) {
-            return ListTile(
-              title: Text(loc.getLanguageName(locale.languageCode)),
-              onTap: () => Navigator.of(ctx).pop(locale.languageCode),
-            );
-          }).toList(),
-        ),
+      isScrollControlled: true,
+      builder: (ctx) => OrderExportSheet(
+        list: _list!,
+        itemsWithQuantities: itemsWithNames,
+        companyName: companyName,
+        loc: loc,
+        onSaved: (msg) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg))),
       ),
     );
-    if (lang == null || !mounted) return;
-
-    // Загружаем продукты для перевода названий (если есть productId)
-    final store = context.read<ProductStoreSupabase>();
-    if (store.allProducts.isEmpty) await store.loadProducts();
-
-    final lines = <String>[];
-    lines.add(_list!.name);
-    lines.add('${loc.tForLanguage(lang, 'order_list_supplier_name')}: ${_list!.supplierName}');
-    lines.add('');
-    lines.add('${loc.tForLanguage(lang, 'order_list_quantity')}\t${loc.tForLanguage(lang, 'order_list_unit')}\t${loc.tForLanguage(lang, 'inventory_item_name')}');
-    for (var idx = 0; idx < _list!.items.length; idx++) {
-      final item = _list!.items[idx];
-      final q = idx < _qtyControllers.length
-          ? (double.tryParse(_qtyControllers[idx].text.replaceFirst(',', '.')) ?? item.quantity)
-          : item.quantity;
-      final productName = (item.productId != null
-              ? store.findProductById(item.productId!)?.getLocalizedName(lang)
-              : null) ??
-          item.productName;
-      lines.add('$q\t${_unitLabel(item.unit, lang)}\t$productName');
-    }
-    final commentText = _commentCtrl.text.trim();
-    if (commentText.isNotEmpty) {
-      lines.add('');
-      lines.add('${loc.tForLanguage(lang, 'order_list_comment')}: $commentText');
-    }
-    final content = lines.join('\n');
-    final bytes = utf8.encode(content);
-    final dateStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    final fileName = 'order_${_list!.name.replaceAll(RegExp(r'[^\w\-.]'), '_')}_$dateStr.txt';
-    await saveFileBytes(fileName, bytes);
-
-    // Отправить шеф-повару во Входящие
-    final account = context.read<AccountManagerSupabase>();
-    final establishment = account.establishment;
-    final employee = account.currentEmployee;
-    if (establishment != null && employee != null) {
-      final chefs = await account.getExecutiveChefsForEstablishment(establishment.id);
-      if (chefs.isNotEmpty) {
-        final itemsWithQty = <Map<String, dynamic>>[];
-        for (var idx = 0; idx < _list!.items.length; idx++) {
-          final item = _list!.items[idx];
-          final q = idx < _qtyControllers.length
-              ? (double.tryParse(_qtyControllers[idx].text.replaceFirst(',', '.')) ?? item.quantity)
-              : item.quantity;
-          final productName = (item.productId != null
-                  ? store.findProductById(item.productId!)?.getLocalizedName(lang)
-                  : null) ??
-              item.productName;
-          itemsWithQty.add({
-            'productName': productName,
-            'unit': item.unit,
-            'quantity': q,
-          });
-        }
-        final payload = {
-          'header': {
-            'establishmentName': establishment.name,
-            'employeeName': employee.fullName,
-            'supplierName': _list!.supplierName,
-            'date': dateStr.replaceAll('-', '.'),
-            'listName': _list!.name,
-            'comment': _commentCtrl.text.trim(),
-          },
-          'rows': itemsWithQty,
-        };
-        await OrderDocumentService().save(
-          establishmentId: establishment.id,
-          createdByEmployeeId: employee.id,
-          recipientChefId: chefs.first.id,
-          recipientEmail: chefs.first.email,
-          payload: payload,
-        );
-      }
-    }
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${loc.t('order_list_save_to_device')}: $fileName')),
-      );
-    }
   }
 
   @override
@@ -353,7 +291,7 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
                       const SizedBox(width: 16),
                       Expanded(
                         child: FilledButton(
-                          onPressed: _sendSaveToDevice,
+                          onPressed: _showExportSheet,
                           style: FilledButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 16),
                           ),

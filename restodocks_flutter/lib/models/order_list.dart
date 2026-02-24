@@ -16,6 +16,8 @@ class OrderList {
   final String comment;
   /// Дата сохранения списка с количествами (null = шаблон).
   final DateTime? savedAt;
+  /// На когда заказ (желаемая дата поставки).
+  final DateTime? orderForDate;
 
   const OrderList({
     required this.id,
@@ -29,6 +31,7 @@ class OrderList {
     this.items = const [],
     this.comment = '',
     this.savedAt,
+    this.orderForDate,
   });
 
   bool get isSavedWithQuantities => savedAt != null;
@@ -45,6 +48,7 @@ class OrderList {
         'items': items.map((e) => e.toJson()).toList(),
         'comment': comment,
         'savedAt': savedAt?.toIso8601String(),
+        'orderForDate': orderForDate?.toIso8601String(),
       };
 
   factory OrderList.fromJson(Map<String, dynamic> json) {
@@ -64,6 +68,7 @@ class OrderList {
           [],
       comment: json['comment'] as String? ?? '',
       savedAt: savedAtStr != null ? DateTime.tryParse(savedAtStr) : null,
+      orderForDate: (json['orderForDate'] as String?) != null ? DateTime.tryParse(json['orderForDate'] as String) : null,
     );
   }
 
@@ -79,6 +84,7 @@ class OrderList {
     List<OrderListItem>? items,
     String? comment,
     DateTime? savedAt,
+    DateTime? orderForDate,
   }) =>
       OrderList(
         id: id ?? this.id,
@@ -92,6 +98,7 @@ class OrderList {
         items: items ?? this.items,
         comment: comment ?? this.comment,
         savedAt: savedAt ?? this.savedAt,
+        orderForDate: orderForDate ?? this.orderForDate,
       );
 }
 
