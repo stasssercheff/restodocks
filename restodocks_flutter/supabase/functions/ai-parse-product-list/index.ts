@@ -34,13 +34,14 @@ RULES:
 - Infer columns by content meaning. Product names can be in any column.
 - Extract and normalize product names: fix ALL typos (grammatical and semantic)
 - Fix typos: "картофан" -> "Картофель", "помидор" -> "Томат", "лук" -> "Лук репчатый", "Авокало" -> "Авокадо", "Анчоусм" -> "Анчоусы", "АпельсмН" -> "Апельсин"
-- Use standard culinary terminology, correct spelling
-- Handle various price formats: "50р", "50 руб", "50.5", "50,5"
+- Используй стандартную кулинарную терминологию. Результат — без опечаток
+- Цены: "50р", "50 руб", "50.5", "50,5", "110000", "1 360 000"
 - Analyze prices: detect currency, validate reasonableness
 - Recognize units: кг, г, шт, л, мл, порция, упаковка
 - Handle comma as decimal separator (50,5 = 50.5) and dots (50.5 = 50.5)
 - Handle spaces in numbers (1 000 = 1000)
 - Skip rows without product names (headers, totals, empty rows)
+- Никогда не используй голое число (110000, 4302) как name — это цена. Ищи название продукта в контексте строки
 - Return ONLY valid JSON array, no markdown, no extra text.
 - Max 500 items. If more rows, take first 500.
 

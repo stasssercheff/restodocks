@@ -381,7 +381,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       ),
     );
     if (result == null || result.trim().isEmpty || !mounted) return;
-    await _processWithDeferredModeration(text: result);
+    await _processWithDeferredModeration(text: result, source: 'вставленный текст');
   }
 
   /// 2. Загрузить из файла — выбор файла → извлечение данных → _processWithDeferredModeration
@@ -766,7 +766,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         );
         return;
       }
-      await _processWithDeferredModeration(rows: rows);
+      await _processWithDeferredModeration(rows: rows, source: _sourceFromFileName(name));
     } else {
       final controller = TextEditingController();
       final result = await showDialog<String>(
@@ -794,7 +794,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         ),
       );
       if (result != null && result.trim().isNotEmpty) {
-        await _processWithDeferredModeration(text: result);
+        await _processWithDeferredModeration(text: result, source: 'вставленный текст');
       }
     }
   }
@@ -2891,13 +2891,16 @@ ${allProducts.map((p) => p.name).join('\n')}
       final cells = cellPattern.allMatches(tableContent);
 
       if (cells.length >= 2) {
-        // Берем первые две ячейки (название и цена)
-        final nameCell = _cleanRtfCell(cells.first.group(1) ?? '');
-        final priceCell = cells.length > 1 ? _cleanRtfCell(cells.elementAt(1).group(1) ?? '') : '';
-
-        if (nameCell.isNotEmpty) {
-          final row = priceCell.isNotEmpty ? '$nameCell\t$priceCell' : nameCell;
-          rows.add(row);
+        var cell1 = _cleanRtfCell(cells.first.group(1) ?? '');
+        var cell2 = cells.length > 1 ? _cleanRtfCell(cells.elementAt(1).group(1) ?? '') : '';
+        // Если первая ячейка — число (цена), вторая — текст (название), поменять местами
+        if (cell1.isNotEmpty && cell2.isNotEmpty &&
+            RegExp(r'^[\d\s,\.]+$').hasMatch(cell1.replaceAll(' ', '')) &&
+            RegExp(r'[a-zA-Zа-яА-ЯёЁ]').hasMatch(cell2)) {
+          final t = cell1; cell1 = cell2; cell2 = t;
+        }
+        if (cell1.isNotEmpty) {
+          rows.add(cell2.isNotEmpty ? '$cell1\t$cell2' : cell1);
         }
       }
     }

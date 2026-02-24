@@ -10,7 +10,9 @@ function corsHeaders(origin: string | null) {
   };
 }
 
-const SYSTEM_PROMPT = `You are a product name normalizer for a restaurant. Given a list of product names (possibly with typos, slang, abbreviations), return corrected standard names.
+const SYSTEM_PROMPT = `Ты — нормализатор названий продуктов для ресторана. Исправляй ВСЕ опечатки. Результат должен соответствовать стандартным названиям из базы продуктов.
+
+КРИТИЧЕСКИ ВАЖНО: В итоге не должно быть названий с опечатками. Прогоняй каждое название через проверку.
 
 RULES:
 - Fix typos: "картофан" -> "Картофель", "помидор" -> "Томат", "лук репка" -> "Лук репчатый", "морков" -> "Морковь"
