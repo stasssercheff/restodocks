@@ -16,6 +16,11 @@ class OwnerHomeContent extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        // Маркер для проверки деплоя: видишь v1.0.1 — новая сборка
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Text('v1.0.1', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey)),
+        ),
         _SectionTitle(title: loc.t('schedule')),
         _Tile(icon: Icons.calendar_month, title: loc.t('schedule'), subtitle: loc.t('all_employees_schedule'), onTap: () => context.push('/schedule')),
         _Tile(icon: Icons.inbox, title: 'Входящие', onTap: () => context.push('/inbox')),
