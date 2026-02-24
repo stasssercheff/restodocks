@@ -281,13 +281,8 @@ class AppRouter {
         path: '/tech-cards',
         builder: (context, state) => const TechCardsListScreen(),
       ),
-      GoRoute(
-        path: '/tech-cards/:department',
-        builder: (context, state) {
-          final department = state.pathParameters['department'] ?? 'kitchen';
-          return TechCardsListScreen(department: department);
-        },
-      ),
+      // /tech-cards/new и /tech-cards/import-review должны быть ДО /tech-cards/:department,
+      // иначе /tech-cards/new матчится как department='new' и показывается список вместо формы создания
       GoRoute(
         path: '/tech-cards/new',
         builder: (context, state) {
@@ -301,6 +296,13 @@ class AppRouter {
           final list = state.extra as List?;
           final cards = list != null ? list.map((e) => e as TechCardRecognitionResult).toList() : <TechCardRecognitionResult>[];
           return TechCardsImportReviewScreen(cards: cards);
+        },
+      ),
+      GoRoute(
+        path: '/tech-cards/:department',
+        builder: (context, state) {
+          final department = state.pathParameters['department'] ?? 'kitchen';
+          return TechCardsListScreen(department: department);
         },
       ),
       GoRoute(
