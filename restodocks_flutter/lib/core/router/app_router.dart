@@ -1,9 +1,10 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../initial_location_stub.dart'
+    if (dart.library.html) '../initial_location_web.dart' as initial_loc;
 import '../../models/models.dart';
 import '../../screens/screens.dart';
 import '../../screens/company_registration_screen.dart';
@@ -34,16 +35,11 @@ bool _isPublicPath(String loc) {
   return false;
 }
 
-/// Начальный путь: при обновлении страницы (web) сохраняем текущий URL и query (токен сброса пароля и т.д.).
+/// Начальный путь: при F5 (web) — текущая страница из URL, без сброса на домашний
 String _getInitialLocation() {
   if (kIsWeb) {
-    try {
-      final uri = Uri.base;
-      final path = uri.path;
-      if (path.isNotEmpty && path != '/') {
-        return uri.hasQuery ? '$path?${uri.query}' : path;
-      }
-    } catch (_) {}
+    final loc = initial_loc.getInitialLocation();
+    if (loc.isNotEmpty && loc != '/') return loc;
   }
   return '/';
 }

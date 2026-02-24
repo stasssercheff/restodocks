@@ -335,11 +335,11 @@ class _InventoryScreenState extends State<InventoryScreen>
       // Добавляем недостающие продукты и ПФ
       for (final p in products) {
         if (_rows.any((r) => r.product?.id == p.id || r.productId == p.id)) continue;
-        _rows.add(_InventoryRow(product: p, techCard: null, quantities: List<double>.filled(minQtyCount, 0.0)));
+        _rows.add(_InventoryRow(product: p, techCard: null, quantities: List<double>.generate(minQtyCount, (_) => 0.0)));
       }
       for (final tc in pfOnly) {
         if (_rows.any((r) => r.techCard?.id == tc.id || r.techCardId == tc.id)) continue;
-        _rows.add(_InventoryRow(product: null, techCard: tc, quantities: List<double>.filled(minQtyCount, 0.0), pfUnit: _pfUnitPcs));
+        _rows.add(_InventoryRow(product: null, techCard: tc, quantities: List<double>.generate(minQtyCount, (_) => 0.0), pfUnit: _pfUnitPcs));
       }
 
       for (var i = 0; i < _rows.length; i++) {
@@ -546,7 +546,7 @@ class _InventoryScreenState extends State<InventoryScreen>
 
   void _addProduct(Product p) {
     // Все новые продукты начинаются с 2 колонок
-    final quantities = List<double>.filled(2, 0.0);
+    final quantities = <double>[0.0, 0.0];
     setState(() {
       _rows.add(_InventoryRow(product: p, techCard: null, quantities: quantities));
     });
@@ -1795,13 +1795,9 @@ class _QtyCellState extends State<_QtyCell> {
   @override
   void didUpdateWidget(_QtyCell old) {
     super.didUpdateWidget(old);
-    // Если виджет обновился и у нас был фокус, восстанавливаем его после перестроения
-    if (_wasFocused && !_focus.hasFocus) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _wasFocused) {
-          _focus.requestFocus();
-        }
-      });
+    // Если виджет обновился и у нас был фокус, восстанавливаем его сразу
+    if (_wasFocused && !_focus.hasFocus && mounted) {
+      _focus.requestFocus();
     }
     // Обновляем текст только если значение изменилось извне
     if (old.value != widget.value) {
