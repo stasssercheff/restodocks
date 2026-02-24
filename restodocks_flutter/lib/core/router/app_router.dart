@@ -56,6 +56,11 @@ class AppRouter {
     initialLocation: _getInitialLocation(),
     redirect: (context, state) async {
       final loc = state.matchedLocation;
+      // Web: если роутер показал корень/splash, но в адресной строке другой путь — восстанавливаем его (F5)
+      if (kIsWeb && (loc == '/' || loc == '/splash')) {
+        final browserPath = initial_loc.getCurrentBrowserPath();
+        if (browserPath != null) return browserPath;
+      }
       if (_isPublicPath(loc)) return null;
       // Сессия восстановлена в main() — при F5 остаёмся на текущем URL
       final account = context.read<AccountManagerSupabase>();

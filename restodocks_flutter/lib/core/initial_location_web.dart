@@ -22,3 +22,12 @@ String getInitialLocation() {
   } catch (_) {}
   return '/';
 }
+
+/// Текущий путь из адресной строки (для коррекции в redirect). Возвращает null если корень.
+String? getCurrentBrowserPath() {
+  try {
+    final loc = getInitialLocation();
+    if (loc.isNotEmpty && loc != '/') return loc;
+  } catch (_) {}
+  return null;
+}

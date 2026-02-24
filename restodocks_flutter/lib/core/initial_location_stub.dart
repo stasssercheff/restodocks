@@ -2,3 +2,5 @@
 String getInitialLocation() {
   return '/';
 }
+
+String? getCurrentBrowserPath() => null;
