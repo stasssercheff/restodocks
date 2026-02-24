@@ -1472,20 +1472,6 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
                     icon: const Icon(Icons.cloud_download, size: 20),
                     label: Text(widget.loc.t('load_kbju_for_all').replaceAll('%s', '${needsKbju.length}')),
                   ),
-                if (needsTranslation.isNotEmpty)
-                  FilledButton.tonalIcon(
-                    onPressed: () => widget.onLoadTranslations(context, needsTranslation.where((item) => item.isProduct).map((item) => item.product!).toList()),
-                    icon: const Icon(Icons.translate, size: 20),
-                    label: Text(widget.loc.t('translate_names_for_all').replaceAll('%s', '${needsTranslation.length}')),
-                  ),
-                Tooltip(
-                  message: widget.loc.t('verify_with_ai_tooltip'),
-                  child: FilledButton.tonalIcon(
-                    onPressed: () => widget.onVerifyWithAi(context, widget.items.where((item) => item.isProduct).map((item) => item.product!).toList()),
-                    icon: const Icon(Icons.auto_awesome, size: 20),
-                    label: Text(widget.loc.t('verify_with_ai').replaceAll('%s', '${widget.items.length}')),
-                  ),
-                ),
               ],
             ),
           ),
@@ -2353,12 +2339,6 @@ class _CatalogTab extends StatelessWidget {
                     onPressed: () => _loadKbjuForAll(context, needsKbju),
                     icon: const Icon(Icons.cloud_download, size: 20),
                     label: Text(loc.t('load_kbju_for_all').replaceAll('%s', '${needsKbju.length}')),
-                  ),
-                if (needsTranslation.isNotEmpty)
-                  FilledButton.tonalIcon(
-                    onPressed: () => _loadTranslationsForAll(context, needsTranslation),
-                    icon: const Icon(Icons.translate, size: 20),
-                    label: Text(loc.t('translate_names_for_all').replaceAll('%s', '${needsTranslation.length}')),
                   ),
               ],
             ),
