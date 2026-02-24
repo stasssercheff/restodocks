@@ -141,6 +141,11 @@ final class AccountManager: ObservableObject {
         employees.first { $0.id == id }?.fullName ?? "—"
     }
 
+    func employeePosition(for id: UUID) -> String {
+        guard let emp = employees.first(where: { $0.id == id }) else { return "—" }
+        return emp.jobPosition ?? emp.roles.first ?? "—"
+    }
+
     @MainActor
     func updateEmployeePayroll(employeeId: UUID, costPerUnit: Double, payrollCountingMode: String) async {
         do {

@@ -5,28 +5,36 @@ struct ScheduleView: View {
     @EnvironmentObject var accounts: AccountManager
 
     var body: some View {
-        NavigationStack {
-            List {
-                ForEach(accounts.shifts) { shift in
-                    VStack(alignment: .leading, spacing: 6) {
+        List {
+            ForEach(accounts.shifts) { shift in
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
                         Text(accounts.employeeName(for: shift.employeeId))
                             .font(.headline)
-
                         Text(formattedDate(shift.date))
                             .font(.subheadline)
                             .foregroundColor(.secondary)
-
-                        if shift.fullDay {
-                            Text(lang.t("full_day"))
-                                .font(.caption)
-                        } else {
-                            Text("⏰ \(shift.startHour):00 – \(shift.endHour):00")
-                                .font(.caption)
-                        }
+                    }
+                    Text(positionDisplayName(accounts.employeePosition(for: shift.employeeId)))
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color(.systemGray5))
+                        .cornerRadius(6)
+                    Spacer()
+                    if shift.fullDay {
+                        Text(lang.t("full_day"))
+                            .font(.caption)
+                    } else {
+                        Text("⏰ \(shift.startHour):00 – \(shift.endHour):00")
+                            .font(.caption)
                     }
                 }
-                .onDelete(perform: deleteShift)
+                .padding(.vertical, 4)
             }
+            .onDelete(perform: deleteShift)
+        }
             .navigationTitle(lang.t("schedule"))
             .task {
                 await accounts.fetchEmployees()
@@ -44,7 +52,6 @@ struct ScheduleView: View {
                     }
                 }
             }
-        }
     }
 
     private func deleteShift(at offsets: IndexSet) {
@@ -60,5 +67,10 @@ struct ScheduleView: View {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
         return formatter.string(from: date)
+    }
+
+    private func positionDisplayName(_ role: String) -> String {
+        let translated = lang.t(role)
+        return translated != role ? translated : role.replacingOccurrences(of: "_", with: " ").capitalized
     }
 }

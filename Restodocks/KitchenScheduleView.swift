@@ -70,8 +70,7 @@ struct KitchenScheduleView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
+        VStack(spacing: 0) {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(Department.allCases) { department in
@@ -107,7 +106,7 @@ struct KitchenScheduleView: View {
                         LazyVStack(spacing: 16) {
                             ForEach(shiftsByDate.keys.sorted(), id: \.self) { date in
                                 if let dayShifts = shiftsByDate[date], !dayShifts.isEmpty {
-                                    DayScheduleCard(date: date, shifts: dayShifts, employeeName: { accounts.employeeName(for: $0) })
+                                    DayScheduleCard(date: date, shifts: dayShifts, employeeName: { accounts.employeeName(for: $0) }, employeePosition: { accounts.employeePosition(for: $0) })
                                 }
                             }
                         }
@@ -134,7 +133,6 @@ struct KitchenScheduleView: View {
             .sheet(isPresented: $showingAddShift) {
                 CreateShiftView()
             }
-        }
     }
 }
 
@@ -142,6 +140,7 @@ struct DayScheduleCard: View {
     let date: Date
     let shifts: [Shift]
     let employeeName: (UUID) -> String
+    let employeePosition: (UUID) -> String
 
     var formattedDate: String {
         let formatter = DateFormatter()
@@ -157,7 +156,7 @@ struct DayScheduleCard: View {
                 .padding(.horizontal)
 
             ForEach(shifts) { shift in
-                ShiftCard(shift: shift, employeeName: employeeName(shift.employeeId))
+                ShiftCard(shift: shift, employeeName: employeeName(shift.employeeId), employeePosition: employeePosition(shift.employeeId))
             }
         }
         .padding(.vertical)
@@ -172,6 +171,7 @@ struct ShiftCard: View {
     @EnvironmentObject var lang: LocalizationManager
     let shift: Shift
     let employeeName: String
+    let employeePosition: String
 
     var departmentInfo: (icon: String, name: String) {
         switch shift.department {
@@ -197,27 +197,34 @@ struct ShiftCard: View {
         }
     }
 
+    private func positionDisplayName(_ role: String) -> String {
+        let key = role
+        let translated = lang.t(key)
+        return translated != key ? translated : role.replacingOccurrences(of: "_", with: " ").capitalized
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             Text(departmentInfo.icon)
                 .font(.title2)
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(employeeName)
-                    .font(.headline)
+            Text(employeeName)
+                .font(.headline)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-                HStack {
-                    Text(departmentInfo.name)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+            Text(positionDisplayName(employeePosition))
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(Color(.systemGray5))
+                .cornerRadius(6)
 
-                    Spacer()
+            Spacer()
 
-                    Text(timeString)
-                        .font(.subheadline)
-                        .foregroundColor(.blue)
-                }
-            }
+            Text(timeString)
+                .font(.subheadline)
+                .foregroundColor(.blue)
         }
         .padding()
         .background(Color(.systemGray6))
