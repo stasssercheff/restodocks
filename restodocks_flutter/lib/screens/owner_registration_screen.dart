@@ -223,19 +223,23 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                Text(loc.t('role_optional'), style: Theme.of(context).textTheme.titleSmall),
+                Text(loc.t('position_optional'), style: Theme.of(context).textTheme.titleSmall),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   value: _selectedRole,
                   decoration: InputDecoration(
-                    labelText: loc.t('role'),
+                    labelText: loc.t('position'),
                     prefixIcon: const Icon(Icons.badge),
                   ),
                   items: [
-                    DropdownMenuItem(value: null, child: Text(loc.t('role_optional'))),
+                    DropdownMenuItem(value: null, child: Text(loc.t('owner_only'))),
                     DropdownMenuItem(value: 'executive_chef', child: Text(loc.t('executive_chef'))),
                     DropdownMenuItem(value: 'sous_chef', child: Text(loc.t('sous_chef'))),
-                    DropdownMenuItem(value: 'manager', child: Text(loc.t('manager'))),
+                    DropdownMenuItem(value: 'bartender', child: Text(loc.t('bartender'))),
+                    DropdownMenuItem(value: 'waiter', child: Text(loc.t('waiter'))),
+                    DropdownMenuItem(value: 'bar_manager', child: Text(loc.t('bar_manager'))),
+                    DropdownMenuItem(value: 'floor_manager', child: Text(loc.t('floor_manager'))),
+                    DropdownMenuItem(value: 'general_manager', child: Text(loc.t('general_manager'))),
                   ],
                   onChanged: (v) => setState(() => _selectedRole = v),
                 ),

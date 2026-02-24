@@ -70,19 +70,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  String _getRoleDisplayName(EmployeeRole? role, LocalizationService loc) {
-    if (role == null) return loc.t('owner');
-    switch (role.code) {
-      case 'executive_chef':
-        return loc.t('executive_chef');
-      case 'sous_chef':
-        return loc.t('sous_chef');
-      case 'bartender':
-        return loc.t('bartender');
-      case 'waiter':
-        return loc.t('waiter');
-      default:
-        return loc.t('owner');
+  String _getRoleDisplayName(EmployeeRole? role, LocalizationService loc) => _getPositionDisplayName(role?.code, loc);
+
+  String _getPositionDisplayName(String? code, LocalizationService loc) {
+    if (code == null || code.isEmpty) return loc.t('owner_only');
+    switch (code) {
+      case 'executive_chef': return loc.t('executive_chef');
+      case 'sous_chef': return loc.t('sous_chef');
+      case 'bartender': return loc.t('bartender');
+      case 'waiter': return loc.t('waiter');
+      case 'bar_manager': return loc.t('bar_manager');
+      case 'floor_manager': return loc.t('floor_manager');
+      case 'general_manager': return loc.t('general_manager');
+      case 'manager': return loc.t('manager');
+      default: return code;
     }
   }
 
@@ -159,113 +160,136 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ).then((_) => emailController.dispose());
   }
 
-  void _showProDialog(BuildContext context, LocalizationService loc, AccountManagerSupabase accountManager) {
+  /// Одно окно «Настройки про»: статус подписки, ввод промокода, настройка кнопки «Домой»
+  void _showProSettingsDialog(BuildContext context, LocalizationService loc, AccountManagerSupabase accountManager, HomeButtonConfigService homeBtn) {
     final hasPro = accountManager.hasProSubscription;
     final establishment = accountManager.establishment;
+    final codeController = TextEditingController();
 
-    if (hasPro) {
-      // Показать данные о подписке
-      showDialog<void>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(loc.t('pro')),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('${loc.t('subscription_status')}: ${loc.t('active')}'),
-              if (establishment?.subscriptionPlan != null)
-                Text('${loc.t('subscription_plan')}: ${establishment!.subscriptionPlan}'),
-              // Здесь можно добавить больше деталей о подписке
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx2, setState) {
+          return AlertDialog(
+            title: Text(loc.t('pro_settings')),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Статус подписки
+                  Text(
+                    '${loc.t('subscription_status')}: ${hasPro ? loc.t('active') : loc.t('inactive')}',
+                    style: Theme.of(ctx2).textTheme.titleSmall,
+                  ),
+                  if (hasPro && establishment?.subscriptionPlan != null)
+                    Text('${loc.t('subscription_plan')}: ${establishment!.subscriptionPlan}'),
+                  const SizedBox(height: 16),
+
+                  // Ввод промокода (если нет Pro)
+                  if (!hasPro) ...[
+                    Text(loc.t('activation_code'), style: Theme.of(ctx2).textTheme.titleSmall),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: codeController,
+                      decoration: InputDecoration(
+                        hintText: loc.t('enter_activation_code'),
+                        border: const OutlineInputBorder(),
+                        filled: true,
+                      ),
+                      textCapitalization: TextCapitalization.characters,
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // Настройка кнопки «Домой» (только для Pro)
+                  if (hasPro) ...[
+                    Text(loc.t('home_button_config'), style: Theme.of(ctx2).textTheme.titleSmall),
+                    const SizedBox(height: 8),
+                    ...HomeButtonAction.values.map((action) => ListTile(
+                      dense: true,
+                      title: Text(_homeButtonActionLabel(loc, action)),
+                      trailing: homeBtn.action == action ? const Icon(Icons.check, color: Colors.green, size: 20) : null,
+                      onTap: () async {
+                        await homeBtn.setAction(action);
+                        if (ctx2.mounted) setState(() {});
+                      },
+                    )),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx2).pop(),
+                child: Text(MaterialLocalizations.of(ctx2).cancelButtonLabel),
+              ),
+              if (!hasPro)
+                FilledButton(
+                  onPressed: () async {
+                    final code = codeController.text.trim();
+                    if (code.isEmpty) return;
+                    // TODO: логика активации кода
+                    if (ctx2.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('${loc.t('code_activated')}: $code')),
+                      );
+                      Navigator.of(ctx2).pop();
+                    }
+                  },
+                  child: Text(loc.t('activate')),
+                )
+              else
+                FilledButton(
+                  onPressed: () => Navigator.of(ctx2).pop(),
+                  child: Text(MaterialLocalizations.of(ctx2).okButtonLabel),
+                ),
             ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
-            ),
-          ],
-        ),
-      );
-    } else {
-      // Показать окно ввода кода
-      final codeController = TextEditingController();
-      showDialog<void>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text('${loc.t('pro')} - ${loc.t('enter_code')}'),
-          content: TextField(
-            controller: codeController,
-            decoration: InputDecoration(
-              labelText: loc.t('activation_code'),
-              hintText: loc.t('enter_activation_code'),
-            ),
-            textCapitalization: TextCapitalization.characters,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
-            ),
-            FilledButton(
-              onPressed: () async {
-                final code = codeController.text.trim();
-                if (code.isEmpty) return;
-
-                // Здесь должна быть логика активации кода
-                // Пока просто показываем сообщение
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('${loc.t('code_activated')}: $code')),
-                );
-                Navigator.of(ctx).pop();
-              },
-              child: Text(loc.t('activate')),
-            ),
-          ],
-        ),
-      ).then((_) => codeController.dispose());
-    }
+          );
+        },
+      ),
+    ).then((_) => codeController.dispose());
   }
 
-  void _showRolePicker(BuildContext context, LocalizationService loc, Employee currentEmployee, AccountManagerSupabase accountManager) {
-    final availableRoles = [
-      {'code': 'owner', 'name': loc.t('owner')},
+  /// Выбор должности (owner — дополнительная роль, не должность)
+  void _showPositionPicker(BuildContext context, LocalizationService loc, Employee currentEmployee, AccountManagerSupabase accountManager) {
+    final availablePositions = [
+      {'code': null, 'name': loc.t('owner_only')},
       {'code': 'executive_chef', 'name': loc.t('executive_chef')},
       {'code': 'sous_chef', 'name': loc.t('sous_chef')},
       {'code': 'bartender', 'name': loc.t('bartender')},
       {'code': 'waiter', 'name': loc.t('waiter')},
+      {'code': 'bar_manager', 'name': loc.t('bar_manager')},
+      {'code': 'floor_manager', 'name': loc.t('floor_manager')},
+      {'code': 'general_manager', 'name': loc.t('general_manager')},
     ];
 
-    final currentRoleCode = currentEmployee.primaryRole?.code ?? 'owner';
+    final currentPosition = currentEmployee.positionRole;
 
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(loc.t('select_role')),
+        title: Text(loc.t('select_position')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          children: availableRoles.map((role) {
-            final isSelected = role['code'] == currentRoleCode;
+          children: availablePositions.map((pos) {
+            final code = pos['code'] as String?;
+            final isSelected = code == currentPosition;
             return ListTile(
-              title: Text(role['name']!),
+              title: Text(pos['name']!),
               trailing: isSelected ? const Icon(Icons.check, color: Colors.green) : null,
               onTap: () async {
                 if (isSelected) {
                   Navigator.of(ctx).pop();
                   return;
                 }
-
-                // Обновляем роли сотрудника
-                final newRoles = ['owner']; // Всегда сохраняем роль owner
-                if (role['code'] != 'owner') {
-                  newRoles.add(role['code']!);
-                }
+                final newRoles = ['owner'];
+                if (code != null && code.isNotEmpty) newRoles.add(code);
 
                 final updatedEmployee = currentEmployee.copyWith(
                   roles: newRoles,
                   updatedAt: DateTime.now(),
                 );
-
                 await accountManager.updateEmployee(updatedEmployee);
                 if (ctx.mounted) Navigator.of(ctx).pop();
               },
@@ -549,37 +573,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onTap: () => _showCurrencyPicker(context, localization),
               ),
             ],
+            // Настройки про — одна кнопка: статус, промокод, кнопка «Домой»
             Consumer2<HomeButtonConfigService, AccountManagerSupabase>(
               builder: (_, homeBtn, account, __) {
                 final isPro = account.hasProSubscription;
+                final subtitle = isPro
+                    ? '${localization.t('active')} • ${_homeButtonActionLabel(localization, homeBtn.action)}'
+                    : localization.t('pro_required_hint');
                 return ListTile(
-                  leading: const Icon(Icons.tune),
-                  title: Text('${localization.t('home_button_config')} (${localization.t('pro')})'),
-                  subtitle: Text(isPro ? _homeButtonActionLabel(localization, homeBtn.action) : localization.t('pro_required_hint')),
+                  leading: const Icon(Icons.star),
+                  title: Text(localization.t('pro_settings')),
+                  subtitle: Text(subtitle),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () => isPro ? _showHomeButtonPicker(context, localization, homeBtn) : _showProRequiredDialog(context, localization),
+                  onTap: () => _showProSettingsDialog(context, localization, accountManager, homeBtn),
                 );
               },
             ),
             if (currentEmployee.hasRole('owner')) ...[
+              // Переключатель: интерфейс собственника ↔ должность (если есть должность)
+              if (currentEmployee.positionRole != null)
+                Consumer<OwnerViewPreferenceService>(
+                  builder: (_, pref, __) => SwitchListTile(
+                    secondary: const Icon(Icons.swap_horiz),
+                    title: Text(localization.t('owner_view_mode')),
+                    subtitle: Text(pref.viewAsOwner ? localization.t('owner') : _getPositionDisplayName(currentEmployee.positionRole, localization)),
+                    value: pref.viewAsOwner,
+                    onChanged: (v) => pref.setViewAsOwner(v),
+                  ),
+                ),
               ListTile(
                 leading: const Icon(Icons.work),
-                title: Text(localization.t('role')),
-                subtitle: Text(_getRoleDisplayName(currentEmployee.primaryRole, localization)),
+                title: Text(localization.t('position')),
+                subtitle: Text(_getPositionDisplayName(currentEmployee.positionRole, localization)),
                 trailing: const Icon(Icons.chevron_right),
-                onTap: () => _showRolePicker(context, localization, currentEmployee, accountManager),
+                onTap: () => _showPositionPicker(context, localization, currentEmployee, accountManager),
               ),
               ListTile(
                 leading: const Icon(Icons.person_add),
                 title: Text(localization.t('invite_co_owner')),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => _showInviteCoOwnerDialog(context, localization, accountManager),
-              ),
-              ListTile(
-                leading: const Icon(Icons.star),
-                title: Text(localization.t('pro')),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => _showProDialog(context, localization, accountManager),
               ),
             ],
             const Divider(),

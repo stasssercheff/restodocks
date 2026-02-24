@@ -172,6 +172,10 @@ class AppRouter {
         builder: (context, state) => const ExpensesPlaceholderScreen(),
       ),
       GoRoute(
+        path: '/expenses/salary',
+        builder: (context, state) => const SalaryExpenseScreen(),
+      ),
+      GoRoute(
         path: '/department/:id',
         builder: (context, state) {
           final id = state.pathParameters['id'] ?? 'kitchen';

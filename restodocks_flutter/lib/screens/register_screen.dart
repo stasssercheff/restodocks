@@ -225,7 +225,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 TextFormField(
                   controller: _surnameController,
                   decoration: InputDecoration(
-                    labelText: '${loc.t('surname')} (Pro)',
+                    labelText: loc.t('surname'),
                     hintText: loc.t('enter_surname'),
                     prefixIcon: const Icon(Icons.badge),
                   ),

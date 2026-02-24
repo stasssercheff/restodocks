@@ -193,6 +193,14 @@ class Employee extends Equatable {
     return EmployeeRole.fromCode(roles.first);
   }
 
+  /// Должность (первая не-owner роль). Собственник = дополнительная роль, должность выбирается отдельно.
+  String? get positionRole {
+    for (final code in roles) {
+      if (code != 'owner') return code;
+    }
+    return null;
+  }
+
   /// Отдел сотрудника
   EmployeeDepartment? get employeeDepartment => EmployeeDepartment.fromCode(department);
 

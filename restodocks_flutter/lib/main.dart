@@ -24,6 +24,7 @@ void main() async {
   await LocalizationService.initialize();
   await ThemeService().initialize();
   await HomeButtonConfigService().initialize();
+  await OwnerViewPreferenceService().initialize();
   runApp(const RestodocksApp());
 }
 

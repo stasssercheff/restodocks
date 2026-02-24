@@ -108,6 +108,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildHomeTab(Employee employee) {
     if (employee.hasRole('owner')) {
+      final pref = context.read<OwnerViewPreferenceService>();
+      // Если у собственника есть должность и выбран режим «по должности» — показываем интерфейс должности
+      if (employee.positionRole != null && !pref.viewAsOwner) {
+        if (employee.canViewDepartment('management')) {
+          return ManagementHomeContent(employee: employee);
+        }
+        return StaffHomeContent(employee: employee);
+      }
       return const OwnerHomeContent();
     }
     if (employee.canViewDepartment('management')) {

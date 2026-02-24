@@ -20,6 +20,9 @@ class AppProviders {
         ChangeNotifierProvider<HomeButtonConfigService>(
           create: (_) => HomeButtonConfigService(),
         ),
+        ChangeNotifierProvider<OwnerViewPreferenceService>(
+          create: (_) => OwnerViewPreferenceService(),
+        ),
         // Используем Supabase версии сервисов
         Provider<AccountManagerSupabase>(
           create: (_) => AccountManagerSupabase(),
