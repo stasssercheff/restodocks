@@ -44,10 +44,18 @@ struct SuppliersView: View {
         .navigationTitle(lang.t("suppliers"))
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    showingAddSupplier = true
-                } label: {
-                    Image(systemName: "plus")
+                HStack(spacing: 12) {
+                    Button {
+                        popCurrentNavigationToRoot()
+                    } label: {
+                        Image(systemName: "house.fill")
+                    }
+                    .accessibilityLabel(lang.t("home"))
+                    Button {
+                        showingAddSupplier = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
                 }
             }
         }

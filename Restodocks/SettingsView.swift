@@ -52,12 +52,31 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle(lang.t("settings"))
+            .navigationBarBackButtonHidden(true)
             .toolbar {
 
-                // ✅ КНОПКА ЗАКРЫТИЯ
+                // Кнопка «Назад» — ведёт на домашний экран (как и «Домой»)
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button {
+                        popCurrentNavigationToRoot()
+                    } label: {
+                        Image(systemName: "chevron.left")
+                    }
+                    .accessibilityLabel(lang.t("home"))
+                }
+
+                // Кнопка «Домой» и «Закрыть» в trailing
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(lang.t("close")) {
-                        dismiss()
+                    HStack(spacing: 12) {
+                        Button {
+                            popCurrentNavigationToRoot()
+                        } label: {
+                            Image(systemName: "house.fill")
+                        }
+                        .accessibilityLabel(lang.t("home"))
+                        Button(lang.t("close")) {
+                            dismiss()
+                        }
                     }
                 }
             }

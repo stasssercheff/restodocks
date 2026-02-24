@@ -50,5 +50,15 @@ struct ProSettingsView: View {
             }
         }
         .navigationTitle("PRO")
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    popCurrentNavigationToRoot()
+                } label: {
+                    Image(systemName: "house.fill")
+                }
+                .accessibilityLabel(lang.t("home"))
+            }
+        }
     }
 }

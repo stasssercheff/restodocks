@@ -11,6 +11,7 @@
 		A799B3722EFE509B0049E7A2 /* system_products_01_vegetables.json in Resources */ = {isa = PBXBuildFile; fileRef = A799B3712EFE509B0049E7A2 /* system_products_01_vegetables.json */; };
 		A7EEF2D22EE522A1002FF0B7 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = A7EEF2D12EE522A1002FF0B7 /* Supabase */; };
 		A7EEF2E02EE522A2002FF0B7 /* Translation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A7EEF2E12EE522A2002FF0B7 /* Translation.framework */; };
+		A7EEF2E32EE522A3002FF0B7 /* MessageUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A7EEF2E22EE522A3002FF0B7 /* MessageUI.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -18,6 +19,7 @@
 		A799B3712EFE509B0049E7A2 /* system_products_01_vegetables.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = system_products_01_vegetables.json; sourceTree = "<group>"; };
 		A7EEF2C22EE51FFC002FF0B7 /* Restodocks.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Restodocks.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A7EEF2E12EE522A2002FF0B7 /* Translation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Translation.framework; path = System/Library/Frameworks/Translation.framework; sourceTree = SDKROOT; };
+		A7EEF2E22EE522A3002FF0B7 /* MessageUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MessageUI.framework; path = System/Library/Frameworks/MessageUI.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -48,6 +50,7 @@
 			files = (
 				A7EEF2D22EE522A1002FF0B7 /* Supabase in Frameworks */,
 				A7EEF2E02EE522A2002FF0B7 /* Translation.framework in Frameworks */,
+				A7EEF2E32EE522A3002FF0B7 /* MessageUI.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

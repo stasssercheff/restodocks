@@ -5,15 +5,15 @@ struct HallView: View {
 
     var body: some View {
         List {
-            // Products for dining room
-            NavigationLink {
-                ProductCatalogView(department: "dining_room")
-            } label: {
-                HStack {
-                    Image(systemName: "cart")
-                    Text(lang.t("products"))
-                }
-            }
+            // Products for dining room — скрыто
+            // NavigationLink {
+            //     ProductCatalogView(department: "dining_room")
+            // } label: {
+            //     HStack {
+            //         Image(systemName: "cart")
+            //         Text(lang.t("products"))
+            //     }
+            // }
 
             // Menu (for waitstaff) - view only
             NavigationLink {

@@ -78,12 +78,29 @@ struct KitchenScheduleView: View {
         Dictionary(grouping: filteredShifts) { Calendar.current.startOfDay(for: $0.date) }
     }
 
-    /// Диапазон дат для графика: 90 дней (лёгкий скролл). При необходимости можно расширить.
+    /// Диапазон дат: только дни с сменами + буфер, но не более 45 дней (для плавного скролла).
     private var scheduleDateRange: (start: Date, end: Date) {
         let cal = Calendar.current
         let today = cal.startOfDay(for: Date())
-        let start = cal.date(byAdding: .day, value: -14, to: today)!
-        let end = cal.date(byAdding: .day, value: 76, to: today)!
+        let minDays = 21
+        let maxDays = 45
+        let shifts = filteredShifts
+        if shifts.isEmpty {
+            let start = cal.date(byAdding: .day, value: -7, to: today)!
+            let end = cal.date(byAdding: .day, value: minDays - 8, to: today)!
+            return (start, end)
+        }
+        let dates = shifts.map { cal.startOfDay(for: $0.date) }
+        let minDate = dates.min()!
+        let maxDate = dates.max()!
+        let start = cal.date(byAdding: .day, value: -7, to: minDate)!
+        var end = cal.date(byAdding: .day, value: 14, to: maxDate)!
+        let total = cal.dateComponents([.day], from: start, to: end).day.map { $0 + 1 } ?? 0
+        if total > maxDays {
+            end = cal.date(byAdding: .day, value: maxDays - 1, to: start)!
+        } else if total < minDays {
+            end = cal.date(byAdding: .day, value: minDays - 1, to: start)!
+        }
         return (start, end)
     }
 
@@ -142,6 +159,7 @@ struct KitchenScheduleView: View {
                                     employeeName: { accounts.employeeName(for: $0) },
                                     employeePosition: { accounts.employeePosition(for: $0) }
                                 )
+                                .drawingGroup()
                             }
                         }
                         .padding(.vertical)
@@ -254,7 +272,8 @@ struct ShiftCard: View {
         if shift.fullDay {
             return lang.t("full_day_text")
         }
-        return "\(shift.startHour):00 - \(shift.endHour):00"
+        // Только время, без «смена» / «1»
+        return "\(shift.startHour):00 – \(shift.endHour):00"
     }
 
     private func positionDisplayName(_ role: String) -> String {

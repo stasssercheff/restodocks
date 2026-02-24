@@ -75,15 +75,6 @@ final class AppState: ObservableObject {
         }
     }
 
-    /// Показывать время в сменах: true = показывать время, false = показывать "смена"
-    var showTimeInShifts: Bool {
-        get { userDefaults.bool(forKey: "show_time_in_shifts") }
-        set {
-            userDefaults.set(newValue, forKey: "show_time_in_shifts")
-            objectWillChange.send()
-        }
-    }
-
     init() {
         // Загружаем сохраненные значения при инициализации
         isCompanyCreated = userDefaults.bool(forKey: "is_company_created")

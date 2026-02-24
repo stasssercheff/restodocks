@@ -63,12 +63,12 @@ struct HomeView: View {
                     HomeButton(title: lang.t("management"))
                 }
 
-                // Products
-                NavigationLink {
-                    ProductsRootView()
-                } label: {
-                    HomeButton(title: lang.t("products"))
-                }
+                // Products — скрыто
+                // NavigationLink {
+                //     ProductsRootView()
+                // } label: {
+                //     HomeButton(title: lang.t("products"))
+                // }
 
                 // Employees
                 NavigationLink {

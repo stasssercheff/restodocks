@@ -36,10 +36,18 @@ struct StaffView: View {
         }
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                NavigationLink {
-                    EmployeeRegistrationView()
-                } label: {
-                    Image(systemName: "plus")
+                HStack(spacing: 12) {
+                    Button {
+                        popCurrentNavigationToRoot()
+                    } label: {
+                        Image(systemName: "house.fill")
+                    }
+                    .accessibilityLabel(lang.t("home"))
+                    NavigationLink {
+                        EmployeeRegistrationView()
+                    } label: {
+                        Image(systemName: "plus")
+                    }
                 }
             }
         }

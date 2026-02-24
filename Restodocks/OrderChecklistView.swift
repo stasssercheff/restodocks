@@ -42,6 +42,8 @@ struct OrderChecklistView: View {
     @State private var orderLines: [OrderLine] = []
     @State private var editingOrder: SavedOrder?
     @State private var isSaving = false
+    @State private var showSharePDF = false
+    @State private var sharePdfURL: URL?
 
     /// Продукты из номенклатуры для выбора (с учётом поиска и категории)
     var productsFromNomenclature: [Product] {
@@ -88,6 +90,36 @@ struct OrderChecklistView: View {
             }
             isSaving = false
         }
+    }
+
+    private func saveOrderAsPDF() {
+        guard !orderLines.isEmpty else { return }
+        let title = lang.t("order_checklist")
+        guard let pdfData = OrderPDFGenerator.pdfData(
+            orderLines: orderLines,
+            title: title,
+            date: Date(),
+            productColumnTitle: lang.t("product_catalog"),
+            unitColumnTitle: lang.t("unit"),
+            quantityColumnTitle: lang.t("quantity")
+        ) else { return }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd_HH-mm"
+        let fileName = "order_\(formatter.string(from: Date())).pdf"
+        let tempDir = FileManager.default.temporaryDirectory
+        let fileURL = tempDir.appendingPathComponent(fileName)
+        do {
+            try pdfData.write(to: fileURL)
+            sharePdfURL = fileURL
+            showSharePDF = true
+        } catch {
+            print("❌ Save PDF error:", error)
+        }
+    }
+
+    private func formatOrderQuantity(_ q: Double) -> String {
+        if q == floor(q) { return "\(Int(q))" }
+        return String(format: "%.1f", q)
     }
 
     var body: some View {
@@ -215,15 +247,19 @@ struct OrderChecklistView: View {
         }
         .navigationTitle(lang.t("order_checklist"))
         .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                if editingOrder != nil || !orderLines.isEmpty {
-                    Button(lang.t("new_order")) {
-                        clearCurrentOrder()
-                    }
-                }
-            }
+            // Leading оставляем пустым — системная стрелка «Назад» всегда активна
             ToolbarItem(placement: .navigationBarTrailing) {
                 HStack(spacing: 12) {
+                    if !orderLines.isEmpty {
+                        Button(lang.t("save_pdf")) {
+                            saveOrderAsPDF()
+                        }
+                    }
+                    if editingOrder != nil || !orderLines.isEmpty {
+                        Button(lang.t("new_order")) {
+                            clearCurrentOrder()
+                        }
+                    }
                     if !orderLines.isEmpty {
                         Button(lang.t("save")) {
                             saveOrder()
@@ -235,6 +271,13 @@ struct OrderChecklistView: View {
                             orderLines.removeAll()
                         }
                     }
+                    // Кнопка «Домой» — переход на домашний экран
+                    Button {
+                        popCurrentNavigationToRoot()
+                    } label: {
+                        Image(systemName: "house.fill")
+                    }
+                    .accessibilityLabel(lang.t("home"))
                 }
             }
         }
@@ -244,6 +287,15 @@ struct OrderChecklistView: View {
         }
         .refreshable {
             await accounts.fetchSavedOrders()
+        }
+        .sheet(isPresented: $showSharePDF) {
+            if let url = sharePdfURL {
+                ShareSheetView(fileURL: url) {
+                    showSharePDF = false
+                    try? FileManager.default.removeItem(at: url)
+                    sharePdfURL = nil
+                }
+            }
         }
     }
 

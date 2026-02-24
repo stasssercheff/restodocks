@@ -1182,6 +1182,13 @@
         "de": "Bestellliste senden",
         "fr": "Envoyer la liste de commande"
       },
+      "save_pdf": {
+        "ru": "Сохранить PDF",
+        "en": "Save as PDF",
+        "es": "Guardar como PDF",
+        "de": "Als PDF speichern",
+        "fr": "Enregistrer en PDF"
+      },
       "inventory_all": {
         "ru": "Вся номенклатура",
         "en": "All Inventory",

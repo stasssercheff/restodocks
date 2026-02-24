@@ -7,8 +7,8 @@ struct CreateShiftView: View {
 
     @State private var selectedEmployee: Employee?
     @State private var date = Date()
-    /// По умолчанию выключен — отображается выбор времени смены.
-    @State private var fullDay = false
+    /// По умолчанию fullDay = true — выключен выбор времени (полный день/выходной).
+    @State private var fullDay = true
     @State private var startHour: Int = 9
     @State private var endHour: Int = 18
     @State private var isSaving = false
@@ -51,6 +51,9 @@ struct CreateShiftView: View {
             }
         }
         .navigationTitle(lang.t("new_shift"))
+        .onAppear {
+            fullDay = true
+        }
         .task {
             await accounts.fetchEmployees()
         }
