@@ -567,14 +567,6 @@ class _InventoryScreenState extends State<InventoryScreen>
     saveNow();
   }
 
-  /// При фокусе на последнюю ячейку — сразу добавляем новую (n+1), чтобы пользователь видел место для ввода.
-  void _onFocusLastQtyCell(int rowIndex, int colIndex) {
-    if (rowIndex < 0 || rowIndex >= _rows.length) return;
-    final row = _rows[rowIndex];
-    if (colIndex != row.quantities.length - 1) return;
-    setState(() => _addColumnToAll());
-  }
-
   void _removeRow(int index) {
     setState(() {
       _rows.removeAt(index);
@@ -1453,11 +1445,7 @@ class _InventoryScreenState extends State<InventoryScreen>
             Container(
               width: _colTotalWidth,
               padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Text(
-                _formatQty(row.totalDisplay),
-                key: ValueKey('total_${actualIndex}_${row.quantities.join("_")}'),
-                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-              ),
+              child: Text(_formatQty(row.totalDisplay), style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
             ),
             SizedBox(width: _colGap),
             ...List.generate(
@@ -1474,7 +1462,6 @@ class _InventoryScreenState extends State<InventoryScreen>
                               value: row.quantities[colIndex],
                               useGrams: row.isWeightInKg,
                               onChanged: (v) => _setQuantity(actualIndex, colIndex, v),
-                              onFocus: colIndex == qtyCols - 1 ? () => _onFocusLastQtyCell(actualIndex, colIndex) : null,
                             ))
                       : const SizedBox.shrink(),
                 ),
@@ -1698,11 +1685,7 @@ class _InventoryScreenState extends State<InventoryScreen>
             width: _colTotalWidth,
             padding: const EdgeInsets.symmetric(horizontal: 4),
             alignment: Alignment.center,
-            child: Text(
-              _formatQty(row.totalDisplay),
-              key: ValueKey('total_${actualIndex}_${row.quantities.join("_")}'),
-              style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-            ),
+            child: Text(_formatQty(row.totalDisplay), style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -1950,10 +1933,8 @@ class _QtyCell extends StatefulWidget {
   /// true: отображать и вводить в граммах (значение хранится в кг, показываем value*1000).
   final bool useGrams;
   final void Function(double) onChanged;
-  /// Вызывается при получении фокуса (для n+1: при фокусе на последнюю ячейку добавляется новая).
-  final VoidCallback? onFocus;
 
-  const _QtyCell({super.key, required this.value, this.useGrams = false, required this.onChanged, this.onFocus});
+  const _QtyCell({super.key, required this.value, this.useGrams = false, required this.onChanged});
 
   @override
   State<_QtyCell> createState() => _QtyCellState();
@@ -1969,13 +1950,6 @@ class _QtyCellState extends State<_QtyCell> {
   void initState() {
     super.initState();
     _controller = TextEditingController(text: _displayValue(_displayValueRaw));
-    _focus.addListener(_onFocusChange);
-  }
-
-  void _onFocusChange() {
-    if (_focus.hasFocus && widget.onFocus != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => widget.onFocus!());
-    }
   }
 
   @override
@@ -1994,7 +1968,6 @@ class _QtyCellState extends State<_QtyCell> {
 
   @override
   void dispose() {
-    _focus.removeListener(_onFocusChange);
     _controller.dispose();
     _focus.dispose();
     super.dispose();
