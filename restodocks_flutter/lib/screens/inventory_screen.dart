@@ -1228,11 +1228,11 @@ class _InventoryScreenState extends State<InventoryScreen>
     );
   }
 
-  static const double _colNoWidth = 28;
+  static const double _colNoWidth = 20; // Сужен с 28
   static const double _colUnitWidth = 48;
   static const double _colTotalWidth = 56;
-  static const double _colQtyWidth = 64;
-  static const double _colGap = 10;
+  static const double _colQtyWidth = 48; // Сужен с 64
+  static const double _colGap = 4; // Уменьшен с 10
   /// Высота заголовка секции (Продукты/ПФ) — для выравнивания фиксированной и прокручиваемой колонок.
   static const double _sectionHeaderHeight = 36;
   /// Фиксированная высота строки данных — для выравнивания ячеек ввода с текстом.
