@@ -12,10 +12,10 @@ Future<ScheduleModel> loadSchedule(String establishmentId) async {
   final raw = prefs.getString(key);
   if (raw == null || raw.isEmpty) {
     final now = DateTime.now();
-    final monday = now.subtract(Duration(days: now.weekday - 1));
+    // Начинаем с 1 января текущего года вместо понедельника текущей недели
     return ScheduleModel(
       sections: ScheduleModel.defaultSections,
-      startDate: DateTime(monday.year, monday.month, monday.day),
+      startDate: DateTime(now.year, 1, 1),
     );
   }
   try {
@@ -23,8 +23,8 @@ Future<ScheduleModel> loadSchedule(String establishmentId) async {
     return ScheduleModel.fromJson(json);
   } catch (_) {
     final now = DateTime.now();
-    final monday = now.subtract(Duration(days: now.weekday - 1));
-    return ScheduleModel(startDate: DateTime(monday.year, monday.month, monday.day));
+    // Начинаем с 1 января текущего года вместо понедельника текущей недели
+    return ScheduleModel(startDate: DateTime(now.year, 1, 1));
   }
 }
 

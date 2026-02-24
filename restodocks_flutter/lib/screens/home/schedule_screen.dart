@@ -21,7 +21,7 @@ class ScheduleScreen extends StatefulWidget {
 }
 
 class _ScheduleScreenState extends State<ScheduleScreen> {
-  static const int _defaultWeeks = 12;
+  static const int _defaultWeeks = 52; // Увеличили до 52 недель (полный год)
   static const double _slotColumnWidth = 120;
   /// Ширина ячейки дня: 7 дней влезают на экран телефона (7 × 36 ≈ 252px).
   static const double _dayCellWidth = 36;
@@ -33,7 +33,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   final ScrollController _horizontalScrollController = ScrollController();
 
   ScheduleModel _model = ScheduleModel(
-    startDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day),
+    startDate: DateTime(DateTime.now().year, 1, 1), // Начинаем с 1 января текущего года
     numWeeks: _defaultWeeks,
   );
   bool _loading = true;
