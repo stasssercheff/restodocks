@@ -112,7 +112,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     if (sections.isEmpty) return '';
 
     String sectionKey;
-    if (employee.hasRole('owner')) {
+    // Владелец, шеф-повар и су-шеф — в блок «Управление», не в цех
+    if (employee.hasRole('owner') ||
+        employee.hasRole('executive_chef') ||
+        employee.hasRole('sous_chef')) {
       sectionKey = 'management';
     } else {
       final departmentToSection = {
@@ -152,7 +155,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             _model = _model.copyWith(sections: ScheduleModel.defaultSections);
           }
           final needsManagement = _employees.any((e) =>
-              e.hasRole('owner') || e.department == 'management');
+              e.hasRole('owner') || e.hasRole('executive_chef') || e.hasRole('sous_chef') || e.department == 'management');
           if (needsManagement && !_model.sections.any((s) => s.id == 'management')) {
             _model = _model.copyWith(sections: [
               ..._model.sections,
