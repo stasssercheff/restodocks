@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:excel/excel.dart' hide Border, TextSpan;
@@ -690,38 +691,51 @@ class _InventoryScreenState extends State<InventoryScreen>
       clearDraft();
     }
 
-    // Генерация Excel и скачивание без почтового клиента
+    // Выбор формата экспорта и генерация файла
     try {
-      final bytes = _buildExcelBytes(payload, loc);
-      if (bytes != null && bytes.isNotEmpty && mounted) {
-        await _downloadExcel(bytes, payload, loc);
+      final format = await _showExportFormatDialog(context, loc);
+      if (format == null || !mounted) return;
+
+      if (format == 'excel') {
+        final bytes = _buildExcelBytes(payload, loc);
+        if (bytes != null && bytes.isNotEmpty && mounted) {
+          await _downloadExcel(bytes, payload, loc, 'xlsx');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(loc.t('inventory_excel_downloaded'))),
+            );
+          }
+        }
+      } else if (format == 'csv') {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(loc.t('inventory_excel_downloaded'))),
+            SnackBar(content: Text('CSV экспорт пока не реализован')),
           );
         }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${loc.t('inventory_document_saved')} (Excel: ${e.toString()})')),
+          SnackBar(content: Text('${loc.t('inventory_document_saved')} (Экспорт: ${e.toString()})')),
         );
       }
     }
   }
 
-  /// Столбцы Excel: номер, наименование, мера, итоговое количество, данные при заполнении (1, 2, ...)
+  /// Создание Excel с 2 листами: 1) продукты+ПФ+перерасчет, 2) все продукты включая ПФ
   List<int>? _buildExcelBytes(Map<String, dynamic> payload, LocalizationService loc) {
     final rows = payload['rows'] as List<dynamic>? ?? [];
     final maxCols = _maxQuantityColumns;
     try {
       final excel = Excel.createExcel();
-      final sheet = excel[excel.getDefaultSheet()!];
       final numLabel = loc.t('inventory_excel_number');
       final nameLabel = loc.t('inventory_item_name');
       final unitLabel = loc.t('inventory_unit');
       final totalLabel = loc.t('inventory_excel_total');
       final fillLabel = loc.t('inventory_excel_fill_data');
+
+      // ЛИСТ 1: Продукты + ПФ с итогами + перерасчет ПФ в брутто (объединенный)
+      final sheet1 = excel['Продукты + ПФ'];
       final headerCells = <CellValue>[
         TextCellValue(numLabel),
         TextCellValue(nameLabel),
@@ -731,7 +745,10 @@ class _InventoryScreenState extends State<InventoryScreen>
       for (var c = 0; c < maxCols; c++) {
         headerCells.add(TextCellValue('$fillLabel ${c + 1}'));
       }
-      sheet.appendRow(headerCells);
+      sheet1.appendRow(headerCells);
+
+      // Добавляем все продукты и ПФ
+      var rowNum = 1;
       for (var i = 0; i < rows.length; i++) {
         final r = rows[i] as Map<String, dynamic>;
         final name = r['productName'] as String? ?? '';
@@ -739,7 +756,7 @@ class _InventoryScreenState extends State<InventoryScreen>
         final total = r['total'] as num? ?? 0;
         final quantities = r['quantities'] as List<dynamic>? ?? [];
         final rowCells = <CellValue>[
-          IntCellValue(i + 1),
+          IntCellValue(rowNum++),
           TextCellValue(name),
           TextCellValue(unit),
           DoubleCellValue(total.toDouble()),
@@ -748,210 +765,193 @@ class _InventoryScreenState extends State<InventoryScreen>
           final q = c < quantities.length ? (quantities[c] as num?)?.toDouble() ?? 0.0 : 0.0;
           rowCells.add(DoubleCellValue(q));
         }
-        sheet.appendRow(rowCells);
+        sheet1.appendRow(rowCells);
       }
 
-      // Третья секция: продукты, перерасчитанные из ПФ по ТТК
+      // Перерасчет ПФ в брутто (объединенный - суммируем одинаковые продукты)
       final aggregated = payload['aggregatedProducts'] as List<dynamic>? ?? [];
       if (aggregated.isNotEmpty) {
-        sheet.appendRow([]);
-        sheet.appendRow([TextCellValue(loc.t('inventory_pf_products_title'))]);
-        sheet.appendRow([
+        sheet1.appendRow([]);
+        sheet1.appendRow([TextCellValue(loc.t('inventory_pf_products_title'))]);
+        sheet1.appendRow([
           TextCellValue(loc.t('inventory_excel_number')),
           TextCellValue(loc.t('inventory_item_name')),
           TextCellValue(loc.t('inventory_pf_gross_g')),
           TextCellValue(loc.t('inventory_pf_net_g')),
         ]);
-        for (var i = 0; i < aggregated.length; i++) {
-          final p = aggregated[i] as Map<String, dynamic>;
-          sheet.appendRow([
+
+        // Группируем продукты по имени и суммируем
+        final groupedProducts = <String, Map<String, dynamic>>{};
+        for (final p in aggregated) {
+          final name = (p['productName'] as String? ?? '').trim();
+          final gross = (p['grossGrams'] as num?)?.toDouble() ?? 0.0;
+          final net = (p['netGrams'] as num?)?.toDouble() ?? 0.0;
+
+          if (groupedProducts.containsKey(name)) {
+            groupedProducts[name]!['grossGrams'] = (groupedProducts[name]!['grossGrams'] as double) + gross;
+            groupedProducts[name]!['netGrams'] = (groupedProducts[name]!['netGrams'] as double) + net;
+          } else {
+            groupedProducts[name] = {
+              'productName': name,
+              'grossGrams': gross,
+              'netGrams': net,
+            };
+          }
+        }
+
+        final groupedList = groupedProducts.values.toList()
+          ..sort((a, b) => (a['productName'] as String).compareTo(b['productName'] as String));
+
+        for (var i = 0; i < groupedList.length; i++) {
+          final p = groupedList[i];
+          sheet1.appendRow([
             IntCellValue(i + 1),
             TextCellValue((p['productName'] as String? ?? '').toString()),
-            IntCellValue(((p['grossGrams'] as num?)?.toDouble() ?? 0).round()),
-            IntCellValue(((p['netGrams'] as num?)?.toDouble() ?? 0).round()),
+            IntCellValue((p['grossGrams'] as double).round()),
+            IntCellValue((p['netGrams'] as double).round()),
           ]);
         }
       }
 
+      // ЛИСТ 2: Все продукты включая данные из ПФ
+      final sheet2 = excel['Все продукты с ПФ'];
+      sheet2.appendRow(headerCells); // Тот же заголовок
+
+      // Собираем все продукты (из основной номенклатуры + из перерасчета ПФ)
+      final allProducts = <String, Map<String, dynamic>>{};
+
+      // Добавляем продукты из основной таблицы
+      for (var i = 0; i < rows.length; i++) {
+        final r = rows[i] as Map<String, dynamic>;
+        final name = r['productName'] as String? ?? '';
+        final unit = r['unit'] as String? ?? '';
+        final total = r['total'] as num? ?? 0;
+        final quantities = r['quantities'] as List<dynamic>? ?? [];
+
+        if (allProducts.containsKey(name)) {
+          // Суммируем количества
+          final existing = allProducts[name]!;
+          existing['total'] = (existing['total'] as double) + total.toDouble();
+          final existingQuantities = existing['quantities'] as List<double>;
+          for (var c = 0; c < quantities.length && c < existingQuantities.length; c++) {
+            existingQuantities[c] += (quantities[c] as num?)?.toDouble() ?? 0.0;
+          }
+        } else {
+          allProducts[name] = {
+            'productName': name,
+            'unit': unit,
+            'total': total.toDouble(),
+            'quantities': List<double>.from(quantities.map((q) => (q as num?)?.toDouble() ?? 0.0)),
+          };
+        }
+      }
+
+      // Добавляем продукты из перерасчета ПФ (в брутто граммах)
+      for (final p in aggregated) {
+        final name = (p['productName'] as String? ?? '').trim();
+        final grossGrams = (p['grossGrams'] as num?)?.toDouble() ?? 0.0;
+
+        if (allProducts.containsKey(name)) {
+          // Суммируем к существующему продукту
+          final existing = allProducts[name]!;
+          existing['total'] = (existing['total'] as double) + grossGrams;
+          // Для ПФ добавляем количество в первую колонку
+          final quantities = existing['quantities'] as List<double>;
+          if (quantities.isNotEmpty) {
+            quantities[0] += grossGrams;
+          } else {
+            quantities.add(grossGrams);
+          }
+        } else {
+          // Новый продукт только из ПФ
+          allProducts[name] = {
+            'productName': name,
+            'unit': 'g', // брутто в граммах
+            'total': grossGrams,
+            'quantities': [grossGrams], // в первой колонке
+          };
+        }
+      }
+
+      // Выводим все продукты в отсортированном порядке
+      final sortedProducts = allProducts.values.toList()
+        ..sort((a, b) => (a['productName'] as String).compareTo(b['productName'] as String));
+
+      for (var i = 0; i < sortedProducts.length; i++) {
+        final p = sortedProducts[i];
+        final name = p['productName'] as String;
+        final unit = p['unit'] as String;
+        final total = p['total'] as double;
+        final quantities = p['quantities'] as List<double>;
+
+        final rowCells = <CellValue>[
+          IntCellValue(i + 1),
+          TextCellValue(name),
+          TextCellValue(unit),
+          DoubleCellValue(total),
+        ];
+        for (var c = 0; c < maxCols; c++) {
+          final q = c < quantities.length ? quantities[c] : 0.0;
+          rowCells.add(DoubleCellValue(q));
+        }
+        sheet2.appendRow(rowCells);
+      }
+
       final out = excel.encode();
       return out != null && out.isNotEmpty ? out : null;
-    } catch (_) {
+    } catch (e) {
+      print('Error building Excel: $e');
       return null;
     }
   }
 
-  Future<void> _downloadExcel(List<int> bytes, Map<String, dynamic> payload, LocalizationService loc) async {
+  /*
+  /// Создание CSV данных (2 секции как в Excel)
+  String? _buildCsvData(Map<String, dynamic> payload, LocalizationService loc) {
+    final buffer = StringBuffer();
+    buffer.writeln('CSV export - coming soon');
+    buffer.writeln('Date: ${DateTime.now()}');
+    return buffer.toString();
+  }
+  */
+
+  Future<String?> _showExportFormatDialog(BuildContext context, LocalizationService loc) async {
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Выберите формат экспорта'),
+        content: Text('Выберите формат файла для экспорта инвентаризации:'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop('excel'),
+            child: const Text('Excel (.xlsx)'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop('csv'),
+            child: const Text('CSV (.csv)'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _downloadExcel(List<int> bytes, Map<String, dynamic> payload, LocalizationService loc, String extension) async {
     final header = payload['header'] as Map<String, dynamic>? ?? {};
     final date = header['date'] as String? ?? DateTime.now().toIso8601String().split('T').first;
-    final fileName = 'inventory_$date.xlsx';
+    final fileName = 'inventory_$date.$extension';
     await saveFileBytes(fileName, bytes);
   }
 
-  static String _cellStr(CellValue? v) {
-    if (v == null) return '';
-    if (v is TextCellValue) {
-      final val = v.value;
-      try {
-        final t = (val as dynamic).text;
-        if (t != null) return t is String ? t : t.toString();
-      } catch (_) {}
-      final String s = val is String ? val as String : (val ?? '').toString();
-      return s;
-    }
-    if (v is IntCellValue) return v.value.toString();
-    if (v is DoubleCellValue) return v.value.toString();
-    return v.toString();
-  }
-
-  static double _cellNum(CellValue? v) {
-    if (v == null) return 0;
-    if (v is IntCellValue) return v.value.toDouble();
-    if (v is DoubleCellValue) return v.value;
-    final s = _cellStr(v).replaceFirst(',', '.');
-    return double.tryParse(s) ?? 0;
-  }
-
-  /// Загрузка заполненного бланка: первая таблица → _rows, третья секция → _aggregatedFromFile.
-  Future<void> _loadFilledFile(BuildContext context, LocalizationService loc) async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['xlsx'],
-      withData: true,
-    );
-    if (result == null || result.files.isEmpty || result.files.single.bytes == null) return;
-    final bytes = Uint8List.fromList(result.files.single.bytes!);
-    final store = context.read<ProductStoreSupabase>();
-    final account = context.read<AccountManagerSupabase>();
-    final techCardSvc = context.read<TechCardServiceSupabase>();
-    final estId = account.establishment?.id;
-    if (estId == null) return;
-    await store.loadProducts();
-    await store.loadNomenclature(estId);
-    final techCards = await techCardSvc.getTechCardsForEstablishment(estId);
-    final pfOnly = techCards.where((tc) => tc.isSemiFinished).toList();
-    final products = store.getNomenclatureProducts(estId);
-    final lang = loc.currentLanguageCode;
-
-    try {
-      final excel = Excel.decodeBytes(bytes);
-      final sheetName = excel.tables.keys.isNotEmpty ? excel.tables.keys.first : null;
-      if (sheetName == null) throw Exception('No sheet');
-      final sheet = excel.tables[sheetName]!;
-      final newRows = <_InventoryRow>[];
-      List<Map<String, dynamic>>? aggregated = [];
-      var r = 1;
-      final maxRows = sheet.maxRows;
-      final maxCols = sheet.maxColumns;
-
-      while (r < maxRows) {
-        final nameCell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: r));
-        final name = _cellStr(nameCell.value).trim();
-        if (name.isEmpty) {
-          r++;
-          continue;
-        }
-        if (name.toLowerCase().contains('продукт') && (name.toLowerCase().contains('пф') || name.toLowerCase().contains('перерасч'))) {
-          r++;
-          break;
-        }
-        final unitStr = _cellStr(sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: r)).value).trim().toLowerCase();
-        final total = _cellNum(sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: r)).value);
-        final quantities = <double>[];
-        for (var c = 4; c < maxCols; c++) {
-          final q = _cellNum(sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r)).value);
-          if (c == 4 || q != 0 || quantities.isNotEmpty) quantities.add(q);
-        }
-        if (quantities.isEmpty) quantities.add(total);
-
-        Product? product;
-        TechCard? techCard;
-        String? freeName;
-        String? freeUnit;
-        String? pfUnit;
-        String? dishNameForPf;
-        if (name.startsWith('ПФ ')) {
-          dishNameForPf = name.substring(3).trim();
-        } else if (name.endsWith(' (ПФ)')) {
-          dishNameForPf = name.substring(0, name.length - 5).trim();
-        }
-        if (dishNameForPf != null) {
-          techCard = pfOnly.cast<TechCard?>().firstWhere((t) => t?.getLocalizedDishName(lang) == dishNameForPf, orElse: () => null);
-          if (techCard == null) {
-            freeName = name;
-            freeUnit = unitStr.contains('гр') || unitStr == 'g' ? 'g' : 'pcs';
-          } else {
-            pfUnit = (unitStr.contains('гр') || unitStr == 'g') ? _pfUnitGrams : _pfUnitPcs;
-          }
-        } else if (dishNameForPf == null) {
-          product = products.cast<Product?>().firstWhere((p) => p?.getLocalizedName(lang) == name, orElse: () => null);
-          if (product == null) {
-            freeName = name;
-            freeUnit = unitStr.contains('гр') || unitStr == 'g' ? 'g' : (unitStr.contains('порц') || unitStr == 'pcs' ? 'pcs' : unitStr);
-          } else if ((product.unit ?? '').toLowerCase() == 'kg' || product.unit == 'кг') {
-            for (var i = 0; i < quantities.length; i++) quantities[i] = quantities[i] / 1000;
-          }
-        }
-
-        // Нормализуем quantities: всегда должна быть хотя бы одна пустая ячейка в конце для продуктов
-        if (dishNameForPf == null && quantities.isNotEmpty && quantities.last != 0.0) {
-          quantities.add(0.0);
-        } else if (dishNameForPf == null && quantities.isEmpty) {
-          quantities.add(0.0);
-          quantities.add(0.0); // Для новых строк всегда две пустые ячейки
-        }
-
-        newRows.add(_InventoryRow(
-          product: product,
-          techCard: techCard,
-          freeName: freeName,
-          freeUnit: freeUnit,
-          quantities: quantities,
-          pfUnit: pfUnit,
-        ));
-        r++;
-      }
-
-      while (r < maxRows) {
-        final a1 = _cellStr(sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: r)).value).trim();
-        if (a1.isEmpty) {
-          r++;
-          continue;
-        }
-        final a2 = _cellStr(sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: r)).value).toLowerCase();
-        if (a2.contains('брутто') || a2.contains('gross')) {
-          r++;
-          break;
-        }
-        r++;
-      }
-
-      while (r < maxRows) {
-        final name = _cellStr(sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: r)).value).trim();
-        if (name.isEmpty) break;
-        final gross = _cellNum(sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: r)).value);
-        final net = _cellNum(sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: r)).value);
-        aggregated!.add({'productName': name, 'grossGrams': gross, 'netGrams': net});
-        r++;
-      }
-      if (aggregated != null && aggregated.isEmpty) aggregated = null;
-
-      if (!mounted) return;
-      setState(() {
-        _rows.clear();
-        _rows.addAll(newRows);
-        _aggregatedFromFile = aggregated;
-        _completed = false;
-      });
-      if (mounted) {
-        final msg = loc.t('inventory_loaded').replaceAll('%s', '${newRows.length}');
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-      }
-    } catch (e) {
-      if (mounted) {
-        final errMsg = loc.t('error_with_message').replaceAll('%s', e.toString());
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errMsg)));
-      }
-    }
+  Future<void> _downloadCsv(String csvData, Map<String, dynamic> payload, LocalizationService loc) async {
+    final header = payload['header'] as Map<String, dynamic>? ?? {};
+    final date = header['date'] as String? ?? DateTime.now().toIso8601String().split('T').first;
+    final fileName = 'inventory_$date.csv';
+    final bytes = utf8.encode(csvData);
+    await saveFileBytes(fileName, bytes);
   }
 
   Map<String, dynamic> _buildPayload({
@@ -993,897 +993,6 @@ class _InventoryScreenState extends State<InventoryScreen>
       'rows': rows,
       'aggregatedProducts': aggregatedProducts ?? [],
     };
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final loc = context.watch<LocalizationService>();
-    final account = context.watch<AccountManagerSupabase>();
-    final establishment = account.establishment;
-    final employee = account.currentEmployee;
-
-    // Определяем режим ввода (клавиатура открыта или активно поле ввода)
-    final viewInsets = MediaQuery.viewInsetsOf(context);
-    final isKeyboardOpen = viewInsets.bottom > 0;
-    // Не меняем _isInputMode слишком часто, чтобы не сбивать фокус
-    if (isKeyboardOpen && !_isInputMode) {
-      _isInputMode = true;
-    } else if (!isKeyboardOpen && _isInputMode) {
-      // Задержка перед выключением режима ввода
-      Future.delayed(const Duration(milliseconds: 300), () {
-        if (mounted && MediaQuery.viewInsetsOf(context).bottom == 0) {
-          setState(() => _isInputMode = false);
-        }
-      });
-    }
-
-    return Scaffold(
-      appBar: _isInputMode ? AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-        ),
-        title: Text(
-          loc.t('inventory_blank_title'),
-          style: const TextStyle(fontSize: 16),
-        ),
-        toolbarHeight: 48,
-        elevation: 0,
-        actions: [appBarHomeButton(context)],
-      ) : AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
-        title: Text(loc.t('inventory_blank_title')),
-        actions: [appBarHomeButton(context)],
-      ),
-      body: Stack(
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (!_isInputMode) _buildHeader(loc, establishment, employee),
-              if (!_isInputMode) const Divider(height: 1),
-              Expanded(
-                child: _buildTable(loc),
-              ),
-              if (!_isInputMode) const Divider(height: 1),
-              _buildFooter(loc),
-            ],
-          ),
-          if (!_isInputMode) DataSafetyIndicator(isVisible: true),
-        ],
-      ),
-    );
-  }
-
-  /// Шапка: дата_время начала_имя_должность_время завершения (компактно в 1 строку)
-  Widget _buildHeader(
-    LocalizationService loc,
-    Establishment? establishment,
-    Employee? employee,
-  ) {
-    // В режиме ввода скрываем верхний информационный блок
-    if (_isInputMode) {
-      return const SizedBox.shrink();
-    }
-    final theme = Theme.of(context);
-    final narrow = MediaQuery.sizeOf(context).width < 420;
-    final dateStr = '${_date.day.toString().padLeft(2, '0')}.${_date.month.toString().padLeft(2, '0')}.${_date.year}';
-    final startStr = _startTime != null ? '${_startTime!.hour.toString().padLeft(2, '0')}:${_startTime!.minute.toString().padLeft(2, '0')}' : '—';
-    final endStr = _endTime != null ? '${_endTime!.hour.toString().padLeft(2, '0')}:${_endTime!.minute.toString().padLeft(2, '0')}' : null;
-    final roleStr = employee?.roleDisplayName ?? '—';
-    final headerLine = '$dateStr ${startStr} ${employee?.fullName ?? '—'} ($roleStr)${endStr != null ? ' $endStr' : ''}';
-    final headerRow = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
-      ),
-      child: Text(headerLine, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis, maxLines: 1),
-    );
-    /// Кнопка переключения алфавитного порядка А–Я ↔ Я–А.
-    final sortAlphabetButton = !_completed && _rows.isNotEmpty
-        ? IconButton(
-            icon: Icon(Icons.sort_by_alpha, size: 22),
-            tooltip: _sortMode == _InventorySort.alphabetAsc
-                ? (loc.t('inventory_sort_az') ?? 'А–Я')
-                : (loc.t('inventory_sort_za') ?? 'Я–А'),
-            onPressed: () => setState(() {
-              _sortMode = _sortMode == _InventorySort.alphabetAsc
-                  ? _InventorySort.alphabetDesc
-                  : _InventorySort.alphabetAsc;
-            }),
-          )
-        : null;
-    final nameFilterField = !_completed && _rows.isNotEmpty
-        ? SizedBox(
-            width: narrow ? double.infinity : 160,
-            child: TextField(
-              controller: _nameFilterCtrl,
-              decoration: InputDecoration(
-                hintText: loc.t('inventory_filter_name') ?? 'По названию',
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                border: const OutlineInputBorder(),
-              ),
-              style: const TextStyle(fontSize: 12),
-              onChanged: (_) => setState(() {}),
-            ),
-          )
-        : null;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        headerRow,
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerLow,
-            border: Border(bottom: BorderSide(color: theme.dividerColor, width: 1)),
-          ),
-          child: SafeArea(
-            top: true,
-            bottom: false,
-            child: narrow
-            ? Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (!_isInputMode) Row(
-                    children: [
-                      Icon(Icons.store, size: 16, color: theme.colorScheme.primary),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          establishment?.name ?? '—',
-                          style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      InkWell(
-                        onTap: () => _pickDate(context),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                          child: Text(
-                            '${_date.day.toString().padLeft(2, '0')}.${_date.month.toString().padLeft(2, '0')}.${_date.year}',
-                            style: theme.textTheme.bodySmall,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${_startTime?.hour.toString().padLeft(2, '0') ?? '—'}:${_startTime?.minute.toString().padLeft(2, '0') ?? '—'}',
-                        style: theme.textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
-                  if (sortAlphabetButton != null && nameFilterField != null && !_isInputMode) ...[
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        sortAlphabetButton,
-                        const SizedBox(width: 8),
-                        Expanded(child: nameFilterField),
-                      ],
-                    ),
-                  ],
-                  // В режиме ввода показываем только поле поиска
-                  if (_isInputMode && narrow && nameFilterField != null) ...[
-                    const SizedBox(height: 6),
-                    nameFilterField,
-                  ],
-                ],
-              )
-            : Row(
-                children: [
-                  if (!_isInputMode) ...[
-                    Icon(Icons.store, size: 16, color: theme.colorScheme.primary),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        establishment?.name ?? '—',
-                        style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                  if (_isInputMode) const Spacer(),
-                  InkWell(
-                    onTap: () => _pickDate(context),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                      child: Text(
-                        '${_date.day.toString().padLeft(2, '0')}.${_date.month.toString().padLeft(2, '0')}.${_date.year}',
-                        style: theme.textTheme.bodySmall,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${_startTime?.hour.toString().padLeft(2, '0') ?? '—'}:${_startTime?.minute.toString().padLeft(2, '0') ?? '—'}',
-                    style: theme.textTheme.bodySmall,
-                  ),
-                  if (sortAlphabetButton != null && !_isInputMode) ...[
-                    const SizedBox(width: 6),
-                    sortAlphabetButton,
-                    if (nameFilterField != null) ...[
-                      const SizedBox(width: 6),
-                      nameFilterField,
-                    ],
-                  ],
-                  // В режиме ввода на desktop показываем поле поиска
-                  if (_isInputMode && !narrow && nameFilterField != null) ...[
-                    const SizedBox(width: 6),
-                    nameFilterField,
-                  ],
-                ],
-              ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  static const double _colNoWidth = 20; // Сужен с 28
-  static const double _colUnitWidth = 48;
-  static const double _colTotalWidth = 56;
-  static const double _colQtyWidth = 48; // Сужен с 64
-  static const double _colGap = 4; // Уменьшен с 10
-  /// Высота заголовка секции (Продукты/ПФ) — для выравнивания фиксированной и прокручиваемой колонок.
-  static const double _sectionHeaderHeight = 36;
-  /// Фиксированная высота строки данных — для выравнивания ячеек ввода с текстом.
-  static const double _dataRowHeight = 44;
-
-  /// Ширина фиксированной части: #, Наименование, Мера, Итого (продукт зафиксирован слева).
-  double _leftWidth(BuildContext context) {
-    final w = MediaQuery.of(context).size.width;
-    final base = (w * 0.42).clamp(140.0, 200.0);
-    return base + _colGap + _colTotalWidth;
-  }
-
-  double _colNameWidth(BuildContext context) =>
-      _leftWidth(context) - _colNoWidth - _colGap - _colUnitWidth - _colGap - _colTotalWidth;
-
-  Widget _buildTable(LocalizationService loc) {
-    if (_rows.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.inventory_2_outlined, size: 64, color: Theme.of(context).colorScheme.outline),
-              const SizedBox(height: 16),
-              Text(
-                loc.t('inventory_empty_hint'),
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              FilledButton.tonalIcon(
-                onPressed: () => _showProductPicker(context, loc),
-                icon: const Icon(Icons.add),
-                label: Text(loc.t('inventory_add_product')),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-    // По ТЗ: всегда таблица с фиксированным левым столбцом (продукты, мера, итого)
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 300),
-      child: _buildTableWithFixedColumn(loc),
-    );
-  }
-
-  Widget _buildAggregatedHeaderRow(LocalizationService loc) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: _isInputMode ? const EdgeInsets.symmetric(horizontal: 6, vertical: 3) : const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: theme.dividerColor)),
-        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
-      ),
-      child: Row(
-        children: [
-          SizedBox(width: _colNoWidth, child: Text(loc.t('inventory_excel_number'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
-          SizedBox(width: _colGap),
-          Expanded(child: Text(loc.t('inventory_item_name'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
-          SizedBox(width: _colGap),
-          SizedBox(width: 72, child: Text(loc.t('inventory_pf_gross_g'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
-          SizedBox(width: _colGap),
-          SizedBox(width: 72, child: Text(loc.t('inventory_pf_net_g'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAggregatedDataRow(LocalizationService loc, Map<String, dynamic> p, int rowNumber, {bool compact = false}) {
-    final theme = Theme.of(context);
-    final name = p['productName'] as String? ?? '';
-    final gross = ((p['grossGrams'] as num?)?.toDouble() ?? 0).round();
-    final net = ((p['netGrams'] as num?)?.toDouble() ?? 0).round();
-    return Container(
-      padding: compact ? const EdgeInsets.symmetric(horizontal: 6, vertical: 2) : const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
-        color: theme.colorScheme.surface,
-      ),
-      child: Row(
-        children: [
-          SizedBox(width: _colNoWidth, child: Text('$rowNumber', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant))),
-          SizedBox(width: _colGap),
-          Expanded(child: Text(name, style: theme.textTheme.bodyMedium, overflow: TextOverflow.ellipsis)),
-          SizedBox(width: _colGap),
-          SizedBox(width: 72, child: Text('$gross', style: theme.textTheme.bodyMedium)),
-          SizedBox(width: _colGap),
-          SizedBox(width: 72, child: Text('$net', style: theme.textTheme.bodyMedium)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSectionHeader(LocalizationService loc, String title, {bool isFixed = false}) {
-    final theme = Theme.of(context);
-    final leftW = isFixed ? _leftWidth(context) : null;
-
-    return SizedBox(
-      height: _sectionHeaderHeight,
-      width: leftW,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.primaryContainer.withOpacity(0.5),
-          border: Border(bottom: BorderSide(color: theme.colorScheme.outline.withOpacity(0.3))),
-        ),
-        alignment: Alignment.centerLeft,
-        child: Text(
-          title,
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: theme.colorScheme.onSurface,
-          ),
-          overflow: TextOverflow.ellipsis,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeaderRow(LocalizationService loc) {
-    final theme = Theme.of(context);
-    final nameW = _colNameWidth(context);
-    final qtyColsW = _maxQuantityColumns * (_colQtyWidth + _colGap) + 28;
-    return Container(
-      padding: _isInputMode ? const EdgeInsets.symmetric(horizontal: 6, vertical: 4) : const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.primaryContainer.withOpacity(0.3),
-        border: Border(bottom: BorderSide(color: theme.colorScheme.outline.withOpacity(0.3))),
-      ),
-      child: Row(
-        children: [
-          SizedBox(width: _colNoWidth, child: Text('#', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface))),
-          const SizedBox(width: _colGap),
-          SizedBox(width: nameW, child: Text(loc.t('inventory_item_name'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface), overflow: TextOverflow.ellipsis, maxLines: 1)),
-          const SizedBox(width: _colGap),
-          SizedBox(width: _colUnitWidth, child: Text(loc.t('inventory_unit'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface))),
-          const SizedBox(width: _colGap),
-          SizedBox(width: _colTotalWidth, child: Text(loc.t('inventory_total'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface))),
-          const SizedBox(width: _colGap),
-          SizedBox(width: qtyColsW, child: Text(loc.t('inventory_quantity'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface), overflow: TextOverflow.ellipsis)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDataRow(LocalizationService loc, int actualIndex, int rowNumber, {bool compact = false}) {
-    final theme = Theme.of(context);
-    final row = _rows[actualIndex];
-    final nameW = _colNameWidth(context);
-    final maxCols = _maxQuantityColumns;
-    final qtyCols = row.quantities.length;
-    return InkWell(
-      onLongPress: () {
-        if (_completed) return;
-        _removeRow(actualIndex);
-      },
-      child: Container(
-        padding: compact ? const EdgeInsets.symmetric(horizontal: 6, vertical: 2) : const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-        decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
-          color: rowNumber.isEven ? theme.colorScheme.surface : theme.colorScheme.surfaceContainerLowest.withOpacity(0.5),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            SizedBox(width: _colNoWidth, child: Text('$rowNumber', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant))),
-            SizedBox(width: _colGap),
-            SizedBox(
-              width: nameW,
-              child: Text(
-                row.productName(loc.currentLanguageCode),
-                style: theme.textTheme.bodyMedium,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                softWrap: true,
-              ),
-            ),
-            SizedBox(width: _colGap),
-            SizedBox(
-              width: _colUnitWidth,
-              child: !_completed
-                  ? (row.isPf
-                      ? DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: row.pfUnit ?? _pfUnitPcs,
-                            isDense: true,
-                            isExpanded: true,
-                            items: [
-                              DropdownMenuItem(value: _pfUnitPcs, child: Text(loc.currentLanguageCode == 'ru' ? 'порц.' : 'pcs', style: theme.textTheme.bodySmall, overflow: TextOverflow.ellipsis)),
-                              DropdownMenuItem(value: _pfUnitGrams, child: Text(loc.currentLanguageCode == 'ru' ? 'гр' : 'g', style: theme.textTheme.bodySmall, overflow: TextOverflow.ellipsis)),
-                            ],
-                            onChanged: (v) => v != null ? _setPfUnit(actualIndex, v) : null,
-                          ),
-                        )
-                      : _ProductUnitDropdown(
-                          value: row.unit,
-                          lang: loc.currentLanguageCode,
-                          onChanged: (v) => _setProductUnit(actualIndex, v),
-                          theme: theme,
-                        ))
-                  : Text(
-                      row.unitDisplayForBlank(loc.currentLanguageCode),
-                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-            ),
-            SizedBox(width: _colGap),
-            Container(
-              width: _colTotalWidth,
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Text(_formatQty(row.totalDisplay), style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
-            ),
-            SizedBox(width: _colGap),
-            ...List.generate(
-              maxCols,
-              (colIndex) => Padding(
-                padding: EdgeInsets.only(right: colIndex < maxCols - 1 ? _colGap : 0),
-                child: SizedBox(
-                  width: _colQtyWidth,
-                  child: colIndex < qtyCols
-                      ? (_completed
-                          ? Text(_formatQty(row.quantityDisplayAt(colIndex)), style: theme.textTheme.bodyMedium)
-                          : _QtyCell(
-                              key: ValueKey('qty_${actualIndex}_$colIndex'),
-                              value: row.quantities[colIndex],
-                              useGrams: row.isWeightInKg,
-                              onChanged: (v) => _setQuantity(actualIndex, colIndex, v),
-                            ))
-                      : const SizedBox.shrink(),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _formatQty(double q) {
-    if (q == q.truncateToDouble()) return q.toInt().toString();
-    return q.toStringAsFixed(1);
-  }
-
-  Widget _buildTableWithFixedColumn(LocalizationService loc) {
-    final leftW = _leftWidth(context);
-    final screenW = MediaQuery.of(context).size.width;
-    final rightW = _maxQuantityColumns * (_colQtyWidth + _colGap) + 48;
-
-    return Column(
-      children: [
-        // Fixed header row
-        Row(
-          children: [
-            // Fixed left header
-            Container(
-              width: leftW,
-              child: _buildFixedHeaderRow(loc),
-            ),
-            // Scrollable right header
-            Expanded(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                controller: _hScroll,
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: SizedBox(
-                  width: rightW.clamp(screenW - leftW, double.infinity),
-                  child: _buildScrollableHeaderRow(loc),
-                ),
-              ),
-            ),
-          ],
-        ),
-        Expanded(
-          child: SingleChildScrollView(
-            physics: const ClampingScrollPhysics(),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: leftW,
-                  decoration: BoxDecoration(
-                    border: Border(right: BorderSide(color: Theme.of(context).dividerColor.withOpacity(0.3))),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (_blockFilter != _InventoryBlockFilter.pfOnly && _productIndices.isNotEmpty) ...[
-                        _buildSectionHeader(loc, loc.t('inventory_block_products'), isFixed: true),
-                        ..._productIndices.asMap().entries.map((e) => _buildFixedDataRow(loc, e.value, e.key + 1)),
-                      ],
-                      if (_blockFilter != _InventoryBlockFilter.productsOnly && _pfIndices.isNotEmpty) ...[
-                        _buildSectionHeader(loc, loc.t('inventory_block_pf'), isFixed: true),
-                        ..._pfIndices.asMap().entries.map((e) {
-                          final rowNum = _blockFilter == _InventoryBlockFilter.pfOnly ? e.key + 1 : _productIndices.length + e.key + 1;
-                          return _buildFixedDataRow(loc, e.value, rowNum);
-                        }),
-                      ],
-                      if (_aggregatedFromFile != null && _aggregatedFromFile!.isNotEmpty) ...[
-                        _buildSectionHeader(loc, loc.t('inventory_pf_products_title'), isFixed: true),
-                        _buildFixedAggregatedHeaderRow(loc),
-                        ..._aggregatedFromFile!.asMap().entries.map((e) => _buildFixedAggregatedDataRow(loc, e.value, e.key + 1)),
-                      ],
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    controller: _hScroll,
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    child: SizedBox(
-                      width: rightW.clamp(screenW - leftW, double.infinity),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (_blockFilter != _InventoryBlockFilter.pfOnly && _productIndices.isNotEmpty) ...[
-                            SizedBox(height: _sectionHeaderHeight),
-                            ..._productIndices.asMap().entries.map((e) => _buildScrollableDataRow(loc, e.value)),
-                          ],
-                          if (_blockFilter != _InventoryBlockFilter.productsOnly && _pfIndices.isNotEmpty) ...[
-                            SizedBox(height: _sectionHeaderHeight),
-                            ..._pfIndices.asMap().entries.map((e) => _buildScrollableDataRow(loc, e.value)),
-                          ],
-                          if (_aggregatedFromFile != null && _aggregatedFromFile!.isNotEmpty) ...[
-                            SizedBox(height: _sectionHeaderHeight),
-                            _buildScrollableAggregatedHeaderRow(loc),
-                            ..._aggregatedFromFile!.asMap().entries.map((e) => _buildScrollableAggregatedDataRow(loc, e.value)),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFixedHeaderRow(LocalizationService loc) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: theme.dividerColor)),
-        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
-      ),
-      child: Row(
-        children: [
-          SizedBox(width: _colNoWidth, child: Text('#', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
-          SizedBox(width: _colGap),
-          SizedBox(width: _colNameWidth(context), child: Text(loc.t('inventory_item_name'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
-          SizedBox(width: _colGap),
-          SizedBox(width: _colUnitWidth, child: Text(loc.t('inventory_unit'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
-          SizedBox(width: _colGap),
-          SizedBox(width: _colTotalWidth, child: Text(loc.t('inventory_total'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildScrollableHeaderRow(LocalizationService loc) {
-    final theme = Theme.of(context);
-    final maxCols = _maxQuantityColumns;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: theme.dividerColor)),
-        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
-      ),
-      child: Row(
-        children: [
-          ...List.generate(
-            maxCols,
-            (colIndex) => Padding(
-              padding: EdgeInsets.only(right: colIndex < maxCols - 1 ? _colGap : 0),
-              child: SizedBox(
-                width: _colQtyWidth,
-                child: Text('${colIndex + 1}', textAlign: TextAlign.center, style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold)),
-              ),
-            ),
-          ),
-          if (!_completed) SizedBox(width: 28),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFixedDataRow(LocalizationService loc, int actualIndex, int rowNumber) {
-    final theme = Theme.of(context);
-    final row = _rows[actualIndex];
-
-    return SizedBox(
-      height: _dataRowHeight,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-        decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
-          color: rowNumber.isEven ? theme.colorScheme.surface : theme.colorScheme.surfaceContainerLowest.withOpacity(0.5),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-          SizedBox(width: _colNoWidth, child: Text('$rowNumber', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant))),
-          SizedBox(width: _colGap),
-          SizedBox(
-            width: _colNameWidth(context),
-            child: Text(
-              row.productName(loc.currentLanguageCode),
-              style: theme.textTheme.bodyMedium,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              softWrap: true,
-            ),
-          ),
-          SizedBox(width: _colGap),
-          SizedBox(
-            width: _colUnitWidth,
-            child: !_completed
-                ? (row.isPf
-                    ? DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: row.pfUnit ?? _pfUnitPcs,
-                          isDense: true,
-                          isExpanded: true,
-                          items: [
-                            DropdownMenuItem(value: _pfUnitPcs, child: Text(loc.currentLanguageCode == 'ru' ? 'порц.' : 'pcs', style: theme.textTheme.bodySmall, overflow: TextOverflow.ellipsis)),
-                            DropdownMenuItem(value: _pfUnitGrams, child: Text(loc.currentLanguageCode == 'ru' ? 'гр' : 'g', style: theme.textTheme.bodySmall, overflow: TextOverflow.ellipsis)),
-                          ],
-                          onChanged: (v) => v != null ? _setPfUnit(actualIndex, v) : null,
-                        ),
-                      )
-                    : _ProductUnitDropdown(
-                        value: row.unit,
-                        lang: loc.currentLanguageCode,
-                        onChanged: (v) => _setProductUnit(actualIndex, v),
-                        theme: theme,
-                      ))
-                : Text(row.unitDisplayForBlank(loc.currentLanguageCode), style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant), overflow: TextOverflow.ellipsis),
-          ),
-          SizedBox(width: _colGap),
-          Container(
-            width: _colTotalWidth,
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            alignment: Alignment.center,
-            child: Text(_formatQty(row.totalDisplay), style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
-          ),
-        ],
-      ),
-    ),
-    );
-  }
-
-  Widget _buildScrollableDataRow(LocalizationService loc, int actualIndex) {
-    final theme = Theme.of(context);
-    final row = _rows[actualIndex];
-    final maxCols = _maxQuantityColumns;
-    final qtyCols = row.quantities.length;
-
-    return SizedBox(
-      height: _dataRowHeight,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-          ...List.generate(
-            maxCols,
-            (colIndex) => Padding(
-              padding: EdgeInsets.only(right: colIndex < maxCols - 1 ? _colGap : 0),
-              child: SizedBox(
-                width: _colQtyWidth,
-                child: colIndex < qtyCols
-                    ? (_completed
-                        ? Text(_formatQty(row.quantityDisplayAt(colIndex)), style: theme.textTheme.bodyMedium)
-                        : _QtyCell(
-                            key: ValueKey('qty_${actualIndex}_$colIndex'),
-                            value: row.quantities[colIndex],
-                            useGrams: row.isWeightInKg,
-                            onChanged: (v) => _setQuantity(actualIndex, colIndex, v),
-                          ))
-                    : const SizedBox.shrink(),
-              ),
-            ),
-          ),
-        ],
-      ),
-    ),
-    );
-  }
-
-  Widget _buildFixedAggregatedHeaderRow(LocalizationService loc) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: theme.dividerColor)),
-        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
-      ),
-      child: Row(
-        children: [
-          SizedBox(width: _colNoWidth, child: Text(loc.t('inventory_excel_number'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
-          SizedBox(width: _colGap),
-          Expanded(child: Text(loc.t('inventory_item_name'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildScrollableAggregatedHeaderRow(LocalizationService loc) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: theme.dividerColor)),
-        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
-      ),
-      child: Row(
-        children: [
-          SizedBox(width: 72, child: Text(loc.t('inventory_pf_gross_g'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
-          SizedBox(width: _colGap),
-          SizedBox(width: 72, child: Text(loc.t('inventory_pf_net_g'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFixedAggregatedDataRow(LocalizationService loc, Map<String, dynamic> p, int rowNumber) {
-    final theme = Theme.of(context);
-    final name = p['productName'] as String? ?? '';
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
-        color: theme.colorScheme.surface,
-      ),
-      child: Row(
-        children: [
-          SizedBox(width: _colNoWidth, child: Text('$rowNumber', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant))),
-          SizedBox(width: _colGap),
-          Expanded(
-            child: Text(
-              name,
-              style: theme.textTheme.bodyMedium,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildScrollableAggregatedDataRow(LocalizationService loc, Map<String, dynamic> p) {
-    final theme = Theme.of(context);
-    final gross = ((p['grossGrams'] as num?)?.toDouble() ?? 0).round();
-    final net = ((p['netGrams'] as num?)?.toDouble() ?? 0).round();
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-      ),
-      child: Row(
-        children: [
-          SizedBox(width: 72, child: Text('$gross', style: theme.textTheme.bodyMedium)),
-          SizedBox(width: _colGap),
-          SizedBox(width: 72, child: Text('$net', style: theme.textTheme.bodyMedium)),
-        ],
-      ),
-    );
-  }
-
-  /// Компактный нижний блок: не перекрывает таблицу, минимум высоты.
-  Widget _buildFooter(LocalizationService loc) {
-    final theme = Theme.of(context);
-    // В режиме ввода кнопка "Завершить" фиксируется над клавиатурой
-    if (_isInputMode) {
-      return const SizedBox.shrink();
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
-        border: Border(top: BorderSide(color: theme.dividerColor)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Row(
-          children: [
-            Expanded(
-              child: FilledButton(
-                onPressed: _completed ? null : () => _complete(context),
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                ),
-                child: Text(
-                  loc.t('inventory_complete'),
-                  style: _isInputMode ? const TextStyle(fontSize: 14) : null,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _showProductPicker(BuildContext context, LocalizationService loc) async {
-    final productStore = context.read<ProductStoreSupabase>();
-    final account = context.read<AccountManagerSupabase>();
-    final estId = account.establishment?.id;
-    if (estId == null) return;
-    await productStore.loadProducts();
-    await productStore.loadNomenclature(estId);
-    if (!mounted) return;
-
-    final products = productStore.getNomenclatureProducts(estId);
-    if (products.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${loc.t('nomenclature')}: ${loc.t('no_products')}')),
-      );
-      return;
-    }
-
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (ctx) => _ProductPickerSheet(
-        products: products,
-        loc: loc,
-        onSelect: (p) {
-          _addProduct(p);
-          Navigator.of(ctx).pop();
-        },
-      ),
-    );
   }
 }
 
