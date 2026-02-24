@@ -46,10 +46,21 @@
   <div id="loading-screen"></div>
   <script src="flutter_bootstrap.js" async></script>
   <script>
-    window.addEventListener('flutter-first-frame', function() {
+    function hideLoadingScreen() {
       var el = document.getElementById('loading-screen');
       if (el) el.remove();
+    }
+    window.addEventListener('flutter-first-frame', hideLoadingScreen);
+    // Fallback: detect when Flutter adds its canvas (flt-scene-host) to DOM
+    var obs = new MutationObserver(function(mutations, observer) {
+      if (document.querySelector('flt-scene-host') || document.querySelector('canvas')) {
+        observer.disconnect();
+        hideLoadingScreen();
+      }
     });
+    obs.observe(document.body, { childList: true, subtree: true });
+    // Last resort: remove after 20s
+    setTimeout(hideLoadingScreen, 20000);
   </script>
 </body>
 </html>
