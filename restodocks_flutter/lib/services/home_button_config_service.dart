@@ -5,6 +5,7 @@ const _keyHomeButton = 'restodocks_home_button_action';
 
 /// Действия для средней кнопки на главном экране
 enum HomeButtonAction {
+  inbox,
   schedule,
   checklists,
   ttk,
@@ -14,6 +15,8 @@ enum HomeButtonAction {
 extension HomeButtonActionExt on HomeButtonAction {
   String get route {
     switch (this) {
+      case HomeButtonAction.inbox:
+        return '/notifications';
       case HomeButtonAction.schedule:
         return '/schedule';
       case HomeButtonAction.checklists:
@@ -27,6 +30,8 @@ extension HomeButtonActionExt on HomeButtonAction {
 
   IconData get icon {
     switch (this) {
+      case HomeButtonAction.inbox:
+        return Icons.inbox;
       case HomeButtonAction.schedule:
         return Icons.calendar_month;
       case HomeButtonAction.checklists:
@@ -40,6 +45,8 @@ extension HomeButtonActionExt on HomeButtonAction {
 
   IconData get iconOutlined {
     switch (this) {
+      case HomeButtonAction.inbox:
+        return Icons.inbox_outlined;
       case HomeButtonAction.schedule:
         return Icons.calendar_month_outlined;
       case HomeButtonAction.checklists:
@@ -53,6 +60,8 @@ extension HomeButtonActionExt on HomeButtonAction {
 
   String get storageKey {
     switch (this) {
+      case HomeButtonAction.inbox:
+        return 'inbox';
       case HomeButtonAction.schedule:
         return 'schedule';
       case HomeButtonAction.checklists:
@@ -66,6 +75,8 @@ extension HomeButtonActionExt on HomeButtonAction {
 
   static HomeButtonAction fromStorageKey(String key) {
     switch (key) {
+      case 'inbox':
+        return HomeButtonAction.inbox;
       case 'checklists':
         return HomeButtonAction.checklists;
       case 'ttk':

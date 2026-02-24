@@ -33,11 +33,10 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     final isOwner = currentEmployee.hasRole('owner');
-    final isManagement = currentEmployee.canViewDepartment('management') && !isOwner;
     final account = context.watch<AccountManagerSupabase>();
     final homeBtnConfig = context.watch<HomeButtonConfigService>();
-    final middleAction = isOwner ? null : (account.hasProSubscription ? homeBtnConfig.action : HomeButtonAction.schedule);
-    final middleLabel = isOwner ? loc.t('inbox') : _labelForAction(loc, middleAction!);
+    final middleAction = account.hasProSubscription ? homeBtnConfig.action : (isOwner ? HomeButtonAction.inbox : HomeButtonAction.schedule);
+    final middleLabel = _labelForAction(loc, middleAction);
 
     return Scaffold(
       appBar: AppBar(
@@ -46,11 +45,6 @@ class _HomeScreenState extends State<HomeScreen> {
             : null,
         title: Text(_appBarTitle(loc, isOwner)),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.home),
-            onPressed: () => context.go('/home'),
-            tooltip: loc.t('home'),
-          ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () => _logout(context),
@@ -68,7 +62,13 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
-        onDestinationSelected: (i) => setState(() => _selectedIndex = i),
+        onDestinationSelected: (i) {
+          if (i == 1) {
+            context.go(middleAction.route);
+            return;
+          }
+          setState(() => _selectedIndex = i);
+        },
         destinations: [
           NavigationDestination(
             icon: const Icon(Icons.home_outlined),
@@ -76,8 +76,8 @@ class _HomeScreenState extends State<HomeScreen> {
             label: loc.t('home'),
           ),
           NavigationDestination(
-            icon: Icon(isOwner ? Icons.move_to_inbox : (middleAction?.iconOutlined ?? Icons.calendar_month_outlined)),
-            selectedIcon: Icon(isOwner ? Icons.inbox : (middleAction?.icon ?? Icons.calendar_month)),
+            icon: Icon(middleAction.iconOutlined),
+            selectedIcon: Icon(middleAction.icon),
             label: middleLabel,
           ),
           NavigationDestination(
@@ -93,12 +93,12 @@ class _HomeScreenState extends State<HomeScreen> {
   String _appBarTitle(LocalizationService loc, bool isOwner) {
     final account = context.read<AccountManagerSupabase>();
     final homeBtnConfig = context.read<HomeButtonConfigService>();
-    final middleAction = isOwner ? null : (account.hasProSubscription ? homeBtnConfig.action : HomeButtonAction.schedule);
+    final middleAction = account.hasProSubscription ? homeBtnConfig.action : (isOwner ? HomeButtonAction.inbox : HomeButtonAction.schedule);
     switch (_selectedIndex) {
       case 0:
         return loc.t('app_name');
       case 1:
-        return isOwner ? loc.t('inbox') : _labelForAction(loc, middleAction!);
+        return _labelForAction(loc, middleAction);
       case 2:
         return loc.t('personal_cabinet');
       default:
@@ -126,6 +126,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String _labelForAction(LocalizationService loc, HomeButtonAction action) {
     switch (action) {
+      case HomeButtonAction.inbox:
+        return loc.t('inbox');
       case HomeButtonAction.schedule:
         return loc.t('schedule');
       case HomeButtonAction.checklists:
@@ -140,18 +142,11 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildMiddleTab(Employee employee, bool isOwner, LocalizationService loc) {
     final account = context.read<AccountManagerSupabase>();
     final homeBtnConfig = context.read<HomeButtonConfigService>();
-    if (isOwner) {
-      return _MiddleTabBody(
-        icon: Icons.inbox_outlined,
-        title: loc.t('inbox'),
-        onTap: () => context.push('/notifications'),
-      );
-    }
-    final action = account.hasProSubscription ? homeBtnConfig.action : HomeButtonAction.schedule;
+    final action = account.hasProSubscription ? homeBtnConfig.action : (isOwner ? HomeButtonAction.inbox : HomeButtonAction.schedule);
     return _MiddleTabBody(
       icon: action.icon,
       title: _labelForAction(loc, action),
-      onTap: () => context.push(action.route),
+      onTap: () => context.go(action.route),
     );
   }
 

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../services/services.dart';
+import '../widgets/app_bar_home_button.dart';
 
 /// Экран «Забыли пароль» — ввод email для отправки ссылки восстановления
 class ForgotPasswordScreen extends StatefulWidget {
@@ -64,6 +65,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           onPressed: () => context.pop(),
         ),
         title: Text(loc.t('forgot_password') ?? 'Восстановление доступа'),
+        actions: [appBarHomeButton(context)],
       ),
       body: SafeArea(
         child: SingleChildScrollView(

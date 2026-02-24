@@ -24,6 +24,7 @@ import '../services/services.dart';
 import '../services/intelligent_product_import_service.dart';
 import '../services/translation_service.dart';
 import '../services/translation_manager.dart';
+import '../widgets/app_bar_home_button.dart';
 
 // Глобальная переменная для хранения debug логов
 List<String> _debugLogs = [];
@@ -206,6 +207,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         title: Text(loc.t('upload_products')),
         backgroundColor: Theme.of(context).colorScheme.primaryContainer,
         actions: [
+          appBarHomeButton(context),
           if (kDebugMode) ...[
             IconButton(
               icon: const Icon(Icons.bug_report),

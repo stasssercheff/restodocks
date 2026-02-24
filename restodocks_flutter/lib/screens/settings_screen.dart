@@ -59,6 +59,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   String _homeButtonActionLabel(LocalizationService loc, HomeButtonAction action) {
     switch (action) {
+      case HomeButtonAction.inbox:
+        return loc.t('inbox');
       case HomeButtonAction.schedule:
         return loc.t('schedule');
       case HomeButtonAction.checklists:
@@ -590,6 +592,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
               },
             ),
             if (currentEmployee.hasRole('owner')) ...[
+              Consumer<HomeButtonConfigService>(
+                builder: (_, homeBtn, __) => ListTile(
+                  leading: const Icon(Icons.tune),
+                  title: Text(localization.t('central_button')),
+                  subtitle: Text(_homeButtonActionLabel(localization, homeBtn.action)),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _showHomeButtonPicker(context, localization, homeBtn),
+                ),
+              ),
               // Переключатель: интерфейс собственника ↔ должность (если есть должность)
               if (currentEmployee.positionRole != null)
                 Consumer<OwnerViewPreferenceService>(

@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 
 import '../models/models.dart';
 import '../services/services.dart';
+import '../widgets/app_bar_home_button.dart';
 
 /// Шаг 1 создания списка заказа: название списка, поставщик (наименование), контакты (почта, телефон, TG, Zalo, WhatsApp).
 class OrderListCreateScreen extends StatefulWidget {
@@ -64,6 +65,7 @@ class _OrderListCreateScreenState extends State<OrderListCreateScreen> {
       appBar: AppBar(
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
         title: Text(loc.t('order_list_create')),
+        actions: [appBarHomeButton(context)],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),

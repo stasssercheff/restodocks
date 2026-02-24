@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../models/models.dart';
 import '../services/services.dart';
+import '../widgets/app_bar_home_button.dart';
 
 /// Экран модерации импорта: просмотр и подтверждение перед записью в БД.
 /// Режим отложенной модерации — без диалогов на каждую строку.
@@ -137,6 +138,7 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
             icon: const Icon(Icons.check_circle_outline, size: 18),
             label: Text(loc.t('accept_all') ?? 'Принять всё'),
           ),
+          appBarHomeButton(context),
         ],
       ),
       body: Column(

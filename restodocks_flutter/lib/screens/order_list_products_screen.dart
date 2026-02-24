@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../models/models.dart';
 import '../services/services.dart';
+import '../widgets/app_bar_home_button.dart';
 
 /// Шаг 2: добавление продуктов в список заказа (для конкретного поставщика). У каждого продукта задаётся единица измерения.
 class OrderListProductsScreen extends StatefulWidget {
@@ -125,6 +126,7 @@ class _OrderListProductsScreenState extends State<OrderListProductsScreen> {
               onPressed: _save,
               child: Text(loc.t('save')),
             ),
+          appBarHomeButton(context),
         ],
       ),
       body: Column(

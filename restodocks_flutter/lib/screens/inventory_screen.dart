@@ -15,6 +15,7 @@ import '../services/inventory_download.dart';
 import '../services/services.dart';
 import '../mixins/auto_save_mixin.dart';
 import '../mixins/input_change_listener_mixin.dart';
+import '../widgets/app_bar_home_button.dart';
 
 /// Единица для ПФ в бланке: вес (г) или штуки/порции.
 const String _pfUnitGrams = 'g';
@@ -1041,12 +1042,14 @@ class _InventoryScreenState extends State<InventoryScreen>
         ),
         toolbarHeight: 48,
         elevation: 0,
+        actions: [appBarHomeButton(context)],
       ) : AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
         ),
         title: Text(loc.t('inventory_blank_title')),
+        actions: [appBarHomeButton(context)],
       ),
       body: Stack(
         children: [
