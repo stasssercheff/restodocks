@@ -346,11 +346,11 @@ ${sampleTexts.take(5).join('\n')}
   /// Нормализовать название продукта через AI
   Future<String?> _aiNormalizeProductName(String productName) async {
     try {
-      final result = await _aiService.callFunction('ai-recognize-product', {
+      final result = await (_aiService as dynamic).invoke('ai-recognize-product', {
         'userInput': productName,
       });
 
-      if (result['normalizedName'] != null) {
+      if (result != null && result['normalizedName'] != null) {
         return result['normalizedName'] as String;
       }
     } catch (e) {
