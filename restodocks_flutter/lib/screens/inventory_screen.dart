@@ -1774,23 +1774,45 @@ class _QtyCell extends StatefulWidget {
   State<_QtyCell> createState() => _QtyCellState();
 }
 
-class _QtyCellState extends State<_QtyCell> {
+class _QtyCellState extends State<_QtyCell> with AutomaticKeepAliveClientMixin {
   late TextEditingController _controller;
   final FocusNode _focus = FocusNode();
+  late double _currentValue;
+  bool _hasFocus = false;
 
-  double get _displayValueRaw => widget.useGrams ? widget.value * 1000 : widget.value;
+  @override
+  bool get wantKeepAlive => true;
+
+  double get _displayValueRaw => widget.useGrams ? _currentValue * 1000 : _currentValue;
 
   @override
   void initState() {
     super.initState();
+    _currentValue = widget.value;
     _controller = TextEditingController(text: _displayValue(_displayValueRaw));
+    _focus.addListener(_onFocusChanged);
   }
 
   @override
   void didUpdateWidget(_QtyCell old) {
     super.didUpdateWidget(old);
-    if ((old.value != widget.value || old.useGrams != widget.useGrams) && !_focus.hasFocus) {
-      _controller.text = _displayValue(widget.useGrams ? widget.value * 1000 : widget.value);
+    if (old.value != widget.value && !_hasFocus) {
+      _currentValue = widget.value;
+      _controller.text = _displayValue(_displayValueRaw);
+    }
+  }
+
+  void _onFocusChanged() {
+    _hasFocus = _focus.hasFocus;
+    if (!_hasFocus) {
+      // Когда фокус теряется, синхронизируем значение
+      final textValue = _controller.text;
+      final v = double.tryParse(textValue.replaceFirst(',', '.')) ?? 0;
+      final actualValue = widget.useGrams ? v / 1000 : v;
+      if (actualValue != _currentValue) {
+        _currentValue = actualValue;
+        widget.onChanged(actualValue);
+      }
     }
   }
 
@@ -1802,6 +1824,7 @@ class _QtyCellState extends State<_QtyCell> {
 
   @override
   void dispose() {
+    _focus.removeListener(_onFocusChanged);
     _controller.dispose();
     _focus.dispose();
     super.dispose();
@@ -1809,7 +1832,9 @@ class _QtyCellState extends State<_QtyCell> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Важно для AutomaticKeepAliveClientMixin
     final theme = Theme.of(context);
+
     return TextField(
       controller: _controller,
       focusNode: _focus,
@@ -1827,8 +1852,9 @@ class _QtyCellState extends State<_QtyCell> {
         fillColor: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
       ),
       onChanged: (s) {
+        // Обновляем локальное значение без вызова callback
         final v = double.tryParse(s.replaceFirst(',', '.')) ?? 0;
-        widget.onChanged(widget.useGrams ? v / 1000 : v);
+        _currentValue = widget.useGrams ? v / 1000 : v;
       },
     );
   }
