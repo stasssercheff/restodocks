@@ -552,7 +552,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     saveNow(); // Сохранить немедленно при добавлении продукта
   }
 
-  /// Обновление значения ячейки. При вводе в последнюю ячейку — добавляется новая пустая (n+1).
+  /// Обновление значения ячейки. При вводе в последнюю ячейку — добавляется новая колонка ко всем строкам (n+1).
   void _setQuantity(int rowIndex, int colIndex, double value) {
     if (rowIndex < 0 || rowIndex >= _rows.length) return;
     final row = _rows[rowIndex];
@@ -561,7 +561,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     setState(() {
       row.quantities[colIndex] = value;
       if (colIndex == row.quantities.length - 1) {
-        row.quantities.add(0.0);
+        _addColumnToAll();
       }
     });
     saveNow();
@@ -1235,6 +1235,8 @@ class _InventoryScreenState extends State<InventoryScreen>
   static const double _colGap = 10;
   /// Высота заголовка секции (Продукты/ПФ) — для выравнивания фиксированной и прокручиваемой колонок.
   static const double _sectionHeaderHeight = 36;
+  /// Фиксированная высота строки данных — для выравнивания ячеек ввода с текстом.
+  static const double _dataRowHeight = 44;
 
   /// Ширина фиксированной части: #, Наименование, Мера, Итого (продукт зафиксирован слева).
   double _leftWidth(BuildContext context) {
@@ -1630,15 +1632,17 @@ class _InventoryScreenState extends State<InventoryScreen>
     final theme = Theme.of(context);
     final row = _rows[actualIndex];
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
-        color: rowNumber.isEven ? theme.colorScheme.surface : theme.colorScheme.surfaceContainerLowest.withOpacity(0.5),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
+    return SizedBox(
+      height: _dataRowHeight,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
+          color: rowNumber.isEven ? theme.colorScheme.surface : theme.colorScheme.surfaceContainerLowest.withOpacity(0.5),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
           SizedBox(width: _colNoWidth, child: Text('$rowNumber', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant))),
           SizedBox(width: _colGap),
           SizedBox(
@@ -1680,10 +1684,12 @@ class _InventoryScreenState extends State<InventoryScreen>
           Container(
             width: _colTotalWidth,
             padding: const EdgeInsets.symmetric(horizontal: 4),
+            alignment: Alignment.center,
             child: Text(_formatQty(row.totalDisplay), style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
           ),
         ],
       ),
+    ),
     );
   }
 
@@ -1693,14 +1699,17 @@ class _InventoryScreenState extends State<InventoryScreen>
     final maxCols = _maxQuantityColumns;
     final qtyCols = row.quantities.length;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
-      ),
-      child: Row(
-        children: [
+    return SizedBox(
+      height: _dataRowHeight,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
           ...List.generate(
             maxCols,
             (colIndex) => Padding(
@@ -1722,6 +1731,7 @@ class _InventoryScreenState extends State<InventoryScreen>
           ),
         ],
       ),
+    ),
     );
   }
 
@@ -1977,8 +1987,8 @@ class _QtyCellState extends State<_QtyCell> {
       style: theme.textTheme.bodyMedium,
       decoration: InputDecoration(
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
         filled: true,
         fillColor: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
       ),
