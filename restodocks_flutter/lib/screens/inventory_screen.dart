@@ -563,9 +563,9 @@ class _InventoryScreenState extends State<InventoryScreen>
       // Обновляем значение
       row.quantities[colIndex] = value;
 
-      // Если это последняя ячейка и значение > 0, добавляем новую колонку
+      // Если это последняя ячейка и значение > 0, добавляем одну пустую ячейку для этой строки
       if (colIndex == row.quantities.length - 1 && value > 0) {
-        _addColumnToAll();
+        row.quantities.add(0.0);
       }
     });
 
@@ -1485,7 +1485,6 @@ class _InventoryScreenState extends State<InventoryScreen>
   Widget _buildScrollableDataRow(LocalizationService loc, int actualIndex) {
     final theme = Theme.of(context);
     final row = _rows[actualIndex];
-    final maxCols = _maxQuantityColumns;
     final qtyCols = row.quantities.length;
 
     return SizedBox(
@@ -1500,21 +1499,19 @@ class _InventoryScreenState extends State<InventoryScreen>
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
           ...List.generate(
-            maxCols,
+            qtyCols,
             (colIndex) => Padding(
-              padding: EdgeInsets.only(right: colIndex < maxCols - 1 ? _colGap : 0),
+              padding: EdgeInsets.only(right: colIndex < qtyCols - 1 ? _colGap : 0),
               child: SizedBox(
                 width: _colQtyWidth,
-                child: colIndex < qtyCols
-                    ? (_completed
-                        ? Text(_formatQty(row.quantityDisplayAt(colIndex)), style: theme.textTheme.bodyMedium)
-                        : _QtyCell(
-                            key: ValueKey('qty_${actualIndex}_$colIndex'),
-                            value: row.quantities[colIndex],
-                            useGrams: row.isWeightInKg,
-                            onChanged: (v) => _setQuantity(actualIndex, colIndex, v),
-                          ))
-                    : const SizedBox.shrink(),
+                child: _completed
+                    ? Text(_formatQty(row.quantityDisplayAt(colIndex)), style: theme.textTheme.bodyMedium)
+                    : _QtyCell(
+                        key: ValueKey('qty_${actualIndex}_$colIndex'),
+                        value: row.quantities[colIndex],
+                        useGrams: row.isWeightInKg,
+                        onChanged: (v) => _setQuantity(actualIndex, colIndex, v),
+                      ),
               ),
             ),
           ),

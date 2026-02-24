@@ -4,10 +4,37 @@ import SwiftUI
 struct HomeView: View {
     @EnvironmentObject var lang: LocalizationManager
     @EnvironmentObject var pro: ProAccess
+    @EnvironmentObject var accounts: AccountManager
+    @EnvironmentObject var appState: AppState
+
+    private var currentEmployee: Employee? {
+        accounts.currentEmployee ?? appState.currentEmployee
+    }
+
+    /// Шеф-повар или су-шеф — показываем отдельные кнопки ТТК
+    private var isChefOrSousChef: Bool {
+        guard let emp = currentEmployee else { return false }
+        return emp.rolesArray.contains("executive_chef") || emp.rolesArray.contains("sous_chef")
+    }
 
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
+                // ТТК и Просмотр ТТК — для шеф/су-шеф
+                if isChefOrSousChef {
+                    NavigationLink {
+                        TTKView()
+                    } label: {
+                        HomeButton(title: lang.t("ttk"))
+                    }
+
+                    NavigationLink {
+                        DepartmentTTKView(department: "kitchen")
+                    } label: {
+                        HomeButton(title: lang.t("view_ttk"))
+                    }
+                }
+
                 // Kitchen
                 NavigationLink {
                     KitchenRootView()

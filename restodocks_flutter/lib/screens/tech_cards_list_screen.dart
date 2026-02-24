@@ -504,35 +504,86 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
 
   Widget _buildTechCardsTable(List<TechCard> techCards, LocalizationService loc) {
     final lang = loc.currentLanguageCode;
+    final isNarrow = MediaQuery.of(context).size.width < 600;
+
     return RefreshIndicator(
       onRefresh: _load,
+      child: isNarrow
+          ? _buildCompactList(techCards, loc, lang)
+          : _buildWideTable(techCards, loc, lang),
+    );
+  }
+
+  /// Компактный список для телефона: узкие строки, влезает много ТТК без горизонтального скролла.
+  Widget _buildCompactList(List<TechCard> techCards, LocalizationService loc, String lang) {
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 80),
+      itemCount: techCards.length,
+      itemBuilder: (context, i) {
+        final tc = techCards[i];
+        final selected = _selectedTechCards.contains(tc.id);
+        return ListTile(
+          dense: true,
+          selected: selected,
+          selectedTileColor: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.5),
+          title: Text(
+            tc.getDisplayNameInLists(lang),
+            style: const TextStyle(fontSize: 15),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          subtitle: Text(
+            '${_categoryLabel(tc.category, loc)} · ${_calculateCostPerKg(tc).toStringAsFixed(0)}/кг',
+            style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          trailing: _selectionMode
+              ? Checkbox(
+                  value: selected,
+                  onChanged: (_) => _toggleTechCardSelection(tc.id),
+                )
+              : const Icon(Icons.chevron_right, color: Colors.grey),
+          onTap: () {
+            if (_selectionMode) {
+              _toggleTechCardSelection(tc.id);
+            } else {
+              context.push('/tech-cards/${tc.id}');
+            }
+          },
+        );
+      },
+    );
+  }
+
+  /// Широкая таблица для планшетов и десктопов.
+  Widget _buildWideTable(List<TechCard> techCards, LocalizationService loc, String lang) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+      scrollDirection: Axis.vertical,
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-        scrollDirection: Axis.vertical,
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minWidth: 1000), // Та же ширина как при создании
-            child: DataTable(
-              headingRowColor: WidgetStateProperty.all(Theme.of(context).colorScheme.primaryContainer),
-              columns: [
-                DataColumn(label: Text('Название', style: const TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Категория', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Стоимость за кг', style: TextStyle(fontWeight: FontWeight.bold))),
-              ],
-              rows: List.generate(techCards.length, (i) {
-                final tc = techCards[i];
-                return DataRow(
-                  selected: _selectedTechCards.contains(tc.id),
-                  cells: [
-                    DataCell(Text(tc.getDisplayNameInLists(lang))),
-                    DataCell(Text(_categoryLabel(tc.category, loc))),
-                    DataCell(Text(_calculateCostPerKg(tc).toStringAsFixed(0))),
-                  ],
-                  onSelectChanged: _selectionMode ? null : (_) => context.push('/tech-cards/${tc.id}'),
-                );
-              }),
-            ),
+        scrollDirection: Axis.horizontal,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 1000),
+          child: DataTable(
+            headingRowColor: WidgetStateProperty.all(Theme.of(context).colorScheme.primaryContainer),
+            columns: [
+              DataColumn(label: Text('Название', style: const TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(label: Text('Категория', style: TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(label: Text('Стоимость за кг', style: TextStyle(fontWeight: FontWeight.bold))),
+            ],
+            rows: List.generate(techCards.length, (i) {
+              final tc = techCards[i];
+              return DataRow(
+                selected: _selectedTechCards.contains(tc.id),
+                cells: [
+                  DataCell(Text(tc.getDisplayNameInLists(lang))),
+                  DataCell(Text(_categoryLabel(tc.category, loc))),
+                  DataCell(Text(_calculateCostPerKg(tc).toStringAsFixed(0))),
+                ],
+                onSelectChanged: _selectionMode ? null : (_) => context.push('/tech-cards/${tc.id}'),
+              );
+            }),
           ),
         ),
       ),

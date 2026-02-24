@@ -78,6 +78,36 @@ struct KitchenScheduleView: View {
         Dictionary(grouping: filteredShifts) { Calendar.current.startOfDay(for: $0.date) }
     }
 
+    /// Диапазон дат для графика: от прошлого до года вперёд, без «конца вселенной»
+    private var scheduleDateRange: (start: Date, end: Date) {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: Date())
+        let past = cal.date(byAdding: .day, value: -30, to: today)!
+        let future = cal.date(byAdding: .day, value: 365, to: today)!
+        let withShifts = filteredShifts
+        let minShift = withShifts.map { cal.startOfDay(for: $0.date) }.min()
+        let maxShift = withShifts.map { cal.startOfDay(for: $0.date) }.max()
+        if let minS = minShift, let maxS = maxShift {
+            let start = min(minS, past)
+            let end = max(maxS, future)
+            return (start, end)
+        }
+        // Нет смен — показываем от сегодня до 90 дней вперёд
+        return (today, cal.date(byAdding: .day, value: 89, to: today)!)
+    }
+
+    /// Все даты от начала до конца диапазона (график «вечный»)
+    private var allScheduleDates: [Date] {
+        let cal = Calendar.current
+        var dates: [Date] = []
+        var current = scheduleDateRange.start
+        while current <= scheduleDateRange.end {
+            dates.append(current)
+            current = cal.date(byAdding: .day, value: 1, to: current)!
+        }
+        return dates
+    }
+
     var body: some View {
         VStack(spacing: 0) {
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -96,7 +126,7 @@ struct KitchenScheduleView: View {
                 }
                 .background(Color(.systemBackground))
 
-                if shiftsByDate.isEmpty {
+                if allScheduleDates.isEmpty {
                     VStack(spacing: 20) {
                         Image(systemName: "calendar.badge.exclamationmark")
                             .font(.system(size: 60))
@@ -113,10 +143,14 @@ struct KitchenScheduleView: View {
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 16) {
-                            ForEach(shiftsByDate.keys.sorted(), id: \.self) { date in
-                                if let dayShifts = shiftsByDate[date], !dayShifts.isEmpty {
-                                    DayScheduleCard(date: date, shifts: dayShifts, employeeName: { accounts.employeeName(for: $0) }, employeePosition: { accounts.employeePosition(for: $0) })
-                                }
+                            ForEach(allScheduleDates, id: \.self) { date in
+                                let dayShifts = shiftsByDate[date] ?? []
+                                DayScheduleCard(
+                                    date: date,
+                                    shifts: dayShifts,
+                                    employeeName: { accounts.employeeName(for: $0) },
+                                    employeePosition: { accounts.employeePosition(for: $0) }
+                                )
                             }
                         }
                         .padding(.vertical)
@@ -153,6 +187,7 @@ struct KitchenScheduleView: View {
 }
 
 struct DayScheduleCard: View {
+    @EnvironmentObject var lang: LocalizationManager
     let date: Date
     let shifts: [Shift]
     let employeeName: (UUID) -> String
@@ -171,8 +206,15 @@ struct DayScheduleCard: View {
                 .font(.headline)
                 .padding(.horizontal)
 
-            ForEach(shifts) { shift in
-                ShiftCard(shift: shift, employeeName: employeeName(shift.employeeId), employeePosition: employeePosition(shift.employeeId))
+            if shifts.isEmpty {
+                Text(lang.t("no_shifts"))
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal)
+            } else {
+                ForEach(shifts) { shift in
+                    ShiftCard(shift: shift, employeeName: employeeName(shift.employeeId), employeePosition: employeePosition(shift.employeeId))
+                }
             }
         }
         .padding(.vertical)

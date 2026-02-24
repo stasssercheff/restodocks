@@ -1609,6 +1609,13 @@
     "de": "Erste Schicht hinzufügen",
     "fr": "Ajouter le premier quart"
   },
+  "no_shifts": {
+    "ru": "Нет смен",
+    "en": "No shifts",
+    "es": "Sin turnos",
+    "de": "Keine Schichten",
+    "fr": "Aucun quart"
+  },
   "unknown": {
     "ru": "Неизвестно",
     "en": "Unknown",

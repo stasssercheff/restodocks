@@ -22,9 +22,7 @@ struct HotKitchenTTKView: View {
             }
             Section(header: Text(lang.t("tech_cards"))) {
                 ForEach(demoCards) { card in
-                    NavigationLink {
-                        TTKCardView(card: card)
-                    } label: {
+                    NavigationLink(value: card.id) {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(card.localizedDishName)
@@ -37,6 +35,11 @@ struct HotKitchenTTKView: View {
                         }
                     }
                 }
+            }
+        }
+        .navigationDestination(for: UUID.self) { cardId in
+            if let card = demoCards.first(where: { $0.id == cardId }) {
+                TTKCardView(card: card)
             }
         }
         .navigationTitle(lang.t("ttk"))
