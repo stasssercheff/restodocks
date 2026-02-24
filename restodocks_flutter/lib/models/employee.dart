@@ -330,8 +330,8 @@ class Employee extends Equatable {
         return currency; // Возвращаем код валюты если символ неизвестен
     }
   }
-    return department;
-  }
+
+  /// Отображаемое имя отдела
 
   /// Отображаемое имя секции (если есть)
   String? get sectionDisplayName {
@@ -357,6 +357,7 @@ class Employee extends Equatable {
   List<Object?> get props => [
     id,
     fullName,
+    surname,
     email,
     password,
     department,
@@ -365,7 +366,9 @@ class Employee extends Equatable {
     establishmentId,
     personalPin,
     avatarUrl,
+    subscriptionPlan,
     preferredLanguage,
+    preferredCurrency,
     paymentType,
     ratePerShift,
     hourlyRate,
