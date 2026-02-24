@@ -78,13 +78,13 @@ struct KitchenScheduleView: View {
         Dictionary(grouping: filteredShifts) { Calendar.current.startOfDay(for: $0.date) }
     }
 
-    /// Диапазон дат для графика: всегда от 30 дней назад до 365 дней вперёд (график «бесконечный»)
+    /// Диапазон дат для графика: от 30 дней назад до конца текущего года (чтобы не подлагивало)
     private var scheduleDateRange: (start: Date, end: Date) {
         let cal = Calendar.current
         let today = cal.startOfDay(for: Date())
         let start = cal.date(byAdding: .day, value: -30, to: today)!
-        let end = cal.date(byAdding: .day, value: 365, to: today)!
-        return (start, end)
+        let endOfYear = cal.date(from: DateComponents(year: cal.component(.year, from: today), month: 12, day: 31))!
+        return (start, endOfYear)
     }
 
     /// Все даты от начала до конца диапазона (график «вечный»)
@@ -288,26 +288,29 @@ struct ShiftCard: View {
         .padding(.horizontal)
     }
 
+    @MainActor
     private func copySchedule(from copyRange: (Date, Date), to pasteRange: (Date, Date), for employee: Employee, department: String?) async {
         let calendar = Calendar.current
-        let copyDays = calendar.dateComponents([.day], from: copyRange.0, to: copyRange.1).day! + 1
-        let pasteDays = calendar.dateComponents([.day], from: pasteRange.0, to: pasteRange.1).day! + 1
+        let copyStart = calendar.startOfDay(for: copyRange.0)
+        let copyEnd = calendar.startOfDay(for: copyRange.1)
+        let pasteStart = calendar.startOfDay(for: pasteRange.0)
+        let pasteEnd = calendar.startOfDay(for: pasteRange.1)
 
-        var currentPasteDate = pasteRange.0
+        guard let copyDays = calendar.dateComponents([.day], from: copyStart, to: copyEnd).day.map({ $0 + 1 }),
+              let pasteDays = calendar.dateComponents([.day], from: pasteStart, to: pasteEnd).day.map({ $0 + 1 }),
+              copyDays > 0, pasteDays > 0 else { return }
 
         for pasteIndex in 0..<pasteDays {
-            // Циклически берём дату из копируемого диапазона
             let copyIndex = pasteIndex % copyDays
-            let sourceDate = calendar.date(byAdding: .day, value: copyIndex, to: copyRange.0)!
+            guard let sourceDate = calendar.date(byAdding: .day, value: copyIndex, to: copyStart),
+                  let currentPasteDate = calendar.date(byAdding: .day, value: pasteIndex, to: pasteStart) else { continue }
 
-            // Находим смены сотрудника на sourceDate
             let shiftsOnSourceDate = accounts.shifts.filter { shift in
                 calendar.isDate(shift.date, inSameDayAs: sourceDate) &&
                 shift.employeeId == employee.id &&
                 (department == nil || shift.department == department)
             }
 
-            // Удаляем существующие смены сотрудника на текущей дате вставки
             let existingShiftsOnPasteDate = accounts.shifts.filter { shift in
                 calendar.isDate(shift.date, inSameDayAs: currentPasteDate) &&
                 shift.employeeId == employee.id &&
@@ -317,20 +320,20 @@ struct ShiftCard: View {
                 await accounts.deleteShift(shift)
             }
 
-            // Копируем смены на новую дату
             for shift in shiftsOnSourceDate {
-                let newDate = calendar.date(byAdding: .day, value: pasteIndex, to: pasteRange.0)!
-                try? await accounts.createShift(
-                    employeeId: employee.id,
-                    date: newDate,
-                    department: shift.department,
-                    startHour: shift.startHour,
-                    endHour: shift.endHour,
-                    fullDay: shift.fullDay
-                )
+                do {
+                    try await accounts.createShift(
+                        employeeId: employee.id,
+                        date: currentPasteDate,
+                        department: shift.department,
+                        startHour: shift.startHour,
+                        endHour: shift.endHour,
+                        fullDay: shift.fullDay
+                    )
+                } catch {
+                    print("❌ Copy shift error:", error)
+                }
             }
-
-            currentPasteDate = calendar.date(byAdding: .day, value: 1, to: currentPasteDate)!
         }
     }
 }

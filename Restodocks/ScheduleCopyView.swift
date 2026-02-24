@@ -41,6 +41,7 @@ struct ScheduleCopyView: View {
 
                 Section(header: Text("Сотрудник")) {
                     Picker("Выберите сотрудника", selection: $selectedEmployee) {
+                        Text("—").tag(nil as Employee?)
                         ForEach(filteredEmployees) { employee in
                             Text(employee.fullName).tag(employee as Employee?)
                         }
@@ -51,12 +52,15 @@ struct ScheduleCopyView: View {
                     Button("Копировать график") {
                         guard let employee = selectedEmployee else { return }
                         isCopying = true
-                        Task {
-                            await onCopy((copyFromDate, copyToDate), (pasteFromDate, pasteToDate), employee)
-                            await MainActor.run {
-                                isCopying = false
-                                dismiss()
-                            }
+                        let cal = Calendar.current
+                        let copyFrom = cal.startOfDay(for: copyFromDate)
+                        let copyTo = cal.startOfDay(for: copyToDate)
+                        let pasteFrom = cal.startOfDay(for: pasteFromDate)
+                        let pasteTo = cal.startOfDay(for: pasteToDate)
+                        Task { @MainActor in
+                            await onCopy((copyFrom, copyTo), (pasteFrom, pasteTo), employee)
+                            isCopying = false
+                            dismiss()
                         }
                     }
                     .disabled(selectedEmployee == nil || isCopying)
