@@ -5,15 +5,16 @@ struct ScheduleCopyView: View {
     @Environment(\.dismiss) private var dismiss
 
     let department: String? // nil = все departments
-    let onCopy: ((Date, Date), (Date, Date), Employee) -> Void
+    let onCopy: ((Date, Date), (Date, Date), Employee) async -> Void
 
     @State private var copyFromDate = Date()
     @State private var copyToDate = Date()
     @State private var pasteFromDate = Date()
     @State private var pasteToDate = Date()
     @State private var selectedEmployee: Employee?
+    @State private var isCopying = false
 
-    init(department: String? = nil, onCopy: @escaping ((Date, Date), (Date, Date), Employee) -> Void) {
+    init(department: String? = nil, onCopy: @escaping ((Date, Date), (Date, Date), Employee) async -> Void) {
         self.department = department
         self.onCopy = onCopy
     }
@@ -49,10 +50,16 @@ struct ScheduleCopyView: View {
                 Section {
                     Button("Копировать график") {
                         guard let employee = selectedEmployee else { return }
-                        onCopy((copyFromDate, copyToDate), (pasteFromDate, pasteToDate), employee)
-                        dismiss()
+                        isCopying = true
+                        Task {
+                            await onCopy((copyFromDate, copyToDate), (pasteFromDate, pasteToDate), employee)
+                            await MainActor.run {
+                                isCopying = false
+                                dismiss()
+                            }
+                        }
                     }
-                    .disabled(selectedEmployee == nil)
+                    .disabled(selectedEmployee == nil || isCopying)
                 }
             }
             .navigationTitle("Копирование графика")

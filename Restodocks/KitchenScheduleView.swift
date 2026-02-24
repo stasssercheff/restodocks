@@ -78,22 +78,13 @@ struct KitchenScheduleView: View {
         Dictionary(grouping: filteredShifts) { Calendar.current.startOfDay(for: $0.date) }
     }
 
-    /// Диапазон дат для графика: от прошлого до года вперёд, без «конца вселенной»
+    /// Диапазон дат для графика: всегда от 30 дней назад до 365 дней вперёд (график «бесконечный»)
     private var scheduleDateRange: (start: Date, end: Date) {
         let cal = Calendar.current
         let today = cal.startOfDay(for: Date())
-        let past = cal.date(byAdding: .day, value: -30, to: today)!
-        let future = cal.date(byAdding: .day, value: 365, to: today)!
-        let withShifts = filteredShifts
-        let minShift = withShifts.map { cal.startOfDay(for: $0.date) }.min()
-        let maxShift = withShifts.map { cal.startOfDay(for: $0.date) }.max()
-        if let minS = minShift, let maxS = maxShift {
-            let start = min(minS, past)
-            let end = max(maxS, future)
-            return (start, end)
-        }
-        // Нет смен — показываем от сегодня до 90 дней вперёд
-        return (today, cal.date(byAdding: .day, value: 89, to: today)!)
+        let start = cal.date(byAdding: .day, value: -30, to: today)!
+        let end = cal.date(byAdding: .day, value: 365, to: today)!
+        return (start, end)
     }
 
     /// Все даты от начала до конца диапазона (график «вечный»)
@@ -165,10 +156,17 @@ struct KitchenScheduleView: View {
             .toolbar {
                 if appState.canManageSchedule {
                     ToolbarItem(placement: .navigationBarTrailing) {
-                        Button {
-                            showingAddShift = true
-                        } label: {
-                            Image(systemName: "plus")
+                        HStack(spacing: 16) {
+                            Button {
+                                showingCopyDialog = true
+                            } label: {
+                                Image(systemName: "doc.on.doc")
+                            }
+                            Button {
+                                showingAddShift = true
+                            } label: {
+                                Image(systemName: "plus")
+                            }
                         }
                     }
                 }
@@ -180,6 +178,7 @@ struct KitchenScheduleView: View {
                 ScheduleCopyView(department: department, onCopy: { copyRange, pasteRange, selectedEmployee in
                     Task {
                         await copySchedule(from: copyRange, to: pasteRange, for: selectedEmployee, department: department)
+                        await accounts.fetchShifts()
                     }
                 })
             }
@@ -227,7 +226,6 @@ struct DayScheduleCard: View {
 
 struct ShiftCard: View {
     @EnvironmentObject var lang: LocalizationManager
-    @EnvironmentObject var appState: AppState
     let shift: Shift
     let employeeName: String
     let employeePosition: String
@@ -251,11 +249,8 @@ struct ShiftCard: View {
     var timeString: String {
         if shift.fullDay {
             return lang.t("full_day_text")
-        } else if appState.showTimeInShifts {
-            return "\(shift.startHour):00 - \(shift.endHour):00"
-        } else {
-            return lang.t("смена")
         }
+        return "\(shift.startHour):00 - \(shift.endHour):00"
     }
 
     private func positionDisplayName(_ role: String) -> String {
