@@ -1774,21 +1774,16 @@ class _QtyCell extends StatefulWidget {
   State<_QtyCell> createState() => _QtyCellState();
 }
 
-class _QtyCellState extends State<_QtyCell> with AutomaticKeepAliveClientMixin {
+class _QtyCellState extends State<_QtyCell> {
   late TextEditingController _controller;
   final FocusNode _focus = FocusNode();
-  late double _currentValue;
-  bool _hasFocus = false;
+  bool _wasFocused = false;
 
-  @override
-  bool get wantKeepAlive => true;
-
-  double get _displayValueRaw => widget.useGrams ? _currentValue * 1000 : _currentValue;
+  double get _displayValueRaw => widget.useGrams ? widget.value * 1000 : widget.value;
 
   @override
   void initState() {
     super.initState();
-    _currentValue = widget.value;
     _controller = TextEditingController(text: _displayValue(_displayValueRaw));
     _focus.addListener(_onFocusChanged);
   }
@@ -1796,23 +1791,28 @@ class _QtyCellState extends State<_QtyCell> with AutomaticKeepAliveClientMixin {
   @override
   void didUpdateWidget(_QtyCell old) {
     super.didUpdateWidget(old);
-    if (old.value != widget.value && !_hasFocus) {
-      _currentValue = widget.value;
+    // Если виджет обновился и у нас был фокус, восстанавливаем его после перестроения
+    if (_wasFocused && !_focus.hasFocus) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _wasFocused) {
+          _focus.requestFocus();
+        }
+      });
+    }
+    // Обновляем текст только если значение изменилось извне
+    if (old.value != widget.value) {
       _controller.text = _displayValue(_displayValueRaw);
     }
   }
 
   void _onFocusChanged() {
-    _hasFocus = _focus.hasFocus;
-    if (!_hasFocus) {
-      // Когда фокус теряется, синхронизируем значение
-      final textValue = _controller.text;
-      final v = double.tryParse(textValue.replaceFirst(',', '.')) ?? 0;
-      final actualValue = widget.useGrams ? v / 1000 : v;
-      if (actualValue != _currentValue) {
-        _currentValue = actualValue;
-        widget.onChanged(actualValue);
-      }
+    _wasFocused = _focus.hasFocus;
+    if (!_focus.hasFocus) {
+      // При потере фокуса применяем изменения
+      final textValue = _controller.text.trim();
+      final parsedValue = double.tryParse(textValue.replaceFirst(',', '.')) ?? 0;
+      final actualValue = widget.useGrams ? parsedValue / 1000 : parsedValue;
+      widget.onChanged(actualValue);
     }
   }
 
@@ -1832,9 +1832,7 @@ class _QtyCellState extends State<_QtyCell> with AutomaticKeepAliveClientMixin {
 
   @override
   Widget build(BuildContext context) {
-    super.build(context); // Важно для AutomaticKeepAliveClientMixin
     final theme = Theme.of(context);
-
     return TextField(
       controller: _controller,
       focusNode: _focus,
@@ -1852,9 +1850,7 @@ class _QtyCellState extends State<_QtyCell> with AutomaticKeepAliveClientMixin {
         fillColor: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
       ),
       onChanged: (s) {
-        // Обновляем локальное значение без вызова callback
-        final v = double.tryParse(s.replaceFirst(',', '.')) ?? 0;
-        _currentValue = widget.useGrams ? v / 1000 : v;
+        // Не применяем изменения сразу, только при потере фокуса
       },
     );
   }
