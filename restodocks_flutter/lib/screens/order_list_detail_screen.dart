@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/models.dart';
-import '../services/order_document_service.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
 import '../widgets/order_export_sheet.dart';
@@ -196,6 +195,30 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
                   Text(
                     '${loc.t('order_list_supplier_name')}: ${list.supplierName}',
                     style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Text('${loc.t('order_export_order_for')}: ', style: Theme.of(context).textTheme.bodyMedium),
+                      TextButton(
+                        onPressed: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: list.orderForDate ?? DateTime.now().add(const Duration(days: 1)),
+                            firstDate: DateTime.now(),
+                            lastDate: DateTime.now().add(const Duration(days: 365)),
+                          );
+                          if (picked != null) {
+                            setState(() => _list = _list!.copyWith(orderForDate: picked));
+                          }
+                        },
+                        child: Text(
+                          list.orderForDate != null
+                              ? DateFormat('dd.MM.yyyy').format(list.orderForDate!)
+                              : '${loc.t('order_export_order_for')}...',
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 16),
                   Table(

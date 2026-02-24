@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
@@ -23,6 +24,7 @@ class _OrderListCreateScreenState extends State<OrderListCreateScreen> {
   final _telegramCtrl = TextEditingController();
   final _zaloCtrl = TextEditingController();
   final _whatsappCtrl = TextEditingController();
+  DateTime? _orderForDate;
 
   @override
   void dispose() {
@@ -54,6 +56,7 @@ class _OrderListCreateScreenState extends State<OrderListCreateScreen> {
       telegram: _telegramCtrl.text.trim().isEmpty ? null : _telegramCtrl.text.trim(),
       zalo: _zaloCtrl.text.trim().isEmpty ? null : _zaloCtrl.text.trim(),
       whatsapp: _whatsappCtrl.text.trim().isEmpty ? null : _whatsappCtrl.text.trim(),
+      orderForDate: _orderForDate,
     );
     context.push('/product-order/new/products', extra: draft);
   }
@@ -90,6 +93,24 @@ class _OrderListCreateScreenState extends State<OrderListCreateScreen> {
                 filled: true,
               ),
               textCapitalization: TextCapitalization.words,
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(child: Text(loc.t('order_export_order_for'))),
+                TextButton(
+                  onPressed: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: _orderForDate ?? DateTime.now().add(const Duration(days: 1)),
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                    );
+                    if (picked != null) setState(() => _orderForDate = picked);
+                  },
+                  child: Text(_orderForDate != null ? DateFormat('dd.MM.yyyy').format(_orderForDate!) : '...'),
+                ),
+              ],
             ),
             const SizedBox(height: 20),
             Text(
