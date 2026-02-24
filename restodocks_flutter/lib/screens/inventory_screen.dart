@@ -559,15 +559,15 @@ class _InventoryScreenState extends State<InventoryScreen>
     final row = _rows[rowIndex];
     if (colIndex < 0 || colIndex >= row.quantities.length) return;
 
-    setState(() {
-      // Обновляем значение
-      row.quantities[colIndex] = value;
+    // Обновляем значение напрямую (без setState для избежания потери фокуса)
+    row.quantities[colIndex] = value;
 
-      // Если это последняя ячейка и значение > 0, добавляем одну пустую ячейку для этой строки
-      if (colIndex == row.quantities.length - 1 && value > 0) {
+    // Если это последняя ячейка и значение > 0, добавляем новую ячейку для этой строки
+    if (colIndex == row.quantities.length - 1 && value > 0) {
+      setState(() {
         row.quantities.add(0.0);
-      }
-    });
+      });
+    }
 
     saveNow();
   }
@@ -1779,12 +1779,15 @@ class _QtyCellState extends State<_QtyCell> {
   late TextEditingController _controller;
   final FocusNode _focus = FocusNode();
   bool _wasFocused = false;
+  Timer? _updateTimer;
+  late double _currentValue;
 
   double get _displayValueRaw => widget.useGrams ? widget.value * 1000 : widget.value;
 
   @override
   void initState() {
     super.initState();
+    _currentValue = widget.value;
     _controller = TextEditingController(text: _displayValue(_displayValueRaw));
     _focus.addListener(_onFocusChanged);
   }
@@ -1798,6 +1801,7 @@ class _QtyCellState extends State<_QtyCell> {
     }
     // Обновляем текст только если значение изменилось извне
     if (old.value != widget.value) {
+      _currentValue = widget.value;
       _controller.text = _displayValue(_displayValueRaw);
     }
   }
@@ -1821,6 +1825,7 @@ class _QtyCellState extends State<_QtyCell> {
 
   @override
   void dispose() {
+    _updateTimer?.cancel();
     _focus.removeListener(_onFocusChanged);
     _controller.dispose();
     _focus.dispose();
@@ -1847,7 +1852,17 @@ class _QtyCellState extends State<_QtyCell> {
         fillColor: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
       ),
       onChanged: (s) {
-        // Не применяем изменения сразу, только при потере фокуса
+        // Обновляем значение в реальном времени для расчета итогов
+        final v = double.tryParse(s.replaceFirst(',', '.')) ?? 0;
+        final actualValue = widget.useGrams ? v / 1000 : v;
+
+        _currentValue = actualValue;
+
+        // Откладываем вызов callback для избежания слишком частых обновлений
+        _updateTimer?.cancel();
+        _updateTimer = Timer(const Duration(milliseconds: 300), () {
+          widget.onChanged(actualValue);
+        });
       },
     );
   }
