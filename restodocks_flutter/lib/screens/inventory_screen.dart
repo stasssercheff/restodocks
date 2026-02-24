@@ -84,6 +84,7 @@ class _InventoryRow {
       isWeightInKg ? quantities[i] * 1000 : quantities[i];
   double get totalDisplay => isWeightInKg ? total * 1000 : total;
 
+  /// Сумма всех числовых значений строки. Последняя ячейка — пустая для продолжения ввода, в итог не входит.
   double get total {
     if (quantities.isEmpty) return 0.0;
     if (quantities.length == 1) return quantities[0];
@@ -555,19 +556,29 @@ class _InventoryScreenState extends State<InventoryScreen>
     saveNow(); // Сохранить немедленно при добавлении продукта
   }
 
+  /// Обновление значения ячейки. При вводе в последнюю ячейку — добавляется новая пустая (n+1).
+  /// Добавление откладывается на следующий кадр, чтобы не терять фокус ввода.
   void _setQuantity(int rowIndex, int colIndex, double value) {
     if (rowIndex < 0 || rowIndex >= _rows.length) return;
     final row = _rows[rowIndex];
     if (colIndex < 0 || colIndex >= row.quantities.length) return;
 
+    final isLastCell = colIndex == row.quantities.length - 1;
+
     setState(() {
       row.quantities[colIndex] = value;
-      if (colIndex == row.quantities.length - 1) {
-        row.quantities.add(0.0);
-      }
     });
-
     saveNow();
+
+    if (isLastCell) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() {
+          row.quantities.add(0.0);
+        });
+        saveNow();
+      });
+    }
   }
 
   void _removeRow(int index) {
