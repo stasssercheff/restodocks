@@ -1,7 +1,7 @@
 /**
- * Общий слой вызова ИИ. Поддерживаются: GigaChat, OpenAI, Google Gemini, Anthropic Claude.
+ * Общий слой вызова ИИ. Поддерживаются: Google Gemini, GigaChat, OpenAI.
  * Переменные:
- * - AI_PROVIDER = "gigachat" | "openai" | "gemini" | "claude" — явный выбор; иначе по приоритету ключей
+ * - AI_PROVIDER = "gemini" | "gigachat" | "openai" — явный выбор; иначе по приоритету ключей
  * - GIGACHAT_AUTH_KEY = Base64(ClientID:ClientSecret) — GigaChat (бесплатный лимит для физлиц)
  * - OPENAI_API_KEY — OpenAI (фото + текст)
  * - GEMINI_API_KEY — Google AI Studio, бесплатный tier (aistudio.google.com)
@@ -46,13 +46,13 @@ async function getGigaChatToken(authKey: string): Promise<string> {
 
 export type TextProvider = "gigachat" | "openai" | "gemini" | "claude";
 
-/** Определяет провайдера: AI_PROVIDER или по приоритету ключей (gigachat → gemini → claude → openai) */
+/** Определяет провайдера: AI_PROVIDER или по приоритету ключей (gemini → gigachat → openai) */
 export function getProvider(): TextProvider {
   const forced = Deno.env.get("AI_PROVIDER")?.toLowerCase();
   if (forced === "openai" || forced === "gigachat" || forced === "gemini" || forced === "claude") return forced;
-  if (Deno.env.get("GIGACHAT_AUTH_KEY")?.trim()) return "gigachat";
   if (Deno.env.get("GEMINI_API_KEY")?.trim()) return "gemini";
-  if (Deno.env.get("ANTHROPIC_API_KEY")?.trim()) return "claude";
+  if (Deno.env.get("GIGACHAT_AUTH_KEY")?.trim()) return "gigachat";
+  if (Deno.env.get("OPENAI_API_KEY")?.trim()) return "openai";
   return "openai";
 }
 
