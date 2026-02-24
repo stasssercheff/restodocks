@@ -91,16 +91,53 @@ class OrderExportSheet extends StatelessWidget {
   }
 
   Future<void> _sendEmail(BuildContext context) async {
+    final to = list.email!.trim();
     final content = _buildText();
     final subject = '${_t('product_order')}: ${list.name}';
-    final url = OrderListExportService.mailToUrl(list.email!, subject, content);
-    if (url != null) {
-      final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri);
-      }
-      if (context.mounted) Navigator.of(context).pop();
+    final htmlBody = '<pre style="font-family: sans-serif; white-space: pre-wrap;">${_escapeHtml(content)}</pre>';
+    final dateStr = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
+    final pdfFileName = 'order_${list.name.replaceAll(RegExp(r'[^\w\-.\s]'), '_')}_$dateStr.pdf';
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_t('sending'))),
+      );
     }
+
+    final pdfBytes = await OrderListExportService.buildOrderPdfBytes(
+      list: list,
+      companyName: companyName,
+      itemsWithQuantities: _items,
+      lang: loc.currentLanguageCode,
+      documentDate: DateTime.now(),
+      t: _t,
+    );
+
+    final result = await EmailService().sendOrderEmail(
+      to: to,
+      subject: subject,
+      html: htmlBody,
+      pdfBytes: pdfBytes,
+      pdfFileName: pdfFileName,
+    );
+
+    if (!context.mounted) return;
+    Navigator.of(context).pop();
+    if (result.ok) {
+      onSaved(_t('order_export_email_sent'));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${_t('error_short')}: ${result.error}')),
+      );
+    }
+  }
+
+  static String _escapeHtml(String s) {
+    return s
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;');
   }
 
   Future<void> _sendWhatsApp(BuildContext context) async {

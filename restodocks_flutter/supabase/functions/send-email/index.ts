@@ -10,6 +10,8 @@ interface EmailRequest {
   to: string
   subject: string
   html: string
+  /** Optional: attachments as base64. Resend expects content as base64 string or buffer. */
+  attachments?: Array<{ filename: string; content: string }>
 }
 
 serve(async (req) => {
@@ -21,14 +23,25 @@ serve(async (req) => {
   try {
     const resend = new Resend(Deno.env.get('RESEND_API_KEY'))
 
-    const { to, subject, html }: EmailRequest = await req.json()
+    const { to, subject, html, attachments }: EmailRequest = await req.json()
 
-    const { data, error } = await resend.emails.send({
-      from: 'Restodocks <noreply@restodocks.com>',
+    const payload: {
+      from: string
+      to: string[]
+      subject: string
+      html: string
+      attachments?: Array<{ filename: string; content: string }>
+    } = {
+      from: Deno.env.get('RESEND_FROM_EMAIL')?.trim() || 'Restodocks <noreply@restodocks.com>',
       to: [to],
       subject: subject,
       html: html,
-    })
+    }
+    if (attachments?.length) {
+      payload.attachments = attachments.map((a) => ({ filename: a.filename, content: a.content }))
+    }
+
+    const { data, error } = await resend.emails.send(payload)
 
     if (error) {
       console.error('Resend error:', error)

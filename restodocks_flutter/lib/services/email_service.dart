@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Сервис отправки писем через Edge Functions (Resend).
@@ -62,6 +64,40 @@ class EmailService {
         'reset-password',
         body: {'token': token, 'password': newPassword},
       );
+      if (res.status == 200) {
+        return (ok: true, error: null);
+      }
+      final msg = (res.data as Map?)?['error']?.toString() ?? 'Unknown error';
+      return (ok: false, error: msg);
+    } catch (e) {
+      return (ok: false, error: e.toString());
+    }
+  }
+
+  /// Отправить заказ продуктов на email через Resend (с вложением PDF).
+  /// [pdfBytes] — сгенерированный PDF заказа (если null, письмо уходит только с html).
+  Future<({bool ok, String? error})> sendOrderEmail({
+    required String to,
+    required String subject,
+    required String html,
+    List<int>? pdfBytes,
+    String pdfFileName = 'order.pdf',
+  }) async {
+    try {
+      final body = <String, dynamic>{
+        'to': to.trim(),
+        'subject': subject,
+        'html': html,
+      };
+      if (pdfBytes != null && pdfBytes.isNotEmpty) {
+        body['attachments'] = [
+          {
+            'filename': pdfFileName,
+            'content': base64Encode(pdfBytes),
+          },
+        ];
+      }
+      final res = await _client.functions.invoke('send-email', body: body);
       if (res.status == 200) {
         return (ok: true, error: null);
       }
