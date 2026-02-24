@@ -374,16 +374,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
       'CNY': '¥ Китайский юань',
     };
 
+    final localization = context.read<LocalizationService>();
+
     String? selectedCurrency = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Выберите валюту'),
+        title: Text(localization.t('select_currency')),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: currencies.entries.map((entry) {
               return RadioListTile<String>(
-                title: Text(entry.value),
+                title: Text(localization.t('currency_${entry.key.toLowerCase()}') ?? entry.value),
                 value: entry.key,
                 groupValue: currentEmployee.currency,
                 onChanged: (value) => Navigator.of(context).pop(value),
@@ -394,7 +396,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Отмена'),
+            child: Text(localization.t('cancel')),
           ),
         ],
       ),
@@ -405,9 +407,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final updatedEmployee = currentEmployee.copyWith(preferredCurrency: selectedCurrency);
         await accountManager.updateEmployee(updatedEmployee);
         setState(() {}); // Обновить UI
+        final localization = context.read<LocalizationService>();
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Валюта изменена на ${currencies[selectedCurrency]}')),
+            SnackBar(content: Text('${localization.t('currency_changed')} ${localization.t('currency_${selectedCurrency!.toLowerCase()}') ?? currencies[selectedCurrency]}')),
           );
         }
       } catch (e) {
