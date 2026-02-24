@@ -10,6 +10,7 @@ import '../models/models.dart';
 import '../services/inventory_download.dart';
 import '../services/order_document_service.dart';
 import '../services/services.dart';
+import '../widgets/app_bar_home_button.dart';
 
 /// Просмотр/редактирование списка заказа: наименование, единица (редактируемая), количество. Комментарий. Сохранить список / Отправить (сохранить на устройство).
 class OrderListDetailScreen extends StatefulWidget {
@@ -218,13 +219,21 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
     final lang = loc.currentLanguageCode;
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()), title: Text(loc.t('product_order'))),
+        appBar: AppBar(
+          leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+          title: Text(loc.t('product_order')),
+          actions: [appBarHomeButton(context)],
+        ),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
     if (_list == null) {
       return Scaffold(
-        appBar: AppBar(leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()), title: Text(loc.t('product_order'))),
+        appBar: AppBar(
+          leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+          title: Text(loc.t('product_order')),
+          actions: [appBarHomeButton(context)],
+        ),
         body: const Center(child: Text('Список не найден')),
       );
     }

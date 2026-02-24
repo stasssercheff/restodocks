@@ -12,6 +12,7 @@ import '../services/localization_service.dart';
 import '../services/account_manager_supabase.dart';
 import '../services/tech_card_service_supabase.dart';
 import '../services/ai_service_supabase.dart';
+import '../widgets/app_bar_home_button.dart';
 
 /// Экран базы продуктов: просмотр и управление продуктами с КБЖУ
 /// Поддерживает интеллектуальный импорт и защиту от удаления используемых продуктов
@@ -686,6 +687,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
         ),
         title: Text(loc.t('products')),
         actions: [
+          appBarHomeButton(context),
           // 1. Количество
           Center(
             child: Container(

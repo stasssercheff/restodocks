@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../models/models.dart';
 import '../services/countries_cities_data.dart';
 import '../services/services.dart';
+import '../widgets/app_bar_home_button.dart';
 
 /// Регистрация компании: язык, название, страна/город (выпадающие с поиском), PIN автоген + копирование.
 class CompanyRegistrationScreen extends StatefulWidget {
@@ -136,6 +137,7 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
         ),
         title: Text(loc.t('register_company')),
         actions: [
+          appBarHomeButton(context),
           // Кнопка очистки тестовых данных (только для разработки)
           IconButton(
             icon: const Icon(Icons.cleaning_services),

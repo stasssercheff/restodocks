@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../services/inventory_download.dart';
 import '../services/services.dart';
+import '../widgets/app_bar_home_button.dart';
 
 /// Полученные и отправленные заказы продуктов: просмотр и скачивание.
 class ProductOrderReceivedScreen extends StatefulWidget {
@@ -79,11 +80,7 @@ class _ProductOrderReceivedScreenState extends State<ProductOrderReceivedScreen>
             onPressed: _loading ? null : _load,
             tooltip: loc.t('refresh'),
           ),
-          IconButton(
-            icon: const Icon(Icons.home),
-            onPressed: () => context.go('/home'),
-            tooltip: loc.t('home'),
-          ),
+          appBarHomeButton(context),
         ],
       ),
       body: _buildBody(loc, establishmentName),

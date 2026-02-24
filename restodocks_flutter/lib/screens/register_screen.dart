@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../core/config/roles_config.dart';
 import '../services/services.dart';
+import '../widgets/app_bar_home_button.dart';
 
 /// Регистрация сотрудника: имя, фамилия (pro), почта, пароль, PIN, подразделение → цех → должность.
 class RegisterScreen extends StatefulWidget {
@@ -186,13 +187,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           onPressed: () => context.pop(),
         ),
         title: Text(loc.t('register_employee')),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.home),
-            onPressed: () => context.go('/home'),
-            tooltip: loc.t('home'),
-          ),
-        ],
+        actions: [appBarHomeButton(context)],
       ),
       body: SafeArea(
         child: SingleChildScrollView(

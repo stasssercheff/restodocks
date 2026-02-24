@@ -6,6 +6,7 @@ import '../models/models.dart';
 import '../services/services.dart';
 import '../mixins/auto_save_mixin.dart';
 import '../mixins/input_change_listener_mixin.dart';
+import '../widgets/app_bar_home_button.dart';
 
 /// Редактирование чеклиста-шаблона. Сохранить, создать по аналогии, удалить.
 class ChecklistEditScreen extends StatefulWidget {
@@ -267,6 +268,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
         appBar: AppBar(
           leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
           title: Text(loc.t('checklists')),
+          actions: [appBarHomeButton(context)],
         ),
         body: const Center(child: CircularProgressIndicator()),
       );
@@ -276,6 +278,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
         appBar: AppBar(
           leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
           title: Text(loc.t('checklists')),
+          actions: [appBarHomeButton(context)],
         ),
         body: Center(
           child: Padding(

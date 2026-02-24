@@ -451,9 +451,10 @@ class _InventoryScreenState extends State<InventoryScreen>
     }
   }
 
+  /// Минимум 2 пустых ячейки при открытии. При заполнении последней — добавляется ещё одна.
   int get _maxQuantityColumns {
-    if (_rows.isEmpty) return 1;
-    return _rows.map((r) => r.quantities.length).reduce((a, b) => a > b ? a : b);
+    if (_rows.isEmpty) return 2;
+    return _rows.map((r) => r.quantities.length).fold<int>(2, (a, b) => a > b ? a : b);
   }
 
   void _addQuantityToRow(int rowIndex) {
@@ -558,23 +559,19 @@ class _InventoryScreenState extends State<InventoryScreen>
     final row = _rows[rowIndex];
     if (colIndex < 0 || colIndex >= row.quantities.length) return;
 
-    // Запоминаем предыдущее значение
-    final previousValue = row.quantities[colIndex];
-
     setState(() {
       row.quantities[colIndex] = value;
 
-      // Если начали заполнять вторую колонку (индекс 1), добавляем третью
+      // При заполнении 2-й ячейки (индекс 1) — сразу добавляем пустую справа
       if (!row.isFree && colIndex == 1 && row.quantities.length <= 2) {
         row.quantities.add(0.0);
       }
-      // Если заполнили последнюю ячейку, добавляем новую пустую
+      // При заполнении последней ячейки — добавляем ещё одну пустую справа (всегда крайняя пустая)
       else if (!row.isFree && colIndex == row.quantities.length - 1) {
         row.quantities.add(0.0);
       }
     });
 
-    // НЕМЕДЛЕННОЕ СОХРАНЕНИЕ при любом изменении количества
     saveNow();
   }
 
@@ -1347,13 +1344,15 @@ class _InventoryScreenState extends State<InventoryScreen>
   static const double _colQtyWidth = 64;
   static const double _colGap = 10;
 
+  /// Ширина фиксированной части: #, Наименование, Мера, Итого (продукт зафиксирован слева).
   double _leftWidth(BuildContext context) {
     final w = MediaQuery.of(context).size.width;
-    return (w * 0.42).clamp(140.0, 200.0);
+    final base = (w * 0.42).clamp(140.0, 200.0);
+    return base + _colGap + _colTotalWidth;
   }
 
   double _colNameWidth(BuildContext context) =>
-      _leftWidth(context) - _colNoWidth - _colUnitWidth;
+      _leftWidth(context) - _colNoWidth - _colGap - _colUnitWidth - _colGap - _colTotalWidth;
 
   Widget _buildTable(LocalizationService loc) {
     if (_rows.isEmpty) {
@@ -1383,7 +1382,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     }
     final leftW = _leftWidth(context);
     final screenW = MediaQuery.of(context).size.width;
-    final rightW = _colTotalWidth + _colGap + _maxQuantityColumns * (_colQtyWidth + _colGap) + 48;
+    final rightW = _maxQuantityColumns * (_colQtyWidth + _colGap) + 48;
     final totalW = (leftW + rightW).clamp(screenW, double.infinity);
     // Use fixed column layout when there are many quantity columns or screen is narrow
     // Добавляем плавный transition при переключении режимов
@@ -1539,8 +1538,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     final row = _rows[actualIndex];
     final nameW = _colNameWidth(context);
     final maxCols = _maxQuantityColumns;
-    // Всегда показываем минимум 2 колонки, и добавляем +1 если пользователь заполнил вторую колонку
-    final qtyCols = row.quantities.length + (row.quantities.length >= 2 && row.quantities[1] > 0 ? 1 : 0);
+    final qtyCols = row.quantities.length;
     return InkWell(
       onLongPress: () {
         if (_completed) return;
@@ -1635,7 +1633,7 @@ class _InventoryScreenState extends State<InventoryScreen>
   Widget _buildTableWithFixedColumn(LocalizationService loc) {
     final leftW = _leftWidth(context);
     final screenW = MediaQuery.of(context).size.width;
-    final rightW = _colTotalWidth + _colGap + _maxQuantityColumns * (_colQtyWidth + _colGap) + 48;
+    final rightW = _maxQuantityColumns * (_colQtyWidth + _colGap) + 48;
 
     return Column(
       children: [
@@ -1754,6 +1752,8 @@ class _InventoryScreenState extends State<InventoryScreen>
           SizedBox(width: _colNameWidth(context), child: Text(loc.t('inventory_item_name'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
           SizedBox(width: _colGap),
           SizedBox(width: _colUnitWidth, child: Text(loc.t('inventory_unit'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+          SizedBox(width: _colGap),
+          SizedBox(width: _colTotalWidth, child: Text(loc.t('inventory_total'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
         ],
       ),
     );
@@ -1771,8 +1771,6 @@ class _InventoryScreenState extends State<InventoryScreen>
       ),
       child: Row(
         children: [
-          SizedBox(width: _colTotalWidth, child: Text(loc.t('inventory_total'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
-          SizedBox(width: _colGap),
           ...List.generate(
             maxCols,
             (colIndex) => Padding(
@@ -1839,6 +1837,12 @@ class _InventoryScreenState extends State<InventoryScreen>
                       ))
                 : Text(row.unitDisplayForBlank(loc.currentLanguageCode), style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant), overflow: TextOverflow.ellipsis),
           ),
+          SizedBox(width: _colGap),
+          Container(
+            width: _colTotalWidth,
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(_formatQty(row.totalDisplay), style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+          ),
         ],
       ),
     );
@@ -1854,15 +1858,10 @@ class _InventoryScreenState extends State<InventoryScreen>
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
+        border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
       ),
       child: Row(
         children: [
-          Container(
-            width: _colTotalWidth,
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Text(_formatQty(row.totalDisplay), style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
-          ),
-          SizedBox(width: _colGap),
           ...List.generate(
             maxCols,
             (colIndex) => Padding(

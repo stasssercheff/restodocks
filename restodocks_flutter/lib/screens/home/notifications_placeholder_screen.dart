@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../services/services.dart';
+import '../../widgets/app_bar_home_button.dart';
 
 /// Экран уведомлений с историей заказов и инвентаризаций
 class NotificationsScreen extends StatefulWidget {
@@ -48,11 +49,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
             onPressed: _showDateFilter,
             tooltip: 'Фильтр по датам',
           ),
-          IconButton(
-            icon: const Icon(Icons.home),
-            onPressed: () => context.go('/home'),
-            tooltip: loc.t('home'),
-          ),
+          appBarHomeButton(context),
         ],
         bottom: TabBar(
           controller: _tabController,

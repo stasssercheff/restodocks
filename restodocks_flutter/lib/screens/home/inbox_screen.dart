@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../services/services.dart';
 import '../../models/models.dart';
 import '../../services/inbox_service.dart';
+import '../../widgets/app_bar_home_button.dart';
 
 import '../../services/services.dart';
 import '../../models/models.dart';
@@ -82,11 +83,7 @@ class _InboxScreenState extends State<InboxScreen> {
             onPressed: _loadDocuments,
             tooltip: 'Обновить',
           ),
-          IconButton(
-            icon: const Icon(Icons.home),
-            onPressed: () => context.go('/home'),
-            tooltip: loc.t('home'),
-          ),
+          appBarHomeButton(context),
         ],
       ),
       body: Column(

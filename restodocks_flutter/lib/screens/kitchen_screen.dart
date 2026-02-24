@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../services/services.dart';
 import '../models/models.dart';
+import '../services/services.dart';
+import '../widgets/app_bar_home_button.dart';
 import '../widgets/widgets.dart';
 
 /// Экран кухни
@@ -29,6 +30,7 @@ class _KitchenScreenState extends State<KitchenScreen> {
       appBar: AppBar(
         title: Text(localization.t('kitchen')),
         actions: [
+          appBarHomeButton(context),
           if (currentEmployee.canEditChecklistsAndTechCards)
             IconButton(
               icon: const Icon(Icons.add),

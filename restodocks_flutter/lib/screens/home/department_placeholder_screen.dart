@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../services/services.dart';
+import '../../widgets/app_bar_home_button.dart';
 
 /// Заглушка раздела подразделения (кухня/бар/зал/менеджмент).
 class DepartmentPlaceholderScreen extends StatelessWidget {
@@ -22,13 +23,7 @@ class DepartmentPlaceholderScreen extends StatelessWidget {
           onPressed: () => context.pop(),
         ),
         title: Text(label),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.home),
-            onPressed: () => context.go('/home'),
-            tooltip: loc.t('home'),
-          ),
-        ],
+        actions: [appBarHomeButton(context)],
       ),
       body: Center(
         child: Column(

@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../services/inventory_download.dart';
 import '../services/services.dart';
+import '../widgets/app_bar_home_button.dart';
 
 /// Кабинет шеф-повара: полученные документы инвентаризации.
 class InventoryReceivedScreen extends StatefulWidget {
@@ -64,6 +65,7 @@ class _InventoryReceivedScreenState extends State<InventoryReceivedScreen> {
             onPressed: _loading ? null : _load,
             tooltip: loc.t('refresh'),
           ),
+          appBarHomeButton(context),
         ],
       ),
       body: _buildBody(loc),
@@ -290,6 +292,7 @@ class _InventoryDocumentDetailScreen extends StatelessWidget {
             tooltip: loc.t('download') ?? 'Скачать',
             onPressed: () => _download(context),
           ),
+          appBarHomeButton(context),
         ],
       ),
       body: SingleChildScrollView(

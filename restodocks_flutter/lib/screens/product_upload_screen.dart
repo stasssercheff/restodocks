@@ -94,6 +94,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
         ),
+        actions: [appBarHomeButton(context)],
       ),
       body: Center(
         child: Column(

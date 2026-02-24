@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../services/services.dart';
+import '../../widgets/app_bar_home_button.dart';
 
 /// График: минимально по должностям (без имён). Позже — даты, смены, данные из БД.
 class SchedulePlaceholderScreen extends StatelessWidget {
@@ -41,13 +42,7 @@ class SchedulePlaceholderScreen extends StatelessWidget {
           onPressed: () => context.pop(),
         ),
         title: Text(loc.t('schedule')),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.home),
-            onPressed: () => context.go('/home'),
-            tooltip: loc.t('home'),
-          ),
-        ],
+        actions: [appBarHomeButton(context)],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),

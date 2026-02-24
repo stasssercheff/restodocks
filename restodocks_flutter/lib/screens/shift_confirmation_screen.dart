@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../models/models.dart';
 import '../services/schedule_storage_service.dart';
 import '../services/services.dart';
+import '../widgets/app_bar_home_button.dart';
 
 /// Подтверждение присутствия на смене: сегодня (или выбранная дата) — список людей по графику, галочки «присутствовал».
 /// Доступно шефу и су-шефу.
@@ -100,6 +101,7 @@ class _ShiftConfirmationScreenState extends State<ShiftConfirmationScreen> {
         appBar: AppBar(
           leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
           title: Text(loc.t('shift_confirmation') ?? 'Подтверждение смены'),
+          actions: [appBarHomeButton(context)],
         ),
         body: Center(
           child: Padding(
@@ -123,7 +125,11 @@ class _ShiftConfirmationScreenState extends State<ShiftConfirmationScreen> {
 
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()), title: Text(loc.t('shift_confirmation') ?? 'Подтверждение смены')),
+        appBar: AppBar(
+          leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+          title: Text(loc.t('shift_confirmation') ?? 'Подтверждение смены'),
+          actions: [appBarHomeButton(context)],
+        ),
         body: const Center(child: CircularProgressIndicator()),
       );
     }

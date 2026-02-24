@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../models/models.dart';
 import '../services/inventory_download.dart';
 import '../services/services.dart';
+import '../widgets/app_bar_home_button.dart';
 
 /// Строка: полуфабрикат (ТТК) + количество порций
 class _PfRow {
@@ -310,6 +311,7 @@ class _InventoryPfScreenState extends State<InventoryPfScreen> {
       appBar: AppBar(
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
         title: Text(loc.t('inventory_pf_title')),
+        actions: [appBarHomeButton(context)],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())

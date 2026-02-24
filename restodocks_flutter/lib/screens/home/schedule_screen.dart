@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 import '../../models/models.dart';
 import '../../services/schedule_storage_service.dart';
 import '../../services/services.dart';
+import '../../widgets/app_bar_home_button.dart';
 
 /// График: слоты (должности/имена) задаются вручную, можно выбрать сотрудника из списка или вписать имя.
 /// Один график на заведение, прокрутка по неделям (неделя влезает на экран, ограничений нет).
@@ -490,7 +491,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(title: Text(loc.t('schedule'))),
+        appBar: AppBar(
+          title: Text(loc.t('schedule')),
+          actions: [appBarHomeButton(context)],
+        ),
         body: const Center(child: CircularProgressIndicator()),
       );
     }

@@ -75,7 +75,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _getRoleDisplayName(EmployeeRole? role, LocalizationService loc) => _getPositionDisplayName(role?.code, loc);
 
   String _getPositionDisplayName(String? code, LocalizationService loc) {
-    if (code == null || code.isEmpty) return loc.t('owner_only');
+    if (code == null || code.isEmpty) return loc.t('no_position');
     switch (code) {
       case 'executive_chef': return loc.t('executive_chef');
       case 'sous_chef': return loc.t('sous_chef');
@@ -253,10 +253,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ).then((_) => codeController.dispose());
   }
 
-  /// Выбор должности (owner — дополнительная роль, не должность)
+  /// Выбор должности (owner — дополнительная роль, не должность; «Без должности» = только собственник)
   void _showPositionPicker(BuildContext context, LocalizationService loc, Employee currentEmployee, AccountManagerSupabase accountManager) {
     final availablePositions = [
-      {'code': null, 'name': loc.t('owner_only')},
+      {'code': null, 'name': loc.t('no_position')},
       {'code': 'executive_chef', 'name': loc.t('executive_chef')},
       {'code': 'sous_chef', 'name': loc.t('sous_chef')},
       {'code': 'bartender', 'name': loc.t('bartender')},
@@ -601,17 +601,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onTap: () => _showHomeButtonPicker(context, localization, homeBtn),
                 ),
               ),
-              // Переключатель: интерфейс собственника ↔ должность (если есть должность)
-              if (currentEmployee.positionRole != null)
-                Consumer<OwnerViewPreferenceService>(
-                  builder: (_, pref, __) => SwitchListTile(
-                    secondary: const Icon(Icons.swap_horiz),
-                    title: Text(localization.t('owner_view_mode')),
-                    subtitle: Text(pref.viewAsOwner ? localization.t('owner') : _getPositionDisplayName(currentEmployee.positionRole, localization)),
-                    value: pref.viewAsOwner,
-                    onChanged: (v) => pref.setViewAsOwner(v),
-                  ),
-                ),
+              // 1. Должность — добавляемая должность для собственника (не «собственник»)
               ListTile(
                 leading: const Icon(Icons.work),
                 title: Text(localization.t('position')),
@@ -619,6 +609,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => _showPositionPicker(context, localization, currentEmployee, accountManager),
               ),
+              // 2. Выбор роли — переключение интерфейса (собственник ↔ должность), только если есть должность
+              if (currentEmployee.positionRole != null)
+                Consumer<OwnerViewPreferenceService>(
+                  builder: (_, pref, __) => SwitchListTile(
+                    secondary: const Icon(Icons.swap_horiz),
+                    title: Text(localization.t('role_selection')),
+                    subtitle: Text(pref.viewAsOwner ? localization.t('owner') : _getPositionDisplayName(currentEmployee.positionRole, localization)),
+                    value: pref.viewAsOwner,
+                    onChanged: (v) => pref.setViewAsOwner(v),
+                  ),
+                ),
               ListTile(
                 leading: const Icon(Icons.person_add),
                 title: Text(localization.t('invite_co_owner')),

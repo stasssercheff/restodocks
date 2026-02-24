@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../models/models.dart';
 import '../services/services.dart';
+import '../widgets/app_bar_home_button.dart';
 
 /// Экран принятия приглашения соучредителем
 class AcceptCoOwnerInvitationScreen extends StatefulWidget {
@@ -120,7 +121,10 @@ class _AcceptCoOwnerInvitationScreenState extends State<AcceptCoOwnerInvitationS
 
     if (_error != null) {
       return Scaffold(
-        appBar: AppBar(title: Text(loc.t('invitation'))),
+        appBar: AppBar(
+          title: Text(loc.t('invitation')),
+          actions: [appBarHomeButton(context)],
+        ),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
