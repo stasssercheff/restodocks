@@ -38,8 +38,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
 
-    // Рассчитываем зарплату только если у сотрудника есть должность
-    if (employee.hasRole('owner') && employee.jobPosition == null) {
+    // Рассчитываем зарплату только если у сотрудника есть должность (не владелец без роли)
+    if (employee.hasRole('owner') && employee.roles.length <= 1) {
       setState(() => _loadingSalary = false);
       return;
     }
@@ -97,7 +97,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     final isOwner = currentEmployee.hasRole('owner');
-    final hasPosition = currentEmployee.jobPosition != null;
+    final hasPosition = !currentEmployee.hasRole('owner') || currentEmployee.roles.length > 1;
 
     return Scaffold(
       appBar: AppBar(
@@ -200,14 +200,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
 
             // Должность
-            if (employee.jobPosition != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                employee.jobPosition!,
-                style: const TextStyle(fontSize: 16, color: Colors.grey),
-                textAlign: TextAlign.center,
-              ),
-            ],
+            const SizedBox(height: 8),
+            Text(
+              employee.roleDisplayName,
+              style: const TextStyle(fontSize: 16, color: Colors.grey),
+              textAlign: TextAlign.center,
+            ),
 
             // Email
             const SizedBox(height: 8),
