@@ -29,7 +29,7 @@ OUTPUT: JSON array of objects, each with:
 RULES:
 - Infer columns by content meaning. Product names can be in any column.
 - Extract and normalize product names: fix ALL typos (grammatical and semantic)
-- Fix typos: "картофан" -> "Картофель", "помидор" -> "Томат", "лук" -> "Лук репчатый"
+- Fix typos: "картофан" -> "Картофель", "помидор" -> "Томат", "лук" -> "Лук репчатый", "Авокало" -> "Авокадо", "Анчоусм" -> "Анчоусы", "АпельсмН" -> "Апельсин"
 - Use standard culinary terminology, correct spelling
 - Handle various price formats: "50р", "50 руб", "50.5", "50,5"
 - Analyze prices: detect currency, validate reasonableness

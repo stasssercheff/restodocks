@@ -14,6 +14,7 @@ const SYSTEM_PROMPT = `You are a product name normalizer for a restaurant. Given
 
 RULES:
 - Fix typos: "картофан" -> "Картофель", "помидор" -> "Томат", "лук репка" -> "Лук репчатый", "морков" -> "Морковь"
+- Fix common misspellings: "Авокало" -> "Авокадо", "Анчоусм" -> "Анчоусы", "АпельсмН" -> "Апельсин"
 - Handle colloquial names: "болгарка" -> "Перец сладкий", "батат" -> "Сладкий картофель", "зелень" -> "Зелень свежая"
 - Expand abbreviations: "л. репч." -> "Лук репчатый", "пом." -> "Помидоры", "карт." -> "Картофель"
 - Remove extra words: "(заказ)", "кг", "шт", "упаковка", "пачка" if redundant

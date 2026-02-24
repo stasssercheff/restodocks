@@ -428,15 +428,16 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     }
     if (name.endsWith('.rtf')) {
       final rtfContent = utf8.decode(bytes, allowMalformed: true);
-      final rows = _extractRowsFromRtf(rtfContent);
+      List<String> rows = _extractRowsFromRtf(rtfContent);
       _addDebugLog('RTF processing: extracted ${rows.length} rows');
       for (var i = 0; i < min(5, rows.length); i++) {
         _addDebugLog('RTF row $i: "${rows[i]}"');
       }
-
-      // Если RTF обработка не дала результатов, вернем то что есть
-      // AI обработка будет выполнена позже в вызывающем коде
-
+      // Если одна длинная строка (всё в кучу) — разбить по табу/запятой
+      if (rows.length == 1 && rows.single.length > 200) {
+        final parts = rows.single.split(RegExp(r'[\t;,]+')).map((s) => s.trim()).where((s) => s.length >= 2).toList();
+        if (parts.length >= 2) rows = parts;
+      }
       return rows;
     }
     if (name.endsWith('.pages')) return _extractRowsFromPages(bytes);
@@ -518,26 +519,27 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     return [];
   }
 
-  /// Извлекает сырой текст из zip (Numbers, Pages) — для fallback на AI при неудачном парсинге
+  /// Извлекает сырой текст из zip (Numbers, Pages) — для fallback на AI. Только XML/plist, без IWA (бинарный мусор → иероглифы)
   String _extractRawTextFromZipForAI(Uint8List bytes) {
     try {
       final archive = ZipDecoder().decodeBytes(bytes);
       final buffer = StringBuffer();
       for (final f in archive.files) {
         if (f.content == null || f.content!.isEmpty) continue;
+        // Не трогать .iwa — бинарный формат, даёт иероглифы
+        if (f.name.endsWith('.iwa') || f.name.endsWith('.bin')) continue;
+        if (!f.name.endsWith('.xml') && !f.name.endsWith('.plist') && !f.name.endsWith('.xml.gz')) continue;
         try {
-          final decoded = utf8.decode(f.content as List<int>, allowMalformed: true);
-          for (final part in decoded.split(RegExp(r'[\r\n\x00\uFFFD]{2,}'))) {
-            for (final line in part.split(RegExp(r'[\r\n\t]+'))) {
-              final t = line.trim();
-              if (t.length >= 2 && t.length < 400) {
-                if (!t.contains('<?xml') && !t.startsWith('<') && !t.contains('/Index/') &&
-                    !t.contains('TSP.') && !t.contains('protobuf') &&
-                    RegExp(r'[a-zA-Zа-яА-ЯёЁ0-9]').hasMatch(t) &&
-                    !RegExp(r'^[\x00-\x1f\x7f-\x9f]+$').hasMatch(t)) {
-                  buffer.writeln(t);
-                }
-              }
+          var data = f.content as List<int>;
+          if (f.name.endsWith('.gz')) {
+            data = GZipDecoder().decodeBytes(data);
+          }
+          final decoded = utf8.decode(data, allowMalformed: true);
+          // Только строки, похожие на читаемый текст (без бинарного мусора)
+          for (final line in decoded.split(RegExp(r'[\r\n]+'))) {
+            final t = line.trim();
+            if (t.length >= 3 && t.length < 300 && _looksLikeReadableProductLine(t)) {
+              buffer.writeln(t);
             }
           }
         } catch (_) {}
@@ -546,6 +548,18 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     } catch (_) {
       return '';
     }
+  }
+
+  /// Строка похожа на название продукта (без иероглифов и мусора)
+  bool _looksLikeReadableProductLine(String s) {
+    if (s.contains('<?xml') || s.startsWith('<') || s.contains('/Index/') ||
+        s.contains('TSP.') || s.contains('protobuf') || s.contains('gregorian') ||
+        s.contains('en_US') || s.contains('March"April')) return false;
+    // Должно быть минимум 50% букв (кириллица/латиница), без управляющих символов
+    final letters = s.replaceAll(RegExp(r'[^a-zA-Zа-яА-ЯёЁ]'), '').length;
+    if (letters < s.length * 0.3) return false;
+    if (RegExp(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f\uFFFD]').hasMatch(s)) return false;
+    return true;
   }
 
   List<String> _extractRowsFromDocx(Uint8List bytes) {
@@ -817,7 +831,23 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         }
       }
 
-      print('DEBUG: Successfully parsed ${parsed.length} products');
+      // Исправление опечаток для ВСЕХ продуктов (не только новых)
+      if (parsed.isNotEmpty) {
+        _setLoadingMessage('Исправление опечаток...');
+        final ai = context.read<AiService>();
+        final allNames = parsed.map((p) => p.name).toList();
+        final normalized = await ai.normalizeProductNames(allNames);
+        if (mounted && normalized.length == parsed.length) {
+          parsed = parsed.asMap().entries.map((e) {
+            final i = e.key;
+            final p = e.value;
+            final norm = normalized[i];
+            return norm != null && norm != p.name
+                ? ParsedProductItem(name: norm, price: p.price, unit: p.unit)
+                : p;
+          }).toList();
+        }
+      }
 
       if (parsed.isEmpty) {
         _cancelLoadingTimeout();
@@ -2968,7 +2998,9 @@ ${allProducts.map((p) => p.name).join('\n')}
       rtf = rtf.replaceAll('\\-', '');
       rtf = rtf.replaceAll('\\_', '_');
 
-      // Заменяем \par и \line на переносы строк
+      // Сохраняем структуру строк и ячеек: \row -> новая строка, \cell -> табуляция
+      rtf = rtf.replaceAll(RegExp(r'\\row\b'), '\n');
+      rtf = rtf.replaceAll(RegExp(r'\\cell\b'), '\t');
       rtf = rtf.replaceAll('\\par', '\n');
       rtf = rtf.replaceAll('\\line', '\n');
       rtf = rtf.replaceAll('\\tab', '\t');
@@ -2995,9 +3027,9 @@ ${allProducts.map((p) => p.name).join('\n')}
         return '';
       });
 
-      // Финальная очистка
+      // Финальная очистка: сжимаем пробелы/табы, но сохраняем переносы строк
       rtf = rtf.replaceAll(RegExp(r'[{}]+'), '');
-      rtf = rtf.replaceAll(RegExp(r'\s+'), ' ').trim();
+      rtf = rtf.split('\n').map((line) => line.replaceAll(RegExp(r'[ \t]+'), ' ').trim()).join('\n');
 
       _addDebugLog('RTF extraction result: "${rtf.substring(0, min(100, rtf.length))}"');
       return rtf;
