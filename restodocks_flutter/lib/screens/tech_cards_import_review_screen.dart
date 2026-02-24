@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 
 import '../services/ai_service.dart';
 import '../services/services.dart';
-import '../widgets/app_bar_home_button.dart';
 
 /// Экран просмотра и правки распознанных ТТК перед созданием (пакетный импорт из Excel).
 class TechCardsImportReviewScreen extends StatefulWidget {
@@ -109,7 +108,6 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
       appBar: AppBar(
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
         title: Text(loc.t('tech_cards_import_review_title')),
-        actions: [appBarHomeButton(context)],
       ),
       body: Column(
         children: [
