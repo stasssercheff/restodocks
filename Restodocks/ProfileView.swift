@@ -30,6 +30,12 @@ struct ProfileView: View {
         ("fr", "Français")
     ]
 
+    /// Определяем подразделение сотрудника на основе его department
+    private var employeeDepartment: String? {
+        guard let employee = accounts.currentEmployee else { return nil }
+        return employee.department
+    }
+
     private var currencies: [(String, String)] = [
         ("RUB", "₽ Рубль (RUB)"),
         ("USD", "$ Доллар (USD)"),
@@ -171,21 +177,22 @@ struct ProfileView: View {
                         Text("Технологические карты")
                             .font(.headline)
 
-                        NavigationLink {
-                            KitchenRootView()
-                        } label: {
-                            HStack {
-                                Image(systemName: "doc.text.magnifyingglass")
-                                    .foregroundColor(AppTheme.primary)
-                                Text(lang.t("view_ttk"))
-                                    .foregroundColor(AppTheme.textPrimary)
-                                Text("(\(lang.t("view_only")))")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .foregroundColor(AppTheme.primary)
-                            }
+                        if let dept = employeeDepartment {
+                            NavigationLink {
+                                DepartmentTTKView(department: dept)
+                            } label: {
+                                HStack {
+                                    Image(systemName: departmentIcon(for: dept))
+                                        .foregroundColor(AppTheme.primary)
+                                    Text(departmentTTKTitle(for: dept))
+                                        .foregroundColor(AppTheme.textPrimary)
+                                    Text("(\(lang.t("view_only")))")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .foregroundColor(AppTheme.primary)
+                                }
                             .padding()
                             .background(AppTheme.cardBackground)
                             .cornerRadius(12)
@@ -516,6 +523,24 @@ struct ProfileView: View {
         let filename = "profile_\(employeeId.uuidString).jpg"
         if let image = ImageService.shared.loadImageFromDocuments(filename: filename) {
             profileImage = image
+        }
+    }
+
+    private func departmentIcon(for department: String) -> String {
+        switch department {
+        case "kitchen": return "🍳"
+        case "bar": return "🍸"
+        case "dining_room": return "🍽️"
+        default: return "📋"
+        }
+    }
+
+    private func departmentTTKTitle(for department: String) -> String {
+        switch department {
+        case "kitchen": return "ТТК кухни"
+        case "bar": return "ТТК бара"
+        case "dining_room": return "ТТК зала"
+        default: return lang.t("view_ttk")
         }
     }
 }

@@ -15,6 +15,31 @@ struct ManagementView: View {
         return appState.ownerViewMode == "position"
     }
 
+    /// Определяем подразделение сотрудника на основе его роли
+    private var employeeDepartment: String? {
+        guard let emp = currentEmployee else { return nil }
+
+        // Шеф-повара и су-шефы - кухня
+        if emp.rolesArray.contains("executive_chef") || emp.rolesArray.contains("sous_chef") {
+            return "kitchen"
+        }
+
+        // Бар-менеджеры - бар
+        if emp.rolesArray.contains("bar_manager") {
+            return "bar"
+        }
+
+        // Менеджеры зала - зал
+        if emp.rolesArray.contains("dining_manager") {
+            return "dining_room"
+        }
+
+        // Общие менеджеры - используем department из профиля
+        return emp.department == "kitchen" ? "kitchen" :
+               emp.department == "bar" ? "bar" :
+               emp.department == "dining_room" ? "dining_room" : nil
+    }
+
     var body: some View {
         Group {
             if shouldShowPositionInterface, let position = currentEmployee?.jobPosition {
@@ -60,20 +85,38 @@ struct ManagementView: View {
                 }
             }
 
-            // Кнопка просмотра ТТК для сотрудников управления
-            if appState.canManageSchedule {
+            // Кнопка просмотра ТТК для сотрудников управления (только своего подразделения)
+            if appState.canManageSchedule, let dept = employeeDepartment {
                 NavigationLink {
-                    KitchenRootView()
+                    DepartmentTTKView(department: dept)
                 } label: {
                     HStack {
-                        Image(systemName: "doc.text.magnifyingglass")
-                        Text(lang.t("view_ttk"))
+                        Image(systemName: departmentIcon(for: dept))
+                        Text(departmentTTKTitle(for: dept))
                         Text("(\(lang.t("view_only")))")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
                 }
             }
+        }
+    }
+
+    private func departmentIcon(for department: String) -> String {
+        switch department {
+        case "kitchen": return "🍳"
+        case "bar": return "🍸"
+        case "dining_room": return "🍽️"
+        default: return "📋"
+        }
+    }
+
+    private func departmentTTKTitle(for department: String) -> String {
+        switch department {
+        case "kitchen": return "ТТК кухни"
+        case "bar": return "ТТК бара"
+        case "dining_room": return "ТТК зала"
+        default: return lang.t("view_ttk")
         }
     }
 }
