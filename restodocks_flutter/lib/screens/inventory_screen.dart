@@ -84,11 +84,10 @@ class _InventoryRow {
       isWeightInKg ? quantities[i] * 1000 : quantities[i];
   double get totalDisplay => isWeightInKg ? total * 1000 : total;
 
-  /// Сумма всех числовых значений строки. Последняя ячейка — пустая для продолжения ввода, в итог не входит.
+  /// Сумма всех числовых значений строки (включая вторую ячейку и далее; последняя пустая — буфер для n+1).
   double get total {
     if (quantities.isEmpty) return 0.0;
-    if (quantities.length == 1) return quantities[0];
-    return quantities.sublist(0, quantities.length - 1).fold(0.0, (a, b) => a + b);
+    return quantities.fold(0.0, (a, b) => a + b);
   }
 
   _InventoryRow copyWith({Product? product, TechCard? techCard, String? pfUnit, String? unitOverride}) => _InventoryRow(
@@ -557,28 +556,18 @@ class _InventoryScreenState extends State<InventoryScreen>
   }
 
   /// Обновление значения ячейки. При вводе в последнюю ячейку — добавляется новая пустая (n+1).
-  /// Добавление откладывается на следующий кадр, чтобы не терять фокус ввода.
   void _setQuantity(int rowIndex, int colIndex, double value) {
     if (rowIndex < 0 || rowIndex >= _rows.length) return;
     final row = _rows[rowIndex];
     if (colIndex < 0 || colIndex >= row.quantities.length) return;
 
-    final isLastCell = colIndex == row.quantities.length - 1;
-
     setState(() {
       row.quantities[colIndex] = value;
+      if (colIndex == row.quantities.length - 1) {
+        row.quantities.add(0.0);
+      }
     });
     saveNow();
-
-    if (isLastCell) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        setState(() {
-          row.quantities.add(0.0);
-        });
-        saveNow();
-      });
-    }
   }
 
   void _removeRow(int index) {
@@ -1349,6 +1338,8 @@ class _InventoryScreenState extends State<InventoryScreen>
   static const double _colTotalWidth = 56;
   static const double _colQtyWidth = 64;
   static const double _colGap = 10;
+  /// Высота заголовка секции (Продукты/ПФ) — для выравнивания фиксированной и прокручиваемой колонок.
+  static const double _sectionHeaderHeight = 36;
 
   /// Ширина фиксированной части: #, Наименование, Мера, Итого (продукт зафиксирован слева).
   double _leftWidth(BuildContext context) {
@@ -1444,18 +1435,23 @@ class _InventoryScreenState extends State<InventoryScreen>
     final theme = Theme.of(context);
     final leftW = isFixed ? _leftWidth(context) : null;
 
-    return Container(
+    return SizedBox(
+      height: _sectionHeaderHeight,
       width: leftW,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.primaryContainer.withOpacity(0.5),
-        border: Border(bottom: BorderSide(color: theme.colorScheme.outline.withOpacity(0.3))),
-      ),
-      child: Text(
-        title,
-        style: theme.textTheme.titleSmall?.copyWith(
-          fontWeight: FontWeight.bold,
-          color: theme.colorScheme.onSurface,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.primaryContainer.withOpacity(0.5),
+          border: Border(bottom: BorderSide(color: theme.colorScheme.outline.withOpacity(0.3))),
+        ),
+        alignment: Alignment.centerLeft,
+        child: Text(
+          title,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.onSurface,
+          ),
+          overflow: TextOverflow.ellipsis,
         ),
       ),
     );
@@ -1659,17 +1655,16 @@ class _InventoryScreenState extends State<InventoryScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          SizedBox(height: _completed ? 56 : 48),
                           if (_blockFilter != _InventoryBlockFilter.pfOnly && _productIndices.isNotEmpty) ...[
-                            SizedBox(height: 32),
+                            SizedBox(height: _sectionHeaderHeight),
                             ..._productIndices.asMap().entries.map((e) => _buildScrollableDataRow(loc, e.value)),
                           ],
                           if (_blockFilter != _InventoryBlockFilter.productsOnly && _pfIndices.isNotEmpty) ...[
-                            SizedBox(height: 32),
+                            SizedBox(height: _sectionHeaderHeight),
                             ..._pfIndices.asMap().entries.map((e) => _buildScrollableDataRow(loc, e.value)),
                           ],
                           if (_aggregatedFromFile != null && _aggregatedFromFile!.isNotEmpty) ...[
-                            SizedBox(height: 32),
+                            SizedBox(height: _sectionHeaderHeight),
                             _buildScrollableAggregatedHeaderRow(loc),
                             ..._aggregatedFromFile!.asMap().entries.map((e) => _buildScrollableAggregatedDataRow(loc, e.value)),
                           ],
