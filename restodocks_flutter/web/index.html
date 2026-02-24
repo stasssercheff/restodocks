@@ -39,10 +39,35 @@
       background: url('welcome_logo.png') center center no-repeat;
       background-size: cover;
       z-index: 9999;
+      transition: opacity 0.2s ease;
     }
+    /* При F5 на внутренней странице — не показывать полноэкранный логотип, только лёгкий индикатор */
+    body.loading-refresh #loading-screen {
+      background: rgba(255,255,255,0.95);
+      background-image: none;
+    }
+    body.loading-refresh #loading-screen::after {
+      content: '';
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 32px; height: 32px;
+      margin: -16px 0 0 -16px;
+      border: 3px solid #e0e0e0;
+      border-top-color: #AD292C;
+      border-radius: 50%;
+      animation: loading-spin 0.8s linear infinite;
+    }
+    @keyframes loading-spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
+  <script>
+    (function() {
+      var path = (window.location.pathname || '').replace(/\/$/, '');
+      var sameOrigin = document.referrer && document.referrer.indexOf(window.location.origin) === 0;
+      if ((path.length > 1 && path !== '/') || sameOrigin) document.body.classList.add('loading-refresh');
+    })();
+  </script>
   <div id="loading-screen"></div>
   <script src="flutter_bootstrap.js" async></script>
   <script>
