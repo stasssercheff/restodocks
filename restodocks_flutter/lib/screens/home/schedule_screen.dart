@@ -21,7 +21,7 @@ class ScheduleScreen extends StatefulWidget {
 }
 
 class _ScheduleScreenState extends State<ScheduleScreen> {
-  static const int _defaultWeeks = 52; // Увеличили до 52 недель (полный год)
+  static const int _defaultWeeks = 208; // 4 года — будущие даты не ограничены
   static const double _slotColumnWidth = 120;
   /// Ширина ячейки дня: 7 дней влезают на экран телефона (7 × 36 ≈ 252px).
   static const double _dayCellWidth = 36;
@@ -151,6 +151,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           final raw = employees ?? [];
           _employees = _dedupeEmployeesById(raw);
           _model = model;
+          if (_model.numWeeks < _defaultWeeks) {
+            _model = _model.copyWith(numWeeks: _defaultWeeks);
+            saveSchedule(est.id, _model);
+          }
           if (_model.sections.isEmpty) {
             _model = _model.copyWith(sections: ScheduleModel.defaultSections);
           }

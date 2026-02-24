@@ -12,10 +12,10 @@ Future<ScheduleModel> loadSchedule(String establishmentId) async {
   final raw = prefs.getString(key);
   if (raw == null || raw.isEmpty) {
     final now = DateTime.now();
-    // Начинаем с 1 января текущего года вместо понедельника текущей недели
     return ScheduleModel(
       sections: ScheduleModel.defaultSections,
       startDate: DateTime(now.year, 1, 1),
+      numWeeks: 208, // 4 года — будущие даты не ограничены
     );
   }
   try {
@@ -24,7 +24,7 @@ Future<ScheduleModel> loadSchedule(String establishmentId) async {
   } catch (_) {
     final now = DateTime.now();
     // Начинаем с 1 января текущего года вместо понедельника текущей недели
-    return ScheduleModel(startDate: DateTime(now.year, 1, 1));
+    return ScheduleModel(startDate: DateTime(now.year, 1, 1), numWeeks: 208);
   }
 }
 
