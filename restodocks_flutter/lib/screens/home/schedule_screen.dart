@@ -21,7 +21,7 @@ class ScheduleScreen extends StatefulWidget {
 }
 
 class _ScheduleScreenState extends State<ScheduleScreen> {
-  static const int _defaultWeeks = 208; // 4 года — будущие даты не ограничены
+  static const int _defaultWeeks = 1040; // 20 лет — график не должен заканчиваться
   static const double _slotColumnWidth = 120;
   /// Ширина ячейки дня: 7 дней влезают на экран телефона (7 × 36 ≈ 252px).
   static const double _dayCellWidth = 36;
@@ -311,8 +311,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   }
 
   List<DateTime> get _visibleDates {
-    final yesterday = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day - 1);
-    return _model.dates.where((d) => !d.isAfter(yesterday)).toList();
+    return _model.dates; // Показываем все даты, график не должен заканчиваться
   }
 
   void _showCopyRangeDialog() {
