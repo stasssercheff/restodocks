@@ -745,6 +745,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
       _setLoadingMessage('Сопоставление с базой...');
       final store = context.read<ProductStoreSupabase>();
+      await store.loadProducts();
       await store.loadNomenclature(est.id);
       final existingProducts = store.getNomenclatureProducts(est.id);
       final allProducts = store.allProducts;
@@ -826,13 +827,11 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       for (final n in pNames) {
         final nNorm = n.toLowerCase().replaceAll(RegExp(r'[^\w\s]'), '').replaceAll(RegExp(r'\s+'), ' ').trim();
         if (nNorm == normalized) {
-          // Получаем актуальную цену ТОЛЬКО из establishment_products
+          // Цена из establishment_products (номенклатура заведения), fallback — basePrice из карточки продукта
           final ep = store.getEstablishmentPrice(p.id, establishmentId);
-          double? existingPrice = ep?.$1;
-          final fromEstablishment = existingPrice != null;
-
-          // Если цены нет в establishment_products, значит продукт есть в номенклатуре без цены
-          // existingPrice остается null, что правильно - нет текущей цены для сравнения
+          final priceFromEst = ep?.$1;
+          final existingPrice = priceFromEst ?? p.basePrice;
+          final fromEstablishment = priceFromEst != null;
 
           final priceDiff = price != null && existingPrice != null && (existingPrice - price).abs() > 0.01;
           return (existingId: p.id, existingName: p.name, existingPrice: existingPrice, existingPriceFromEstablishment: fromEstablishment, priceDiff: priceDiff);

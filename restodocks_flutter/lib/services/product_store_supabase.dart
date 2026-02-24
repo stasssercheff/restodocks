@@ -471,6 +471,8 @@ class ProductStoreSupabase {
     print('💰 ProductStore: Setting price for $productId in establishment $establishmentId: $price $currency');
 
     if (price != null) {
+      final oldPrice = getEstablishmentPrice(productId, establishmentId)?.$1;
+
       // upsert — создаёт запись если нет, обновляет если есть
       await _supabase.client
           .from('establishment_products')
@@ -484,6 +486,21 @@ class ProductStoreSupabase {
             onConflict: 'establishment_id,product_id',
           );
       print('✅ ProductStore: Price upserted in establishment_products');
+
+      // Записываем в историю изменений (если цена изменилась)
+      if (oldPrice == null || (oldPrice - price).abs() > 0.001) {
+        try {
+          await _supabase.client.from('product_price_history').insert({
+            'establishment_id': establishmentId,
+            'product_id': productId,
+            'old_price': oldPrice,
+            'new_price': price,
+            'currency': currency ?? 'RUB',
+          });
+        } catch (e) {
+          print('⚠️ ProductStore: Failed to record price history: $e');
+        }
+      }
 
       // Также обновляем basePrice в таблице products
       await _supabase.client
@@ -651,4 +668,45 @@ class ProductStoreSupabase {
   void clearPriceCache() {
     _priceCache.clear();
   }
+
+  /// История изменений цены продукта в номенклатуре заведения
+  Future<List<PriceHistoryEntry>> getPriceHistory(String productId, String establishmentId) async {
+    try {
+      final response = await _supabase.client
+          .from('product_price_history')
+          .select('old_price, new_price, currency, changed_at')
+          .eq('establishment_id', establishmentId)
+          .eq('product_id', productId)
+          .order('changed_at', ascending: false)
+          .limit(20);
+      final list = response is List ? response : <dynamic>[];
+      return list.map((e) {
+        final m = Map<String, dynamic>.from(e as Map);
+        return PriceHistoryEntry(
+          oldPrice: m['old_price'] != null ? (m['old_price'] as num).toDouble() : null,
+          newPrice: (m['new_price'] as num?)?.toDouble(),
+          currency: m['currency'] as String?,
+          changedAt: m['changed_at'] != null ? DateTime.parse(m['changed_at'] as String) : null,
+        );
+      }).toList();
+    } catch (e) {
+      print('⚠️ ProductStore: Failed to load price history: $e');
+      return [];
+    }
+  }
+}
+
+/// Запись истории изменения цены
+class PriceHistoryEntry {
+  final double? oldPrice;
+  final double? newPrice;
+  final String? currency;
+  final DateTime? changedAt;
+
+  const PriceHistoryEntry({
+    this.oldPrice,
+    this.newPrice,
+    this.currency,
+    this.changedAt,
+  });
 }

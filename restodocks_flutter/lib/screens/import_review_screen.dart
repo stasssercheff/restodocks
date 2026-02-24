@@ -38,6 +38,19 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
     });
   }
 
+  void _deselectAll() {
+    setState(() {
+      _items = _items.map((i) => i.copyWith(approved: false)).toList();
+    });
+  }
+
+  void _toggleAll() {
+    final allApproved = _items.every((i) => i.approved);
+    setState(() {
+      _items = _items.map((i) => i.copyWith(approved: !allApproved)).toList();
+    });
+  }
+
   void _toggle(int index, bool value) {
     setState(() {
       _items[index] = _items[index].copyWith(approved: value);
@@ -153,9 +166,11 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
         title: Text(loc.t('import_review_title') ?? 'Модерация импорта'),
         actions: [
           TextButton.icon(
-            onPressed: _saving ? null : _approveAll,
-            icon: const Icon(Icons.check_circle_outline, size: 18),
-            label: Text(loc.t('accept_all') ?? 'Принять всё'),
+            onPressed: _saving ? null : _toggleAll,
+            icon: Icon(approved == _items.length ? Icons.check_box_outlined : Icons.check_box, size: 18),
+            label: Text(approved == _items.length
+                ? (loc.t('deselect_all') ?? 'Снять все')
+                : (loc.t('accept_all') ?? 'Принять всё')),
           ),
           appBarHomeButton(context),
         ],

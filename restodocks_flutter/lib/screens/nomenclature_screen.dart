@@ -2573,6 +2573,8 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
   late String _currency;
   late bool _containsGluten;
   late bool _containsLactose;
+  List<PriceHistoryEntry> _priceHistory = [];
+  bool _priceHistoryLoaded = false;
 
   @override
   void initState() {
@@ -2599,6 +2601,16 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
     _currency = p.currency ?? 'VND';
     _containsGluten = p.containsGluten ?? false;
     _containsLactose = p.containsLactose ?? false;
+    if (widget.establishmentId != null && widget.establishmentId!.isNotEmpty) {
+      widget.store.getPriceHistory(p.id, widget.establishmentId!).then((list) {
+        if (mounted) setState(() {
+          _priceHistory = list;
+          _priceHistoryLoaded = true;
+        });
+      });
+    } else {
+      _priceHistoryLoaded = true;
+    }
   }
 
   @override
@@ -2794,6 +2806,33 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                 contentPadding: EdgeInsets.zero,
                 controlAffinity: ListTileControlAffinity.leading,
               ),
+              if (widget.establishmentId != null && widget.establishmentId!.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Text(widget.loc.t('price_history') ?? 'История изменений цены', style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: 8),
+                if (!_priceHistoryLoaded)
+                  const SizedBox(height: 24, child: Center(child: CircularProgressIndicator(strokeWidth: 2)))
+                else if (_priceHistory.isEmpty)
+                  Text(
+                    widget.loc.t('price_history_empty') ?? 'Нет записей',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  )
+                else
+                  ..._priceHistory.take(10).map((e) {
+                    final oldStr = e.oldPrice != null ? e.oldPrice!.toStringAsFixed(0) : '—';
+                    final newStr = e.newPrice != null ? e.newPrice!.toStringAsFixed(0) : '—';
+                    final dateStr = e.changedAt != null
+                        ? '${e.changedAt!.day.toString().padLeft(2, '0')}.${e.changedAt!.month.toString().padLeft(2, '0')}.${e.changedAt!.year}'
+                        : '';
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        '$oldStr → $newStr ${e.currency ?? ''} ($dateStr)',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    );
+                  }),
+              ],
             ],
           ),
         ),
