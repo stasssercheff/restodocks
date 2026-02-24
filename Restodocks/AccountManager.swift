@@ -47,6 +47,14 @@ final class AccountManager: ObservableObject {
     private func loadSession() async {
         do {
             let session = try await client.auth.session
+
+            // Check if email is confirmed
+            guard let user = session.user, user.emailConfirmedAt != nil else {
+                // Email not confirmed - sign out and don't load session
+                try? await client.auth.signOut()
+                return
+            }
+
             let userId = session.user.id
             let employees: [Employee] = try await client
                 .from("employees")
