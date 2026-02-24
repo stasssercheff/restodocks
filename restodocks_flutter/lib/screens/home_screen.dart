@@ -33,9 +33,8 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     final isOwner = currentEmployee.hasRole('owner');
-    final account = context.watch<AccountManagerSupabase>();
     final homeBtnConfig = context.watch<HomeButtonConfigService>();
-    final middleAction = account.hasProSubscription ? homeBtnConfig.action : (isOwner ? HomeButtonAction.inbox : HomeButtonAction.schedule);
+    final middleAction = homeBtnConfig.action;
     final middleLabel = _labelForAction(loc, middleAction);
 
     return Scaffold(
@@ -84,9 +83,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   String _appBarTitle(LocalizationService loc, bool isOwner) {
-    final account = context.read<AccountManagerSupabase>();
     final homeBtnConfig = context.read<HomeButtonConfigService>();
-    final middleAction = account.hasProSubscription ? homeBtnConfig.action : (isOwner ? HomeButtonAction.inbox : HomeButtonAction.schedule);
+    final middleAction = homeBtnConfig.action;
     switch (_selectedIndex) {
       case 0:
         return loc.t('app_name');
@@ -133,9 +131,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildMiddleTab(Employee employee, bool isOwner, LocalizationService loc) {
-    final account = context.read<AccountManagerSupabase>();
     final homeBtnConfig = context.read<HomeButtonConfigService>();
-    final action = account.hasProSubscription ? homeBtnConfig.action : (isOwner ? HomeButtonAction.inbox : HomeButtonAction.schedule);
+    final action = homeBtnConfig.action;
     return _MiddleTabBody(
       icon: action.icon,
       title: _labelForAction(loc, action),
