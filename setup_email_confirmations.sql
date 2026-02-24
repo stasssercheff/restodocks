@@ -6,28 +6,11 @@
 -- 2. Настроить SMTP провайдер (например, Resend, SendGrid)
 --    В Supabase Dashboard: Authentication -> SMTP Settings
 
--- 3. Создать webhook для отслеживания подтверждения email
+-- 3. Включить pg_net extension (если не включен)
+CREATE EXTENSION IF NOT EXISTS pg_net;
+
+-- 4. Создать webhook для отслеживания подтверждения email
 --    Этот webhook срабатывает при обновлении auth.users
-
-INSERT INTO supabase_functions.http_request_queue (
-  method,
-  url,
-  headers,
-  body,
-  timeout_ms
-) VALUES (
-  'POST',
-  CONCAT(current_setting('app.supabase_url'), '/functions/v1/send-welcome-email'),
-  jsonb_build_object(
-    'Authorization', CONCAT('Bearer ', current_setting('app.service_role_key')),
-    'Content-Type', 'application/json'
-  ),
-  NULL,
-  5000
-);
-
--- Создаем webhook через pg_net для отправки POST запроса к Edge Function
--- при подтверждении email пользователя
 
 CREATE OR REPLACE FUNCTION handle_email_confirmation()
 RETURNS TRIGGER AS $$
