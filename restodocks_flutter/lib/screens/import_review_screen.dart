@@ -51,6 +51,20 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
     });
   }
 
+  void _approveAllPriceUpdates() {
+    setState(() {
+      _items = _items.map((i) => i.category == ModerationCategory.priceUpdate
+          ? i.copyWith(approved: true) : i).toList();
+    });
+  }
+
+  void _deselectAllPriceUpdates() {
+    setState(() {
+      _items = _items.map((i) => i.category == ModerationCategory.priceUpdate
+          ? i.copyWith(approved: false) : i).toList();
+    });
+  }
+
   void _toggle(int index, bool value) {
     setState(() {
       _items[index] = _items[index].copyWith(approved: value);
@@ -187,12 +201,24 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
                 Chip(
                   label: Text('$approved / ${_items.length}'),
                   backgroundColor: theme.colorScheme.primaryContainer,
                 ),
+                if (_items.any((i) => i.category == ModerationCategory.priceUpdate)) ...[
+                  FilledButton.tonal(
+                    onPressed: _saving ? null : _approveAllPriceUpdates,
+                    child: Text(loc.t('apply_all_price_updates') ?? 'Принять все обновления цен'),
+                  ),
+                  OutlinedButton(
+                    onPressed: _saving ? null : _deselectAllPriceUpdates,
+                    child: Text(loc.t('deselect_price_updates') ?? 'Снять обновления цен'),
+                  ),
+                ],
               ],
             ),
           ),

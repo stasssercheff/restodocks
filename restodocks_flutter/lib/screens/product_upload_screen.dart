@@ -388,7 +388,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   Future<void> _uploadFromFileUnified() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['xlsx', 'xls', 'csv', 'txt', 'rtf', 'pages', 'numbers', 'docx', 'doc', 'excel'],
+      allowedExtensions: ['numbers', 'pages', 'csv', 'txt', 'rtf', 'doc', 'docx', 'xls', 'xlsx'],
       withData: true,
     );
     if (result == null || result.files.isEmpty || result.files.single.bytes == null) return;
@@ -678,7 +678,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     if (choice == 'file') {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['xlsx', 'xls', 'csv', 'txt', 'rtf', 'pages', 'numbers', 'docx', 'doc', 'excel'],
+        allowedExtensions: ['numbers', 'pages', 'csv', 'txt', 'rtf', 'doc', 'docx', 'xls', 'xlsx'],
         withData: true,
       );
       if (result == null || result.files.isEmpty || result.files.single.bytes == null) return;
@@ -879,7 +879,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     print('=== _uploadExcelSimple called ===');
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['xlsx', 'xls'],
+      allowedExtensions: ['numbers', 'pages', 'csv', 'txt', 'rtf', 'doc', 'docx', 'xls', 'xlsx'],
       allowMultiple: false,
     );
     print('Excel simple picker result: ${result != null ? "files selected" : "cancelled"}');
@@ -906,7 +906,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       final loc = context.read<LocalizationService>();
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['txt', 'xlsx', 'xls', 'rtf', 'csv'],
+        allowedExtensions: ['numbers', 'pages', 'csv', 'txt', 'rtf', 'doc', 'docx', 'xls', 'xlsx'],
         withData: true,
       );
 
@@ -1149,11 +1149,11 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       return;
     }
 
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['xlsx', 'xls'],
-      withData: true,
-    );
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['numbers', 'pages', 'csv', 'txt', 'rtf', 'doc', 'docx', 'xls', 'xlsx'],
+        withData: true,
+      );
 
     if (result == null || result.files.isEmpty || result.files.single.bytes == null) return;
 

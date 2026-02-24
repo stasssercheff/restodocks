@@ -25,13 +25,15 @@ OUTPUT: JSON array of objects, each with:
 
 RULES:
 - Infer columns by content meaning. Product names can be in any column.
-- Extract and normalize product names: fix typos, use standard terminology
+- Extract and normalize product names: fix ALL typos (grammatical and semantic)
+- Fix typos: "картофан" -> "Картофель", "помидор" -> "Томат", "лук" -> "Лук репчатый"
+- Use standard culinary terminology, correct spelling
 - Handle various price formats: "50р", "50 руб", "50.5", "50,5"
+- Analyze prices: detect currency, validate reasonableness
 - Recognize units: кг, г, шт, л, мл, порция, упаковка
 - Handle comma as decimal separator (50,5 = 50.5) and dots (50.5 = 50.5)
 - Handle spaces in numbers (1 000 = 1000)
 - Skip rows without product names (headers, totals, empty rows)
-- Normalize product names: "картофан" -> "Картофель", "помидор" -> "Томат"
 - Return ONLY valid JSON array, no markdown, no extra text.
 - Max 500 items. If more rows, take first 500.
 
