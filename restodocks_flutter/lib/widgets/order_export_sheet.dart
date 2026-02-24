@@ -93,10 +93,12 @@ class OrderExportSheet extends StatelessWidget {
   Future<void> _sendEmail(BuildContext context) async {
     final to = list.email!.trim();
     final content = _buildText();
-    final subject = '${_t('product_order')}: ${list.name}';
+    final subject = '${_t('product_order')}: ${list.name} — $companyName';
     final htmlBody = '<pre style="font-family: sans-serif; white-space: pre-wrap;">${_escapeHtml(content)}</pre>';
     final dateStr = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
-    final pdfFileName = 'order_${list.name.replaceAll(RegExp(r'[^\w\-.\s]'), '_')}_$dateStr.pdf';
+    final safeCompany = companyName.replaceAll(RegExp(r'[^\w\-.\s]'), '_');
+    final safeListName = list.name.replaceAll(RegExp(r'[^\w\-.\s]'), '_');
+    final pdfFileName = 'order_${safeCompany}_${safeListName}_$dateStr.pdf';
 
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
