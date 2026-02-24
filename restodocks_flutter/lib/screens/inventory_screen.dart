@@ -1381,62 +1381,10 @@ class _InventoryScreenState extends State<InventoryScreen>
         ),
       );
     }
-    final leftW = _leftWidth(context);
-    final screenW = MediaQuery.of(context).size.width;
-    final rightW = _maxQuantityColumns * (_colQtyWidth + _colGap) + 48;
-    final totalW = (leftW + rightW).clamp(screenW, double.infinity);
-    // Use fixed column layout when there are many quantity columns or screen is narrow
-    // Добавляем плавный transition при переключении режимов
-    final useFixedColumn = totalW > screenW * 1.2; // Убрал условие _maxQuantityColumns > 3 чтобы избежать переключения при добавлении колонок
-    if (useFixedColumn) {
-      return AnimatedSwitcher(
-        duration: const Duration(milliseconds: 300),
-        child: _buildTableWithFixedColumn(loc),
-      );
-    }
-
-    // Original scrollable table for few columns
-    return Scrollbar(
-      thumbVisibility: true,
-      controller: _hScroll,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        controller: _hScroll,
-        physics: const AlwaysScrollableScrollPhysics(),
-        child: SingleChildScrollView(
-          physics: const ClampingScrollPhysics(),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minWidth: totalW),
-            child: SizedBox(
-              width: totalW,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildHeaderRow(loc),
-                  if (_blockFilter != _InventoryBlockFilter.pfOnly && _productIndices.isNotEmpty) ...[
-                    if (!_isInputMode) _buildSectionHeader(loc, loc.t('inventory_block_products')),
-                    ..._productIndices.asMap().entries.map((e) => _buildDataRow(loc, e.value, e.key + 1, compact: false)),
-                  ],
-                  if (_blockFilter != _InventoryBlockFilter.productsOnly && _pfIndices.isNotEmpty) ...[
-                    if (!_isInputMode) _buildSectionHeader(loc, loc.t('inventory_block_pf')),
-                    ..._pfIndices.asMap().entries.map((e) {
-                      final rowNum = _blockFilter == _InventoryBlockFilter.pfOnly ? e.key + 1 : _productIndices.length + e.key + 1;
-                      return _buildDataRow(loc, e.value, rowNum, compact: false);
-                    }),
-                  ],
-                  if (_aggregatedFromFile != null && _aggregatedFromFile!.isNotEmpty) ...[
-                    if (!_isInputMode) const Divider(height: 24),
-                    if (!_isInputMode) _buildSectionHeader(loc, loc.t('inventory_pf_products_title')),
-                    if (!_isInputMode) _buildAggregatedHeaderRow(loc),
-                    ..._aggregatedFromFile!.asMap().entries.map((e) => _buildAggregatedDataRow(loc, e.value, e.key + 1, compact: false)),
-                  ],
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
+    // По ТЗ: всегда таблица с фиксированным левым столбцом (продукты, мера, итого)
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 300),
+      child: _buildTableWithFixedColumn(loc),
     );
   }
 
