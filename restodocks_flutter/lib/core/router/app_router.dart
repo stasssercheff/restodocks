@@ -52,6 +52,8 @@ String _getInitialLocation() {
 
 /// Настройка маршрутизации приложения
 class AppRouter {
+  static bool _webLocationCorrected = false;
+
   static final GoRouter router = GoRouter(
     initialLocation: _getInitialLocation(),
     redirect: (context, state) async {
@@ -479,4 +481,38 @@ class _RedirectToProductOrderState extends State<_RedirectToProductOrder> {
       body: Center(child: CircularProgressIndicator()),
     );
   }
+}
+
+/// Обёртка для web: после первого кадра синхронизирует маршрут с адресной строкой (F5).
+class WebLocationCorrection extends StatefulWidget {
+  const WebLocationCorrection({super.key, required this.child});
+  final Widget? child;
+
+  @override
+  State<WebLocationCorrection> createState() => _WebLocationCorrectionState();
+}
+
+class _WebLocationCorrectionState extends State<WebLocationCorrection> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _correctOnce());
+  }
+
+  void _correctOnce() {
+    if (!mounted || !kIsWeb || AppRouter._webLocationCorrected) return;
+    final browserPath = initial_loc.getCurrentBrowserPath();
+    if (browserPath == null) return;
+    try {
+      final state = GoRouterState.of(context);
+      final loc = state.matchedLocation;
+      if (loc == '/' || loc == '/splash') {
+        AppRouter._webLocationCorrected = true;
+        if (mounted) context.go(browserPath);
+      }
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child ?? const SizedBox.shrink();
 }

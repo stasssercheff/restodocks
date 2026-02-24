@@ -55,6 +55,7 @@ class RestodocksApp extends StatelessWidget {
               GlobalCupertinoLocalizations.delegate,
             ],
             routerConfig: AppRouter.router,
+            builder: (context, child) => WebLocationCorrection(child: child),
             debugShowCheckedModeBanner: false,
           );
         },
