@@ -560,11 +560,15 @@ class _InventoryScreenState extends State<InventoryScreen>
     final row = _rows[rowIndex];
     if (colIndex < 0 || colIndex >= row.quantities.length) return;
 
+    final oldValue = row.quantities[colIndex];
+
     // Обновляем значение напрямую
     row.quantities[colIndex] = value;
 
-    // Всегда вызываем setState для обновления UI (итогов)
-    setState(() {});
+    // Вызываем setState только если значение действительно изменилось
+    if (oldValue != value) {
+      setState(() {});
+    }
 
     // Если это последняя ячейка и значение > 0, добавляем новую ячейку для этой строки
     if (colIndex == row.quantities.length - 1 && value > 0) {
@@ -1782,6 +1786,7 @@ class _QtyCellState extends State<_QtyCell> {
   final FocusNode _focus = FocusNode();
   bool _wasFocused = false;
   late double _currentValue;
+  Timer? _updateTimer;
 
   double get _displayValueRaw => widget.useGrams ? widget.value * 1000 : widget.value;
 
@@ -1800,8 +1805,8 @@ class _QtyCellState extends State<_QtyCell> {
     if (_wasFocused && !_focus.hasFocus && mounted) {
       _focus.requestFocus();
     }
-    // Обновляем текст только если значение изменилось извне
-    if (old.value != widget.value) {
+    // Обновляем текст только если значение изменилось извне и фокус не активен
+    if (old.value != widget.value && !_focus.hasFocus) {
       _currentValue = widget.value;
       _controller.text = _displayValue(_displayValueRaw);
     }
@@ -1826,6 +1831,7 @@ class _QtyCellState extends State<_QtyCell> {
 
   @override
   void dispose() {
+    _updateTimer?.cancel();
     _focus.removeListener(_onFocusChanged);
     _controller.dispose();
     _focus.dispose();
@@ -1852,13 +1858,17 @@ class _QtyCellState extends State<_QtyCell> {
         fillColor: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
       ),
       onChanged: (s) {
-        // Обновляем значение сразу для синхронного обновления итогов
+        // Обновляем локальное значение
         final v = double.tryParse(s.replaceFirst(',', '.')) ?? 0;
-        final actualValue = widget.useGrams ? v / 1000 : v;
-        _currentValue = actualValue;
+        _currentValue = widget.useGrams ? v / 1000 : v;
 
-        // Вызываем callback сразу
-        widget.onChanged(actualValue);
+        // Откладываем применение изменений для избежания частых перестроений
+        _updateTimer?.cancel();
+        _updateTimer = Timer(const Duration(milliseconds: 150), () {
+          if (mounted) {
+            widget.onChanged(_currentValue);
+          }
+        });
       },
     );
   }
