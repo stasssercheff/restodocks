@@ -1,24 +1,11 @@
-//
-//  KitchenScheduleView.swift
-//  Restodocks
-//
-
 import SwiftUI
-import CoreData
 
 struct KitchenScheduleView: View {
     @EnvironmentObject var lang: LocalizationManager
     @EnvironmentObject var appState: AppState
-    @Environment(\.managedObjectContext) private var context
-
-    @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \ShiftEntity.date, ascending: true)],
-        animation: .default
-    )
-    private var shifts: FetchedResults<ShiftEntity>
+    @EnvironmentObject var accounts: AccountManager
 
     @State private var selectedDepartment: Department = .all
-    @State private var selectedDate = Date()
     @State private var showingAddShift = false
 
     enum Department: String, CaseIterable, Identifiable {
@@ -69,9 +56,8 @@ struct KitchenScheduleView: View {
         }
     }
 
-    var filteredShifts: [ShiftEntity] {
-        shifts.filter { shift in
-            // Filter by department
+    var filteredShifts: [Shift] {
+        accounts.shifts.filter { shift in
             if selectedDepartment != .all {
                 return shift.department == selectedDepartment.rawValue
             }
@@ -79,16 +65,13 @@ struct KitchenScheduleView: View {
         }
     }
 
-    var shiftsByDate: [Date: [ShiftEntity]] {
-        Dictionary(grouping: filteredShifts) { shift in
-            Calendar.current.startOfDay(for: shift.date ?? Date())
-        }
+    var shiftsByDate: [Date: [Shift]] {
+        Dictionary(grouping: filteredShifts) { Calendar.current.startOfDay(for: $0.date) }
     }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // Department filter
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(Department.allCases) { department in
@@ -105,7 +88,6 @@ struct KitchenScheduleView: View {
                 }
                 .background(Color(.systemBackground))
 
-                // Schedule content
                 if shiftsByDate.isEmpty {
                     VStack(spacing: 20) {
                         Image(systemName: "calendar.badge.exclamationmark")
@@ -125,7 +107,7 @@ struct KitchenScheduleView: View {
                         LazyVStack(spacing: 16) {
                             ForEach(shiftsByDate.keys.sorted(), id: \.self) { date in
                                 if let dayShifts = shiftsByDate[date], !dayShifts.isEmpty {
-                                    DayScheduleCard(date: date, shifts: dayShifts)
+                                    DayScheduleCard(date: date, shifts: dayShifts, employeeName: { accounts.employeeName(for: $0) })
                                 }
                             }
                         }
@@ -134,6 +116,10 @@ struct KitchenScheduleView: View {
                 }
             }
             .navigationTitle(lang.t("schedule"))
+            .task {
+                await accounts.fetchEmployees()
+                await accounts.fetchShifts()
+            }
             .toolbar {
                 if appState.canManageSchedule {
                     ToolbarItem(placement: .navigationBarTrailing) {
@@ -152,36 +138,10 @@ struct KitchenScheduleView: View {
     }
 }
 
-struct DepartmentFilterButton: View {
-    let department: KitchenScheduleView.Department
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 4) {
-                Text(department.icon)
-                    .font(.title2)
-
-                Text(department.displayName)
-                    .font(.caption)
-                    .lineLimit(1)
-            }
-            .frame(width: 80, height: 60)
-            .background(isSelected ? Color.blue.opacity(0.1) : Color.gray.opacity(0.1))
-            .foregroundColor(isSelected ? .blue : .primary)
-            .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? Color.blue : Color.clear, lineWidth: 2)
-            )
-        }
-    }
-}
-
 struct DayScheduleCard: View {
     let date: Date
-    let shifts: [ShiftEntity]
+    let shifts: [Shift]
+    let employeeName: (UUID) -> String
 
     var formattedDate: String {
         let formatter = DateFormatter()
@@ -196,8 +156,8 @@ struct DayScheduleCard: View {
                 .font(.headline)
                 .padding(.horizontal)
 
-            ForEach(shifts, id: \.id) { shift in
-                ShiftCard(shift: shift)
+            ForEach(shifts) { shift in
+                ShiftCard(shift: shift, employeeName: employeeName(shift.employeeId))
             }
         }
         .padding(.vertical)
@@ -210,7 +170,8 @@ struct DayScheduleCard: View {
 
 struct ShiftCard: View {
     @EnvironmentObject var lang: LocalizationManager
-    let shift: ShiftEntity
+    let shift: Shift
+    let employeeName: String
 
     var departmentInfo: (icon: String, name: String) {
         switch shift.department {
@@ -238,12 +199,11 @@ struct ShiftCard: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // Department icon
             Text(departmentInfo.icon)
                 .font(.title2)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(shift.employee?.fullName ?? lang.t("unknown"))
+                Text(employeeName)
                     .font(.headline)
 
                 HStack {

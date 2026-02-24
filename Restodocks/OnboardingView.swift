@@ -321,49 +321,66 @@ struct OnboardingView: View {
 
     private func loginToCompany() {
         loginError = ""
-
-        if let company = accounts.findCompanyByName(companyName) {
-            if company.pinCode == companyPin {
-                accounts.establishment = company
-                appState.isCompanySelected = true
-                appState.companyPinCode = companyPin
-                currentStep = 2
-            } else {
-                loginError = getInvalidPinText()
+        Task { @MainActor in
+            do {
+                if let company = try await accounts.findCompanyByName(companyName) {
+                    let cleanPin = company.pinCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+                    let inputPin = companyPin.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+                    if cleanPin == inputPin {
+                        accounts.establishment = company
+                        appState.isCompanySelected = true
+                        appState.companyPinCode = companyPin
+                        currentStep = 2
+                    } else {
+                        loginError = getInvalidPinText()
+                    }
+                } else {
+                    loginError = getCompanyNotFoundText()
+                }
+            } catch {
+                loginError = error.localizedDescription
             }
-        } else {
-            loginError = getCompanyNotFoundText()
         }
     }
 
     private func createNewCompany() {
         registrationError = ""
-
-        if newCompanyGeneratedPin == companyPin {
-            _ = accounts.createEstablishment(name: newCompanyName)
-            appState.isCompanySelected = true
-            currentStep = 2
-        } else {
+        guard newCompanyGeneratedPin == companyPin else {
             registrationError = "\(getPinMismatchText()): \(newCompanyGeneratedPin)"
+            return
         }
+        // Откладываем создание до шага 3 (registerEmployee) — нужны данные владельца
+        appState.isCompanySelected = true
+        currentStep = 2
     }
 
     private func registerEmployee() {
         isLoading = true
-
-        if let company = accounts.establishment {
-            accounts.createEmployeeForCompany(
-                company,
-                fullName: employeeName,
-                email: employeeEmail,
-                password: employeePassword,
-                department: employeeDepartment,
-                role: employeeRole
-            )
-            // Navigation will happen automatically through state change
+        Task { @MainActor in
+            do {
+                if let company = accounts.establishment {
+                    try await accounts.createEmployeeForCompany(
+                        establishmentId: company.id,
+                        fullName: employeeName,
+                        email: employeeEmail,
+                        password: employeePassword,
+                        department: employeeDepartment,
+                        role: employeeRole
+                    )
+                } else if !newCompanyName.isEmpty && newCompanyGeneratedPin == companyPin {
+                    _ = try await accounts.createCompanyAndOwner(
+                        companyName: newCompanyName,
+                        fullName: employeeName,
+                        email: employeeEmail,
+                        password: employeePassword,
+                        ownerRole: employeeRole
+                    )
+                }
+            } catch {
+                print("❌ Register employee error:", error)
+            }
+            isLoading = false
         }
-
-        isLoading = false
     }
 
     // Localized text methods

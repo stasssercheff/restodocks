@@ -50,18 +50,20 @@ struct CreateOwnerView: View {
     }
 
     private func createOwner() {
-        accounts.createOwner(
-            fullName: fullName,
-            email: email,
-            password: password
-        )
-        if let owner = accounts.currentEmployee {
-            var roles = ["owner"]
-            if !jobPosition.isEmpty {
-                roles.append(jobPosition)
+        let companyName = accounts.establishment?.name ?? ""
+        let role = jobPosition.isEmpty ? "owner" : jobPosition
+        Task { @MainActor in
+            do {
+                _ = try await accounts.createCompanyAndOwner(
+                    companyName: companyName,
+                    fullName: fullName,
+                    email: email,
+                    password: password,
+                    ownerRole: role
+                )
+            } catch {
+                print("❌ Create owner error:", error)
             }
-            owner.rolesArray = roles
-            accounts.saveContext()
         }
     }
 }

@@ -5,7 +5,7 @@ struct ManagementView: View {
     @EnvironmentObject var accounts: AccountManager
     @EnvironmentObject var appState: AppState
 
-    private var currentEmployee: EmployeeEntity? {
+    private var currentEmployee: Employee? {
         accounts.currentEmployee ?? appState.currentEmployee
     }
 

@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A73187A22F1F546800FFE34F /* RestodocksModel.xcdatamodeld in Sources */ = {isa = PBXBuildFile; fileRef = A73187A02F1F546800FFE34F /* RestodocksModel.xcdatamodeld */; };
 		A799B3702EFE4CB60049E7A2 /* system_products.json in Resources */ = {isa = PBXBuildFile; fileRef = A799B36F2EFE4CB60049E7A2 /* system_products.json */; };
 		A799B3722EFE509B0049E7A2 /* system_products_01_vegetables.json in Resources */ = {isa = PBXBuildFile; fileRef = A799B3712EFE509B0049E7A2 /* system_products_01_vegetables.json */; };
 		A7EEF2D22EE522A1002FF0B7 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = A7EEF2D12EE522A1002FF0B7 /* Supabase */; };
@@ -15,7 +14,6 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		A73187A12F1F546800FFE34F /* RestodocksModel.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = RestodocksModel.xcdatamodel; sourceTree = "<group>"; };
 		A799B36F2EFE4CB60049E7A2 /* system_products.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = system_products.json; sourceTree = "<group>"; };
 		A799B3712EFE509B0049E7A2 /* system_products_01_vegetables.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = system_products_01_vegetables.json; sourceTree = "<group>"; };
 		A7EEF2C22EE51FFC002FF0B7 /* Restodocks.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Restodocks.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -59,7 +57,6 @@
 		A7EEF2B92EE51FFC002FF0B7 = {
 			isa = PBXGroup;
 			children = (
-				A73187A02F1F546800FFE34F /* RestodocksModel.xcdatamodeld */,
 				A7EEF2C32EE51FFC002FF0B7 /* Products */,
 				A7EEF2C42EE51FFC002FF0B7 /* Restodocks */,
 			);
@@ -155,7 +152,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A73187A22F1F546800FFE34F /* RestodocksModel.xcdatamodeld in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -391,18 +387,6 @@
 		};
 /* End XCSwiftPackageProductDependency section */
 
-/* Begin XCVersionGroup section */
-		A73187A02F1F546800FFE34F /* RestodocksModel.xcdatamodeld */ = {
-			isa = XCVersionGroup;
-			children = (
-				A73187A12F1F546800FFE34F /* RestodocksModel.xcdatamodel */,
-			);
-			currentVersion = A73187A12F1F546800FFE34F /* RestodocksModel.xcdatamodel */;
-			path = RestodocksModel.xcdatamodeld;
-			sourceTree = "<group>";
-			versionGroupType = wrapper.xcdatamodel;
-		};
-/* End XCVersionGroup section */
 	};
 	rootObject = A7EEF2BA2EE51FFC002FF0B7 /* Project object */;
 }

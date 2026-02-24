@@ -270,37 +270,24 @@ struct CompanyRegistrationView: View {
         isLoading = true
         showError = false
 
-        // Создаем компанию (имена могут дублироваться, PIN - уникальный идентификатор)
-        _ = accounts.createEstablishment(name: companyName)
-
-        // Создаем владельца
-        if accounts.establishment != nil {
-            accounts.createOwner(
-                fullName: ownerName,
-                email: ownerEmail,
-                password: ownerPassword
-            )
-
-            // Устанавливаем роли владельца (всегда owner + дополнительная роль)
-            if let owner = accounts.currentEmployee {
-                var roles = ["owner"] // Владелец по умолчанию
-                if ownerRole != "owner" {
-                    roles.append(ownerRole) // Добавляем дополнительную роль
-                }
-                owner.rolesArray = roles
-                print("👑 Owner roles set: \(roles) for \(owner.fullName ?? "unknown")")
-                accounts.saveContext()
+        Task { @MainActor in
+            do {
+                let pin = try await accounts.createCompanyAndOwner(
+                    companyName: companyName,
+                    fullName: ownerName,
+                    email: ownerEmail,
+                    password: ownerPassword,
+                    ownerRole: ownerRole
+                )
+                generatedPin = pin
+                appState.isCompanySelected = true
+                appState.companyPinCode = pin
+                print("👑 Company and owner created: \(ownerName)")
+            } catch {
+                showErrorMessage(error.localizedDescription)
             }
-
-            // Устанавливаем состояния
-            appState.isCompanySelected = true
-            appState.companyPinCode = generatedPin
-            // isLoggedIn уже установлен в createOwner
-        } else {
-            showErrorMessage(getCreationError())
+            isLoading = false
         }
-
-        isLoading = false
     }
 
     private func showErrorMessage(_ message: String) {

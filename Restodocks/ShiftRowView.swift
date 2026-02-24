@@ -1,21 +1,13 @@
-//
-//  ShiftRowView.swift
-//  Restodocks
-//
-
 import SwiftUI
 
 struct ShiftRowView: View {
-
-    let shift: ShiftEntity
+    let shift: Shift
+    let employeeName: String
 
     var body: some View {
-
         HStack {
-
             VStack(alignment: .leading) {
-
-                Text(shift.employee?.fullName ?? "—")
+                Text(employeeName)
                     .font(.body)
                     .bold()
 
@@ -29,7 +21,6 @@ struct ShiftRowView: View {
                         .foregroundColor(.secondary)
                 }
             }
-
             Spacer()
         }
         .padding(.vertical, 4)

@@ -1,33 +1,15 @@
-//
-//  OwnerPanelView.swift
-//  Restodocks
-//
-
 import SwiftUI
-import CoreData
 
 struct OwnerPanelView: View {
-
-    @Environment(\.managedObjectContext) private var context
     @EnvironmentObject var lang: LocalizationManager
-
-    @FetchRequest(
-        sortDescriptors: [
-            NSSortDescriptor(keyPath: \EmployeeEntity.fullName, ascending: true)
-        ],
-        animation: .default
-    )
-    private var employees: FetchedResults<EmployeeEntity>
+    @EnvironmentObject var accounts: AccountManager
 
     var body: some View {
         List {
-
             Section(header: Text(lang.t("staff"))) {
-
-                ForEach(employees) { employee in
+                ForEach(accounts.employees) { employee in
                     VStack(alignment: .leading, spacing: 4) {
-
-                        Text(employee.fullName ?? "—")
+                        Text(employee.fullName)
                             .font(.headline)
 
                         Text(employee.rolesArray.joined(separator: ", "))
@@ -38,5 +20,8 @@ struct OwnerPanelView: View {
             }
         }
         .navigationTitle(lang.t("owner_panel"))
+        .task {
+            await accounts.fetchEmployees()
+        }
     }
 }

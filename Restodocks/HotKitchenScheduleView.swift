@@ -1,38 +1,24 @@
-//
-//  HotKitchenScheduleView.swift
-//  Restodocks
-//
-//  Created by Stanislav Rebrikov on 1/6/26.
-//
-
-
 import SwiftUI
-import CoreData
 
 struct HotKitchenScheduleView: View {
     @EnvironmentObject var lang: LocalizationManager
-    @Environment(\.managedObjectContext) private var context
-    
-    @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \ShiftEntity.date, ascending: true)],
-        predicate: NSPredicate(format: "department == %@", "hot_kitchen"),
-        animation: .default
-    )
-    private var shifts: FetchedResults<ShiftEntity>
-    
+    @EnvironmentObject var accounts: AccountManager
+
+    private var hotShifts: [Shift] {
+        accounts.shifts.filter { $0.department == "hot_kitchen" }
+    }
+
     var body: some View {
         List {
-            ForEach(shifts, id: \.id) { shift in
+            ForEach(hotShifts) { shift in
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(shift.employee?.fullName ?? "—")
+                    Text(accounts.employeeName(for: shift.employeeId))
                         .font(.headline)
-                    
-                    if let date = shift.date {
-                        Text(formatDate(date))
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
-                    
+
+                    Text(formatDate(shift.date))
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+
                     if shift.fullDay {
                         Text(lang.t("full_day"))
                             .font(.caption)
@@ -44,8 +30,12 @@ struct HotKitchenScheduleView: View {
             }
         }
         .navigationTitle(lang.t("schedule"))
+        .task {
+            await accounts.fetchEmployees()
+            await accounts.fetchShifts()
+        }
     }
-    
+
     private func formatDate(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium

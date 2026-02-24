@@ -2,31 +2,16 @@
 //  PayrollView.swift
 //  Restodocks
 //
-//  ФЗП: сотрудники, стоимость смены/часа, количество смен/часов, итого за месяц.
-//
 
 import SwiftUI
-import CoreData
 
 struct PayrollView: View {
     @EnvironmentObject var lang: LocalizationManager
     @EnvironmentObject var appState: AppState
-    @Environment(\.managedObjectContext) private var context
-
-    @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \EmployeeEntity.fullName, ascending: true)],
-        animation: .default
-    )
-    private var employees: FetchedResults<EmployeeEntity>
-
-    @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \ShiftEntity.date, ascending: true)],
-        animation: .default
-    )
-    private var allShifts: FetchedResults<ShiftEntity>
+    @EnvironmentObject var accounts: AccountManager
 
     @State private var selectedMonth: Date = Date()
-    @State private var editingEmployee: EmployeeEntity?
+    @State private var editingEmployee: Employee?
     @State private var editCost: String = ""
     @State private var editMode: String = "shift"
     @State private var showEditSheet = false
@@ -35,17 +20,12 @@ struct PayrollView: View {
     private var monthStart: Date { calendar.date(from: calendar.dateComponents([.year, .month], from: selectedMonth)) ?? selectedMonth }
     private var monthEnd: Date { calendar.date(byAdding: DateComponents(month: 1, day: -1), to: monthStart) ?? selectedMonth }
 
-    private var shiftsInMonth: [ShiftEntity] {
-        allShifts.filter { shift in
-            guard let d = shift.date else { return false }
-            return d >= monthStart && d <= monthEnd
-        }
+    private var shiftsInMonth: [Shift] {
+        accounts.shifts.filter { $0.date >= monthStart && $0.date <= monthEnd }
     }
 
-    private var shiftsByEmployee: [UUID: [ShiftEntity]] {
-        Dictionary(grouping: shiftsInMonth) { shift in
-            shift.employee?.id ?? UUID()
-        }
+    private var shiftsByEmployee: [UUID: [Shift]] {
+        Dictionary(grouping: shiftsInMonth) { $0.employeeId }
     }
 
     var body: some View {
@@ -56,7 +36,7 @@ struct PayrollView: View {
             }
 
             Section(header: Text(lang.t("staff"))) {
-                ForEach(employees) { emp in
+                ForEach(accounts.employees) { emp in
                     payrollRow(for: emp)
                 }
             }
@@ -73,6 +53,10 @@ struct PayrollView: View {
             }
         }
         .navigationTitle(lang.t("payroll"))
+        .task {
+            await accounts.fetchEmployees()
+            await accounts.fetchShifts()
+        }
         .sheet(isPresented: $showEditSheet) {
             if let emp = editingEmployee {
                 PayrollEditSheet(
@@ -89,18 +73,18 @@ struct PayrollView: View {
         }
     }
 
-    private func payrollRow(for emp: EmployeeEntity) -> some View {
-        let empShifts = shiftsByEmployee[emp.id ?? UUID()] ?? []
+    private func payrollRow(for emp: Employee) -> some View {
+        let empShifts = shiftsByEmployee[emp.id] ?? []
         let (units, total) = calculateForEmployee(emp, shifts: empShifts)
 
         return VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(emp.fullName ?? "—")
+                Text(emp.fullName)
                     .font(.headline)
                 Spacer()
                 Button {
                     editingEmployee = emp
-                    editCost = emp.costPerUnit > 0 ? String(Int(emp.costPerUnit)) : ""
+                    editCost = (emp.costPerUnit ?? 0) > 0 ? String(Int(emp.costPerUnit ?? 0)) : ""
                     editMode = emp.payrollCountingMode ?? "shift"
                     showEditSheet = true
                 } label: {
@@ -114,7 +98,7 @@ struct PayrollView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
                 Spacer()
-                Text("\(formatCurrency(emp.costPerUnit))")
+                Text(formatCurrency(emp.costPerUnit ?? 0))
                     .font(.subheadline)
             }
 
@@ -140,9 +124,9 @@ struct PayrollView: View {
         .padding(.vertical, 4)
     }
 
-    private func calculateForEmployee(_ emp: EmployeeEntity, shifts: [ShiftEntity]) -> (units: Double, total: Double) {
+    private func calculateForEmployee(_ emp: Employee, shifts: [Shift]) -> (units: Double, total: Double) {
         let mode = emp.payrollCountingMode ?? "shift"
-        let cost = emp.costPerUnit
+        let cost = emp.costPerUnit ?? 0
 
         let units: Double
         if mode == "hour" {
@@ -155,23 +139,19 @@ struct PayrollView: View {
     }
 
     private var grandTotal: Double {
-        employees.reduce(0) { sum, emp in
-            let shifts = shiftsByEmployee[emp.id ?? UUID()] ?? []
+        accounts.employees.reduce(0) { sum, emp in
+            let shifts = shiftsByEmployee[emp.id] ?? []
             let (_, total) = calculateForEmployee(emp, shifts: shifts)
             return sum + total
         }
     }
 
-    private func shiftHours(_ shift: ShiftEntity) -> Double {
-        if shift.fullDay {
-            return 8
-        }
-        let start = Int(shift.startHour)
-        let end = Int(shift.endHour)
-        return max(0, Double(end - start))
+    private func shiftHours(_ shift: Shift) -> Double {
+        if shift.fullDay { return 8 }
+        return max(0, Double(shift.endHour - shift.startHour))
     }
 
-    private func unitLabel(_ emp: EmployeeEntity) -> String {
+    private func unitLabel(_ emp: Employee) -> String {
         (emp.payrollCountingMode ?? "shift") == "hour"
             ? lang.t("cost_per_hour")
             : lang.t("cost_per_shift")
@@ -186,19 +166,18 @@ struct PayrollView: View {
         return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
     }
 
-    private func savePayrollConfig(_ emp: EmployeeEntity) {
-        emp.costPerUnit = Double(editCost.replacingOccurrences(of: ",", with: ".")) ?? 0
-        emp.payrollCountingMode = editMode
-        try? context.save()
+    private func savePayrollConfig(_ emp: Employee) {
+        let cost = Double(editCost.replacingOccurrences(of: ",", with: ".")) ?? 0
+        Task {
+            await accounts.updateEmployeePayroll(employeeId: emp.id, costPerUnit: cost, payrollCountingMode: editMode)
+        }
         editingEmployee = nil
         showEditSheet = false
     }
 }
 
-// MARK: - Edit Sheet
-
 struct PayrollEditSheet: View {
-    let employee: EmployeeEntity
+    let employee: Employee
     @Binding var cost: String
     @Binding var mode: String
     let onSave: () -> Void
@@ -209,7 +188,7 @@ struct PayrollEditSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section(header: Text(employee.fullName ?? "—")) {
+                Section(header: Text(employee.fullName)) {
                     Picker(lang.t("calculation_mode"), selection: $mode) {
                         Text(lang.t("per_shift")).tag("shift")
                         Text(lang.t("per_hour")).tag("hour")
@@ -232,4 +211,3 @@ struct PayrollEditSheet: View {
         }
     }
 }
-

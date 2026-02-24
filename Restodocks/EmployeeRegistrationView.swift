@@ -306,44 +306,40 @@ struct EmployeeRegistrationView: View {
         isLoading = true
         showError = false
 
-        // Ищем компанию по названию (очищаем от лишних символов)
-        if let existingCompany = accounts.findCompanyByName(companyName.trimmingCharacters(in: .whitespacesAndNewlines)) {
-            // Компания найдена, проверяем PIN (без учета регистра и лишних символов)
-            let cleanExistingPin = existingCompany.pinCode?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() ?? ""
-            let cleanInputPin = companyPin.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-            if cleanExistingPin == cleanInputPin {
-                // PIN верный, регистрируем сотрудника
-                accounts.createEmployeeForCompany(
-                    existingCompany,
-                    fullName: employeeName,
-                    email: email,
-                    password: password,
-                    department: employeeDepartment,
-                    role: employeeRole
-                )
-                appState.isLoggedIn = true
-            } else {
-                showErrorMessage(getInvalidPinText())
+        Task { @MainActor in
+            do {
+                let name = companyName.trimmingCharacters(in: .whitespacesAndNewlines)
+                if let existingCompany = try await accounts.findCompanyByName(name) {
+                    let cleanExistingPin = existingCompany.pinCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+                    let cleanInputPin = companyPin.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+                    if cleanExistingPin == cleanInputPin {
+                        try await accounts.createEmployeeForCompany(
+                            establishmentId: existingCompany.id,
+                            fullName: employeeName,
+                            email: email,
+                            password: password,
+                            department: employeeDepartment,
+                            role: employeeRole
+                        )
+                        appState.isLoggedIn = true
+                    } else {
+                        showErrorMessage(getInvalidPinText())
+                    }
+                } else {
+                    _ = try await accounts.createCompanyAndOwner(
+                        companyName: name,
+                        fullName: employeeName,
+                        email: email,
+                        password: password,
+                        ownerRole: employeeRole
+                    )
+                    appState.isLoggedIn = true
+                }
+            } catch {
+                showErrorMessage(error.localizedDescription)
             }
-        } else {
-            // Компания не найдена, создаем новую (PIN генерируется автоматически)
-            _ = accounts.createEstablishment(name: companyName.trimmingCharacters(in: .whitespacesAndNewlines))
-            if let newCompany = accounts.establishment {
-                accounts.createEmployeeForCompany(
-                    newCompany,
-                    fullName: employeeName,
-                    email: email,
-                    password: password,
-                    department: employeeDepartment,
-                    role: employeeRole
-                )
-                appState.isLoggedIn = true
-            } else {
-                showErrorMessage(getErrorCreatingCompanyText())
-            }
+            isLoading = false
         }
-
-        isLoading = false
     }
 
     private func showErrorMessage(_ message: String) {

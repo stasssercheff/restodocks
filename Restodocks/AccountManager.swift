@@ -4,33 +4,34 @@
 //
 
 import Foundation
-import CoreData
 import Combine
+import Supabase
 
 final class AccountManager: ObservableObject {
 
-    private let context =
-        PersistenceController.shared.container.viewContext
+    private let client = SupabaseManager.shared.client
 
-    // связь с AppState (НЕ дублируем логику)
     weak var appState: AppState? {
         didSet {
-            // ✅ Sync AppState when connection is established
             if appState != nil {
                 syncAppState()
             }
         }
     }
 
-    @Published var establishment: EstablishmentEntity?
-    @Published var currentEmployee: EmployeeEntity?
+    @Published var establishment: Establishment?
+    @Published var currentEmployee: Employee?
+    @Published var employees: [Employee] = []
+    @Published var shifts: [Shift] = []
+    @Published var isLoading = false
+    @Published var errorMessage: String?
 
     init() {
-        loadEstablishment()
-        loadActiveEmployee()
+        Task {
+            await loadSession()
+        }
     }
-    
-    // MARK: - SYNC
+
     private func syncAppState() {
         if establishment != nil {
             appState?.isCompanyCreated = true
@@ -40,206 +41,408 @@ final class AccountManager: ObservableObject {
         }
     }
 
-    // MARK: - MIGRATION TO SUPABASE
-    func clearAllLocalData() {
-        // Очистить все локальные данные Core Data
-        let fetchRequest: NSFetchRequest<NSFetchRequestResult> = EmployeeEntity.fetchRequest()
-        let deleteRequest = NSBatchDeleteRequest(fetchRequest: fetchRequest)
-
-        let establishmentFetchRequest: NSFetchRequest<NSFetchRequestResult> = EstablishmentEntity.fetchRequest()
-        let establishmentDeleteRequest = NSBatchDeleteRequest(fetchRequest: establishmentFetchRequest)
-
+    // MARK: - SESSION
+    @MainActor
+    private func loadSession() async {
         do {
-            try context.execute(deleteRequest)
-            try context.execute(establishmentDeleteRequest)
-            try context.save()
-
-            // Очистить UserDefaults
-            UserDefaults.standard.removeObject(forKey: "is_company_created")
-            UserDefaults.standard.removeObject(forKey: "company_selected")
-            UserDefaults.standard.removeObject(forKey: "company_pin_code")
-            UserDefaults.standard.removeObject(forKey: "is_logged_in")
-
-            print("✅ All local data cleared for Supabase migration")
+            let session = try await client.auth.session
+            let userId = session.user.id
+            let employees: [Employee] = try await client
+                .from("employees")
+                .select()
+                .eq("id", value: userId.uuidString)
+                .limit(1)
+                .execute()
+                .value
+            if let emp = employees.first {
+                currentEmployee = emp
+                let establishments: [Establishment] = try await client
+                    .from("establishments")
+                    .select()
+                    .eq("id", value: emp.establishmentId.uuidString)
+                    .limit(1)
+                    .execute()
+                    .value
+                establishment = establishments.first
+                appState?.isCompanyCreated = true
+                appState?.isLoggedIn = true
+                if let pin = establishment?.pinCode {
+                    appState?.companyPinCode = pin
+                }
+                await fetchEmployees()
+            }
         } catch {
-            print("❌ Failed to clear local data: \(error)")
+            // Нет сессии — нормально при первом запуске
+        }
+    }
+
+    @MainActor
+    func fetchEmployees() async {
+        guard let estId = establishment?.id else { employees = []; return }
+        do {
+            let list: [Employee] = try await client
+                .from("employees")
+                .select()
+                .eq("establishment_id", value: estId.uuidString)
+                .order("full_name", ascending: true)
+                .execute()
+                .value
+            employees = list
+        } catch {
+            employees = []
+        }
+    }
+
+    @MainActor
+    func fetchShifts() async {
+        guard !employees.isEmpty else { shifts = []; return }
+        do {
+            var all: [Shift] = []
+            for emp in employees {
+                let list: [Shift] = try await client
+                    .from("shifts")
+                    .select()
+                    .eq("employee_id", value: emp.id.uuidString)
+                    .execute()
+                    .value
+                all.append(contentsOf: list)
+            }
+            shifts = all.sorted { ($0.date, $0.startHour) < ($1.date, $1.startHour) }
+        } catch {
+            shifts = []
+        }
+    }
+
+    @MainActor
+    func createShift(employeeId: UUID, date: Date, department: String?, startHour: Int16, endHour: Int16, fullDay: Bool) async throws {
+        struct ShiftInsert: Encodable {
+            let employee_id: String
+            let date: String
+            let department: String?
+            let start_hour: Int
+            let end_hour: Int
+            let full_day: Bool
+        }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let shift = ShiftInsert(
+            employee_id: employeeId.uuidString,
+            date: formatter.string(from: date),
+            department: department,
+            start_hour: Int(startHour),
+            end_hour: Int(endHour),
+            full_day: fullDay
+        )
+        try await client.from("shifts").insert(shift).execute()
+        await fetchShifts()
+    }
+
+    func employeeName(for id: UUID) -> String {
+        employees.first { $0.id == id }?.fullName ?? "—"
+    }
+
+    @MainActor
+    func updateEmployeePayroll(employeeId: UUID, costPerUnit: Double, payrollCountingMode: String) async {
+        do {
+            try await client.from("employees")
+                .update(["cost_per_unit": costPerUnit, "payroll_counting_mode": payrollCountingMode])
+                .eq("id", value: employeeId.uuidString)
+                .execute()
+            await fetchEmployees()
+        } catch {
+            print("❌ Update employee error:", error)
+        }
+    }
+
+    @MainActor
+    func deleteShift(_ shift: Shift) async {
+        do {
+            try await client.from("shifts").delete().eq("id", value: shift.id.uuidString).execute()
+            await fetchShifts()
+        } catch {
+            print("❌ Delete shift error:", error)
         }
     }
 
     // MARK: - COMPANY
-    func createEstablishment(name: String) -> String {
-        // ⚠️ ВРЕМЕННО: сохраняем в Core Data для обратной совместимости
-        // TODO: Перевести на Supabase
-
-        let entity = EstablishmentEntity(context: context)
-        entity.id = UUID()
-        entity.name = name
-
-        // Генерируем PIN код через AppState
+    @MainActor
+    func createEstablishment(name: String) async throws -> String {
+        // 1. Регистрация владельца уже выполнена — получаем user
+        guard let user = try? await client.auth.user() else {
+            throw NSError(domain: "AccountManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not authenticated"])
+        }
         let pinCode = appState?.generatePinCode() ?? "0000"
-        entity.pinCode = pinCode
+        let establishmentId = UUID()
 
-        saveContext()
+        let establishment: [String: AnyJSON] = [
+            "id": .string(establishmentId.uuidString),
+            "name": .string(name),
+            "pin_code": .string(pinCode),
+            "owner_id": .string(user.id.uuidString)
+        ]
 
-        establishment = entity
+        try await client
+            .from("establishments")
+            .insert(establishment)
+            .execute()
+
+        self.establishment = Establishment(
+            id: establishmentId,
+            name: name,
+            pinCode: pinCode,
+            ownerId: user.id
+        )
         appState?.isCompanyCreated = true
-
+        appState?.companyPinCode = pinCode
         return pinCode
     }
 
-    // MARK: - OWNER
+    /// Создание компании и владельца (один вызов для Supabase)
+    @MainActor
+    func createCompanyAndOwner(
+        companyName: String,
+        fullName: String,
+        email: String,
+        password: String,
+        ownerRole: String = "owner"
+    ) async throws -> String {
+        let pinCode = appState?.generatePinCode() ?? "0000"
+
+        // 1. Регистрация в Supabase Auth
+        let session = try await client.auth.signUp(
+            email: email,
+            password: password
+        )
+        guard let user = session.user else {
+            throw NSError(domain: "AccountManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "Sign up failed"])
+        }
+
+        // 2. Создание заведения
+        let establishmentId = UUID()
+        let establishmentRow: [String: AnyJSON] = [
+            "id": .string(establishmentId.uuidString),
+            "name": .string(companyName),
+            "pin_code": .string(pinCode),
+            "owner_id": .string(user.id.uuidString)
+        ]
+        try await client.from("establishments").insert(establishmentRow).execute()
+
+        // 3. Создание записи владельца в employees
+        var roles = ["owner"]
+        if ownerRole != "owner" { roles.append(ownerRole) }
+        struct EmployeeInsert: Encodable {
+            let id: String
+            let full_name: String
+            let email: String
+            let password_hash: String
+            let department: String
+            let roles: [String]
+            let establishment_id: String
+            let personal_pin: String
+            let is_active: Bool
+        }
+        let employeeInsert = EmployeeInsert(
+            id: user.id.uuidString,
+            full_name: fullName,
+            email: email,
+            password_hash: "auth",
+            department: "management",
+            roles: roles,
+            establishment_id: establishmentId.uuidString,
+            personal_pin: pinCode,
+            is_active: true
+        )
+        try await client.from("employees").insert(employeeInsert).execute()
+
+        self.establishment = Establishment(
+            id: establishmentId,
+            name: companyName,
+            pinCode: pinCode,
+            ownerId: user.id
+        )
+        self.currentEmployee = Employee(
+            id: user.id,
+            fullName: fullName,
+            email: email,
+            department: "management",
+            roles: roles,
+            establishmentId: establishmentId,
+            personalPin: pinCode,
+            isActive: true
+        )
+        appState?.isCompanyCreated = true
+        appState?.isLoggedIn = true
+        appState?.companyPinCode = pinCode
+        appState?.currentEmployee = currentEmployee
+        appState?.isCompanySelected = true
+        await fetchEmployees()
+        await fetchShifts()
+        return pinCode
+    }
+
+    /// Устаревший метод — используйте createCompanyAndOwner
+    @MainActor
     func createOwner(
         fullName: String,
         email: String,
         password: String
-    ) {
-        guard let company = establishment else { return }
-
-        let owner = EmployeeEntity(context: context)
-        owner.id = UUID()
-        owner.fullName = fullName
-        owner.email = email
-        owner.password = password
-        owner.rolesArray = ["owner"]
-        owner.isActive = true
-        owner.pinCode = company.pinCode
-        owner.department = "management"
-        owner.establishment = company  // ✅ Set relationship
-
-        saveContext()
-
-        currentEmployee = owner
-        appState?.isLoggedIn = true
+    ) async throws {
+        guard let name = establishment?.name else {
+            throw NSError(domain: "AccountManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "Establishment required"])
+        }
+        _ = try await createCompanyAndOwner(
+            companyName: name,
+            fullName: fullName,
+            email: email,
+            password: password
+        )
     }
 
-    // MARK: - EMPLOYEE
-    func createEmployee(
-        fullName: String,
-        email: String,
-        password: String,
-        department: String,
-        role: String
-    ) {
-        guard let company = establishment else { return }
-
-        let employee = EmployeeEntity(context: context)
-        employee.id = UUID()
-        employee.fullName = fullName
-        employee.email = email
-        employee.password = password
-        employee.department = department
-        employee.rolesArray = [role]
-        employee.isActive = true
-        employee.pinCode = appState?.generatePinCode() ?? "0000" // Генерируем персональный PIN
-        employee.establishment = company
-
-        print("👥 createEmployeeForCompany: saved employee \(fullName) with roles \(employee.rolesArray)")
-
-        saveContext()
-
-        currentEmployee = employee
-        appState?.isLoggedIn = true
-    }
-
-    // MARK: - EMPLOYEE REGISTRATION FOR EXISTING COMPANY
+    // MARK: - EMPLOYEE REGISTRATION (owner creates employee)
+    @MainActor
     func createEmployeeForCompany(
-        _ company: EstablishmentEntity,
+        establishmentId: UUID,
         fullName: String,
         email: String,
         password: String,
         department: String,
         role: String
-    ) {
-        let employee = EmployeeEntity(context: context)
-        employee.id = UUID()
-        employee.fullName = fullName
-        employee.email = email
-        employee.password = password
-        employee.department = department
-        employee.rolesArray = [role]
-        employee.isActive = true
-        employee.pinCode = appState?.generatePinCode() ?? "0000" // Персональный PIN сотрудника
-        employee.establishment = company
+    ) async throws {
+        let personalPin = appState?.generatePinCode() ?? "0000"
 
-        saveContext()
+        // 1. Регистрация в Supabase Auth
+        let session = try await client.auth.signUp(
+            email: email,
+            password: password
+        )
+        guard let user = session.user else {
+            throw NSError(domain: "AccountManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "Sign up failed"])
+        }
 
-        currentEmployee = employee
-        establishment = company
-        appState?.currentEmployee = employee
-        appState?.isCompanyCreated = true
+        // 2. Создание записи сотрудника
+        struct EmployeeInsert: Encodable {
+            let id: String
+            let full_name: String
+            let email: String
+            let password_hash: String
+            let department: String
+            let roles: [String]
+            let establishment_id: String
+            let personal_pin: String
+            let is_active: Bool
+        }
+        let employeeInsert = EmployeeInsert(
+            id: user.id.uuidString,
+            full_name: fullName,
+            email: email,
+            password_hash: "auth",
+            department: department,
+            roles: [role],
+            establishment_id: establishmentId.uuidString,
+            personal_pin: personalPin,
+            is_active: true
+        )
+        try await client.from("employees").insert(employeeInsert).execute()
+
+        self.currentEmployee = Employee(
+            id: user.id,
+            fullName: fullName,
+            email: email,
+            department: department,
+            roles: [role],
+            establishmentId: establishmentId,
+            personalPin: personalPin,
+            isActive: true
+        )
         appState?.isLoggedIn = true
     }
 
     // MARK: - COMPANY SEARCH
-    func findCompanyByName(_ name: String) -> EstablishmentEntity? {
-        let req: NSFetchRequest<EstablishmentEntity> = EstablishmentEntity.fetchRequest()
-        req.predicate = NSPredicate(format: "name ==[c] %@", name)
-        req.fetchLimit = 1
-        return try? context.fetch(req).first
+    func findCompanyByName(_ name: String) async throws -> Establishment? {
+        let req: [Establishment] = try await client
+            .from("establishments")
+            .select()
+            .ilike("name", pattern: name)
+            .limit(1)
+            .execute()
+            .value
+        return req.first
     }
 
-    func findCompanyByPinCode(_ pinCode: String) -> EstablishmentEntity? {
-        let req: NSFetchRequest<EstablishmentEntity> = EstablishmentEntity.fetchRequest()
-        req.predicate = NSPredicate(format: "pinCode ==[c] %@", pinCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased())
-        req.fetchLimit = 1
-        return try? context.fetch(req).first
+    func findCompanyByPinCode(_ pinCode: String) async throws -> Establishment? {
+        let trimmed = pinCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        let req: [Establishment] = try await client
+            .from("establishments")
+            .select()
+            .eq("pin_code", value: trimmed)
+            .limit(1)
+            .execute()
+            .value
+        return req.first
     }
 
-    // MARK: - EMPLOYEE LOGIN
-    func findEmployeeByPinCode(_ pinCode: String) -> EmployeeEntity? {
-        let req: NSFetchRequest<EmployeeEntity> = EmployeeEntity.fetchRequest()
-        req.predicate = NSPredicate(format: "pinCode == %@", pinCode)
-        return try? context.fetch(req).first
-    }
+    // MARK: - EMPLOYEE LOGIN (email + password)
+    @MainActor
+    func signIn(email: String, password: String, companyPin: String) async throws {
+        // 1. Supabase Auth signIn
+        let session = try await client.auth.signIn(
+            email: email,
+            password: password
+        )
+        let userId = session.user.id
 
-    func findEmployeeByEmailAndPassword(_ email: String, _ password: String, inCompany company: EstablishmentEntity) -> EmployeeEntity? {
-        let req: NSFetchRequest<EmployeeEntity> = EmployeeEntity.fetchRequest()
-        req.predicate = NSPredicate(format: "email ==[c] %@ AND password == %@ AND establishment == %@", email, password, company)
-        req.fetchLimit = 1
-        return try? context.fetch(req).first
-    }
+        // 2. Получить employee и establishment
+        let employees: [Employee] = try await client
+            .from("employees")
+            .select()
+            .eq("id", value: userId.uuidString)
+            .limit(1)
+            .execute()
+            .value
 
-    // MARK: - LOAD
-    private func loadEstablishment() {
-        let req: NSFetchRequest<EstablishmentEntity> =
-            EstablishmentEntity.fetchRequest()
-        req.fetchLimit = 1
-        establishment = try? context.fetch(req).first
-
-        if let company = establishment {
-            appState?.isCompanyCreated = true
-            // Загружаем PIN код из Core Data в AppState
-            if let pinCode = company.pinCode {
-                appState?.companyPinCode = pinCode
-            }
+        guard let emp = employees.first else {
+            try? await client.auth.signOut()
+            throw NSError(domain: "AccountManager", code: 403, userInfo: [NSLocalizedDescriptionKey: "Employee not found"])
         }
-    }
 
-    private func loadActiveEmployee() {
-        let req: NSFetchRequest<EmployeeEntity> =
-            EmployeeEntity.fetchRequest()
-        req.predicate = NSPredicate(format: "isActive == YES")
-        req.fetchLimit = 1
+        let establishments: [Establishment] = try await client
+            .from("establishments")
+            .select()
+            .eq("id", value: emp.establishmentId.uuidString)
+            .limit(1)
+            .execute()
+            .value
 
-        if let emp = try? context.fetch(req).first {
-            currentEmployee = emp
-            appState?.isLoggedIn = true
+        guard let company = establishments.first else {
+            try? await client.auth.signOut()
+            throw NSError(domain: "AccountManager", code: 404, userInfo: [NSLocalizedDescriptionKey: "Establishment not found"])
         }
+
+        // 3. Проверить PIN компании
+        let trimmedPin = companyPin.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard company.pinCode == trimmedPin else {
+            try? await client.auth.signOut()
+            throw NSError(domain: "AccountManager", code: 403, userInfo: [NSLocalizedDescriptionKey: "Invalid company PIN"])
+        }
+
+        currentEmployee = emp
+        establishment = company
+        appState?.currentEmployee = emp
+        appState?.isLoggedIn = true
+        appState?.isCompanySelected = true
+        appState?.companyPinCode = company.pinCode
+        await fetchEmployees()
+        await fetchShifts()
     }
 
-    func logout() {
-        currentEmployee?.isActive = false
-        saveContext()
+    // MARK: - LOGOUT
+    @MainActor
+    func logout() async {
+        try? await client.auth.signOut()
         currentEmployee = nil
+        establishment = nil
         appState?.isLoggedIn = false
+        appState?.currentEmployee = nil
     }
 
-    func saveContext() {
-        try? context.save()
-    }
-
-    private static func generatePin() -> String {
-        let chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-        return String((0..<6).compactMap { _ in chars.randomElement() })
-    }
 }

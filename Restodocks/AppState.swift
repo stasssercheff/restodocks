@@ -42,12 +42,12 @@ final class AppState: ObservableObject {
         }
     }
 
-    /// текущий пользователь (не сохраняется, восстанавливается из Core Data)
-    @Published var currentEmployee: EmployeeEntity? {
+    /// текущий пользователь (не сохраняется, восстанавливается из Supabase)
+    @Published var currentEmployee: Employee? {
         didSet {
             objectWillChange.send()
             if let employee = currentEmployee {
-                print("👤 currentEmployee set: \(employee.fullName ?? "unknown"), roles: \(employee.rolesArray)")
+                print("👤 currentEmployee set: \(employee.fullName), roles: \(employee.rolesArray)")
             } else {
                 print("👤 currentEmployee set to nil")
             }
@@ -103,7 +103,7 @@ final class AppState: ObservableObject {
             return false
         }
         let roles = employee.rolesArray
-        print("🔍 canManageSchedule: employee \(employee.fullName ?? "unknown"), roles: \(roles)")
+        print("🔍 canManageSchedule: employee \(employee.fullName), roles: \(roles)")
 
         // Владелец всегда может управлять графиком
         if roles.contains("owner") {

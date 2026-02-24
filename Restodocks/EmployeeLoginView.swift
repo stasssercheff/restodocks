@@ -107,24 +107,18 @@ struct EmployeeLoginView: View {
         isLoading = true
         showError = false
 
-        // Find company by PIN
-        if let company = accounts.findCompanyByPinCode(companyPin) {
-            // Find employee by email and password in this company
-            if let employee = accounts.findEmployeeByEmailAndPassword(email, password, inCompany: company) {
-                accounts.currentEmployee = employee
-                accounts.establishment = company
-                appState.currentEmployee = employee
-                appState.isLoggedIn = true
-                appState.isCompanySelected = true
-                // Navigation will happen automatically
-            } else {
-                showErrorMessage(getInvalidCredentialsText())
+        Task { @MainActor in
+            do {
+                try await accounts.signIn(email: email, password: password, companyPin: companyPin)
+            } catch {
+                if (error as NSError).code == 404 {
+                    showErrorMessage(getCompanyNotFoundText())
+                } else {
+                    showErrorMessage(getInvalidCredentialsText())
+                }
             }
-        } else {
-            showErrorMessage(getCompanyNotFoundText())
+            isLoading = false
         }
-
-        isLoading = false
     }
 
     private func showErrorMessage(_ message: String) {

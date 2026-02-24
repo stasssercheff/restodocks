@@ -4,8 +4,12 @@ struct CreateEstablishmentView: View {
     @EnvironmentObject var lang: LocalizationManager
     @EnvironmentObject var accounts: AccountManager
     @State private var name = ""
+    @State private var ownerName = ""
+    @State private var ownerEmail = ""
+    @State private var ownerPassword = ""
     @State private var showPinCode = false
     @State private var generatedPinCode = ""
+    @State private var errorMessage = ""
 
     var body: some View {
         VStack {
@@ -55,21 +59,48 @@ struct CreateEstablishmentView: View {
                 }
                 .padding()
             } else {
-                // Форма создания компании
                 Form {
                     Section(lang.t("company")) {
                         TextField(lang.t("company_name"), text: $name)
                     }
-
+                    Section(lang.t("owner")) {
+                        TextField(lang.t("name"), text: $ownerName)
+                        TextField(lang.t("email"), text: $ownerEmail)
+                            .keyboardType(.emailAddress)
+                        SecureField(lang.t("password"), text: $ownerPassword)
+                    }
+                    if !errorMessage.isEmpty {
+                        Text(errorMessage).foregroundColor(.red).font(.caption)
+                    }
                     Section {
-                        PrimaryButton(title: lang.t("create_company"), isDisabled: name.isEmpty) {
-                            let pinCode = accounts.createEstablishment(name: name)
-                            generatedPinCode = pinCode
-                            showPinCode = true
+                        PrimaryButton(title: lang.t("create_company"), isDisabled: !isFormValid) {
+                            createCompany()
                         }
                     }
                 }
                 .navigationTitle(lang.t("register_company"))
+            }
+        }
+    }
+
+    private var isFormValid: Bool {
+        !name.isEmpty && !ownerName.isEmpty && !ownerEmail.isEmpty && !ownerPassword.isEmpty
+    }
+
+    private func createCompany() {
+        errorMessage = ""
+        Task { @MainActor in
+            do {
+                let pinCode = try await accounts.createCompanyAndOwner(
+                    companyName: name,
+                    fullName: ownerName,
+                    email: ownerEmail,
+                    password: ownerPassword
+                )
+                generatedPinCode = pinCode
+                showPinCode = true
+            } catch {
+                errorMessage = error.localizedDescription
             }
         }
     }

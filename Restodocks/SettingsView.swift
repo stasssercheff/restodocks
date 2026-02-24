@@ -8,7 +8,7 @@ struct SettingsView: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) private var dismiss
 
-    private var currentEmployee: EmployeeEntity? {
+    private var currentEmployee: Employee? {
         accounts.currentEmployee ?? appState.currentEmployee
     }
 

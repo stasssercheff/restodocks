@@ -1,29 +1,15 @@
-//
-//  ScheduleView.swift
-//  Restodocks
-//
-
 import SwiftUI
-import CoreData
 
 struct ScheduleView: View {
     @EnvironmentObject var lang: LocalizationManager
-    @Environment(\.managedObjectContext) private var context
-
-    @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \ShiftEntity.date, ascending: true)],
-        animation: .default
-    )
-    private var shifts: FetchedResults<ShiftEntity>
+    @EnvironmentObject var accounts: AccountManager
 
     var body: some View {
         NavigationStack {
-
             List {
-                ForEach(shifts) { shift in
+                ForEach(accounts.shifts) { shift in
                     VStack(alignment: .leading, spacing: 6) {
-
-                        Text(shift.employee?.fullName ?? "—")
+                        Text(accounts.employeeName(for: shift.employeeId))
                             .font(.headline)
 
                         Text(formattedDate(shift.date))
@@ -42,6 +28,13 @@ struct ScheduleView: View {
                 .onDelete(perform: deleteShift)
             }
             .navigationTitle(lang.t("schedule"))
+            .task {
+                await accounts.fetchEmployees()
+                await accounts.fetchShifts()
+            }
+            .refreshable {
+                await accounts.fetchShifts()
+            }
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     NavigationLink {
@@ -54,25 +47,16 @@ struct ScheduleView: View {
         }
     }
 
-    // MARK: - DELETE
-
     private func deleteShift(at offsets: IndexSet) {
         for index in offsets {
-            let shift = shifts[index]
-            context.delete(shift)
-        }
-
-        do {
-            try context.save()
-        } catch {
-            print("❌ Delete error:", error)
+            let shift = accounts.shifts[index]
+            Task {
+                await accounts.deleteShift(shift)
+            }
         }
     }
 
-    // MARK: - DATE FORMAT
-
-    private func formattedDate(_ date: Date?) -> String {
-        guard let date else { return "—" }
+    private func formattedDate(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
         return formatter.string(from: date)
