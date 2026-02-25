@@ -944,10 +944,9 @@ class _InventoryScreenState extends State<InventoryScreen>
       });
     }
 
-    // На мобильной при открытой клавиатуре: header не скрываем (чтобы не дёргать layout), футер «Завершить» уводим под клавиатуру.
-    final collapseLayout = _isInputMode && !isNarrow;
-    final hideFooterUnderKeyboard = _isInputMode && isNarrow;
-    final viewInsetsBottom = viewInsets.bottom;
+    // На мобильной при открытой клавиатуре: скрываем футер «Завершить», чтобы вся область — под поля ввода.
+    // Не добавляем SizedBox(viewInsetsBottom) — он забирал место у таблицы и вместо полей показывал белый фон.
+    final collapseLayout = _isInputMode;
 
     return Scaffold(
       appBar: _isInputMode ? AppBar(
@@ -983,7 +982,6 @@ class _InventoryScreenState extends State<InventoryScreen>
                 child: _buildTable(loc),
               ),
               if (!collapseLayout) const Divider(height: 1),
-              if (hideFooterUnderKeyboard) SizedBox(height: viewInsetsBottom),
               _buildFooter(loc, collapseLayout),
             ],
           ),
