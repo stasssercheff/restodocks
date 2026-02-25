@@ -40,11 +40,10 @@ class _LoginScreenState extends State<LoginScreen> {
     final account = context.read<AccountManagerSupabase>();
     final saved = await account.loadRememberedCredentials();
     if (!mounted) return;
-    // Подставляем только в пустые поля — не перезаписываем то, что уже ввёл пользователь или браузер (auto-fill)
-    if (saved.email != null && saved.email!.isNotEmpty && _emailController.text.isEmpty) {
+    if (saved.email != null && saved.email!.isNotEmpty) {
       _emailController.text = saved.email!;
     }
-    if (saved.password != null && saved.password!.isNotEmpty && _passwordController.text.isEmpty) {
+    if (saved.password != null && saved.password!.isNotEmpty) {
       _passwordController.text = saved.password!;
     }
     setState(() {});
@@ -212,12 +211,7 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (result == null) {
-        if (mounted) {
-          final detail = AccountManagerSupabase.lastAuthError;
-          setState(() => _errorMessage = detail != null && detail.isNotEmpty
-              ? '${loc.t('invalid_email_or_password')}\n($detail)'
-              : loc.t('invalid_email_or_password'));
-        }
+        if (mounted) setState(() => _errorMessage = loc.t('invalid_email_or_password'));
         return;
       }
 

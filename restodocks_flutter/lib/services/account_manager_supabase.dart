@@ -379,9 +379,6 @@ class AccountManagerSupabase {
     }
   }
 
-  /// Последняя ошибка Auth (для отображения пользователю при отладке)
-  static String? lastAuthError;
-
   /// Вход по email и паролю: сначала Supabase Auth, при отсутствии — legacy (employees.password_hash)
   Future<({Employee employee, Establishment establishment})?> findEmployeeByEmailAndPasswordGlobal({
     required String email,
@@ -389,8 +386,6 @@ class AccountManagerSupabase {
   }) async {
     final emailTrim = email.trim();
     if (emailTrim.isEmpty) return null;
-
-    lastAuthError = null;
 
     // 1. Пробуем Supabase Auth (для новых учёток)
     try {
@@ -424,17 +419,12 @@ class AccountManagerSupabase {
 
         await _supabase.signOut();
       }
-    } catch (e) {
-      lastAuthError = e.toString();
-      print('🔐 AccountManager: Supabase Auth signIn failed: $e');
+    } catch (_) {
       await _supabase.signOut();
     }
 
     // 2. Legacy: поиск по employees и проверка password_hash
-    final legacy = await _findEmployeeByPasswordHash(emailTrim, password);
-    if (legacy != null) lastAuthError = null;
-    else lastAuthError ??= 'Legacy: сотрудник не найден или неверный пароль';
-    return legacy;
+    return _findEmployeeByPasswordHash(emailTrim, password);
   }
 
   /// Привязка auth_user_id к employee по email (после подтверждения письма)
