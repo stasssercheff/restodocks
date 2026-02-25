@@ -922,20 +922,29 @@ class _InventoryScreenState extends State<InventoryScreen>
     final establishment = account.establishment;
     final employee = account.currentEmployee;
 
-    // Определяем режим ввода (клавиатура открыта или активно поле ввода)
+    // Определяем режим ввода (клавиатура открыта). Обновляем только через addPostFrameCallback,
+    // чтобы не мутировать state во время build — иначе на мобильной версии клавиатура закрывается.
     final viewInsets = MediaQuery.viewInsetsOf(context);
     final isKeyboardOpen = viewInsets.bottom > 0;
-    // Не меняем _isInputMode слишком часто, чтобы не сбивать фокус
+    final isNarrow = MediaQuery.sizeOf(context).width < 600;
+
     if (isKeyboardOpen && !_isInputMode) {
-      _isInputMode = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && MediaQuery.viewInsetsOf(context).bottom > 0) {
+          setState(() => _isInputMode = true);
+        }
+      });
     } else if (!isKeyboardOpen && _isInputMode) {
-      // Задержка перед выключением режима ввода
       Future.delayed(const Duration(milliseconds: 300), () {
         if (mounted && MediaQuery.viewInsetsOf(context).bottom == 0) {
           setState(() => _isInputMode = false);
         }
       });
     }
+
+    // На мобильной версии не скрываем header/footer при открытой клавиатуре — иначе
+    // layout меняется и клавиатура сразу закрывается.
+    final collapseLayout = _isInputMode && !isNarrow;
 
     return Scaffold(
       appBar: _isInputMode ? AppBar(
@@ -965,16 +974,16 @@ class _InventoryScreenState extends State<InventoryScreen>
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (!_isInputMode) _buildHeader(loc, establishment, employee),
-              if (!_isInputMode) const Divider(height: 1),
+              if (!collapseLayout) _buildHeader(loc, establishment, employee, collapseLayout: false),
+              if (!collapseLayout) const Divider(height: 1),
               Expanded(
                 child: _buildTable(loc),
               ),
-              if (!_isInputMode) const Divider(height: 1),
-              _buildFooter(loc),
+              if (!collapseLayout) const Divider(height: 1),
+              _buildFooter(loc, collapseLayout),
             ],
           ),
-          if (!_isInputMode) DataSafetyIndicator(isVisible: true),
+          if (!collapseLayout) DataSafetyIndicator(isVisible: true),
         ],
       ),
     );
@@ -984,12 +993,10 @@ class _InventoryScreenState extends State<InventoryScreen>
   Widget _buildHeader(
     LocalizationService loc,
     Establishment? establishment,
-    Employee? employee,
-  ) {
-    // В режиме ввода скрываем верхний информационный блок
-    if (_isInputMode) {
-      return const SizedBox.shrink();
-    }
+    Employee? employee, {
+    bool collapseLayout = false,
+  }) {
+    // collapseLayout передаётся снаружи; при вызове из body он всегда false (уже отфильтровано)
     final theme = Theme.of(context);
     final narrow = MediaQuery.sizeOf(context).width < 420;
     final dateStr = '${_date.day.toString().padLeft(2, '0')}.${_date.month.toString().padLeft(2, '0')}.${_date.year}';
@@ -1055,7 +1062,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (!_isInputMode) Row(
+                  if (!collapseLayout) Row(
                     children: [
                       Icon(Icons.store, size: 16, color: theme.colorScheme.primary),
                       const SizedBox(width: 4),
@@ -1087,7 +1094,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        if (!_isInputMode) ...[sortAlphabetButton!, const SizedBox(width: 8)],
+                        if (!collapseLayout) ...[sortAlphabetButton!, const SizedBox(width: 8)],
                         Expanded(child: nameFilterField!),
                       ],
                     ),
@@ -1096,7 +1103,7 @@ class _InventoryScreenState extends State<InventoryScreen>
               )
             : Row(
                 children: [
-                  if (!_isInputMode) ...[
+                  if (!collapseLayout) ...[
                     Icon(Icons.store, size: 16, color: theme.colorScheme.primary),
                     const SizedBox(width: 4),
                     Expanded(
@@ -1107,7 +1114,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                       ),
                     ),
                   ],
-                  if (_isInputMode) const Spacer(),
+                  if (collapseLayout) const Spacer(),
                   InkWell(
                     onTap: () => _pickDate(context),
                     child: Padding(
@@ -1125,8 +1132,8 @@ class _InventoryScreenState extends State<InventoryScreen>
                   ),
                   if (sortAlphabetButton != null && nameFilterField != null) ...[
                     const SizedBox(width: 6),
-                    if (!_isInputMode) sortAlphabetButton!,
-                    if (!_isInputMode) const SizedBox(width: 6),
+                    if (!collapseLayout) sortAlphabetButton!,
+                    if (!collapseLayout) const SizedBox(width: 6),
                     nameFilterField!,
                   ],
                 ],
@@ -1171,10 +1178,10 @@ class _InventoryScreenState extends State<InventoryScreen>
   }
 
   /// Компактный нижний блок: не перекрывает таблицу, минимум высоты.
-  Widget _buildFooter(LocalizationService loc) {
+  /// [collapseLayout] — на мобильной при открытой клавиатуре не скрываем, чтобы клавиатура не закрывалась.
+  Widget _buildFooter(LocalizationService loc, bool collapseLayout) {
     final theme = Theme.of(context);
-    // В режиме ввода кнопка "Завершить" фиксируется над клавиатурой
-    if (_isInputMode) {
+    if (collapseLayout) {
       return const SizedBox.shrink();
     }
 
@@ -1196,7 +1203,6 @@ class _InventoryScreenState extends State<InventoryScreen>
                 ),
                 child: Text(
                   loc.t('inventory_complete'),
-                  style: _isInputMode ? const TextStyle(fontSize: 14) : null,
                 ),
               ),
             ),

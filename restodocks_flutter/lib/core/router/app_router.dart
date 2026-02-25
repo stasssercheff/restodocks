@@ -131,10 +131,16 @@ class AppRouter {
         },
       ),
 
-      // Главный экран
+      // Главный экран (tab=0 — вкладка «Домой», для перехода из Профиля/Настроек)
       GoRoute(
         path: '/home',
-        builder: (context, state) => const HomeScreen(),
+        builder: (context, state) {
+          final tabParam = state.queryParameters['tab'];
+          final tab = (tabParam != null && int.tryParse(tabParam) != null)
+              ? int.parse(tabParam).clamp(0, 2)
+              : null;
+          return HomeScreen(initialTabIndex: tab);
+        },
       ),
 
       // Профиль

@@ -8,7 +8,7 @@ Widget appBarHomeButton(BuildContext context) {
   final loc = context.read<LocalizationService>();
   return IconButton(
     icon: const Icon(Icons.home),
-    onPressed: () => GoRouter.of(context).go('/home'),
+    onPressed: () => GoRouter.of(context).go('/home?tab=0'),
     tooltip: loc.t('home'),
   );
 }
