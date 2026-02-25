@@ -259,7 +259,9 @@ class AppRouter {
       ),
       GoRoute(
         path: '/nomenclature',
-        builder: (context, state) => const NomenclatureScreen(),
+        builder: (context, state) {
+          return const NomenclatureScreen();
+        },
       ),
       GoRoute(
         path: '/nomenclature/:department',

@@ -13,7 +13,27 @@ class AiServiceSupabase implements AiService {
   SupabaseClient get _client => Supabase.instance.client;
 
   /// Последняя ошибка парсинга списка продуктов (для диагностики, когда ИИ не распознал данные).
+  /// Хранит пользовательское сообщение, а не сырой JSON.
   static String? lastParseProductListError;
+
+  /// Преобразует сырую ошибку API (JSON, 429 и т.д.) в понятное пользователю сообщение.
+  static String _sanitizeAiError(String raw) {
+    if (raw.isEmpty) return 'Неизвестная ошибка';
+    final lower = raw.toLowerCase();
+    if (lower.contains('429') || lower.contains('resource_exhausted') || lower.contains('quota')) {
+      return 'Превышен лимит запросов к ИИ. Попробуйте позже или проверьте лимиты в AI Studio.';
+    }
+    if (lower.contains('gemini') && lower.contains('{')) {
+      return 'Сервис ИИ временно недоступен. Используется локальный разбор.';
+    }
+    if (lower.contains('functionexception') || lower.contains('status: 500')) {
+      return 'Ошибка сервера ИИ. Используется локальный разбор.';
+    }
+    if (raw.length > 200 || raw.contains('"status"') || raw.contains('"message"')) {
+      return 'ИИ не смог обработать запрос. Используется локальный разбор.';
+    }
+    return raw;
+  }
 
   Future<Map<String, dynamic>?> invoke(String name, Map<String, dynamic> body) async {
     try {
@@ -44,7 +64,7 @@ class AiServiceSupabase implements AiService {
       final res = await _client.functions.invoke('ai-parse-product-list', body: body);
       final data = res.data;
       if (res.status != 200) {
-        lastParseProductListError = 'HTTP ${res.status}';
+        lastParseProductListError = _sanitizeAiError('HTTP ${res.status}');
         return [];
       }
       if (data is! Map<String, dynamic>) {
@@ -52,7 +72,7 @@ class AiServiceSupabase implements AiService {
         return [];
       }
       if (data.containsKey('error') && data['error'] != null) {
-        lastParseProductListError = data['error'].toString();
+        lastParseProductListError = _sanitizeAiError(data['error'].toString());
       }
       final raw = data['items'];
       if (raw is! List) return [];
@@ -67,11 +87,11 @@ class AiServiceSupabase implements AiService {
         );
       }).whereType<ParsedProductItem>().toList();
       if (list.isEmpty && lastParseProductListError == null && data['error'] != null) {
-        lastParseProductListError = data['error'].toString();
+        lastParseProductListError = _sanitizeAiError(data['error'].toString());
       }
       return list;
     } catch (e) {
-      lastParseProductListError = e.toString();
+      lastParseProductListError = _sanitizeAiError(e.toString());
       return [];
     }
   }

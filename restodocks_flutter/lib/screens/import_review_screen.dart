@@ -29,39 +29,10 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
     _items = List.from(widget.items);
   }
 
-  List<ModerationItem> _byCategory(ModerationCategory cat) =>
-      _items.where((i) => i.category == cat && i.approved).toList();
-
-  void _approveAll() {
-    setState(() {
-      _items = _items.map((i) => i.copyWith(approved: true)).toList();
-    });
-  }
-
-  void _deselectAll() {
-    setState(() {
-      _items = _items.map((i) => i.copyWith(approved: false)).toList();
-    });
-  }
-
   void _toggleAll() {
     final allApproved = _items.every((i) => i.approved);
     setState(() {
       _items = _items.map((i) => i.copyWith(approved: !allApproved)).toList();
-    });
-  }
-
-  void _approveAllPriceUpdates() {
-    setState(() {
-      _items = _items.map((i) => i.category == ModerationCategory.priceUpdate
-          ? i.copyWith(approved: true) : i).toList();
-    });
-  }
-
-  void _deselectAllPriceUpdates() {
-    setState(() {
-      _items = _items.map((i) => i.category == ModerationCategory.priceUpdate
-          ? i.copyWith(approved: false) : i).toList();
     });
   }
 
@@ -145,7 +116,7 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
             ),
           ),
         );
-        context.go('/nomenclature');
+        context.go('/nomenclature?refresh=1');
       }
     } catch (e) {
       if (mounted) {
@@ -158,19 +129,6 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
           SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))),
         );
       }
-    }
-  }
-
-  String _categoryTitle(ModerationCategory cat, LocalizationService loc) {
-    switch (cat) {
-      case ModerationCategory.nameFix:
-        return loc.t('moderation_name_fix') ?? 'Исправление названий';
-      case ModerationCategory.priceAnomaly:
-        return loc.t('moderation_price_anomaly') ?? 'Проверка цен';
-      case ModerationCategory.priceUpdate:
-        return loc.t('moderation_price_update') ?? 'Обновление цен';
-      case ModerationCategory.newProduct:
-        return loc.t('moderation_new') ?? 'Новые продукты';
     }
   }
 
@@ -204,37 +162,6 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
               loc.t('import_review_hint') ??
                   'Проверьте данные перед сохранением. Запись в базу произойдёт только после подтверждения.',
               style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                Chip(
-                  label: Text('$approved / ${_items.length}'),
-                  backgroundColor: theme.colorScheme.primaryContainer,
-                ),
-                Chip(
-                  label: Text(loc.t('in_nomenclature_count')?.replaceAll('%s', '${_items.where((i) => i.existingProductId != null).length}') ?? 'В номенклатуре (${_items.where((i) => i.existingProductId != null).length})'),
-                  backgroundColor: theme.colorScheme.secondaryContainer.withOpacity(0.6),
-                ),
-                Chip(
-                  label: Text(loc.t('new_products_count')?.replaceAll('%s', '${_items.where((i) => i.existingProductId == null).length}') ?? 'Новые (${_items.where((i) => i.existingProductId == null).length})'),
-                  backgroundColor: theme.colorScheme.tertiaryContainer.withOpacity(0.6),
-                ),
-                if (_items.any((i) => i.category == ModerationCategory.priceUpdate)) ...[
-                  FilledButton.tonal(
-                    onPressed: _saving ? null : _approveAllPriceUpdates,
-                    child: Text(loc.t('apply_all_price_updates') ?? 'Принять все обновления цен'),
-                  ),
-                  OutlinedButton(
-                    onPressed: _saving ? null : _deselectAllPriceUpdates,
-                    child: Text(loc.t('deselect_price_updates') ?? 'Снять обновления цен'),
-                  ),
-                ],
-              ],
             ),
           ),
           const SizedBox(height: 8),

@@ -291,10 +291,22 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
   List<NomenclatureItem> _nomenclatureItems = [];
   bool _isLoading = true;
 
+  bool _refreshHandled = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _ensureLoaded());
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // При возврате из импорта (?refresh=1) принудительно обновляем данные
+    if (!_refreshHandled && GoRouterState.of(context).uri.queryParameters['refresh'] == '1') {
+      _refreshHandled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _ensureLoaded());
+    }
   }
 
   Future<void> _ensureLoaded() async {
