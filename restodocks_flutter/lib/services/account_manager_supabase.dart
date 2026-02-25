@@ -419,7 +419,8 @@ class AccountManagerSupabase {
 
         await _supabase.signOut();
       }
-    } catch (_) {
+    } catch (e) {
+      print('🔐 AccountManager: Supabase Auth signIn failed: $e');
       await _supabase.signOut();
     }
 
