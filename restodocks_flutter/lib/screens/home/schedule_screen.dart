@@ -325,24 +325,23 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         loc: loc,
         onCopy: (sourceStart, sourceEnd, targetStart, targetEnd, selectedSlots) async {
           var updatedModel = _model;
+          final sourceDates = _getDatesInRange(sourceStart, sourceEnd);
+          final targetDates = _getDatesInRange(targetStart, targetEnd);
+          if (sourceDates.isEmpty || targetDates.isEmpty) return;
+
           for (final slotId in selectedSlots) {
-            final sourceDates = _getDatesInRange(sourceStart, sourceEnd);
-            final targetDates = _getDatesInRange(targetStart, targetEnd);
+            for (var i = 0; i < targetDates.length; i++) {
+              final sourceDate = sourceDates[i % sourceDates.length];
+              final targetDate = targetDates[i];
 
-            if (sourceDates.length == targetDates.length) {
-              for (var i = 0; i < sourceDates.length; i++) {
-                final sourceDate = sourceDates[i];
-                final targetDate = targetDates[i];
+              final assignment = updatedModel.getAssignment(slotId, sourceDate);
+              final timeRange = updatedModel.getTimeRange(slotId, sourceDate);
 
-                final assignment = updatedModel.getAssignment(slotId, sourceDate);
-                final timeRange = updatedModel.getTimeRange(slotId, sourceDate);
-
-                updatedModel = updatedModel.setAssignment(slotId, targetDate, assignment);
-                if (timeRange != null) {
-                  final parts = timeRange.split('|');
-                  if (parts.length >= 2) {
-                    updatedModel = updatedModel.setTimeRange(slotId, targetDate, parts[0].trim(), parts[1].trim());
-                  }
+              updatedModel = updatedModel.setAssignment(slotId, targetDate, assignment);
+              if (timeRange != null) {
+                final parts = timeRange.split('|');
+                if (parts.length >= 2) {
+                  updatedModel = updatedModel.setTimeRange(slotId, targetDate, parts[0].trim(), parts[1].trim());
                 }
               }
             }
@@ -356,7 +355,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             if (mounted) {
               if (ok) {
                 setState(() => _model = updatedModel);
-                scaffoldMessenger.showSnackBar(const SnackBar(content: Text('График скопирован')));
+                scaffoldMessenger.showSnackBar(const SnackBar(content: Text('График вставлен в выбранный диапазон')));
               } else {
                 scaffoldMessenger.showSnackBar(const SnackBar(content: Text('Ошибка: не удалось сохранить график')));
               }
