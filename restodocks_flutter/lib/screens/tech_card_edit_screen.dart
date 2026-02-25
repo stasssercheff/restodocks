@@ -2213,7 +2213,7 @@ class _TtkCookTable extends StatefulWidget {
 class _TtkCookTableState extends State<_TtkCookTable> {
   late List<TTIngredient> _ingredients;
   late double _totalOutput;
-  int _portionsCount = 1; // количество порций в итого (ввод пользователя)
+  double _portionsCount = 1; // количество порций в итого (ввод пользователя), допускаются дробные (0.3)
 
   @override
   void initState() {
@@ -2239,33 +2239,33 @@ class _TtkCookTableState extends State<_TtkCookTable> {
     widget.onIngredientsChanged(_ingredients);
   }
 
+  /// При изменении брутто одного продукта — масштабируем ВСЕ продукты, выход и порции.
   void _updateGrossAt(int index, double newGross) {
     if (index < 0 || index >= _ingredients.length) return;
     final ing = _ingredients[index];
-    final net = newGross * (1.0 - (ing.primaryWastePct.clamp(0.0, 99.9) / 100.0));
-    final loss = ((ing.cookingLossPctOverride ?? 0).clamp(0.0, 99.9) / 100.0);
-    final output = net * (1.0 - loss);
-    final pricePerKg = ing.pricePerKg ?? 0;
-    final newCost = pricePerKg * (newGross / 1000.0);
-    _ingredients[index] = ing.copyWith(
-      grossWeight: newGross,
-      netWeight: net,
-      outputWeight: output,
-      cost: newCost,
-      isNetWeightManual: false,
-    );
+    if (ing.grossWeight <= 0) return;
+    final factor = newGross / ing.grossWeight;
+    if (factor <= 0) return;
+    _ingredients = _ingredients.map((i) => i.scaleBy(factor)).toList();
     _totalOutput = _ingredients.fold<double>(0, (s, i) => s + i.outputWeight);
+    setState(() {});
     widget.onIngredientsChanged(_ingredients);
   }
 
+  /// При изменении нетто одного продукта — масштабируем ВСЕ продукты, выход и порции.
   void _updateNetAt(int index, double newNet) {
     if (index < 0 || index >= _ingredients.length) return;
-    _ingredients[index] = _ingredients[index].updateNetWeightForCook(newNet);
+    final ing = _ingredients[index];
+    if (ing.netWeight <= 0) return;
+    final factor = newNet / ing.netWeight;
+    if (factor <= 0) return;
+    _ingredients = _ingredients.map((i) => i.scaleBy(factor)).toList();
     _totalOutput = _ingredients.fold<double>(0, (s, i) => s + i.outputWeight);
+    setState(() {});
     widget.onIngredientsChanged(_ingredients);
   }
 
-  /// Количество продукта на N порций: outputWeight * (N * weightPerPortion / totalOutput)
+  /// Количество продукта на N порций: outputWeight * (N * weightPerPortion / totalOutput). Допускаются дробные порции (0.3).
   String _portionsAmount(TTIngredient ing) {
     if (ing.productName.isEmpty || _totalOutput <= 0) return '';
     final val = ing.outputWeight * (_portionsCount * widget.weightPerPortion / _totalOutput);
@@ -2371,9 +2371,10 @@ class _TtkCookTableState extends State<_TtkCookTable> {
               child: Padding(
                 padding: _TtkCookTable._cellPad,
                 child: _EditableNetCell(
-                  value: _portionsCount.toDouble(),
+                  value: _portionsCount,
+                  decimalPlaces: 1,
                   onChanged: (v) {
-                    if (v != null && v >= 1) setState(() => _portionsCount = v.toInt().clamp(1, 9999));
+                    if (v != null && v > 0) setState(() => _portionsCount = v.clamp(0.1, 9999.0));
                   },
                 ),
               ),
@@ -2422,10 +2423,19 @@ class _TtkCookTableState extends State<_TtkCookTable> {
 }
 
 class _EditableNetCell extends StatefulWidget {
-  const _EditableNetCell({required this.value, required this.onChanged});
+  const _EditableNetCell({
+    required this.value,
+    required this.onChanged,
+    this.decimalPlaces = 0,
+  });
 
   final double value;
   final void Function(double? v) onChanged;
+  /// Количество знаков после запятой (0 = целые, 1 = 0.3 и т.д.)
+  final int decimalPlaces;
+
+  String _format(double v) =>
+      decimalPlaces == 0 ? v.toStringAsFixed(0) : v.toStringAsFixed(decimalPlaces);
 
   @override
   State<_EditableNetCell> createState() => _EditableNetCellState();
@@ -2438,14 +2448,15 @@ class _EditableNetCellState extends State<_EditableNetCell> {
   @override
   void initState() {
     super.initState();
-    _ctrl = TextEditingController(text: widget.value.toStringAsFixed(0));
+    _ctrl = TextEditingController(text: widget._format(widget.value));
   }
 
   @override
   void didUpdateWidget(covariant _EditableNetCell oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.value != widget.value && _ctrl.text != widget.value.toStringAsFixed(0)) {
-      _ctrl.text = widget.value.toStringAsFixed(0);
+    final fmt = widget._format(widget.value);
+    if (oldWidget.value != widget.value && _ctrl.text != fmt) {
+      _ctrl.text = fmt;
     }
   }
 
