@@ -1135,6 +1135,11 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     setState(() => _ingredients[i] = ing.copyWith(primaryWastePct: waste, netWeight: net, isNetWeightManual: false));
   }
 
+  /// Блок фото: ПФ — сетка до 10, блюдо — 1 фото.
+  Widget _buildPhotoSection(LocalizationService loc, bool effectiveCanEdit) {
+    return const SizedBox.shrink(); // TODO: реализовать отображение/добавление фото
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
@@ -1422,28 +1427,27 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
               child: SizedBox(
                 width: MediaQuery.of(context).size.width > 1000 ? 1000 : MediaQuery.of(context).size.width,
                 child: Container(
-                child: Container(
-                margin: const EdgeInsets.only(top: 12),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Theme.of(context).colorScheme.outline),
-                  color: Theme.of(context).colorScheme.surfaceContainerLowest,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                        border: const Border(bottom: BorderSide(color: Colors.grey, width: 1)),
+                  margin: const EdgeInsets.only(top: 12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Theme.of(context).colorScheme.outline),
+                    color: Theme.of(context).colorScheme.surfaceContainerLowest,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                          border: const Border(bottom: BorderSide(color: Colors.grey, width: 1)),
+                        ),
+                        child: Text(loc.t('ttk_technology'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                       ),
-                      child: Text(loc.t('ttk_technology'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                    ),
-                    SingleChildScrollView(
-                      padding: const EdgeInsets.all(12),
-                      child: effectiveCanEdit
+                      SingleChildScrollView(
+                        padding: const EdgeInsets.all(12),
+                        child: effectiveCanEdit
                             ? TextField(
                                 controller: _technologyController,
                                 maxLines: null,
@@ -1460,12 +1464,12 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                                 _technologyController.text.isEmpty ? '—' : _technologyController.text,
                                 style: const TextStyle(fontSize: 13, height: 1.4),
                               ),
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
             // Блок фото: ПФ — сетка до 10, блюдо — 1 фото
             _buildPhotoSection(loc, effectiveCanEdit),
             if (effectiveCanEdit)
