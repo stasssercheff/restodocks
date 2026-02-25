@@ -39,7 +39,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   bool _loading = true;
   String? _establishmentId;
   List<Employee> _employees = [];
-  bool _showTimeInCells = false; // Показывать время в ячейках графика
 
   @override
   void initState() {
@@ -427,50 +426,18 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       );
     }
 
-    // Строка 1: заголовок «Дата» + даты
+    // Строка 1: заголовок «Дата»
     leftCells.add(leftCell(
       Text(loc.t('schedule_date'), style: TextStyle(fontWeight: FontWeight.w600, color: headerFg, fontSize: 12)),
       height: _rowHeight,
       decoration: BoxDecoration(color: headerBg, border: Border(right: BorderSide(color: borderColor))),
     ));
-    rightRows.add(Container(
-      height: _rowHeight,
-      decoration: BoxDecoration(color: headerBg),
-      child: Row(
-        children: dates.map((d) {
-          final weekend = isWeekend(d);
-          final dayIsToday = isToday(d);
-          final bg = dayIsToday ? todayHighlightBg : (weekend ? weekendHeaderBg : headerBg);
-          final fg = weekend ? weekendHeaderFg : headerFg;
-          return rightCell(
-            Text(DateFormat('dd.MM', localeStr).format(d), textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: fg)),
-            bg: bg,
-          );
-        }).toList(),
-      ),
-    ));
 
-    // Строка 2: «День» + Пн, Вт, ...
+    // Строка 2: «День»
     leftCells.add(leftCell(
       Text(loc.t('schedule_day'), style: TextStyle(fontWeight: FontWeight.w600, color: headerFg, fontSize: 11)),
       height: _rowHeight,
       decoration: BoxDecoration(color: headerBg, border: Border(right: BorderSide(color: borderColor))),
-    ));
-    rightRows.add(Container(
-      height: _rowHeight,
-      decoration: BoxDecoration(color: headerBg),
-      child: Row(
-        children: dates.map((d) {
-          final weekend = isWeekend(d);
-          final dayIsToday = isToday(d);
-          final bg = dayIsToday ? todayHighlightBg : (weekend ? weekendHeaderBg : headerBg);
-          final fg = weekend ? weekendHeaderFg : headerFg;
-          return rightCell(
-            Text(weekdays[d.weekday - 1], textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: fg)),
-            bg: bg,
-          );
-        }).toList(),
-      ),
     ));
 
     for (final section in _model.sections) {
@@ -481,19 +448,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       final sectionBg = theme.colorScheme.secondaryContainer.withOpacity(0.6);
       final sectionFg = theme.colorScheme.onSecondaryContainer;
 
-      // Разделитель цеха: одна единая ячейка (слева — название, справа — одна полоса на все даты, без кучи пустых ячеек)
       leftCells.add(leftCell(
         Text(sectionLabel, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: sectionFg), overflow: TextOverflow.ellipsis),
         height: _rowHeight,
         decoration: BoxDecoration(color: sectionBg, border: Border(right: BorderSide(color: borderColor))),
-      ));
-      rightRows.add(Container(
-        width: dates.length * _dayCellWidth,
-        height: _rowHeight,
-        decoration: BoxDecoration(
-          color: sectionBg,
-          border: Border(right: BorderSide(color: borderColor), bottom: BorderSide(color: borderColor)),
-        ),
       ));
 
       for (final slot in sectionSlots) {
@@ -501,66 +459,83 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           Text(_slotDisplayName(slot), style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
           decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3), border: Border(right: BorderSide(color: borderColor))),
         ));
-        rightRows.add(Container(
-          height: _rowHeight,
-          child: Row(
-            children: dates.map((date) {
-              final val = _cellValue(slot.id, date);
-              final isShift = val == '1';
-              final isDayOff = val == '0';
-              final timeRange = isShift ? _model.getTimeRange(slot.id, date) : null;
-              String timeDisplay = '';
-              if (timeRange != null) {
-                final parts = timeRange.split('|');
-                if (parts.length >= 2) timeDisplay = '${parts[0]}–${parts[1]}';
-              }
-              var bg = isShift ? Colors.green.shade100 : isDayOff ? Colors.amber.shade100 : null;
-              if (isToday(date)) {
-                final base = bg ?? theme.colorScheme.surface;
-                bg = Color.lerp(base, todayHighlightBg, 0.6) ?? base;
-              }
-              final content = _showTimeInCells && isShift
-                  ? (timeDisplay.isNotEmpty
-                      ? Column(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: timeDisplay.split('–').map((time) => Text(
-                            time.trim(),
-                            style: TextStyle(fontSize: 9, fontWeight: FontWeight.w500, color: theme.colorScheme.onSurface),
-                            textAlign: TextAlign.center,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          )).toList(),
-                        )
-                      : Text('—', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: theme.colorScheme.onSurfaceVariant), textAlign: TextAlign.center))
-                  : Column(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(val ?? '—', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: val != null ? theme.colorScheme.onSurface : theme.colorScheme.onSurfaceVariant), textAlign: TextAlign.center),
-                        if (timeDisplay.isNotEmpty && !_showTimeInCells) Text(timeDisplay, style: TextStyle(fontSize: 9, color: theme.colorScheme.onSurface.withOpacity(0.8)), textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis),
-                      ],
-                    );
-              return rightCell(
-                canEdit
-                    ? GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () => _onCellTap(slot.id, date),
-                        child: Container(
-                          constraints: BoxConstraints(
-                            minWidth: isMobile ? 44 : 36,
-                            minHeight: isMobile ? 44 : 36,
-                          ),
-                          child: content,
-                        ),
-                      )
-                    : content,
-                bg: bg,
-              );
-            }).toList(),
-          ),
-        ));
       }
+    }
+
+    /// Строит один столбец даты для ListView.builder (виртуализация — строятся только видимые столбцы)
+    Widget buildDateColumn(int index) {
+      final d = dates[index];
+      final columnChildren = <Widget>[];
+
+      final weekend = isWeekend(d);
+      final dayIsToday = isToday(d);
+      final headerCellBg = dayIsToday ? todayHighlightBg : (weekend ? weekendHeaderBg : headerBg);
+      final headerCellFg = weekend ? weekendHeaderFg : headerFg;
+
+      columnChildren.add(rightCell(
+        Text(DateFormat('dd.MM', localeStr).format(d), textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: headerCellFg)),
+        bg: headerCellBg,
+      ));
+      columnChildren.add(rightCell(
+        Text(weekdays[d.weekday - 1], textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: headerCellFg)),
+        bg: headerCellBg,
+      ));
+
+      for (final section in _model.sections) {
+        final sectionSlots = _model.slotsBySection[section.id] ?? [];
+        if (sectionSlots.isEmpty) continue;
+        final sectionBg = theme.colorScheme.secondaryContainer.withOpacity(0.6);
+
+        columnChildren.add(rightCell(const SizedBox.shrink(), bg: sectionBg));
+
+        for (final slot in sectionSlots) {
+          final val = _cellValue(slot.id, d);
+          final isShift = val == '1';
+          final isDayOff = val == '0';
+          final timeRange = isShift ? _model.getTimeRange(slot.id, d) : null;
+          String timeDisplay = '';
+          if (timeRange != null) {
+            final parts = timeRange.split('|');
+            if (parts.length >= 2) timeDisplay = '${parts[0]}–${parts[1]}';
+          }
+          var bg = isShift ? Colors.green.shade100 : isDayOff ? Colors.amber.shade100 : null;
+          if (isToday(d)) {
+            final base = bg ?? theme.colorScheme.surface;
+            bg = Color.lerp(base, todayHighlightBg, 0.6) ?? base;
+          }
+          final displayText = isDayOff
+              ? loc.t('schedule_day_off')
+              : (isShift && timeDisplay.isNotEmpty ? timeDisplay : (val ?? '—'));
+          final content = Text(
+            displayText,
+            style: TextStyle(
+              fontSize: timeDisplay.isNotEmpty && isShift ? 9 : 12,
+              fontWeight: FontWeight.w600,
+              color: val != null ? theme.colorScheme.onSurface : theme.colorScheme.onSurfaceVariant,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          );
+          columnChildren.add(rightCell(
+            canEdit
+                ? GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => _onCellTap(slot.id, d),
+                    child: Container(
+                      constraints: BoxConstraints(minWidth: isMobile ? 44 : 36, minHeight: isMobile ? 44 : 36),
+                      child: content,
+                    ),
+                  )
+                : content,
+            bg: bg,
+          ));
+        }
+      }
+
+      return RepaintBoundary(
+        child: Column(mainAxisSize: MainAxisSize.min, children: columnChildren),
+      );
     }
 
     return Scaffold(
@@ -568,18 +543,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
         title: Text(loc.t('schedule')),
         actions: [
-          if (canEdit) ...[
+          if (canEdit)
             IconButton(
               icon: const Icon(Icons.copy),
               onPressed: _showCopyRangeDialog,
               tooltip: 'Копировать диапазон',
             ),
-            IconButton(
-              icon: Icon(_showTimeInCells ? Icons.access_time : Icons.access_time_outlined),
-              onPressed: () => setState(() => _showTimeInCells = !_showTimeInCells),
-              tooltip: _showTimeInCells ? 'Скрыть время' : 'Показать время',
-            ),
-          ],
           IconButton(icon: const Icon(Icons.home), onPressed: () => context.go('/home'), tooltip: loc.t('home')),
         ],
       ),
@@ -591,27 +560,30 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: Text(loc.t('schedule_view_only_hint') ?? 'Редактирование графика доступно шеф-повару и су-шефу.', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
             ),
+          const SizedBox(height: 12),
           Expanded(
             child: SingleChildScrollView(
               scrollDirection: Axis.vertical,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(
-                    width: _slotColumnWidth,
-                    child: Column(mainAxisSize: MainAxisSize.min, children: leftCells),
-                  ),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      controller: _horizontalScrollController,
-                      scrollDirection: Axis.horizontal,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: rightRows,
+              child: SizedBox(
+                height: leftCells.length * _rowHeight,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: _slotColumnWidth,
+                      child: Column(mainAxisSize: MainAxisSize.min, children: leftCells),
+                    ),
+                    Expanded(
+                      child: ListView.builder(
+                        controller: _horizontalScrollController,
+                        scrollDirection: Axis.horizontal,
+                        itemCount: dates.length,
+                        itemExtent: _dayCellWidth,
+                        itemBuilder: (context, index) => buildDateColumn(index),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -654,7 +626,7 @@ class _ScheduleCellDialogState extends State<_ScheduleCellDialog> {
     _selectedValue = widget.initialValue.isEmpty ? '1' : widget.initialValue;
     _startCtrl = TextEditingController(text: widget.initialStart);
     _endCtrl = TextEditingController(text: widget.initialEnd);
-    _showTime = widget.initialStart.isNotEmpty && widget.initialEnd.isNotEmpty;
+    _showTime = false; // По умолчанию выключен при открытии диалога
   }
 
   @override
