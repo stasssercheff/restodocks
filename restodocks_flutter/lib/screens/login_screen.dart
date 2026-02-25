@@ -211,7 +211,12 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (result == null) {
-        if (mounted) setState(() => _errorMessage = loc.t('invalid_email_or_password'));
+        if (mounted) {
+          final detail = AccountManagerSupabase.lastAuthError;
+          setState(() => _errorMessage = detail != null && detail.isNotEmpty
+              ? '${loc.t('invalid_email_or_password')}\n($detail)'
+              : loc.t('invalid_email_or_password'));
+        }
         return;
       }
 
