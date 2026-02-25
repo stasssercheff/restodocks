@@ -109,10 +109,28 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     return '$first$surnameLetter'.trim();
   }
 
-  String? _slotPosition(ScheduleSlot slot) {
+  /// Должность для отображения в графике. Собственник — не должность; если есть должность — показываем её (напр. «Шеф»), иначе null.
+  String? _slotPosition(ScheduleSlot slot, LocalizationService loc) {
     if (slot.employeeId == null) return null;
     final emp = _employees.where((e) => e.id == slot.employeeId).firstOrNull;
-    return emp?.roleDisplayName;
+    if (emp == null) return null;
+    final pos = emp.positionRole;
+    if (pos == null || pos.isEmpty) return null;
+    return _positionDisplayName(pos, loc);
+  }
+
+  String _positionDisplayName(String code, LocalizationService loc) {
+    switch (code) {
+      case 'executive_chef': return loc.t('executive_chef');
+      case 'sous_chef': return loc.t('sous_chef');
+      case 'bartender': return loc.t('bartender');
+      case 'waiter': return loc.t('waiter');
+      case 'bar_manager': return loc.t('bar_manager');
+      case 'floor_manager': return loc.t('floor_manager');
+      case 'general_manager': return loc.t('general_manager');
+      case 'manager': return loc.t('manager');
+      default: return code;
+    }
   }
 
   String _getSectionIdForEmployee(Employee employee, List<ScheduleSection> sections) {
@@ -506,7 +524,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       ));
 
       for (final slot in sectionSlots) {
-      final position = _slotPosition(slot);
+      final position = _slotPosition(slot, loc);
       leftCells.add(leftCell(
         Column(
           mainAxisAlignment: MainAxisAlignment.center,
