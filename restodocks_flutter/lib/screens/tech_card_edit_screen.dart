@@ -2374,7 +2374,13 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                   value: _portionsCount,
                   decimalPlaces: 1,
                   onChanged: (v) {
-                    if (v != null && v > 0) setState(() => _portionsCount = v.clamp(0.1, 9999.0));
+                    if (v == null || v <= 0) return;
+                    setState(() {
+                      _portionsCount = v.clamp(0.1, 9999.0);
+                      // Пересчёт всей таблицы под N порций: брутто, нетто, выход по всем продуктам и в Итого
+                      final targetOutput = _portionsCount * widget.weightPerPortion;
+                      _scaleByOutput(targetOutput);
+                    });
                   },
                 ),
               ),
@@ -2434,8 +2440,11 @@ class _EditableNetCell extends StatefulWidget {
   /// Количество знаков после запятой (0 = целые, 1 = 0.3 и т.д.)
   final int decimalPlaces;
 
-  String _format(double v) =>
-      decimalPlaces == 0 ? v.toStringAsFixed(0) : v.toStringAsFixed(decimalPlaces);
+  /// Целые без .0 (1, 2), дробные с одним знаком (0.5, 0.3).
+  String _format(double v) {
+    if (decimalPlaces == 0) return v.toStringAsFixed(0);
+    return v == v.truncateToDouble() ? v.toInt().toString() : v.toStringAsFixed(decimalPlaces);
+  }
 
   @override
   State<_EditableNetCell> createState() => _EditableNetCellState();
