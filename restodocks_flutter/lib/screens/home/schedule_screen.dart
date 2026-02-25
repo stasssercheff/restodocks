@@ -107,6 +107,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     return '$first$surnameLetter'.trim();
   }
 
+  String? _slotPosition(ScheduleSlot slot) {
+    if (slot.employeeId == null) return null;
+    final emp = _employees.where((e) => e.id == slot.employeeId).firstOrNull;
+    return emp?.roleDisplayName;
+  }
+
   String _getSectionIdForEmployee(Employee employee, List<ScheduleSection> sections) {
     if (sections.isEmpty) return '';
 
@@ -418,7 +424,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
     // Строки таблицы: левая колонка (имена) и правая часть (даты) — чтобы при горизонтальной прокрутке левая колонка оставалась на месте
     final leftCells = <Widget>[];
-    final rightRows = <Widget>[];
 
     Widget leftCell(Widget child, {double? height, BoxDecoration? decoration}) {
       return Container(
@@ -430,14 +435,17 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       );
     }
 
-    Widget rightCell(Widget child, {Color? bg}) {
+    Widget rightCell(Widget child, {Color? bg, bool mergeRight = false}) {
       return Container(
         width: _dayCellWidth,
         height: _rowHeight,
         padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
         decoration: BoxDecoration(
           color: bg,
-          border: Border(right: BorderSide(color: borderColor), bottom: BorderSide(color: borderColor)),
+          border: Border(
+            right: mergeRight ? BorderSide.none : BorderSide(color: borderColor),
+            bottom: BorderSide(color: borderColor),
+          ),
         ),
         alignment: Alignment.center,
         child: child,
@@ -469,14 +477,40 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       leftCells.add(leftCell(
         Text(sectionLabel, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: sectionFg), overflow: TextOverflow.ellipsis),
         height: _rowHeight,
-        decoration: BoxDecoration(color: sectionBg, border: Border(right: BorderSide(color: borderColor))),
+        decoration: BoxDecoration(
+          color: sectionBg,
+          border: Border(right: BorderSide(color: borderColor), bottom: BorderSide(color: borderColor)),
+        ),
       ));
 
       for (final slot in sectionSlots) {
-        leftCells.add(leftCell(
-          Text(_slotDisplayName(slot), style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
-          decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3), border: Border(right: BorderSide(color: borderColor))),
-        ));
+      final position = _slotPosition(slot);
+      leftCells.add(leftCell(
+        Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _slotDisplayName(slot),
+              style: TextStyle(fontSize: isMobile ? 11 : 12),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
+            if (position != null && position.isNotEmpty)
+              Text(
+                position,
+                style: TextStyle(fontSize: isMobile ? 8 : 9, color: theme.colorScheme.onSurfaceVariant),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+          ],
+        ),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+          border: Border(right: BorderSide(color: borderColor), bottom: BorderSide(color: borderColor)),
+        ),
+      ));
       }
     }
 
@@ -484,6 +518,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     Widget buildDateColumn(int index) {
       final d = dates[index];
       final columnChildren = <Widget>[];
+      final isLastColumn = index == dates.length - 1;
 
       final weekend = isWeekend(d);
       final dayIsToday = isToday(d);
@@ -504,7 +539,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         if (sectionSlots.isEmpty) continue;
         final sectionBg = theme.colorScheme.secondaryContainer.withOpacity(0.6);
 
-        columnChildren.add(rightCell(const SizedBox.shrink(), bg: sectionBg));
+        // Объединённая строка раздела: без правой границы между ячейками (mergeRight), чтобы визуально сливались
+        columnChildren.add(rightCell(const SizedBox.shrink(), bg: sectionBg, mergeRight: !isLastColumn));
 
         for (final slot in sectionSlots) {
           final val = _cellValue(slot.id, d);
