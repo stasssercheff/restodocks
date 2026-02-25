@@ -533,11 +533,12 @@ class AccountManagerSupabase {
         debugPrint('🔐 Login: Legacy - no matching password for any employee');
       }
       return null;
-    } catch (e) {
+    } catch (e, st) {
       if (kDebugMode) {
         debugPrint('🔐 Login: Legacy error: $e');
+        debugPrint('🔐 Login: Stack: $st');
       }
-      return null;
+      rethrow; // чтобы не маскировать ошибку как «неверный пароль»
     }
   }
 
