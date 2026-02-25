@@ -112,8 +112,15 @@ class Establishment extends Equatable {
     return cleanInput == cleanStored;
   }
 
-  /// JSON сериализация
-  factory Establishment.fromJson(Map<String, dynamic> json) => _$EstablishmentFromJson(json);
+  /// JSON сериализация (защита от null из БД/API на Web)
+  factory Establishment.fromJson(Map<String, dynamic> json) {
+    final m = Map<String, dynamic>.from(json);
+    m['id'] = m['id']?.toString() ?? '';
+    m['name'] = m['name']?.toString() ?? '';
+    m['pin_code'] = m['pin_code']?.toString() ?? '';
+    m['owner_id'] = m['owner_id']?.toString() ?? '';
+    return _$EstablishmentFromJson(m);
+  }
   Map<String, dynamic> toJson() => _$EstablishmentToJson(this);
 
   @override

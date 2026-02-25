@@ -344,12 +344,26 @@ class Employee extends Equatable {
     return '$fullName (${roleDisplayName})';
   }
 
-  /// JSON сериализация
+  /// JSON сериализация (защита от null из БД/API на Web)
   factory Employee.fromJson(Map<String, dynamic> json) {
     final m = Map<String, dynamic>.from(json);
     final ph = m['password_hash'];
     m['password_hash'] = (ph == null || ph is! String) ? '' : ph;
+    m['id'] = _str(m['id'], '');
+    m['email'] = _str(m['email'], '');
+    m['establishment_id'] = _str(m['establishment_id'], '');
+    m['department'] = _str(m['department'], 'management');
+    m['full_name'] = _str(m['full_name'], '');
     return _$EmployeeFromJson(m);
+  }
+  static String _str(dynamic v, String fallback) {
+    if (v == null) return fallback;
+    try {
+      final s = v.toString();
+      return s.isNotEmpty ? s : fallback;
+    } catch (_) {
+      return fallback;
+    }
   }
   Map<String, dynamic> toJson() => _$EmployeeToJson(this);
 

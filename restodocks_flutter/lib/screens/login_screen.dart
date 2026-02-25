@@ -234,8 +234,9 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       if (!mounted) return;
       final loc = context.read<LocalizationService>();
+      final errStr = _safeErrorString(e, loc.t('invalid_email_or_password'));
       setState(() {
-        _errorMessage = loc.t('login_error', args: {'error': e.toString()});
+        _errorMessage = loc.t('login_error', args: {'error': errStr});
       });
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -299,6 +300,26 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       },
     );
+  }
+
+  /// Безопасное преобразование ошибки в строку (избегаем JSNull на Web)
+  /// Для ошибок Auth (400, invalid_grant) показываем [authErrorFallback]
+  String _safeErrorString(Object? e, String authErrorFallback) {
+    if (e == null) return authErrorFallback;
+    try {
+      final s = e.toString();
+      if (s.isEmpty) return authErrorFallback;
+      // Ошибки Auth при 400/token — показываем понятное сообщение
+      if (s.contains('JSNull') ||
+          s.contains('invalid_grant') ||
+          s.contains('Invalid login credentials') ||
+          (s.contains('400') && s.toLowerCase().contains('token'))) {
+        return authErrorFallback;
+      }
+      return s;
+    } catch (_) {
+      return authErrorFallback;
+    }
   }
 
   String _flag(String code) {

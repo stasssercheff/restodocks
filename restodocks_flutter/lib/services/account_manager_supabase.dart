@@ -414,7 +414,9 @@ class AccountManagerSupabase {
       if (kDebugMode) {
         debugPrint('🔐 Login: Supabase Auth failed: $authErr');
       }
-      await _supabase.signOut();
+      try {
+        await _supabase.signOut();
+      } catch (_) { /* игнор при ошибке выхода */ }
     }
 
     // 2. Legacy: поиск по employees и проверка password_hash
