@@ -757,10 +757,12 @@ class _InventoryScreenState extends State<InventoryScreen>
       }
       sheet1.appendRow(headerCells);
 
-      // Добавляем все продукты и ПФ
+      // Добавляем все продукты и ПФ в алфавитном порядке по наименованию
+      final rowsSorted = List<Map<String, dynamic>>.from(rows.map((e) => e as Map<String, dynamic>))
+        ..sort((a, b) => ((a['productName'] as String?) ?? '').toLowerCase().compareTo(((b['productName'] as String?) ?? '').toLowerCase()));
       var rowNum = 1;
-      for (var i = 0; i < rows.length; i++) {
-        final r = rows[i] as Map<String, dynamic>;
+      for (var i = 0; i < rowsSorted.length; i++) {
+        final r = rowsSorted[i];
         final name = r['productName'] as String? ?? '';
         final unit = r['unit'] as String? ?? '';
         final total = r['total'] as num? ?? 0;
@@ -810,7 +812,7 @@ class _InventoryScreenState extends State<InventoryScreen>
         }
 
         final groupedList = groupedProducts.values.toList()
-          ..sort((a, b) => (a['productName'] as String).compareTo(b['productName'] as String));
+          ..sort((a, b) => ((a['productName'] as String?) ?? '').toLowerCase().compareTo(((b['productName'] as String?) ?? '').toLowerCase()));
 
         for (var i = 0; i < groupedList.length; i++) {
           final p = groupedList[i];
@@ -883,9 +885,9 @@ class _InventoryScreenState extends State<InventoryScreen>
         }
       }
 
-      // Выводим все продукты в отсортированном порядке
+      // Выводим все продукты в алфавитном порядке по наименованию
       final sortedProducts = allProducts.values.toList()
-        ..sort((a, b) => (a['productName'] as String).compareTo(b['productName'] as String));
+        ..sort((a, b) => ((a['productName'] as String?) ?? '').toLowerCase().compareTo(((b['productName'] as String?) ?? '').toLowerCase()));
 
       for (var i = 0; i < sortedProducts.length; i++) {
         final p = sortedProducts[i];
