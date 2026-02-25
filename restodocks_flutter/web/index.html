@@ -63,9 +63,13 @@
 <body>
   <script>
     (function() {
+      // Path-based: /tech-cards и т.д.
       var path = (window.location.pathname || '').replace(/\/$/, '');
+      // Hash-based (наш случай): #/tech-cards, #/inventory и т.д.
+      var hash = (window.location.hash || '').replace(/^#/, '').split('?')[0];
+      var hasInternalRoute = (path.length > 1 && path !== '/') || (hash.length > 1 && hash !== '/' && hash !== '');
       var sameOrigin = document.referrer && document.referrer.indexOf(window.location.origin) === 0;
-      if ((path.length > 1 && path !== '/') || sameOrigin) document.body.classList.add('loading-refresh');
+      if (hasInternalRoute || sameOrigin) document.body.classList.add('loading-refresh');
     })();
   </script>
   <div id="loading-screen"></div>
