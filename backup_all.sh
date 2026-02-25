@@ -40,6 +40,14 @@ else
     echo "   ⚠️ Файл backup_config.env не найден"
 fi
 
+# 2b. Бэкап Vercel env и Supabase Auth чеклиста
+echo ""
+echo "📋 ШАГ 2b: Бэкап Vercel env и Supabase Auth..."
+if [ -f "scripts/backup_extras.sh" ]; then
+    chmod +x scripts/backup_extras.sh 2>/dev/null || true
+    ./scripts/backup_extras.sh "$BACKUP_DIR" 2>/dev/null || true
+fi
+
 # 3. БЭКАП STORAGE
 echo ""
 echo "💾 ШАГ 3: Бэкап файлового хранилища..."
@@ -84,10 +92,9 @@ echo ""
 echo "✅ Содержимое:"
 echo "   • Исходный код проекта"
 echo "   • Supabase миграции и функции"
-echo "   • Конфигурационные файлы"
-if [ -f "$BACKUP_DIR/database.sql.gz" ]; then
-    echo "   • База данных PostgreSQL"
-fi
+echo "   • База данных PostgreSQL (employees, auth.users, RLS)"
+echo "   • Vercel env (если vercel CLI настроен)"
+echo "   • Supabase Auth чеклист (при сбое входа)"
 echo "   • Файловое хранилище (если есть файлы)"
 echo ""
 echo "💡 Для восстановления используйте скрипт restore.sh из архива"

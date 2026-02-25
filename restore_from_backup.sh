@@ -49,6 +49,9 @@ echo ""
 
 # 2. Восстановление кода
 echo "📦 ШАГ 2: Восстановление кода..."
+if [ -L "supabase/functions" ]; then
+    rm -f supabase/functions && mkdir -p supabase/functions
+fi
 if [ -d "$EXTRACTED_DIR/code" ]; then
     echo "   Копируем код проекта..."
     cp -r "$EXTRACTED_DIR/code"/* ./
@@ -95,13 +98,13 @@ echo "====================================="
 if [ -f "$EXTRACTED_DIR/database.sql.gz" ]; then
     echo "✅ ДАМП БАЗЫ ДАННЫХ НАЙДЕН!"
     echo ""
-    echo "📋 ИНСТРУКЦИИ:"
-    echo "1. Распакуйте дамп: gunzip database.sql.gz"
-    echo "2. Создайте новую базу данных в Supabase"
-    echo "3. Восстановите данные:"
-    echo "   psql 'postgresql://postgres:[ПАРОЛЬ]@db.osglfptwbuqqmqunttha.supabase.co:5432/postgres' < database.sql"
+    echo "📋 Восстановить БД (employees, auth.users, RLS, данные):"
+    echo "   gunzip -c $EXTRACTED_DIR/database.sql.gz | psql \"\$SUPABASE_DB_URL\""
     echo ""
-    echo "⚠️  ВАЖНО: Используйте новый пароль базы данных!"
+    echo "   Или вручную: gunzip -k $EXTRACTED_DIR/database.sql.gz"
+    echo "   затем: psql 'postgresql://postgres:[ПАРОЛЬ]@db.osglfptwbuqqmqunttha.supabase.co:5432/postgres' < $EXTRACTED_DIR/database.sql"
+    echo ""
+    echo "   При сбое входа см. scripts/fix_login_diagnostic.sql"
 else
     echo "⚠️ ДАМП БАЗЫ ДАННЫХ НЕ НАЙДЕН В АРХИВЕ"
     echo "   Возможно, pg_dump не был настроен во время бэкапа"
