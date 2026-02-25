@@ -434,10 +434,19 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     // Строки таблицы: левая колонка (имена) и правая часть (даты) — чтобы при горизонтальной прокрутке левая колонка оставалась на месте
     final leftCells = <Widget>[];
 
-    Widget leftCell(Widget child, {double? height, BoxDecoration? decoration}) {
+    Border leftCellBorder({bool top = false}) => Border(
+      left: BorderSide(color: borderColor),
+      right: BorderSide(color: borderColor),
+      top: top ? BorderSide(color: borderColor) : BorderSide.none,
+      bottom: BorderSide(color: borderColor),
+    );
+
+    Widget leftCell(Widget child, {double? height, BoxDecoration? decoration, bool withTopBorder = false}) {
       return Container(
         height: height ?? _rowHeight,
-        decoration: decoration != null ? BoxDecoration(border: Border(right: BorderSide(color: borderColor))) : null,
+        decoration: (decoration ?? BoxDecoration()).copyWith(
+          border: leftCellBorder(top: withTopBorder),
+        ),
         padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
         alignment: Alignment.centerLeft,
         child: child,
@@ -465,7 +474,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     leftCells.add(leftCell(
       Text(loc.t('schedule_date'), style: TextStyle(fontWeight: FontWeight.w600, color: headerFg, fontSize: 12)),
       height: _rowHeight,
-      decoration: BoxDecoration(color: headerBg, border: Border(right: BorderSide(color: borderColor))),
+      decoration: BoxDecoration(color: headerBg),
+      withTopBorder: true,
     ));
 
     // Строка 2: «День»
