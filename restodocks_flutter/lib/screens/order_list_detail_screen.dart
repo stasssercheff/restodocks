@@ -126,8 +126,7 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
       double pricePerKg = 0;
       if (item.productId != null) {
         final ep = store.getEstablishmentPrice(item.productId!, establishment.id);
-        final product = store.findProductById(item.productId!);
-        pricePerKg = ep?.$1 ?? product?.basePrice ?? 0;
+        pricePerKg = ep?.$1 ?? 0;
       }
       double pricePerUnit = pricePerKg;
       if (item.unit == 'g' || item.unit == 'г') {
