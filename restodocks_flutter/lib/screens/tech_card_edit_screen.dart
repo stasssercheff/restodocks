@@ -1,5 +1,9 @@
+import 'dart:typed_data';
+
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../models/models.dart';
@@ -412,6 +416,7 @@ TechCard _applyEdits(
   double? portionWeight,
   double? yieldGrams,
   Map<String, String>? technologyLocalized,
+  List<String>? photoUrls,
   List<TTIngredient>? ingredients,
 }) {
   return t.copyWith(
@@ -422,6 +427,7 @@ TechCard _applyEdits(
     portionWeight: portionWeight,
     yield: yieldGrams,
     technologyLocalized: technologyLocalized,
+    photoUrls: photoUrls,
     ingredients: ingredients,
   );
 }
@@ -475,8 +481,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   List<TechCard> _pickerTechCards = [];
   List<TechCard> _semiFinishedProducts = [];
   double _portionWeight = 100; // вес порции (г), вносится в столбец «вес прц» в итого
+  /// URL фото с сервера (для существующей ТТК)
+  List<String> _photoUrls = [];
+  /// Фото, выбранные для новой ТТК до первого сохранения (загружаем после create)
+  List<Uint8List> _pendingPhotoBytes = [];
 
   bool get _isNew => widget.techCardId.isEmpty || widget.techCardId == 'new';
+  /// Макс. фото: ПФ — 10, блюдо — 1
+  int get _maxPhotos => _isSemiFinished ? 10 : 1;
 
   String _categoryLabel(String c, String lang) {
     final Map<String, Map<String, String>> categoryTranslations = {
@@ -595,6 +607,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
             _selectedCategory = _categoryOptions.contains(tc.category) ? tc.category : 'misc';
             _selectedSection = tc.section;
             _isSemiFinished = tc.isSemiFinished;
+            _photoUrls = tc.photoUrls ?? [];
+            _pendingPhotoBytes = [];
             _technologyController.text = tc.getLocalizedTechnology(context.read<LocalizationService>().currentLanguageCode);
             _ingredients
               ..clear()
@@ -671,13 +685,26 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           createdBy: emp.id,
         );
         var updated = _applyEdits(created, portionWeight: _portionWeight, yieldGrams: yieldVal, technologyLocalized: techMap, ingredients: toSaveIngredients);
+        if (_pendingPhotoBytes.isNotEmpty) {
+          final urls = <String>[];
+          for (var i = 0; i < _pendingPhotoBytes.length; i++) {
+            final url = await svc.uploadTechCardPhoto(
+              establishmentId: est.id,
+              techCardId: created.id,
+              index: i,
+              bytes: _pendingPhotoBytes[i],
+            );
+            if (url != null) urls.add(url);
+          }
+          if (urls.isNotEmpty) updated = updated.copyWith(photoUrls: urls);
+        }
         await svc.saveTechCard(updated);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('tech_card_created'))));
           context.go('/tech-cards');
         }
       } else {
-        final updated = _applyEdits(tc, dishName: name, category: category, section: _selectedSection, isSemiFinished: _isSemiFinished, portionWeight: _portionWeight, yieldGrams: yieldVal, technologyLocalized: techMap, ingredients: toSaveIngredients);
+        final updated = _applyEdits(tc, dishName: name, category: category, section: _selectedSection, isSemiFinished: _isSemiFinished, portionWeight: _portionWeight, yieldGrams: yieldVal, technologyLocalized: techMap, photoUrls: _photoUrls, ingredients: toSaveIngredients);
         await svc.saveTechCard(updated);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.read<LocalizationService>().t('save') + ' ✓')));
@@ -1374,6 +1401,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                             technology: _technologyController.text,
                             weightPerPortion: _portionWeight,
                             hideTechnologyInTable: true,
+                            onTapPfIngredient: (id) => context.push('/tech-cards/$id?view=1'),
                             onIngredientsChanged: (list) {
                               WidgetsBinding.instance.addPostFrameCallback((_) {
                                 if (!mounted) return;
@@ -1438,7 +1466,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
               ),
             ),
           ),
-        ),
+            // Блок фото: ПФ — сетка до 10, блюдо — 1 фото
+            _buildPhotoSection(loc, effectiveCanEdit),
             if (effectiveCanEdit)
               SafeArea(
                   top: false,
@@ -2186,6 +2215,7 @@ class _TtkCookTable extends StatefulWidget {
     required this.onIngredientsChanged,
     this.hideTechnologyInTable = false,
     this.weightPerPortion = 100,
+    this.onTapPfIngredient,
   });
 
   final LocalizationService loc;
@@ -2195,6 +2225,8 @@ class _TtkCookTable extends StatefulWidget {
   final void Function(List<TTIngredient> list) onIngredientsChanged;
   final bool hideTechnologyInTable;
   final double weightPerPortion;
+  /// При нажатии на ингредиент-ПФ открывает карточку ТТК ПФ (просмотр).
+  final void Function(String techCardId)? onTapPfIngredient;
 
   static const _cellPad = EdgeInsets.symmetric(horizontal: 6, vertical: 6);
   // Ширины как в _TtkTable (таблица создания)
@@ -2315,9 +2347,26 @@ class _TtkCookTableState extends State<_TtkCookTable> {
         ..._ingredients.asMap().entries.map((e) {
           final i = e.key;
           final ing = e.value;
+          final firstColText = i == 0 ? widget.dishName : (ing.sourceTechCardName ?? widget.loc.t('dash'));
+          final isPfLink = ing.sourceTechCardId != null && ing.sourceTechCardId!.isNotEmpty;
           return TableRow(
             children: [
-              _cell(i == 0 ? widget.dishName : (ing.sourceTechCardName ?? widget.loc.t('dash'))),
+              isPfLink && widget.onTapPfIngredient != null
+                  ? TableCell(
+                      child: InkWell(
+                        onTap: () => widget.onTapPfIngredient!(ing.sourceTechCardId!),
+                        child: Padding(
+                          padding: _TtkCookTable._cellPad,
+                          child: Text(
+                            firstColText,
+                            style: const TextStyle(fontSize: 12),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 2,
+                          ),
+                        ),
+                      ),
+                    )
+                  : _cell(firstColText),
               _cell(ing.productName),
               TableCell(
                 child: Padding(

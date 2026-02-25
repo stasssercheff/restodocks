@@ -71,7 +71,10 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
     });
   }
 
-  Future<void> _save() async {
+  /// Сохранить только продукты, которых ещё нет в номенклатуре (новые).
+  void _saveOnlyNew() => _save(onlyNew: true);
+
+  Future<void> _save({bool onlyNew = false}) async {
     final acc = context.read<AccountManagerSupabase>();
     final est = acc.establishment;
     final emp = acc.currentEmployee;
@@ -81,7 +84,9 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
     final loc = context.read<LocalizationService>();
     final defCur = est.defaultCurrency ?? 'RUB';
 
-    final toSave = _items.where((i) => i.approved).toList();
+    final toSave = onlyNew
+        ? _items.where((i) => i.approved && i.existingProductId == null).toList()
+        : _items.where((i) => i.approved).toList();
     setState(() {
       _saving = true;
       _saveTotal = toSave.length;
@@ -211,6 +216,14 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
                   label: Text('$approved / ${_items.length}'),
                   backgroundColor: theme.colorScheme.primaryContainer,
                 ),
+                Chip(
+                  label: Text(loc.t('in_nomenclature_count')?.replaceAll('%s', '${_items.where((i) => i.existingProductId != null).length}') ?? 'В номенклатуре (${_items.where((i) => i.existingProductId != null).length})'),
+                  backgroundColor: theme.colorScheme.secondaryContainer.withOpacity(0.6),
+                ),
+                Chip(
+                  label: Text(loc.t('new_products_count')?.replaceAll('%s', '${_items.where((i) => i.existingProductId == null).length}') ?? 'Новые (${_items.where((i) => i.existingProductId == null).length})'),
+                  backgroundColor: theme.colorScheme.tertiaryContainer.withOpacity(0.6),
+                ),
                 if (_items.any((i) => i.category == ModerationCategory.priceUpdate)) ...[
                   FilledButton.tonal(
                     onPressed: _saving ? null : _approveAllPriceUpdates,
@@ -271,7 +284,7 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
                 const SizedBox(height: 12),
               ],
               FilledButton(
-                onPressed: _saving || approved == 0 ? null : _save,
+                onPressed: _saving || approved == 0 ? null : () => _save(),
                 child: _saving
                     ? const SizedBox(
                         height: 20,
@@ -280,6 +293,15 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
                       )
                     : Text(loc.t('save') ?? 'Сохранить'),
               ),
+              if (_items.any((i) => i.existingProductId == null)) ...[
+                const SizedBox(height: 8),
+                OutlinedButton(
+                  onPressed: _saving || _items.where((i) => i.approved && i.existingProductId == null).isEmpty
+                      ? null
+                      : _saveOnlyNew,
+                  child: Text(loc.t('save_only_new_products') ?? 'Сохранить только новые продукты'),
+                ),
+              ],
             ],
           ),
         ),
@@ -288,7 +310,14 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
   }
 
   Widget? _buildSubtitle(ModerationItem item, ThemeData theme) {
+    final loc = context.read<LocalizationService>();
     final parts = <String>[];
+    // Сопоставление с номенклатурой: явно показываем "Сопоставлено с: X" или "Новый продукт"
+    if (item.existingProductId != null && item.existingProductName != null) {
+      parts.add((loc.t('match_in_nomenclature') ?? 'Сопоставлено с: %s').replaceAll('%s', item.existingProductName!));
+    } else {
+      parts.add(loc.t('new_product_label') ?? 'Новый продукт');
+    }
     if (item.displayPrice != null) {
       final cur = item.currency != null ? ' ${item.currency}' : '';
       final hasPriceChange = item.existingProductId != null && item.existingPrice != null &&
