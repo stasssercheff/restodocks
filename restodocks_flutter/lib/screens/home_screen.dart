@@ -10,33 +10,14 @@ import '../models/models.dart';
 
 /// Главный экран: 3 вкладки (Домой, График/Уведомления, Личный кабинет), контент по роли.
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, this.initialTabIndex});
-
-  /// При переходе из Профиля/Настроек — 0 = вкладка «Домой», не личный кабинет.
-  final int? initialTabIndex;
+  const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  late int _selectedIndex;
-
-  @override
-  void initState() {
-    super.initState();
-    _selectedIndex = widget.initialTabIndex != null
-        ? (widget.initialTabIndex!.clamp(0, 2))
-        : 0;
-  }
-
-  @override
-  void didUpdateWidget(HomeScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.initialTabIndex != null && widget.initialTabIndex != oldWidget.initialTabIndex) {
-      setState(() => _selectedIndex = widget.initialTabIndex!.clamp(0, 2));
-    }
-  }
+  int _selectedIndex = 0;
 
   @override
   Widget build(BuildContext context) {

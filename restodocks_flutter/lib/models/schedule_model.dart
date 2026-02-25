@@ -85,22 +85,15 @@ class ScheduleModel {
     this.shiftConfirmations = const {},
   });
 
-  /// Порядок отображения: управление всегда сверху.
-  static List<ScheduleSection> sectionsInDisplayOrder(List<ScheduleSection> sections) {
-    final management = sections.where((s) => s.id == 'management').toList();
-    final rest = sections.where((s) => s.id != 'management').toList();
-    return [...management, ...rest];
-  }
-
-  /// Цеха по умолчанию (если в сохранённых данных нет). Управление всегда сверху.
+  /// Цеха по умолчанию (если в сохранённых данных нет).
   static List<ScheduleSection> get defaultSections => const [
-    ScheduleSection(id: 'management', nameKey: 'management'),
     ScheduleSection(id: 'hot_kitchen', nameKey: 'section_hot_kitchen'),
     ScheduleSection(id: 'cold_kitchen', nameKey: 'section_cold_kitchen'),
     ScheduleSection(id: 'grill', nameKey: 'section_grill'),
     ScheduleSection(id: 'pastry', nameKey: 'section_pastry'),
     ScheduleSection(id: 'prep', nameKey: 'section_prep'),
     ScheduleSection(id: 'cleaning', nameKey: 'section_cleaning'),
+    ScheduleSection(id: 'management', nameKey: 'management'),
   ];
 
   static String _dateKey(DateTime d) {

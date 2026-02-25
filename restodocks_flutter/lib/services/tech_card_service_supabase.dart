@@ -1,12 +1,8 @@
-import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/models.dart';
 import 'ai_service.dart';
 import 'supabase_service.dart';
-
-/// Bucket для фото ТТК (блюда и ПФ). Создать в Supabase Storage вручную, public.
-const String kTechCardPhotosBucket = 'tech_card_photos';
 
 /// Сервис управления технологическими картами с использованием Supabase
 class TechCardServiceSupabase {
@@ -15,27 +11,6 @@ class TechCardServiceSupabase {
   TechCardServiceSupabase._internal();
 
   final SupabaseService _supabase = SupabaseService();
-
-  /// Загрузить фото блюда/ПФ в Storage. Путь: {establishmentId}/{techCardId}/{index}.jpg
-  /// Возвращает публичный URL или null при ошибке.
-  Future<String?> uploadTechCardPhoto({
-    required String establishmentId,
-    required String techCardId,
-    required int index,
-    required Uint8List bytes,
-  }) async {
-    try {
-      final path = '$establishmentId/$techCardId/$index.jpg';
-      await _supabase.client.storage
-          .from(kTechCardPhotosBucket)
-          .uploadBinary(path, bytes, fileOptions: FileOptions(upsert: true));
-      final url = _supabase.client.storage.from(kTechCardPhotosBucket).getPublicUrl(path);
-      return '$url?t=${DateTime.now().millisecondsSinceEpoch}';
-    } catch (e) {
-      print('TechCardServiceSupabase.uploadTechCardPhoto: $e');
-      return null;
-    }
-  }
 
   /// Payload для вставки в tt_ingredients. Только колонки из схемы БД.
   /// Убираем: id, price_per_kg, cost_currency, gramsPerPiece — их нет в tt_ingredients.

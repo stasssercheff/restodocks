@@ -455,7 +455,6 @@ class TTIngredient extends Equatable {
     return copyWith(
       grossWeight: grossWeight * factor,
       netWeight: netWeight * factor,
-      outputWeight: outputWeight * factor,
       cost: cost * factor,
       finalCalories: finalCalories * factor,
       finalProtein: finalProtein * factor,

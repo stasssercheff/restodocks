@@ -1,5 +1,4 @@
 import 'package:bcrypt/bcrypt.dart';
-import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/models.dart';
@@ -26,8 +25,7 @@ class AccountManagerSupabase {
   /// Доступ к SupabaseService
   SupabaseService get supabase => _supabase;
 
-  /// Убираем avatar_url из payload только при вставке в контекстах, где колонки нет.
-  /// При updateEmployee колонка avatar_url уже добавлена миграцией — сохраняем.
+  /// Убираем avatar_url из payload — колонки может не быть в схеме employees (PGRST204).
   static void _stripAvatarFromPayload(Map<String, dynamic> data) {
     data.remove('avatar_url');
     data.remove('avatarUrl');
@@ -47,27 +45,15 @@ class AccountManagerSupabase {
   bool get isLoggedInSync => _currentEmployee != null && _establishment != null;
 
   /// Инициализация сервиса
-  /// Supabase восстанавливает сессию из localStorage при Supabase.initialize() в main().
-  /// При F5/hard refresh Auth может восстанавливаться асинхронно — делаем retry.
+  /// Supabase восстанавливает сессию из localStorage при Supabase.initialize() в main()
   Future<void> initialize() async {
     print('🔐 AccountManager: Starting initialization...');
     await _secureStorage.initialize();
 
-    await _tryRestoreSession();
-    if (isLoggedInSync) return;
-
-    // Retry: при hard refresh Supabase Auth может ещё не успеть прочитать localStorage.
-    await Future.delayed(const Duration(milliseconds: 400));
-    await _tryRestoreSession();
-    if (isLoggedInSync) return;
-
-    print('🔐 AccountManager: No stored session and not authenticated');
-  }
-
-  Future<void> _tryRestoreSession() async {
+    print('🔐 AccountManager: Secure storage initialized');
     final employeeId = await _secureStorage.get(_keyEmployeeId);
     final establishmentId = await _secureStorage.get(_keyEstablishmentId);
-    print('🔐 AccountManager: Storage - employee: $employeeId, establishment: $establishmentId, auth: ${_supabase.isAuthenticated}');
+    print('🔐 AccountManager: Retrieved from storage - employee: $employeeId, establishment: $establishmentId');
 
     // 1. Сначала проверяем Supabase Auth — приоритет для пользователей с auth
     if (_supabase.isAuthenticated) {
@@ -84,7 +70,10 @@ class AccountManagerSupabase {
       print('🔐 AccountManager: Restoring session from storage...');
       await _restoreSession(employeeId, establishmentId);
       print('🔐 AccountManager: Session restored, logged in: $isLoggedInSync');
+      return;
     }
+
+    print('🔐 AccountManager: No stored session and not authenticated');
   }
 
   Future<void> _restoreSession(String employeeId, String establishmentId) async {
@@ -386,12 +375,11 @@ class AccountManagerSupabase {
     required String password,
   }) async {
     final emailTrim = email.trim();
-    final passwordTrimmed = password.trim();
     if (emailTrim.isEmpty) return null;
 
     // 1. Пробуем Supabase Auth (для новых учёток)
     try {
-      await _supabase.signInWithEmail(emailTrim, passwordTrimmed);
+      await _supabase.signInWithEmail(emailTrim, password);
       if (_supabase.isAuthenticated) {
         final authUserId = _supabase.currentUser!.id;
         final list = await _supabase.client
@@ -421,15 +409,12 @@ class AccountManagerSupabase {
 
         await _supabase.signOut();
       }
-    } catch (authErr) {
-      if (kDebugMode) {
-        debugPrint('🔐 Login: Supabase Auth failed: $authErr');
-      }
+    } catch (_) {
       await _supabase.signOut();
     }
 
     // 2. Legacy: поиск по employees и проверка password_hash
-    return _findEmployeeByPasswordHash(emailTrim, passwordTrimmed);
+    return _findEmployeeByPasswordHash(emailTrim, password);
   }
 
   /// Привязка auth_user_id к employee по email (после подтверждения письма)
@@ -483,39 +468,19 @@ class AccountManagerSupabase {
           .ilike('email', emailTrim)
           .eq('is_active', true);
 
-      if (empList == null || (empList as List).isEmpty) {
-        if (kDebugMode) {
-          debugPrint('🔐 Login: Legacy - no employees found for email');
-        }
-        return null;
-      }
-
-      if (kDebugMode) {
-        debugPrint('🔐 Login: Legacy - found ${(empList as List).length} employee(s)');
-      }
+      if (empList == null || (empList as List).isEmpty) return null;
 
       for (final empRaw in empList) {
         final employeeData = Map<String, dynamic>.from(empRaw);
         final hash = employeeData['password_hash'] as String?;
-        if (hash == null || hash.isEmpty) {
-          if (kDebugMode) {
-            debugPrint('🔐 Login: Legacy - employee has no password_hash (uses Auth?)');
-          }
-          continue;
-        }
+        if (hash == null || hash.isEmpty) continue;
         employeeData['password'] = hash;
         final employee = Employee.fromJson(employeeData);
         bool ok = false;
         if (hash.startsWith(r'$2a$') || hash.startsWith(r'$2b$')) {
           ok = BCrypt.checkpw(password, hash);
-          if (kDebugMode && !ok) {
-            debugPrint('🔐 Login: Legacy - BCrypt check failed for employee');
-          }
         } else {
           ok = (hash == password);
-          if (kDebugMode && !ok) {
-            debugPrint('🔐 Login: Legacy - plain password mismatch');
-          }
         }
         if (!ok) continue;
 
@@ -529,14 +494,9 @@ class AccountManagerSupabase {
         final establishment = Establishment.fromJson(estData);
         return (employee: employee, establishment: establishment);
       }
-      if (kDebugMode) {
-        debugPrint('🔐 Login: Legacy - no matching password for any employee');
-      }
       return null;
     } catch (e) {
-      if (kDebugMode) {
-        debugPrint('🔐 Login: Legacy error: $e');
-      }
+      print('Ошибка поиска сотрудника по email: $e');
       return null;
     }
   }
@@ -662,13 +622,12 @@ class AccountManagerSupabase {
   }
 
   /// Обновить данные сотрудника (пароль не обновляется — используйте отдельный поток смены пароля).
-  /// avatar_url сохраняется в Supabase Storage (bucket avatars) — данные не зависят от деплоя.
   Future<void> updateEmployee(Employee employee) async {
     try {
       var employeeData = employee.toJson()
         ..remove('password')
         ..remove('password_hash');
-      // avatar_url сохраняем — колонка добавлена миграцией supabase_migration_employee_avatar.sql
+      _stripAvatarFromPayload(employeeData);
 
       try {
         await _supabase.updateData(

@@ -2,7 +2,7 @@
     "name": "restodocks",
     "short_name": "restodocks",
     "start_url": ".",
-    "display": "fullscreen",
+    "display": "standalone",
     "background_color": "#AD292C",
     "theme_color": "#AD292C",
     "description": "A new Flutter project.",

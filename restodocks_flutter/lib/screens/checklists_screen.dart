@@ -1,7 +1,4 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -79,19 +76,12 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
     final schedule = await loadSchedule(est.id);
     final sectionNames = schedule.sections.map((s) => s.nameKey.replaceFirst('section_', '')).join(', ');
     final slotNames = schedule.slots.map((s) => s.name).join(', ');
-    final map = <String, dynamic>{
+    return {
       'items': products.map((p) => {'id': p.id, 'name': p.getLocalizedName(lang)}).toList(),
       'recipes': techCards.map((t) => {'id': t.id, 'name': t.getDisplayNameInLists(lang)}).toList(),
       'employees': employees.map((e) => e.fullName).toList(),
       'scheduleSummary': 'Цеха: $sectionNames. Должности/слоты: $slotNames',
     };
-    // Загружаем шаблоны для маппинга запроса → пункты чеклиста
-    try {
-      final json = await rootBundle.loadString('assets/data/checklist_templates.json');
-      final templates = jsonDecode(json) as Map<String, dynamic>?;
-      if (templates != null) map['templates'] = templates;
-    } catch (_) {}
-    return map;
   }
 
   Future<void> _generateByPrompt() async {
@@ -434,32 +424,14 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
             );
           }
           final c = _list[canEdit ? i - 1 : i];
-          final sectionLabel = c.assignedSection != null
-              ? (KitchenSection.fromCode(c.assignedSection!)?.displayName ?? c.assignedSection)
-              : null;
           return Card(
             margin: const EdgeInsets.only(bottom: 8),
             child: ListTile(
-              leading: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.checklist),
-                  if (sectionLabel != null) ...[
-                    const SizedBox(width: 8),
-                    Tooltip(
-                      message: sectionLabel,
-                      child: Icon(Icons.store, size: 18, color: Theme.of(context).colorScheme.outline),
-                    ),
-                  ],
-                ],
-              ),
+              leading: const Icon(Icons.checklist),
               title: Text(c.name),
-              subtitle: Text([
-                if (sectionLabel != null) sectionLabel,
-                '${c.items.length} ${loc.t('items_count')}',
-              ].join(' • ')),
-              trailing: Icon(Icons.chevron_right),
-              onTap: () => context.push(canEdit ? '/checklists/${c.id}' : '/checklists/${c.id}/fill'),
+              subtitle: Text('${c.items.length} ${loc.t('items_count')}'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push('/checklists/${c.id}'),
             ),
           );
         },

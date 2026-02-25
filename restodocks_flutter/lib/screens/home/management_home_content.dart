@@ -31,10 +31,12 @@ class ManagementHomeContent extends StatelessWidget {
         if (employee.department == 'kitchen' || isChef || roles.contains('sous_chef'))
           _Tile(icon: Icons.checklist, title: loc.t('checklists'), onTap: () => context.push('/checklists')),
         _Tile(icon: Icons.description, title: isBarManager ? loc.t('ttk_bar') : loc.t('ttk_kitchen'), onTap: () => context.push('/tech-cards')),
+        _Tile(icon: Icons.library_books, title: loc.t('products'), onTap: () => context.push('/products')),
+        _Tile(icon: Icons.assignment, title: loc.t('nomenclature'), onTap: () => context.push('/nomenclature')),
+        if (isChef || isBarManager)
+          _Tile(icon: Icons.shopping_cart, title: loc.t('product_order'), onTap: () => context.push('/product-order')),
         if (isChef)
-          _Tile(icon: Icons.assignment, title: loc.t('nomenclature'), onTap: () => context.push('/nomenclature')),
-        _Tile(icon: Icons.shopping_cart, title: loc.t('product_order'), onTap: () => context.push('/product-order')),
-        _Tile(icon: Icons.assignment, title: loc.t('inventory_blank'), onTap: () => context.push('/inventory')),
+          _Tile(icon: Icons.assignment, title: loc.t('inventory_blank'), onTap: () => context.push('/inventory')),
         if (isGeneral) ...[
           _Tile(icon: Icons.savings, title: '${loc.t('expenses')} (${loc.t('pro')})', onTap: () => context.push('/expenses')),
         ],

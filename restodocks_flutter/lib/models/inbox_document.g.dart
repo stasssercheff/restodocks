@@ -38,5 +38,4 @@ const _$DocumentTypeEnumMap = {
   DocumentType.inventory: 'inventory',
   DocumentType.productOrder: 'productOrder',
   DocumentType.shiftConfirmation: 'shiftConfirmation',
-  DocumentType.checklistSubmission: 'checklistSubmission',
 };

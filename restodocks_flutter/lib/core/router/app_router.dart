@@ -11,15 +11,11 @@ import '../../screens/company_registration_screen.dart';
 import '../../screens/owner_registration_screen.dart';
 import '../../screens/home/schedule_screen.dart';
 import '../../screens/home/inbox_screen.dart';
-import '../../screens/inventory_inbox_detail_screen.dart';
-import '../../screens/order_inbox_detail_screen.dart';
-import '../../screens/checklist_inbox_detail_screen.dart';
 import '../../screens/home/expenses_placeholder_screen.dart';
 import '../../screens/home/department_placeholder_screen.dart';
 import '../../screens/supabase_test_screen.dart';
 import '../../screens/checklists_screen.dart';
 import '../../screens/checklist_edit_screen.dart';
-import '../../screens/checklist_fill_screen.dart';
 import '../../screens/tech_cards_list_screen.dart';
 import '../../screens/tech_card_edit_screen.dart';
 import '../../screens/order_lists_screen.dart';
@@ -80,16 +76,10 @@ class AppRouter {
       return null;
     },
     routes: [
-      // Корневой маршрут - при F5 на внутренней странице сохраняем URL, иначе — splash
+      // Корневой маршрут - перенаправляет на splash
       GoRoute(
         path: '/',
-        redirect: (context, state) {
-          if (kIsWeb) {
-            final bp = initial_loc.getCurrentBrowserPath();
-            if (bp != null && bp != '/splash') return bp;
-          }
-          return '/splash';
-        },
+        redirect: (context, state) => '/splash',
       ),
 
       // Стартовый экран (проверка авторизации)
@@ -141,16 +131,10 @@ class AppRouter {
         },
       ),
 
-      // Главный экран (tab=0 — вкладка «Домой», для перехода из Профиля/Настроек)
+      // Главный экран
       GoRoute(
         path: '/home',
-        builder: (context, state) {
-          final tabParam = state.queryParameters['tab'];
-          final tab = (tabParam != null && int.tryParse(tabParam) != null)
-              ? int.parse(tabParam).clamp(0, 2)
-              : null;
-          return HomeScreen(initialTabIndex: tab);
-        },
+        builder: (context, state) => const HomeScreen(),
       ),
 
       // Профиль
@@ -166,45 +150,18 @@ class AppRouter {
 
       GoRoute(
         path: '/schedule',
-        builder: (context, state) {
-          final personal = state.queryParameters['personal'] == '1';
-          return ScheduleScreen(personalOnly: personal);
-        },
+        builder: (context, state) => const ScheduleScreen(),
       ),
       GoRoute(
         path: '/schedule/:department',
         builder: (context, state) {
           final department = state.pathParameters['department'] ?? 'all';
-          final personal = state.queryParameters['personal'] == '1';
-          return ScheduleScreen(department: department, personalOnly: personal);
+          return ScheduleScreen(department: department);
         },
       ),
       GoRoute(
         path: '/inbox',
         builder: (context, state) => const InboxScreen(),
-        routes: [
-          GoRoute(
-            path: 'inventory/:id',
-            builder: (context, state) {
-              final id = state.pathParameters['id'] ?? '';
-              return InventoryInboxDetailScreen(documentId: id);
-            },
-          ),
-          GoRoute(
-            path: 'order/:id',
-            builder: (context, state) {
-              final id = state.pathParameters['id'] ?? '';
-              return OrderInboxDetailScreen(documentId: id);
-            },
-          ),
-          GoRoute(
-            path: 'checklist/:id',
-            builder: (context, state) {
-              final id = state.pathParameters['id'] ?? '';
-              return ChecklistInboxDetailScreen(documentId: id);
-            },
-          ),
-        ],
       ),
       GoRoute(
         path: '/employees',
@@ -259,9 +216,7 @@ class AppRouter {
       ),
       GoRoute(
         path: '/nomenclature',
-        builder: (context, state) {
-          return const NomenclatureScreen();
-        },
+        builder: (context, state) => const NomenclatureScreen(),
       ),
       GoRoute(
         path: '/nomenclature/:department',
@@ -338,13 +293,6 @@ class AppRouter {
           return ChecklistEditScreen(checklistId: id);
         },
       ),
-      GoRoute(
-        path: '/checklists/:id/fill',
-        builder: (context, state) {
-          final id = state.pathParameters['id'] ?? '';
-          return ChecklistFillScreen(checklistId: id);
-        },
-      ),
 
       GoRoute(
         path: '/tech-cards',
@@ -377,8 +325,7 @@ class AppRouter {
           if (knownDepartments.contains(segment)) {
             return TechCardsListScreen(department: segment);
           }
-          final viewOnly = state.queryParameters['view'] == '1';
-          return TechCardEditScreen(techCardId: segment, forceViewMode: viewOnly);
+          return TechCardEditScreen(techCardId: segment);
         },
       ),
 

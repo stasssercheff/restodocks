@@ -9,7 +9,6 @@ enum DocumentType {
   inventory,
   productOrder,
   shiftConfirmation,
-  checklistSubmission,
 }
 
 /// Модель документа во входящих
@@ -63,8 +62,6 @@ class InboxDocument extends Equatable {
         return Icons.shopping_cart;
       case DocumentType.shiftConfirmation:
         return Icons.how_to_reg;
-      case DocumentType.checklistSubmission:
-        return Icons.checklist;
     }
   }
 
@@ -77,8 +74,6 @@ class InboxDocument extends Equatable {
         return 'Заказ продуктов';
       case DocumentType.shiftConfirmation:
         return 'Подтверждение смены';
-      case DocumentType.checklistSubmission:
-        return 'Чеклист';
     }
   }
 

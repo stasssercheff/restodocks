@@ -655,22 +655,13 @@ class _InventoryScreenState extends State<InventoryScreen>
       aggregatedProducts: aggregatedProducts,
     );
     final docService = InventoryDocumentService();
-    final docSaved = await docService.save(
+    await docService.save(
       establishmentId: establishment.id,
       createdByEmployeeId: employee.id,
       recipientChefId: chef.id,
       recipientEmail: chef.email,
       payload: payload,
     );
-    if (docSaved == null && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(loc.t('inventory_document_save_error') ?? 'Не удалось сохранить инвентаризацию во входящие. Проверьте подключение.'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
-      return;
-    }
 
     // Сохраняем инвентаризацию в историю перед установкой статуса
     try {
@@ -706,6 +697,8 @@ class _InventoryScreenState extends State<InventoryScreen>
         _endTime = endTime;
         _completed = true;
       });
+      // Очистка черновика после успешной отправки
+      clearDraft();
     }
 
     // Выбор формата экспорта и генерация файла
@@ -737,22 +730,6 @@ class _InventoryScreenState extends State<InventoryScreen>
         );
       }
     }
-    // Очистка черновика только после экспорта — сохраняем данные на экране до выгрузки
-    if (mounted) await clearDraft();
-  }
-
-  /// Начать новую инвентаризацию (очистить форму после завершённой).
-  void _startNewInventory() {
-    setState(() {
-      _rows.clear();
-      _aggregatedFromFile = null;
-      _date = DateTime.now();
-      _startTime = TimeOfDay.now();
-      _endTime = null;
-      _completed = false;
-    });
-    clearDraft();
-    _loadNomenclature();
   }
 
   /// Создание Excel с 2 листами: 1) продукты+ПФ+перерасчет, 2) все продукты включая ПФ
@@ -780,12 +757,10 @@ class _InventoryScreenState extends State<InventoryScreen>
       }
       sheet1.appendRow(headerCells);
 
-      // Добавляем все продукты и ПФ в алфавитном порядке по наименованию
-      final rowsSorted = List<Map<String, dynamic>>.from(rows.map((e) => e as Map<String, dynamic>))
-        ..sort((a, b) => ((a['productName'] as String?) ?? '').toLowerCase().compareTo(((b['productName'] as String?) ?? '').toLowerCase()));
+      // Добавляем все продукты и ПФ
       var rowNum = 1;
-      for (var i = 0; i < rowsSorted.length; i++) {
-        final r = rowsSorted[i];
+      for (var i = 0; i < rows.length; i++) {
+        final r = rows[i] as Map<String, dynamic>;
         final name = r['productName'] as String? ?? '';
         final unit = r['unit'] as String? ?? '';
         final total = r['total'] as num? ?? 0;
@@ -835,7 +810,7 @@ class _InventoryScreenState extends State<InventoryScreen>
         }
 
         final groupedList = groupedProducts.values.toList()
-          ..sort((a, b) => ((a['productName'] as String?) ?? '').toLowerCase().compareTo(((b['productName'] as String?) ?? '').toLowerCase()));
+          ..sort((a, b) => (a['productName'] as String).compareTo(b['productName'] as String));
 
         for (var i = 0; i < groupedList.length; i++) {
           final p = groupedList[i];
@@ -908,9 +883,9 @@ class _InventoryScreenState extends State<InventoryScreen>
         }
       }
 
-      // Выводим все продукты в алфавитном порядке по наименованию
+      // Выводим все продукты в отсортированном порядке
       final sortedProducts = allProducts.values.toList()
-        ..sort((a, b) => ((a['productName'] as String?) ?? '').toLowerCase().compareTo(((b['productName'] as String?) ?? '').toLowerCase()));
+        ..sort((a, b) => (a['productName'] as String).compareTo(b['productName'] as String));
 
       for (var i = 0; i < sortedProducts.length; i++) {
         final p = sortedProducts[i];
@@ -947,31 +922,20 @@ class _InventoryScreenState extends State<InventoryScreen>
     final establishment = account.establishment;
     final employee = account.currentEmployee;
 
-    // Определяем режим ввода (клавиатура открыта). Обновляем только через addPostFrameCallback,
-    // чтобы не мутировать state во время build — иначе на мобильной версии клавиатура закрывается.
+    // Определяем режим ввода (клавиатура открыта или активно поле ввода)
     final viewInsets = MediaQuery.viewInsetsOf(context);
     final isKeyboardOpen = viewInsets.bottom > 0;
-    final isNarrow = MediaQuery.sizeOf(context).width < 600;
-
-    // Обновляем _isInputMode только на десктопе — на мобильной setState при открытой клавиатуре
-    // схлопывает layout и TextField теряет фокус → клавиатура закрывается.
-    if (isKeyboardOpen && !_isInputMode && !isNarrow) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && MediaQuery.viewInsetsOf(context).bottom > 0 && !(MediaQuery.sizeOf(context).width < 600)) {
-          setState(() => _isInputMode = true);
-        }
-      });
+    // Не меняем _isInputMode слишком часто, чтобы не сбивать фокус
+    if (isKeyboardOpen && !_isInputMode) {
+      _isInputMode = true;
     } else if (!isKeyboardOpen && _isInputMode) {
+      // Задержка перед выключением режима ввода
       Future.delayed(const Duration(milliseconds: 300), () {
         if (mounted && MediaQuery.viewInsetsOf(context).bottom == 0) {
           setState(() => _isInputMode = false);
         }
       });
     }
-
-    // collapseLayout только на десктопе при клавиатуре. На мобильной — не трогаем layout, иначе клавиатура пропадает.
-    // Не добавляем SizedBox(viewInsetsBottom) — он забирал место у таблицы и вместо полей показывал белый фон.
-    final collapseLayout = _isInputMode && !isNarrow;
 
     return Scaffold(
       appBar: _isInputMode ? AppBar(
@@ -1001,16 +965,16 @@ class _InventoryScreenState extends State<InventoryScreen>
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (!collapseLayout) _buildHeader(loc, establishment, employee, collapseLayout: false),
-              if (!collapseLayout) const Divider(height: 1),
+              if (!_isInputMode) _buildHeader(loc, establishment, employee),
+              if (!_isInputMode) const Divider(height: 1),
               Expanded(
                 child: _buildTable(loc),
               ),
-              if (!collapseLayout) const Divider(height: 1),
-              _buildFooter(loc, collapseLayout),
+              if (!_isInputMode) const Divider(height: 1),
+              _buildFooter(loc),
             ],
           ),
-          if (!collapseLayout) DataSafetyIndicator(isVisible: true),
+          if (!_isInputMode) DataSafetyIndicator(isVisible: true),
         ],
       ),
     );
@@ -1020,10 +984,12 @@ class _InventoryScreenState extends State<InventoryScreen>
   Widget _buildHeader(
     LocalizationService loc,
     Establishment? establishment,
-    Employee? employee, {
-    bool collapseLayout = false,
-  }) {
-    // collapseLayout передаётся снаружи; при вызове из body он всегда false (уже отфильтровано)
+    Employee? employee,
+  ) {
+    // В режиме ввода скрываем верхний информационный блок
+    if (_isInputMode) {
+      return const SizedBox.shrink();
+    }
     final theme = Theme.of(context);
     final narrow = MediaQuery.sizeOf(context).width < 420;
     final dateStr = '${_date.day.toString().padLeft(2, '0')}.${_date.month.toString().padLeft(2, '0')}.${_date.year}';
@@ -1089,7 +1055,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (!collapseLayout) Row(
+                  if (!_isInputMode) Row(
                     children: [
                       Icon(Icons.store, size: 16, color: theme.colorScheme.primary),
                       const SizedBox(width: 4),
@@ -1121,7 +1087,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        if (!collapseLayout) ...[sortAlphabetButton!, const SizedBox(width: 8)],
+                        if (!_isInputMode) ...[sortAlphabetButton!, const SizedBox(width: 8)],
                         Expanded(child: nameFilterField!),
                       ],
                     ),
@@ -1130,7 +1096,7 @@ class _InventoryScreenState extends State<InventoryScreen>
               )
             : Row(
                 children: [
-                  if (!collapseLayout) ...[
+                  if (!_isInputMode) ...[
                     Icon(Icons.store, size: 16, color: theme.colorScheme.primary),
                     const SizedBox(width: 4),
                     Expanded(
@@ -1141,7 +1107,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                       ),
                     ),
                   ],
-                  if (collapseLayout) const Spacer(),
+                  if (_isInputMode) const Spacer(),
                   InkWell(
                     onTap: () => _pickDate(context),
                     child: Padding(
@@ -1159,8 +1125,8 @@ class _InventoryScreenState extends State<InventoryScreen>
                   ),
                   if (sortAlphabetButton != null && nameFilterField != null) ...[
                     const SizedBox(width: 6),
-                    if (!collapseLayout) sortAlphabetButton!,
-                    if (!collapseLayout) const SizedBox(width: 6),
+                    if (!_isInputMode) sortAlphabetButton!,
+                    if (!_isInputMode) const SizedBox(width: 6),
                     nameFilterField!,
                   ],
                 ],
@@ -1205,10 +1171,10 @@ class _InventoryScreenState extends State<InventoryScreen>
   }
 
   /// Компактный нижний блок: не перекрывает таблицу, минимум высоты.
-  /// [collapseLayout] — на десктопе при вводе скрываем футер. На мобильной при клавиатуре футер сдвигается вниз отступом (SizedBox выше), уходит под клавиатуру.
-  Widget _buildFooter(LocalizationService loc, bool collapseLayout) {
+  Widget _buildFooter(LocalizationService loc) {
     final theme = Theme.of(context);
-    if (collapseLayout) {
+    // В режиме ввода кнопка "Завершить" фиксируется над клавиатурой
+    if (_isInputMode) {
       return const SizedBox.shrink();
     }
 
@@ -1228,21 +1194,12 @@ class _InventoryScreenState extends State<InventoryScreen>
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 10),
                 ),
-                child: Text(loc.t('inventory_complete')),
-              ),
-            ),
-            if (_completed) ...[
-              const SizedBox(width: 12),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: _startNewInventory,
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                  ),
-                  child: Text(loc.t('inventory_new')),
+                child: Text(
+                  loc.t('inventory_complete'),
+                  style: _isInputMode ? const TextStyle(fontSize: 14) : null,
                 ),
               ),
-            ],
+            ),
           ],
         ),
       ),
@@ -1328,17 +1285,11 @@ class _InventoryScreenState extends State<InventoryScreen>
                         children: [
                           if (_blockFilter != _InventoryBlockFilter.pfOnly && _productIndices.isNotEmpty) ...[
                             SizedBox(height: _sectionHeaderHeight),
-                            ..._productIndices.asMap().entries.map((e) {
-                              final lastIdx = _pfIndices.isNotEmpty ? _pfIndices.last : _productIndices.last;
-                              return _buildScrollableDataRow(loc, e.value, isLastRow: e.value == lastIdx);
-                            }),
+                            ..._productIndices.asMap().entries.map((e) => _buildScrollableDataRow(loc, e.value)),
                           ],
                           if (_blockFilter != _InventoryBlockFilter.productsOnly && _pfIndices.isNotEmpty) ...[
                             SizedBox(height: _sectionHeaderHeight),
-                            ..._pfIndices.asMap().entries.map((e) {
-                              final lastIdx = _pfIndices.last;
-                              return _buildScrollableDataRow(loc, e.value, isLastRow: e.value == lastIdx);
-                            }),
+                            ..._pfIndices.asMap().entries.map((e) => _buildScrollableDataRow(loc, e.value)),
                           ],
                           if (_aggregatedFromFile != null && _aggregatedFromFile!.isNotEmpty) ...[
                             SizedBox(height: _sectionHeaderHeight),
@@ -1529,7 +1480,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     );
   }
 
-  Widget _buildScrollableDataRow(LocalizationService loc, int actualIndex, {bool isLastRow = false}) {
+  Widget _buildScrollableDataRow(LocalizationService loc, int actualIndex) {
     final theme = Theme.of(context);
     final row = _rows[actualIndex];
     final qtyCols = row.quantities.length;
@@ -1547,9 +1498,7 @@ class _InventoryScreenState extends State<InventoryScreen>
           children: [
           ...List.generate(
             qtyCols,
-            (colIndex) {
-              final isLastCell = isLastRow && colIndex == qtyCols - 1;
-              return Padding(
+            (colIndex) => Padding(
               padding: EdgeInsets.only(right: colIndex < qtyCols - 1 ? _colGap : 0),
               child: SizedBox(
                 width: _colQtyWidth,
@@ -1560,11 +1509,9 @@ class _InventoryScreenState extends State<InventoryScreen>
                         value: row.quantities[colIndex],
                         useGrams: row.isWeightInKg,
                         onChanged: (v) => _setQuantity(actualIndex, colIndex, v),
-                        textInputAction: isLastCell ? TextInputAction.done : TextInputAction.next,
                       ),
               ),
-            );
-            },
+            ),
           ),
         ],
       ),
@@ -1819,16 +1766,8 @@ class _QtyCell extends StatefulWidget {
   /// true: отображать и вводить в граммах (значение хранится в кг, показываем value*1000).
   final bool useGrams;
   final void Function(double) onChanged;
-  /// TextInputAction.next — «Далее» на клавиатуре переходит к следующей ячейке.
-  final TextInputAction textInputAction;
 
-  const _QtyCell({
-    super.key,
-    required this.value,
-    this.useGrams = false,
-    required this.onChanged,
-    this.textInputAction = TextInputAction.next,
-  });
+  const _QtyCell({super.key, required this.value, this.useGrams = false, required this.onChanged});
 
   @override
   State<_QtyCell> createState() => _QtyCellState();
@@ -1893,7 +1832,6 @@ class _QtyCellState extends State<_QtyCell> {
     return TextField(
       controller: _controller,
       focusNode: _focus,
-      textInputAction: widget.textInputAction,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       inputFormatters: [
         FilteringTextInputFormatter.allow(RegExp(r'[\d,.]')),

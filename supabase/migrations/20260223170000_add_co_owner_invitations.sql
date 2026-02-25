@@ -19,7 +19,6 @@ CREATE INDEX IF NOT EXISTS idx_co_owner_invitations_invited_email ON co_owner_in
 -- RLS политики
 ALTER TABLE co_owner_invitations ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Owners can view co-owner invitations" ON co_owner_invitations;
 -- Владельцы могут видеть приглашения своего заведения
 CREATE POLICY "Owners can view co-owner invitations" ON co_owner_invitations
   FOR SELECT USING (
@@ -30,7 +29,6 @@ CREATE POLICY "Owners can view co-owner invitations" ON co_owner_invitations
     )
   );
 
-DROP POLICY IF EXISTS "Owners can create co-owner invitations" ON co_owner_invitations;
 -- Владельцы могут создавать приглашения
 CREATE POLICY "Owners can create co-owner invitations" ON co_owner_invitations
   FOR INSERT WITH CHECK (
@@ -41,7 +39,6 @@ CREATE POLICY "Owners can create co-owner invitations" ON co_owner_invitations
     )
   );
 
-DROP POLICY IF EXISTS "Owners can update co-owner invitations" ON co_owner_invitations;
 -- Владельцы могут обновлять приглашения
 CREATE POLICY "Owners can update co-owner invitations" ON co_owner_invitations
   FOR UPDATE USING (

@@ -29,6 +29,21 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
     _items = List.from(widget.items);
   }
 
+  List<ModerationItem> _byCategory(ModerationCategory cat) =>
+      _items.where((i) => i.category == cat && i.approved).toList();
+
+  void _approveAll() {
+    setState(() {
+      _items = _items.map((i) => i.copyWith(approved: true)).toList();
+    });
+  }
+
+  void _deselectAll() {
+    setState(() {
+      _items = _items.map((i) => i.copyWith(approved: false)).toList();
+    });
+  }
+
   void _toggleAll() {
     final allApproved = _items.every((i) => i.approved);
     setState(() {
@@ -56,10 +71,7 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
     });
   }
 
-  /// Сохранить только продукты, которых ещё нет в номенклатуре (новые).
-  void _saveOnlyNew() => _save(onlyNew: true);
-
-  Future<void> _save({bool onlyNew = false}) async {
+  Future<void> _save() async {
     final acc = context.read<AccountManagerSupabase>();
     final est = acc.establishment;
     final emp = acc.currentEmployee;
@@ -69,9 +81,7 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
     final loc = context.read<LocalizationService>();
     final defCur = est.defaultCurrency ?? 'RUB';
 
-    final toSave = onlyNew
-        ? _items.where((i) => i.approved && i.existingProductId == null).toList()
-        : _items.where((i) => i.approved).toList();
+    final toSave = _items.where((i) => i.approved).toList();
     setState(() {
       _saving = true;
       _saveTotal = toSave.length;
@@ -130,7 +140,7 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
             ),
           ),
         );
-        context.go('/nomenclature?refresh=1');
+        context.go('/nomenclature');
       }
     } catch (e) {
       if (mounted) {
@@ -143,6 +153,19 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
           SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))),
         );
       }
+    }
+  }
+
+  String _categoryTitle(ModerationCategory cat, LocalizationService loc) {
+    switch (cat) {
+      case ModerationCategory.nameFix:
+        return loc.t('moderation_name_fix') ?? 'Исправление названий';
+      case ModerationCategory.priceAnomaly:
+        return loc.t('moderation_price_anomaly') ?? 'Проверка цен';
+      case ModerationCategory.priceUpdate:
+        return loc.t('moderation_price_update') ?? 'Обновление цен';
+      case ModerationCategory.newProduct:
+        return loc.t('moderation_new') ?? 'Новые продукты';
     }
   }
 
@@ -178,57 +201,29 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
               style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
           ),
-          if (_items.any((i) => i.category == ModerationCategory.priceUpdate))
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Builder(
-                builder: (context) {
-                  final priceUpdateItems = _items.where((i) => i.category == ModerationCategory.priceUpdate).toList();
-                  final allApproved = priceUpdateItems.isNotEmpty && priceUpdateItems.every((i) => i.approved);
-                  final noneApproved = priceUpdateItems.every((i) => !i.approved);
-                  return Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      FilledButton.tonal(
-                        onPressed: _saving ? null : _approveAllPriceUpdates,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: allApproved ? theme.colorScheme.primaryContainer : null,
-                          foregroundColor: allApproved ? theme.colorScheme.onPrimaryContainer : null,
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (allApproved) ...[
-                              Icon(Icons.check_circle, size: 18, color: theme.colorScheme.onPrimaryContainer),
-                              const SizedBox(width: 6),
-                            ],
-                            Text(loc.t('apply_all_price_updates') ?? 'Принять все обновления цен'),
-                          ],
-                        ),
-                      ),
-                      OutlinedButton(
-                        onPressed: _saving ? null : _deselectAllPriceUpdates,
-                        style: OutlinedButton.styleFrom(
-                          backgroundColor: noneApproved ? theme.colorScheme.surfaceContainerHighest : null,
-                          foregroundColor: noneApproved ? theme.colorScheme.onSurface : null,
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (noneApproved) ...[
-                              Icon(Icons.cancel_outlined, size: 18, color: theme.colorScheme.onSurface),
-                              const SizedBox(width: 6),
-                            ],
-                            Text(loc.t('deselect_price_updates') ?? 'Снять обновления цен'),
-                          ],
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                Chip(
+                  label: Text('$approved / ${_items.length}'),
+                  backgroundColor: theme.colorScheme.primaryContainer,
+                ),
+                if (_items.any((i) => i.category == ModerationCategory.priceUpdate)) ...[
+                  FilledButton.tonal(
+                    onPressed: _saving ? null : _approveAllPriceUpdates,
+                    child: Text(loc.t('apply_all_price_updates') ?? 'Принять все обновления цен'),
+                  ),
+                  OutlinedButton(
+                    onPressed: _saving ? null : _deselectAllPriceUpdates,
+                    child: Text(loc.t('deselect_price_updates') ?? 'Снять обновления цен'),
+                  ),
+                ],
+              ],
             ),
+          ),
           const SizedBox(height: 8),
           Expanded(
             child: ListView.builder(
@@ -276,7 +271,7 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
                 const SizedBox(height: 12),
               ],
               FilledButton(
-                onPressed: _saving || approved == 0 ? null : () => _save(),
+                onPressed: _saving || approved == 0 ? null : _save,
                 child: _saving
                     ? const SizedBox(
                         height: 20,
@@ -285,15 +280,6 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
                       )
                     : Text(loc.t('save') ?? 'Сохранить'),
               ),
-              if (_items.any((i) => i.existingProductId == null)) ...[
-                const SizedBox(height: 8),
-                OutlinedButton(
-                  onPressed: _saving || _items.where((i) => i.approved && i.existingProductId == null).isEmpty
-                      ? null
-                      : _saveOnlyNew,
-                  child: Text(loc.t('save_only_new_products') ?? 'Сохранить только новые продукты'),
-                ),
-              ],
             ],
           ),
         ),
@@ -302,14 +288,7 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
   }
 
   Widget? _buildSubtitle(ModerationItem item, ThemeData theme) {
-    final loc = context.read<LocalizationService>();
     final parts = <String>[];
-    // Сопоставление с номенклатурой: явно показываем "Сопоставлено с: X" или "Новый продукт"
-    if (item.existingProductId != null && item.existingProductName != null) {
-      parts.add((loc.t('match_in_nomenclature') ?? 'Сопоставлено с: %s').replaceAll('%s', item.existingProductName!));
-    } else {
-      parts.add(loc.t('new_product_label') ?? 'Новый продукт');
-    }
     if (item.displayPrice != null) {
       final cur = item.currency != null ? ' ${item.currency}' : '';
       final hasPriceChange = item.existingProductId != null && item.existingPrice != null &&

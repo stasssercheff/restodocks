@@ -5,9 +5,13 @@ import 'package:intl/intl.dart';
 
 import '../../services/services.dart';
 import '../../models/models.dart';
-import '../../models/inbox_document.dart';
 import '../../services/inbox_service.dart';
 import '../../widgets/app_bar_home_button.dart';
+
+import '../../services/services.dart';
+import '../../models/models.dart';
+import '../../models/inbox_document.dart';
+import '../../services/inbox_service.dart';
 
 /// Входящие: Документы по отделам (Инвентаризация, Заказы продуктов, Подтверждения смен)
 class InboxScreen extends StatefulWidget {
@@ -43,8 +47,7 @@ class _InboxScreenState extends State<InboxScreen> {
     }
 
     try {
-      final currentEmployee = accountManager.currentEmployee;
-      final documents = await _inboxService.getInboxDocuments(establishment.id, currentEmployee);
+      final documents = await _inboxService.getInboxDocuments(establishment.id);
       if (mounted) {
         setState(() {
           _documents = documents;
@@ -127,6 +130,8 @@ class _InboxScreenState extends State<InboxScreen> {
                 children: [
                   _buildDepartmentChip('all', loc.t('all') ?? 'Все'),
                   _buildDepartmentChip('kitchen', loc.t('kitchen')),
+                  _buildDepartmentChip('bar', loc.t('bar')),
+                  _buildDepartmentChip('hall', loc.t('dining_room')),
                   _buildDepartmentChip('management', loc.t('management')),
                 ],
               ),
@@ -281,15 +286,7 @@ class _DocumentTile extends StatelessWidget {
           onSelected: (value) {
             switch (value) {
               case 'download':
-                if (document.type == DocumentType.inventory) {
-                  context.push('/inbox/inventory/${document.id}');
-                } else if (document.type == DocumentType.productOrder) {
-                  context.push('/inbox/order/${document.id}');
-                } else if (document.type == DocumentType.checklistSubmission) {
-                  context.push('/inbox/checklist/${document.id}');
-                } else {
-                  onDownload(document);
-                }
+                onDownload(document);
                 break;
               case 'view':
                 _viewDocument(context);
@@ -325,21 +322,10 @@ class _DocumentTile extends StatelessWidget {
   }
 
   void _viewDocument(BuildContext context) {
-    if (document.type == DocumentType.inventory) {
-      context.push('/inbox/inventory/${document.id}');
-      return;
-    }
-    if (document.type == DocumentType.productOrder) {
-      context.push('/inbox/order/${document.id}');
-      return;
-    }
-    if (document.type == DocumentType.checklistSubmission) {
-      context.push('/inbox/checklist/${document.id}');
-      return;
-    }
+    // Показать детали документа
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (context) => AlertDialog(
         title: Text(document.title),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -355,13 +341,13 @@ class _DocumentTile extends StatelessWidget {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
+            onPressed: () => Navigator.of(context).pop(),
             child: const Text('Закрыть'),
           ),
           if (document.fileUrl != null)
             ElevatedButton(
               onPressed: () {
-                Navigator.of(ctx).pop();
+                Navigator.of(context).pop();
                 onDownload(document);
               },
               child: const Text('Сохранить'),

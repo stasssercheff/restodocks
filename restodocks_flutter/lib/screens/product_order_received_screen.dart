@@ -1,3 +1,4 @@
+import 'package:excel/excel.dart' hide TextSpan;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -33,16 +34,16 @@ class _ProductOrderReceivedScreenState extends State<ProductOrderReceivedScreen>
     });
     try {
       final account = context.read<AccountManagerSupabase>();
-      final establishmentId = account.establishment?.id;
-      if (establishmentId == null) {
+      final chefId = account.currentEmployee?.id;
+      if (chefId == null) {
         setState(() {
           _loading = false;
-          _error = 'Заведение не выбрано';
+          _error = 'Не авторизован';
         });
         return;
       }
 
-      final docs = await OrderDocumentService().listForEstablishment(establishmentId);
+      final docs = await OrderDocumentService().listForChef(chefId);
 
       if (mounted) {
         setState(() {
@@ -158,7 +159,7 @@ class _ProductOrderReceivedScreenState extends State<ProductOrderReceivedScreen>
   void _showOrderDetails(BuildContext context, Map<String, dynamic> doc, LocalizationService loc) {
     final payload = doc['payload'] as Map<String, dynamic>? ?? {};
     final header = payload['header'] as Map<String, dynamic>? ?? {};
-    final rows = payload['items'] as List<dynamic>? ?? payload['rows'] as List<dynamic>? ?? [];
+    final rows = payload['rows'] as List<dynamic>? ?? [];
     final createdAt = DateTime.tryParse(doc['created_at']?.toString() ?? '') ?? DateTime.now();
     final employeeName = header['employeeName'] ?? '—';
     final establishmentName = header['establishmentName'] ?? '—';
@@ -218,37 +219,6 @@ class _ProductOrderReceivedScreenState extends State<ProductOrderReceivedScreen>
 
   Widget _buildOrderTable(BuildContext context, LocalizationService loc, List<dynamic> rows) {
     final theme = Theme.of(context);
-    final hasPrices = rows.isNotEmpty && (rows.first as Map<String, dynamic>).containsKey('pricePerUnit');
-    if (hasPrices) {
-      return Table(
-        border: TableBorder.all(color: theme.dividerColor),
-        columnWidths: const {0: FlexColumnWidth(2), 1: FixedColumnWidth(50), 2: FixedColumnWidth(70), 3: FixedColumnWidth(90), 4: FixedColumnWidth(90)},
-        children: [
-          TableRow(
-            decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest),
-            children: [
-              _tableCell(theme, loc.t('inventory_item_name'), bold: true),
-              _tableCell(theme, loc.t('order_list_unit'), bold: true),
-              _tableCell(theme, loc.t('order_list_quantity'), bold: true),
-              _tableCell(theme, loc.t('order_list_unit_price') ?? 'Цена', bold: true),
-              _tableCell(theme, loc.t('order_list_line_total') ?? 'Сумма', bold: true),
-            ],
-          ),
-          ...rows.map((r) {
-            final m = r as Map<String, dynamic>;
-            return TableRow(
-              children: [
-                _tableCell(theme, (m['productName'] ?? '').toString()),
-                _tableCell(theme, (m['unit'] ?? '').toString()),
-                _tableCell(theme, _fmtNum(m['quantity'])),
-                _tableCell(theme, _fmtNum(m['pricePerUnit'])),
-                _tableCell(theme, _fmtNum(m['lineTotal'])),
-              ],
-            );
-          }),
-        ],
-      );
-    }
     return Table(
       border: TableBorder.all(color: theme.dividerColor),
       columnWidths: const {0: FlexColumnWidth(2), 1: FixedColumnWidth(80), 2: FixedColumnWidth(100)},
@@ -290,14 +260,37 @@ class _ProductOrderReceivedScreenState extends State<ProductOrderReceivedScreen>
 
   Future<void> _downloadOrder(Map<String, dynamic> doc, LocalizationService loc) async {
     final payload = doc['payload'] as Map<String, dynamic>? ?? {};
+    final header = payload['header'] as Map<String, dynamic>? ?? {};
+    final rows = payload['rows'] as List<dynamic>? ?? [];
     try {
-      final bytes = await OrderListExportService.buildOrderExcelBytesFromPayload(
-        payload: payload,
-        t: (k) => loc.t(k) ?? k,
-      );
-      if (bytes.isNotEmpty) {
+      final excel = Excel.createExcel();
+      final sheet = excel[excel.getDefaultSheet()!];
+
+      sheet.appendRow([TextCellValue(header['listName'] ?? 'Заказ')]);
+      sheet.appendRow([TextCellValue('${loc.t('inbox_header_supplier') ?? 'Поставщик'}: ${header['supplierName'] ?? '—'}')]);
+      sheet.appendRow([TextCellValue('${loc.t('inbox_header_date') ?? 'Дата'}: ${header['date'] ?? '—'}')]);
+      sheet.appendRow([TextCellValue('${loc.t('inbox_header_employee') ?? 'Сотрудник'}: ${header['employeeName'] ?? '—'}')]);
+      sheet.appendRow([]);
+
+      sheet.appendRow([
+        TextCellValue(loc.t('inventory_item_name')),
+        TextCellValue(loc.t('order_list_unit')),
+        TextCellValue(loc.t('order_list_quantity')),
+      ]);
+      for (final r in rows) {
+        final m = r as Map<String, dynamic>;
+        final qty = (m['quantity'] as num?)?.toDouble() ?? 0.0;
+        sheet.appendRow([
+          TextCellValue((m['productName'] ?? '').toString()),
+          TextCellValue((m['unit'] ?? '').toString()),
+          DoubleCellValue(qty),
+        ]);
+      }
+
+      final out = excel.encode();
+      if (out != null && out.isNotEmpty) {
         final dateStr = DateFormat('yyyy-MM-dd').format(DateTime.tryParse(doc['created_at']?.toString() ?? '') ?? DateTime.now());
-        await saveFileBytes('order_$dateStr.xlsx', bytes);
+        await saveFileBytes('order_$dateStr.xlsx', out);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('inventory_excel_downloaded') ?? 'Файл Excel сохранён')));
         }

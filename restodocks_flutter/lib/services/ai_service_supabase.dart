@@ -12,29 +12,6 @@ import 'nutrition_api_service.dart';
 class AiServiceSupabase implements AiService {
   SupabaseClient get _client => Supabase.instance.client;
 
-  /// Последняя ошибка парсинга списка продуктов (для диагностики, когда ИИ не распознал данные).
-  /// Хранит пользовательское сообщение, а не сырой JSON.
-  static String? lastParseProductListError;
-
-  /// Преобразует сырую ошибку API (JSON, 429 и т.д.) в понятное пользователю сообщение.
-  static String _sanitizeAiError(String raw) {
-    if (raw.isEmpty) return 'Неизвестная ошибка';
-    final lower = raw.toLowerCase();
-    if (lower.contains('429') || lower.contains('resource_exhausted') || lower.contains('quota')) {
-      return 'Превышен лимит запросов к ИИ. Попробуйте позже или проверьте лимиты в AI Studio.';
-    }
-    if (lower.contains('gemini') && lower.contains('{')) {
-      return 'Сервис ИИ временно недоступен. Используется локальный разбор.';
-    }
-    if (lower.contains('functionexception') || lower.contains('status: 500')) {
-      return 'Ошибка сервера ИИ. Используется локальный разбор.';
-    }
-    if (raw.length > 200 || raw.contains('"status"') || raw.contains('"message"')) {
-      return 'ИИ не смог обработать запрос. Используется локальный разбор.';
-    }
-    return raw;
-  }
-
   Future<Map<String, dynamic>?> invoke(String name, Map<String, dynamic> body) async {
     try {
       final res = await _client.functions.invoke(name, body: body);
@@ -54,46 +31,25 @@ class AiServiceSupabase implements AiService {
 
   @override
   Future<List<ParsedProductItem>> parseProductList({List<String>? rows, String? text, String? source, String? userLocale}) async {
-    lastParseProductListError = null;
     final body = <String, dynamic>{};
     if (rows != null && rows.isNotEmpty) body['rows'] = rows;
     if (text != null && text.trim().isNotEmpty) body['text'] = text;
     if (source != null && source.isNotEmpty) body['source'] = source;
     if (userLocale != null && userLocale.isNotEmpty) body['userLocale'] = userLocale;
-    try {
-      final res = await _client.functions.invoke('ai-parse-product-list', body: body);
-      final data = res.data;
-      if (res.status != 200) {
-        lastParseProductListError = _sanitizeAiError('HTTP ${res.status}');
-        return [];
-      }
-      if (data is! Map<String, dynamic>) {
-        lastParseProductListError = 'Неверный формат ответа';
-        return [];
-      }
-      if (data.containsKey('error') && data['error'] != null) {
-        lastParseProductListError = _sanitizeAiError(data['error'].toString());
-      }
-      final raw = data['items'];
-      if (raw is! List) return [];
-      final list = raw.map((e) {
-        if (e is! Map) return null;
-        final m = Map<String, dynamic>.from(e as Map);
-        return ParsedProductItem(
-          name: (m['name'] as String?) ?? '',
-          price: m['price'] != null ? (m['price'] as num).toDouble() : null,
-          unit: m['unit'] as String?,
-          currency: m['currency'] as String?,
-        );
-      }).whereType<ParsedProductItem>().toList();
-      if (list.isEmpty && lastParseProductListError == null && data['error'] != null) {
-        lastParseProductListError = _sanitizeAiError(data['error'].toString());
-      }
-      return list;
-    } catch (e) {
-      lastParseProductListError = _sanitizeAiError(e.toString());
-      return [];
-    }
+    final data = await invoke('ai-parse-product-list', body);
+    if (data == null) return [];
+    final raw = data['items'];
+    if (raw is! List) return [];
+    return raw.map((e) {
+      if (e is! Map) return null;
+      final m = Map<String, dynamic>.from(e as Map);
+      return ParsedProductItem(
+        name: (m['name'] as String?) ?? '',
+        price: m['price'] != null ? (m['price'] as num).toDouble() : null,
+        unit: m['unit'] as String?,
+        currency: m['currency'] as String?,
+      );
+    }).whereType<ParsedProductItem>().toList();
   }
 
   @override

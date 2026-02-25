@@ -28,10 +28,10 @@ class OwnerHomeContent extends StatelessWidget {
         _Tile(icon: Icons.description, title: loc.t('ttk_kitchen'), onTap: () => context.push('/tech-cards/kitchen')),
         _Tile(icon: Icons.assignment, title: loc.t('nomenclature'), onTap: () => context.push('/nomenclature/kitchen')),
 
-        const SizedBox(height: 16),
-        _SectionTitle(title: loc.t('dining_room')),
-        _Tile(icon: Icons.schedule, title: loc.t('schedule'), onTap: () => context.push('/schedule/dining_room')),
-        _Tile(icon: Icons.restaurant_menu, title: loc.t('menu'), onTap: () => context.push('/menu/dining_room')),
+        // Бар (pro), Зал — временно скрыты
+        // const SizedBox(height: 16),
+        // _SectionTitle(title: 'Бар (pro)'), ...
+        // _SectionTitle(title: 'Зал'), ...
 
         const SizedBox(height: 16),
         _SectionTitle(title: '${loc.t('expenses')} (${loc.t('pro')})'),
