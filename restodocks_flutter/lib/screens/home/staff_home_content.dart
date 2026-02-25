@@ -25,11 +25,6 @@ class StaffHomeContent extends StatelessWidget {
         ),
         _Tile(icon: Icons.shopping_cart, title: loc.t('product_order'), onTap: () => context.push('/product-order')),
         _Tile(
-          icon: Icons.assignment,
-          title: loc.t('nomenclature'),
-          onTap: () => context.push('/nomenclature'),
-        ),
-        _Tile(
           icon: Icons.restaurant_menu,
           title: loc.t('menu'),
           onTap: () => context.push('/menu/${employee.department}'),
