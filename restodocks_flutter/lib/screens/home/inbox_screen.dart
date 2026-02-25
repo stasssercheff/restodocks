@@ -127,8 +127,6 @@ class _InboxScreenState extends State<InboxScreen> {
                 children: [
                   _buildDepartmentChip('all', loc.t('all') ?? 'Все'),
                   _buildDepartmentChip('kitchen', loc.t('kitchen')),
-                  _buildDepartmentChip('bar', loc.t('bar')),
-                  _buildDepartmentChip('hall', loc.t('dining_room')),
                   _buildDepartmentChip('management', loc.t('management')),
                 ],
               ),
