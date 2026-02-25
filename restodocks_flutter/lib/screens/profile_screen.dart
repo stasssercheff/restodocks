@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
@@ -126,6 +127,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
             // Компания
             _buildCompanySection(establishment, localization),
 
+            if (isOwner) ...[
+              const SizedBox(height: 24),
+              _buildPinCodeSection(establishment, localization),
+            ],
+
             const SizedBox(height: 24),
 
             // Основная информация профиля
@@ -141,6 +147,66 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
             // Выход
             _buildLogoutSection(localization),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _copyPin(BuildContext context, String pinCode) {
+    Clipboard.setData(ClipboardData(text: pinCode));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(context.read<LocalizationService>().t('pin_copied'))),
+    );
+  }
+
+  Widget _buildPinCodeSection(Establishment establishment, LocalizationService localization) {
+    final loc = localization;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              loc.t('generated_pin'),
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              loc.t('pin_auto_hint'),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Theme.of(context).dividerColor),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      establishment.pinCode,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 2,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                IconButton.filled(
+                  onPressed: () => _copyPin(context, establishment.pinCode),
+                  icon: const Icon(Icons.copy),
+                  tooltip: loc.t('copy_pin'),
+                ),
+              ],
+            ),
           ],
         ),
       ),
