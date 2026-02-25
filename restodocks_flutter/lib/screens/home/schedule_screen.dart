@@ -321,9 +321,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         dates: _visibleDates,
         slots: _model.slots,
         loc: loc,
-        onCopy: (sourceStart, sourceEnd, targetStart, targetEnd, selectedSlots) {
+        onCopy: (sourceStart, sourceEnd, targetStart, targetEnd, selectedSlots) async {
           setState(() {
-            // Копируем данные из исходного диапазона в целевой
             for (final slotId in selectedSlots) {
               final sourceDates = _getDatesInRange(sourceStart, sourceEnd);
               final targetDates = _getDatesInRange(targetStart, targetEnd);
@@ -346,8 +345,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                 }
               }
             }
-            _save();
           });
+          await _save();
         },
       ),
     );
@@ -422,7 +421,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           color: bg,
           border: Border(right: BorderSide(color: borderColor), bottom: BorderSide(color: borderColor)),
         ),
-        child: child,
+        child: Center(child: child),
       );
     }
 
@@ -504,7 +503,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             bg = Color.lerp(base, todayHighlightBg, 0.6) ?? base;
           }
           final displayText = isDayOff
-              ? loc.t('schedule_day_off')
+              ? '0'
               : (isShift && timeDisplay.isNotEmpty ? timeDisplay : (val ?? '—'));
           final content = Text(
             displayText,
@@ -767,7 +766,7 @@ class _CopyRangeDialog extends StatefulWidget {
   final List<DateTime> dates;
   final List<ScheduleSlot> slots;
   final LocalizationService loc;
-  final void Function(DateTime sourceStart, DateTime sourceEnd, DateTime targetStart, DateTime targetEnd, List<String> selectedSlots) onCopy;
+  final Future<void> Function(DateTime sourceStart, DateTime sourceEnd, DateTime targetStart, DateTime targetEnd, List<String> selectedSlots) onCopy;
 
   @override
   State<_CopyRangeDialog> createState() => _CopyRangeDialogState();
@@ -880,7 +879,7 @@ class _CopyRangeDialogState extends State<_CopyRangeDialog> {
           child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
         ),
         FilledButton(
-          onPressed: _canCopy ? _copy : null,
+          onPressed: _canCopy ? () async { await _copy(); } : null,
           child: const Text('Копировать'),
         ),
       ],
@@ -896,9 +895,10 @@ class _CopyRangeDialogState extends State<_CopyRangeDialog> {
       !_sourceStart!.isAfter(_sourceEnd!) &&
       !_targetStart!.isAfter(_targetEnd!);
 
-  void _copy() {
+  Future<void> _copy() async {
     if (!_canCopy) return;
-    widget.onCopy(_sourceStart!, _sourceEnd!, _targetStart!, _targetEnd!, _selectedSlots.toList());
+    await widget.onCopy(_sourceStart!, _sourceEnd!, _targetStart!, _targetEnd!, _selectedSlots.toList());
+    if (!mounted) return;
     Navigator.of(context).pop();
   }
 }
