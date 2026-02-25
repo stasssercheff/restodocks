@@ -385,11 +385,12 @@ class AccountManagerSupabase {
     required String password,
   }) async {
     final emailTrim = email.trim();
+    final passwordTrimmed = password.trim();
     if (emailTrim.isEmpty) return null;
 
     // 1. Пробуем Supabase Auth (для новых учёток)
     try {
-      await _supabase.signInWithEmail(emailTrim, password);
+      await _supabase.signInWithEmail(emailTrim, passwordTrimmed);
       if (_supabase.isAuthenticated) {
         final authUserId = _supabase.currentUser!.id;
         final list = await _supabase.client
@@ -424,7 +425,7 @@ class AccountManagerSupabase {
     }
 
     // 2. Legacy: поиск по employees и проверка password_hash
-    return _findEmployeeByPasswordHash(emailTrim, password);
+    return _findEmployeeByPasswordHash(emailTrim, passwordTrimmed);
   }
 
   /// Привязка auth_user_id к employee по email (после подтверждения письма)
