@@ -76,10 +76,16 @@ class AppRouter {
       return null;
     },
     routes: [
-      // Корневой маршрут - перенаправляет на splash
+      // Корневой маршрут - при F5 на внутренней странице сохраняем URL, иначе — splash
       GoRoute(
         path: '/',
-        redirect: (context, state) => '/splash',
+        redirect: (context, state) {
+          if (kIsWeb) {
+            final bp = initial_loc.getCurrentBrowserPath();
+            if (bp != null && bp != '/splash') return bp;
+          }
+          return '/splash';
+        },
       ),
 
       // Стартовый экран (проверка авторизации)

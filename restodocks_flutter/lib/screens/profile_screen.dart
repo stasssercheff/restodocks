@@ -528,9 +528,13 @@ class _ProfileEditDialogState extends State<_ProfileEditDialog> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final loc = context.read<LocalizationService>();
+    final screenH = MediaQuery.of(context).size.height;
     return Dialog(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 400, maxHeight: 520),
+        constraints: BoxConstraints(
+          maxWidth: 400,
+          maxHeight: (screenH * 0.85).clamp(520.0, 800.0),
+        ),
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: SingleChildScrollView(
