@@ -285,6 +285,8 @@ class _DocumentTile extends StatelessWidget {
               case 'download':
                 if (document.type == DocumentType.inventory) {
                   context.push('/inbox/inventory/${document.id}');
+                } else if (document.type == DocumentType.productOrder) {
+                  context.push('/inbox/order/${document.id}');
                 } else {
                   onDownload(document);
                 }
@@ -325,6 +327,10 @@ class _DocumentTile extends StatelessWidget {
   void _viewDocument(BuildContext context) {
     if (document.type == DocumentType.inventory) {
       context.push('/inbox/inventory/${document.id}');
+      return;
+    }
+    if (document.type == DocumentType.productOrder) {
+      context.push('/inbox/order/${document.id}');
       return;
     }
     showDialog(

@@ -85,6 +85,13 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
   Future<void> _saveWithQuantities() async {
     if (_list == null || _establishmentId == null) return;
     final loc = context.read<LocalizationService>();
+    final account = context.read<AccountManagerSupabase>();
+    final employee = account.currentEmployee;
+    final establishment = account.establishment;
+    if (employee == null || establishment == null) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('error_short') ?? 'Ошибка')));
+      return;
+    }
     final now = DateTime.now();
     final dateStr = DateFormat('dd.MM.yyyy').format(now);
     final itemsWithQty = _list!.items.asMap().entries.map((e) {
@@ -102,6 +109,54 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
     );
     final lists = await loadOrderLists(_establishmentId!);
     await saveOrderLists(_establishmentId!, [...lists, saved]);
+
+    // Сохранить во входящие (шефу и собственнику) с ценами и итогами
+    final store = context.read<ProductStoreSupabase>();
+    final orderForDateStr = saved.orderForDate != null ? DateFormat('yyyy-MM-dd').format(saved.orderForDate!) : null;
+    final header = {
+      'supplierName': saved.supplierName,
+      'employeeName': employee.fullName,
+      'establishmentName': establishment.name,
+      'createdAt': now.toIso8601String(),
+      'orderForDate': orderForDateStr,
+    };
+    double grandTotal = 0;
+    final itemsPayload = <Map<String, dynamic>>[];
+    for (final item in itemsWithQty) {
+      double pricePerKg = 0;
+      if (item.productId != null) {
+        final ep = store.getEstablishmentPrice(item.productId!, establishment.id);
+        final product = store.findProductById(item.productId!);
+        pricePerKg = ep?.$1 ?? product?.basePrice ?? 0;
+      }
+      double pricePerUnit = pricePerKg;
+      if (item.unit == 'g' || item.unit == 'г') {
+        pricePerUnit = pricePerKg / 1000;
+      } else if (item.unit != 'kg' && item.unit != 'кг') {
+        pricePerUnit = pricePerKg;
+      }
+      final lineTotal = item.quantity * pricePerUnit;
+      grandTotal += lineTotal;
+      itemsPayload.add({
+        'productName': item.productName,
+        'unit': item.unit,
+        'quantity': item.quantity,
+        'pricePerUnit': pricePerUnit,
+        'lineTotal': lineTotal,
+      });
+    }
+    final payload = {
+      'header': header,
+      'items': itemsPayload,
+      'grandTotal': grandTotal,
+      'comment': saved.comment,
+    };
+    await OrderDocumentService().save(
+      establishmentId: establishment.id,
+      createdByEmployeeId: employee.id,
+      payload: payload,
+    );
+
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${loc.t('order_list_save_with_quantities')} ✓')));
       context.go('/product-order');

@@ -25,7 +25,7 @@ class InboxService {
       } else if (currentEmployee.hasRole('executive_chef') || currentEmployee.hasRole('sous_chef')) {
         rawList = await docService.listForChef(currentEmployee.id);
       } else {
-        return documents;
+        rawList = [];
       }
 
       for (final doc in rawList) {
@@ -41,6 +41,31 @@ class InboxService {
           id: doc['id']?.toString() ?? '',
           type: DocumentType.inventory,
           title: 'Инвентаризация $dateStr',
+          description: employeeName,
+          createdAt: createdAt,
+          employeeId: doc['created_by_employee_id']?.toString() ?? '',
+          employeeName: employeeName,
+          department: _mapSectionToDepartment(currentEmployee.department),
+          fileUrl: null,
+          metadata: payload,
+        ));
+      }
+
+      // Заказы продуктов — для шефа и собственника по заведению
+      final orderDocs = await OrderDocumentService().listForEstablishment(establishmentId);
+      for (final doc in orderDocs) {
+        final payload = doc['payload'] as Map<String, dynamic>? ?? {};
+        final header = payload['header'] as Map<String, dynamic>? ?? {};
+        final supplierName = header['supplierName']?.toString() ?? '—';
+        final employeeName = header['employeeName']?.toString() ?? '—';
+        final createdAt = doc['created_at'] != null
+            ? DateTime.tryParse(doc['created_at'].toString()) ?? DateTime.now()
+            : DateTime.now();
+
+        documents.add(InboxDocument(
+          id: doc['id']?.toString() ?? '',
+          type: DocumentType.productOrder,
+          title: 'Заказ $supplierName',
           description: employeeName,
           createdAt: createdAt,
           employeeId: doc['created_by_employee_id']?.toString() ?? '',

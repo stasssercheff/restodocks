@@ -210,6 +210,180 @@ class OrderListExportService {
     return fileName;
   }
 
+  /// Построить PDF из payload входящих (с ценами и итогом).
+  static Future<Uint8List> buildOrderPdfBytesFromPayload({
+    required Map<String, dynamic> payload,
+    required String Function(String) t,
+  }) async {
+    final doc = pw.Document();
+    final header = payload['header'] as Map<String, dynamic>? ?? {};
+    final items = payload['items'] as List<dynamic>? ?? [];
+    final grandTotal = (payload['grandTotal'] as num?)?.toDouble() ?? 0;
+    final comment = (payload['comment'] as String?)?.trim() ?? '';
+
+    final companyName = header['establishmentName'] ?? '—';
+    final supplierName = header['supplierName'] ?? '—';
+    final employeeName = header['employeeName'] ?? '—';
+    final createdAt = header['createdAt'] != null ? DateTime.tryParse(header['createdAt'].toString()) : null;
+    final orderForDate = header['orderForDate'] != null ? DateTime.tryParse(header['orderForDate'].toString()) : null;
+    final dateStr = createdAt != null ? DateFormat('dd.MM.yyyy HH:mm').format(createdAt) : '—';
+    final orderForStr = orderForDate != null ? DateFormat('dd.MM.yyyy').format(orderForDate) : '—';
+
+    doc.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: pw.EdgeInsets.all(24),
+        build: (context) => [
+          pw.Header(
+            level: 0,
+            child: pw.Text(
+              t('product_order'),
+              style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
+            ),
+          ),
+          pw.Paragraph(text: '${t('order_export_from')}: $companyName'),
+          pw.Paragraph(text: '${t('order_export_to')}: $supplierName'),
+          pw.Paragraph(text: '${t('order_export_date_time')}: $dateStr'),
+          pw.Paragraph(text: '${t('order_export_order_for')}: $orderForStr'),
+          pw.Paragraph(text: '${t('inbox_header_employee') ?? 'Сотрудник'}: $employeeName'),
+          pw.SizedBox(height: 16),
+          pw.Text(
+            '${t('order_export_list')}:',
+            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 8),
+          pw.Table(
+            border: pw.TableBorder.all(color: PdfColors.grey400),
+            columnWidths: {
+              0: const pw.FlexColumnWidth(0.5),
+              1: const pw.FlexColumnWidth(2.5),
+              2: const pw.FlexColumnWidth(0.8),
+              3: const pw.FlexColumnWidth(0.8),
+              4: const pw.FlexColumnWidth(1),
+              5: const pw.FlexColumnWidth(1),
+            },
+            children: [
+              pw.TableRow(
+                decoration: pw.BoxDecoration(color: PdfColors.grey300),
+                children: [
+                  _pdfCell(t('order_export_no'), bold: true),
+                  _pdfCell(t('inventory_item_name'), bold: true),
+                  _pdfCell(t('order_list_unit'), bold: true),
+                  _pdfCell(t('order_list_quantity'), bold: true),
+                  _pdfCell(t('order_list_unit_price') ?? 'Цена за ед.', bold: true),
+                  _pdfCell(t('order_list_line_total') ?? 'Сумма', bold: true),
+                ],
+              ),
+              ...items.asMap().entries.map((e) {
+                final i = e.key + 1;
+                final item = e.value as Map<String, dynamic>;
+                final name = item['productName']?.toString() ?? '';
+                final unit = item['unit']?.toString() ?? '';
+                final qty = (item['quantity'] as num?)?.toDouble() ?? 0;
+                final pricePerUnit = (item['pricePerUnit'] as num?)?.toDouble() ?? 0;
+                final lineTotal = (item['lineTotal'] as num?)?.toDouble() ?? 0;
+                final qtyStr = qty == qty.truncateToDouble() ? qty.toInt().toString() : qty.toStringAsFixed(1);
+                return pw.TableRow(
+                  children: [
+                    _pdfCell('$i'),
+                    _pdfCell(name),
+                    _pdfCell(unit),
+                    _pdfCell(qtyStr),
+                    _pdfCell(pricePerUnit.toStringAsFixed(2)),
+                    _pdfCell(lineTotal.toStringAsFixed(2)),
+                  ],
+                );
+              }),
+              pw.TableRow(
+                decoration: pw.BoxDecoration(color: PdfColors.grey300),
+                children: [
+                  _pdfCell('', bold: true),
+                  _pdfCell(t('order_list_grand_total') ?? 'Итого:', bold: true),
+                  _pdfCell('', bold: true),
+                  _pdfCell('', bold: true),
+                  _pdfCell('', bold: true),
+                  _pdfCell(grandTotal.toStringAsFixed(2), bold: true),
+                ],
+              ),
+            ],
+          ),
+          if (comment.isNotEmpty) ...[
+            pw.SizedBox(height: 16),
+            pw.Paragraph(
+              text: '${t('order_list_comment')}: $comment',
+              style: pw.TextStyle(fontStyle: pw.FontStyle.italic),
+            ),
+          ],
+        ],
+      ),
+    );
+
+    return doc.save();
+  }
+
+  /// Построить Excel из payload входящих (с ценами и итогом).
+  static Future<Uint8List> buildOrderExcelBytesFromPayload({
+    required Map<String, dynamic> payload,
+    required String Function(String) t,
+  }) async {
+    final excel = Excel.createExcel();
+    final sheet = excel[excel.getDefaultSheet()!];
+    final header = payload['header'] as Map<String, dynamic>? ?? {};
+    final items = payload['items'] as List<dynamic>? ?? [];
+    final grandTotal = (payload['grandTotal'] as num?)?.toDouble() ?? 0;
+
+    final companyName = header['establishmentName'] ?? '—';
+    final supplierName = header['supplierName'] ?? '—';
+    final employeeName = header['employeeName'] ?? '—';
+    final createdAt = header['createdAt'] != null ? DateTime.tryParse(header['createdAt'].toString()) : null;
+    final orderForDate = header['orderForDate'] != null ? DateTime.tryParse(header['orderForDate'].toString()) : null;
+
+    sheet.appendRow([TextCellValue('${t('order_export_from')}: $companyName')]);
+    sheet.appendRow([TextCellValue('${t('order_export_to')}: $supplierName')]);
+    sheet.appendRow([TextCellValue('${t('inbox_header_employee') ?? 'Сотрудник'}: $employeeName')]);
+    sheet.appendRow([TextCellValue('${t('order_export_date_time')}: ${createdAt != null ? DateFormat('dd.MM.yyyy HH:mm').format(createdAt) : '—'}')]);
+    sheet.appendRow([TextCellValue('${t('order_export_order_for')}: ${orderForDate != null ? DateFormat('dd.MM.yyyy').format(orderForDate) : '—'}')]);
+    sheet.appendRow([]);
+
+    sheet.appendRow([
+      TextCellValue(t('order_export_no')),
+      TextCellValue(t('inventory_item_name')),
+      TextCellValue(t('order_list_unit')),
+      TextCellValue(t('order_list_quantity')),
+      TextCellValue(t('order_list_unit_price') ?? 'Цена за ед.'),
+      TextCellValue(t('order_list_line_total') ?? 'Сумма'),
+    ]);
+    for (var i = 0; i < items.length; i++) {
+      final item = items[i] as Map<String, dynamic>;
+      sheet.appendRow([
+        IntCellValue(i + 1),
+        TextCellValue((item['productName'] ?? '').toString()),
+        TextCellValue((item['unit'] ?? '').toString()),
+        DoubleCellValue((item['quantity'] as num?)?.toDouble() ?? 0),
+        DoubleCellValue((item['pricePerUnit'] as num?)?.toDouble() ?? 0),
+        DoubleCellValue((item['lineTotal'] as num?)?.toDouble() ?? 0),
+      ]);
+    }
+    sheet.appendRow([]);
+    sheet.appendRow([
+      TextCellValue(''),
+      TextCellValue(''),
+      TextCellValue(''),
+      TextCellValue(t('order_list_grand_total') ?? 'Итого:'),
+      TextCellValue(''),
+      DoubleCellValue(grandTotal),
+    ]);
+
+    final comment = (payload['comment'] as String?)?.trim();
+    if (comment.isNotEmpty) {
+      sheet.appendRow([]);
+      sheet.appendRow([TextCellValue('${t('order_list_comment')}: $comment')]);
+    }
+
+    final out = excel.encode();
+    return out ?? Uint8List(0);
+  }
+
   /// URL для WhatsApp: wa.me/PHONE?text=MESSAGE (телефон без +, только цифры).
   static String? whatsAppUrl(String? phone, String message) {
     final p = phone?.replaceAll(RegExp(r'[\s\-\(\)]'), '') ?? '';
