@@ -181,19 +181,52 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
           if (_items.any((i) => i.category == ModerationCategory.priceUpdate))
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  FilledButton.tonal(
-                    onPressed: _saving ? null : _approveAllPriceUpdates,
-                    child: Text(loc.t('apply_all_price_updates') ?? 'Принять все обновления цен'),
-                  ),
-                  OutlinedButton(
-                    onPressed: _saving ? null : _deselectAllPriceUpdates,
-                    child: Text(loc.t('deselect_price_updates') ?? 'Снять обновления цен'),
-                  ),
-                ],
+              child: Builder(
+                builder: (context) {
+                  final priceUpdateItems = _items.where((i) => i.category == ModerationCategory.priceUpdate).toList();
+                  final allApproved = priceUpdateItems.isNotEmpty && priceUpdateItems.every((i) => i.approved);
+                  final noneApproved = priceUpdateItems.every((i) => !i.approved);
+                  return Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      FilledButton.tonal(
+                        onPressed: _saving ? null : _approveAllPriceUpdates,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: allApproved ? theme.colorScheme.primaryContainer : null,
+                          foregroundColor: allApproved ? theme.colorScheme.onPrimaryContainer : null,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (allApproved) ...[
+                              Icon(Icons.check_circle, size: 18, color: theme.colorScheme.onPrimaryContainer),
+                              const SizedBox(width: 6),
+                            ],
+                            Text(loc.t('apply_all_price_updates') ?? 'Принять все обновления цен'),
+                          ],
+                        ),
+                      ),
+                      OutlinedButton(
+                        onPressed: _saving ? null : _deselectAllPriceUpdates,
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor: noneApproved ? theme.colorScheme.surfaceContainerHighest : null,
+                          foregroundColor: noneApproved ? theme.colorScheme.onSurface : null,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (noneApproved) ...[
+                              Icon(Icons.cancel_outlined, size: 18, color: theme.colorScheme.onSurface),
+                              const SizedBox(width: 6),
+                            ],
+                            Text(loc.t('deselect_price_updates') ?? 'Снять обновления цен'),
+                          ],
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
           const SizedBox(height: 8),
