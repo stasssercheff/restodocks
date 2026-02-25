@@ -697,8 +697,6 @@ class _InventoryScreenState extends State<InventoryScreen>
         _endTime = endTime;
         _completed = true;
       });
-      // Очистка черновика после успешной отправки
-      clearDraft();
     }
 
     // Выбор формата экспорта и генерация файла
@@ -730,6 +728,22 @@ class _InventoryScreenState extends State<InventoryScreen>
         );
       }
     }
+    // Очистка черновика только после экспорта — сохраняем данные на экране до выгрузки
+    if (mounted) await clearDraft();
+  }
+
+  /// Начать новую инвентаризацию (очистить форму после завершённой).
+  void _startNewInventory() {
+    setState(() {
+      _rows.clear();
+      _aggregatedFromFile = null;
+      _date = DateTime.now();
+      _startTime = TimeOfDay.now();
+      _endTime = null;
+      _completed = false;
+    });
+    clearDraft();
+    _loadNomenclature();
   }
 
   /// Создание Excel с 2 листами: 1) продукты+ПФ+перерасчет, 2) все продукты включая ПФ
@@ -1205,11 +1219,21 @@ class _InventoryScreenState extends State<InventoryScreen>
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 10),
                 ),
-                child: Text(
-                  loc.t('inventory_complete'),
-                ),
+                child: Text(loc.t('inventory_complete')),
               ),
             ),
+            if (_completed) ...[
+              const SizedBox(width: 12),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _startNewInventory,
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                  child: Text(loc.t('inventory_new')),
+                ),
+              ),
+            ],
           ],
         ),
       ),
