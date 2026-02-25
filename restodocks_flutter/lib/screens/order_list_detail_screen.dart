@@ -39,6 +39,9 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
       return;
     }
     _establishmentId = est.id;
+    // Загружаем номенклатуру с ценами для расчёта итоговой суммы заказа
+    final store = context.read<ProductStoreSupabase>();
+    await store.loadNomenclature(est.id);
     final lists = await loadOrderLists(est.id);
     final found = lists.where((l) => l.id == widget.listId).firstOrNull;
     for (final c in _qtyControllers) {
@@ -150,13 +153,22 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
       'grandTotal': grandTotal,
       'comment': saved.comment,
     };
-    await OrderDocumentService().save(
+    final orderDoc = await OrderDocumentService().save(
       establishmentId: establishment.id,
       createdByEmployeeId: employee.id,
       payload: payload,
     );
 
     if (mounted) {
+      if (orderDoc == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${loc.t('error_short') ?? 'Ошибка'}: не удалось сохранить заказ во входящие. Проверьте подключение.'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${loc.t('order_list_save_with_quantities')} ✓')));
       context.go('/product-order');
     }

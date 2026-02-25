@@ -655,13 +655,22 @@ class _InventoryScreenState extends State<InventoryScreen>
       aggregatedProducts: aggregatedProducts,
     );
     final docService = InventoryDocumentService();
-    await docService.save(
+    final docSaved = await docService.save(
       establishmentId: establishment.id,
       createdByEmployeeId: employee.id,
       recipientChefId: chef.id,
       recipientEmail: chef.email,
       payload: payload,
     );
+    if (docSaved == null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(loc.t('inventory_document_save_error') ?? 'Не удалось сохранить инвентаризацию во входящие. Проверьте подключение.'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+      return;
+    }
 
     // Сохраняем инвентаризацию в историю перед установкой статуса
     try {
