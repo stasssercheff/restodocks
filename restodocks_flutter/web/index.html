@@ -63,13 +63,14 @@
 <body>
   <script>
     (function() {
-      // Path-based: /tech-cards и т.д.
+      // Логотип при первой загрузке (/, #/, #/splash, #/home). Лёгкий спиннер только при F5 на «глубокой» странице.
       var path = (window.location.pathname || '').replace(/\/$/, '');
-      // Hash-based (наш случай): #/tech-cards, #/inventory и т.д.
-      var hash = (window.location.hash || '').replace(/^#/, '').split('?')[0];
-      var hasInternalRoute = (path.length > 1 && path !== '/') || (hash.length > 1 && hash !== '/' && hash !== '');
+      var hash = (window.location.hash || '').replace(/^#/, '').split('?')[0].replace(/\/$/, '');
+      var isRootOrStart = (path === '' || path === '/') && (!hash || hash === '' || hash === '/' || hash === '/splash' || hash === '/home');
+      var pathDeep = path.length > 1 && path !== '/';
+      var hashDeep = hash.length > 1 && hash !== '/' && hash !== '/splash' && hash !== '/home';
       var sameOrigin = document.referrer && document.referrer.indexOf(window.location.origin) === 0;
-      if (hasInternalRoute || sameOrigin) document.body.classList.add('loading-refresh');
+      if (!isRootOrStart && (pathDeep || hashDeep || sameOrigin)) document.body.classList.add('loading-refresh');
     })();
   </script>
   <div id="loading-screen"></div>

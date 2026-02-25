@@ -942,9 +942,10 @@ class _InventoryScreenState extends State<InventoryScreen>
       });
     }
 
-    // На мобильной не скрываем header/footer — иначе layout меняется и клавиатура закрывается.
-    // Панель навигации (Prev/Next) — часть клавиатуры. «Завершить» остаётся под клавиатурой.
+    // На мобильной при открытой клавиатуре: header не скрываем (чтобы не дёргать layout), футер «Завершить» уводим под клавиатуру.
     final collapseLayout = _isInputMode && !isNarrow;
+    final hideFooterUnderKeyboard = _isInputMode && isNarrow;
+    final viewInsetsBottom = viewInsets.bottom;
 
     return Scaffold(
       appBar: _isInputMode ? AppBar(
@@ -980,6 +981,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                 child: _buildTable(loc),
               ),
               if (!collapseLayout) const Divider(height: 1),
+              if (hideFooterUnderKeyboard) SizedBox(height: viewInsetsBottom),
               _buildFooter(loc, collapseLayout),
             ],
           ),
@@ -1178,7 +1180,7 @@ class _InventoryScreenState extends State<InventoryScreen>
   }
 
   /// Компактный нижний блок: не перекрывает таблицу, минимум высоты.
-  /// [collapseLayout] — на мобильной при открытой клавиатуре не скрываем, чтобы клавиатура не закрывалась.
+  /// [collapseLayout] — на десктопе при вводе скрываем футер. На мобильной при клавиатуре футер сдвигается вниз отступом (SizedBox выше), уходит под клавиатуру.
   Widget _buildFooter(LocalizationService loc, bool collapseLayout) {
     final theme = Theme.of(context);
     if (collapseLayout) {
