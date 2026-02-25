@@ -3,8 +3,9 @@ set -e
 
 # Полный бэкап проекта Restodocks
 # Включает: код, базу данных Supabase, storage, конфигурацию
+# Если вызван из backup_all.sh — использует BACKUP_TARGET_DIR
 
-BACKUP_DIR="backup_$(date +%Y%m%d_%H%M%S)"
+BACKUP_DIR="${BACKUP_TARGET_DIR:-backup_$(date +%Y%m%d_%H%M%S)}"
 mkdir -p "$BACKUP_DIR"
 echo "📁 Создаю директорию бэкапа: $BACKUP_DIR"
 
@@ -101,10 +102,12 @@ EOF
 
 chmod +x "$BACKUP_DIR/restore.sh"
 
-# 8. Создание архива
-echo "📦 Создание архива..."
-tar -czf "${BACKUP_DIR}.tar.gz" "$BACKUP_DIR"
-echo "✅ Архив создан: ${BACKUP_DIR}.tar.gz"
+# 8. Создание архива (пропуск при вызове из backup_all — там свой финальный архив)
+if [ -z "$BACKUP_TARGET_DIR" ]; then
+  echo "📦 Создание архива..."
+  tar -czf "${BACKUP_DIR}.tar.gz" "$BACKUP_DIR"
+  echo "✅ Архив создан: ${BACKUP_DIR}.tar.gz"
+fi
 
 # 9. Инструкции по ручному бэкапу
 cat > "$BACKUP_DIR/MANUAL_BACKUP_README.md" << 'EOF'

@@ -16,7 +16,7 @@ echo ""
 
 # 1. БЭКАП КОДА И КОНФИГУРАЦИИ
 echo "📦 ШАГ 1: Бэкап кода и конфигурации..."
-echo "   Выполняю: ./full_backup.sh"
+export BACKUP_TARGET_DIR="$BACKUP_DIR"
 ./full_backup.sh > /dev/null 2>&1
 echo "   ✅ Код и конфигурация сохранены"
 
@@ -27,10 +27,11 @@ if [ -f "backup_config.env" ]; then
     source backup_config.env
     if [ -n "$SUPABASE_DB_URL" ] && command -v pg_dump >/dev/null 2>&1; then
         echo "   Найдены настройки БД, выполняю бэкап..."
-        pg_dump "$SUPABASE_DB_URL" --no-owner --no-privileges --clean --if-exists > "$BACKUP_DIR/database.sql" 2>/dev/null || echo "   ⚠️ Ошибка бэкапа БД (проверьте настройки)"
-        if [ -f "$BACKUP_DIR/database.sql" ]; then
+        if pg_dump "$SUPABASE_DB_URL" --no-owner --no-privileges --clean --if-exists > "$BACKUP_DIR/database.sql" 2>/dev/null; then
             gzip "$BACKUP_DIR/database.sql"
             echo "   ✅ База данных сохранена: database.sql.gz"
+        else
+            echo "   ⚠️ Ошибка pg_dump (проверьте SUPABASE_DB_URL и pg_dump)"
         fi
     else
         echo "   ⚠️ БД не настроена или pg_dump не найден"
@@ -89,13 +90,13 @@ echo "📁 Архив: $FINAL_ARCHIVE"
 echo "📊 Размер: $FINAL_SIZE"
 echo "📅 Дата: $(date)"
 echo ""
-echo "✅ Содержимое:"
-echo "   • Исходный код проекта"
-echo "   • Supabase миграции и функции"
-echo "   • База данных PostgreSQL (employees, auth.users, RLS)"
-echo "   • Vercel env (если vercel CLI настроен)"
-echo "   • Supabase Auth чеклист (при сбое входа)"
-echo "   • Файловое хранилище (если есть файлы)"
+echo "✅ Содержимое архива:"
+if tar -tzf "$FINAL_ARCHIVE" | grep -q "database.sql.gz"; then
+  echo "   • База данных PostgreSQL ✓"
+else
+  echo "   ⚠️ БАЗА ДАННЫХ ОТСУТСТВУЕТ — настройте backup_config.env (SUPABASE_DB_URL) и pg_dump"
+fi
+echo "   • Код, миграции, env, Vercel, Auth-чеклист, Storage"
 echo ""
 echo "💡 Для восстановления используйте скрипт restore.sh из архива"
 echo ""
