@@ -23,7 +23,7 @@ class StaffHomeContent extends StatelessWidget {
           title: loc.t('schedule'),
           onTap: () => context.push('/schedule'),
         ),
-        _Tile(icon: Icons.library_books, title: loc.t('products'), onTap: () => context.push('/products')),
+        _Tile(icon: Icons.shopping_cart, title: loc.t('product_order'), onTap: () => context.push('/product-order')),
         _Tile(
           icon: Icons.assignment,
           title: loc.t('nomenclature'),

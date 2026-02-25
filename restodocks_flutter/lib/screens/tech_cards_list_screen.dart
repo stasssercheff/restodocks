@@ -417,7 +417,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       ),
       body: Stack(
         children: [
-          _buildBody(loc),
+          _buildBody(loc, canEdit),
           if (_loadingExcel)
             ColoredBox(
               color: Theme.of(context).colorScheme.surface.withOpacity(0.7),
@@ -449,7 +449,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     );
   }
 
-  Widget _buildBody(LocalizationService loc) {
+  Widget _buildBody(LocalizationService loc, bool canEdit) {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
       return Center(
@@ -533,8 +533,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           Expanded(
             child: TabBarView(
               children: [
-                _buildTechCardsTable(semiFinishedCards, loc),
-                _buildTechCardsTable(dishCards, loc),
+                _buildTechCardsTable(semiFinishedCards, loc, canEdit),
+                _buildTechCardsTable(dishCards, loc, canEdit),
               ],
             ),
           ),
@@ -544,7 +544,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   }
 
   /// Компактная таблица с шапкой: влезает в экран телефона, без горизонтального скролла.
-  Widget _buildTechCardsTable(List<TechCard> techCards, LocalizationService loc) {
+  Widget _buildTechCardsTable(List<TechCard> techCards, LocalizationService loc, bool canEdit) {
     final lang = loc.currentLanguageCode;
     const colCatWidth = 52.0;
     const colCostWidth = 48.0;
@@ -582,6 +582,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                         context.push('/tech-cards/${tc.id}');
                       }
                     },
+                    onLongPress: canEdit && !_selectionMode
+                        ? () => context.push('/tech-cards/${tc.id}?view=1')
+                        : null,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       child: Row(
@@ -621,7 +624,22 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                                   value: selected,
                                   onChanged: (_) => _toggleTechCardSelection(tc.id),
                                 )
-                              : Icon(Icons.chevron_right, size: 20, color: Theme.of(context).colorScheme.outline),
+                              : Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (canEdit)
+                                      IconButton(
+                                        icon: const Icon(Icons.visibility_outlined, size: 20),
+                                        tooltip: 'Просмотр ТТК',
+                                        onPressed: () => context.push('/tech-cards/${tc.id}?view=1'),
+                                        style: IconButton.styleFrom(
+                                          minimumSize: const Size(36, 36),
+                                          padding: EdgeInsets.zero,
+                                        ),
+                                      ),
+                                    Icon(Icons.chevron_right, size: 20, color: Theme.of(context).colorScheme.outline),
+                                  ],
+                                ),
                         ],
                       ),
                     ),

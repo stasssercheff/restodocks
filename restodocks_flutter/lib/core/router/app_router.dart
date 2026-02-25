@@ -335,7 +335,8 @@ class AppRouter {
           if (knownDepartments.contains(segment)) {
             return TechCardsListScreen(department: segment);
           }
-          return TechCardEditScreen(techCardId: segment);
+          final viewOnly = state.queryParameters['view'] == '1';
+          return TechCardEditScreen(techCardId: segment, forceViewMode: viewOnly);
         },
       ),
 

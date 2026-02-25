@@ -187,8 +187,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               e.hasRole('owner') || e.hasRole('executive_chef') || e.hasRole('sous_chef') || e.department == 'management');
           if (needsManagement && !_model.sections.any((s) => s.id == 'management')) {
             _model = _model.copyWith(sections: [
-              ..._model.sections,
               const ScheduleSection(id: 'management', nameKey: 'management'),
+              ..._model.sections,
             ]);
             saveSchedule(est.id, _model);
           }
@@ -503,7 +503,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       decoration: BoxDecoration(color: headerBg, border: Border(right: BorderSide(color: borderColor))),
     ));
 
-    for (final section in _model.sections) {
+    for (final section in ScheduleModel.sectionsInDisplayOrder(_model.sections)) {
       var sectionSlots = _model.slotsBySection[section.id] ?? [];
       if (widget.personalOnly && currentEmployeeId != null) {
         sectionSlots = sectionSlots.where(slotMatchesPersonal).toList();
@@ -574,7 +574,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         bg: headerCellBg,
       ));
 
-      for (final section in _model.sections) {
+      for (final section in ScheduleModel.sectionsInDisplayOrder(_model.sections)) {
         var sectionSlots = _model.slotsBySection[section.id] ?? [];
         if (widget.personalOnly && currentEmployeeId != null) {
           sectionSlots = sectionSlots.where(slotMatchesPersonal).toList();

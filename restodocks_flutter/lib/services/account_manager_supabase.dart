@@ -25,7 +25,8 @@ class AccountManagerSupabase {
   /// Доступ к SupabaseService
   SupabaseService get supabase => _supabase;
 
-  /// Убираем avatar_url из payload — колонки может не быть в схеме employees (PGRST204).
+  /// Убираем avatar_url из payload только при вставке в контекстах, где колонки нет.
+  /// При updateEmployee колонка avatar_url уже добавлена миграцией — сохраняем.
   static void _stripAvatarFromPayload(Map<String, dynamic> data) {
     data.remove('avatar_url');
     data.remove('avatarUrl');
@@ -631,12 +632,13 @@ class AccountManagerSupabase {
   }
 
   /// Обновить данные сотрудника (пароль не обновляется — используйте отдельный поток смены пароля).
+  /// avatar_url сохраняется в Supabase Storage (bucket avatars) — данные не зависят от деплоя.
   Future<void> updateEmployee(Employee employee) async {
     try {
       var employeeData = employee.toJson()
         ..remove('password')
         ..remove('password_hash');
-      _stripAvatarFromPayload(employeeData);
+      // avatar_url сохраняем — колонка добавлена миграцией supabase_migration_employee_avatar.sql
 
       try {
         await _supabase.updateData(

@@ -9,7 +9,7 @@ import 'excel_style_ttk_table.dart';
 /// Создание или редактирование ТТК. Ингредиенты — из номенклатуры или из других ТТК (ПФ).
 ///
 /// Составление/редактирование карточек остаётся как реализовано (таблица, ингредиенты, технология).
-/// Отображение для сотрудников (режим просмотра, !canEdit) должно соответствовать референсу:
+/// Отображение для сотрудников (режим просмотра, !effectiveCanEdit) должно соответствовать референсу:
 /// https://github.com/stasssercheff/shbb326 — kitchen/kitchen/ttk/Preps (ТТК ПФ), dish (карточки блюд), sv (су-вид).
 
 class _EditableShrinkageCell extends StatefulWidget {
@@ -427,12 +427,14 @@ TechCard _applyEdits(
 }
 
 class TechCardEditScreen extends StatefulWidget {
-  const TechCardEditScreen({super.key, required this.techCardId, this.initialFromAi});
+  const TechCardEditScreen({super.key, required this.techCardId, this.initialFromAi, this.forceViewMode = false});
 
   /// Пусто для «новой», иначе id существующей ТТК.
   final String techCardId;
   /// Предзаполнение из ИИ (фото/Excel). Используется только при techCardId == 'new'.
   final TechCardRecognitionResult? initialFromAi;
+  /// Режим только просмотра (для управляющих кухней — кнопка «Просмотр ТТК»).
+  final bool forceViewMode;
 
   @override
   State<TechCardEditScreen> createState() => _TechCardEditScreenState();
@@ -529,6 +531,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
         if (mounted) {
           final ai = widget.initialFromAi;
           final canEdit = context.read<AccountManagerSupabase>().currentEmployee?.canEditChecklistsAndTechCards ?? false;
+          final addPlaceholders = canEdit && !widget.forceViewMode;
           if (ai != null) {
             _nameController.text = ai.dishName?.trim() ?? '';
             _technologyController.text = ai.technologyText?.trim() ?? '';
@@ -561,13 +564,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                 cost: 0,
               ));
             }
-            if (canEdit && _ingredients.isEmpty) {
+            if (addPlaceholders && _ingredients.isEmpty) {
               _ingredients.add(TTIngredient.emptyPlaceholder());
               _ingredients.add(TTIngredient.emptyPlaceholder());
-            } else if (canEdit && !_ingredients.last.isPlaceholder) {
+            } else if (addPlaceholders && !_ingredients.last.isPlaceholder) {
               _ingredients.add(TTIngredient.emptyPlaceholder());
             }
-          } else if (canEdit && _ingredients.isEmpty) {
+          } else if (addPlaceholders && _ingredients.isEmpty) {
             _ingredients.add(TTIngredient.emptyPlaceholder());
             _ingredients.add(TTIngredient.emptyPlaceholder());
           }
@@ -579,6 +582,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
       final tc = await svc.getTechCardById(widget.techCardId);
       if (!mounted) return;
       final canEdit = context.read<AccountManagerSupabase>().currentEmployee?.canEditChecklistsAndTechCards ?? false;
+          final addPlaceholders = canEdit && !widget.forceViewMode;
       // Откладываем тяжёлый setState на следующий кадр, чтобы не блокировать UI при большом числе ингредиентов
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
@@ -595,10 +599,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
             _ingredients
               ..clear()
               ..addAll(tc.ingredients);
-            if (canEdit && _ingredients.isEmpty) {
+            if (addPlaceholders && _ingredients.isEmpty) {
               _ingredients.add(TTIngredient.emptyPlaceholder());
               _ingredients.add(TTIngredient.emptyPlaceholder());
-            } else if (canEdit && !_ingredients.last.isPlaceholder) {
+            } else if (addPlaceholders && !_ingredients.last.isPlaceholder) {
               _ingredients.add(TTIngredient.emptyPlaceholder());
             }
           }
@@ -721,6 +725,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     }
     if (ai.isSemiFinished != null) _isSemiFinished = ai.isSemiFinished!;
     final canEdit = context.read<AccountManagerSupabase>().currentEmployee?.canEditChecklistsAndTechCards ?? false;
+          final addPlaceholders = canEdit && !widget.forceViewMode;
     final hadPlaceholder = _ingredients.isNotEmpty && _ingredients.last.isPlaceholder;
     if (ai.ingredients.isNotEmpty) {
       _ingredients.removeWhere((e) => e.isPlaceholder);
@@ -747,12 +752,12 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           cost: 0,
         ));
       }
-      if (canEdit && (_ingredients.isEmpty || !_ingredients.last.isPlaceholder)) {
+      if (addPlaceholders && (_ingredients.isEmpty || !_ingredients.last.isPlaceholder)) {
         _ingredients.add(TTIngredient.emptyPlaceholder());
       }
     } else if (hadPlaceholder && _ingredients.isNotEmpty) {
       // сохраняем плейсхолдер
-    } else if (canEdit && _ingredients.isEmpty) {
+    } else if (addPlaceholders && _ingredients.isEmpty) {
       _ingredients.add(TTIngredient.emptyPlaceholder());
     }
   }
@@ -984,7 +989,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
         _ingredients.add(ing);
       }
       final canEdit = context.read<AccountManagerSupabase>().currentEmployee?.canEditChecklistsAndTechCards ?? false;
-      if (canEdit && (_ingredients.isEmpty || !_ingredients.last.isPlaceholder)) {
+          final addPlaceholders = canEdit && !widget.forceViewMode;
+      if (addPlaceholders && (_ingredients.isEmpty || !_ingredients.last.isPlaceholder)) {
         _ingredients.add(TTIngredient.emptyPlaceholder());
       }
     });
@@ -1018,7 +1024,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
         if (replaceIndex >= 0 && replaceIndex < _ingredients.length) {
           _ingredients[replaceIndex] = ing;
           final canEdit = context.read<AccountManagerSupabase>().currentEmployee?.canEditChecklistsAndTechCards ?? false;
-          if (canEdit && (_ingredients.isEmpty || !_ingredients.last.isPlaceholder)) {
+          final addPlaceholders = canEdit && !widget.forceViewMode;
+          if (addPlaceholders && (_ingredients.isEmpty || !_ingredients.last.isPlaceholder)) {
             _ingredients.add(TTIngredient.emptyPlaceholder());
           }
         } else {
@@ -1054,7 +1061,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
         _ingredients.add(ing);
       }
       final canEdit = context.read<AccountManagerSupabase>().currentEmployee?.canEditChecklistsAndTechCards ?? false;
-      if (canEdit && (_ingredients.isEmpty || !_ingredients.last.isPlaceholder)) {
+          final addPlaceholders = canEdit && !widget.forceViewMode;
+      if (addPlaceholders && (_ingredients.isEmpty || !_ingredients.last.isPlaceholder)) {
         _ingredients.add(TTIngredient.emptyPlaceholder());
       }
     });
@@ -1075,10 +1083,11 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     setState(() {
       _ingredients.removeAt(i);
       final canEdit = context.read<AccountManagerSupabase>().currentEmployee?.canEditChecklistsAndTechCards ?? false;
-      if (canEdit && _ingredients.isEmpty) {
+          final addPlaceholders = canEdit && !widget.forceViewMode;
+      if (addPlaceholders && _ingredients.isEmpty) {
         _ingredients.add(TTIngredient.emptyPlaceholder());
         _ingredients.add(TTIngredient.emptyPlaceholder());
-      } else if (canEdit && !_ingredients.last.isPlaceholder) {
+      } else if (addPlaceholders && !_ingredients.last.isPlaceholder) {
         _ingredients.add(TTIngredient.emptyPlaceholder());
       }
     });
@@ -1103,13 +1112,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
     final canEdit = context.watch<AccountManagerSupabase>().currentEmployee?.canEditChecklistsAndTechCards ?? false;
+    final effectiveCanEdit = canEdit && !widget.forceViewMode; // forceViewMode = режим «Просмотр ТТК»
     final employee = context.watch<AccountManagerSupabase>().currentEmployee;
-    final isCook = employee?.department == 'kitchen' && !canEdit; // Повар - кухня без прав редактирования
+    final isCook = employee?.department == 'kitchen' && !effectiveCanEdit; // Повар - кухня без прав редактирования
 
     // Определяем, является ли устройство мобильным
     final isMobile = MediaQuery.of(context).size.width < 600;
 
-    if (_isNew && !canEdit) {
+    if (_isNew && !effectiveCanEdit) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) context.pushReplacement('/tech-cards');
       });
@@ -1136,8 +1146,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop(), style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
         title: Text(_isNew ? loc.t('create_tech_card') : (_techCard?.getDisplayNameInLists(loc.currentLanguageCode) ?? loc.t('tech_cards'))),
         actions: [
-          if (canEdit) IconButton(icon: const Icon(Icons.save), onPressed: _save, tooltip: loc.t('save'), style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
-          if (canEdit && !_isNew) IconButton(icon: const Icon(Icons.delete_outline), onPressed: () => _confirmDelete(context, loc), tooltip: loc.t('delete_tech_card'), style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
+          if (effectiveCanEdit) IconButton(icon: const Icon(Icons.save), onPressed: _save, tooltip: loc.t('save'), style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
+          if (effectiveCanEdit && !_isNew) IconButton(icon: const Icon(Icons.delete_outline), onPressed: () => _confirmDelete(context, loc), tooltip: loc.t('delete_tech_card'), style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
           // Кнопка экспорта текущей ТТК
           if (!_isNew && _techCard != null) IconButton(
             icon: const Icon(Icons.download),
@@ -1179,7 +1189,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                 if (narrow) ...[
                   TextField(
                     controller: _nameController,
-                    readOnly: !canEdit,
+                    readOnly: !effectiveCanEdit,
                     style: TextStyle(fontSize: isMobile ? 16 : 14),
                     decoration: InputDecoration(
                       labelText: loc.t('ttk_name'),
@@ -1190,7 +1200,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  canEdit
+                  effectiveCanEdit
                       ? DropdownButtonFormField<String>(
                           value: _selectedCategory,
                           decoration: InputDecoration(labelText: loc.t('category'), isDense: true, border: const OutlineInputBorder()),
@@ -1202,7 +1212,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                           child: Text(_categoryLabel(_selectedCategory, loc.currentLanguageCode)),
                         ),
                   const SizedBox(height: 12),
-                  canEdit
+                  effectiveCanEdit
                       ? DropdownButtonFormField<String>(
                           value: _selectedSection,
                           decoration: InputDecoration(labelText: 'Цех', isDense: true, border: const OutlineInputBorder()),
@@ -1215,7 +1225,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                           child: Text(_sectionOptions[_selectedSection!] ?? _selectedSection!),
                         ) : const SizedBox.shrink(),
                   const SizedBox(height: 12),
-                  canEdit
+                  effectiveCanEdit
                       ? DropdownButtonFormField<bool>(
                           value: _isSemiFinished,
                           decoration: InputDecoration(labelText: loc.t('tt_type_hint'), isDense: true, border: const OutlineInputBorder()),
@@ -1240,7 +1250,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                           height: 56,
                           child: TextField(
                             controller: _nameController,
-                            readOnly: !canEdit,
+                            readOnly: !effectiveCanEdit,
                             style: TextStyle(fontSize: isMobile ? 16 : 14),
                             decoration: InputDecoration(
                               labelText: loc.t('ttk_name'),
@@ -1254,7 +1264,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                         const SizedBox(width: 8),
                         SizedBox(
                           width: 140,
-                          child: canEdit
+                          child: effectiveCanEdit
                               ? DropdownButtonFormField<String>(
                                   value: _selectedCategory,
                                   decoration: InputDecoration(labelText: loc.t('category'), isDense: true, contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
@@ -1269,7 +1279,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                         const SizedBox(width: 8),
                         SizedBox(
                           width: 140,
-                          child: canEdit
+                          child: effectiveCanEdit
                               ? DropdownButtonFormField<String>(
                                   value: _selectedSection,
                                   decoration: InputDecoration(labelText: 'Цех', isDense: true, contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
@@ -1283,7 +1293,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                                 ) : const SizedBox.shrink(),
                         ),
                         const SizedBox(width: 8),
-                        if (canEdit)
+                        if (effectiveCanEdit)
                           Tooltip(
                             message: loc.t('tt_type_hint'),
                             child: SegmentedButton<bool>(
@@ -1319,13 +1329,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                       minWidth: MediaQuery.of(context).size.width,
                       minHeight: 220,
                     ),
-                    child: canEdit
+                    child: effectiveCanEdit
                         ? ExcelStyleTtkTable(
                             loc: loc,
                             dishName: _nameController.text,
                             isSemiFinished: _isSemiFinished,
                             ingredients: _ingredients,
-                            canEdit: true,
+                            canEdit: effectiveCanEdit,
                             dishNameController: _nameController,
                             technologyController: _technologyController,
                             productStore: context.read<ProductStoreSupabase>(),
@@ -1404,7 +1414,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                     ),
                     SingleChildScrollView(
                       padding: const EdgeInsets.all(12),
-                      child: canEdit
+                      child: effectiveCanEdit
                             ? TextField(
                                 controller: _technologyController,
                                 maxLines: null,
@@ -1428,7 +1438,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
             ),
           ),
         ),
-            if (canEdit)
+            if (effectiveCanEdit)
               SafeArea(
                   top: false,
                   child: Padding(
@@ -1471,7 +1481,7 @@ class _TtkTable extends StatefulWidget {
     required this.dishName,
     required this.isSemiFinished,
     required this.ingredients,
-    required this.canEdit,
+    required this.effectiveCanEdit,
     required this.onRemove,
     required this.onUpdate,
     required this.onAdd,
@@ -1489,7 +1499,7 @@ class _TtkTable extends StatefulWidget {
   final String dishName;
   final bool isSemiFinished;
   final List<TTIngredient> ingredients;
-  final bool canEdit;
+  final bool effectiveCanEdit;
   final void Function(int i) onRemove;
   final void Function(int i, TTIngredient ing) onUpdate;
   final VoidCallback onAdd;
@@ -1551,7 +1561,7 @@ class _TtkTableState extends State<_TtkTable> {
     final sym = currency == 'RUB' ? '₽' : currency == 'VND' ? '₫' : currency == 'USD' ? '\$' : currency;
     final hasProSubscription = context.read<AccountManagerSupabase>().currentEmployee?.hasProSubscription ?? false;
 
-    final hasDeleteCol = widget.canEdit;
+    final hasDeleteCol = widget.effectiveCanEdit;
     // Порядок колонок как в образце. Ширины подобраны так, чтобы вся строка с полями ввода помещалась на экране без горизонтальной прокрутки.
     const colType = 64.0;   // Тип ТТК
     const colName = 100.0;  // Наименование
@@ -1688,7 +1698,7 @@ class _TtkTableState extends State<_TtkTable> {
                 ),
               ),
               // Продукт: выпадающий список из ячейки (не снизу экрана). Пустая строка = кнопка «Выбрать продукт».
-              widget.canEdit && (ing.productName.isEmpty && !ing.hasData)
+              widget.effectiveCanEdit && (ing.productName.isEmpty && !ing.hasData)
                   ? TableCell(
                       child: wrapCell(
                         Container(
@@ -1709,7 +1719,7 @@ class _TtkTableState extends State<_TtkTable> {
                         fillColor: firstColsBg,
                       ),
                     )
-                  : widget.canEdit && product == null
+                  : widget.effectiveCanEdit && product == null
                       ? TableCell(
                           child: wrapCell(
                             Container(
@@ -1738,7 +1748,7 @@ class _TtkTableState extends State<_TtkTable> {
                           ),
                         )
                       : TableCell(child: wrapCell(Container(color: firstColsBg, constraints: const BoxConstraints(minHeight: 44), padding: _cellPad, alignment: Alignment.centerLeft, child: Text(ing.sourceTechCardName ?? ing.productName, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)), fillColor: firstColsBg, dataCell: true)),
-              widget.canEdit
+              widget.effectiveCanEdit
                   ? TableCell(
                       child: wrapCell(ConstrainedBox(
                         constraints: const BoxConstraints(minHeight: 44),
@@ -1754,7 +1764,7 @@ class _TtkTableState extends State<_TtkTable> {
                       )),
                     )
                   : _cell(ing.grossWeight.toStringAsFixed(0)),
-              widget.canEdit
+              widget.effectiveCanEdit
                   ? TableCell(
                       child: wrapCell(ConstrainedBox(
                         constraints: const BoxConstraints(minHeight: 44),
@@ -1791,7 +1801,7 @@ class _TtkTableState extends State<_TtkTable> {
                       )),
                     )
                   : _cell(ing.primaryWastePct.toStringAsFixed(0)),
-              widget.canEdit
+              widget.effectiveCanEdit
                   ? TableCell(
                       child: wrapCell(ConstrainedBox(
                         constraints: const BoxConstraints(minHeight: 44),
@@ -1807,7 +1817,7 @@ class _TtkTableState extends State<_TtkTable> {
                       )),
                     )
                   : _cell('${ing.effectiveGrossWeight.toStringAsFixed(0)}'),
-              widget.canEdit
+              widget.effectiveCanEdit
                   ? TableCell(
                       child: wrapCell(ConstrainedBox(
                         constraints: const BoxConstraints(minHeight: 44),
@@ -1855,7 +1865,7 @@ class _TtkTableState extends State<_TtkTable> {
                       )),
                     )
                   : _cell(ing.cookingProcessName ?? loc.t('dash')),
-              widget.canEdit
+              widget.effectiveCanEdit
                   ? TableCell(
                       child: wrapCell(ConstrainedBox(
                         constraints: const BoxConstraints(minHeight: 44),
@@ -1881,7 +1891,7 @@ class _TtkTableState extends State<_TtkTable> {
                       )),
                     )
                   : _cell(ing.cookingProcessName != null ? ing.weightLossPercentage.toStringAsFixed(0) : loc.t('dash')),
-              widget.canEdit
+              widget.effectiveCanEdit
                   ? TableCell(
                       child: wrapCell(ConstrainedBox(
                         constraints: const BoxConstraints(minHeight: 44),
@@ -1905,7 +1915,7 @@ class _TtkTableState extends State<_TtkTable> {
                       )),
                     )
                   : _cell('${(ing.outputWeight > 0 ? ing.outputWeight : ing.effectiveGrossWeight * (1.0 - (ing.cookingLossPctOverride ?? ing.weightLossPercentage) / 100.0)).toStringAsFixed(0)}'),
-              widget.canEdit
+              widget.effectiveCanEdit
                   ? TableCell(
                       child: wrapCell(ConstrainedBox(
                         constraints: const BoxConstraints(minHeight: 44),
@@ -1934,7 +1944,7 @@ class _TtkTableState extends State<_TtkTable> {
                         alignment: Alignment.topLeft,
                         child: TextField(
                           controller: widget.technologyController,
-                          readOnly: !widget.canEdit,
+                          readOnly: !widget.effectiveCanEdit,
                           maxLines: 8,
                           style: const TextStyle(fontSize: 12),
                           decoration: InputDecoration(
@@ -2006,7 +2016,7 @@ class _TtkTableState extends State<_TtkTable> {
               ),
               padding: _cellPad,
               alignment: Alignment.topLeft,
-              child: widget.canEdit && widget.dishNameController != null
+              child: widget.effectiveCanEdit && widget.dishNameController != null
                   ? TextField(
                       controller: widget.dishNameController,
                       decoration: InputDecoration(

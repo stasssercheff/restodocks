@@ -264,7 +264,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final positions = [
       {'code': null, 'name': loc.t('owner')},
       ...currentEmployee.roles
-          .where((r) => r != 'owner')
+          .where((r) => r != 'owner' && _visiblePositionCodes.contains(r))
           .map((code) => {'code': code, 'name': _getPositionDisplayName(code, loc)}),
     ];
 
@@ -293,16 +293,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  /// Должности, не скрытые при регистрации (совпадает с owner_registration).
+  static const List<String> _visiblePositionCodes = ['executive_chef', 'sous_chef'];
+
   void _showPositionPicker(BuildContext context, LocalizationService loc, Employee currentEmployee, AccountManagerSupabase accountManager) {
     final availablePositions = [
       {'code': null, 'name': loc.t('no_position')},
-      {'code': 'executive_chef', 'name': loc.t('executive_chef')},
-      {'code': 'sous_chef', 'name': loc.t('sous_chef')},
-      {'code': 'bartender', 'name': loc.t('bartender')},
-      {'code': 'waiter', 'name': loc.t('waiter')},
-      {'code': 'bar_manager', 'name': loc.t('bar_manager')},
-      {'code': 'floor_manager', 'name': loc.t('floor_manager')},
-      {'code': 'general_manager', 'name': loc.t('general_manager')},
+      ..._visiblePositionCodes.map((code) => {'code': code, 'name': _getPositionDisplayName(code, loc)}),
     ];
 
     final currentPosition = currentEmployee.positionRole;
