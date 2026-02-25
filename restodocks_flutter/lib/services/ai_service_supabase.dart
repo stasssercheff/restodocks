@@ -30,11 +30,12 @@ class AiServiceSupabase implements AiService {
   }
 
   @override
-  Future<List<ParsedProductItem>> parseProductList({List<String>? rows, String? text, String? source}) async {
+  Future<List<ParsedProductItem>> parseProductList({List<String>? rows, String? text, String? source, String? userLocale}) async {
     final body = <String, dynamic>{};
     if (rows != null && rows.isNotEmpty) body['rows'] = rows;
     if (text != null && text.trim().isNotEmpty) body['text'] = text;
     if (source != null && source.isNotEmpty) body['source'] = source;
+    if (userLocale != null && userLocale.isNotEmpty) body['userLocale'] = userLocale;
     final data = await invoke('ai-parse-product-list', body);
     if (data == null) return [];
     final raw = data['items'];
@@ -46,6 +47,7 @@ class AiServiceSupabase implements AiService {
         name: (m['name'] as String?) ?? '',
         price: m['price'] != null ? (m['price'] as num).toDouble() : null,
         unit: m['unit'] as String?,
+        currency: m['currency'] as String?,
       );
     }).whereType<ParsedProductItem>().toList();
   }

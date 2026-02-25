@@ -96,22 +96,24 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
 
         if (item.existingProductId != null) {
           if (item.displayPrice != null) {
-            await store.addToNomenclature(est.id, item.existingProductId!, price: item.displayPrice, currency: defCur);
+            final cur = item.currency ?? defCur;
+            await store.addToNomenclature(est.id, item.existingProductId!, price: item.displayPrice, currency: cur);
             updated++;
           }
         } else {
+          final cur = item.currency ?? defCur;
           final product = Product.create(
             name: item.displayName,
             category: 'imported',
             basePrice: item.displayPrice ?? 0.0,
-            currency: item.displayPrice != null ? defCur : null,
+            currency: item.displayPrice != null ? cur : null,
           );
           await store.addProduct(product);
           await store.addToNomenclature(
             est.id,
             product.id,
             price: item.displayPrice,
-            currency: item.displayPrice != null ? defCur : null,
+            currency: item.displayPrice != null ? cur : null,
           );
           created++;
         }
@@ -288,13 +290,14 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
   Widget? _buildSubtitle(ModerationItem item, ThemeData theme) {
     final parts = <String>[];
     if (item.displayPrice != null) {
+      final cur = item.currency != null ? ' ${item.currency}' : '';
       final hasPriceChange = item.existingProductId != null && item.existingPrice != null &&
           item.existingPriceFromEstablishment &&
           (item.existingPrice! - item.displayPrice!).abs() > 0.01;
       if (hasPriceChange) {
-        parts.add('Новая цена: ${item.displayPrice} (сейчас: ${item.existingPrice})');
+        parts.add('Новая цена: ${item.displayPrice}$cur (сейчас: ${item.existingPrice})');
       } else {
-        parts.add('Цена: ${item.displayPrice}');
+        parts.add('Цена: ${item.displayPrice}$cur');
       }
     } else if (item.existingProductId != null && item.existingPrice != null && item.existingPriceFromEstablishment) {
       parts.add('Цена: ${item.existingPrice}');

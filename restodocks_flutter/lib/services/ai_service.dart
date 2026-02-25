@@ -103,8 +103,9 @@ class ParsedProductItem {
   final String name;
   final double? price;
   final String? unit;
+  final String? currency;
 
-  const ParsedProductItem({required this.name, this.price, this.unit});
+  const ParsedProductItem({required this.name, this.price, this.unit, this.currency});
 }
 
 /// Результат верификации продукта ИИ: возможная цена, КБЖУ, исправление названия (для сверки по списку).
@@ -143,7 +144,8 @@ abstract class AiService {
 
   /// Всеядный парсинг списка продуктов из сырых строк (Excel/CSV/Numbers/RTF/текст).
   /// [source] — подсказка для ИИ: "numbers", "rtf", "text", "csv" и т.п.
-  Future<List<ParsedProductItem>> parseProductList({List<String>? rows, String? text, String? source});
+  /// [userLocale] — локаль для подсказки валюты (ru_RU, en_US и т.д.)
+  Future<List<ParsedProductItem>> parseProductList({List<String>? rows, String? text, String? source, String? userLocale});
 
   /// Батч-исправление названий продуктов (опечатки, сленг).
   Future<List<String>> normalizeProductNames(List<String> names);
@@ -185,7 +187,7 @@ class AiServiceStub implements AiService {
       null;
 
   @override
-  Future<List<ParsedProductItem>> parseProductList({List<String>? rows, String? text, String? source}) async => [];
+  Future<List<ParsedProductItem>> parseProductList({List<String>? rows, String? text, String? source, String? userLocale}) async => [];
 
   @override
   Future<List<String>> normalizeProductNames(List<String> names) async => names;

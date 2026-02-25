@@ -17,6 +17,7 @@ class ModerationItem extends Equatable {
   final String name;
   final double? price;
   final String? unit;
+  final String? currency;
   final String? normalizedName;
   final double? suggestedPrice;
   final String? existingProductId;
@@ -31,6 +32,7 @@ class ModerationItem extends Equatable {
     required this.name,
     this.price,
     this.unit,
+    this.currency,
     this.normalizedName,
     this.suggestedPrice,
     this.existingProductId,
@@ -48,6 +50,7 @@ class ModerationItem extends Equatable {
     String? name,
     double? price,
     String? unit,
+    String? currency,
     String? normalizedName,
     double? suggestedPrice,
     String? existingProductId,
@@ -61,6 +64,7 @@ class ModerationItem extends Equatable {
       name: name ?? this.name,
       price: price ?? this.price,
       unit: unit ?? this.unit,
+      currency: currency ?? this.currency,
       normalizedName: normalizedName ?? this.normalizedName,
       suggestedPrice: suggestedPrice ?? this.suggestedPrice,
     existingProductId: existingProductId ?? this.existingProductId,
@@ -77,6 +81,7 @@ class ModerationItem extends Equatable {
         name,
         price,
         unit,
+        currency,
         normalizedName,
         suggestedPrice,
         existingProductId,

@@ -819,11 +819,12 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       List<ParsedProductItem> parsed = [];
       final ai = context.read<AiService>();
 
-      // ИИ обрабатывает входящие данные (текст или файл) — корректно определяет названия, цены, исправляет опечатки
+      // ИИ обрабатывает входящие данные (текст или файл) — корректно определяет названия, цены, валюту, исправляет опечатки
+      final userLocale = WidgetsBinding.instance.platformDispatcher.locale.toString();
       if (rows != null && rows.isNotEmpty) {
-        parsed = await ai.parseProductList(rows: rows, source: source ?? 'строки');
+        parsed = await ai.parseProductList(rows: rows, source: source ?? 'строки', userLocale: userLocale);
       } else if (text != null && text.trim().isNotEmpty) {
-        parsed = await ai.parseProductList(text: text, source: source ?? 'вставленный текст');
+        parsed = await ai.parseProductList(text: text, source: source ?? 'вставленный текст', userLocale: userLocale);
       }
 
       // Fallback: локальный парсинг, если ИИ недоступен или вернул пустой результат
@@ -834,7 +835,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
           final line = rawLines[i];
           final r = _parseLine(line);
           if (r.name.isNotEmpty) {
-            parsed.add(ParsedProductItem(name: r.name, price: r.price, unit: null));
+            parsed.add(ParsedProductItem(name: r.name, price: r.price, unit: null, currency: null));
           }
         }
       }
@@ -851,7 +852,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
             final p = e.value;
             final norm = normalized[i];
             return norm != null && norm != p.name
-                ? ParsedProductItem(name: norm, price: p.price, unit: p.unit)
+                ? ParsedProductItem(name: norm, price: p.price, unit: p.unit, currency: p.currency)
                 : p;
           }).toList();
         }
@@ -887,6 +888,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
             name: p.name,
             price: p.price,
             unit: p.unit,
+            currency: p.currency,
             existingProductId: match.existingId,
             existingProductName: match.existingName,
             existingPrice: match.existingPrice,
@@ -900,6 +902,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
             name: p.name,
             price: p.price,
             unit: p.unit,
+            currency: p.currency,
             category: ModerationCategory.newProduct,
           ));
         }
