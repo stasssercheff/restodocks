@@ -930,9 +930,11 @@ class _InventoryScreenState extends State<InventoryScreen>
     final isKeyboardOpen = viewInsets.bottom > 0;
     final isNarrow = MediaQuery.sizeOf(context).width < 600;
 
-    if (isKeyboardOpen && !_isInputMode) {
+    // Обновляем _isInputMode только на десктопе — на мобильной setState при открытой клавиатуре
+    // схлопывает layout и TextField теряет фокус → клавиатура закрывается.
+    if (isKeyboardOpen && !_isInputMode && !isNarrow) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && MediaQuery.viewInsetsOf(context).bottom > 0) {
+        if (mounted && MediaQuery.viewInsetsOf(context).bottom > 0 && !(MediaQuery.sizeOf(context).width < 600)) {
           setState(() => _isInputMode = true);
         }
       });
@@ -944,9 +946,9 @@ class _InventoryScreenState extends State<InventoryScreen>
       });
     }
 
-    // На мобильной при открытой клавиатуре: скрываем футер «Завершить», чтобы вся область — под поля ввода.
+    // collapseLayout только на десктопе при клавиатуре. На мобильной — не трогаем layout, иначе клавиатура пропадает.
     // Не добавляем SizedBox(viewInsetsBottom) — он забирал место у таблицы и вместо полей показывал белый фон.
-    final collapseLayout = _isInputMode;
+    final collapseLayout = _isInputMode && !isNarrow;
 
     return Scaffold(
       appBar: _isInputMode ? AppBar(
