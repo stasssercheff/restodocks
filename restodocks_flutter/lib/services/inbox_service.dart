@@ -4,18 +4,54 @@ import 'package:http/http.dart' as http;
 import '../models/models.dart';
 import 'services.dart';
 
-/// Сервис для работы с документами во входящих
+/// Сервис для работы с документами во входящих (инвентаризации — шефу и собственнику).
 class InboxService {
   final SupabaseService _supabase;
 
   InboxService(this._supabase);
 
-  /// Получить все документы во входящих для заведения
-  Future<List<InboxDocument>> getInboxDocuments(String establishmentId) async {
+  /// Получить документы во входящих: для шефа — полученные им инвентаризации, для собственника/управления — все по заведению.
+  Future<List<InboxDocument>> getInboxDocuments(String establishmentId, Employee? currentEmployee) async {
     final documents = <InboxDocument>[];
 
+    if (currentEmployee == null) return documents;
+
     try {
-      // Пока возвращаем пустой список - будет доработано позже
+      final docService = InventoryDocumentService();
+      List<Map<String, dynamic>> rawList;
+
+      if (currentEmployee.hasRole('owner') || currentEmployee.department == 'management') {
+        rawList = await docService.listForEstablishment(establishmentId);
+      } else if (currentEmployee.hasRole('executive_chef') || currentEmployee.hasRole('sous_chef')) {
+        rawList = await docService.listForChef(currentEmployee.id);
+      } else {
+        return documents;
+      }
+
+      for (final doc in rawList) {
+        final payload = doc['payload'] as Map<String, dynamic>? ?? {};
+        final header = payload['header'] as Map<String, dynamic>? ?? {};
+        final dateStr = header['date']?.toString() ?? '';
+        final employeeName = header['employeeName']?.toString() ?? '—';
+        final createdAt = doc['created_at'] != null
+            ? DateTime.tryParse(doc['created_at'].toString()) ?? DateTime.now()
+            : DateTime.now();
+
+        documents.add(InboxDocument(
+          id: doc['id']?.toString() ?? '',
+          type: DocumentType.inventory,
+          title: 'Инвентаризация $dateStr',
+          description: employeeName,
+          createdAt: createdAt,
+          employeeId: doc['created_by_employee_id']?.toString() ?? '',
+          employeeName: employeeName,
+          department: _mapSectionToDepartment(currentEmployee.department),
+          fileUrl: null,
+          metadata: payload,
+        ));
+      }
+
+      documents.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       return documents;
     } catch (e) {
       print('Error loading inbox documents: $e');

@@ -5,13 +5,9 @@ import 'package:intl/intl.dart';
 
 import '../../services/services.dart';
 import '../../models/models.dart';
-import '../../services/inbox_service.dart';
-import '../../widgets/app_bar_home_button.dart';
-
-import '../../services/services.dart';
-import '../../models/models.dart';
 import '../../models/inbox_document.dart';
 import '../../services/inbox_service.dart';
+import '../../widgets/app_bar_home_button.dart';
 
 /// Входящие: Документы по отделам (Инвентаризация, Заказы продуктов, Подтверждения смен)
 class InboxScreen extends StatefulWidget {
@@ -47,7 +43,8 @@ class _InboxScreenState extends State<InboxScreen> {
     }
 
     try {
-      final documents = await _inboxService.getInboxDocuments(establishment.id);
+      final currentEmployee = accountManager.currentEmployee;
+      final documents = await _inboxService.getInboxDocuments(establishment.id, currentEmployee);
       if (mounted) {
         setState(() {
           _documents = documents;
@@ -286,7 +283,11 @@ class _DocumentTile extends StatelessWidget {
           onSelected: (value) {
             switch (value) {
               case 'download':
-                onDownload(document);
+                if (document.type == DocumentType.inventory) {
+                  context.push('/inbox/inventory/${document.id}');
+                } else {
+                  onDownload(document);
+                }
                 break;
               case 'view':
                 _viewDocument(context);
@@ -322,10 +323,13 @@ class _DocumentTile extends StatelessWidget {
   }
 
   void _viewDocument(BuildContext context) {
-    // Показать детали документа
+    if (document.type == DocumentType.inventory) {
+      context.push('/inbox/inventory/${document.id}');
+      return;
+    }
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: Text(document.title),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -341,13 +345,13 @@ class _DocumentTile extends StatelessWidget {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(ctx).pop(),
             child: const Text('Закрыть'),
           ),
           if (document.fileUrl != null)
             ElevatedButton(
               onPressed: () {
-                Navigator.of(context).pop();
+                Navigator.of(ctx).pop();
                 onDownload(document);
               },
               child: const Text('Сохранить'),

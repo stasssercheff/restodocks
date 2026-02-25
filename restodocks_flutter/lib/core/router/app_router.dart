@@ -11,6 +11,7 @@ import '../../screens/company_registration_screen.dart';
 import '../../screens/owner_registration_screen.dart';
 import '../../screens/home/schedule_screen.dart';
 import '../../screens/home/inbox_screen.dart';
+import '../../screens/inventory_inbox_detail_screen.dart';
 import '../../screens/home/expenses_placeholder_screen.dart';
 import '../../screens/home/department_placeholder_screen.dart';
 import '../../screens/supabase_test_screen.dart';
@@ -178,6 +179,15 @@ class AppRouter {
       GoRoute(
         path: '/inbox',
         builder: (context, state) => const InboxScreen(),
+        routes: [
+          GoRoute(
+            path: 'inventory/:id',
+            builder: (context, state) {
+              final id = state.pathParameters['id'] ?? '';
+              return InventoryInboxDetailScreen(documentId: id);
+            },
+          ),
+        ],
       ),
       GoRoute(
         path: '/employees',

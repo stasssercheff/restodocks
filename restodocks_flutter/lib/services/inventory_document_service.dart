@@ -62,4 +62,35 @@ class InventoryDocumentService {
       return [];
     }
   }
+
+  /// Список всех документов инвентаризации по заведению (для собственника/управления).
+  Future<List<Map<String, dynamic>>> listForEstablishment(String establishmentId) async {
+    try {
+      final data = await _supabase.client
+          .from(_table)
+          .select()
+          .eq('establishment_id', establishmentId)
+          .order('created_at', ascending: false);
+
+      return (data as List).map((e) => Map<String, dynamic>.from(e as Map<String, dynamic>)).toList();
+    } catch (e) {
+      print('Ошибка загрузки документов инвентаризации по заведению: $e');
+      return [];
+    }
+  }
+
+  /// Получить документ по id (для просмотра во входящих).
+  Future<Map<String, dynamic>?> getById(String id) async {
+    try {
+      final data = await _supabase.client
+          .from(_table)
+          .select()
+          .eq('id', id)
+          .maybeSingle();
+      return data != null ? Map<String, dynamic>.from(data as Map<String, dynamic>) : null;
+    } catch (e) {
+      print('Ошибка загрузки документа инвентаризации: $e');
+      return null;
+    }
+  }
 }
