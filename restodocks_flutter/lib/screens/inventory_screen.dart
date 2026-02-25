@@ -1083,20 +1083,14 @@ class _InventoryScreenState extends State<InventoryScreen>
                       ),
                     ],
                   ),
-                  if (sortAlphabetButton != null && nameFilterField != null && !_isInputMode) ...[
+                  if (sortAlphabetButton != null && nameFilterField != null) ...[
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        sortAlphabetButton,
-                        const SizedBox(width: 8),
-                        Expanded(child: nameFilterField),
+                        if (!_isInputMode) ...[sortAlphabetButton!, const SizedBox(width: 8)],
+                        Expanded(child: nameFilterField!),
                       ],
                     ),
-                  ],
-                  // В режиме ввода показываем только поле поиска
-                  if (_isInputMode && narrow && nameFilterField != null) ...[
-                    const SizedBox(height: 6),
-                    nameFilterField,
                   ],
                 ],
               )
@@ -1129,18 +1123,11 @@ class _InventoryScreenState extends State<InventoryScreen>
                     '${_startTime?.hour.toString().padLeft(2, '0') ?? '—'}:${_startTime?.minute.toString().padLeft(2, '0') ?? '—'}',
                     style: theme.textTheme.bodySmall,
                   ),
-                  if (sortAlphabetButton != null && !_isInputMode) ...[
+                  if (sortAlphabetButton != null && nameFilterField != null) ...[
                     const SizedBox(width: 6),
-                    sortAlphabetButton,
-                    if (nameFilterField != null) ...[
-                      const SizedBox(width: 6),
-                      nameFilterField,
-                    ],
-                  ],
-                  // В режиме ввода на desktop показываем поле поиска
-                  if (_isInputMode && !narrow && nameFilterField != null) ...[
-                    const SizedBox(width: 6),
-                    nameFilterField,
+                    if (!_isInputMode) sortAlphabetButton!,
+                    if (!_isInputMode) const SizedBox(width: 6),
+                    nameFilterField!,
                   ],
                 ],
               ),
@@ -1236,10 +1223,11 @@ class _InventoryScreenState extends State<InventoryScreen>
             ),
             // Scrollable right header
             Expanded(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                controller: _hScroll,
-                physics: const AlwaysScrollableScrollPhysics(),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            controller: _hScroll,
+            physics: const AlwaysScrollableScrollPhysics(),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
                 child: SizedBox(
                   width: rightW.clamp(screenW - leftW, double.infinity),
                   child: _buildScrollableHeaderRow(loc),
@@ -1251,6 +1239,7 @@ class _InventoryScreenState extends State<InventoryScreen>
         Expanded(
           child: SingleChildScrollView(
             physics: const ClampingScrollPhysics(),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1283,10 +1272,11 @@ class _InventoryScreenState extends State<InventoryScreen>
                   ),
                 ),
                 Expanded(
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    controller: _hScroll,
-                    physics: const AlwaysScrollableScrollPhysics(),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            controller: _hScroll,
+            physics: const AlwaysScrollableScrollPhysics(),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
                     child: SizedBox(
                       width: rightW.clamp(screenW - leftW, double.infinity),
                       child: Column(

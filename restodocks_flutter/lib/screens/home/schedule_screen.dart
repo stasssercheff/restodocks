@@ -286,7 +286,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         initialStart: startStr,
         initialEnd: endStr,
         loc: loc,
-        onSave: (value, start, end, showTime) {
+        onSave: (value, start, end, showTime) async {
           setState(() {
             _model = _model.setAssignment(slotId, date, value.isEmpty ? null : value);
             if (value == '1' && showTime && start.isNotEmpty && end.isNotEmpty) {
@@ -294,8 +294,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             } else {
               _model = _model.setTimeRange(slotId, date, null, null);
             }
-            _save();
           });
+          await _save();
         },
       ),
     );
@@ -322,31 +322,33 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         slots: _model.slots,
         loc: loc,
         onCopy: (sourceStart, sourceEnd, targetStart, targetEnd, selectedSlots) async {
-          setState(() {
-            for (final slotId in selectedSlots) {
-              final sourceDates = _getDatesInRange(sourceStart, sourceEnd);
-              final targetDates = _getDatesInRange(targetStart, targetEnd);
+          var updatedModel = _model;
+          for (final slotId in selectedSlots) {
+            final sourceDates = _getDatesInRange(sourceStart, sourceEnd);
+            final targetDates = _getDatesInRange(targetStart, targetEnd);
 
-              if (sourceDates.length == targetDates.length) {
-                for (var i = 0; i < sourceDates.length; i++) {
-                  final sourceDate = sourceDates[i];
-                  final targetDate = targetDates[i];
+            if (sourceDates.length == targetDates.length) {
+              for (var i = 0; i < sourceDates.length; i++) {
+                final sourceDate = sourceDates[i];
+                final targetDate = targetDates[i];
 
-                  final assignment = _model.getAssignment(slotId, sourceDate);
-                  final timeRange = _model.getTimeRange(slotId, sourceDate);
+                final assignment = updatedModel.getAssignment(slotId, sourceDate);
+                final timeRange = updatedModel.getTimeRange(slotId, sourceDate);
 
-                  _model = _model.setAssignment(slotId, targetDate, assignment);
-                  if (timeRange != null) {
-                    final parts = timeRange.split('|');
-                    if (parts.length >= 2) {
-                      _model = _model.setTimeRange(slotId, targetDate, parts[0].trim(), parts[1].trim());
-                    }
+                updatedModel = updatedModel.setAssignment(slotId, targetDate, assignment);
+                if (timeRange != null) {
+                  final parts = timeRange.split('|');
+                  if (parts.length >= 2) {
+                    updatedModel = updatedModel.setTimeRange(slotId, targetDate, parts[0].trim(), parts[1].trim());
                   }
                 }
               }
             }
-          });
-          await _save();
+          }
+          setState(() => _model = updatedModel);
+          if (_establishmentId != null) {
+            await saveSchedule(_establishmentId!, updatedModel);
+          }
         },
       ),
     );
@@ -416,12 +418,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         width: _dayCellWidth,
         height: _rowHeight,
         padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
-        alignment: Alignment.center,
         decoration: BoxDecoration(
           color: bg,
           border: Border(right: BorderSide(color: borderColor), bottom: BorderSide(color: borderColor)),
         ),
-        child: Center(child: child),
+        alignment: Alignment.center,
+        child: child,
       );
     }
 
@@ -521,12 +523,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                 ? GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: () => _onCellTap(slot.id, d),
-                    child: Container(
-                      constraints: BoxConstraints(minWidth: isMobile ? 44 : 36, minHeight: isMobile ? 44 : 36),
-                      child: content,
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: double.infinity,
+                      child: Center(child: content),
                     ),
                   )
-                : content,
+                : Center(child: content),
             bg: bg,
           ));
         }
@@ -607,7 +610,7 @@ class _ScheduleCellDialog extends StatefulWidget {
   final String initialStart;
   final String initialEnd;
   final LocalizationService loc;
-  final void Function(String value, String start, String end, bool showTime) onSave;
+  final Future<void> Function(String value, String start, String end, bool showTime) onSave;
 
   @override
   State<_ScheduleCellDialog> createState() => _ScheduleCellDialogState();
@@ -745,8 +748,9 @@ class _ScheduleCellDialogState extends State<_ScheduleCellDialog> {
     return [
       TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(MaterialLocalizations.of(context).cancelButtonLabel)),
       FilledButton(
-        onPressed: () {
-          widget.onSave(_selectedValue, _startCtrl.text.trim(), _endCtrl.text.trim(), _showTime);
+        onPressed: () async {
+          await widget.onSave(_selectedValue, _startCtrl.text.trim(), _endCtrl.text.trim(), _showTime);
+          if (!context.mounted) return;
           Navigator.of(context).pop();
         },
         child: Text(loc.t('save')),
