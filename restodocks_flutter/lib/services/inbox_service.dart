@@ -51,6 +51,30 @@ class InboxService {
         ));
       }
 
+      // Отправленные чеклисты — для шефа и су-шефа
+      if (currentEmployee.hasRole('executive_chef') || currentEmployee.hasRole('sous_chef') ||
+          currentEmployee.hasRole('owner') || currentEmployee.department == 'management') {
+        final subSvc = ChecklistSubmissionService();
+        final subList = currentEmployee.hasRole('owner') || currentEmployee.department == 'management'
+            ? await subSvc.listForEstablishment(establishmentId)
+            : await subSvc.listForChef(currentEmployee.id);
+        for (final sub in subList) {
+          final submittedName = sub.submittedByName.isNotEmpty ? sub.submittedByName : '—';
+          documents.add(InboxDocument(
+            id: sub.id,
+            type: DocumentType.checklistSubmission,
+            title: 'Чеклист: ${sub.checklistName}',
+            description: '$submittedName${sub.section != null ? ' • ${sub.section}' : ''}',
+            createdAt: sub.createdAt,
+            employeeId: sub.submittedByEmployeeId,
+            employeeName: submittedName,
+            department: 'kitchen',
+            fileUrl: null,
+            metadata: {'submission': sub.payload, 'checklistId': sub.checklistId},
+          ));
+        }
+      }
+
       // Заказы продуктов — для шефа и собственника по заведению
       final orderDocs = await OrderDocumentService().listForEstablishment(establishmentId);
       for (final doc in orderDocs) {

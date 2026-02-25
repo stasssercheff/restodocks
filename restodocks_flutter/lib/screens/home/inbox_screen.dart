@@ -285,6 +285,8 @@ class _DocumentTile extends StatelessWidget {
                   context.push('/inbox/inventory/${document.id}');
                 } else if (document.type == DocumentType.productOrder) {
                   context.push('/inbox/order/${document.id}');
+                } else if (document.type == DocumentType.checklistSubmission) {
+                  context.push('/inbox/checklist/${document.id}');
                 } else {
                   onDownload(document);
                 }
@@ -329,6 +331,10 @@ class _DocumentTile extends StatelessWidget {
     }
     if (document.type == DocumentType.productOrder) {
       context.push('/inbox/order/${document.id}');
+      return;
+    }
+    if (document.type == DocumentType.checklistSubmission) {
+      context.push('/inbox/checklist/${document.id}');
       return;
     }
     showDialog(

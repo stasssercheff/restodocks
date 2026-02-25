@@ -123,6 +123,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
     }
     final updated = c.copyWith(
       name: name,
+      assignedSection: c.assignedSection,
       items: _items
           .map((e) => ChecklistItem(
                 id: e.id,
@@ -308,6 +309,12 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
         title: Text(loc.t('checklists')),
         actions: [
           if (canEdit)
+            TextButton.icon(
+              onPressed: () => context.push('/checklists/${widget.checklistId}/fill'),
+              icon: const Icon(Icons.task_alt, size: 18),
+              label: Text(loc.t('fill_checklist') ?? 'Заполнить'),
+            ),
+          if (canEdit)
             TextButton(
               onPressed: _duplicate,
               child: Text(loc.t('create_by_analogy')),
@@ -339,6 +346,20 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                 labelText: loc.t('checklist_name'),
                 hintText: loc.t('checklist_name_hint'),
               ),
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String?>(
+              value: _checklist?.assignedSection?.isNotEmpty == true ? _checklist!.assignedSection : null,
+              decoration: InputDecoration(
+                labelText: loc.t('checklist_section') ?? 'Цех/отдел',
+              ),
+              items: [
+                DropdownMenuItem(value: null, child: Text(loc.t('not_specified') ?? 'Не указан')),
+                ...KitchenSection.values.map((s) => DropdownMenuItem(value: s.code, child: Text(s.displayName))),
+              ],
+              onChanged: canEdit ? (v) {
+                setState(() => _checklist = _checklist?.copyWith(assignedSection: v));
+              } : null,
             ),
             if (canEdit) ...[
               const SizedBox(height: 24),

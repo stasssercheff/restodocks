@@ -13,11 +13,13 @@ import '../../screens/home/schedule_screen.dart';
 import '../../screens/home/inbox_screen.dart';
 import '../../screens/inventory_inbox_detail_screen.dart';
 import '../../screens/order_inbox_detail_screen.dart';
+import '../../screens/checklist_inbox_detail_screen.dart';
 import '../../screens/home/expenses_placeholder_screen.dart';
 import '../../screens/home/department_placeholder_screen.dart';
 import '../../screens/supabase_test_screen.dart';
 import '../../screens/checklists_screen.dart';
 import '../../screens/checklist_edit_screen.dart';
+import '../../screens/checklist_fill_screen.dart';
 import '../../screens/tech_cards_list_screen.dart';
 import '../../screens/tech_card_edit_screen.dart';
 import '../../screens/order_lists_screen.dart';
@@ -195,6 +197,13 @@ class AppRouter {
               return OrderInboxDetailScreen(documentId: id);
             },
           ),
+          GoRoute(
+            path: 'checklist/:id',
+            builder: (context, state) {
+              final id = state.pathParameters['id'] ?? '';
+              return ChecklistInboxDetailScreen(documentId: id);
+            },
+          ),
         ],
       ),
       GoRoute(
@@ -325,6 +334,13 @@ class AppRouter {
         builder: (context, state) {
           final id = state.pathParameters['id'] ?? '';
           return ChecklistEditScreen(checklistId: id);
+        },
+      ),
+      GoRoute(
+        path: '/checklists/:id/fill',
+        builder: (context, state) {
+          final id = state.pathParameters['id'] ?? '';
+          return ChecklistFillScreen(checklistId: id);
         },
       ),
 

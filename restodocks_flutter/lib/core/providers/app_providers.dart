@@ -39,6 +39,9 @@ class AppProviders {
         Provider<ChecklistServiceSupabase>(
           create: (_) => ChecklistServiceSupabase(),
         ),
+        Provider<ChecklistSubmissionService>(
+          create: (_) => ChecklistSubmissionService(),
+        ),
         Provider<AiServiceSupabase>(
           create: (_) => AiServiceSupabase(),
         ),

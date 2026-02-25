@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS checklists (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- assigned_section, assigned_employee_id — см. supabase_migration_checklists_assigned.sql
+
 CREATE TABLE IF NOT EXISTS checklist_items (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   checklist_id UUID NOT NULL REFERENCES checklists(id) ON DELETE CASCADE,
