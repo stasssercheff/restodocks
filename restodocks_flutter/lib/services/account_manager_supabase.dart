@@ -1,4 +1,5 @@
 import 'package:bcrypt/bcrypt.dart';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/models.dart';
@@ -420,7 +421,10 @@ class AccountManagerSupabase {
 
         await _supabase.signOut();
       }
-    } catch (_) {
+    } catch (authErr) {
+      if (kDebugMode) {
+        debugPrint('🔐 Login: Supabase Auth failed: $authErr');
+      }
       await _supabase.signOut();
     }
 
@@ -479,19 +483,39 @@ class AccountManagerSupabase {
           .ilike('email', emailTrim)
           .eq('is_active', true);
 
-      if (empList == null || (empList as List).isEmpty) return null;
+      if (empList == null || (empList as List).isEmpty) {
+        if (kDebugMode) {
+          debugPrint('🔐 Login: Legacy - no employees found for email');
+        }
+        return null;
+      }
+
+      if (kDebugMode) {
+        debugPrint('🔐 Login: Legacy - found ${(empList as List).length} employee(s)');
+      }
 
       for (final empRaw in empList) {
         final employeeData = Map<String, dynamic>.from(empRaw);
         final hash = employeeData['password_hash'] as String?;
-        if (hash == null || hash.isEmpty) continue;
+        if (hash == null || hash.isEmpty) {
+          if (kDebugMode) {
+            debugPrint('🔐 Login: Legacy - employee has no password_hash (uses Auth?)');
+          }
+          continue;
+        }
         employeeData['password'] = hash;
         final employee = Employee.fromJson(employeeData);
         bool ok = false;
         if (hash.startsWith(r'$2a$') || hash.startsWith(r'$2b$')) {
           ok = BCrypt.checkpw(password, hash);
+          if (kDebugMode && !ok) {
+            debugPrint('🔐 Login: Legacy - BCrypt check failed for employee');
+          }
         } else {
           ok = (hash == password);
+          if (kDebugMode && !ok) {
+            debugPrint('🔐 Login: Legacy - plain password mismatch');
+          }
         }
         if (!ok) continue;
 
@@ -505,9 +529,14 @@ class AccountManagerSupabase {
         final establishment = Establishment.fromJson(estData);
         return (employee: employee, establishment: establishment);
       }
+      if (kDebugMode) {
+        debugPrint('🔐 Login: Legacy - no matching password for any employee');
+      }
       return null;
     } catch (e) {
-      print('Ошибка поиска сотрудника по email: $e');
+      if (kDebugMode) {
+        debugPrint('🔐 Login: Legacy error: $e');
+      }
       return null;
     }
   }
