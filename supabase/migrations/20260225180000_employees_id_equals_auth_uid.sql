@@ -9,6 +9,19 @@ UPDATE establishments SET owner_id = NULL;
 -- 2. Очистить employees (CASCADE затронет order_documents, inventory_documents, inventory_drafts, co_owner_invitations, password_reset_tokens)
 TRUNCATE employees CASCADE;
 
+-- 3. Удалить политики, зависящие от auth_user_id (до DROP COLUMN)
+DROP POLICY IF EXISTS "auth_select_employees" ON employees;
+DROP POLICY IF EXISTS "auth_insert_employees" ON employees;
+DROP POLICY IF EXISTS "auth_update_employees" ON employees;
+DROP POLICY IF EXISTS "auth_select_establishments" ON establishments;
+DROP POLICY IF EXISTS "auth_update_establishments" ON establishments;
+DROP POLICY IF EXISTS "Owners can view co-owner invitations" ON co_owner_invitations;
+DROP POLICY IF EXISTS "Owners can create co-owner invitations" ON co_owner_invitations;
+DROP POLICY IF EXISTS "Owners can update co-owner invitations" ON co_owner_invitations;
+DROP POLICY IF EXISTS "auth_select_product_price_history" ON product_price_history;
+DROP POLICY IF EXISTS "auth_insert_product_price_history" ON product_price_history;
+DROP POLICY IF EXISTS "Разрешить обновление цен для шефа" ON products;
+
 -- 4. Удалить колонку auth_user_id
 ALTER TABLE employees DROP COLUMN IF EXISTS auth_user_id;
 

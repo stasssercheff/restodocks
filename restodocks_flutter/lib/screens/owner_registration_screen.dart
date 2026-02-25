@@ -64,25 +64,21 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
       }
 
       final password = _passwordController.text;
-      // Сначала Supabase Auth (employees.id = auth.users.id)
+      // 1. Supabase Auth (employees.id = auth.users.id)
       final accSupabase = accountManager as AccountManagerSupabase;
-      await accSupabase.signUpWithEmailForOwner(email, password);
-      final authUserId = accSupabase.supabase.currentUser?.id;
+      final signUpResult = await accSupabase.signUpWithEmailForOwner(email, password);
+      final authUserId = signUpResult.userId;
       if (authUserId == null) throw Exception('Не удалось создать учётную запись');
 
-      final employee = await accountManager.createEmployeeForCompany(
-        company: estab,
+      // 2. Создаём владельца через RPC (работает без сессии при Confirm Email)
+      final employee = await accSupabase.createOwnerEmployeeViaRpc(
+        authUserId: authUserId,
+        establishment: estab,
         fullName: _nameController.text.trim(),
         surname: _surnameController.text.trim().isEmpty ? null : _surnameController.text.trim(),
         email: email,
-        password: password,
-        department: 'management',
-        section: null,
         roles: roles,
-        authUserId: authUserId,
       );
-
-      await accountManager.login(employee, estab);
 
       // Отправка письма владельцу
       final emailService = EmailService();
@@ -96,7 +92,13 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
       );
 
       if (!mounted) return;
-      context.go('/home');
+      if (signUpResult.hasSession) {
+        await accountManager.login(employee, estab);
+        context.go('/home');
+      } else {
+        // Confirm Email включён — переход на экран «Подтвердите учётную запись»
+        context.go('/confirm-email?email=${Uri.encodeComponent(email)}');
+      }
     } catch (e) {
       if (!mounted) return;
       final loc = context.read<LocalizationService>();

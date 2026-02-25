@@ -28,6 +28,7 @@ import '../../screens/order_list_products_screen.dart';
 import '../../screens/order_list_detail_screen.dart';
 import '../../screens/accept_co_owner_invitation_screen.dart';
 import '../../screens/register_co_owner_screen.dart';
+import '../../screens/confirm_email_screen.dart';
 import '../../models/order_list.dart';
 import '../../services/ai_service.dart';
 import '../../services/services.dart';
@@ -37,7 +38,7 @@ bool _isPublicPath(String loc) {
   if (loc == '/' || loc == '/splash') return true;
   if (loc.startsWith('/login') || loc.startsWith('/register') || loc.startsWith('/register-co-owner') ||
       loc.startsWith('/forgot-password') || loc.startsWith('/reset-password') ||
-      loc.startsWith('/accept-co-owner-invitation')) return true;
+      loc.startsWith('/accept-co-owner-invitation') || loc.startsWith('/confirm-email')) return true;
   return false;
 }
 
@@ -140,6 +141,14 @@ class AppRouter {
         builder: (context, state) {
           final token = state.queryParameters['token'];
           return ResetPasswordScreen(token: token);
+        },
+      ),
+      // Подтверждение email после регистрации (переход по ссылке вернёт в приложение с сессией)
+      GoRoute(
+        path: '/confirm-email',
+        builder: (context, state) {
+          final email = state.queryParameters['email'] ?? '';
+          return ConfirmEmailScreen(email: email);
         },
       ),
 

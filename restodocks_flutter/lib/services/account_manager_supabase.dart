@@ -369,8 +369,39 @@ class AccountManagerSupabase {
   }
 
   /// Регистрация владельца в Supabase Auth (employees.id = auth.users.id — создаём auth первым)
-  Future<void> signUpWithEmailForOwner(String email, String password) async {
-    await _supabase.signUpWithEmail(email.trim(), password);
+  /// Возвращает (auth user id, есть ли сессия).
+  /// При Confirm Email session = null — пользователь должен подтвердить почту.
+  Future<({String? userId, bool hasSession})> signUpWithEmailForOwner(String email, String password) async {
+    final res = await _supabase.signUpWithEmail(email.trim(), password);
+    final uid = res.user?.id ?? _supabase.currentUser?.id;
+    final hasSession = res.session != null;
+    return (userId: uid, hasSession: hasSession);
+  }
+
+  /// Создание владельца через RPC (обход RLS при Confirm Email — нет сессии после signUp)
+  Future<Employee> createOwnerEmployeeViaRpc({
+    required String authUserId,
+    required Establishment establishment,
+    required String fullName,
+    String? surname,
+    required String email,
+    required List<String> roles,
+  }) async {
+    final res = await _supabase.client.rpc(
+      'create_owner_employee',
+      params: {
+        'p_auth_user_id': authUserId,
+        'p_establishment_id': establishment.id,
+        'p_full_name': fullName,
+        'p_surname': surname ?? '',
+        'p_email': email,
+        'p_roles': roles,
+      },
+    );
+    final data = Map<String, dynamic>.from(res as Map);
+    data['password'] = '';
+    data['password_hash'] = '';
+    return Employee.fromJson(data);
   }
 
   /// Вход по email и паролю: сначала Supabase Auth, при отсутствии — legacy (employees.password_hash)
