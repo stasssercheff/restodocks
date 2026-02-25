@@ -88,6 +88,10 @@ if [ -f "$EXTRACTED/environment.env" ]; then
     cp "$EXTRACTED/environment.env" .env
     echo "   ✅ .env восстановлен"
 fi
+if [ -f "$EXTRACTED/backup_config.env" ]; then
+    cp "$EXTRACTED/backup_config.env" ./
+    echo "   ✅ backup_config.env восстановлен (для restore БД)"
+fi
 if [ -d "$EXTRACTED/supabase_config" ]; then
     mkdir -p restodocks_flutter/supabase/migrations restodocks_flutter/supabase/functions
     cp -r "$EXTRACTED/supabase_config/migrations/"* restodocks_flutter/supabase/migrations/ 2>/dev/null || true

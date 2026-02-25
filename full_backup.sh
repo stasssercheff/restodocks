@@ -9,20 +9,16 @@ BACKUP_DIR="${BACKUP_TARGET_DIR:-backup_$(date +%Y%m%d_%H%M%S)}"
 mkdir -p "$BACKUP_DIR"
 echo "📁 Создаю директорию бэкапа: $BACKUP_DIR"
 
-# 1. Бэкап кода из GitHub (уже знаете, но добавим автоматизацию)
-echo "📦 Бэкап репозитория..."
-git clone https://github.com/stasssercheff/restodocks.git "$BACKUP_DIR/code" --depth 1
+# 1. Бэкап кода (локальный проект — включая незакоммиченные изменения)
+echo "📦 Бэкап кода проекта..."
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+mkdir -p "$BACKUP_DIR/code"
+rsync -a --exclude='node_modules' --exclude='.venv' --exclude='.venv-*' --exclude='build' --exclude='__pycache__' \
+  --exclude='*.tar.gz' --exclude='backup_*' --exclude='.restore_tmp_*'   "$SCRIPT_DIR/" "$BACKUP_DIR/code/" 2>/dev/null || \
+  (cd "$SCRIPT_DIR" && tar -cf - --exclude='node_modules' --exclude='.venv*' --exclude='build' --exclude='*.tar.gz' --exclude='backup_*' . | tar -xf - -C "$BACKUP_DIR/code")
 echo "✅ Код сохранен в $BACKUP_DIR/code"
 
-# 2. Бэкап базы данных Supabase
-echo "🗄️ Бэкап базы данных Supabase..."
-echo "Для бэкапа базы данных выполните в терминале Supabase CLI:"
-echo "supabase db dump --db-url 'postgresql://postgres:[YOUR-PASSWORD]@db.osglfptwbuqqmqunttha.supabase.co:5432/postgres' > $BACKUP_DIR/database.sql"
-echo "ИЛИ через pg_dump:"
-echo "pg_dump 'postgresql://postgres:[YOUR-PASSWORD]@db.osglfptwbuqqmqunttha.supabase.co:5432/postgres' > $BACKUP_DIR/database.sql"
-echo "⚠️  Вам нужно получить пароль базы данных из Supabase Dashboard > Settings > Database"
-
-# 3. Бэкап Supabase Storage
+# 2. Storage бэкап — вызывается из backup_all
 echo "💾 Бэкап файлового хранилища..."
 echo "Для бэкапа storage используйте Supabase CLI:"
 echo "supabase storage ls --project-ref osglfptwbuqqmqunttha > $BACKUP_DIR/storage_files.txt"
@@ -33,8 +29,10 @@ echo "⚠️  Проверьте доступные бакеты в Supabase Das
 echo "⚙️ Бэкап конфигурации Supabase..."
 mkdir -p "$BACKUP_DIR/supabase_config"
 
-# Сохраняем миграции
-cp -r restodocks_flutter/supabase/migrations "$BACKUP_DIR/supabase_config/" 2>/dev/null || echo "Миграции не найдены"
+# Сохраняем миграции (оба пути)
+mkdir -p "$BACKUP_DIR/supabase_config/migrations"
+cp -r restodocks_flutter/supabase/migrations/* "$BACKUP_DIR/supabase_config/migrations/" 2>/dev/null || true
+cp -r supabase/migrations/* "$BACKUP_DIR/supabase_config/migrations/" 2>/dev/null || true
 
 # Сохраняем функции
 cp -r restodocks_flutter/supabase/functions "$BACKUP_DIR/supabase_config/" 2>/dev/null || echo "Функции не найдены"
@@ -70,37 +68,32 @@ EOF
 
 echo "✅ Настройки Vercel сохранены в $BACKUP_DIR/vercel_config.md"
 
-# 7. Создание скрипта восстановления
-cat > "$BACKUP_DIR/restore.sh" << 'EOF'
+# 7. Скрипт восстановления (запускать из распакованного архива)
+cat > "$BACKUP_DIR/ВОССТАНОВИТЬ.sh" << 'RESTOREEOF'
 #!/bin/bash
+# Запуск: после распаковки архива выполни: cd backup_XXX && ./ВОССТАНОВИТЬ.sh
 set -e
-
-echo "🔄 Начинаем восстановление Restodocks..."
-
-# 1. Восстановление кода
-echo "📦 Восстанавливаем код..."
-git clone https://github.com/stasssercheff/restodocks.git restored_project
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+echo "🔄 Восстановление Restodocks из $SCRIPT_DIR"
+mkdir -p restored_project
+echo "📦 Копирую код..."
+cp -r code/* restored_project/ 2>/dev/null || cp -r code/. restored_project/
 cd restored_project
-
-# 2. Восстановление переменных окружения
-cp ../environment.env .env
-
-# 3. Установка зависимостей
-echo "📦 Устанавливаем зависимости..."
-flutter pub get
-npm install
-
-# 4. Восстановление базы данных
-echo "🗄️ Для восстановления базы данных выполните:"
-echo "psql 'postgresql://postgres:[PASSWORD]@db.osglfptwbuqqmqunttha.supabase.co:5432/postgres' < ../database.sql"
-
-# 5. Восстановление storage
-echo "💾 Для восстановления storage используйте Supabase CLI"
-
-echo "✅ Восстановление завершено. Проверьте настройки Vercel и Supabase."
-EOF
-
-chmod +x "$BACKUP_DIR/restore.sh"
+[ -f ../environment.env ] && cp ../environment.env .env && echo "   ✅ .env"
+[ -f ../backup_config.env ] && cp ../backup_config.env . && echo "   ✅ backup_config.env"
+if [ -f ../database.sql.gz ] && command -v psql >/dev/null 2>&1; then
+    source ../backup_config.env 2>/dev/null || true
+    if [ -n "$SUPABASE_DB_URL" ]; then
+        read -p "Восстановить БД? (y/N): " -n 1 -r
+        echo
+        [[ $REPLY =~ ^[Yy]$ ]] && gunzip -c ../database.sql.gz | psql "$SUPABASE_DB_URL" && echo "   ✅ БД восстановлена"
+    fi
+fi
+echo "📦 Зависимости: flutter pub get && npm install"
+echo "✅ Готово. Проект в: $SCRIPT_DIR/restored_project"
+RESTOREEOF
+chmod +x "$BACKUP_DIR/ВОССТАНОВИТЬ.sh"
 
 # 8. Создание архива (пропуск при вызове из backup_all — там свой финальный архив)
 if [ -z "$BACKUP_TARGET_DIR" ]; then

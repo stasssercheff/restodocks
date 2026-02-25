@@ -6,6 +6,33 @@ echo "====================================="
 echo "Дата: $(date)"
 echo ""
 
+# ПРОВЕРКА: без этого бэкап будет неполный
+if [ ! -f "backup_config.env" ]; then
+    echo "❌ ОШИБКА: Файл backup_config.env не найден!"
+    echo ""
+    echo "📋 Сделай один раз (2 минуты):"
+    echo "   1. Открой: https://supabase.com/dashboard/project/osglfptwbuqqmqunttha/settings/database"
+    echo "   2. Скопируй пароль БД (Database password)"
+    echo "   3. Создай файл backup_config.env в папке проекта с содержимым:"
+    echo "      SUPABASE_DB_URL=postgresql://postgres:ТВОЙ_ПАРОЛЬ@db.osglfptwbuqqmqunttha.supabase.co:5432/postgres"
+    echo ""
+    echo "   Подробнее: НАСТРОЙКА_БЭКАПА_ОДИН_РАЗ.md"
+    exit 1
+fi
+
+if ! command -v pg_dump >/dev/null 2>&1; then
+    echo "❌ ОШИБКА: pg_dump не найден (нужен для бэкапа БД)"
+    echo ""
+    echo "📋 Установи Postgres.app (1 минута):"
+    echo "   1. Скачай: https://postgresapp.com"
+    echo "   2. Перетащи в Applications"
+    echo "   3. Запусти Postgres.app → кнопка Initialize"
+    echo "   4. Запусти этот бэкап снова"
+    echo ""
+    echo "   Подробнее: НАСТРОЙКА_БЭКАПА_ОДИН_РАЗ.md"
+    exit 1
+fi
+
 # Создаем временную директорию для бэкапа
 BACKUP_NAME="backup_$(date +%Y%m%d_%H%M%S)"
 BACKUP_DIR="$BACKUP_NAME"
@@ -41,6 +68,9 @@ else
     echo "   ⚠️ Файл backup_config.env не найден"
 fi
 
+# 2a. backup_config.env (нужен для восстановления БД)
+cp backup_config.env "$BACKUP_DIR/" 2>/dev/null && echo "   ✅ backup_config.env сохранён" || true
+
 # 2b. Бэкап Vercel env и Supabase Auth чеклиста
 echo ""
 echo "📋 ШАГ 2b: Бэкап Vercel env и Supabase Auth..."
@@ -56,10 +86,13 @@ if command -v python3 >/dev/null 2>&1 && [ -f "storage_backup.py" ]; then
     echo "   Запускаю бэкап storage..."
     SUPABASE_URL=https://osglfptwbuqqmqunttha.supabase.co \
     SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zZ2xmcHR3YnVxcW1xdW50dGhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUwNTk0MDQsImV4cCI6MjA4MDYzNTQwNH0.Jy7yi2TNdSrmoBdILXBGRYB_vxGtq8scCZ9eCA9vfTE \
-    python3 storage_backup.py > /dev/null 2>&1 || echo "   ⚠️ Ошибка бэкапа storage (возможно нет файлов)"
-    echo "   ✅ Бэкап storage завершен"
+    python3 storage_backup.py 2>/dev/null || true
+    # Добавляем storage в архив (распаковываем и переименовываем)
+    for f in storage_backup_*.tar.gz; do
+        [ -f "$f" ] && tar -xzf "$f" -C "$BACKUP_DIR" && mv "$BACKUP_DIR"/storage_backup_* "$BACKUP_DIR/storage_backup" 2>/dev/null && echo "   ✅ Storage сохранён" && break
+    done
 else
-    echo "   ⚠️ Python3 или storage_backup.py не найдены"
+    echo "   ⚠️ Python3 или storage_backup.py не найдены (storage пропущен)"
 fi
 
 # 4. ОБЪЕДИНЕНИЕ В ОДИН АРХИВ
@@ -98,7 +131,7 @@ else
 fi
 echo "   • Код, миграции, env, Vercel, Auth-чеклист, Storage"
 echo ""
-echo "💡 Для восстановления используйте скрипт restore.sh из архива"
+echo "💡 Восстановление: ./restore_all.sh  (из папки с архивом)"
 echo ""
 echo "🚀 ГОТОВО! Нажмите любую клавишу для выхода..."
 read -n 1 -s
