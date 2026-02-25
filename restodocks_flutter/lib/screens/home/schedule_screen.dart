@@ -12,9 +12,11 @@ import '../../widgets/app_bar_home_button.dart';
 /// График: слоты (должности/имена) задаются вручную, можно выбрать сотрудника из списка или вписать имя.
 /// Один график на заведение, прокрутка по неделям (неделя влезает на экран, ограничений нет).
 class ScheduleScreen extends StatefulWidget {
-  const ScheduleScreen({super.key, this.department = 'all'});
+  const ScheduleScreen({super.key, this.department = 'all', this.personalOnly = false});
 
   final String department;
+  /// Личный график — только строка текущего сотрудника.
+  final bool personalOnly;
 
   @override
   State<ScheduleScreen> createState() => _ScheduleScreenState();
@@ -412,6 +414,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
     final dates = _visibleDates;
     final todayDate = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    final currentEmployeeId = widget.personalOnly ? acc.currentEmployee?.id : null;
+
+    bool slotMatchesPersonal(ScheduleSlot slot) {
+      if (currentEmployeeId == null) return true;
+      return slot.employeeId == currentEmployeeId;
+    }
+
     final headerBg = theme.colorScheme.primary;
     final headerFg = theme.colorScheme.onPrimary;
     final weekendHeaderBg = theme.colorScheme.secondaryContainer;
@@ -467,7 +476,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     ));
 
     for (final section in _model.sections) {
-      final sectionSlots = _model.slotsBySection[section.id] ?? [];
+      var sectionSlots = _model.slotsBySection[section.id] ?? [];
+      if (widget.personalOnly && currentEmployeeId != null) {
+        sectionSlots = sectionSlots.where(slotMatchesPersonal).toList();
+      }
       if (sectionSlots.isEmpty) continue;
       final sectionName = loc.translate(section.nameKey);
       final sectionLabel = sectionName == section.nameKey ? section.id : sectionName;
@@ -535,7 +547,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       ));
 
       for (final section in _model.sections) {
-        final sectionSlots = _model.slotsBySection[section.id] ?? [];
+        var sectionSlots = _model.slotsBySection[section.id] ?? [];
+        if (widget.personalOnly && currentEmployeeId != null) {
+          sectionSlots = sectionSlots.where(slotMatchesPersonal).toList();
+        }
         if (sectionSlots.isEmpty) continue;
         final sectionBg = theme.colorScheme.secondaryContainer.withOpacity(0.6);
 
@@ -596,7 +611,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
-        title: Text(loc.t('schedule')),
+        title: Text(widget.personalOnly ? loc.t('personal_schedule') : loc.t('schedule')),
         actions: [
           if (canEdit)
             IconButton(

@@ -156,13 +156,17 @@ class AppRouter {
 
       GoRoute(
         path: '/schedule',
-        builder: (context, state) => const ScheduleScreen(),
+        builder: (context, state) {
+          final personal = state.queryParameters['personal'] == '1';
+          return ScheduleScreen(personalOnly: personal);
+        },
       ),
       GoRoute(
         path: '/schedule/:department',
         builder: (context, state) {
           final department = state.pathParameters['department'] ?? 'all';
-          return ScheduleScreen(department: department);
+          final personal = state.queryParameters['personal'] == '1';
+          return ScheduleScreen(department: department, personalOnly: personal);
         },
       ),
       GoRoute(
