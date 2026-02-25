@@ -17,7 +17,20 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _selectedIndex = 0;
+  late int _selectedIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedIndex = 0;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final tab = GoRouterState.of(context).uri.queryParameters['tab'];
+    if (tab == '0') _selectedIndex = 0;
+  }
 
   @override
   Widget build(BuildContext context) {

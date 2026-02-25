@@ -534,7 +534,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.home),
-            onPressed: () => context.go('/home'),
+            onPressed: () => context.go('/home', queryParameters: {'tab': '0'}),
             tooltip: localization.t('home'),
           ),
         ],
