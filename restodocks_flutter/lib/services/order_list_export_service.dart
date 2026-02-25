@@ -375,13 +375,13 @@ class OrderListExportService {
     ]);
 
     final comment = (payload['comment'] as String?)?.trim();
-    if (comment.isNotEmpty) {
+    if ((comment ?? '').isNotEmpty) {
       sheet.appendRow([]);
       sheet.appendRow([TextCellValue('${t('order_list_comment')}: $comment')]);
     }
 
     final out = excel.encode();
-    return out ?? Uint8List(0);
+    return Uint8List.fromList(out ?? []);
   }
 
   /// URL для WhatsApp: wa.me/PHONE?text=MESSAGE (телефон без +, только цифры).
