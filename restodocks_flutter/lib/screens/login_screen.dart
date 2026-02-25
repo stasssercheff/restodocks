@@ -40,10 +40,11 @@ class _LoginScreenState extends State<LoginScreen> {
     final account = context.read<AccountManagerSupabase>();
     final saved = await account.loadRememberedCredentials();
     if (!mounted) return;
-    if (saved.email != null && saved.email!.isNotEmpty) {
+    // Подставляем только в пустые поля — не перезаписываем то, что уже ввёл пользователь или браузер (auto-fill)
+    if (saved.email != null && saved.email!.isNotEmpty && _emailController.text.isEmpty) {
       _emailController.text = saved.email!;
     }
-    if (saved.password != null && saved.password!.isNotEmpty) {
+    if (saved.password != null && saved.password!.isNotEmpty && _passwordController.text.isEmpty) {
       _passwordController.text = saved.password!;
     }
     setState(() {});
