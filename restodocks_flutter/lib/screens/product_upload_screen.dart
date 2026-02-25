@@ -423,6 +423,8 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     return 'файл';
   }
 
+  /// Извлекает строки из файла (rtf, xls, xlsx, doc, docx, txt, csv).
+  /// Структура у пользователей разная — передаём всё в ИИ, он определяет название продукта и цену.
   List<String> _extractRowsFromFile(Uint8List bytes, String name) {
     if (name.endsWith('.csv') || name.endsWith('.txt')) {
       final text = utf8.decode(bytes, allowMalformed: true);
@@ -2851,18 +2853,25 @@ ${allProducts.map((p) => p.name).join('\n')}
     // Разбиваем на строки и фильтруем
     final lines = text.split(RegExp(r'\r?\n')).map((s) => s.replaceAll(RegExp(r'\\'), '').trim()).where((s) => s.isNotEmpty).toList();
 
-    // RTF часто даёт чередование: строка с названием, строка с ценой. Объединяем пары.
+    // RTF может давать: таблицу (название\tцена), чередование строк, несколько колонок (№, поставщик и т.д.).
+    // Объединяем пары название+цена при чередовании; всё остальное передаём как есть — ИИ разберётся.
     final paired = _pairAlternatingNamePriceLines(lines);
 
-    // Дополнительная обработка для поиска паттернов продукт-цена
+    // Передаём ВСЕ строки в ИИ — не фильтруем. ИИ определит название продукта и привязанную цену
+    // при любом формате: одна строка, таблица, доп. колонки (нумерация, поставщик).
     final processedLines = <String>[];
-
     for (final line in paired) {
+      if (line.trim().isEmpty) continue;
       if (_looksLikeProductLine(line)) {
         processedLines.add(line);
       } else {
         final subLines = _splitComplexLine(line);
-        processedLines.addAll(subLines);
+        if (subLines.isNotEmpty) {
+          processedLines.addAll(subLines);
+        } else if (_looksLikeNameOnly(line) || line.contains(RegExp(r'[а-яА-ЯёЁa-zA-Z]'))) {
+          // Строка с текстом (название, поставщик и т.д.) — не отбрасываем, ИИ определит роль
+          processedLines.add(line);
+        }
       }
     }
 

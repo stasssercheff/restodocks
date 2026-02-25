@@ -39,10 +39,9 @@ class StaffHomeContent extends StatelessWidget {
           title: employee.department == 'bar' ? loc.t('ttk_bar') : loc.t('ttk_kitchen'),
           onTap: () => context.push('/tech-cards'),
         ),
-        if (employee.department == 'kitchen') ...[
+        if (employee.department == 'kitchen')
           _Tile(icon: Icons.checklist, title: loc.t('checklists'), onTap: () => context.push('/checklists')),
-          _Tile(icon: Icons.assignment, title: loc.t('inventory_blank'), onTap: () => context.push('/inventory')),
-        ],
+        _Tile(icon: Icons.assignment, title: loc.t('inventory_blank'), onTap: () => context.push('/inventory')),
       ],
     );
   }
