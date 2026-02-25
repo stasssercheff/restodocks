@@ -942,9 +942,9 @@ class _InventoryScreenState extends State<InventoryScreen>
       });
     }
 
-    // При открытой клавиатуре скрываем header/footer, чтобы не мешать вводу
-    // (кнопка «Завершить» и навигация не работают при вводе).
-    final collapseLayout = _isInputMode;
+    // На мобильной не скрываем header/footer — иначе layout меняется и клавиатура закрывается.
+    // Панель навигации (Prev/Next) — часть клавиатуры. «Завершить» остаётся под клавиатурой.
+    final collapseLayout = _isInputMode && !isNarrow;
 
     return Scaffold(
       appBar: _isInputMode ? AppBar(
@@ -1291,11 +1291,17 @@ class _InventoryScreenState extends State<InventoryScreen>
                         children: [
                           if (_blockFilter != _InventoryBlockFilter.pfOnly && _productIndices.isNotEmpty) ...[
                             SizedBox(height: _sectionHeaderHeight),
-                            ..._productIndices.asMap().entries.map((e) => _buildScrollableDataRow(loc, e.value)),
+                            ..._productIndices.asMap().entries.map((e) {
+                              final lastIdx = _pfIndices.isNotEmpty ? _pfIndices.last : _productIndices.last;
+                              return _buildScrollableDataRow(loc, e.value, isLastRow: e.value == lastIdx);
+                            }),
                           ],
                           if (_blockFilter != _InventoryBlockFilter.productsOnly && _pfIndices.isNotEmpty) ...[
                             SizedBox(height: _sectionHeaderHeight),
-                            ..._pfIndices.asMap().entries.map((e) => _buildScrollableDataRow(loc, e.value)),
+                            ..._pfIndices.asMap().entries.map((e) {
+                              final lastIdx = _pfIndices.last;
+                              return _buildScrollableDataRow(loc, e.value, isLastRow: e.value == lastIdx);
+                            }),
                           ],
                           if (_aggregatedFromFile != null && _aggregatedFromFile!.isNotEmpty) ...[
                             SizedBox(height: _sectionHeaderHeight),
@@ -1486,7 +1492,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     );
   }
 
-  Widget _buildScrollableDataRow(LocalizationService loc, int actualIndex) {
+  Widget _buildScrollableDataRow(LocalizationService loc, int actualIndex, {bool isLastRow = false}) {
     final theme = Theme.of(context);
     final row = _rows[actualIndex];
     final qtyCols = row.quantities.length;
@@ -1504,7 +1510,9 @@ class _InventoryScreenState extends State<InventoryScreen>
           children: [
           ...List.generate(
             qtyCols,
-            (colIndex) => Padding(
+            (colIndex) {
+              final isLastCell = isLastRow && colIndex == qtyCols - 1;
+              return Padding(
               padding: EdgeInsets.only(right: colIndex < qtyCols - 1 ? _colGap : 0),
               child: SizedBox(
                 width: _colQtyWidth,
@@ -1515,9 +1523,11 @@ class _InventoryScreenState extends State<InventoryScreen>
                         value: row.quantities[colIndex],
                         useGrams: row.isWeightInKg,
                         onChanged: (v) => _setQuantity(actualIndex, colIndex, v),
+                        textInputAction: isLastCell ? TextInputAction.done : TextInputAction.next,
                       ),
               ),
-            ),
+            );
+            },
           ),
         ],
       ),
@@ -1772,8 +1782,16 @@ class _QtyCell extends StatefulWidget {
   /// true: отображать и вводить в граммах (значение хранится в кг, показываем value*1000).
   final bool useGrams;
   final void Function(double) onChanged;
+  /// TextInputAction.next — «Далее» на клавиатуре переходит к следующей ячейке.
+  final TextInputAction textInputAction;
 
-  const _QtyCell({super.key, required this.value, this.useGrams = false, required this.onChanged});
+  const _QtyCell({
+    super.key,
+    required this.value,
+    this.useGrams = false,
+    required this.onChanged,
+    this.textInputAction = TextInputAction.next,
+  });
 
   @override
   State<_QtyCell> createState() => _QtyCellState();
@@ -1838,6 +1856,7 @@ class _QtyCellState extends State<_QtyCell> {
     return TextField(
       controller: _controller,
       focusNode: _focus,
+      textInputAction: widget.textInputAction,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       inputFormatters: [
         FilteringTextInputFormatter.allow(RegExp(r'[\d,.]')),
