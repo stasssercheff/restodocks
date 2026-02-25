@@ -64,6 +64,12 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
       }
 
       final password = _passwordController.text;
+      // Сначала Supabase Auth (employees.id = auth.users.id)
+      final accSupabase = accountManager as AccountManagerSupabase;
+      await accSupabase.signUpWithEmailForOwner(email, password);
+      final authUserId = accSupabase.supabase.currentUser?.id;
+      if (authUserId == null) throw Exception('Не удалось создать учётную запись');
+
       final employee = await accountManager.createEmployeeForCompany(
         company: estab,
         fullName: _nameController.text.trim(),
@@ -73,9 +79,9 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
         department: 'management',
         section: null,
         roles: roles,
+        authUserId: authUserId,
       );
 
-      await accountManager.signUpAndLinkAuthUser(email, password);
       await accountManager.login(employee, estab);
 
       // Отправка письма владельцу

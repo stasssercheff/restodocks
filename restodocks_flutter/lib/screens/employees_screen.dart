@@ -639,6 +639,8 @@ class _EmployeeAddSheetState extends State<_EmployeeAddSheet> {
         setState(() { _error = 'Этот email уже зарегистрирован'; _saving = false; });
         return;
       }
+      // signUp создаёт auth-пользователя и переключает сессию на него — нужно для INSERT (id = auth.uid())
+      final authUserId = await acc.signUpToSupabaseAuth(email, password);
       await acc.createEmployeeForCompany(
         company: widget.establishment,
         fullName: name,
@@ -648,8 +650,17 @@ class _EmployeeAddSheetState extends State<_EmployeeAddSheet> {
         department: _department,
         section: _department == 'kitchen' ? _section : null,
         roles: _roles,
+        authUserId: authUserId,
       );
-      if (mounted) widget.onSaved();
+      await acc.supabase.signOut();
+      if (mounted) {
+        final loc = context.read<LocalizationService>();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.t('employee_added') ?? 'Сотрудник добавлен. Войдите в свой аккаунт снова.')),
+        );
+        context.go('/login');
+      }
+      widget.onSaved();
     } catch (e) {
       if (mounted) setState(() { _error = e.toString(); _saving = false; });
     }

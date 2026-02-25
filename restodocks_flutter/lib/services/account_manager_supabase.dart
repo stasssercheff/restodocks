@@ -299,11 +299,11 @@ class AccountManagerSupabase {
     final employeeData = employee.toJson();
     employeeData['password_hash'] = passwordHash;
     employeeData.remove('password');
-    employeeData.remove('id');
     employeeData.remove('created_at');
     employeeData.remove('updated_at');
     _stripAvatarFromPayload(employeeData);
-    if (authUserId != null) employeeData['auth_user_id'] = authUserId;
+    // employees.id = auth.users.id — обязательно передаём при вставке
+    if (authUserId != null) employeeData['id'] = authUserId;
 
     final response = await _supabase.insertData('employees', employeeData);
     final resp = Map<String, dynamic>.from(response);
@@ -368,16 +368,9 @@ class AccountManagerSupabase {
     }
   }
 
-  /// Регистрация в Supabase Auth и привязка auth_user_id к employee (для владельца)
-  Future<void> signUpAndLinkAuthUser(String email, String password) async {
+  /// Регистрация владельца в Supabase Auth (employees.id = auth.users.id — создаём auth первым)
+  Future<void> signUpWithEmailForOwner(String email, String password) async {
     await _supabase.signUpWithEmail(email.trim(), password);
-    final authUserId = _supabase.currentUser?.id;
-    if (authUserId != null) {
-      await _supabase.client
-          .from('employees')
-          .update({'auth_user_id': authUserId})
-          .eq('email', email.trim());
-    }
   }
 
   /// Вход по email и паролю: сначала Supabase Auth, при отсутствии — legacy (employees.password_hash)
@@ -397,7 +390,7 @@ class AccountManagerSupabase {
         final list = await _supabase.client
             .from('employees')
             .select()
-            .eq('auth_user_id', authUserId)
+            .eq('id', authUserId)
             .eq('is_active', true)
             .limit(1);
 
@@ -415,10 +408,6 @@ class AccountManagerSupabase {
           return (employee: employee, establishment: establishment);
         }
 
-        // Employee не привязан к auth (подтверждение email только что прошло) — привязываем
-        final linked = await _linkAuthUserToEmployeeByEmail(emailTrim, authUserId);
-        if (linked != null) return linked;
-
         await _supabase.signOut();
       }
     } catch (authErr) {
@@ -430,45 +419,6 @@ class AccountManagerSupabase {
 
     // 2. Legacy: поиск по employees и проверка password_hash
     return _findEmployeeByPasswordHash(emailTrim, passwordTrimmed);
-  }
-
-  /// Привязка auth_user_id к employee по email (после подтверждения письма)
-  Future<({Employee employee, Establishment establishment})?> _linkAuthUserToEmployeeByEmail(
-    String emailTrim,
-    String authUserId,
-  ) async {
-    try {
-      final list = await _supabase.client
-          .from('employees')
-          .select()
-          .ilike('email', emailTrim)
-          .eq('is_active', true)
-          .limit(1);
-
-      if (list == null || (list as List).isEmpty) return null;
-
-      final empData = Map<String, dynamic>.from((list as List).first);
-      if (empData['auth_user_id'] != null) return null;
-
-      await _supabase.client
-          .from('employees')
-          .update({'auth_user_id': authUserId})
-          .eq('email', emailTrim);
-
-      empData['auth_user_id'] = authUserId;
-      empData['password'] = empData['password_hash'] ?? '';
-      final employee = Employee.fromJson(empData);
-      final estData = await _supabase.client
-          .from('establishments')
-          .select()
-          .eq('id', employee.establishmentId)
-          .limit(1)
-          .single();
-      final establishment = Establishment.fromJson(estData);
-      return (employee: employee, establishment: establishment);
-    } catch (_) {
-      return null;
-    }
   }
 
   /// Legacy: поиск по employees.password_hash (BCrypt или plain)
@@ -753,7 +703,7 @@ class AccountManagerSupabase {
       final list = await _supabase.client
           .from('employees')
           .select()
-          .eq('auth_user_id', authUserId)
+          .eq('id', authUserId)
           .eq('is_active', true)
           .limit(1);
 

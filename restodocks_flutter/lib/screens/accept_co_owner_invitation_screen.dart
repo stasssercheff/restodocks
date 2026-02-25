@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../models/models.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
 
@@ -65,31 +64,8 @@ class _AcceptCoOwnerInvitationScreenState extends State<AcceptCoOwnerInvitationS
 
     try {
       final accountManager = context.read<AccountManagerSupabase>();
-      final email = _invitationData!['invited_email'];
-      final establishmentId = _invitationData!['establishment_id'];
 
-      // Создаем нового сотрудника с ролью owner
-      await accountManager.createEmployeeForCompany(
-        company: Establishment(
-          id: establishmentId,
-          name: _invitationData!['establishments']['name'],
-          pinCode: '', // PIN будет сгенерирован автоматически
-          ownerId: '', // Будет установлен в createEmployeeForCompany
-          defaultCurrency: 'RUB',
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        ),
-        fullName: '', // Пользователь введет сам при регистрации
-        surname: null,
-        email: email,
-        password: '', // Пользователь введет сам
-        department: 'management',
-        section: null,
-        roles: ['owner'],
-        authUserId: null, // Будет создан при регистрации
-      );
-
-      // Обновляем статус приглашения
+      // Обновляем статус приглашения (сотрудник создаётся на экране регистрации с id = auth.uid())
       await accountManager.supabase.client
           .from('co_owner_invitations')
           .update({'status': 'accepted', 'updated_at': DateTime.now().toIso8601String()})

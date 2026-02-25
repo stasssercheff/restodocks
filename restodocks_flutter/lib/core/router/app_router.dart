@@ -27,6 +27,7 @@ import '../../screens/order_list_create_screen.dart';
 import '../../screens/order_list_products_screen.dart';
 import '../../screens/order_list_detail_screen.dart';
 import '../../screens/accept_co_owner_invitation_screen.dart';
+import '../../screens/register_co_owner_screen.dart';
 import '../../models/order_list.dart';
 import '../../services/ai_service.dart';
 import '../../services/services.dart';
@@ -34,8 +35,9 @@ import '../../services/services.dart';
 /// Публичные пути (без проверки авторизации). Не использовать startsWith('/') — иначе все пути считаются публичными.
 bool _isPublicPath(String loc) {
   if (loc == '/' || loc == '/splash') return true;
-  if (loc.startsWith('/login') || loc.startsWith('/register') ||
-      loc.startsWith('/forgot-password') || loc.startsWith('/reset-password')) return true;
+  if (loc.startsWith('/login') || loc.startsWith('/register') || loc.startsWith('/register-co-owner') ||
+      loc.startsWith('/forgot-password') || loc.startsWith('/reset-password') ||
+      loc.startsWith('/accept-co-owner-invitation')) return true;
   return false;
 }
 
@@ -388,6 +390,17 @@ class AppRouter {
         builder: (context, state) => const SupabaseTestScreen(),
       ),
 
+      // Регистрация соучредителя после принятия приглашения
+      GoRoute(
+        path: '/register-co-owner',
+        builder: (context, state) {
+          final token = state.queryParameters['token'];
+          if (token == null || token.isEmpty) {
+            return const Scaffold(body: Center(child: Text('Invalid link')));
+          }
+          return RegisterCoOwnerScreen(token: token);
+        },
+      ),
       // Принятие приглашения соучредителем
       GoRoute(
         path: '/accept-co-owner-invitation',
