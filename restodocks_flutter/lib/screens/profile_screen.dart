@@ -112,11 +112,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onPressed: () => _showEditProfile(context),
             tooltip: localization.t('edit_profile'),
           ),
-          IconButton(
-            icon: const Icon(Icons.home),
-            onPressed: () => context.go('/home?tab=0'),
-            tooltip: localization.t('home'),
-          ),
         ],
       ),
       body: SingleChildScrollView(
