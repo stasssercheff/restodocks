@@ -1,6 +1,7 @@
 import 'dart:html' as html;
 
 /// Читает путь из адресной строки (pathname, href, hash). Нужно для F5.
+/// pathname — основной источник при path-based URLs (usePathUrlStrategy).
 String _pathFromWindow() {
   try {
     String path = html.window.location.pathname ?? '';
@@ -10,6 +11,7 @@ String _pathFromWindow() {
     if (path.isNotEmpty && path != '/') {
       return search.isNotEmpty ? '$path$search' : path;
     }
+    // Fallback: hash-based routing (legacy)
     final hash = html.window.location.hash ?? '';
     if (hash.isNotEmpty) {
       String h = hash.startsWith('#') ? hash.substring(1) : hash;

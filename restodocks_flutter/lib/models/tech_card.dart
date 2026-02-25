@@ -13,6 +13,8 @@ class TechCard extends Equatable {
   final double portionWeight; // вес порции в граммах
   final double yield; // выход готового блюда в граммах
   final Map<String, String>? technologyLocalized; // технология приготовления, многоязычно
+  /// URL фото: блюдо — до 1, ПФ — до 10. Storage bucket tech_card_photos.
+  final List<String>? photoUrls;
   final List<TTIngredient> ingredients;
   final String establishmentId;
   final String createdBy; // ID сотрудника-создателя
@@ -29,6 +31,7 @@ class TechCard extends Equatable {
     required this.portionWeight,
     required this.yield,
     this.technologyLocalized,
+    this.photoUrls,
     required this.ingredients,
     required this.establishmentId,
     required this.createdBy,
@@ -52,6 +55,7 @@ class TechCard extends Equatable {
       technologyLocalized: (json['technology_localized'] as Map<String, dynamic>?)?.map(
         (key, value) => MapEntry(key, value as String),
       ),
+      photoUrls: (json['photo_urls'] as List<dynamic>?)?.map((e) => e.toString()).where((s) => s.isNotEmpty).toList(),
       ingredients: [], // Загружается отдельно через сервис
       establishmentId: json['establishment_id'] as String,
       createdBy: json['created_by'] as String,
@@ -72,6 +76,7 @@ class TechCard extends Equatable {
       'portion_weight': portionWeight,
       'yield': yield,
       'technology_localized': technologyLocalized,
+      'photo_urls': photoUrls ?? [],
       'establishment_id': establishmentId,
       'created_by': createdBy,
       'created_at': createdAt.toIso8601String(),
@@ -93,6 +98,7 @@ class TechCard extends Equatable {
     double? portionWeight,
     double? yield,
     Map<String, String>? technologyLocalized,
+    List<String>? photoUrls,
     List<TTIngredient>? ingredients,
     String? establishmentId,
     String? createdBy,
@@ -109,6 +115,7 @@ class TechCard extends Equatable {
       portionWeight: portionWeight ?? this.portionWeight,
       yield: yield ?? this.yield,
       technologyLocalized: technologyLocalized ?? this.technologyLocalized,
+      photoUrls: photoUrls ?? this.photoUrls,
       ingredients: ingredients ?? this.ingredients,
       establishmentId: establishmentId ?? this.establishmentId,
       createdBy: createdBy ?? this.createdBy,
@@ -245,6 +252,7 @@ class TechCard extends Equatable {
     portionWeight,
     yield,
     technologyLocalized,
+    photoUrls,
     ingredients,
     establishmentId,
     createdBy,
@@ -273,6 +281,7 @@ class TechCard extends Equatable {
       portionWeight: 100, // вес порции по умолчанию
       yield: 0,
       technologyLocalized: null,
+      photoUrls: null,
       ingredients: [],
       establishmentId: establishmentId,
       createdBy: createdBy,

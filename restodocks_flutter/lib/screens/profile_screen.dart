@@ -90,6 +90,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final currentEmployee = accountManager.currentEmployee;
     final establishment = accountManager.establishment;
     final localization = context.watch<LocalizationService>();
+    final pref = context.watch<OwnerViewPreferenceService>();
 
     if (currentEmployee == null || establishment == null) {
       return const Scaffold(
@@ -98,7 +99,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     final isOwner = currentEmployee.hasRole('owner');
-    final hasPosition = !currentEmployee.hasRole('owner') || currentEmployee.roles.length > 1;
+    final hasPosition = currentEmployee.positionRole != null;
+    // Личный график и ЗП: у собственника — только когда выбрана роль «должность»; у сотрудников — всегда при наличии должности
+    final showScheduleAndSalary = hasPosition && (isOwner ? !pref.viewAsOwner : true);
 
     return Scaffold(
       appBar: AppBar(
@@ -111,11 +114,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             icon: const Icon(Icons.edit),
             onPressed: () => _showEditProfile(context),
             tooltip: localization.t('edit_profile'),
-          ),
-          IconButton(
-            icon: const Icon(Icons.home),
-            onPressed: () => context.go('/home'),
-            tooltip: localization.t('home'),
           ),
         ],
       ),
@@ -134,13 +132,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
             const SizedBox(height: 24),
 
-            // Основная информация профиля
+            // Профиль: Собственник/должность, фото, имя, фамилия, почта
             _buildProfileInfo(currentEmployee, establishment, localization, isOwner),
 
             const SizedBox(height: 24),
 
-            // Личный график и ЗП (если есть должность)
-            if (hasPosition) ...[
+            // Личный график и ЗП — только когда выбрана роль должности (не собственник)
+            if (showScheduleAndSalary) ...[
               _buildScheduleAndSalarySection(currentEmployee, establishment, localization),
               const SizedBox(height: 24),
             ],
@@ -236,30 +234,77 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildProfileInfo(Employee employee, Establishment establishment, LocalizationService localization, bool isOwner) {
+    final position = employee.positionRole;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // Фото профиля
+            // Собственник и должность (если есть)
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              alignment: WrapAlignment.center,
+              children: [
+                if (isOwner)
+                  Chip(
+                    label: Text(localization.t('owner'), style: const TextStyle(fontSize: 12)),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                if (position != null && position.isNotEmpty)
+                  Chip(
+                    label: Text(
+                      EmployeeRole.fromCode(position)?.displayName ?? position,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Фото (можно изменить по тапу)
             Center(
-              child: _buildAvatar(employee, 80),
+              child: GestureDetector(
+                onTap: () => _showEditProfile(context),
+                child: _buildAvatar(employee, 80),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              localization.t('tap_to_change_photo'),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 16),
 
             // Имя и фамилия
-            Text(
-              employee.fullName,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-              textAlign: TextAlign.center,
-            ),
-
-            // Должность
-            const SizedBox(height: 8),
-            Text(
-              employee.roleDisplayName,
-              style: const TextStyle(fontSize: 16, color: Colors.grey),
-              textAlign: TextAlign.center,
+            Builder(
+              builder: (_) {
+                final parts = employee.fullName.trim().split(RegExp(r'\s+'));
+                final name = parts.isNotEmpty ? parts.first : employee.fullName;
+                final surname = employee.surname?.trim().isNotEmpty == true
+                    ? employee.surname!
+                    : (parts.length > 1 ? parts.sublist(1).join(' ') : null);
+                return Column(
+                  children: [
+                    Text(
+                      name,
+                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+                      textAlign: TextAlign.center,
+                    ),
+                    if (surname != null && surname.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        surname,
+                        style: const TextStyle(fontSize: 18, color: Colors.grey),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ],
+                );
+              },
             ),
 
             // Email
@@ -281,13 +326,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Личный график
+        // Личный график (1 строка — только этот сотрудник)
         ListTile(
           leading: const Icon(Icons.calendar_month),
           title: const Text('Личный график'),
           subtitle: const Text('График непосредственно этого сотрудника'),
           trailing: const Icon(Icons.chevron_right),
-          onTap: () => context.push('/schedule'),
+          onTap: () => context.push('/schedule?personal=1'),
         ),
 
         // ЗП за отработанный период
@@ -483,9 +528,13 @@ class _ProfileEditDialogState extends State<_ProfileEditDialog> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final loc = context.read<LocalizationService>();
+    final screenH = MediaQuery.of(context).size.height;
     return Dialog(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 400, maxHeight: 520),
+        constraints: BoxConstraints(
+          maxWidth: 400,
+          maxHeight: (screenH * 0.85).clamp(520.0, 800.0),
+        ),
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: SingleChildScrollView(

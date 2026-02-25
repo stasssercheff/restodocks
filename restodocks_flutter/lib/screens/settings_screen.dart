@@ -254,16 +254,52 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   /// Выбор должности (owner — дополнительная роль, не должность; «Без должности» = только собственник)
+  void _showRolePicker(
+    BuildContext context,
+    LocalizationService loc,
+    Employee currentEmployee,
+    AccountManagerSupabase accountManager,
+    OwnerViewPreferenceService pref,
+  ) {
+    final positions = [
+      {'code': null, 'name': loc.t('owner')},
+      ...currentEmployee.roles
+          .where((r) => r != 'owner' && _visiblePositionCodes.contains(r))
+          .map((code) => {'code': code, 'name': _getPositionDisplayName(code, loc)}),
+    ];
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('role_selection')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: positions.map((p) {
+            final code = p['code'] as String?;
+            final isOwnerSelected = pref.viewAsOwner && code == null;
+            final isPositionSelected = !pref.viewAsOwner && code != null && code == currentEmployee.positionRole;
+            final isSelected = isOwnerSelected || isPositionSelected;
+            return ListTile(
+              title: Text(p['name']!),
+              trailing: isSelected ? const Icon(Icons.check, color: Colors.green) : null,
+              onTap: () async {
+                await pref.setViewAsOwner(code == null);
+                if (ctx.mounted) Navigator.of(ctx).pop();
+              },
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  /// Должности, не скрытые при регистрации (совпадает с owner_registration).
+  static const List<String> _visiblePositionCodes = ['executive_chef', 'sous_chef'];
+
   void _showPositionPicker(BuildContext context, LocalizationService loc, Employee currentEmployee, AccountManagerSupabase accountManager) {
     final availablePositions = [
       {'code': null, 'name': loc.t('no_position')},
-      {'code': 'executive_chef', 'name': loc.t('executive_chef')},
-      {'code': 'sous_chef', 'name': loc.t('sous_chef')},
-      {'code': 'bartender', 'name': loc.t('bartender')},
-      {'code': 'waiter', 'name': loc.t('waiter')},
-      {'code': 'bar_manager', 'name': loc.t('bar_manager')},
-      {'code': 'floor_manager', 'name': loc.t('floor_manager')},
-      {'code': 'general_manager', 'name': loc.t('general_manager')},
+      ..._visiblePositionCodes.map((code) => {'code': code, 'name': _getPositionDisplayName(code, loc)}),
     ];
 
     final currentPosition = currentEmployee.positionRole;
@@ -531,13 +567,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       appBar: AppBar(
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
         title: Text(localization.t('settings')),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.home),
-            onPressed: () => context.go('/home'),
-            tooltip: localization.t('home'),
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -609,15 +638,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => _showPositionPicker(context, localization, currentEmployee, accountManager),
               ),
-              // 2. Выбор роли — переключение интерфейса (собственник ↔ должность), только если есть должность
+              // 2. Выбор роли — список «Собственник» или должность (не переключатель)
               if (currentEmployee.positionRole != null)
                 Consumer<OwnerViewPreferenceService>(
-                  builder: (_, pref, __) => SwitchListTile(
-                    secondary: const Icon(Icons.swap_horiz),
+                  builder: (_, pref, __) => ListTile(
+                    leading: const Icon(Icons.swap_horiz),
                     title: Text(localization.t('role_selection')),
                     subtitle: Text(pref.viewAsOwner ? localization.t('owner') : _getPositionDisplayName(currentEmployee.positionRole, localization)),
-                    value: pref.viewAsOwner,
-                    onChanged: (v) => pref.setViewAsOwner(v),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => _showRolePicker(context, localization, currentEmployee, accountManager, pref),
                   ),
                 ),
               ListTile(

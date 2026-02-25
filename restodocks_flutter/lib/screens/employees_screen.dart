@@ -59,16 +59,6 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
-  String _roleDisplay(Employee e, LocalizationService loc) {
-    if (e.roles.isEmpty) return '—';
-    final roleKeys = <String, String>{
-      'owner': 'Владелец', 'executive_chef': 'Шеф-повар', 'sous_chef': 'Су-шеф', 'cook': 'Повар',
-      'bartender': 'Бармен', 'waiter': 'Официант', 'bar_manager': 'Менеджер бара',
-      'general_manager': 'Управляющий', 'brigadier': 'Бригадир',
-    };
-    return e.roles.map((r) => roleKeys[r] ?? r).join(', ');
-  }
-
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
@@ -241,14 +231,23 @@ class _EmployeeCard extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
-  static String roleDisplay(Employee e) {
-    const roleKeys = {
-      'owner': 'Владелец', 'executive_chef': 'Шеф-повар', 'sous_chef': 'Су-шеф', 'cook': 'Повар',
-      'bartender': 'Бармен', 'waiter': 'Официант', 'bar_manager': 'Менеджер бара',
-      'general_manager': 'Управляющий', 'brigadier': 'Бригадир',
-      'senior_cook': 'Старший повар', 'pizzaiolo': 'Пиццайоло', 'pastry_chef': 'Кондитер',
-    };
-    return e.roles.isEmpty ? '—' : e.roles.map((r) => roleKeys[r] ?? r).join(', ');
+  static const _roleLabels = {
+    'owner': 'Владелец', 'executive_chef': 'Шеф-повар', 'sous_chef': 'Су-шеф', 'cook': 'Повар',
+    'bartender': 'Бармен', 'waiter': 'Официант', 'bar_manager': 'Менеджер бара',
+    'general_manager': 'Управляющий', 'brigadier': 'Бригадир',
+    'senior_cook': 'Старший повар', 'pizzaiolo': 'Пиццайоло', 'pastry_chef': 'Кондитер',
+    'floor_manager': 'Администратор зала', 'senior_waiter': 'Старший официант', 'host': 'Хостес',
+  };
+  static String positionDisplay(Employee e) {
+    final pos = e.positionRole;
+    return pos != null ? (_roleLabels[pos] ?? pos) : '—';
+  }
+
+  static Widget _labelChip(ThemeData theme, String label, String value) {
+    return Text(
+      '$label: $value',
+      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+    );
   }
 
   @override
@@ -281,20 +280,27 @@ class _EmployeeCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(employee.fullName, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
-                        if (employee.email.isNotEmpty)
-                          Text(employee.email, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-                        const SizedBox(height: 4),
-                        Text(roleDisplay(employee), style: theme.textTheme.bodySmall),
-                        if (employee.section != null && employee.section!.isNotEmpty)
-                          Text(employee.section!, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.primary)),
-                      ],
-                    ),
-                  ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(employee.fullName, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+                            if (employee.email.isNotEmpty)
+                              Text(employee.email, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                            const SizedBox(height: 4),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 2,
+                              children: [
+                                _labelChip(theme, loc.t('department') ?? 'Подразделение', employee.departmentDisplayName),
+                                if (employee.department == 'kitchen' && employee.section != null && employee.section!.isNotEmpty)
+                                  _labelChip(theme, loc.t('section') ?? 'Цех', loc.t('section_${employee.section}') ?? employee.sectionDisplayName ?? employee.section!),
+                                _labelChip(theme, loc.t('position') ?? 'Должность', positionDisplay(employee)),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
                   if (canEdit) ...[
                     IconButton(
                       icon: const Icon(Icons.delete_outline, color: Colors.red),

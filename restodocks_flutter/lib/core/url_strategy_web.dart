@@ -1,6 +1,7 @@
-import 'package:flutter_web_plugins/url_strategy.dart' as impl;
+// HashStrategy: URL с # (site.com/#/inventory).
+// F5 работает без настройки сервера — хэш не отправляется на сервер.
+import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 
-/// Web: включить path-based URLs (/path вместо /#/path) для сохранения URL при обновлении
 void initUrlStrategy() {
-  impl.usePathUrlStrategy();
+  setUrlStrategy(const HashUrlStrategy());
 }

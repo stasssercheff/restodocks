@@ -207,7 +207,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       final result = await accountManager.findEmployeeByEmailAndPasswordGlobal(
         email: _emailController.text.trim(),
-        password: _passwordController.text,
+        password: _passwordController.text.trim(),
       );
 
       if (result == null) {
@@ -220,7 +220,7 @@ class _LoginScreenState extends State<LoginScreen> {
         result.establishment,
         rememberCredentials: _rememberCredentials,
         email: _emailController.text.trim(),
-        password: _passwordController.text,
+        password: _passwordController.text.trim(),
       );
 
       if (mounted) {

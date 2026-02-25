@@ -83,6 +83,7 @@ Examples:
 - Each object in "items" = one row.
 - For Selection: always include "source": "Items" or "Recipes".
 - For Number, Status, Scale: include "label" with a short name.
+- When "Reference templates" are provided in context: if the user prompt relates to a category or named template (e.g. "гигиена персонала", "открытие смены", "генеральная уборка"), prefer using those exact task labels as {"type":"Status","label":"..."} items. Map semantically: "hygiene" → ГИГИЕНА И ДОПУСК ПЕРСОНАЛА, "opening" → Открытие смены, etc.
 - Output ONLY valid JSON, no markdown, no extra text.`;
 
     let contextBlock = "";
@@ -105,6 +106,25 @@ Examples:
       const schedule = context.scheduleSummary as string | undefined;
       if (typeof schedule === "string" && schedule) {
         parts.push(`Schedule: ${schedule}`);
+      }
+      // Шаблоны чеклистов: связь запроса с категориями и пунктами для маппинга
+      const templates = context.templates as { categories?: Array<{ category: string; tasks: string[] }>; namedTemplates?: Array<{ name: string; description?: string; tasks: string[] }> } | undefined;
+      if (templates) {
+        parts.push("\n## Reference templates (map user prompt to these items when relevant):");
+        const cats = templates.categories;
+        if (Array.isArray(cats) && cats.length > 0) {
+          for (const c of cats.slice(0, 8)) {
+            const tasks = Array.isArray(c.tasks) ? c.tasks.slice(0, 15) : [];
+            parts.push(`- ${c.category}: ${tasks.join("; ")}${tasks.length < (c.tasks?.length ?? 0) ? "..." : ""}`);
+          }
+        }
+        const named = templates.namedTemplates;
+        if (Array.isArray(named) && named.length > 0) {
+          for (const t of named) {
+            const tasks = Array.isArray(t.tasks) ? t.tasks : [];
+            parts.push(`- "${t.name}": ${tasks.join("; ")}`);
+          }
+        }
       }
       if (parts.length > 1) {
         contextBlock = "\n\n" + parts.join("\n");

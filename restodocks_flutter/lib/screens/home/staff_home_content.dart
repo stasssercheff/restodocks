@@ -23,12 +23,7 @@ class StaffHomeContent extends StatelessWidget {
           title: loc.t('schedule'),
           onTap: () => context.push('/schedule'),
         ),
-        _Tile(icon: Icons.library_books, title: loc.t('products'), onTap: () => context.push('/products')),
-        _Tile(
-          icon: Icons.assignment,
-          title: loc.t('nomenclature'),
-          onTap: () => context.push('/nomenclature'),
-        ),
+        _Tile(icon: Icons.shopping_cart, title: loc.t('product_order'), onTap: () => context.push('/product-order')),
         _Tile(
           icon: Icons.restaurant_menu,
           title: loc.t('menu'),
@@ -39,10 +34,9 @@ class StaffHomeContent extends StatelessWidget {
           title: employee.department == 'bar' ? loc.t('ttk_bar') : loc.t('ttk_kitchen'),
           onTap: () => context.push('/tech-cards'),
         ),
-        if (employee.department == 'kitchen') ...[
+        if (employee.department == 'kitchen')
           _Tile(icon: Icons.checklist, title: loc.t('checklists'), onTap: () => context.push('/checklists')),
-          _Tile(icon: Icons.assignment, title: loc.t('inventory_blank'), onTap: () => context.push('/inventory')),
-        ],
+        _Tile(icon: Icons.assignment, title: loc.t('inventory_blank'), onTap: () => context.push('/inventory')),
       ],
     );
   }

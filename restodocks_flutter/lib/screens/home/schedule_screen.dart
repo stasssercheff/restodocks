@@ -12,9 +12,11 @@ import '../../widgets/app_bar_home_button.dart';
 /// График: слоты (должности/имена) задаются вручную, можно выбрать сотрудника из списка или вписать имя.
 /// Один график на заведение, прокрутка по неделям (неделя влезает на экран, ограничений нет).
 class ScheduleScreen extends StatefulWidget {
-  const ScheduleScreen({super.key, this.department = 'all'});
+  const ScheduleScreen({super.key, this.department = 'all', this.personalOnly = false});
 
   final String department;
+  /// Личный график — только строка текущего сотрудника.
+  final bool personalOnly;
 
   @override
   State<ScheduleScreen> createState() => _ScheduleScreenState();
@@ -107,6 +109,30 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     return '$first$surnameLetter'.trim();
   }
 
+  /// Должность для отображения в графике. Собственник — не должность; если есть должность — показываем её (напр. «Шеф»), иначе null.
+  String? _slotPosition(ScheduleSlot slot, LocalizationService loc) {
+    if (slot.employeeId == null) return null;
+    final emp = _employees.where((e) => e.id == slot.employeeId).firstOrNull;
+    if (emp == null) return null;
+    final pos = emp.positionRole;
+    if (pos == null || pos.isEmpty) return null;
+    return _positionDisplayName(pos, loc);
+  }
+
+  String _positionDisplayName(String code, LocalizationService loc) {
+    switch (code) {
+      case 'executive_chef': return loc.t('executive_chef');
+      case 'sous_chef': return loc.t('sous_chef');
+      case 'bartender': return loc.t('bartender');
+      case 'waiter': return loc.t('waiter');
+      case 'bar_manager': return loc.t('bar_manager');
+      case 'floor_manager': return loc.t('floor_manager');
+      case 'general_manager': return loc.t('general_manager');
+      case 'manager': return loc.t('manager');
+      default: return code;
+    }
+  }
+
   String _getSectionIdForEmployee(Employee employee, List<ScheduleSection> sections) {
     if (sections.isEmpty) return '';
 
@@ -161,8 +187,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               e.hasRole('owner') || e.hasRole('executive_chef') || e.hasRole('sous_chef') || e.department == 'management');
           if (needsManagement && !_model.sections.any((s) => s.id == 'management')) {
             _model = _model.copyWith(sections: [
-              ..._model.sections,
               const ScheduleSection(id: 'management', nameKey: 'management'),
+              ..._model.sections,
             ]);
             saveSchedule(est.id, _model);
           }
@@ -406,6 +432,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
     final dates = _visibleDates;
     final todayDate = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    final currentEmployeeId = widget.personalOnly ? acc.currentEmployee?.id : null;
+
+    bool slotMatchesPersonal(ScheduleSlot slot) {
+      if (currentEmployeeId == null) return true;
+      return slot.employeeId == currentEmployeeId;
+    }
+
     final headerBg = theme.colorScheme.primary;
     final headerFg = theme.colorScheme.onPrimary;
     final weekendHeaderBg = theme.colorScheme.secondaryContainer;
@@ -418,26 +451,37 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
     // Строки таблицы: левая колонка (имена) и правая часть (даты) — чтобы при горизонтальной прокрутке левая колонка оставалась на месте
     final leftCells = <Widget>[];
-    final rightRows = <Widget>[];
 
-    Widget leftCell(Widget child, {double? height, BoxDecoration? decoration}) {
+    Border leftCellBorder({bool top = false}) => Border(
+      left: BorderSide(color: borderColor),
+      right: BorderSide(color: borderColor),
+      top: top ? BorderSide(color: borderColor) : BorderSide.none,
+      bottom: BorderSide(color: borderColor),
+    );
+
+    Widget leftCell(Widget child, {double? height, BoxDecoration? decoration, bool withTopBorder = false}) {
       return Container(
         height: height ?? _rowHeight,
-        decoration: decoration != null ? BoxDecoration(border: Border(right: BorderSide(color: borderColor))) : null,
+        decoration: (decoration ?? BoxDecoration()).copyWith(
+          border: leftCellBorder(top: withTopBorder),
+        ),
         padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
         alignment: Alignment.centerLeft,
         child: child,
       );
     }
 
-    Widget rightCell(Widget child, {Color? bg}) {
+    Widget rightCell(Widget child, {Color? bg, bool mergeRight = false}) {
       return Container(
         width: _dayCellWidth,
         height: _rowHeight,
         padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
         decoration: BoxDecoration(
           color: bg,
-          border: Border(right: BorderSide(color: borderColor), bottom: BorderSide(color: borderColor)),
+          border: Border(
+            right: mergeRight ? BorderSide.none : BorderSide(color: borderColor),
+            bottom: BorderSide(color: borderColor),
+          ),
         ),
         alignment: Alignment.center,
         child: child,
@@ -448,7 +492,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     leftCells.add(leftCell(
       Text(loc.t('schedule_date'), style: TextStyle(fontWeight: FontWeight.w600, color: headerFg, fontSize: 12)),
       height: _rowHeight,
-      decoration: BoxDecoration(color: headerBg, border: Border(right: BorderSide(color: borderColor))),
+      decoration: BoxDecoration(color: headerBg),
+      withTopBorder: true,
     ));
 
     // Строка 2: «День»
@@ -458,8 +503,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       decoration: BoxDecoration(color: headerBg, border: Border(right: BorderSide(color: borderColor))),
     ));
 
-    for (final section in _model.sections) {
-      final sectionSlots = _model.slotsBySection[section.id] ?? [];
+    for (final section in ScheduleModel.sectionsInDisplayOrder(_model.sections)) {
+      var sectionSlots = _model.slotsBySection[section.id] ?? [];
+      if (widget.personalOnly && currentEmployeeId != null) {
+        sectionSlots = sectionSlots.where(slotMatchesPersonal).toList();
+      }
       if (sectionSlots.isEmpty) continue;
       final sectionName = loc.translate(section.nameKey);
       final sectionLabel = sectionName == section.nameKey ? section.id : sectionName;
@@ -469,14 +517,40 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       leftCells.add(leftCell(
         Text(sectionLabel, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: sectionFg), overflow: TextOverflow.ellipsis),
         height: _rowHeight,
-        decoration: BoxDecoration(color: sectionBg, border: Border(right: BorderSide(color: borderColor))),
+        decoration: BoxDecoration(
+          color: sectionBg,
+          border: Border(right: BorderSide(color: borderColor), bottom: BorderSide(color: borderColor)),
+        ),
       ));
 
       for (final slot in sectionSlots) {
-        leftCells.add(leftCell(
-          Text(_slotDisplayName(slot), style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
-          decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3), border: Border(right: BorderSide(color: borderColor))),
-        ));
+      final position = _slotPosition(slot, loc);
+      leftCells.add(leftCell(
+        Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _slotDisplayName(slot),
+              style: TextStyle(fontSize: isMobile ? 11 : 12),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
+            if (position != null && position.isNotEmpty)
+              Text(
+                position,
+                style: TextStyle(fontSize: isMobile ? 8 : 9, color: theme.colorScheme.onSurfaceVariant),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+          ],
+        ),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+          border: Border(right: BorderSide(color: borderColor), bottom: BorderSide(color: borderColor)),
+        ),
+      ));
       }
     }
 
@@ -484,6 +558,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     Widget buildDateColumn(int index) {
       final d = dates[index];
       final columnChildren = <Widget>[];
+      final isLastColumn = index == dates.length - 1;
 
       final weekend = isWeekend(d);
       final dayIsToday = isToday(d);
@@ -499,12 +574,16 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         bg: headerCellBg,
       ));
 
-      for (final section in _model.sections) {
-        final sectionSlots = _model.slotsBySection[section.id] ?? [];
+      for (final section in ScheduleModel.sectionsInDisplayOrder(_model.sections)) {
+        var sectionSlots = _model.slotsBySection[section.id] ?? [];
+        if (widget.personalOnly && currentEmployeeId != null) {
+          sectionSlots = sectionSlots.where(slotMatchesPersonal).toList();
+        }
         if (sectionSlots.isEmpty) continue;
         final sectionBg = theme.colorScheme.secondaryContainer.withOpacity(0.6);
 
-        columnChildren.add(rightCell(const SizedBox.shrink(), bg: sectionBg));
+        // Объединённая строка раздела: без правой границы между ячейками (mergeRight), чтобы визуально сливались
+        columnChildren.add(rightCell(const SizedBox.shrink(), bg: sectionBg, mergeRight: !isLastColumn));
 
         for (final slot in sectionSlots) {
           final val = _cellValue(slot.id, d);
@@ -560,7 +639,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
-        title: Text(loc.t('schedule')),
+        title: Text(widget.personalOnly ? loc.t('personal_schedule') : loc.t('schedule')),
         actions: [
           if (canEdit)
             IconButton(

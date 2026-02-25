@@ -326,7 +326,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
             _UploadMethodCard(
               icon: Icons.file_upload,
               title: '2. Загрузить из файла',
-              description: 'Excel, CSV, текст (.txt, .rtf), Word (.docx), Apple Pages (.pages), Numbers (.numbers). '
+              description: 'Excel, CSV, текст (.txt, .rtf), Word (.docx). '
                   'Модерация, поиск дубликатов ИИ, сверка цен.',
               color: Colors.blue,
               onTap: _isLoading ? null : () => _uploadFromFileUnified(),
@@ -388,7 +388,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   Future<void> _uploadFromFileUnified() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['numbers', 'pages', 'csv', 'txt', 'rtf', 'doc', 'docx', 'xls', 'xlsx'],
+      allowedExtensions: ['csv', 'txt', 'rtf', 'doc', 'docx', 'xls', 'xlsx'],
       withData: true,
     );
     if (result == null || result.files.isEmpty || result.files.single.bytes == null) return;
@@ -398,14 +398,6 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     List<String> rows = _extractRowsFromFile(bytes, name);
 
     if (rows.isEmpty) {
-      // Fallback: Numbers/Pages — извлекаем сырой текст и передаём в ИИ
-      if (name.endsWith('.numbers') || name.endsWith('.pages')) {
-        final rawText = _extractRawTextFromZipForAI(bytes);
-        if (rawText.trim().length >= 30) {
-          await _processWithDeferredModeration(text: rawText, source: _sourceFromFileName(name));
-          return;
-        }
-      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -431,6 +423,8 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     return 'файл';
   }
 
+  /// Извлекает строки из файла (rtf, xls, xlsx, doc, docx, txt, csv).
+  /// Структура у пользователей разная — передаём всё в ИИ, он определяет название продукта и цену.
   List<String> _extractRowsFromFile(Uint8List bytes, String name) {
     if (name.endsWith('.csv') || name.endsWith('.txt')) {
       final text = utf8.decode(bytes, allowMalformed: true);
@@ -449,8 +443,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       }
       return rows;
     }
-    if (name.endsWith('.pages')) return _extractRowsFromPages(bytes);
-    if (name.endsWith('.numbers')) return _extractRowsFromNumbers(bytes);
+    if (name.endsWith('.pages') || name.endsWith('.numbers')) return []; // не поддерживаются
     if (name.endsWith('.docx')) return _extractRowsFromDocx(bytes);
     if (name.endsWith('.doc')) return _extractRowsFromDoc(bytes);
     if (name.endsWith('.xlsx') || name.endsWith('.xls') || name.endsWith('.excel')) {
@@ -746,20 +739,13 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     if (choice == 'file') {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['numbers', 'pages', 'csv', 'txt', 'rtf', 'doc', 'docx', 'xls', 'xlsx'],
+        allowedExtensions: ['csv', 'txt', 'rtf', 'doc', 'docx', 'xls', 'xlsx'],
         withData: true,
       );
       if (result == null || result.files.isEmpty || result.files.single.bytes == null) return;
       final bytes = result.files.single.bytes!;
       final name = result.files.single.name.toLowerCase();
       List<String> rows = _extractRowsFromFile(bytes, name);
-      if (rows.isEmpty && (name.endsWith('.numbers') || name.endsWith('.pages'))) {
-        final rawText = _extractRawTextFromZipForAI(bytes);
-        if (rawText.trim().length >= 30) {
-          await _processWithDeferredModeration(text: rawText, source: _sourceFromFileName(name));
-          return;
-        }
-      }
       if (rows.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Не удалось извлечь данные из файла')),
@@ -838,32 +824,38 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
             parsed.add(ParsedProductItem(name: r.name, price: r.price, unit: null, currency: null));
           }
         }
-      }
-
-      // Исправление опечаток для ВСЕХ продуктов (не только новых)
-      if (parsed.isNotEmpty) {
-        _setLoadingMessage('Исправление опечаток...');
-        final ai = context.read<AiService>();
-        final allNames = parsed.map((p) => p.name).toList();
-        final normalized = await ai.normalizeProductNames(allNames);
-        if (mounted && normalized.length == parsed.length) {
-          parsed = parsed.asMap().entries.map((e) {
-            final i = e.key;
-            final p = e.value;
-            final norm = normalized[i];
-            return norm != null && norm != p.name
-                ? ParsedProductItem(name: norm, price: p.price, unit: p.unit, currency: p.currency)
-                : p;
-          }).toList();
+        // Диагностика: показать пользователю, почему ИИ не распознал данные (при использовании локального разбора)
+        if (mounted && parsed.isNotEmpty) {
+          final aiError = AiServiceSupabase.lastParseProductListError;
+          final hint = context.read<LocalizationService>().t('ai_fallback_hint') ?? 'ИИ не распознал данные. Использован локальный разбор.';
+          final reason = aiError != null && aiError.isNotEmpty
+              ? (context.read<LocalizationService>().t('ai_error_reason') ?? 'Причина: %s').replaceAll('%s', aiError)
+              : null;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(reason != null ? '$hint $reason' : hint),
+                duration: const Duration(seconds: 6),
+              ),
+            );
+          });
         }
       }
+
+      // Не вызываем normalizeProductNames для всех: ai-parse-product-list уже исправляет опечатки.
+      // Второй проход ИИ часто портил корректные данные (названия/цены «через раз» неверные).
 
       if (parsed.isEmpty) {
         _cancelLoadingTimeout();
         if (mounted) {
           setState(() => _isLoading = false);
+          final aiErr = AiServiceSupabase.lastParseProductListError;
+          final msg = aiErr != null && aiErr.isNotEmpty
+              ? 'Не удалось извлечь продукты. ${context.read<LocalizationService>().t('ai_error_reason')?.replaceAll('%s', aiErr) ?? 'Причина ИИ: $aiErr'}'
+              : 'Не удалось извлечь продукты. Проверьте формат данных.';
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Не удалось извлечь продукты. Проверьте формат данных.')),
+            SnackBar(content: Text(msg), duration: const Duration(seconds: 8)),
           );
         }
         return;
@@ -973,7 +965,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     print('=== _uploadExcelSimple called ===');
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['numbers', 'pages', 'csv', 'txt', 'rtf', 'doc', 'docx', 'xls', 'xlsx'],
+      allowedExtensions: ['csv', 'txt', 'rtf', 'doc', 'docx', 'xls', 'xlsx'],
       allowMultiple: false,
     );
     print('Excel simple picker result: ${result != null ? "files selected" : "cancelled"}');
@@ -1000,7 +992,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       final loc = context.read<LocalizationService>();
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['numbers', 'pages', 'csv', 'txt', 'rtf', 'doc', 'docx', 'xls', 'xlsx'],
+        allowedExtensions: ['csv', 'txt', 'rtf', 'doc', 'docx', 'xls', 'xlsx'],
         withData: true,
       );
 
@@ -1245,7 +1237,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['numbers', 'pages', 'csv', 'txt', 'rtf', 'doc', 'docx', 'xls', 'xlsx'],
+        allowedExtensions: ['csv', 'txt', 'rtf', 'doc', 'docx', 'xls', 'xlsx'],
         withData: true,
       );
 
@@ -2859,19 +2851,27 @@ ${allProducts.map((p) => p.name).join('\n')}
     _addDebugLog('Extracted text from RTF: "${text.substring(0, min(200, text.length))}"');
 
     // Разбиваем на строки и фильтруем
-    final lines = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+    final lines = text.split(RegExp(r'\r?\n')).map((s) => s.replaceAll(RegExp(r'\\'), '').trim()).where((s) => s.isNotEmpty).toList();
 
-    // Дополнительная обработка для поиска паттернов продукт-цена
+    // RTF может давать: таблицу (название\tцена), чередование строк, несколько колонок (№, поставщик и т.д.).
+    // Объединяем пары название+цена при чередовании; всё остальное передаём как есть — ИИ разберётся.
+    final paired = _pairAlternatingNamePriceLines(lines);
+
+    // Передаём ВСЕ строки в ИИ — не фильтруем. ИИ определит название продукта и привязанную цену
+    // при любом формате: одна строка, таблица, доп. колонки (нумерация, поставщик).
     final processedLines = <String>[];
-
-    for (final line in lines) {
-      // Ищем строки, которые выглядят как "Название\tЦена" или "Название Цена"
+    for (final line in paired) {
+      if (line.trim().isEmpty) continue;
       if (_looksLikeProductLine(line)) {
         processedLines.add(line);
       } else {
-        // Разбиваем сложные строки на отдельные продукты
         final subLines = _splitComplexLine(line);
-        processedLines.addAll(subLines);
+        if (subLines.isNotEmpty) {
+          processedLines.addAll(subLines);
+        } else if (_looksLikeNameOnly(line) || line.contains(RegExp(r'[а-яА-ЯёЁa-zA-Z]'))) {
+          // Строка с текстом (название, поставщик и т.д.) — не отбрасываем, ИИ определит роль
+          processedLines.add(line);
+        }
       }
     }
 
@@ -2909,6 +2909,48 @@ ${allProducts.map((p) => p.name).join('\n')}
     }
 
     return rows;
+  }
+
+  /// Объединяет чередующиеся строки "название" + "цена" в "название\tцена"
+  List<String> _pairAlternatingNamePriceLines(List<String> lines) {
+    final result = <String>[];
+    var i = 0;
+    while (i < lines.length) {
+      final line = lines[i];
+      final next = i + 1 < lines.length ? lines[i + 1] : null;
+      final isNameOnly = _looksLikeNameOnly(line);
+      final nextIsPriceOnly = next != null && _looksLikePriceOnly(next);
+
+      if (isNameOnly && nextIsPriceOnly) {
+        result.add('${line.trim()}\t${next!.trim()}');
+        i += 2;
+      } else if (_looksLikeProductLine(line)) {
+        result.add(line);
+        i++;
+      } else if (_looksLikePriceOnly(line) && i > 0 && _looksLikeNameOnly(lines[i - 1])) {
+        // уже объединили с предыдущей строкой
+        i++;
+      } else if (isNameOnly || _looksLikePriceOnly(line)) {
+        result.add(line);
+        i++;
+      } else {
+        i++;
+      }
+    }
+    return result;
+  }
+
+  bool _looksLikeNameOnly(String s) {
+    if (s.isEmpty || s.length > 100) return false;
+    // Буквы (кириллица/латиница), можно с пробелами, без цен
+    if (RegExp(r'[\d,.\s]{4,}').hasMatch(s)) return false; // подозрительно много цифр
+    if (RegExp(r'[₫$€руб]').hasMatch(s)) return false;
+    return RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(s);
+  }
+
+  bool _looksLikePriceOnly(String s) {
+    final t = s.replaceAll(RegExp(r'[₫$€руб\s]'), '').replaceAll(',', '').replaceAll('.', '');
+    return RegExp(r'^\d+$').hasMatch(t) && t.length >= 2;
   }
 
   bool _looksLikeProductLine(String line) {

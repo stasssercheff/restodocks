@@ -9,6 +9,10 @@ class Checklist extends Equatable {
   final List<ChecklistItem> items;
   final DateTime createdAt;
   final DateTime updatedAt;
+  /// Цех/отдел, где отображается чеклист (горячий цех, холодный цех и т.д.)
+  final String? assignedSection;
+  /// Сотрудник, которому назначен чеклист (опционально)
+  final String? assignedEmployeeId;
 
   const Checklist({
     required this.id,
@@ -18,6 +22,8 @@ class Checklist extends Equatable {
     required this.items,
     required this.createdAt,
     required this.updatedAt,
+    this.assignedSection,
+    this.assignedEmployeeId,
   });
 
   factory Checklist.fromJson(Map<String, dynamic> json) {
@@ -29,6 +35,8 @@ class Checklist extends Equatable {
       items: [],
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
+      assignedSection: json['assigned_section'] as String?,
+      assignedEmployeeId: json['assigned_employee_id'] as String?,
     );
   }
 
@@ -40,6 +48,8 @@ class Checklist extends Equatable {
       'name': name,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
+      if (assignedSection != null) 'assigned_section': assignedSection,
+      if (assignedEmployeeId != null) 'assigned_employee_id': assignedEmployeeId,
     };
   }
 
@@ -51,6 +61,8 @@ class Checklist extends Equatable {
     List<ChecklistItem>? items,
     DateTime? createdAt,
     DateTime? updatedAt,
+    String? assignedSection,
+    String? assignedEmployeeId,
   }) {
     return Checklist(
       id: id ?? this.id,
@@ -60,6 +72,8 @@ class Checklist extends Equatable {
       items: items ?? this.items,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      assignedSection: assignedSection ?? this.assignedSection,
+      assignedEmployeeId: assignedEmployeeId ?? this.assignedEmployeeId,
     );
   }
 

@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -164,20 +165,41 @@ class _MenuScreenState extends State<MenuScreen> {
           final tc = _dishes[index];
           final totalCost = tc.totalCost;
           final lang = loc.currentLanguageCode;
+          final photoUrl = tc.photoUrls != null && tc.photoUrls!.isNotEmpty ? tc.photoUrls!.first : null;
           return Card(
             margin: const EdgeInsets.only(bottom: 12),
             child: ExpansionTile(
-              leading: Icon(
-                tc.isSemiFinished ? Icons.inventory_2 : Icons.restaurant,
-                color: Theme.of(context).colorScheme.primary,
+              leading: SizedBox(
+                width: 48,
+                height: 48,
+                child: photoUrl != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: CachedNetworkImage(
+                          imageUrl: photoUrl,
+                          fit: BoxFit.cover,
+                          placeholder: (_, __) => Icon(tc.isSemiFinished ? Icons.inventory_2 : Icons.restaurant, color: Theme.of(context).colorScheme.primary),
+                          errorWidget: (_, __, ___) => Icon(tc.isSemiFinished ? Icons.inventory_2 : Icons.restaurant, color: Theme.of(context).colorScheme.primary),
+                        ),
+                      )
+                    : Icon(
+                        tc.isSemiFinished ? Icons.inventory_2 : Icons.restaurant,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
               ),
-              title: Text(
-                tc.getDisplayNameInLists(lang),
-                style: const TextStyle(fontWeight: FontWeight.w600),
+              title: InkWell(
+                onTap: () => context.push('/tech-cards/${tc.id}?view=1'),
+                child: Text(
+                  tc.getDisplayNameInLists(lang),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
               ),
-              subtitle: Text(
-                '${_categoryLabel(tc.category, lang)} • Себестоимость: ${totalCost.toStringAsFixed(2)} $currencySym',
-                style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+              subtitle: InkWell(
+                onTap: () => context.push('/tech-cards/${tc.id}?view=1'),
+                child: Text(
+                  '${_categoryLabel(tc.category, lang)} • Себестоимость: ${totalCost.toStringAsFixed(2)} $currencySym',
+                  style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                ),
               ),
               children: [
                 Padding(
@@ -205,6 +227,7 @@ class _MenuScreenState extends State<MenuScreen> {
 }
 
 /// Таблица состава блюда (только чтение): как в ТТК.
+/// Ингредиенты-ПФ (sourceTechCardId) кликабельны — открывают карточку ТТК ПФ в просмотре.
 class _MenuDishTable extends StatelessWidget {
   const _MenuDishTable({
     required this.loc,
@@ -222,18 +245,25 @@ class _MenuDishTable extends StatelessWidget {
 
   static const _cellPad = EdgeInsets.symmetric(horizontal: 6, vertical: 6);
 
-  Widget _cell(String text, {bool bold = false}) {
-    return TableCell(
-      child: Padding(
-        padding: _cellPad,
-        child: Text(
-          text,
-          style: TextStyle(fontSize: 12, fontWeight: bold ? FontWeight.bold : null),
-          overflow: TextOverflow.ellipsis,
-          maxLines: 2,
-        ),
+  Widget _cell(BuildContext context, String text, {bool bold = false, String? techCardId}) {
+    final child = Padding(
+      padding: _cellPad,
+      child: Text(
+        text,
+        style: TextStyle(fontSize: 12, fontWeight: bold ? FontWeight.bold : null),
+        overflow: TextOverflow.ellipsis,
+        maxLines: 2,
       ),
     );
+    if (techCardId != null && techCardId.isNotEmpty) {
+      return TableCell(
+        child: InkWell(
+          onTap: () => context.push('/tech-cards/$techCardId?view=1'),
+          child: child,
+        ),
+      );
+    }
+    return TableCell(child: child);
   }
 
   @override
@@ -261,12 +291,12 @@ class _MenuDishTable extends StatelessWidget {
           TableRow(
             decoration: BoxDecoration(color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3)),
             children: [
-              _cell(loc.t('ttk_product'), bold: true),
-              _cell('Брутто', bold: true),
-              _cell(loc.t('ttk_net'), bold: true),
-              _cell(loc.t('ttk_cooking_method'), bold: true),
-              _cell(loc.t('ttk_output'), bold: true),
-              _cell('Стоимость', bold: true),
+              _cell(context, loc.t('ttk_product'), bold: true),
+              _cell(context, 'Брутто', bold: true),
+              _cell(context, loc.t('ttk_net'), bold: true),
+              _cell(context, loc.t('ttk_cooking_method'), bold: true),
+              _cell(context, loc.t('ttk_output'), bold: true),
+              _cell(context, 'Стоимость', bold: true),
             ],
           ),
           if (ingredients.isEmpty)
@@ -276,23 +306,23 @@ class _MenuDishTable extends StatelessWidget {
           else
             ...ingredients.map((ing) => TableRow(
               children: [
-                _cell(ing.sourceTechCardName ?? ing.productName),
-                _cell(ing.grossWeight > 0 ? ing.grossWeight.toStringAsFixed(0) : ''),
-                _cell(ing.netWeight > 0 ? ing.netWeight.toStringAsFixed(0) : ''),
-                _cell(ing.cookingProcessName ?? loc.t('dash')),
-                _cell(ing.outputWeight > 0 ? ing.outputWeight.toStringAsFixed(0) : ''),
-                _cell(ing.cost > 0 ? '${ing.cost.toStringAsFixed(2)} $currencySym' : ''),
+                _cell(context, ing.sourceTechCardName ?? ing.productName, techCardId: ing.sourceTechCardId),
+                _cell(context, ing.grossWeight > 0 ? ing.grossWeight.toStringAsFixed(0) : ''),
+                _cell(context, ing.netWeight > 0 ? ing.netWeight.toStringAsFixed(0) : ''),
+                _cell(context, ing.cookingProcessName ?? loc.t('dash')),
+                _cell(context, ing.outputWeight > 0 ? ing.outputWeight.toStringAsFixed(0) : ''),
+                _cell(context, ing.cost > 0 ? '${ing.cost.toStringAsFixed(2)} $currencySym' : ''),
               ],
             )),
           TableRow(
             decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest),
             children: [
-              _cell(loc.t('ttk_total'), bold: true),
-              _cell(''),
-              _cell(''),
-              _cell(''),
-              _cell('${totalOutput.toStringAsFixed(0)} ${loc.t('gram')}', bold: true),
-              _cell('${totalCost.toStringAsFixed(2)} $currencySym', bold: true),
+              _cell(context, loc.t('ttk_total'), bold: true),
+              _cell(context, ''),
+              _cell(context, ''),
+              _cell(context, ''),
+              _cell(context, '${totalOutput.toStringAsFixed(0)} ${loc.t('gram')}', bold: true),
+              _cell(context, '${totalCost.toStringAsFixed(2)} $currencySym', bold: true),
             ],
           ),
         ],

@@ -62,15 +62,19 @@ class ChecklistServiceSupabase {
     required String createdBy,
     required String name,
     List<ChecklistItem> items = const [],
+    String? assignedSection,
+    String? assignedEmployeeId,
   }) async {
     final now = DateTime.now();
-    final data = {
+    final data = <String, dynamic>{
       'establishment_id': establishmentId,
       'created_by': createdBy,
       'name': name,
       'created_at': now.toIso8601String(),
       'updated_at': now.toIso8601String(),
     };
+    if (assignedSection != null) data['assigned_section'] = assignedSection;
+    if (assignedEmployeeId != null) data['assigned_employee_id'] = assignedEmployeeId;
     final res = await _supabase.insertData('checklists', data);
     final c = Checklist.fromJson(res);
 
@@ -85,15 +89,13 @@ class ChecklistServiceSupabase {
   }
 
   Future<void> saveChecklist(Checklist checklist) async {
-    await _supabase.updateData(
-      'checklists',
-      {
-        'name': checklist.name,
-        'updated_at': DateTime.now().toIso8601String(),
-      },
-      'id',
-      checklist.id,
-    );
+    final upd = <String, dynamic>{
+      'name': checklist.name,
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+    upd['assigned_section'] = checklist.assignedSection;
+    upd['assigned_employee_id'] = checklist.assignedEmployeeId;
+    await _supabase.updateData('checklists', upd, 'id', checklist.id);
     await _supabase.client
         .from('checklist_items')
         .delete()

@@ -657,6 +657,7 @@ class ProductStoreSupabase {
 
   /// Получить цену продукта для конкретного заведения
   /// Возвращает (price, currency) или null если цена не установлена
+  /// Берёт из establishment_products (карточки заведения)
   (double?, String?)? getEstablishmentPrice(String productId, String? establishmentId) {
     if (establishmentId == null) return null;
 
