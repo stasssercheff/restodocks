@@ -45,15 +45,27 @@ class AccountManagerSupabase {
   bool get isLoggedInSync => _currentEmployee != null && _establishment != null;
 
   /// Инициализация сервиса
-  /// Supabase восстанавливает сессию из localStorage при Supabase.initialize() в main()
+  /// Supabase восстанавливает сессию из localStorage при Supabase.initialize() в main().
+  /// При F5/hard refresh Auth может восстанавливаться асинхронно — делаем retry.
   Future<void> initialize() async {
     print('🔐 AccountManager: Starting initialization...');
     await _secureStorage.initialize();
 
-    print('🔐 AccountManager: Secure storage initialized');
+    await _tryRestoreSession();
+    if (isLoggedInSync) return;
+
+    // Retry: при hard refresh Supabase Auth может ещё не успеть прочитать localStorage.
+    await Future.delayed(const Duration(milliseconds: 400));
+    await _tryRestoreSession();
+    if (isLoggedInSync) return;
+
+    print('🔐 AccountManager: No stored session and not authenticated');
+  }
+
+  Future<void> _tryRestoreSession() async {
     final employeeId = await _secureStorage.get(_keyEmployeeId);
     final establishmentId = await _secureStorage.get(_keyEstablishmentId);
-    print('🔐 AccountManager: Retrieved from storage - employee: $employeeId, establishment: $establishmentId');
+    print('🔐 AccountManager: Storage - employee: $employeeId, establishment: $establishmentId, auth: ${_supabase.isAuthenticated}');
 
     // 1. Сначала проверяем Supabase Auth — приоритет для пользователей с auth
     if (_supabase.isAuthenticated) {
@@ -70,10 +82,7 @@ class AccountManagerSupabase {
       print('🔐 AccountManager: Restoring session from storage...');
       await _restoreSession(employeeId, establishmentId);
       print('🔐 AccountManager: Session restored, logged in: $isLoggedInSync');
-      return;
     }
-
-    print('🔐 AccountManager: No stored session and not authenticated');
   }
 
   Future<void> _restoreSession(String employeeId, String establishmentId) async {
