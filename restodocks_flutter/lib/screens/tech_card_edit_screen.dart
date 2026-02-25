@@ -1372,6 +1372,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                             dishName: _nameController.text,
                             ingredients: _ingredients.where((i) => !i.isPlaceholder || i.hasData).toList(),
                             technology: _technologyController.text,
+                            weightPerPortion: _portionWeight,
                             hideTechnologyInTable: true,
                             onIngredientsChanged: (list) {
                               WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -2174,8 +2175,8 @@ class _TtkTableState extends State<_TtkTable> {
   }
 }
 
-/// Упрощённая таблица для повара (режим просмотра для сотрудников): Блюдо, Продукт, Нетто, Способ, Выход.
-/// Внешний вид и структура — по референсу GitHub (Preps / dish / sv).
+/// Упрощённая таблица для повара (режим просмотра для сотрудников): Блюдо, Продукт, Брутто, Нетто, Способ, Выход, порций (шт).
+/// Ширины столбцов как в таблице создания ТТК.
 class _TtkCookTable extends StatefulWidget {
   const _TtkCookTable({
     required this.loc,
@@ -2184,6 +2185,7 @@ class _TtkCookTable extends StatefulWidget {
     required this.technology,
     required this.onIngredientsChanged,
     this.hideTechnologyInTable = false,
+    this.weightPerPortion = 100,
   });
 
   final LocalizationService loc;
@@ -2191,10 +2193,18 @@ class _TtkCookTable extends StatefulWidget {
   final List<TTIngredient> ingredients;
   final String technology;
   final void Function(List<TTIngredient> list) onIngredientsChanged;
-  /// Если true, технология не отображается в таблице (рендерится отдельно в родителе)
   final bool hideTechnologyInTable;
+  final double weightPerPortion;
 
   static const _cellPad = EdgeInsets.symmetric(horizontal: 6, vertical: 6);
+  // Ширины как в _TtkTable (таблица создания)
+  static const _colDish = 100.0;
+  static const _colProduct = 120.0;
+  static const _colGross = 70.0;
+  static const _colNet = 70.0;
+  static const _colMethod = 100.0;
+  static const _colOutput = 70.0;
+  static const _colPortions = 56.0;
 
   @override
   State<_TtkCookTable> createState() => _TtkCookTableState();
@@ -2203,12 +2213,13 @@ class _TtkCookTable extends StatefulWidget {
 class _TtkCookTableState extends State<_TtkCookTable> {
   late List<TTIngredient> _ingredients;
   late double _totalOutput;
+  int _portionsCount = 1; // количество порций в итого (ввод пользователя)
 
   @override
   void initState() {
     super.initState();
     _ingredients = List.from(widget.ingredients);
-    _totalOutput = _ingredients.fold<double>(0, (s, i) => s + i.netWeight);
+    _totalOutput = _ingredients.fold<double>(0, (s, i) => s + i.outputWeight);
   }
 
   @override
@@ -2216,7 +2227,7 @@ class _TtkCookTableState extends State<_TtkCookTable> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.ingredients != widget.ingredients) {
       _ingredients = List.from(widget.ingredients);
-      _totalOutput = _ingredients.fold<double>(0, (s, i) => s + i.netWeight);
+      _totalOutput = _ingredients.fold<double>(0, (s, i) => s + i.outputWeight);
     }
   }
 
@@ -2228,11 +2239,37 @@ class _TtkCookTableState extends State<_TtkCookTable> {
     widget.onIngredientsChanged(_ingredients);
   }
 
+  void _updateGrossAt(int index, double newGross) {
+    if (index < 0 || index >= _ingredients.length) return;
+    final ing = _ingredients[index];
+    final net = newGross * (1.0 - (ing.primaryWastePct.clamp(0.0, 99.9) / 100.0));
+    final loss = ((ing.cookingLossPctOverride ?? 0).clamp(0.0, 99.9) / 100.0);
+    final output = net * (1.0 - loss);
+    final pricePerKg = ing.pricePerKg ?? 0;
+    final newCost = pricePerKg * (newGross / 1000.0);
+    _ingredients[index] = ing.copyWith(
+      grossWeight: newGross,
+      netWeight: net,
+      outputWeight: output,
+      cost: newCost,
+      isNetWeightManual: false,
+    );
+    _totalOutput = _ingredients.fold<double>(0, (s, i) => s + i.outputWeight);
+    widget.onIngredientsChanged(_ingredients);
+  }
+
   void _updateNetAt(int index, double newNet) {
     if (index < 0 || index >= _ingredients.length) return;
     _ingredients[index] = _ingredients[index].updateNetWeightForCook(newNet);
-    _totalOutput = _ingredients.fold<double>(0, (s, i) => s + i.netWeight);
+    _totalOutput = _ingredients.fold<double>(0, (s, i) => s + i.outputWeight);
     widget.onIngredientsChanged(_ingredients);
+  }
+
+  /// Количество продукта на N порций: outputWeight * (N * weightPerPortion / totalOutput)
+  String _portionsAmount(TTIngredient ing) {
+    if (ing.productName.isEmpty || _totalOutput <= 0) return '';
+    final val = ing.outputWeight * (_portionsCount * widget.weightPerPortion / _totalOutput);
+    return val == val.truncateToDouble() ? val.toInt().toString() : val.toStringAsFixed(1);
   }
 
   Widget _cell(String text, {bool bold = false}) {
@@ -2246,20 +2283,16 @@ class _TtkCookTableState extends State<_TtkCookTable> {
 
   @override
   Widget build(BuildContext context) {
-    final lang = widget.loc.currentLanguageCode;
-    final totalCost = _ingredients.fold<double>(0, (s, i) => s + i.cost);
-    final accountManager = context.read<AccountManagerSupabase>();
-    final currency = accountManager.currentEmployee?.currency ?? accountManager.establishment?.defaultCurrency ?? 'RUB';
-    final sym = currency == 'RUB' ? '₽' : currency == 'VND' ? '₫' : currency == 'USD' ? '\$' : currency;
-
     return Table(
       border: TableBorder.all(width: 0.5, color: Colors.grey),
-      columnWidths: const {
-        0: FixedColumnWidth(150),
-        1: FixedColumnWidth(220),
-        2: FixedColumnWidth(90),
-        3: FixedColumnWidth(140),
-        4: FixedColumnWidth(90),
+      columnWidths: {
+        0: const FixedColumnWidth(_TtkCookTable._colDish),
+        1: const FixedColumnWidth(_TtkCookTable._colProduct),
+        2: const FixedColumnWidth(_TtkCookTable._colGross),
+        3: const FixedColumnWidth(_TtkCookTable._colNet),
+        4: const FixedColumnWidth(_TtkCookTable._colMethod),
+        5: const FixedColumnWidth(_TtkCookTable._colOutput),
+        6: const FixedColumnWidth(_TtkCookTable._colPortions),
       },
       children: [
         TableRow(
@@ -2267,14 +2300,16 @@ class _TtkCookTableState extends State<_TtkCookTable> {
           children: [
             _cell(widget.loc.t('ttk_dish'), bold: true),
             _cell(widget.loc.t('ttk_product'), bold: true),
+            _cell(widget.loc.t('ttk_gross'), bold: true),
             _cell(widget.loc.t('ttk_net'), bold: true),
             _cell(widget.loc.t('ttk_cooking_method'), bold: true),
             _cell(widget.loc.t('ttk_output'), bold: true),
+            _cell(widget.loc.t('ttk_portions_pcs'), bold: true),
           ],
         ),
         if (_ingredients.isEmpty)
           TableRow(
-            children: List.filled(5, TableCell(child: Padding(padding: _TtkCookTable._cellPad, child: Text(widget.loc.t('dash'), style: const TextStyle(fontSize: 12))))),
+            children: List.filled(7, TableCell(child: Padding(padding: _TtkCookTable._cellPad, child: Text(widget.loc.t('dash'), style: const TextStyle(fontSize: 12))))),
           )
         else
         ..._ingredients.asMap().entries.map((e) {
@@ -2288,13 +2323,23 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                 child: Padding(
                   padding: _TtkCookTable._cellPad,
                   child: _EditableNetCell(
+                    value: ing.grossWeight,
+                    onChanged: (v) => _updateGrossAt(i, v ?? ing.grossWeight),
+                  ),
+                ),
+              ),
+              TableCell(
+                child: Padding(
+                  padding: _TtkCookTable._cellPad,
+                  child: _EditableNetCell(
                     value: ing.netWeight,
                     onChanged: (v) => _updateNetAt(i, v ?? ing.netWeight),
                   ),
                 ),
               ),
               _cell(ing.cookingProcessName ?? widget.loc.t('dash')),
-              _cell(ing.netWeight.toStringAsFixed(0)),
+              _cell(ing.outputWeight.toStringAsFixed(0)),
+              _cell(_portionsAmount(ing)),
             ],
           );
         }),
@@ -2302,6 +2347,7 @@ class _TtkCookTableState extends State<_TtkCookTable> {
           decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest),
           children: [
             _cell(widget.loc.t('ttk_total'), bold: true),
+            _cell(''),
             _cell(''),
             TableCell(
               child: Padding(
@@ -2321,9 +2367,19 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                 ),
               ),
             ),
+            TableCell(
+              child: Padding(
+                padding: _TtkCookTable._cellPad,
+                child: _EditableNetCell(
+                  value: _portionsCount.toDouble(),
+                  onChanged: (v) {
+                    if (v != null && v >= 1) setState(() => _portionsCount = v.toInt().clamp(1, 9999));
+                  },
+                ),
+              ),
+            ),
           ],
         ),
-        // Технология приготовления (только если есть текст и не скрыта)
         if (!widget.hideTechnologyInTable && widget.technology.trim().isNotEmpty) ...[
           TableRow(
             children: [
@@ -2350,7 +2406,10 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                   ),
                 ),
               ),
-              const TableCell(child: SizedBox()), // Пустые ячейки для выравнивания
+              const TableCell(child: SizedBox()),
+              const TableCell(child: SizedBox()),
+              const TableCell(child: SizedBox()),
+              const TableCell(child: SizedBox()),
               const TableCell(child: SizedBox()),
               const TableCell(child: SizedBox()),
               const TableCell(child: SizedBox()),
