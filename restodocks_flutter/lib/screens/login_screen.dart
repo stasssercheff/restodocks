@@ -43,9 +43,8 @@ class _LoginScreenState extends State<LoginScreen> {
     if (saved.email != null && saved.email!.isNotEmpty) {
       _emailController.text = saved.email!;
     }
-    if (saved.password != null && saved.password!.isNotEmpty) {
-      _passwordController.text = saved.password!;
-    }
+    // Пароль не подставляем из хранилища: он мог устареть (смена пароля, другой устройство),
+    // из-за чего при нажатии «Войти» уходил старый пароль и показывалось «Неверный пароль».
     setState(() {});
   }
 
