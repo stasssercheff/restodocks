@@ -14,8 +14,8 @@ class DataSafetyIndicator extends StatelessWidget {
     if (!isVisible) return const SizedBox.shrink();
 
     return Positioned(
-      bottom: 80, // Над нижней панелью с кнопкой
-      right: 16,
+      top: 8, // В пустой области между датой и строкой поиска
+      left: 16,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(

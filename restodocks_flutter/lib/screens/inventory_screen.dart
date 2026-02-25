@@ -942,9 +942,9 @@ class _InventoryScreenState extends State<InventoryScreen>
       });
     }
 
-    // На мобильной версии не скрываем header/footer при открытой клавиатуре — иначе
-    // layout меняется и клавиатура сразу закрывается.
-    final collapseLayout = _isInputMode && !isNarrow;
+    // При открытой клавиатуре скрываем header/footer, чтобы не мешать вводу
+    // (кнопка «Завершить» и навигация не работают при вводе).
+    final collapseLayout = _isInputMode;
 
     return Scaffold(
       appBar: _isInputMode ? AppBar(
