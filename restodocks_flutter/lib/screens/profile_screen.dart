@@ -139,17 +139,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 24),
             ],
 
-            // Настройки
-            _buildSettingsSection(localization),
-
-            const SizedBox(height: 24),
-
-            // Специальные разделы для собственников
-            if (isOwner) ...[
-              _buildOwnerSections(localization),
-              const SizedBox(height: 24),
-            ],
-
             // Выход
             _buildLogoutSection(localization),
           ],
@@ -260,79 +249,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildSettingsSection(LocalizationService localization) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
-          child: Text(
-            'Настройки',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-          ),
-        ),
-        const SizedBox(height: 8),
-
-        // Тема оформления
-        ListTile(
-          leading: const Icon(Icons.brightness_6),
-          title: const Text('Тема оформления'),
-          subtitle: const Text('Темная / Светлая'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => _showThemeSettings(context),
-        ),
-
-        // Язык
-        ListTile(
-          leading: const Icon(Icons.language),
-          title: const Text('Язык'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => _showLanguageSettings(context),
-        ),
-
-        // Валюта
-        ListTile(
-          leading: const Icon(Icons.currency_ruble),
-          title: const Text('Валюта'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => _showCurrencySettings(context),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildOwnerSections(LocalizationService localization) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Настройки Pro
-        ListTile(
-          leading: const Icon(Icons.star, color: Colors.amber),
-          title: const Text('Настройки Pro'),
-          subtitle: const Text('Ввод промокода, управление подпиской'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => _showProSettings(context),
-        ),
-
-        // Выбор роли
-        ListTile(
-          leading: const Icon(Icons.admin_panel_settings),
-          title: const Text('Выбор роли'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => _showRoleSelection(context),
-        ),
-
-        // Пригласить соучредителя
-        ListTile(
-          leading: const Icon(Icons.person_add),
-          title: const Text('Пригласить соучредителя'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => _showInviteCoOwner(context),
-        ),
-      ],
-    );
-  }
-
   Widget _buildLogoutSection(LocalizationService localization) {
     return ListTile(
       leading: const Icon(Icons.logout, color: Colors.red),
@@ -341,106 +257,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         style: TextStyle(color: Colors.red),
       ),
       onTap: () => _logout(context),
-    );
-  }
-
-  // Методы для показа настроек (заглушки)
-  void _showThemeSettings(BuildContext context) {
-    // TODO: Реализовать переключение темы
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Настройки темы будут добавлены')),
-    );
-  }
-
-  void _showLanguageSettings(BuildContext context) {
-    // TODO: Реализовать выбор языка
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Выбор языка будет добавлен')),
-    );
-  }
-
-  void _showCurrencySettings(BuildContext context) async {
-    final accountManager = context.read<AccountManagerSupabase>();
-    final currentEmployee = accountManager.currentEmployee;
-    if (currentEmployee == null) return;
-
-    final currencies = {
-      'RUB': '₽ Российский рубль',
-      'USD': '\$ Доллар США',
-      'EUR': '€ Евро',
-      'VND': '₫ Вьетнамский донг',
-      'GBP': '£ Фунт стерлингов',
-      'JPY': '¥ Японская йена',
-      'CNY': '¥ Китайский юань',
-    };
-
-    final localization = context.read<LocalizationService>();
-
-    String? selectedCurrency = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(localization.t('select_currency')),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: currencies.entries.map((entry) {
-              return RadioListTile<String>(
-                title: Text(localization.t('currency_${entry.key.toLowerCase()}') ?? entry.value),
-                value: entry.key,
-                groupValue: currentEmployee.currency,
-                onChanged: (value) => Navigator.of(context).pop(value),
-              );
-            }).toList(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(localization.t('cancel')),
-          ),
-        ],
-      ),
-    );
-
-    if (selectedCurrency != null && selectedCurrency != currentEmployee.currency) {
-      try {
-        final updatedEmployee = currentEmployee.copyWith(preferredCurrency: selectedCurrency);
-        await accountManager.updateEmployee(updatedEmployee);
-        setState(() {}); // Обновить UI
-        final localization = context.read<LocalizationService>();
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('${localization.t('currency_changed')} ${localization.t('currency_${selectedCurrency!.toLowerCase()}') ?? currencies[selectedCurrency]}')),
-          );
-        }
-      } catch (e) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Ошибка при сохранении валюты')),
-          );
-        }
-      }
-    }
-  }
-
-  void _showProSettings(BuildContext context) {
-    // TODO: Реализовать Pro настройки
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Pro настройки будут добавлены')),
-    );
-  }
-
-  void _showRoleSelection(BuildContext context) {
-    // TODO: Реализовать выбор роли
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Выбор роли будет добавлен')),
-    );
-  }
-
-  void _showInviteCoOwner(BuildContext context) {
-    // TODO: Реализовать приглашение соучредителя
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Приглашение соучредителя будет добавлено')),
     );
   }
 
