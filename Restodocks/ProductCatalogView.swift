@@ -17,6 +17,7 @@ struct ProductCatalogView: View {
     @State private var showFilters = false
     @State private var showingAddProduct = false
     @State private var newProduct = Product(name: "", category: "misc")
+    @State private var showingImport = false
 
     init(department: String = "kitchen", titleOverride: String? = nil) {
         self.department = department
@@ -124,6 +125,11 @@ struct ProductCatalogView: View {
                     HStack {
                         if appState.canManageSchedule {
                             Button {
+                                showingImport = true
+                            } label: {
+                                Image(systemName: "square.and.arrow.down")
+                            }
+                            Button {
                                 showingAddProduct = true
                             } label: {
                                 Image(systemName: "plus")
@@ -167,8 +173,10 @@ struct ProductCatalogView: View {
                     }
             }
         }
+        .sheet(isPresented: $showingImport) {
+            ProductImportView()
+        }
         .onAppear {
-            // Load products for specific department
             productStore.loadProductsForDepartment(department)
         }
     }

@@ -78,28 +78,25 @@ struct KitchenScheduleView: View {
         Dictionary(grouping: filteredShifts) { Calendar.current.startOfDay(for: $0.date) }
     }
 
-    /// Диапазон дат: только дни с сменами + буфер, но не более 45 дней (для плавного скролла).
+    /// Диапазон дат: компактный (до 28 дней) для плавного скролла.
     private var scheduleDateRange: (start: Date, end: Date) {
         let cal = Calendar.current
         let today = cal.startOfDay(for: Date())
-        let minDays = 21
-        let maxDays = 45
+        let maxDays = 28
         let shifts = filteredShifts
         if shifts.isEmpty {
-            let start = cal.date(byAdding: .day, value: -7, to: today)!
-            let end = cal.date(byAdding: .day, value: minDays - 8, to: today)!
+            let start = cal.date(byAdding: .day, value: -3, to: today)!
+            let end = cal.date(byAdding: .day, value: 24, to: today)!
             return (start, end)
         }
         let dates = shifts.map { cal.startOfDay(for: $0.date) }
         let minDate = dates.min()!
         let maxDate = dates.max()!
-        let start = cal.date(byAdding: .day, value: -7, to: minDate)!
-        var end = cal.date(byAdding: .day, value: 14, to: maxDate)!
+        let start = cal.date(byAdding: .day, value: -3, to: minDate)!
+        var end = cal.date(byAdding: .day, value: 10, to: maxDate)!
         let total = cal.dateComponents([.day], from: start, to: end).day.map { $0 + 1 } ?? 0
         if total > maxDays {
             end = cal.date(byAdding: .day, value: maxDays - 1, to: start)!
-        } else if total < minDays {
-            end = cal.date(byAdding: .day, value: minDays - 1, to: start)!
         }
         return (start, end)
     }
@@ -149,21 +146,23 @@ struct KitchenScheduleView: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    ScrollView {
-                        LazyVStack(spacing: 16) {
-                            ForEach(allScheduleDates, id: \.self) { date in
-                                let dayShifts = shiftsByDate[date] ?? []
-                                DayScheduleCard(
-                                    date: date,
-                                    shifts: dayShifts,
-                                    employeeName: { accounts.employeeName(for: $0) },
-                                    employeePosition: { accounts.employeePosition(for: $0) }
-                                )
-                                .drawingGroup()
-                            }
+                    List {
+                        ForEach(allScheduleDates, id: \.self) { date in
+                            let dayShifts = shiftsByDate[date] ?? []
+                            DayScheduleCard(
+                                date: date,
+                                shifts: dayShifts,
+                                employeeName: { accounts.employeeName(for: $0) },
+                                employeePosition: { accounts.employeePosition(for: $0) }
+                            )
+                            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                            .listRowBackground(Color(.systemGroupedBackground))
+                            .listRowSeparator(.hidden)
                         }
-                        .padding(.vertical)
                     }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                    .background(Color(.systemGroupedBackground))
                 }
             }
             .navigationTitle(lang.t("schedule"))
@@ -238,11 +237,9 @@ struct DayScheduleCard: View {
                 }
             }
         }
-        .padding(.vertical)
+        .padding(.vertical, 8)
         .background(Color(.systemBackground))
-        .cornerRadius(12)
-        .shadow(color: Color.black.opacity(0.1), radius: 4, y: 2)
-        .padding(.horizontal)
+        .cornerRadius(10)
     }
 }
 

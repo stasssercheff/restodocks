@@ -1024,6 +1024,8 @@ class _InventoryScreenState extends State<InventoryScreen>
             width: narrow ? double.infinity : 160,
             child: TextField(
               controller: _nameFilterCtrl,
+              keyboardType: TextInputType.text,
+              textCapitalization: TextCapitalization.sentences,
               decoration: InputDecoration(
                 hintText: loc.t('inventory_filter_name') ?? 'По названию',
                 isDense: true,
@@ -1784,7 +1786,6 @@ class _QtyCell extends StatefulWidget {
 class _QtyCellState extends State<_QtyCell> {
   late TextEditingController _controller;
   final FocusNode _focus = FocusNode();
-  bool _wasFocused = false;
   late double _currentValue;
   Timer? _updateTimer;
 
@@ -1801,10 +1802,8 @@ class _QtyCellState extends State<_QtyCell> {
   @override
   void didUpdateWidget(_QtyCell old) {
     super.didUpdateWidget(old);
-    // Если виджет обновился и у нас был фокус, восстанавливаем его сразу
-    if (_wasFocused && !_focus.hasFocus && mounted) {
-      _focus.requestFocus();
-    }
+    // Не восстанавливаем фокус принудительно — иначе при тапе по поиску/фильтру
+    // фокус «убегает» обратно в ячейку и показывается цифровая клавиатура.
     // Обновляем текст только если значение изменилось извне и фокус не активен
     if (old.value != widget.value && !_focus.hasFocus) {
       _currentValue = widget.value;
@@ -1813,7 +1812,6 @@ class _QtyCellState extends State<_QtyCell> {
   }
 
   void _onFocusChanged() {
-    _wasFocused = _focus.hasFocus;
     if (!_focus.hasFocus) {
       // При потере фокуса применяем изменения
       final textValue = _controller.text.trim();
@@ -1915,6 +1913,8 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
           Padding(
             padding: const EdgeInsets.all(16),
             child: TextField(
+              keyboardType: TextInputType.text,
+              textCapitalization: TextCapitalization.sentences,
               decoration: InputDecoration(
                 labelText: widget.loc.t('search'),
                 prefixIcon: const Icon(Icons.search),

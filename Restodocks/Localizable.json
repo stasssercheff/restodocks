@@ -748,6 +748,34 @@
     "de": "Bestellung",
     "fr": "Commande"
   },
+  "upload_products": {
+    "ru": "Загрузить продукты",
+    "en": "Upload products",
+    "es": "Subir productos",
+    "de": "Produkte hochladen",
+    "fr": "Télécharger les produits"
+  },
+  "import_products_hint": {
+    "ru": "Выберите файл со списком продуктов (одна строка — один продукт). Поддерживаются форматы: TXT, RTF, CSV, XLSX, DOCX.",
+    "en": "Select a file with a product list (one per line). Supported: TXT, RTF, CSV, XLSX, DOCX.",
+    "es": "Seleccione un archivo con la lista de productos (uno por línea). Formatos: TXT, RTF, CSV, XLSX, DOCX.",
+    "de": "Wählen Sie eine Datei mit der Produktliste (eine pro Zeile). Unterstützt: TXT, RTF, CSV, XLSX, DOCX.",
+    "fr": "Choisissez un fichier avec la liste des produits (un par ligne). Formats : TXT, RTF, CSV, XLSX, DOCX."
+  },
+  "import_formats": {
+    "ru": "Форматы: .txt, .rtf, .csv, .xlsx, .xls, .doc, .docx, .numbers, .pages",
+    "en": "Formats: .txt, .rtf, .csv, .xlsx, .xls, .doc, .docx, .numbers, .pages",
+    "es": "Formatos: .txt, .rtf, .csv, .xlsx, .xls, .doc, .docx, .numbers, .pages",
+    "de": "Formate: .txt, .rtf, .csv, .xlsx, .xls, .doc, .docx, .numbers, .pages",
+    "fr": "Formats : .txt, .rtf, .csv, .xlsx, .xls, .doc, .docx, .numbers, .pages"
+  },
+  "open_file": {
+    "ru": "Выбрать файл",
+    "en": "Choose file",
+    "es": "Elegir archivo",
+    "de": "Datei wählen",
+    "fr": "Choisir un fichier"
+  },
   "product_list": {
         "ru": "Список продуктов",
         "en": "Product List",
