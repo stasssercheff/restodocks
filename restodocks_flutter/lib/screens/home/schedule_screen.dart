@@ -315,6 +315,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
   void _showCopyRangeDialog() {
     final loc = context.read<LocalizationService>();
+    final establishmentId = _establishmentId;
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
     showDialog<void>(
       context: context,
       builder: (ctx) => _CopyRangeDialog(
@@ -345,9 +347,25 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               }
             }
           }
-          setState(() => _model = updatedModel);
-          if (_establishmentId != null) {
-            await saveSchedule(_establishmentId!, updatedModel);
+          if (establishmentId == null) {
+            scaffoldMessenger.showSnackBar(SnackBar(content: Text(loc.t('no_establishment') ?? 'Заведение не выбрано')));
+            return;
+          }
+          try {
+            final ok = await saveSchedule(establishmentId, updatedModel);
+            if (mounted) {
+              if (ok) {
+                setState(() => _model = updatedModel);
+                scaffoldMessenger.showSnackBar(const SnackBar(content: Text('График скопирован')));
+              } else {
+                scaffoldMessenger.showSnackBar(const SnackBar(content: Text('Ошибка: не удалось сохранить график')));
+              }
+            }
+          } catch (e, st) {
+            debugPrint('Schedule copy save error: $e\n$st');
+            if (mounted) {
+              scaffoldMessenger.showSnackBar(SnackBar(content: Text('Ошибка сохранения: $e')));
+            }
           }
         },
       ),

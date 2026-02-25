@@ -28,8 +28,10 @@ Future<ScheduleModel> loadSchedule(String establishmentId) async {
   }
 }
 
-Future<void> saveSchedule(String establishmentId, ScheduleModel model) async {
+/// Возвращает true при успешном сохранении.
+Future<bool> saveSchedule(String establishmentId, ScheduleModel model) async {
   final prefs = await SharedPreferences.getInstance();
   final key = '$_keyPrefix$establishmentId';
-  await prefs.setString(key, jsonEncode(model.toJson()));
+  final jsonStr = jsonEncode(model.toJson());
+  return prefs.setString(key, jsonStr);
 }
