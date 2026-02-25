@@ -114,7 +114,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.home),
-            onPressed: () => context.go('/home', queryParameters: {'tab': '0'}),
+            onPressed: () => context.go('/home'),
             tooltip: localization.t('home'),
           ),
         ],
