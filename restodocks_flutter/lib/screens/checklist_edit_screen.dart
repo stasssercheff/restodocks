@@ -279,25 +279,40 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
     final lang = loc.currentLanguageCode;
     final pfs = _techCards.where((tc) => tc.isSemiFinished).toList();
     if (pfs.isEmpty) return;
-    showModalBottomSheet<void>(
+    showDialog<void>(
       context: context,
       builder: (ctx) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Text(loc.t('select_pf') ?? 'Выбрать ПФ', style: Theme.of(context).textTheme.titleMedium),
+        return Center(
+          child: Card(
+            margin: const EdgeInsets.symmetric(horizontal: 24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 400, maxHeight: 400),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Text(loc.t('select_pf') ?? 'Выбрать ПФ', style: Theme.of(context).textTheme.titleMedium),
+                  ),
+                  Flexible(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: pfs.length,
+                      itemBuilder: (_, i) {
+                        final tc = pfs[i];
+                        return ListTile(
+                          title: Text(tc.getDisplayNameInLists(lang)),
+                          onTap: () {
+                            Navigator.of(ctx).pop();
+                            _addItem(title: tc.getDisplayNameInLists(lang), techCardId: tc.id);
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
-              ...pfs.map((tc) => ListTile(
-                    title: Text(tc.getDisplayNameInLists(lang)),
-                    onTap: () {
-                      Navigator.of(ctx).pop();
-                      _addItem(title: tc.getDisplayNameInLists(lang), techCardId: tc.id);
-                    },
-                  )),
-            ],
+            ),
           ),
         );
       },
@@ -498,11 +513,20 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (_type == ChecklistType.prep)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 16),
-                      child: TextButton(
-                        onPressed: _showSelectPfDropdown,
-                        child: Text(loc.t('select_pf') ?? 'Выбрать ПФ'),
+                    SizedBox(
+                      width: 160,
+                      child: InkWell(
+                        onTap: _showSelectPfDropdown,
+                        borderRadius: BorderRadius.circular(4),
+                        child: InputDecorator(
+                          decoration: InputDecoration(
+                            labelText: loc.t('select_pf') ?? 'Выбрать ПФ',
+                            suffixIcon: Icon(Icons.keyboard_arrow_down, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                            border: const OutlineInputBorder(),
+                          ),
+                          isEmpty: true,
+                          child: const SizedBox.shrink(),
+                        ),
                       ),
                     ),
                   if (_type == ChecklistType.prep) const SizedBox(width: 8),
