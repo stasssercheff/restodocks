@@ -70,12 +70,10 @@ class RolesConfig {
     SectionRole('hall_cleaner', false),
   ];
 
-  /// Менеджмент. Шеф-повар здесь.
+  /// Менеджмент. Шеф-повар и менеджер зала.
   static const List<SectionRole> management = [
     SectionRole('executive_chef', false),
-    SectionRole('bar_manager', false),
     SectionRole('floor_manager', false),
-    SectionRole('general_manager', false),
   ];
 
   static List<String> kitchenSections() => kitchen.keys.toList();
