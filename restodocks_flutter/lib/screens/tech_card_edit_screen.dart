@@ -1372,7 +1372,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                       labelText: loc.t('ttk_name'),
                       isDense: true,
                       filled: false,
-                      border: const OutlineInputBorder(),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                     ),
                   ),
@@ -1380,32 +1380,32 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                   effectiveCanEdit
                       ? DropdownButtonFormField<String>(
                           value: _selectedCategory,
-                          decoration: InputDecoration(labelText: loc.t('category'), isDense: true, border: const OutlineInputBorder()),
+                          decoration: InputDecoration(labelText: loc.t('category'), isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
                           items: _categoryOptions.map((c) => DropdownMenuItem(value: c, child: Text(_categoryLabel(c, loc.currentLanguageCode)))).toList(),
                           onChanged: (v) => setState(() => _selectedCategory = v ?? 'misc'),
                         )
                       : InputDecorator(
-                          decoration: InputDecoration(labelText: loc.t('category'), isDense: true, border: const OutlineInputBorder()),
-                          child: Text(_categoryLabel(_selectedCategory, loc.currentLanguageCode)),
+                          decoration: InputDecoration(labelText: loc.t('category'), isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
+                          child: Text(_categoryLabel(_selectedCategory, loc.currentLanguageCode), overflow: TextOverflow.ellipsis),
                         ),
                   const SizedBox(height: 12),
                   effectiveCanEdit
                       ? DropdownButtonFormField<String>(
                           value: _selectedSection,
-                          decoration: InputDecoration(labelText: 'Цех', isDense: true, border: const OutlineInputBorder()),
+                          decoration: InputDecoration(labelText: 'Цех', isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
                           items: _getAvailableSections(context.read<AccountManagerSupabase>().hasProSubscription).entries.map((entry) =>
                             DropdownMenuItem(value: entry.key, child: Text(entry.value))).toList(),
                           onChanged: (v) => setState(() => _selectedSection = v),
                         )
                       : _selectedSection != null ? InputDecorator(
-                          decoration: InputDecoration(labelText: 'Цех', isDense: true, border: const OutlineInputBorder()),
-                          child: Text(_sectionOptions[_selectedSection!] ?? _selectedSection!),
+                          decoration: InputDecoration(labelText: 'Цех', isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
+                          child: Text(_sectionOptions[_selectedSection!] ?? _selectedSection!, overflow: TextOverflow.ellipsis),
                         ) : const SizedBox.shrink(),
                   const SizedBox(height: 12),
                   effectiveCanEdit
                       ? DropdownButtonFormField<bool>(
                           value: _isSemiFinished,
-                          decoration: InputDecoration(labelText: loc.t('tt_type_hint'), isDense: true, border: const OutlineInputBorder()),
+                          decoration: InputDecoration(labelText: loc.t('tt_type_hint'), isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
                           items: [
                             DropdownMenuItem(value: true, child: Row(children: [const Icon(Icons.inventory_2, size: 20), const SizedBox(width: 8), Text(loc.t('tt_type_pf'))])),
                             DropdownMenuItem(value: false, child: Row(children: [const Icon(Icons.restaurant, size: 20), const SizedBox(width: 8), Text(loc.t('tt_type_dish'))])),
@@ -1416,13 +1416,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                           decoration: InputDecoration(
                             labelText: loc.t('tt_type_hint'),
                             isDense: true,
-                            border: const OutlineInputBorder(),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                           ),
                           child: Row(
                             children: [
                               Icon(_isSemiFinished ? Icons.inventory_2 : Icons.restaurant, size: 20, color: Theme.of(context).colorScheme.onSurface),
                               const SizedBox(width: 8),
-                              Text(_isSemiFinished ? loc.t('tt_type_pf') : loc.t('tt_type_dish')),
+                              Text(_isSemiFinished ? loc.t('tt_type_pf') : loc.t('tt_type_dish'), overflow: TextOverflow.ellipsis, maxLines: 1),
                             ],
                           ),
                         ),
@@ -1443,7 +1443,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                               labelText: loc.t('ttk_name'),
                               isDense: true,
                               filled: false,
-                              border: const OutlineInputBorder(),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                             ),
                           ),
@@ -1455,13 +1455,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                           child: effectiveCanEdit
                               ? DropdownButtonFormField<String>(
                                   value: _selectedCategory,
-                                  decoration: InputDecoration(labelText: loc.t('category'), isDense: true, border: const OutlineInputBorder(), contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                                  decoration: InputDecoration(labelText: loc.t('category'), isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)), contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
                                   items: _categoryOptions.map((c) => DropdownMenuItem(value: c, child: Text(_categoryLabel(c, loc.currentLanguageCode)))).toList(),
                                   onChanged: (v) => setState(() => _selectedCategory = v ?? 'misc'),
                                 )
                               : InputDecorator(
-                                  decoration: InputDecoration(labelText: loc.t('category'), isDense: true, border: const OutlineInputBorder()),
-                                  child: Text(_categoryLabel(_selectedCategory, loc.currentLanguageCode)),
+                                  decoration: InputDecoration(labelText: loc.t('category'), isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
+                                  child: Text(_categoryLabel(_selectedCategory, loc.currentLanguageCode), overflow: TextOverflow.ellipsis),
                                 ),
                         ),
                         const SizedBox(width: 8),
@@ -1471,14 +1471,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                           child: effectiveCanEdit
                               ? DropdownButtonFormField<String>(
                                   value: _selectedSection,
-                                  decoration: InputDecoration(labelText: 'Цех', isDense: true, border: const OutlineInputBorder(), contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                                  decoration: InputDecoration(labelText: 'Цех', isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)), contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
                                   items: _getAvailableSections(context.read<AccountManagerSupabase>().hasProSubscription).entries.map((entry) =>
                                     DropdownMenuItem(value: entry.key, child: Text(entry.value))).toList(),
                                   onChanged: (v) => setState(() => _selectedSection = v),
                                 )
                               : _selectedSection != null ? InputDecorator(
-                                  decoration: InputDecoration(labelText: 'Цех', isDense: true, border: const OutlineInputBorder()),
-                                  child: Text(_sectionOptions[_selectedSection!] ?? _selectedSection!),
+                                  decoration: InputDecoration(labelText: 'Цех', isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
+                                  child: Text(_sectionOptions[_selectedSection!] ?? _selectedSection!, overflow: TextOverflow.ellipsis),
                                 ) : const SizedBox.shrink(),
                         ),
                         const SizedBox(width: 8),
@@ -1497,10 +1497,20 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                 minimumSize: const Size(0, 44),
                                 fixedSize: const Size.fromHeight(44),
+                              ).copyWith(
+                                shape: WidgetStateProperty.all(const StadiumBorder()),
                               ),
                               segments: [
-                                ButtonSegment(value: true, label: Text(loc.t('tt_type_pf')), icon: const Icon(Icons.inventory_2, size: 16)),
-                                ButtonSegment(value: false, label: Text(loc.t('tt_type_dish')), icon: const Icon(Icons.restaurant, size: 16)),
+                                ButtonSegment(
+                                  value: true,
+                                  label: Text(loc.t('tt_type_pf'), overflow: TextOverflow.ellipsis, maxLines: 1, softWrap: false),
+                                  icon: const Icon(Icons.inventory_2, size: 16),
+                                ),
+                                ButtonSegment(
+                                  value: false,
+                                  label: Text(loc.t('tt_type_dish'), overflow: TextOverflow.ellipsis, maxLines: 1, softWrap: false),
+                                  icon: const Icon(Icons.restaurant, size: 16),
+                                ),
                               ],
                               selected: {_isSemiFinished},
                               onSelectionChanged: (v) => setState(() => _isSemiFinished = v.first),
@@ -1511,7 +1521,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                             decoration: InputDecoration(
                               labelText: loc.t('tt_type_hint'),
                               isDense: true,
-                              border: const OutlineInputBorder(),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                             ),
                             child: Row(
@@ -1519,7 +1529,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                               children: [
                                 Icon(_isSemiFinished ? Icons.inventory_2 : Icons.restaurant, size: 20, color: Theme.of(context).colorScheme.onSurface),
                                 const SizedBox(width: 8),
-                                Text(_isSemiFinished ? loc.t('tt_type_pf') : loc.t('tt_type_dish')),
+                                Text(_isSemiFinished ? loc.t('tt_type_pf') : loc.t('tt_type_dish'), overflow: TextOverflow.ellipsis, maxLines: 1),
                               ],
                             ),
                           ),
