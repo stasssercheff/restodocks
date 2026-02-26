@@ -57,8 +57,12 @@ class OrderListExportService {
 
   static Future<pw.ThemeData> _getPdfTheme() async {
     if (_pdfTheme != null) return _pdfTheme!;
-    final fontData = await rootBundle.load('assets/fonts/Roboto-Regular.ttf');
-    _pdfTheme = pw.ThemeData.withFont(base: pw.Font.ttf(fontData));
+    final baseFont = await rootBundle.load('assets/fonts/Roboto-Regular.ttf');
+    final boldFont = await rootBundle.load('assets/fonts/Roboto-Bold.ttf');
+    _pdfTheme = pw.ThemeData.withFont(
+      base: pw.Font.ttf(baseFont),
+      bold: pw.Font.ttf(boldFont),
+    );
     return _pdfTheme!;
   }
 
