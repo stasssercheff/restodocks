@@ -1482,42 +1482,43 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                                 ) : const SizedBox.shrink(),
                         ),
                         const SizedBox(width: 8),
-                        SizedBox(
-                          width: 140,
-                          height: 56,
-                          child: Align(
-                            alignment: Alignment.center,
-                            child: effectiveCanEdit
-                        ? Tooltip(
-                            message: loc.t('tt_type_hint'),
-                            child: SegmentedButton<bool>(
-                              style: SegmentedButton.styleFrom(
-                                visualDensity: VisualDensity.compact,
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                minimumSize: const Size(0, 44),
-                                fixedSize: const Size.fromHeight(44),
-                              ).copyWith(
-                                shape: WidgetStateProperty.all(const StadiumBorder()),
-                              ),
-                              segments: [
-                                ButtonSegment(
-                                  value: true,
-                                  label: Text(loc.t('tt_type_pf'), overflow: TextOverflow.ellipsis, maxLines: 1, softWrap: false),
-                                  icon: const Icon(Icons.inventory_2, size: 16),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(minWidth: 160, maxWidth: 220),
+                          child: SizedBox(
+                            height: 56,
+                            child: Align(
+                              alignment: Alignment.center,
+                              child: effectiveCanEdit
+                          ? Tooltip(
+                              message: loc.t('tt_type_hint'),
+                              child: SegmentedButton<bool>(
+                                style: SegmentedButton.styleFrom(
+                                  visualDensity: VisualDensity.compact,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  minimumSize: const Size(80, 44),
+                                ).copyWith(
+                                  shape: WidgetStateProperty.all(const StadiumBorder()),
                                 ),
-                                ButtonSegment(
-                                  value: false,
-                                  label: Text(loc.t('tt_type_dish'), overflow: TextOverflow.ellipsis, maxLines: 1, softWrap: false),
-                                  icon: const Icon(Icons.restaurant, size: 16),
-                                ),
-                              ],
+                                expandedInsets: const EdgeInsets.symmetric(horizontal: 8),
+                                segments: [
+                                  ButtonSegment(
+                                    value: true,
+                                    label: Text(loc.t('tt_type_pf'), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                    icon: const Icon(Icons.inventory_2, size: 16),
+                                  ),
+                                  ButtonSegment(
+                                    value: false,
+                                    label: Text(loc.t('tt_type_dish'), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                    icon: const Icon(Icons.restaurant, size: 16),
+                                  ),
+                                ],
                               selected: {_isSemiFinished},
                               onSelectionChanged: (v) => setState(() => _isSemiFinished = v.first),
                               showSelectedIcon: false,
-                            ),
-                          )
-                        : InputDecorator(
+                              ),
+                            )
+                          : InputDecorator(
                             decoration: InputDecoration(
                               labelText: loc.t('tt_type_hint'),
                               isDense: true,
@@ -1535,6 +1536,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                           ),
                         ),
                       ),
+                        ),
                       ],
                     ),
                   ),
