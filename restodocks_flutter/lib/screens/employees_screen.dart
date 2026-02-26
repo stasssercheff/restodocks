@@ -337,12 +337,12 @@ const _departmentKeys = ['kitchen', 'bar', 'dining_room', 'management'];
 const _departmentLabels = {'kitchen': 'Кухня', 'bar': 'Бар', 'dining_room': 'Зал', 'management': 'Управление'};
 const _roleOptions = [
   'owner', 'executive_chef', 'sous_chef', 'cook', 'bartender', 'waiter',
-  'bar_manager', 'general_manager', 'brigadier', 'senior_cook', 'pizzaiolo', 'pastry_chef',
+  'bar_manager', 'floor_manager', 'general_manager', 'brigadier', 'senior_cook', 'pizzaiolo', 'pastry_chef',
 ];
 const _roleLabels = {
   'owner': 'Владелец', 'executive_chef': 'Шеф-повар', 'sous_chef': 'Су-шеф', 'cook': 'Повар',
   'bartender': 'Бармен', 'waiter': 'Официант', 'bar_manager': 'Менеджер бара',
-  'general_manager': 'Управляющий', 'brigadier': 'Бригадир',
+  'floor_manager': 'Менеджер зала', 'general_manager': 'Управляющий', 'brigadier': 'Бригадир',
   'senior_cook': 'Старший повар', 'pizzaiolo': 'Пиццайоло', 'pastry_chef': 'Кондитер',
 };
 
@@ -602,6 +602,21 @@ class _EmployeeAddSheetState extends State<_EmployeeAddSheet> {
   bool _saving = false;
   String? _error;
 
+  List<String> _roleOptionsForAdd() {
+    switch (_department) {
+      case 'management':
+        return RolesConfig.managementRoles().map((r) => r.roleCode).toList();
+      case 'bar':
+        return RolesConfig.barRoles().map((r) => r.roleCode).toList();
+      case 'dining_room':
+        return RolesConfig.hallRoles().map((r) => r.roleCode).toList();
+      case 'kitchen':
+        return RolesConfig.kitchenRolesForSection(_section ?? 'hot_kitchen').map((r) => r.roleCode).toList();
+      default:
+        return _roleOptions;
+    }
+  }
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -740,6 +755,13 @@ class _EmployeeAddSheetState extends State<_EmployeeAddSheet> {
                         onChanged: (v) => setState(() {
                           _department = v ?? _department;
                           if (_department != 'kitchen') _section = null; else _section = 'hot_kitchen';
+                          if (_department == 'management') {
+                            final mgmt = RolesConfig.managementRoles();
+                            if (mgmt.isNotEmpty && !_roles.any((r) => mgmt.any((sr) => sr.roleCode == r))) {
+                              _roles.clear();
+                              _roles.add(mgmt.first.roleCode);
+                            }
+                          }
                         }),
                       ),
                       if (_department == 'kitchen') ...[
@@ -751,7 +773,14 @@ class _EmployeeAddSheetState extends State<_EmployeeAddSheet> {
                             const DropdownMenuItem(value: null, child: Text('—')),
                             ...RolesConfig.kitchenSections().map((s) => DropdownMenuItem(value: s, child: Text(s))),
                           ],
-                          onChanged: (v) => setState(() => _section = v),
+                          onChanged: (v) => setState(() {
+                            _section = v;
+                            final opts = RolesConfig.kitchenRolesForSection(v ?? 'hot_kitchen');
+                            if (opts.isNotEmpty && !_roles.any((r) => opts.any((sr) => sr.roleCode == r))) {
+                              _roles.clear();
+                              _roles.add(opts.first.roleCode);
+                            }
+                          }),
                         ),
                       ],
                       const SizedBox(height: 12),
@@ -760,10 +789,10 @@ class _EmployeeAddSheetState extends State<_EmployeeAddSheet> {
                       Wrap(
                         spacing: 6,
                         runSpacing: 6,
-                        children: _roleOptions.map((code) {
+                        children: _roleOptionsForAdd().map((code) {
                           final selected = _roles.contains(code);
                           return FilterChip(
-                            label: Text(_roleLabels[code] ?? code),
+                            label: Text(_roleLabels[code] ?? loc.t(code) ?? code),
                             selected: selected,
                             onSelected: (v) => setState(() {
                               if (v) _roles.add(code); else _roles.remove(code);
