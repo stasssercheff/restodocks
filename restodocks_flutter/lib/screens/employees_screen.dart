@@ -226,16 +226,12 @@ class _EmployeeCard extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
-  static const _roleLabels = {
-    'owner': 'Владелец', 'executive_chef': 'Шеф-повар', 'sous_chef': 'Су-шеф', 'cook': 'Повар',
-    'bartender': 'Бармен', 'waiter': 'Официант', 'bar_manager': 'Менеджер бара',
-    'general_manager': 'Управляющий', 'brigadier': 'Бригадир',
-    'senior_cook': 'Старший повар', 'pizzaiolo': 'Пиццайоло', 'pastry_chef': 'Кондитер',
-    'floor_manager': 'Администратор зала', 'senior_waiter': 'Старший официант', 'host': 'Хостес',
-  };
-  static String positionDisplay(Employee e) {
+  static String positionDisplay(Employee e, LocalizationService loc) {
     final pos = e.positionRole;
-    return pos != null ? (_roleLabels[pos] ?? pos) : '—';
+    if (pos == null) return '—';
+    final key = 'role_$pos';
+    final t = loc.t(key);
+    return (t != key && t.isNotEmpty) ? t : pos;
   }
 
   static Widget _labelChip(ThemeData theme, String label, String value) {
@@ -290,7 +286,7 @@ class _EmployeeCard extends StatelessWidget {
                                 _labelChip(theme, loc.t('department') ?? 'Подразделение', employee.departmentDisplayName),
                                 if (employee.department == 'kitchen' && employee.section != null && employee.section!.isNotEmpty)
                                   _labelChip(theme, loc.t('section') ?? 'Цех', loc.t('section_${employee.section}') ?? employee.sectionDisplayName ?? employee.section!),
-                                _labelChip(theme, loc.t('position') ?? 'Должность', positionDisplay(employee)),
+                                _labelChip(theme, loc.t('position') ?? 'Должность', positionDisplay(employee, loc)),
                               ],
                             ),
                           ],
@@ -334,12 +330,11 @@ const _roleOptions = [
   'owner', 'executive_chef', 'sous_chef', 'cook', 'bartender', 'waiter',
   'bar_manager', 'floor_manager', 'general_manager', 'brigadier', 'senior_cook', 'pizzaiolo', 'pastry_chef',
 ];
-const _roleLabels = {
-  'owner': 'Владелец', 'executive_chef': 'Шеф-повар', 'sous_chef': 'Су-шеф', 'cook': 'Повар',
-  'bartender': 'Бармен', 'waiter': 'Официант', 'bar_manager': 'Менеджер бара',
-  'floor_manager': 'Менеджер зала', 'general_manager': 'Управляющий', 'brigadier': 'Бригадир',
-  'senior_cook': 'Старший повар', 'pizzaiolo': 'Пиццайоло', 'pastry_chef': 'Кондитер',
-};
+String _roleLabel(String code, LocalizationService loc) {
+  final key = 'role_$code';
+  final t = loc.t(key);
+  return (t != key && t.isNotEmpty) ? t : code;
+}
 
 class _EmployeeEditSheet extends StatefulWidget {
   const _EmployeeEditSheet({required this.employee, required this.onSaved, required this.onCancel});
@@ -482,7 +477,7 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
                           decoration: InputDecoration(labelText: loc.t('section') ?? 'Цех', border: const OutlineInputBorder(), filled: true),
                           items: [
                             const DropdownMenuItem(value: null, child: Text('—')),
-                            ...RolesConfig.kitchenSections().map((s) => DropdownMenuItem(value: s, child: Text(s))),
+                            ...RolesConfig.kitchenSections().map((s) => DropdownMenuItem(value: s, child: Text(loc.t('section_$s') != 'section_$s' ? loc.t('section_$s') : s))),
                           ],
                           onChanged: (v) => setState(() => _section = v),
                         ),
@@ -496,7 +491,7 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
                         children: _roleOptions.map((code) {
                           final selected = _roles.contains(code);
                           return FilterChip(
-                            label: Text(_roleLabels[code] ?? code),
+                            label: Text(_roleLabel(code, loc)),
                             selected: selected,
                             onSelected: (v) => setState(() {
                               if (v) _roles.add(code); else _roles.remove(code);

@@ -119,18 +119,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     return _positionDisplayName(pos, loc);
   }
 
+  /// Локализованное название должности. Использует ключ role_XXX из переводов.
   String _positionDisplayName(String code, LocalizationService loc) {
-    switch (code) {
-      case 'executive_chef': return loc.t('executive_chef');
-      case 'sous_chef': return loc.t('sous_chef');
-      case 'bartender': return loc.t('bartender');
-      case 'waiter': return loc.t('waiter');
-      case 'bar_manager': return loc.t('bar_manager');
-      case 'floor_manager': return loc.t('floor_manager');
-      case 'general_manager': return loc.t('general_manager');
-      case 'manager': return loc.t('manager');
-      default: return code;
-    }
+    final key = 'role_$code';
+    final t = loc.t(key);
+    return (t != key && t.isNotEmpty) ? t : code;
   }
 
   String _getSectionIdForEmployee(Employee employee, List<ScheduleSection> sections) {
@@ -183,7 +176,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           if (_model.sections.isEmpty) {
             _model = _model.copyWith(sections: ScheduleModel.defaultSections);
           }
-          final needsManagement = _employees.any((e) =>
+          // В графике только сотрудники с должностью. Собственник без должности не показывается.
+          final scheduleableEmployees = _employees.where((e) => e.positionRole != null).toList();
+          final needsManagement = scheduleableEmployees.any((e) =>
               e.hasRole('owner') || e.hasRole('executive_chef') || e.hasRole('sous_chef') || e.department == 'management');
           if (needsManagement && !_model.sections.any((s) => s.id == 'management')) {
             _model = _model.copyWith(sections: [
@@ -192,9 +187,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             ]);
             saveSchedule(est.id, _model);
           }
-          if (_model.slots.isEmpty && _model.sections.isNotEmpty && _employees.isNotEmpty) {
-            // Создаем слоты только на основе реальных зарегистрированных сотрудников (включая собственника)
-            final slots = _employees.map((e) => ScheduleSlot(
+          if (_model.slots.isEmpty && _model.sections.isNotEmpty && scheduleableEmployees.isNotEmpty) {
+            // Создаем слоты только для сотрудников с должностью (собственник без должности не в графике)
+            final slots = scheduleableEmployees.map((e) => ScheduleSlot(
                   id: const Uuid().v4(),
                   name: e.fullName.trim().isEmpty ? 'Сотрудник' : e.fullName.trim(),
                   sectionId: _getSectionIdForEmployee(e, _model.sections),
@@ -202,16 +197,16 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                 )).toList();
             _model = _model.copyWith(slots: slots);
             saveSchedule(est.id, _model);
-          } else if (_model.sections.isNotEmpty && _employees.isNotEmpty) {
-            // Синхронизируем слоты с сотрудниками: добавляем новых, удаляем уволенных, снимаем дубликаты
-            final currentEmployeeIds = _employees.map((e) => e.id).toSet();
+          } else if (_model.sections.isNotEmpty && (_model.slots.isNotEmpty || scheduleableEmployees.isNotEmpty)) {
+            // Синхронизируем слоты: удаляем сотрудников без должности, добавляем новых с должностью
+            final currentEmployeeIds = scheduleableEmployees.map((e) => e.id).toSet();
 
             // Связываем слоты без employeeId с сотрудниками по имени (точное совпадение)
             final slotsWithEmployeeId = _model.slots.map((slot) {
               if (slot.employeeId != null) return slot;
               final slotName = slot.name.trim().toLowerCase();
               if (slotName.isEmpty) return slot;
-              for (final e in _employees) {
+              for (final e in scheduleableEmployees) {
                 if (e.fullName.trim().toLowerCase() == slotName) {
                   return slot.copyWith(employeeId: e.id);
                 }
@@ -234,8 +229,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               return true;
             }).toList();
 
-            // Добавляем новых сотрудников (без слотов)
-            final toAdd = _employees
+            // Добавляем новых сотрудников с должностью (без слотов)
+            final toAdd = scheduleableEmployees
                 .where((e) => !existingEmployeeIds.contains(e.id))
                 .map((e) => ScheduleSlot(
                       id: const Uuid().v4(),
@@ -250,7 +245,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             // Обновляем секции для существующих слотов, если изменился отдел сотрудника
             final finalSlots = updatedSlots.map((slot) {
               if (slot.employeeId != null) {
-                final employee = _employees.where((e) => e.id == slot.employeeId).firstOrNull;
+                final employee = scheduleableEmployees.where((e) => e.id == slot.employeeId).firstOrNull;
                 if (employee != null) {
                   final correctSectionId = _getSectionIdForEmployee(employee, _model.sections);
                   if (slot.sectionId != correctSectionId) {

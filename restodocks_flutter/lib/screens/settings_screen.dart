@@ -76,17 +76,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   String _getPositionDisplayName(String? code, LocalizationService loc) {
     if (code == null || code.isEmpty) return loc.t('no_position');
-    switch (code) {
-      case 'executive_chef': return loc.t('executive_chef');
-      case 'sous_chef': return loc.t('sous_chef');
-      case 'bartender': return loc.t('bartender');
-      case 'waiter': return loc.t('waiter');
-      case 'bar_manager': return loc.t('bar_manager');
-      case 'floor_manager': return loc.t('floor_manager');
-      case 'general_manager': return loc.t('general_manager');
-      case 'manager': return loc.t('manager');
-      default: return code;
-    }
+    final key = 'role_$code';
+    final t = loc.t(key);
+    return (t != key && t.isNotEmpty) ? t : code;
   }
 
   void _showProRequiredDialog(BuildContext context, LocalizationService loc) {
