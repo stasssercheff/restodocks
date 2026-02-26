@@ -2,6 +2,25 @@ import 'dart:html' as html;
 
 const String _sessionStorageKey = 'restodocks_last_path';
 
+bool _beforeUnloadRegistered = false;
+
+void _registerBeforeUnload() {
+  if (_beforeUnloadRegistered) return;
+  _beforeUnloadRegistered = true;
+  try {
+    html.window.addEventListener('beforeunload', (e) {
+      final p = (html.window.location.pathname ?? '').trim();
+      if (p.isNotEmpty && p != '/' && p != '/splash') {
+        var path = p;
+        if (path.endsWith('/') && path.length > 1) path = path.substring(0, path.length - 1);
+        final search = html.window.location.search ?? '';
+        if (search.isNotEmpty) path = '$path$search';
+        html.window.sessionStorage[_sessionStorageKey] = path;
+      }
+    });
+  } catch (_) {}
+}
+
 /// Сохраняет путь в sessionStorage для fallback при F5 (pathname иногда приходит как /).
 void savePathForRefresh(String path) {
   try {
@@ -15,6 +34,15 @@ void savePathForRefresh(String path) {
 String? _pathFromSessionStorage() {
   try {
     final s = html.window.sessionStorage[_sessionStorageKey];
+    if (s != null && s.isNotEmpty && s != '/' && s != '/splash') return s;
+  } catch (_) {}
+  return null;
+}
+
+/// Читает путь из data-initial-path (inline script в head).
+String? _pathFromDataset() {
+  try {
+    final s = html.document.documentElement?.dataset['initialPath'];
     if (s != null && s.isNotEmpty && s != '/' && s != '/splash') return s;
   } catch (_) {}
   return null;
@@ -56,14 +84,15 @@ String _pathFromWindow() {
 /// Путь на момент первой загрузки (до любых переходов). Не меняется.
 String? _cachedInitialPath;
 
-/// Web: при F5 сохраняем текущую страницу из URL (path или hash). Кэшируем при первом вызове.
-/// Fallback: sessionStorage, если pathname пришёл как / (SW/race на загрузке).
+/// Web: при F5 сохраняем текущую страницу из URL. Кэшируем при первом вызове.
+/// Приоритет: pathname → dataset (head script) → sessionStorage.
 String getInitialLocation() {
+  _registerBeforeUnload();
   if (_cachedInitialPath == null) {
     final fromWindow = _pathFromWindow();
     _cachedInitialPath = (fromWindow.isNotEmpty && fromWindow != '/')
         ? fromWindow
-        : _pathFromSessionStorage() ?? '/';
+        : _pathFromDataset() ?? _pathFromSessionStorage() ?? '/';
   }
   return _cachedInitialPath!;
 }
