@@ -22,21 +22,21 @@ class ManagementHomeContent extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        _Tile(icon: Icons.calendar_month, title: loc.t('schedule'), onTap: () => context.push('/schedule')),
-        _Tile(icon: Icons.inbox, title: loc.t('inbox'), onTap: () => context.push('/notifications')),
-        _Tile(icon: Icons.people, title: loc.t('employees'), onTap: () => context.push('/employees')),
+        _Tile(icon: Icons.calendar_month, title: loc.t('schedule'), onTap: () => context.go('/schedule')),
+        _Tile(icon: Icons.inbox, title: loc.t('inbox'), onTap: () => context.go('/notifications')),
+        _Tile(icon: Icons.people, title: loc.t('employees'), onTap: () => context.go('/employees')),
         if (isChef || roles.contains('sous_chef'))
-          _Tile(icon: Icons.how_to_reg, title: loc.t('shift_confirmation'), onTap: () => context.push('/shift-confirmation')),
+          _Tile(icon: Icons.how_to_reg, title: loc.t('shift_confirmation'), onTap: () => context.go('/shift-confirmation')),
         // Чеклисты: кухня или шеф/су-шеф (у шефа часто отдел «Управление» — иначе плитки нет)
         if (employee.department == 'kitchen' || isChef || roles.contains('sous_chef'))
-          _Tile(icon: Icons.checklist, title: loc.t('checklists'), onTap: () => context.push('/checklists')),
-        _Tile(icon: Icons.description, title: isBarManager ? loc.t('ttk_bar') : loc.t('ttk_kitchen'), onTap: () => context.push('/tech-cards')),
+          _Tile(icon: Icons.checklist, title: loc.t('checklists'), onTap: () => context.go('/checklists')),
+        _Tile(icon: Icons.description, title: isBarManager ? loc.t('ttk_bar') : loc.t('ttk_kitchen'), onTap: () => context.go('/tech-cards')),
         if (isChef)
-          _Tile(icon: Icons.assignment, title: loc.t('nomenclature'), onTap: () => context.push('/nomenclature')),
-        _Tile(icon: Icons.shopping_cart, title: loc.t('product_order'), onTap: () => context.push('/product-order')),
-        _Tile(icon: Icons.assignment, title: loc.t('inventory_blank'), onTap: () => context.push('/inventory')),
+          _Tile(icon: Icons.assignment, title: loc.t('nomenclature'), onTap: () => context.go('/nomenclature')),
+        _Tile(icon: Icons.shopping_cart, title: loc.t('product_order'), onTap: () => context.go('/product-order')),
+        _Tile(icon: Icons.assignment, title: loc.t('inventory_blank'), onTap: () => context.go('/inventory')),
         if (isGeneral) ...[
-          _Tile(icon: Icons.savings, title: '${loc.t('expenses')} (${loc.t('pro')})', onTap: () => context.push('/expenses')),
+          _Tile(icon: Icons.savings, title: '${loc.t('expenses')} (${loc.t('pro')})', onTap: () => context.go('/expenses')),
         ],
       ],
     );

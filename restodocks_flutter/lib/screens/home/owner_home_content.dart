@@ -18,24 +18,24 @@ class OwnerHomeContent extends StatelessWidget {
       children: [
         // Управление — сверху, с входящими
         _SectionTitle(title: loc.t('management')),
-        _Tile(icon: Icons.inbox, title: loc.t('inbox'), onTap: () => context.push('/inbox')),
-        _Tile(icon: Icons.people, title: loc.t('employees'), onTap: () => context.push('/employees')),
+        _Tile(icon: Icons.inbox, title: loc.t('inbox'), onTap: () => context.go('/inbox')),
+        _Tile(icon: Icons.people, title: loc.t('employees'), onTap: () => context.go('/employees')),
 
         const SizedBox(height: 16),
         _SectionTitle(title: loc.t('kitchen')),
-        _Tile(icon: Icons.schedule, title: loc.t('schedule'), onTap: () => context.push('/schedule/kitchen')),
-        _Tile(icon: Icons.restaurant_menu, title: loc.t('menu'), onTap: () => context.push('/menu/kitchen')),
-        _Tile(icon: Icons.description, title: loc.t('ttk_kitchen'), onTap: () => context.push('/tech-cards/kitchen')),
-        _Tile(icon: Icons.assignment, title: loc.t('nomenclature'), onTap: () => context.push('/nomenclature/kitchen')),
+        _Tile(icon: Icons.schedule, title: loc.t('schedule'), onTap: () => context.go('/schedule/kitchen')),
+        _Tile(icon: Icons.restaurant_menu, title: loc.t('menu'), onTap: () => context.go('/menu/kitchen')),
+        _Tile(icon: Icons.description, title: loc.t('ttk_kitchen'), onTap: () => context.go('/tech-cards/kitchen')),
+        _Tile(icon: Icons.assignment, title: loc.t('nomenclature'), onTap: () => context.go('/nomenclature/kitchen')),
 
         const SizedBox(height: 16),
         _SectionTitle(title: loc.t('dining_room')),
-        _Tile(icon: Icons.schedule, title: loc.t('schedule'), onTap: () => context.push('/schedule/dining_room')),
-        _Tile(icon: Icons.restaurant_menu, title: loc.t('menu'), onTap: () => context.push('/menu/dining_room')),
+        _Tile(icon: Icons.schedule, title: loc.t('schedule'), onTap: () => context.go('/schedule/dining_room')),
+        _Tile(icon: Icons.restaurant_menu, title: loc.t('menu'), onTap: () => context.go('/menu/dining_room')),
 
         const SizedBox(height: 16),
         _SectionTitle(title: '${loc.t('expenses')} (${loc.t('pro')})'),
-        _Tile(icon: Icons.payments, title: loc.t('salary_expenses'), subtitle: loc.t('salary_period_hint'), onTap: () => context.push('/expenses/salary')),
+        _Tile(icon: Icons.payments, title: loc.t('salary_expenses'), subtitle: loc.t('salary_period_hint'), onTap: () => context.go('/expenses/salary')),
         // Аренда, Закупка, Свой вариант — временно скрыты
       ],
     );

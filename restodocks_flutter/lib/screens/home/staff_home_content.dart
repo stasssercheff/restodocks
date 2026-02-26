@@ -21,22 +21,22 @@ class StaffHomeContent extends StatelessWidget {
         _Tile(
           icon: Icons.calendar_month,
           title: loc.t('schedule'),
-          onTap: () => context.push('/schedule'),
+          onTap: () => context.go('/schedule'),
         ),
-        _Tile(icon: Icons.shopping_cart, title: loc.t('product_order'), onTap: () => context.push('/product-order')),
+        _Tile(icon: Icons.shopping_cart, title: loc.t('product_order'), onTap: () => context.go('/product-order')),
         _Tile(
           icon: Icons.restaurant_menu,
           title: loc.t('menu'),
-          onTap: () => context.push('/menu/${employee.department}'),
+          onTap: () => context.go('/menu/${employee.department}'),
         ),
         _Tile(
           icon: Icons.description,
           title: employee.department == 'bar' ? loc.t('ttk_bar') : loc.t('ttk_kitchen'),
-          onTap: () => context.push('/tech-cards'),
+          onTap: () => context.go('/tech-cards'),
         ),
         if (employee.department == 'kitchen')
-          _Tile(icon: Icons.checklist, title: loc.t('checklists'), onTap: () => context.push('/checklists')),
-        _Tile(icon: Icons.assignment, title: loc.t('inventory_blank'), onTap: () => context.push('/inventory')),
+          _Tile(icon: Icons.checklist, title: loc.t('checklists'), onTap: () => context.go('/checklists')),
+        _Tile(icon: Icons.assignment, title: loc.t('inventory_blank'), onTap: () => context.go('/inventory')),
       ],
     );
   }
