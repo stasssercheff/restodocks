@@ -2513,7 +2513,22 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                   color: theme.colorScheme.surfaceContainerHighest,
                 ),
               ),
-              _cell(ing.productName),
+              ing.sourceTechCardId != null && ing.sourceTechCardId!.isNotEmpty && widget.onTapPfIngredient != null
+                  ? TableCell(
+                      child: InkWell(
+                        onTap: () => widget.onTapPfIngredient!(ing.sourceTechCardId!),
+                        child: Padding(
+                          padding: _TtkCookTable._cellPad,
+                          child: Text(
+                            ing.productName,
+                            style: const TextStyle(fontSize: 12),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 2,
+                          ),
+                        ),
+                      ),
+                    )
+                  : _cell(ing.productName),
               TableCell(
                 child: Padding(
                   padding: _TtkCookTable._cellPad,
@@ -2532,22 +2547,6 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                   ),
                 ),
               ),
-              ing.sourceTechCardId != null && ing.sourceTechCardId!.isNotEmpty && widget.onTapPfIngredient != null
-                  ? TableCell(
-                      child: InkWell(
-                        onTap: () => widget.onTapPfIngredient!(ing.sourceTechCardId!),
-                        child: Padding(
-                          padding: _TtkCookTable._cellPad,
-                          child: Text(
-                            ing.productName,
-                            style: const TextStyle(fontSize: 12),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 2,
-                          ),
-                        ),
-                      ),
-                    )
-                  : _cell(ing.productName),
               _cell(ing.cookingProcessName ?? widget.loc.t('dash')),
               _cell(ing.outputWeight.toStringAsFixed(0)),
               _cell(_portionsAmount(ing)),
@@ -2636,11 +2635,11 @@ class _TtkCookTableState extends State<_TtkCookTable> {
         ],
       ],
     ),
-        // Объединённая ячейка «Название» поверх всех строк продуктов
+        // Объединённая ячейка «Название» — по границам колонки 0
         if (_ingredients.isNotEmpty)
           Positioned(
-            left: 1,
-            top: 44 + 1,
+            left: 0,
+            top: 44,
             width: _TtkCookTable._colDish,
             height: _ingredients.length * 44,
             child: Container(

@@ -354,10 +354,10 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
               ),
                 ],
               ),
-                  // Объединённая ячейка «Название» поверх всех строк продуктов
+                  // Объединённая ячейка «Название» — позиция и размеры по границам столбца 1
                   Positioned(
-                    left: 50 + 1,
-                    top: 44 + 1,
+                    left: 50,  // граница между колонками 0 и 1
+                    top: 44,   // сразу под шапкой
                     width: 120,
                     height: indexedRows.length * 44,
                     child: Container(
