@@ -213,7 +213,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     // Название — placeholder (объединённая ячейка рисуется поверх в Stack)
                     Container(
                       height: 44,
-                      color: const Color(0xFFE0E0E0),
+                      color: Colors.white,
                     ),
 
                     // Продукт
@@ -361,8 +361,11 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     width: 120,
                     height: indexedRows.length * 44,
                     child: Container(
-                      decoration: const BoxDecoration(color: Color(0xFFE0E0E0)),
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        border: Border.all(color: Colors.black, width: 1),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
                       alignment: Alignment.topLeft,
                       child: widget.dishNameController != null
                           ? ValueListenableBuilder<TextEditingValue>(

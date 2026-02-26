@@ -2515,7 +2515,9 @@ class _TtkCookTableState extends State<_TtkCookTable> {
         TableRow(
           decoration: BoxDecoration(color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3)),
           children: [
-            _cell(widget.loc.t('ttk_name'), bold: true),
+            TableCell(
+              child: SizedBox(height: 44, child: Center(child: Text(widget.loc.t('ttk_name'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)))),
+            ),
             _cell(widget.loc.t('ttk_product'), bold: true),
             _cell(widget.loc.t('ttk_gross_gr'), bold: true),
             _cell(widget.loc.t('ttk_net_gr'), bold: true),
@@ -2532,13 +2534,13 @@ class _TtkCookTableState extends State<_TtkCookTable> {
         ..._ingredients.asMap().entries.map((e) {
           final i = e.key;
           final ing = e.value;
-          // Название — placeholder (объединённая ячейка рисуется поверх в Stack)
-          return TableRow(
+              // Название — placeholder (объединённая ячейка рисуется поверх в Stack)
+              return TableRow(
             children: [
               TableCell(
                 child: Container(
                   height: 44,
-                  color: theme.colorScheme.surfaceContainerHighest,
+                  color: Colors.white,
                 ),
               ),
               ing.sourceTechCardId != null && ing.sourceTechCardId!.isNotEmpty && widget.onTapPfIngredient != null
@@ -2672,7 +2674,8 @@ class _TtkCookTableState extends State<_TtkCookTable> {
             height: _ingredients.length * 44,
             child: Container(
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
+                color: Colors.white,
+                border: Border.all(color: Colors.black, width: 1),
               ),
               padding: _TtkCookTable._cellPad,
               alignment: Alignment.topLeft,
