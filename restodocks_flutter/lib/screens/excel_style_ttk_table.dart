@@ -359,7 +359,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     left: 50,  // граница между колонками 0 и 1
                     top: 44,   // сразу под шапкой
                     width: 120,
-                    height: indexedRows.length * 44 + 1,
+                    height: indexedRows.length * 44 + 2,
                     child: Container(
                       decoration: BoxDecoration(
                         color: Colors.white,

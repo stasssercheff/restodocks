@@ -1491,6 +1491,11 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                         ? Tooltip(
                             message: loc.t('tt_type_hint'),
                             child: SegmentedButton<bool>(
+                              style: SegmentedButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
                               segments: [
                                 ButtonSegment(value: true, label: Text(loc.t('tt_type_pf')), icon: const Icon(Icons.inventory_2, size: 16)),
                                 ButtonSegment(value: false, label: Text(loc.t('tt_type_dish')), icon: const Icon(Icons.restaurant, size: 16)),
