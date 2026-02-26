@@ -326,18 +326,28 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                 '${c.items.length} ${loc.t('items_count')}',
               ].join(' • ')),
               trailing: canEdit
-                  ? PopupMenuButton<String>(
-                      icon: const Icon(Icons.more_vert),
-                      onSelected: (v) {
-                        if (v == 'edit') {
-                          context.push('/checklists/${c.id}');
-                        } else {
-                          context.push('/checklists/${c.id}/fill');
-                        }
-                      },
-                      itemBuilder: (_) => [
-                        PopupMenuItem(value: 'edit', child: Text(loc.t('edit') ?? 'Редактировать')),
-                        PopupMenuItem(value: 'fill', child: Text(loc.t('fill_checklist') ?? 'Заполнить')),
+                  ? Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.task_alt),
+                          onPressed: () => context.push('/checklists/${c.id}/fill'),
+                          tooltip: loc.t('fill_checklist') ?? 'Заполнить',
+                        ),
+                        PopupMenuButton<String>(
+                          icon: const Icon(Icons.more_vert),
+                          onSelected: (v) {
+                            if (v == 'edit') {
+                              context.push('/checklists/${c.id}');
+                            } else {
+                              context.push('/checklists/${c.id}/fill');
+                            }
+                          },
+                          itemBuilder: (_) => [
+                            PopupMenuItem(value: 'edit', child: Text(loc.t('edit') ?? 'Редактировать')),
+                            PopupMenuItem(value: 'fill', child: Text(loc.t('fill_checklist') ?? 'Заполнить')),
+                          ],
+                        ),
                       ],
                     )
                   : const Icon(Icons.chevron_right),
