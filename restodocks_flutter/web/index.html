@@ -47,13 +47,18 @@
 <body>
   <div id="loading-screen"></div>
   <script>
-    // Сохраняем путь для F5 до загрузки Flutter (обход race при pathname)
+    // HashUrlStrategy: путь в # (site.com/#/schedule). Сохраняем для F5.
     (function(){
       try {
-        var p = (location.pathname || '').trim();
+        var p = '';
+        if (location.hash && location.hash.indexOf('#/') === 0) {
+          p = location.hash.substring(1).trim();
+        } else {
+          p = (location.pathname || '').trim();
+        }
         if (p && p !== '/' && p !== '/splash') {
           if (p.endsWith('/') && p.length > 1) p = p.slice(0, -1);
-          if (location.search) p += location.search;
+          if (location.search && p.indexOf('?') === -1) p += location.search;
           sessionStorage.setItem('restodocks_last_path', p);
         }
       } catch(e) {}
