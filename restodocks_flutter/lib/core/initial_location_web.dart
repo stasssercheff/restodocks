@@ -9,7 +9,13 @@ void _registerBeforeUnload() {
   _beforeUnloadRegistered = true;
   try {
     html.window.addEventListener('beforeunload', (e) {
-      final p = (html.window.location.pathname ?? '').trim();
+      String p = '';
+      final hash = html.window.location.hash ?? '';
+      if (hash.isNotEmpty && hash.startsWith('#/')) {
+        p = hash.substring(2).trim();
+      } else {
+        p = (html.window.location.pathname ?? '').trim();
+      }
       if (p.isNotEmpty && p != '/' && p != '/splash') {
         var path = p;
         if (path.endsWith('/') && path.length > 1) path = path.substring(0, path.length - 1);
@@ -48,17 +54,10 @@ String? _pathFromDataset() {
   return null;
 }
 
-/// Читает путь из адресной строки (pathname, href, hash). Нужно для F5.
+/// Читает путь из адресной строки. HashUrlStrategy: путь в # (site.com/#/schedule).
 String _pathFromWindow() {
   try {
-    String path = html.window.location.pathname ?? '';
-    path = path.trim();
-    if (path.endsWith('/') && path.length > 1) path = path.substring(0, path.length - 1);
-    final search = html.window.location.search ?? '';
-    if (path.isNotEmpty && path != '/') {
-      return search.isNotEmpty ? '$path$search' : path;
-    }
-    // Fallback: hash-based routing
+    // Сначала hash — при HashUrlStrategy путь всегда там
     final hash = html.window.location.hash ?? '';
     if (hash.isNotEmpty) {
       String h = hash.startsWith('#') ? hash.substring(1) : hash;
@@ -67,6 +66,14 @@ String _pathFromWindow() {
         final p = h.contains('?') ? h.substring(0, h.indexOf('?')) : h;
         if (p != '/' && p.isNotEmpty) return q.isNotEmpty ? '$p$q' : p;
       }
+    }
+    // pathname как fallback (первая загрузка на корень)
+    String path = html.window.location.pathname ?? '';
+    path = path.trim();
+    if (path.endsWith('/') && path.length > 1) path = path.substring(0, path.length - 1);
+    final search = html.window.location.search ?? '';
+    if (path.isNotEmpty && path != '/') {
+      return search.isNotEmpty ? '$path$search' : path;
     }
     final href = html.window.location.href ?? '';
     if (href.isNotEmpty) {

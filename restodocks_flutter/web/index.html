@@ -4,10 +4,15 @@
   <script>
     (function(){
       try {
-        var p = (location.pathname || '').trim();
+        var p = '';
+        if (location.hash && location.hash.indexOf('#/') === 0) {
+          p = location.hash.substring(1).trim();
+        } else {
+          p = (location.pathname || '').trim();
+        }
         if (p && p !== '/' && p !== '/splash') {
           if (p.endsWith('/') && p.length > 1) p = p.slice(0, -1);
-          if (location.search) p += location.search;
+          if (location.search && p.indexOf('?') === -1) p += location.search;
           sessionStorage.setItem('restodocks_last_path', p);
           document.documentElement.dataset.initialPath = p;
         }
@@ -51,9 +56,9 @@
     #loading-screen {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       background: #fff url('welcome_logo.png') center center no-repeat;
-      background-size: cover;
+      background-size: 120px;
       z-index: 9999;
-      transition: opacity 0.2s ease;
+      transition: opacity 0.15s ease;
     }
   </style>
 </head>
