@@ -57,6 +57,27 @@ String _getInitialLocation() {
   return '/';
 }
 
+/// Страница с анимацией: при push — вход справа, при pop — уход вправо (эффект возврата).
+CustomTransitionPage<void> _slideTransitionPage(GoRouterState state, Widget child) {
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 280),
+    reverseTransitionDuration: const Duration(milliseconds: 280),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      return SlideTransition(
+        position: animation.drive(
+          Tween<Offset>(
+            begin: const Offset(1.0, 0),
+            end: Offset.zero,
+          ).chain(CurveTween(curve: Curves.easeInOutCubic)),
+        ),
+        child: child,
+      );
+    },
+  );
+}
+
 /// Настройка маршрутизации приложения
 class AppRouter {
   static bool _webLocationCorrected = false;
@@ -109,329 +130,327 @@ class AppRouter {
       // Стартовый экран (проверка авторизации)
       GoRoute(
         path: '/splash',
-        builder: (context, state) => const SplashScreen(),
+        pageBuilder: (context, state) => _slideTransitionPage(state, const SplashScreen()),
       ),
 
       // Экран входа (redirect — URL для возврата после входа при F5)
       GoRoute(
         path: '/login',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final redirect = state.queryParameters['redirect'];
-          return LoginScreen(redirectAfterLogin: redirect);
+          return _slideTransitionPage(state, LoginScreen(redirectAfterLogin: redirect));
         },
       ),
 
       // Регистрация компании
       GoRoute(
         path: '/register-company',
-        builder: (context, state) => const CompanyRegistrationScreen(),
+        pageBuilder: (context, state) => _slideTransitionPage(state, const CompanyRegistrationScreen()),
       ),
       // Регистрация владельца (extra: Establishment)
       GoRoute(
         path: '/register-owner',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final establishment = state.extra as Establishment?;
           if (establishment == null) {
-            return const _RedirectToLogin();
+            return _slideTransitionPage(state, const _RedirectToLogin());
           }
-          return OwnerRegistrationScreen(establishment: establishment);
+          return _slideTransitionPage(state, OwnerRegistrationScreen(establishment: establishment));
         },
       ),
       // Регистрация сотрудника
       GoRoute(
         path: '/register',
-        builder: (context, state) => const RegisterScreen(),
+        pageBuilder: (context, state) => _slideTransitionPage(state, const RegisterScreen()),
       ),
       // Восстановление доступа
       GoRoute(
         path: '/forgot-password',
-        builder: (context, state) => const ForgotPasswordScreen(),
+        pageBuilder: (context, state) => _slideTransitionPage(state, const ForgotPasswordScreen()),
       ),
       GoRoute(
         path: '/reset-password',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final token = state.queryParameters['token'];
-          return ResetPasswordScreen(token: token);
+          return _slideTransitionPage(state, ResetPasswordScreen(token: token));
         },
       ),
       // Подтверждение email после регистрации (переход по ссылке вернёт в приложение с сессией)
       GoRoute(
         path: '/confirm-email',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final email = state.queryParameters['email'] ?? '';
-          return ConfirmEmailScreen(email: email);
+          return _slideTransitionPage(state, ConfirmEmailScreen(email: email));
         },
       ),
 
       // Главный экран (tab=0 — вкладка «Домой», для перехода из Профиля/Настроек)
       GoRoute(
         path: '/home',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final tabParam = state.queryParameters['tab'];
           final tab = (tabParam != null && int.tryParse(tabParam) != null)
               ? int.parse(tabParam).clamp(0, 2)
               : null;
-          return HomeScreen(initialTabIndex: tab);
+          return _slideTransitionPage(state, HomeScreen(initialTabIndex: tab));
         },
       ),
 
       // Профиль
       GoRoute(
         path: '/profile',
-        builder: (context, state) => const ProfileScreen(),
+        pageBuilder: (context, state) => _slideTransitionPage(state, const ProfileScreen()),
       ),
       // Настройки (без данных профиля)
       GoRoute(
         path: '/settings',
-        builder: (context, state) => const SettingsScreen(),
+        pageBuilder: (context, state) => _slideTransitionPage(state, const SettingsScreen()),
       ),
 
       GoRoute(
         path: '/schedule',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final personal = state.queryParameters['personal'] == '1';
-          return ScheduleScreen(personalOnly: personal);
+          return _slideTransitionPage(state, ScheduleScreen(personalOnly: personal));
         },
       ),
       GoRoute(
         path: '/schedule/:department',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final department = state.pathParameters['department'] ?? 'all';
           final personal = state.queryParameters['personal'] == '1';
-          return ScheduleScreen(department: department, personalOnly: personal);
+          return _slideTransitionPage(state, ScheduleScreen(department: department, personalOnly: personal));
         },
       ),
       GoRoute(
         path: '/inbox',
-        builder: (context, state) => const InboxScreen(),
+        pageBuilder: (context, state) => _slideTransitionPage(state, const InboxScreen()),
         routes: [
           GoRoute(
             path: 'inventory/:id',
-            builder: (context, state) {
+            pageBuilder: (context, state) {
               final id = state.pathParameters['id'] ?? '';
-              return InventoryInboxDetailScreen(documentId: id);
+              return _slideTransitionPage(state, InventoryInboxDetailScreen(documentId: id));
             },
           ),
           GoRoute(
             path: 'order/:id',
-            builder: (context, state) {
+            pageBuilder: (context, state) {
               final id = state.pathParameters['id'] ?? '';
-              return OrderInboxDetailScreen(documentId: id);
+              return _slideTransitionPage(state, OrderInboxDetailScreen(documentId: id));
             },
           ),
           GoRoute(
             path: 'checklist/:id',
-            builder: (context, state) {
+            pageBuilder: (context, state) {
               final id = state.pathParameters['id'] ?? '';
-              return ChecklistInboxDetailScreen(documentId: id);
+              return _slideTransitionPage(state, ChecklistInboxDetailScreen(documentId: id));
             },
           ),
         ],
       ),
       GoRoute(
         path: '/employees',
-        builder: (context, state) => const EmployeesScreen(),
+        pageBuilder: (context, state) => _slideTransitionPage(state, const EmployeesScreen()),
       ),
       GoRoute(
         path: '/shift-confirmation',
-        builder: (context, state) => const ShiftConfirmationScreen(),
+        pageBuilder: (context, state) => _slideTransitionPage(state, const ShiftConfirmationScreen()),
       ),
       GoRoute(
         path: '/inventory',
-        builder: (context, state) => const InventoryScreen(),
+        pageBuilder: (context, state) => _slideTransitionPage(state, const InventoryScreen()),
       ),
       GoRoute(
         path: '/inventory-pf',
-        builder: (context, state) => const InventoryScreen(),
+        pageBuilder: (context, state) => _slideTransitionPage(state, const InventoryScreen()),
       ),
       GoRoute(
         path: '/inventory-received',
-        builder: (context, state) => const InventoryReceivedScreen(),
+        pageBuilder: (context, state) => _slideTransitionPage(state, const InventoryReceivedScreen()),
       ),
       GoRoute(
         path: '/notifications',
-        builder: (context, state) => const InboxScreen(),
+        pageBuilder: (context, state) => _slideTransitionPage(state, const InboxScreen()),
       ),
       GoRoute(
         path: '/expenses',
-        builder: (context, state) => const ExpensesPlaceholderScreen(),
+        pageBuilder: (context, state) => _slideTransitionPage(state, const ExpensesPlaceholderScreen()),
       ),
       GoRoute(
         path: '/expenses/salary',
-        builder: (context, state) => const SalaryExpenseScreen(),
+        pageBuilder: (context, state) => _slideTransitionPage(state, const SalaryExpenseScreen()),
       ),
       GoRoute(
         path: '/department/:id',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final id = state.pathParameters['id'] ?? 'kitchen';
-          return DepartmentPlaceholderScreen(department: id);
+          return _slideTransitionPage(state, DepartmentPlaceholderScreen(department: id));
         },
       ),
 
       GoRoute(
         path: '/products',
-        builder: (context, state) => const ProductsScreen(),
+        pageBuilder: (context, state) => _slideTransitionPage(state, const ProductsScreen()),
       ),
       GoRoute(
         path: '/menu/:department',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final department = state.pathParameters['department'] ?? 'kitchen';
-          return MenuScreen(department: department);
+          return _slideTransitionPage(state, MenuScreen(department: department));
         },
       ),
       GoRoute(
         path: '/nomenclature',
-        builder: (context, state) {
-          return const NomenclatureScreen();
-        },
+        pageBuilder: (context, state) => _slideTransitionPage(state, const NomenclatureScreen()),
       ),
       GoRoute(
         path: '/nomenclature/:department',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final department = state.pathParameters['department'] ?? 'general';
-          return NomenclatureScreen(department: department);
+          return _slideTransitionPage(state, NomenclatureScreen(department: department));
         },
       ),
       GoRoute(
         path: '/products/upload',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final addToNom = state.queryParameters['addToNomenclature'];
           final defaultAddToNomenclature = addToNom != 'false';
           try {
-            return ProductUploadScreen(defaultAddToNomenclature: defaultAddToNomenclature);
+            return _slideTransitionPage(state, ProductUploadScreen(defaultAddToNomenclature: defaultAddToNomenclature));
           } catch (e) {
             print('=== Error building ProductUploadScreen: $e ===');
-            return Scaffold(
+            return _slideTransitionPage(state, Scaffold(
               appBar: AppBar(title: const Text('Ошибка')),
               body: Center(
                 child: Text('Ошибка загрузки экрана: $e'),
               ),
-            );
+            ));
           }
         },
       ),
       GoRoute(
         path: '/import-review',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final items = state.extra as List<ModerationItem>?;
           if (items == null || items.isEmpty) {
-            return const _RedirectToNomenclature();
+            return _slideTransitionPage(state, const _RedirectToNomenclature());
           }
-          return ImportReviewScreen(items: items);
+          return _slideTransitionPage(state, ImportReviewScreen(items: items));
         },
       ),
 
       GoRoute(
         path: '/product-order',
-        builder: (context, state) => const OrderListsScreen(),
+        pageBuilder: (context, state) => _slideTransitionPage(state, const OrderListsScreen()),
       ),
       GoRoute(
         path: '/product-order-received',
-        builder: (context, state) => const ProductOrderReceivedScreen(),
+        pageBuilder: (context, state) => _slideTransitionPage(state, const ProductOrderReceivedScreen()),
       ),
       GoRoute(
         path: '/product-order/new',
-        builder: (context, state) => const OrderListCreateScreen(),
+        pageBuilder: (context, state) => _slideTransitionPage(state, const OrderListCreateScreen()),
       ),
       GoRoute(
         path: '/product-order/new/products',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final draft = state.extra as OrderList?;
-          if (draft == null) return const _RedirectToProductOrder();
-          return OrderListProductsScreen(draft: draft);
+          if (draft == null) return _slideTransitionPage(state, const _RedirectToProductOrder());
+          return _slideTransitionPage(state, OrderListProductsScreen(draft: draft));
         },
       ),
       GoRoute(
         path: '/product-order/:id',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final id = state.pathParameters['id'] ?? '';
-          return OrderListDetailScreen(listId: id);
+          return _slideTransitionPage(state, OrderListDetailScreen(listId: id));
         },
       ),
 
       GoRoute(
         path: '/checklists',
-        builder: (context, state) => const ChecklistsScreen(),
+        pageBuilder: (context, state) => _slideTransitionPage(state, const ChecklistsScreen()),
       ),
       GoRoute(
         path: '/checklists/:id',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final id = state.pathParameters['id'] ?? '';
-          return ChecklistEditScreen(checklistId: id);
+          return _slideTransitionPage(state, ChecklistEditScreen(checklistId: id));
         },
       ),
       GoRoute(
         path: '/checklists/:id/fill',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final id = state.pathParameters['id'] ?? '';
-          return ChecklistFillScreen(checklistId: id);
+          return _slideTransitionPage(state, ChecklistFillScreen(checklistId: id));
         },
       ),
 
       GoRoute(
         path: '/tech-cards',
-        builder: (context, state) => const TechCardsListScreen(),
+        pageBuilder: (context, state) => _slideTransitionPage(state, const TechCardsListScreen()),
       ),
       // /tech-cards/new и /tech-cards/import-review должны быть ДО /tech-cards/:department,
       // иначе /tech-cards/new матчится как department='new' и показывается список вместо формы создания
       GoRoute(
         path: '/tech-cards/new',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final initialFromAi = state.extra as TechCardRecognitionResult?;
-          return TechCardEditScreen(techCardId: 'new', initialFromAi: initialFromAi);
+          return _slideTransitionPage(state, TechCardEditScreen(techCardId: 'new', initialFromAi: initialFromAi));
         },
       ),
       GoRoute(
         path: '/tech-cards/import-review',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final list = state.extra as List?;
           final cards = list != null ? list.map((e) => e as TechCardRecognitionResult).toList() : <TechCardRecognitionResult>[];
-          return TechCardsImportReviewScreen(cards: cards);
+          return _slideTransitionPage(state, TechCardsImportReviewScreen(cards: cards));
         },
       ),
       // Маршрут :id должен быть до :department, иначе uuid открывается как «список с department=uuid».
       // По одному сегменту различаем: если это известный цех — список по цеху, иначе — редактирование ТТК по id.
       GoRoute(
         path: '/tech-cards/:segment',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final segment = state.pathParameters['segment'] ?? '';
           const knownDepartments = ['kitchen', 'bar', 'dining_room'];
           if (knownDepartments.contains(segment)) {
-            return TechCardsListScreen(department: segment);
+            return _slideTransitionPage(state, TechCardsListScreen(department: segment));
           }
           final viewOnly = state.queryParameters['view'] == '1';
-          return TechCardEditScreen(techCardId: segment, forceViewMode: viewOnly);
+          return _slideTransitionPage(state, TechCardEditScreen(techCardId: segment, forceViewMode: viewOnly));
         },
       ),
 
       // Тест Supabase
       GoRoute(
         path: '/supabase-test',
-        builder: (context, state) => const SupabaseTestScreen(),
+        pageBuilder: (context, state) => _slideTransitionPage(state, const SupabaseTestScreen()),
       ),
 
       // Регистрация соучредителя после принятия приглашения
       GoRoute(
         path: '/register-co-owner',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final token = state.queryParameters['token'];
           if (token == null || token.isEmpty) {
-            return const Scaffold(body: Center(child: Text('Invalid link')));
+            return _slideTransitionPage(state, const Scaffold(body: Center(child: Text('Invalid link'))));
           }
-          return RegisterCoOwnerScreen(token: token);
+          return _slideTransitionPage(state, RegisterCoOwnerScreen(token: token));
         },
       ),
       // Принятие приглашения соучредителем
       GoRoute(
         path: '/accept-co-owner-invitation',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final token = state.queryParameters['token'];
           if (token == null || token.isEmpty) {
-            return const Scaffold(
+            return _slideTransitionPage(state, const Scaffold(
               body: Center(child: Text('Invalid invitation link')),
-            );
+            ));
           }
-          return AcceptCoOwnerInvitationScreen(token: token);
+          return _slideTransitionPage(state, AcceptCoOwnerInvitationScreen(token: token));
         },
       ),
     ],
