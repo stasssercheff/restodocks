@@ -34,8 +34,17 @@ String _pathFromWindow() {
   return '/';
 }
 
-/// Web: при F5 сохраняем текущую страницу из URL (path или hash)
-String getInitialLocation() => _pathFromWindow();
+/// Путь на момент первой загрузки (до любых переходов). Не меняется.
+String? _cachedInitialPath;
+
+/// Web: при F5 сохраняем текущую страницу из URL (path или hash). Кэшируем при первом вызове.
+String getInitialLocation() {
+  _cachedInitialPath ??= _pathFromWindow();
+  return _cachedInitialPath!;
+}
+
+/// Исходный путь до любых redirect — использовать при F5, когда текущий URL уже /splash.
+String? getCachedInitialPath() => _cachedInitialPath;
 
 /// Текущий путь из адресной строки (для коррекции в redirect). Возвращает null если корень.
 String? getCurrentBrowserPath() {

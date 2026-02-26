@@ -65,11 +65,11 @@ class AppRouter {
     initialLocation: _getInitialLocation(),
     redirect: (context, state) async {
       final loc = state.matchedLocation;
-      // Web: если роутер показал корень/splash, но в адресной строке другой путь — восстанавливаем его (F5)
+      // Web: если роутер показал корень/splash — восстанавливаем исходный путь (F5, getCurrentBrowserPath уже /splash)
       if (kIsWeb && (loc == '/' || loc == '/splash')) {
-        final browserPath = initial_loc.getCurrentBrowserPath();
-        if (kDebugMode) debugPrint('[Restodocks] redirect: loc=$loc, browserPath=$browserPath');
-        if (browserPath != null) return browserPath;
+        final target = initial_loc.getCachedInitialPath() ?? initial_loc.getCurrentBrowserPath();
+        if (kDebugMode) debugPrint('[Restodocks] redirect: loc=$loc, target=$target');
+        if (target != null && target != '/' && target != '/splash' && target.isNotEmpty) return target;
       }
       if (_isPublicPath(loc)) return null;
       // Сессия восстановлена в main() — при F5 остаёмся на текущем URL
@@ -88,8 +88,9 @@ class AppRouter {
         path: '/',
         redirect: (context, state) {
           if (kIsWeb) {
-            final bp = initial_loc.getCurrentBrowserPath();
-            if (bp != null && bp != '/splash') return bp;
+            // Берём исходный путь до redirect (getCurrentBrowserPath уже может быть /splash)
+            final target = initial_loc.getCachedInitialPath() ?? initial_loc.getCurrentBrowserPath();
+            if (target != null && target != '/' && target != '/splash' && target.isNotEmpty) return target;
           }
           return '/splash';
         },
@@ -461,10 +462,11 @@ class _SplashScreenState extends State<SplashScreen> {
 
     // Принудительно вызываем refresh маршрутизации
     if (accountManager.isLoggedInSync) {
-      // Web: при F5 мог оказаться splash при глубокой ссылке — идём по URL из адресной строки
-      final bp = kIsWeb ? initial_loc.getCurrentBrowserPath() : null;
-      final target = (bp != null && bp != '/splash') ? bp : '/home';
-      context.go(target);
+      // Web: при F5 — исходный путь из URL (getCurrentBrowserPath уже /splash после redirect)
+      final target = kIsWeb
+          ? (initial_loc.getCachedInitialPath() ?? initial_loc.getCurrentBrowserPath())
+          : null;
+      context.go((target != null && target != '/' && target != '/splash' && target.isNotEmpty) ? target : '/home');
     } else {
       context.go('/login');
     }
@@ -576,14 +578,14 @@ class _WebLocationCorrectionState extends State<WebLocationCorrection> {
 
   void _correctOnce() {
     if (!mounted || !kIsWeb || AppRouter._webLocationCorrected) return;
-    final browserPath = initial_loc.getCurrentBrowserPath();
-    if (browserPath == null) return;
+    final target = initial_loc.getCachedInitialPath() ?? initial_loc.getCurrentBrowserPath();
+    if (target == null || target == '/' || target == '/splash') return;
     try {
       final state = GoRouterState.of(context);
       final loc = state.matchedLocation;
       if (loc == '/' || loc == '/splash') {
         AppRouter._webLocationCorrected = true;
-        if (mounted) context.go(browserPath);
+        if (mounted) context.go(target);
       }
     } catch (_) {}
   }

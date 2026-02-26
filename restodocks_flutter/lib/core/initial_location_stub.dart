@@ -1,6 +1,6 @@
 /// Заглушка для не-web — используем Uri.base
-String getInitialLocation() {
-  return '/';
-}
+String getInitialLocation() => '/';
+
+String? getCachedInitialPath() => null;
 
 String? getCurrentBrowserPath() => null;

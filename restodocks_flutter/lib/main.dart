@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'core/url_strategy_stub.dart'
@@ -7,6 +8,8 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/core.dart';
+import 'core/initial_location_stub.dart'
+    if (dart.library.html) 'core/initial_location_web.dart' as initial_loc;
 import 'services/services.dart';
 import 'screens/screens.dart';
 
@@ -16,6 +19,8 @@ const String _supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOi
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   url_strategy.initUrlStrategy();
+  // Фиксируем путь из URL до Supabase (detectSessionInUri может менять URL)
+  if (kIsWeb) initial_loc.getInitialLocation();
   FlutterError.onError = (details) {
     debugPrint('FlutterError: ${details.exception}');
     debugPrint('Stack: ${details.stack}');
