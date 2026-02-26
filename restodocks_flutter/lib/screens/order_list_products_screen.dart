@@ -38,10 +38,12 @@ class _OrderListProductsScreenState extends State<OrderListProductsScreen> {
     final loc = context.read<LocalizationService>();
     final estId = acc.establishment?.id;
     if (estId == null) return;
-    if (store.allProducts.isEmpty) await store.loadProducts();
-    final products = store.getProducts();
+    await store.loadNomenclature(estId);
+    final products = store.getNomenclatureProducts(estId);
     if (products.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('ttk_no_other_pf'))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${loc.t('nomenclature')}: ${loc.t('no_products')}')),
+      );
       return;
     }
     final product = await showDialog<Product>(

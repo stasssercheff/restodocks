@@ -184,24 +184,26 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
     }).toList();
   }
 
-  List<OrderListItem> _getItemsWithLocalizedNames(String lang) {
+  Future<List<OrderListItem>> _getItemsWithLocalizedNames(String lang) async {
     final store = context.read<ProductStoreSupabase>();
+    final estId = _establishmentId;
+    if (estId != null) await store.loadNomenclature(estId);
+    final nomProducts = estId != null ? store.getNomenclatureProducts(estId) : <Product>[];
     return _getItemsWithQuantities().map((item) {
       final name = item.productId != null
-          ? (store.findProductById(item.productId!)?.getLocalizedName(lang) ?? item.productName)
+          ? (nomProducts.where((p) => p.id == item.productId).firstOrNull?.getLocalizedName(lang) ?? item.productName)
           : item.productName;
       return item.copyWith(productName: name);
     }).toList();
   }
 
-  void _showExportSheet() {
+  Future<void> _showExportSheet() async {
     if (_list == null) return;
     final account = context.read<AccountManagerSupabase>();
     final companyName = account.establishment?.name ?? '—';
     final loc = context.read<LocalizationService>();
-    final store = context.read<ProductStoreSupabase>();
-    if (store.allProducts.isEmpty) store.loadProducts();
-    final itemsWithNames = _getItemsWithLocalizedNames(loc.currentLanguageCode);
+    final itemsWithNames = await _getItemsWithLocalizedNames(loc.currentLanguageCode);
+    if (!mounted) return;
 
     showModalBottomSheet<void>(
       context: context,
