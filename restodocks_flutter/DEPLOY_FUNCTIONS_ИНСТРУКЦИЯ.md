@@ -58,11 +58,12 @@ npx supabase functions deploy ai-recognize-tech-cards-batch
 npx supabase functions deploy ai-recognize-product
 npx supabase functions deploy ai-refine-nutrition
 npx supabase functions deploy ai-verify-product
+npx supabase functions deploy translate-text
 ```
 
 Можно скопировать все строки и вставить — они выполнятся по очереди. Для каждой функции в конце должно быть что-то вроде «Deployed function ai-...».
 
-**Важно:** Секреты (GIGACHAT_AUTH_KEY, OPENAI_API_KEY и т.д.) ты уже добавил в Supabase Dashboard. При деплое они автоматически подхватываются — отдельно их вводить в терминал не нужно.
+**Важно:** Секреты (GIGACHAT_AUTH_KEY, OPENAI_API_KEY, GOOGLE_TRANSLATE_API_KEY и т.д.) ты уже добавил в Supabase Dashboard. При деплое они автоматически подхватываются — отдельно их вводить в терминал не нужно.
 
 ---
 

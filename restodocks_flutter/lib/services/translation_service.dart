@@ -8,13 +8,16 @@ import 'ai_service_supabase.dart';
 import 'supabase_service.dart';
 
 /// Сервис для переводов с кешированием.
-/// Источники: 1) кеш и БД, 2) внешний API (MyMemory, бесплатно), 3) ИИ (если включено).
+/// Источники: 1) кеш и БД, 2) Google Cloud Translation API (основной), 3) MyMemory (fallback), 4) ИИ (если включено).
 class TranslationService {
   /// Если false — при отсутствии в кеше/БД используется MyMemory API. Если true — вызывается ИИ.
   static bool useAiForTranslation = false;
 
-  /// Если true — при отсутствии в кеше/БД вызывается внешний API (MyMemory). По умолчанию включено.
+  /// Если true — при отсутствии в кеше/БД вызывается внешний API (Google Translate или MyMemory). По умолчанию включено.
   static bool useTranslationApi = true;
+
+  /// Если true — в первую очередь используется Google Cloud Translation API. Иначе — MyMemory. По умолчанию true.
+  static bool useGoogleTranslate = true;
 
   final AiServiceSupabase _aiService;
   final SupabaseService _supabase;
@@ -72,29 +75,37 @@ class TranslationService {
       // Продолжаем без кеша
     }
 
-    // 1. Перевод через внешний API (MyMemory) — бесплатно, без ИИ
+    // 1. Перевод через внешний API: Google Translate (основной) или MyMemory (fallback)
     if (useTranslationApi && !useAiForTranslation) {
-      try {
-        final translatedText = await _translateWithMyMemory(text, from, to);
-        if (translatedText != null && translatedText.trim().isNotEmpty) {
-          final translation = Translation(
-            id: DateTime.now().millisecondsSinceEpoch.toString(),
-            entityType: entityType,
-            entityId: entityId,
-            fieldName: fieldName,
-            sourceText: text,
-            sourceLanguage: from,
-            targetLanguage: to,
-            translatedText: translatedText,
-            createdAt: DateTime.now(),
-            createdBy: userId,
-            isManualOverride: false,
-          );
-          await saveToDatabase(translation);
-          _cache[cacheKey] = translation;
-          return translatedText;
-        }
-      } catch (_) {}
+      String? translatedText;
+      if (useGoogleTranslate) {
+        try {
+          translatedText = await _translateWithGoogle(text, from, to);
+        } catch (_) {}
+      }
+      if ((translatedText == null || translatedText.trim().isEmpty) && useTranslationApi) {
+        try {
+          translatedText = await _translateWithMyMemory(text, from, to);
+        } catch (_) {}
+      }
+      if (translatedText != null && translatedText.trim().isNotEmpty) {
+        final translation = Translation(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          entityType: entityType,
+          entityId: entityId,
+          fieldName: fieldName,
+          sourceText: text,
+          sourceLanguage: from,
+          targetLanguage: to,
+          translatedText: translatedText,
+          createdAt: DateTime.now(),
+          createdBy: userId,
+          isManualOverride: false,
+        );
+        await saveToDatabase(translation);
+        _cache[cacheKey] = translation;
+        return translatedText;
+      }
     }
 
     // 2. Перевод через AI (только если useAiForTranslation == true)
@@ -128,7 +139,25 @@ class TranslationService {
     return null;
   }
 
-  /// Перевести через MyMemory API (бесплатно, ~5000 символов/день анонимно)
+  /// Перевести через Google Cloud Translation API (Edge Function translate-text)
+  Future<String?> _translateWithGoogle(String text, String from, String to) async {
+    if (text.trim().isEmpty) return null;
+    try {
+      final res = await _supabase.client.functions.invoke(
+        'translate-text',
+        body: {'text': text, 'from': from, 'to': to},
+      );
+      if (res.status != 200) return null;
+      final data = res.data;
+      if (data is! Map<String, dynamic>) return null;
+      if (data.containsKey('error')) return null;
+      final translated = data['translatedText']?.toString().trim();
+      if (translated != null && translated.isNotEmpty) return translated;
+    } catch (_) {}
+    return null;
+  }
+
+  /// Перевести через MyMemory API (бесплатно, ~5000 символов/день анонимно) — fallback
   Future<String?> _translateWithMyMemory(String text, String from, String to) async {
     if (text.trim().isEmpty) return null;
     // MyMemory лимит ~500 байт на запрос; для длинных текстов режем

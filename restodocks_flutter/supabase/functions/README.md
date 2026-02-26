@@ -36,6 +36,15 @@
   ```
   По умолчанию приоритет: GigaChat → Gemini → Claude → OpenAI (по первому заданному ключу).
 
+- **Google Cloud Translation API (для переводов продуктов, ТТК):**
+  1. [Google Cloud Console](https://console.cloud.google.com) → APIs & Services → Enable **Cloud Translation API**
+  2. Credentials → Create API key
+  3. Добавь в Supabase:
+  ```bash
+  supabase secrets set GOOGLE_TRANSLATE_API_KEY=ваш-api-key
+  ```
+  Если секрет не задан — переводы идут через MyMemory (fallback, ограниченный лимит).
+
 ## Деплой
 
 1. Установите [Supabase CLI](https://supabase.com/docs/guides/cli).
@@ -58,6 +67,7 @@
    supabase functions deploy ai-refine-nutrition
    supabase functions deploy ai-verify-product
    supabase functions deploy save-order-document
+   supabase functions deploy translate-text
    ```
    Или из папки, где лежит `supabase/`:
    ```bash
@@ -77,6 +87,7 @@
 | `ai-refine-nutrition` | КБЖУ по названию продукта | GigaChat / OpenAI |
 | `ai-verify-product` | Верификация продукта (цена, КБЖУ, название) | GigaChat / OpenAI |
 | `save-order-document` | Сохранение заказа во входящие с ценами из БД (Edge Function, без AI) | — |
+| `translate-text` | Перевод текста (продукты, ТТК) | Google Cloud Translation API |
 
 ## Локальный запуск (опционально)
 
