@@ -1486,15 +1486,17 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                           width: 140,
                           height: 56,
                           child: Align(
-                            alignment: Alignment.bottomCenter,
+                            alignment: Alignment.center,
                             child: effectiveCanEdit
                         ? Tooltip(
                             message: loc.t('tt_type_hint'),
                             child: SegmentedButton<bool>(
                               style: SegmentedButton.styleFrom(
                                 visualDensity: VisualDensity.compact,
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                minimumSize: const Size(0, 44),
+                                fixedSize: const Size.fromHeight(44),
                               ),
                               segments: [
                                 ButtonSegment(value: true, label: Text(loc.t('tt_type_pf')), icon: const Icon(Icons.inventory_2, size: 16)),
