@@ -1,6 +1,11 @@
 #!/bin/bash
 set -e
 
+# Чтобы pg_dump находился при запуске двойным щелчком (.command), а не только из терминала с .zshrc
+if [ -d "/Applications/Postgres.app/Contents/Versions/latest/bin" ]; then
+  export PATH="/Applications/Postgres.app/Contents/Versions/latest/bin:$PATH"
+fi
+
 echo "🚀 ЗАПУСК ПОЛНОГО БЭКАПА RESTODOCKS"
 echo "====================================="
 echo "Дата: $(date)"
@@ -33,12 +38,13 @@ if ! command -v pg_dump >/dev/null 2>&1; then
     exit 1
 fi
 
-# Создаем временную директорию для бэкапа
+# Каждый бэкап — отдельная папка в backups/; удалил папку = удалил весь бэкап
+BACKUPS_ROOT="backups"
 BACKUP_NAME="backup_$(date +%Y%m%d_%H%M%S)"
-BACKUP_DIR="$BACKUP_NAME"
+BACKUP_DIR="$BACKUPS_ROOT/$BACKUP_NAME"
 mkdir -p "$BACKUP_DIR"
 
-echo "📁 Создаю директорию бэкапа: $BACKUP_DIR"
+echo "📁 Папка бэкапа: $BACKUP_DIR"
 echo ""
 
 # 1. БЭКАП КОДА И КОНФИГУРАЦИИ
@@ -54,11 +60,17 @@ if [ -f "backup_config.env" ]; then
     source backup_config.env
     if [ -n "$SUPABASE_DB_URL" ] && command -v pg_dump >/dev/null 2>&1; then
         echo "   Найдены настройки БД, выполняю бэкап..."
-        if pg_dump "$SUPABASE_DB_URL" --no-owner --no-privileges --clean --if-exists > "$BACKUP_DIR/database.sql" 2>/dev/null; then
+        # Supabase требует SSL; если в URL нет sslmode — добавляем
+        DUMP_URL="$SUPABASE_DB_URL"
+        if [[ "$DUMP_URL" != *"sslmode="* ]]; then
+            [[ "$DUMP_URL" == *"?"* ]] && DUMP_URL="${DUMP_URL}&sslmode=require" || DUMP_URL="${DUMP_URL}?sslmode=require"
+        fi
+        if pg_dump "$DUMP_URL" --no-owner --no-privileges --clean --if-exists > "$BACKUP_DIR/database.sql" 2>"$BACKUP_DIR/pg_dump_err.txt"; then
             gzip "$BACKUP_DIR/database.sql"
             echo "   ✅ База данных сохранена: database.sql.gz"
         else
-            echo "   ⚠️ Ошибка pg_dump (проверьте SUPABASE_DB_URL и pg_dump)"
+            echo "   ⚠️ Ошибка pg_dump (проверьте SUPABASE_DB_URL и пароль БД)"
+            [ -f "$BACKUP_DIR/pg_dump_err.txt" ] && echo "   Текст ошибки: $(cat "$BACKUP_DIR/pg_dump_err.txt")"
         fi
     else
         echo "   ⚠️ БД не настроена или pg_dump не найден"
@@ -95,43 +107,37 @@ else
     echo "   ⚠️ Python3 или storage_backup.py не найдены (storage пропущен)"
 fi
 
-# 4. ОБЪЕДИНЕНИЕ В ОДИН АРХИВ
+# 4. Копируем временные архивы в папку бэкапа и создаём один архив внутри неё
 echo ""
-echo "📦 ШАГ 4: Создание единого архива..."
-FINAL_ARCHIVE="${BACKUP_NAME}_COMPLETE.tar.gz"
+echo "📦 ШАГ 4: Архив внутри папки бэкапа..."
+find . -maxdepth 1 -name "storage_backup_*.tar.gz" -exec mv {} "$BACKUP_DIR/" \; 2>/dev/null || true
+find . -maxdepth 1 -name "database_backup.sql.gz" -exec mv {} "$BACKUP_DIR/" \; 2>/dev/null || true
 
-# Копируем все созданные бэкапы
-find . -name "${BACKUP_NAME}*.tar.gz" -exec cp {} "$BACKUP_DIR/" \; 2>/dev/null || true
-find . -name "storage_backup_*.tar.gz" -exec cp {} "$BACKUP_DIR/" \; 2>/dev/null || true
-find . -name "database_backup.sql.gz" -exec cp {} "$BACKUP_DIR/" \; 2>/dev/null || true
+# Один .tar.gz со всем содержимым папки — внутри самой папки (удобно хранить/переносить)
+(cd "$BACKUP_DIR" && tar -czf archive.tar.gz --exclude='archive.tar.gz' . 2>/dev/null) && echo "   ✅ archive.tar.gz создан в папке" || true
+FINAL_ARCHIVE="$BACKUP_DIR/archive.tar.gz"
+FINAL_SIZE=""
+[ -f "$FINAL_ARCHIVE" ] && FINAL_SIZE=$(ls -lh "$FINAL_ARCHIVE" | awk '{print $5}')
 
-# Создаем финальный архив
-tar -czf "$FINAL_ARCHIVE" "$BACKUP_DIR"
-FINAL_SIZE=$(ls -lh "$FINAL_ARCHIVE" | awk '{print $5}')
-
-# 5. ОЧИСТКА (оставляем только финальный архив)
+# 5. Очистка только временных файлов в корне проекта (папку бэкапа не трогаем)
 echo ""
-echo "🧹 ШАГ 5: Очистка временных файлов..."
-rm -rf "$BACKUP_DIR"
-find . -name "${BACKUP_NAME}*.tar.gz" ! -name "$FINAL_ARCHIVE" -delete 2>/dev/null || true
-find . -name "storage_backup_*.tar.gz" -delete 2>/dev/null || true
+echo "🧹 ШАГ 5: Очистка временных файлов в корне..."
+find . -maxdepth 1 -name "storage_backup_*.tar.gz" -delete 2>/dev/null || true
+find . -maxdepth 1 -name "database_backup.sql.gz" -delete 2>/dev/null || true
 
 echo ""
 echo "🎉 ПОЛНЫЙ БЭКАП ЗАВЕРШЕН!"
 echo "====================================="
-echo "📁 Архив: $FINAL_ARCHIVE"
-echo "📊 Размер: $FINAL_SIZE"
+echo "📁 Папка бэкапа: $BACKUP_DIR"
+echo "   (удали папку целиком, если этот бэкап не нужен)"
+[ -n "$FINAL_SIZE" ] && echo "📦 Внутри: archive.tar.gz ($FINAL_SIZE)"
 echo "📅 Дата: $(date)"
 echo ""
-echo "✅ Содержимое архива:"
-if tar -tzf "$FINAL_ARCHIVE" | grep -q "database.sql.gz"; then
-  echo "   • База данных PostgreSQL ✓"
-else
-  echo "   ⚠️ БАЗА ДАННЫХ ОТСУТСТВУЕТ — настройте backup_config.env (SUPABASE_DB_URL) и pg_dump"
-fi
+echo "✅ Содержимое:"
+[ -f "$BACKUP_DIR/database.sql.gz" ] && echo "   • База данных PostgreSQL ✓" || echo "   ⚠️ БАЗА ДАННЫХ ОТСУТСТВУЕТ"
 echo "   • Код, миграции, env, Vercel, Auth-чеклист, Storage"
 echo ""
-echo "💡 Восстановление: ./restore_all.sh  (из папки с архивом)"
+echo "💡 Восстановление: ./restore_all.sh $BACKUP_NAME  (или укажи путь к папке)"
 echo ""
 echo "🚀 ГОТОВО! Нажмите любую клавишу для выхода..."
 read -n 1 -s

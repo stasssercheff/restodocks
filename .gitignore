@@ -2,4 +2,5 @@
 .env*.local
 backup_*.tar.gz
 backup_*/
+backups/
 backup_config.env
