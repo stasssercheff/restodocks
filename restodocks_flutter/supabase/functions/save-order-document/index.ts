@@ -170,6 +170,26 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // Fallback: если нет шефов/владельцев — используем создателя документа
+    if (recipients.length === 0) {
+      const { data: creator } = await supabase
+        .from("employees")
+        .select("id, email")
+        .eq("id", createdByEmployeeId)
+        .single();
+      if (creator) recipients.push(creator);
+    }
+
+    // Fallback: если нет шефов/владельцев — используем создателя документа
+    if (recipients.length === 0) {
+      const { data: creator } = await supabase
+        .from("employees")
+        .select("id, email")
+        .eq("id", createdByEmployeeId)
+        .single();
+      if (creator) recipients.push(creator);
+    }
+
     if (recipients.length === 0) {
       return new Response(
         JSON.stringify({ error: "Нет получателей (шеф, владелец) в заведении" }),
