@@ -715,13 +715,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: appBarBackButton(context),
         title: Text(loc.t('products')),
         actions: [
-          appBarHomeButton(context),
           // 1. Количество
           Center(
             child: Container(

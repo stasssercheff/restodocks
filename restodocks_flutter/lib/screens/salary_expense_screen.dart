@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../models/models.dart';
 import '../services/schedule_storage_service.dart';
 import '../services/services.dart';
+import '../widgets/app_bar_home_button.dart';
 
 /// ФЗП: список сотрудников с оплатой за смену/час. Часы/смены подтягиваются из графика.
 /// Собственник без должности не отображается. Toggle — включать ли в итог.
@@ -172,11 +173,8 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        leading: appBarBackButton(context),
         title: Text(loc.t('salary_expenses')),
-        actions: [
-          IconButton(icon: const Icon(Icons.home), onPressed: () => context.go('/home'), tooltip: loc.t('home')),
-        ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())

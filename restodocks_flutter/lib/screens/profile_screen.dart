@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import '../services/services.dart';
 import '../services/profile_service.dart';
 import '../models/models.dart';
+import '../widgets/app_bar_home_button.dart';
 
 /// Экран профиля пользователя
 class ProfileScreen extends StatefulWidget {
@@ -105,9 +106,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: Navigator.of(context).canPop()
-            ? IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop())
-            : null,
+        leading: GoRouter.of(context).canPop() ? appBarBackButton(context) : null,
         title: Text(localization.t('profile')),
         actions: [
           IconButton(

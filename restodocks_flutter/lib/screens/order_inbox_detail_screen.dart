@@ -119,14 +119,14 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
 
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop())),
+        appBar: AppBar(leading: appBarBackButton(context)),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_error != null || _doc == null) {
       return Scaffold(
-        appBar: AppBar(leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop())),
+        appBar: AppBar(leading: appBarBackButton(context)),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -148,7 +148,7 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        leading: appBarBackButton(context),
         title: Text(loc.t('product_order')),
         actions: [
           IconButton(
@@ -156,7 +156,6 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
             tooltip: loc.t('download') ?? 'Сохранить',
             onPressed: _showSaveFormatDialog,
           ),
-          appBarHomeButton(context),
         ],
       ),
       body: SingleChildScrollView(

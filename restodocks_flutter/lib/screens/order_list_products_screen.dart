@@ -120,7 +120,7 @@ class _OrderListProductsScreenState extends State<OrderListProductsScreen> {
     final lang = loc.currentLanguageCode;
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        leading: appBarBackButton(context),
         title: Text(loc.t('order_list_add_products')),
         actions: [
           if (_list.items.isNotEmpty)
@@ -128,7 +128,6 @@ class _OrderListProductsScreenState extends State<OrderListProductsScreen> {
               onPressed: _save,
               child: Text(loc.t('save')),
             ),
-          appBarHomeButton(context),
         ],
       ),
       body: Column(

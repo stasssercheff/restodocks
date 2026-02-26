@@ -131,13 +131,9 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: appBarBackButton(context),
         title: Text(loc.t('register_company')),
         actions: [
-          appBarHomeButton(context),
           // Кнопка очистки тестовых данных (только для разработки)
           IconButton(
             icon: const Icon(Icons.cleaning_services),

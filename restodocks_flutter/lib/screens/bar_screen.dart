@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../services/services.dart';
-import '../widgets/app_bar_home_button.dart';
 
 /// Экран бара
 class BarScreen extends StatelessWidget {
@@ -14,7 +13,6 @@ class BarScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(loc.t('bar')),
-        actions: [appBarHomeButton(context)],
       ),
       body: Center(
         child: Text(loc.t('screen_in_dev')),

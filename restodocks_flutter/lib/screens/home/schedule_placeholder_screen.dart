@@ -37,12 +37,8 @@ class SchedulePlaceholderScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: appBarBackButton(context),
         title: Text(loc.t('schedule')),
-        actions: [appBarHomeButton(context)],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),

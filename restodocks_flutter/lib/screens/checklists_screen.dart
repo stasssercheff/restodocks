@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../models/models.dart';
 import '../services/schedule_storage_service.dart';
 import '../services/services.dart';
+import '../widgets/app_bar_home_button.dart';
 
 /// Список чеклистов-шаблонов. Шеф может править и создавать по аналогии.
 class ChecklistsScreen extends StatefulWidget {
@@ -256,14 +257,11 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
     if (emp != null && !canAccessChecklists) {
       return Scaffold(
         appBar: AppBar(
-          leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+          leading: appBarBackButton(context),
           title: GestureDetector(
             onTap: () => _scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut),
             child: Text(loc.t('checklists')),
           ),
-          actions: [
-            IconButton(icon: const Icon(Icons.home), onPressed: () => context.go('/home'), tooltip: loc.t('home')),
-          ],
         ),
         body: Center(
           child: Padding(
@@ -293,10 +291,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: appBarBackButton(context),
         title: GestureDetector(
           onTap: () => _scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut),
           child: Text(loc.t('checklists')),

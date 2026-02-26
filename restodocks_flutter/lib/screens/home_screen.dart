@@ -7,6 +7,7 @@ import 'home/staff_home_content.dart';
 import 'home/management_home_content.dart';
 import '../services/services.dart';
 import '../models/models.dart';
+import '../widgets/app_bar_home_button.dart';
 
 /// Главный экран: 3 вкладки (Домой, График/Уведомления, Личный кабинет), контент по роли.
 class HomeScreen extends StatefulWidget {
@@ -58,9 +59,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: Navigator.of(context).canPop()
-            ? IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop())
-            : null,
+        leading: GoRouter.of(context).canPop() ? appBarBackButton(context) : null,
         title: Text(_appBarTitle(loc, isOwner)),
       ),
       body: IndexedStack(

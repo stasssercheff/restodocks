@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../models/models.dart';
 import '../services/services.dart';
+import '../widgets/app_bar_home_button.dart';
 
 /// Экран только настроек: язык, тема, валюта и т.д. Без данных профиля (профиль — отдельная кнопка).
 class SettingsScreen extends StatefulWidget {
@@ -557,7 +558,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        leading: appBarBackButton(context),
         title: Text(localization.t('settings')),
       ),
       body: SingleChildScrollView(

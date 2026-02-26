@@ -90,11 +90,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Загрузка продуктов'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        actions: [appBarHomeButton(context)],
+        leading: appBarBackButton(context),
       ),
       body: Center(
         child: Column(
@@ -208,7 +204,6 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         title: Text(loc.t('upload_products')),
         backgroundColor: Theme.of(context).colorScheme.primaryContainer,
         actions: [
-          appBarHomeButton(context),
           if (kDebugMode) ...[
             IconButton(
               icon: const Icon(Icons.bug_report),

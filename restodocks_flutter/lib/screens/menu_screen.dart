@@ -107,10 +107,9 @@ class _MenuScreenState extends State<MenuScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(loc.t('menu')),
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        leading: appBarBackButton(context),
         actions: [
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loading ? null : _load, tooltip: loc.t('refresh')),
-          appBarHomeButton(context),
         ],
       ),
       body: _buildBody(loc, sym),

@@ -3,7 +3,6 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../services/services.dart';
-import '../widgets/app_bar_home_button.dart';
 
 /// Экран принятия приглашения соучредителем
 class AcceptCoOwnerInvitationScreen extends StatefulWidget {
@@ -99,7 +98,6 @@ class _AcceptCoOwnerInvitationScreenState extends State<AcceptCoOwnerInvitationS
       return Scaffold(
         appBar: AppBar(
           title: Text(loc.t('invitation')),
-          actions: [appBarHomeButton(context)],
         ),
         body: Center(
           child: Padding(

@@ -309,9 +309,8 @@ class _InventoryPfScreenState extends State<InventoryPfScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        leading: appBarBackButton(context),
         title: Text(loc.t('inventory_pf_title')),
-        actions: [appBarHomeButton(context)],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())

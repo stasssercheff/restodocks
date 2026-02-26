@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 
 import '../models/models.dart';
 import '../services/services.dart';
+import '../widgets/app_bar_home_button.dart';
 import 'excel_style_ttk_table.dart';
 
 /// Создание или редактирование ТТК. Ингредиенты — из номенклатуры или из других ТТК (ПФ).
@@ -1156,26 +1157,26 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
         if (mounted) context.pushReplacement('/tech-cards');
       });
       return Scaffold(
-        appBar: AppBar(leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()), title: Text(loc.t('tech_cards'))),
+        appBar: AppBar(leading: appBarBackButton(context), title: Text(loc.t('tech_cards'))),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()), title: Text(_isNew ? loc.t('create_tech_card') : loc.t('tech_cards'))),
+        appBar: AppBar(leading: appBarBackButton(context), title: Text(_isNew ? loc.t('create_tech_card') : loc.t('tech_cards'))),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
     if (_error != null) {
       return Scaffold(
-        appBar: AppBar(leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()), title: Text(_isNew ? loc.t('create_tech_card') : loc.t('tech_cards'))),
+        appBar: AppBar(leading: appBarBackButton(context), title: Text(_isNew ? loc.t('create_tech_card') : loc.t('tech_cards'))),
         body: Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Text(_error!), const SizedBox(height: 16), FilledButton(onPressed: () => context.pop(), child: Text(loc.t('back')))]))),
       );
     }
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop(), style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
+        leading: appBarBackButton(context),
         title: Text(_isNew ? loc.t('create_tech_card') : (_techCard?.getDisplayNameInLists(loc.currentLanguageCode) ?? loc.t('tech_cards'))),
         actions: [
           if (effectiveCanEdit) IconButton(icon: const Icon(Icons.save), onPressed: _save, tooltip: loc.t('save'), style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
@@ -1202,7 +1203,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
             tooltip: 'Экспорт в Excel',
             style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
           ),
-          IconButton(icon: const Icon(Icons.home), onPressed: () => context.go('/home'), tooltip: loc.t('home'), style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
         ],
       ),
       body: LayoutBuilder(

@@ -68,10 +68,7 @@ class _ProductOrderReceivedScreenState extends State<ProductOrderReceivedScreen>
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: appBarBackButton(context),
         title: Text(loc.t('product_order')),
         actions: [
           IconButton(
@@ -79,7 +76,6 @@ class _ProductOrderReceivedScreenState extends State<ProductOrderReceivedScreen>
             onPressed: _loading ? null : _load,
             tooltip: loc.t('refresh'),
           ),
-          appBarHomeButton(context),
         ],
       ),
       body: _buildBody(loc, establishmentName),

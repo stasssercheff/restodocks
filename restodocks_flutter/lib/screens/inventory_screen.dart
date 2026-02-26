@@ -975,26 +975,16 @@ class _InventoryScreenState extends State<InventoryScreen>
 
     return Scaffold(
       appBar: _isInputMode ? AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-        ),
+        leading: appBarBackButton(context),
         title: Text(
           loc.t('inventory_blank_title'),
           style: const TextStyle(fontSize: 16),
         ),
         toolbarHeight: 48,
         elevation: 0,
-        actions: [appBarHomeButton(context)],
       ) : AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: appBarBackButton(context),
         title: Text(loc.t('inventory_blank_title')),
-        actions: [appBarHomeButton(context)],
       ),
       body: Stack(
         children: [

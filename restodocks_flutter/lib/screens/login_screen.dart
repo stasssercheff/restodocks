@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../services/services.dart';
 import '../models/models.dart';
+import '../widgets/app_bar_home_button.dart';
 
 /// Экран входа в систему
 class LoginScreen extends StatefulWidget {
@@ -61,20 +62,13 @@ class _LoginScreenState extends State<LoginScreen> {
     final loc = context.watch<LocalizationService>();
     return Scaffold(
       appBar: AppBar(
-        leading: Navigator.of(context).canPop()
-            ? IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop())
-            : null,
+        leading: GoRouter.of(context).canPop() ? appBarBackButton(context) : null,
         title: Text(loc.t('login')),
         actions: [
           IconButton(
             icon: const Icon(Icons.language),
             onPressed: () => _showLanguagePicker(context, loc),
             tooltip: loc.t('language'),
-          ),
-          IconButton(
-            icon: const Icon(Icons.home),
-            onPressed: () => context.go('/home'),
-            tooltip: loc.t('home'),
           ),
         ],
       ),

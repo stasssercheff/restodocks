@@ -109,9 +109,8 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen> {
     if (emp != null && !canAccessChecklists) {
       return Scaffold(
         appBar: AppBar(
-          leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+          leading: appBarBackButton(context),
           title: Text(loc.t('fill_checklist') ?? 'Заполнить чеклист'),
-          actions: [appBarHomeButton(context)],
         ),
         body: Center(
           child: Padding(
@@ -134,9 +133,8 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen> {
     if (_loading) {
       return Scaffold(
         appBar: AppBar(
-          leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+          leading: appBarBackButton(context),
           title: Text(loc.t('fill_checklist') ?? 'Заполнить чеклист'),
-          actions: [appBarHomeButton(context)],
         ),
         body: const Center(child: CircularProgressIndicator()),
       );
@@ -144,9 +142,8 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen> {
     if (_error != null || _checklist == null) {
       return Scaffold(
         appBar: AppBar(
-          leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+          leading: appBarBackButton(context),
           title: Text(loc.t('fill_checklist') ?? 'Заполнить чеклист'),
-          actions: [appBarHomeButton(context)],
         ),
         body: Center(
           child: Padding(
@@ -168,9 +165,8 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        leading: appBarBackButton(context),
         title: Text(c.name),
-        actions: [appBarHomeButton(context)],
       ),
       body: Column(
         children: [

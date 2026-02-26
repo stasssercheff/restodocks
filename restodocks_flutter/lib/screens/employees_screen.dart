@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../core/config/roles_config.dart';
 import '../models/models.dart';
 import '../services/services.dart';
+import '../widgets/app_bar_home_button.dart';
 
 /// Список сотрудников. Владелец видит всех; остальные — по своему отделу. Редактирование для шефа/владельца. Добавление — только личная регистрация по PIN.
 class EmployeesScreen extends StatefulWidget {
@@ -68,11 +69,10 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        leading: appBarBackButton(context),
         title: Text(loc.t('employees')),
         actions: [
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loading ? null : _load, tooltip: loc.t('refresh')),
-          IconButton(icon: const Icon(Icons.home), onPressed: () => context.go('/home'), tooltip: loc.t('home')),
         ],
       ),
       body: _buildBody(loc, theme, canEdit, canConfirmShifts: _canConfirmShifts(acc.currentEmployee)),

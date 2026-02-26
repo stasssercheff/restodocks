@@ -417,10 +417,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(
-          title: Text(loc.t('schedule')),
-          actions: [appBarHomeButton(context)],
-        ),
+        appBar: AppBar(title: Text(loc.t('schedule'))),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
@@ -633,7 +630,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        leading: appBarBackButton(context),
         title: Text(widget.personalOnly ? loc.t('personal_schedule') : loc.t('schedule')),
         actions: [
           if (canEdit)
@@ -642,7 +639,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               onPressed: _showCopyRangeDialog,
               tooltip: 'Копировать диапазон',
             ),
-          IconButton(icon: const Icon(Icons.home), onPressed: () => context.go('/home'), tooltip: loc.t('home')),
         ],
       ),
       body: Column(

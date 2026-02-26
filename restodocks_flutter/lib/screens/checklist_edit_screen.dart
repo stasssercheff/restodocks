@@ -240,11 +240,8 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
     if (emp != null && !canAccessChecklists) {
       return Scaffold(
         appBar: AppBar(
-          leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+          leading: appBarBackButton(context),
           title: Text(loc.t('checklists')),
-          actions: [
-            IconButton(icon: const Icon(Icons.home), onPressed: () => context.go('/home'), tooltip: loc.t('home')),
-          ],
         ),
         body: Center(
           child: Padding(
@@ -267,9 +264,8 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
     if (_loading) {
       return Scaffold(
         appBar: AppBar(
-          leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+          leading: appBarBackButton(context),
           title: Text(loc.t('checklists')),
-          actions: [appBarHomeButton(context)],
         ),
         body: const Center(child: CircularProgressIndicator()),
       );
@@ -277,9 +273,8 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
     if (_error != null || _checklist == null) {
       return Scaffold(
         appBar: AppBar(
-          leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+          leading: appBarBackButton(context),
           title: Text(loc.t('checklists')),
-          actions: [appBarHomeButton(context)],
         ),
         body: Center(
           child: Padding(
@@ -302,10 +297,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: appBarBackButton(context),
         title: Text(loc.t('checklists')),
         actions: [
           if (canEdit)
@@ -325,11 +317,6 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
               onPressed: _delete,
               tooltip: loc.t('delete'),
             ),
-          IconButton(
-            icon: const Icon(Icons.home),
-            onPressed: () => context.go('/home'),
-            tooltip: loc.t('home'),
-          ),
         ],
       ),
       body: Stack(

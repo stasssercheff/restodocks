@@ -49,9 +49,8 @@ class _ChecklistInboxDetailScreenState extends State<ChecklistInboxDetailScreen>
     if (_loading) {
       return Scaffold(
         appBar: AppBar(
-          leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+          leading: appBarBackButton(context),
           title: Text(loc.t('checklist') ?? 'Чеклист'),
-          actions: [appBarHomeButton(context)],
         ),
         body: const Center(child: CircularProgressIndicator()),
       );
@@ -59,9 +58,8 @@ class _ChecklistInboxDetailScreenState extends State<ChecklistInboxDetailScreen>
     if (_error != null || _submission == null) {
       return Scaffold(
         appBar: AppBar(
-          leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+          leading: appBarBackButton(context),
           title: Text(loc.t('checklist') ?? 'Чеклист'),
-          actions: [appBarHomeButton(context)],
         ),
         body: Center(
           child: Padding(
@@ -85,9 +83,8 @@ class _ChecklistInboxDetailScreenState extends State<ChecklistInboxDetailScreen>
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        leading: appBarBackButton(context),
         title: Text(sub.checklistName),
-        actions: [appBarHomeButton(context)],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),

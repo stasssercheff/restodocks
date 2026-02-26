@@ -99,9 +99,8 @@ class _ShiftConfirmationScreenState extends State<ShiftConfirmationScreen> {
     if (!canEdit) {
       return Scaffold(
         appBar: AppBar(
-          leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+          leading: appBarBackButton(context),
           title: Text(loc.t('shift_confirmation') ?? 'Подтверждение смены'),
-          actions: [appBarHomeButton(context)],
         ),
         body: Center(
           child: Padding(
@@ -126,9 +125,8 @@ class _ShiftConfirmationScreenState extends State<ShiftConfirmationScreen> {
     if (_loading) {
       return Scaffold(
         appBar: AppBar(
-          leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+          leading: appBarBackButton(context),
           title: Text(loc.t('shift_confirmation') ?? 'Подтверждение смены'),
-          actions: [appBarHomeButton(context)],
         ),
         body: const Center(child: CircularProgressIndicator()),
       );
@@ -139,11 +137,8 @@ class _ShiftConfirmationScreenState extends State<ShiftConfirmationScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        leading: appBarBackButton(context),
         title: Text(loc.t('shift_confirmation') ?? 'Подтверждение смены'),
-        actions: [
-          IconButton(icon: const Icon(Icons.home), onPressed: () => context.go('/home'), tooltip: loc.t('home')),
-        ],
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

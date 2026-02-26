@@ -54,10 +54,7 @@ class _InventoryReceivedScreenState extends State<InventoryReceivedScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: appBarBackButton(context),
         title: Text(loc.t('inventory_received')),
         actions: [
           IconButton(
@@ -65,7 +62,6 @@ class _InventoryReceivedScreenState extends State<InventoryReceivedScreen> {
             onPressed: _loading ? null : _load,
             tooltip: loc.t('refresh'),
           ),
-          appBarHomeButton(context),
         ],
       ),
       body: _buildBody(loc),
@@ -281,10 +277,7 @@ class _InventoryDocumentDetailScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        leading: appBarBackButton(context),
         title: Text(loc.t('inventory_blank_title')),
         actions: [
           IconButton(
@@ -292,7 +285,6 @@ class _InventoryDocumentDetailScreen extends StatelessWidget {
             tooltip: loc.t('download') ?? 'Скачать',
             onPressed: () => _download(context),
           ),
-          appBarHomeButton(context),
         ],
       ),
       body: SingleChildScrollView(

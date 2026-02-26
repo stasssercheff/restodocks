@@ -38,10 +38,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: appBarBackButton(context),
         title: Text(loc.t('notifications')),
         actions: [
           IconButton(
@@ -49,7 +46,6 @@ class _NotificationsScreenState extends State<NotificationsScreen>
             onPressed: _showDateFilter,
             tooltip: 'Фильтр по датам',
           ),
-          appBarHomeButton(context),
         ],
         bottom: TabBar(
           controller: _tabController,

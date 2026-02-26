@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import 'excel_style_ttk_table.dart';
 
 import '../models/models.dart';
+import '../widgets/app_bar_home_button.dart';
 import '../services/ai_service.dart';
 import '../services/image_service.dart';
 import '../services/services.dart';
@@ -307,7 +308,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                 onPressed: _toggleSelectionMode,
                 tooltip: 'Отмена выбора',
               )
-            : IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+            : appBarBackButton(context),
         title: Text(_selectionMode ? 'Выберите ТТК (${_selectedTechCards.length})' : loc.t('tech_cards')),
         actions: [
           // Счетчик ТТК
@@ -412,7 +413,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
             ],
           ),
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loading ? null : _load, tooltip: loc.t('refresh')),
-          IconButton(icon: const Icon(Icons.home), onPressed: () => context.go('/home'), tooltip: loc.t('home')),
         ],
       ),
       body: Stack(

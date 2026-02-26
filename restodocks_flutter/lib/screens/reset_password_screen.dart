@@ -3,7 +3,6 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../services/services.dart';
-import '../widgets/app_bar_home_button.dart';
 
 /// Экран смены пароля по токену из письма
 class ResetPasswordScreen extends StatefulWidget {
@@ -75,7 +74,6 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       return Scaffold(
         appBar: AppBar(
           title: Text(loc.t('reset_password') ?? 'Смена пароля'),
-          actions: [appBarHomeButton(context)],
         ),
         body: Center(
           child: Padding(
@@ -105,7 +103,6 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       appBar: AppBar(
         title: Text(loc.t('reset_password') ?? 'Смена пароля'),
         automaticallyImplyLeading: false,
-        actions: [appBarHomeButton(context)],
       ),
       body: SafeArea(
         child: SingleChildScrollView(

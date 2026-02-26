@@ -69,10 +69,7 @@ class _InboxScreenState extends State<InboxScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: appBarBackButton(context),
         title: Text(loc.t('inbox')),
         actions: [
           IconButton(
@@ -80,7 +77,6 @@ class _InboxScreenState extends State<InboxScreen> {
             onPressed: _loadDocuments,
             tooltip: 'Обновить',
           ),
-          appBarHomeButton(context),
         ],
       ),
       body: Column(

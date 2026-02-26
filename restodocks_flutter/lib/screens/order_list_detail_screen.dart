@@ -284,9 +284,8 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
     if (_loading) {
       return Scaffold(
         appBar: AppBar(
-          leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+          leading: appBarBackButton(context),
           title: Text(loc.t('product_order')),
-          actions: [appBarHomeButton(context)],
         ),
         body: const Center(child: CircularProgressIndicator()),
       );
@@ -294,9 +293,8 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
     if (_list == null) {
       return Scaffold(
         appBar: AppBar(
-          leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+          leading: appBarBackButton(context),
           title: Text(loc.t('product_order')),
-          actions: [appBarHomeButton(context)],
         ),
         body: const Center(child: Text('Список не найден')),
       );
@@ -304,11 +302,8 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
     final list = _list!;
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        leading: appBarBackButton(context),
         title: Text(list.name),
-        actions: [
-          IconButton(icon: const Icon(Icons.home), onPressed: () => context.go('/home'), tooltip: loc.t('home')),
-        ],
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

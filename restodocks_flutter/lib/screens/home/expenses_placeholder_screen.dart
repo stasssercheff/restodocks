@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../services/services.dart';
+import '../../widgets/app_bar_home_button.dart';
 
 /// Заглушка расходов (Pro).
 class ExpensesPlaceholderScreen extends StatelessWidget {
@@ -14,18 +15,8 @@ class ExpensesPlaceholderScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: appBarBackButton(context),
         title: Text('${loc.t('expenses')} (${loc.t('pro')})'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.home),
-            onPressed: () => context.go('/home'),
-            tooltip: loc.t('home'),
-          ),
-        ],
       ),
       body: Center(
         child: Column(

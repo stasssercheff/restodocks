@@ -107,9 +107,8 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        leading: appBarBackButton(context),
         title: Text(loc.t('tech_cards_import_review_title')),
-        actions: [appBarHomeButton(context)],
       ),
       body: Column(
         children: [

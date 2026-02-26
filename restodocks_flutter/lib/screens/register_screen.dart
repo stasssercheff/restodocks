@@ -187,12 +187,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: appBarBackButton(context),
         title: Text(loc.t('register_employee')),
-        actions: [appBarHomeButton(context)],
       ),
       body: SafeArea(
         child: SingleChildScrollView(

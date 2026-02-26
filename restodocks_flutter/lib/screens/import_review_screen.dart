@@ -155,7 +155,7 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        leading: appBarBackButton(context),
         title: Text(loc.t('import_review_title') ?? 'Модерация импорта'),
         actions: [
           TextButton.icon(
@@ -165,7 +165,6 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
                 ? (loc.t('deselect_all') ?? 'Снять все')
                 : (loc.t('accept_all') ?? 'Принять всё')),
           ),
-          appBarHomeButton(context),
         ],
       ),
       body: Column(

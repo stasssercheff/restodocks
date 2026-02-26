@@ -23,6 +23,7 @@ import '../models/order_list.dart';
 import '../models/nomenclature_item.dart';
 import '../models/translation.dart';
 import '../services/account_manager.dart';
+import '../widgets/app_bar_home_button.dart';
 import '../services/account_manager_supabase.dart';
 import '../services/product_store.dart';
 import '../services/product_store_supabase.dart';
@@ -718,7 +719,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        leading: appBarBackButton(context),
         title: Text(loc.t('nomenclature')),
         actions: [
           // Счетчик элементов

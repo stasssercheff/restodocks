@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 
 import '../models/models.dart';
 import '../services/services.dart';
+import '../widgets/app_bar_home_button.dart';
 
 /// Заказ продуктов: при нажатии не список продуктов, а «Создать» и список созданных списков заказов.
 class OrderListsScreen extends StatefulWidget {
@@ -94,11 +95,8 @@ class _OrderListsScreenState extends State<OrderListsScreen> {
     );
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        leading: appBarBackButton(context),
         title: Text(loc.t('product_order')),
-        actions: [
-          IconButton(icon: const Icon(Icons.home), onPressed: () => context.go('/home'), tooltip: loc.t('home')),
-        ],
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
