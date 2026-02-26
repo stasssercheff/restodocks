@@ -4,3 +4,5 @@ String getInitialLocation() => '/';
 String? getCachedInitialPath() => null;
 
 String? getCurrentBrowserPath() => null;
+
+void savePathForRefresh(String path) {}

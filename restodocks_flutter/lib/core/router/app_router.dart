@@ -71,7 +71,13 @@ class AppRouter {
         if (kDebugMode) debugPrint('[Restodocks] redirect: loc=$loc, target=$target');
         if (target != null && target != '/' && target != '/splash' && target.isNotEmpty) return target;
       }
-      if (_isPublicPath(loc)) return null;
+      if (_isPublicPath(loc)) {
+        // Web: сохраняем путь для F5 fallback (sessionStorage)
+        if (kIsWeb && loc.isNotEmpty && loc != '/' && loc != '/splash') {
+          initial_loc.savePathForRefresh(loc);
+        }
+        return null;
+      }
       // Сессия восстановлена в main() — при F5 остаёмся на текущем URL
       final account = context.read<AccountManagerSupabase>();
       if (!account.isLoggedInSync) await account.initialize();
@@ -79,6 +85,10 @@ class AppRouter {
         // Сохраняем URL для возврата после входа
         final redirect = loc.isNotEmpty && loc != '/' ? Uri.encodeComponent(loc) : null;
         return redirect != null ? '/login?redirect=$redirect' : '/login';
+      }
+      // Web: сохраняем путь для F5 fallback
+      if (kIsWeb && loc.isNotEmpty && loc != '/' && loc != '/splash') {
+        initial_loc.savePathForRefresh(loc);
       }
       return null;
     },

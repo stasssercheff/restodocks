@@ -1,5 +1,25 @@
 import 'dart:html' as html;
 
+const String _sessionStorageKey = 'restodocks_last_path';
+
+/// Сохраняет путь в sessionStorage для fallback при F5 (pathname иногда приходит как /).
+void savePathForRefresh(String path) {
+  try {
+    if (path.isNotEmpty && path != '/' && path != '/splash') {
+      html.window.sessionStorage[_sessionStorageKey] = path;
+    }
+  } catch (_) {}
+}
+
+/// Читает путь из sessionStorage (fallback при pathname == '/' на момент загрузки).
+String? _pathFromSessionStorage() {
+  try {
+    final s = html.window.sessionStorage[_sessionStorageKey];
+    if (s != null && s.isNotEmpty && s != '/' && s != '/splash') return s;
+  } catch (_) {}
+  return null;
+}
+
 /// Читает путь из адресной строки (pathname, href, hash). Нужно для F5.
 /// pathname — основной источник при path-based URLs (usePathUrlStrategy).
 String _pathFromWindow() {
@@ -38,8 +58,14 @@ String _pathFromWindow() {
 String? _cachedInitialPath;
 
 /// Web: при F5 сохраняем текущую страницу из URL (path или hash). Кэшируем при первом вызове.
+/// Fallback: sessionStorage, если pathname пришёл как / (SW/race на загрузке).
 String getInitialLocation() {
-  _cachedInitialPath ??= _pathFromWindow();
+  if (_cachedInitialPath == null) {
+    final fromWindow = _pathFromWindow();
+    _cachedInitialPath = (fromWindow.isNotEmpty && fromWindow != '/')
+        ? fromWindow
+        : _pathFromSessionStorage() ?? '/';
+  }
   return _cachedInitialPath!;
 }
 
