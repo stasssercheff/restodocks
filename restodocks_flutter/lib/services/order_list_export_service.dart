@@ -59,9 +59,11 @@ class OrderListExportService {
     if (_pdfTheme != null) return _pdfTheme!;
     final baseFont = await rootBundle.load('assets/fonts/Roboto-Regular.ttf');
     final boldFont = await rootBundle.load('assets/fonts/Roboto-Bold.ttf');
+    final italicFont = await rootBundle.load('assets/fonts/Roboto-Italic.ttf');
     _pdfTheme = pw.ThemeData.withFont(
       base: pw.Font.ttf(baseFont),
       bold: pw.Font.ttf(boldFont),
+      italic: pw.Font.ttf(italicFont),
     );
     return _pdfTheme!;
   }
