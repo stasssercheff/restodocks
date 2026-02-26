@@ -63,7 +63,6 @@ class AppRouter {
 
   static final GoRouter router = GoRouter(
     initialLocation: _getInitialLocation(),
-    overridePlatformDefaultLocation: kIsWeb,
     redirect: (context, state) async {
       final loc = state.matchedLocation;
       // Web: если роутер показал корень/splash — восстанавливаем исходный путь (F5, getCurrentBrowserPath уже /splash)
