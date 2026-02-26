@@ -1,31 +1,19 @@
 # Настройка Storage для фото сотрудников
 
-## Ошибка «Bucket not found»
+## Ошибка «Bucket not found» (404)
 
-Если при загрузке фото в личном кабинете появляется ошибка:
+Если при загрузке фото появляется:
 ```
-Ошибка загрузки: StorageException(message: Bucket not found, statusCode: 404, error: Bucket not found)
+Ошибка загрузки: StorageException(message: Bucket not found, statusCode: 404)
 ```
 
-значит bucket `avatars` ещё не создан в Supabase Storage.
+создайте bucket вручную: **Storage** → **New bucket** → Name: `avatars`, Public bucket: включить → **Create bucket**.
 
-## Решение: создать bucket вручную
+## Ошибка RLS «new row violates row-level security policy» (403)
 
-1. Откройте [Supabase Dashboard](https://supabase.com/dashboard)
-2. Выберите проект Restodocks
-3. В левом меню: **Storage** → **New bucket**
-4. Укажите:
-   - **Name:** `avatars`
-   - **Public bucket:** включить (чтобы фото были доступны по публичному URL)
-5. Нажмите **Create bucket**
+Если появляется:
+```
+Ошибка загрузки: StorageException(message: new row violates row-level security policy, statusCode: 403, error: Unauthorized)
+```
 
-После этого загрузка фото в профиле должна работать.
-
-## Политики доступа (опционально)
-
-Для ограничения доступа можно настроить RLS в Storage:
-
-- **INSERT** — разрешить аутентифицированным пользователям загружать файлы
-- **SELECT** — разрешить всем читать (для публичного bucket)
-
-В Dashboard: Storage → avatars → Policies.
+примените миграцию `supabase/migrations/20260226120000_storage_avatars_rls.sql` в Supabase SQL Editor (или через `supabase db push`).

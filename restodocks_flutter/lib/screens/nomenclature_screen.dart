@@ -497,10 +497,10 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     final loc = context.read<LocalizationService>();
     final establishmentPrice = store.getEstablishmentPrice(p.id, estId);
     final rawPrice = establishmentPrice?.$1 ?? p.basePrice;
-    final currency = establishmentPrice?.$2 ?? p.currency ?? 'VND';
     final accountManager = context.read<AccountManagerSupabase>();
-    final userCurrencySymbol = accountManager.currentEmployee?.currencySymbol ?? _currencySymbol(currency);
-    final currencySymbol = userCurrencySymbol;
+    // Символ берём из валюты заведения, чтобы при смене валюты в настройках знак обновлялся
+    final displayCurrency = accountManager.establishment?.defaultCurrency ?? establishmentPrice?.$2 ?? p.currency ?? 'VND';
+    final currencySymbol = _currencySymbol(displayCurrency);
 
     // Если unit = g, показываем цену за кг (умножаем на 1000)
     String priceText;
@@ -542,7 +542,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     }
   }
 
-  String _buildTechCardSubtitle(TechCard tc) {
+  String _buildTechCardSubtitle(BuildContext context, TechCard tc) {
     // Рассчитываем стоимость за кг для ТТК
     if (tc.ingredients.isEmpty) {
       return 'ПФ · Цена не рассчитана · Выход: ${tc.yield.toStringAsFixed(0)}г';
@@ -551,8 +551,9 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     final totalCost = tc.ingredients.fold<double>(0, (sum, ing) => sum + ing.cost);
     final totalOutput = tc.ingredients.fold<double>(0, (sum, ing) => sum + ing.outputWeight);
     final costPerKg = totalOutput > 0 ? (totalCost / totalOutput) * 1000 : 0;
+    final sym = _currencySymbol(context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'VND');
 
-    return 'ПФ · ${costPerKg.toStringAsFixed(0)} ₽/кг · Выход: ${tc.yield.toStringAsFixed(0)}г';
+    return 'ПФ · ${costPerKg.toStringAsFixed(0)} $sym/кг · Выход: ${tc.yield.toStringAsFixed(0)}г';
   }
 
   bool _needsKbju(NomenclatureItem item) {
@@ -824,7 +825,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
               onNeedsTranslation: (item) => _needsTranslation(item),
               onCanShowNutrition: (context) => _canShowNutrition(context),
               onBuildProductSubtitle: (context, p, store, estId, loc) => _buildProductSubtitle(context, p, store, estId, loc),
-              onBuildTechCardSubtitle: (tc) => _buildTechCardSubtitle(tc),
+              onBuildTechCardSubtitle: (tc) => _buildTechCardSubtitle(context, tc),
             ),
           ),
         ],

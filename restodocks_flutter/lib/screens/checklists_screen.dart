@@ -360,8 +360,8 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
           ),
         ],
       ),
-      body: _body(loc, canEdit, _scrollController),
-      floatingActionButton: canEdit
+      body: _body(loc, canEdit, canAccessChecklists, _scrollController),
+      floatingActionButton: canAccessChecklists
           ? FloatingActionButton(
               onPressed: _loading ? null : _createNew,
               child: const Icon(Icons.add),
@@ -407,7 +407,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
     );
   }
 
-  Widget _body(LocalizationService loc, bool canEdit, ScrollController scrollController) {
+  Widget _body(LocalizationService loc, bool canEdit, bool canAccessChecklists, ScrollController scrollController) {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -451,8 +451,16 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                     ),
                 textAlign: TextAlign.center,
               ),
-              if (canEdit) ...[
+              if (canAccessChecklists) ...[
                 const SizedBox(height: 24),
+                FilledButton.icon(
+                  onPressed: _loading ? null : _createNew,
+                  icon: const Icon(Icons.add),
+                  label: Text(loc.t('create_checklist')),
+                ),
+              ],
+              if (canEdit) ...[
+                const SizedBox(height: 16),
                 _buildAiChecklistButton(loc),
               ],
             ],

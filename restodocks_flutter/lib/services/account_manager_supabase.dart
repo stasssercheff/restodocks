@@ -13,7 +13,7 @@ const _keyRememberEmail = 'restodocks_remember_email';
 const _keyRememberPassword = 'restodocks_remember_password';
 
 /// Сервис управления аккаунтами с использованием Supabase
-class AccountManagerSupabase {
+class AccountManagerSupabase extends ChangeNotifier {
   static final AccountManagerSupabase _instance = AccountManagerSupabase._internal();
   factory AccountManagerSupabase() => _instance;
   AccountManagerSupabase._internal();
@@ -764,6 +764,7 @@ class AccountManagerSupabase {
       );
 
       _establishment = establishment;
+      notifyListeners(); // Обновить символ валюты в номенклатуре и др.
     } catch (e) {
       print('Ошибка обновления заведения: $e');
     }

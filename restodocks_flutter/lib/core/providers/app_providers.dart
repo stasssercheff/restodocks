@@ -24,7 +24,7 @@ class AppProviders {
           create: (_) => OwnerViewPreferenceService(),
         ),
         // Используем Supabase версии сервисов
-        Provider<AccountManagerSupabase>(
+        ChangeNotifierProvider<AccountManagerSupabase>(
           create: (_) => AccountManagerSupabase(),
         ),
         Provider<ProductStoreSupabase>(
