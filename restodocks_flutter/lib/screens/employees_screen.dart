@@ -26,6 +26,16 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     return current.hasRole('owner') || current.hasRole('executive_chef') || current.hasRole('sous_chef');
   }
 
+  /// Может ли переключать доступ к данным: собственник, шеф, су-шеф, менеджер зала, барменеджер.
+  bool _canToggleDataAccess(Employee? current) {
+    if (current == null) return false;
+    return current.hasRole('owner') ||
+        current.hasRole('executive_chef') ||
+        current.hasRole('sous_chef') ||
+        current.hasRole('bar_manager') ||
+        current.hasRole('floor_manager');
+  }
+
   bool _canConfirmShifts(Employee? current) {
     return current?.canEditSchedule ?? false;
   }
@@ -75,11 +85,11 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loading ? null : _load, tooltip: loc.t('refresh')),
         ],
       ),
-      body: _buildBody(loc, theme, canEdit, canConfirmShifts: _canConfirmShifts(acc.currentEmployee)),
+      body: _buildBody(loc, theme, canEdit, canToggleDataAccess: _canToggleDataAccess(acc.currentEmployee), canConfirmShifts: _canConfirmShifts(acc.currentEmployee)),
     );
   }
 
-  Widget _buildBody(LocalizationService loc, ThemeData theme, bool canEdit, {bool canConfirmShifts = false}) {
+  Widget _buildBody(LocalizationService loc, ThemeData theme, bool canEdit, {bool canToggleDataAccess = false, bool canConfirmShifts = false}) {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
       return Center(
@@ -145,7 +155,9 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
         employee: _list[i],
         loc: loc,
         canEdit: canEdit,
+        canToggleDataAccess: canToggleDataAccess,
         onUpdated: _load,
+        onToggleDataAccess: _toggleDataAccess,
         onEdit: () => _openEditEmployee(context, _list[i]),
         onDelete: () => _deleteEmployee(context, _list[i]),
       )),
@@ -194,11 +206,30 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     }
   }
 
+  Future<void> _toggleDataAccess(Employee employee, bool enabled) async {
+    try {
+      final acc = context.read<AccountManagerSupabase>();
+      final updated = employee.copyWith(dataAccessEnabled: enabled, updatedAt: DateTime.now());
+      await acc.updateEmployee(updated);
+      await _load();
+      if (mounted) {
+        final loc = context.read<LocalizationService>();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(enabled ? (loc.t('data_access_enabled') ?? 'Доступ к данным включён') : (loc.t('data_access_disabled') ?? 'Доступ к данным выключен'))),
+        );
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+    }
+  }
+
   void _openEditEmployee(BuildContext context, Employee employee) {
+    final canToggle = _canToggleDataAccess(context.read<AccountManagerSupabase>().currentEmployee);
     showDialog<void>(
       context: context,
       builder: (ctx) => _EmployeeEditSheet(
         employee: employee,
+        canToggleDataAccess: canToggle,
         onSaved: () {
           Navigator.of(ctx).pop();
           _load();
@@ -214,7 +245,9 @@ class _EmployeeCard extends StatelessWidget {
     required this.employee,
     required this.loc,
     required this.canEdit,
+    required this.canToggleDataAccess,
     required this.onUpdated,
+    required this.onToggleDataAccess,
     required this.onEdit,
     required this.onDelete,
   });
@@ -222,7 +255,9 @@ class _EmployeeCard extends StatelessWidget {
   final Employee employee;
   final LocalizationService loc;
   final bool canEdit;
+  final bool canToggleDataAccess;
   final VoidCallback onUpdated;
+  final void Function(Employee employee, bool enabled) onToggleDataAccess;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
@@ -306,6 +341,20 @@ class _EmployeeCard extends StatelessWidget {
                   ],
                 ],
               ),
+              if (canToggleDataAccess && !employee.hasRole('owner')) ...[
+                const Divider(height: 24),
+                Row(
+                  children: [
+                    Icon(Icons.lock_outline, size: 18, color: theme.colorScheme.primary),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(loc.t('data_access') ?? 'Доступ к данным', style: theme.textTheme.bodyMedium)),
+                    Switch(
+                      value: employee.dataAccessEnabled,
+                      onChanged: (v) => onToggleDataAccess(employee, v),
+                    ),
+                  ],
+                ),
+              ],
               const Divider(height: 24),
               Row(
                 children: [
@@ -337,9 +386,15 @@ String _roleLabel(String code, LocalizationService loc) {
 }
 
 class _EmployeeEditSheet extends StatefulWidget {
-  const _EmployeeEditSheet({required this.employee, required this.onSaved, required this.onCancel});
+  const _EmployeeEditSheet({
+    required this.employee,
+    required this.canToggleDataAccess,
+    required this.onSaved,
+    required this.onCancel,
+  });
 
   final Employee employee;
+  final bool canToggleDataAccess;
   final VoidCallback onSaved;
   final VoidCallback onCancel;
 
@@ -355,6 +410,7 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
   late List<String> _roles;
   late String _paymentType;
   late bool _isActive;
+  late bool _dataAccessEnabled;
   bool _saving = false;
   String? _error;
 
@@ -372,6 +428,7 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
     _roles = List.from(widget.employee.roles);
     _paymentType = widget.employee.paymentType ?? 'hourly';
     _isActive = widget.employee.isActive;
+    _dataAccessEnabled = widget.employee.dataAccessEnabled;
   }
 
   @override
@@ -404,6 +461,7 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
         ratePerShift: _paymentType == 'per_shift' ? (rate ?? 0) : null,
         hourlyRate: _paymentType == 'hourly' ? rate : null,
         isActive: _isActive,
+        dataAccessEnabled: _dataAccessEnabled,
       );
       await context.read<AccountManagerSupabase>().updateEmployee(updated);
       if (mounted) widget.onSaved();
@@ -533,6 +591,13 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
                         value: _isActive,
                         onChanged: (v) => setState(() => _isActive = v),
                       ),
+                      if (widget.canToggleDataAccess && !widget.employee.hasRole('owner'))
+                        SwitchListTile(
+                          title: Text(loc.t('data_access') ?? 'Доступ к данным'),
+                          subtitle: Text(loc.t('data_access_hint') ?? 'Без доступа сотрудник видит только график'),
+                          value: _dataAccessEnabled,
+                          onChanged: (v) => setState(() => _dataAccessEnabled = v),
+                        ),
                       if (_error != null) ...[
                         const SizedBox(height: 8),
                         Text(_error!, style: TextStyle(color: theme.colorScheme.error)),

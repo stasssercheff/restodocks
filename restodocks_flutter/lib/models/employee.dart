@@ -119,6 +119,10 @@ class Employee extends Equatable {
   @JsonKey(name: 'is_active')
   final bool isActive;
 
+  /// Доступ к данным (кроме графика). При регистрации false; включает руководитель.
+  @JsonKey(name: 'data_access_enabled')
+  final bool dataAccessEnabled;
+
   @JsonKey(name: 'created_at')
   final DateTime createdAt;
 
@@ -144,6 +148,7 @@ class Employee extends Equatable {
     this.ratePerShift,
     this.hourlyRate,
     this.isActive = true,
+    this.dataAccessEnabled = false,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -167,6 +172,7 @@ class Employee extends Equatable {
     double? ratePerShift,
     double? hourlyRate,
     bool? isActive,
+    bool? dataAccessEnabled,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -188,6 +194,7 @@ class Employee extends Equatable {
       ratePerShift: ratePerShift ?? this.ratePerShift,
       hourlyRate: hourlyRate ?? this.hourlyRate,
       isActive: isActive ?? this.isActive,
+      dataAccessEnabled: dataAccessEnabled ?? this.dataAccessEnabled,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -354,6 +361,7 @@ class Employee extends Equatable {
     m['establishment_id'] = _str(m['establishment_id'], '');
     m['department'] = _str(m['department'], 'management');
     m['full_name'] = _str(m['full_name'], '');
+    if (!m.containsKey('data_access_enabled')) m['data_access_enabled'] = false;
     return _$EmployeeFromJson(m);
   }
   static String _str(dynamic v, String fallback) {
@@ -387,6 +395,7 @@ class Employee extends Equatable {
     ratePerShift,
     hourlyRate,
     isActive,
+    dataAccessEnabled,
     createdAt,
     updatedAt,
   ];
@@ -417,6 +426,7 @@ class Employee extends Equatable {
       preferredLanguage: preferredLanguage,
       personalPin: _generatePersonalPin(),
       isActive: true,
+      dataAccessEnabled: false,
       createdAt: now,
       updatedAt: now,
     );

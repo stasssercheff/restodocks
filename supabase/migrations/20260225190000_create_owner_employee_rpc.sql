@@ -42,12 +42,12 @@ BEGIN
   INSERT INTO employees (
     id, full_name, surname, email, password_hash,
     department, section, roles, establishment_id, personal_pin,
-    preferred_language, is_active, created_at, updated_at
+    preferred_language, is_active, data_access_enabled, created_at, updated_at
   ) VALUES (
     p_auth_user_id, trim(p_full_name), nullif(trim(p_surname), ''),
     trim(p_email), NULL,
     'management', NULL, p_roles, p_establishment_id, v_personal_pin,
-    'ru', true, v_now, v_now
+    'ru', true, true, v_now, v_now
   );
 
   UPDATE establishments SET owner_id = p_auth_user_id, updated_at = v_now
@@ -56,7 +56,7 @@ BEGIN
   SELECT to_jsonb(r) INTO v_emp
   FROM (
     SELECT id, full_name, surname, email, department, section, roles,
-           establishment_id, personal_pin, preferred_language, is_active,
+           establishment_id, personal_pin, preferred_language, is_active, data_access_enabled,
            created_at, updated_at
     FROM employees WHERE id = p_auth_user_id
   ) r;
