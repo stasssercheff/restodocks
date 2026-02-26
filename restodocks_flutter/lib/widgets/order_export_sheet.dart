@@ -6,6 +6,7 @@ import '../models/models.dart';
 import '../services/services.dart';
 
 /// Bottom sheet с выбором: сохранить Excel, сохранить текст, копировать в буфер, отправить по почте/WhatsApp/Telegram.
+/// При любом действии — автоматически сохраняет заказ во входящие (шефу и собственнику).
 class OrderExportSheet extends StatelessWidget {
   const OrderExportSheet({
     super.key,
@@ -14,6 +15,7 @@ class OrderExportSheet extends StatelessWidget {
     required this.companyName,
     required this.loc,
     required this.onSaved,
+    this.onExportToInbox,
   });
 
   final OrderList list;
@@ -21,6 +23,8 @@ class OrderExportSheet extends StatelessWidget {
   final String companyName;
   final LocalizationService loc;
   final void Function(String message) onSaved;
+  /// Вызывается после успешного экспорта — сохраняет заказ во входящие
+  final Future<void> Function()? onExportToInbox;
 
   String _t(String key) => loc.t(key);
 
@@ -48,6 +52,7 @@ class OrderExportSheet extends StatelessWidget {
         documentDate: DateTime.now(),
         t: _t,
       );
+      await onExportToInbox?.call();
       if (context.mounted) {
         Navigator.of(context).pop();
         onSaved('${_t('order_export_excel_saved')}: $fileName');
@@ -68,6 +73,7 @@ class OrderExportSheet extends StatelessWidget {
         content: content,
         listName: list.name,
       );
+      await onExportToInbox?.call();
       if (context.mounted) {
         Navigator.of(context).pop();
         onSaved('${_t('order_export_text_saved')}: $fileName');
@@ -84,6 +90,7 @@ class OrderExportSheet extends StatelessWidget {
   Future<void> _copyToClipboard(BuildContext context) async {
     final content = _buildText();
     await Clipboard.setData(ClipboardData(text: content));
+    await onExportToInbox?.call();
     if (context.mounted) {
       Navigator.of(context).pop();
       onSaved(_t('order_export_copied'));
@@ -124,6 +131,10 @@ class OrderExportSheet extends StatelessWidget {
     );
 
     if (!context.mounted) return;
+    if (result.ok) {
+      await onExportToInbox?.call();
+    }
+    if (!context.mounted) return;
     Navigator.of(context).pop();
     if (result.ok) {
       onSaved(_t('order_export_email_sent'));
@@ -151,6 +162,7 @@ class OrderExportSheet extends StatelessWidget {
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       }
+      await onExportToInbox?.call();
       if (context.mounted) Navigator.of(context).pop();
     }
   }
@@ -163,6 +175,7 @@ class OrderExportSheet extends StatelessWidget {
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       }
+      await onExportToInbox?.call();
       if (context.mounted) Navigator.of(context).pop();
     }
   }

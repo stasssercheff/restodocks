@@ -251,7 +251,13 @@ class _DocumentTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final loc = context.watch<LocalizationService>();
     final dateFormat = DateFormat('dd.MM.yyyy HH:mm', 'ru');
+    final grandTotal = document.type == DocumentType.productOrder
+        ? (document.metadata?['grandTotal'] as num?)?.toDouble()
+        : null;
+    final totalStr = grandTotal != null ? NumberFormat('#,##0.00', 'ru').format(grandTotal) : null;
+    final totalLabel = loc.t('order_list_grand_total') ?? 'Итого';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -268,6 +274,16 @@ class _DocumentTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(document.description),
+            if (totalStr != null) ...[
+              const SizedBox(height: 2),
+              Text(
+                '$totalLabel: $totalStr',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+            ],
             const SizedBox(height: 2),
             Text(
               '${document.employeeName} • ${dateFormat.format(document.createdAt)}',

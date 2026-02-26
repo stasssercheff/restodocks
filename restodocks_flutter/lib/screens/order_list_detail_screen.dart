@@ -197,6 +197,54 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
     }).toList();
   }
 
+  /// Сохранить текущий заказ во входящие (шефу и собственнику). Возвращает true при успехе.
+  Future<bool> _saveOrderToInbox() async {
+    if (_list == null || _establishmentId == null) return false;
+    final account = context.read<AccountManagerSupabase>();
+    final employee = account.currentEmployee;
+    final establishment = account.establishment;
+    if (employee == null || establishment == null) return false;
+    final store = context.read<ProductStoreSupabase>();
+    final itemsWithQty = _getItemsWithQuantities();
+    final now = DateTime.now();
+    final orderForDateStr = _list!.orderForDate != null ? DateFormat('yyyy-MM-dd').format(_list!.orderForDate!) : null;
+    final header = {
+      'supplierName': _list!.supplierName,
+      'employeeName': employee.fullName,
+      'establishmentName': establishment.name,
+      'createdAt': now.toIso8601String(),
+      'orderForDate': orderForDateStr,
+    };
+    double grandTotal = 0;
+    final itemsPayload = <Map<String, dynamic>>[];
+    for (final item in itemsWithQty) {
+      double pricePerKg = 0;
+      if (item.productId != null) {
+        final ep = store.getEstablishmentPrice(item.productId!, establishment.id);
+        pricePerKg = ep?.$1 ?? 0;
+      }
+      double pricePerUnit = pricePerKg;
+      if (item.unit == 'g' || item.unit == 'г') pricePerUnit = pricePerKg / 1000;
+      else if (item.unit != 'kg' && item.unit != 'кг') pricePerUnit = pricePerKg;
+      final lineTotal = item.quantity * pricePerUnit;
+      grandTotal += lineTotal;
+      itemsPayload.add({
+        'productName': item.productName,
+        'unit': item.unit,
+        'quantity': item.quantity,
+        'pricePerUnit': pricePerUnit,
+        'lineTotal': lineTotal,
+      });
+    }
+    final payload = {'header': header, 'items': itemsPayload, 'grandTotal': grandTotal, 'comment': _list!.comment};
+    final orderDoc = await OrderDocumentService().save(
+      establishmentId: establishment.id,
+      createdByEmployeeId: employee.id,
+      payload: payload,
+    );
+    return orderDoc != null;
+  }
+
   Future<void> _showExportSheet() async {
     if (_list == null) return;
     final account = context.read<AccountManagerSupabase>();
@@ -214,6 +262,17 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
         companyName: companyName,
         loc: loc,
         onSaved: (msg) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg))),
+        onExportToInbox: () async {
+          final ok = await _saveOrderToInbox();
+          if (mounted && !ok) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('${loc.t('error_short') ?? 'Ошибка'}: не удалось сохранить заказ во входящие.'),
+                backgroundColor: Theme.of(context).colorScheme.error,
+              ),
+            );
+          }
+        },
       ),
     );
   }

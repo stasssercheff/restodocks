@@ -191,10 +191,10 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        _row(loc.t('inbox_header_employee') ?? 'Кто отправил', header['employeeName'] ?? '—'),
+        _row(loc.t('order_export_date_time') ?? 'Дата отправки', createdAt != null ? DateFormat('dd.MM.yyyy HH:mm').format(createdAt) : '—'),
         _row(loc.t('order_export_to') ?? 'Поставщик', header['supplierName'] ?? '—'),
-        _row(loc.t('inbox_header_employee') ?? 'Сотрудник', header['employeeName'] ?? '—'),
         _row(loc.t('order_export_from') ?? 'Заведение', header['establishmentName'] ?? '—'),
-        _row(loc.t('order_export_date_time') ?? 'Дата и время', createdAt != null ? DateFormat('dd.MM.yyyy HH:mm').format(createdAt) : '—'),
         _row(loc.t('order_export_order_for') ?? 'На дату', orderFor != null ? DateFormat('dd.MM.yyyy').format(orderFor) : '—'),
       ],
     );
