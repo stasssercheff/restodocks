@@ -27,6 +27,7 @@ class _MenuScreenState extends State<MenuScreen> {
     final Map<String, Map<String, String>> categoryTranslations = {
       'sauce': {'ru': 'Соус', 'en': 'Sauce'},
       'vegetables': {'ru': 'Овощи', 'en': 'Vegetables'},
+      'salad': {'ru': 'Салат', 'en': 'Salad'},
       'meat': {'ru': 'Мясо', 'en': 'Meat'},
       'seafood': {'ru': 'Рыба', 'en': 'Seafood'},
       'side': {'ru': 'Гарнир', 'en': 'Side dish'},

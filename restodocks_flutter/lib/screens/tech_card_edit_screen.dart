@@ -453,7 +453,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   String? _error;
   /// 'photo' | 'excel' — какая кнопка сейчас загружает (чтобы показывать правильный текст).
   final _nameController = TextEditingController();
-  static const _categoryOptions = ['sauce', 'vegetables', 'meat', 'seafood', 'side', 'subside', 'bakery', 'dessert', 'decor', 'soup', 'misc', 'beverages'];
+  static const _categoryOptions = ['sauce', 'vegetables', 'salad', 'meat', 'seafood', 'side', 'subside', 'bakery', 'dessert', 'decor', 'soup', 'misc', 'beverages'];
   static const _sectionOptions = {
     'hot_kitchen': 'Горячий цех',
     'cold_kitchen': 'Холодный цех',
@@ -495,6 +495,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     final Map<String, Map<String, String>> categoryTranslations = {
       'sauce': {'ru': 'Соус', 'en': 'Sauce'},
       'vegetables': {'ru': 'Овощи', 'en': 'Vegetables'},
+      'salad': {'ru': 'Салат', 'en': 'Salad'},
       'meat': {'ru': 'Мясо', 'en': 'Meat'},
       'seafood': {'ru': 'Рыба', 'en': 'Seafood'},
       'side': {'ru': 'Гарнир', 'en': 'Side dish'},
@@ -514,7 +515,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   String _inferCategory(String dishName) {
     final lower = dishName.toLowerCase();
     if (lower.contains('соус') || lower.contains('sauce')) return 'sauce';
-    if (lower.contains('овощ') || lower.contains('vegetable') || lower.contains('салат')) return 'vegetables';
+    if (lower.contains('овощ') || lower.contains('vegetable')) return 'vegetables';
+    if (lower.contains('салат') || lower.contains('salad')) return 'salad';
     if (lower.contains('мяс') || lower.contains('meat') || lower.contains('куриц') || lower.contains('говядин')) return 'meat';
     if (lower.contains('рыб') || lower.contains('fish') || lower.contains('море') || lower.contains('seafood')) return 'seafood';
     if (lower.contains('гарнир') || lower.contains('side')) return 'side';
