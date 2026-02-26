@@ -311,18 +311,17 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
               icon: Icons.edit_note,
               title: '1. Загрузить из текста',
               description: 'Вставьте список продуктов из Excel, мессенджера или заметок. '
-                  'ИИ распознает формат, найдёт дубликаты, предложит сверку цен.',
+                  'Формат распознаётся автоматически, дубликаты и сверка цен.',
               color: Colors.green,
               onTap: _isLoading ? null : () => _showTextUploadDialog(),
             ),
             const SizedBox(height: 12),
 
-            // 2. Загрузить из файла
+            // 2. Загрузить из файла (только xls/xlsx)
             _UploadMethodCard(
               icon: Icons.file_upload,
               title: '2. Загрузить из файла',
-              description: 'Excel, CSV, текст (.txt, .rtf), Word (.docx). '
-                  'Модерация, поиск дубликатов ИИ, сверка цен.',
+              description: 'Excel (.xls, .xlsx). Модерация, поиск дубликатов, сверка цен.',
               color: Colors.blue,
               onTap: _isLoading ? null : () => _uploadFromFileUnified(),
             ),
@@ -351,7 +350,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Вставьте список: из Excel (Ctrl+C), мессенджера, заметок. ИИ распознает формат.',
+                'Вставьте список: из Excel (Ctrl+C), мессенджера, заметок. Формат распознаётся автоматически.',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 12),
@@ -383,7 +382,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   Future<void> _uploadFromFileUnified() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['csv', 'txt', 'rtf', 'doc', 'docx', 'xls', 'xlsx'],
+      allowedExtensions: ['xls', 'xlsx'],
       withData: true,
     );
     if (result == null || result.files.isEmpty || result.files.single.bytes == null) return;
@@ -397,7 +396,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Не удалось извлечь данные. Попробуйте экспортировать в CSV или .xlsx.',
+              'Не удалось извлечь данные. Попробуйте сохранить файл как .xlsx.',
             ),
           ),
         );
@@ -710,7 +709,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
             ListTile(
               leading: const Icon(Icons.file_upload),
               title: const Text('Из файла'),
-              subtitle: const Text('Excel, CSV'),
+              subtitle: const Text('Excel (.xls, .xlsx)'),
               onTap: () => Navigator.of(ctx).pop('file'),
             ),
             ListTile(
@@ -734,7 +733,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     if (choice == 'file') {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['csv', 'txt', 'rtf', 'doc', 'docx', 'xls', 'xlsx'],
+        allowedExtensions: ['xls', 'xlsx'],
         withData: true,
       );
       if (result == null || result.files.isEmpty || result.files.single.bytes == null) return;
@@ -794,7 +793,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
     setState(() => _isLoading = true);
     _startLoadingTimeout();
-    _setLoadingMessage('Анализ данных ИИ...');
+    _setLoadingMessage('Анализ данных...');
 
     try {
       List<ParsedProductItem> parsed = [];
@@ -819,23 +818,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
             parsed.add(ParsedProductItem(name: r.name, price: r.price, unit: null, currency: null));
           }
         }
-        // Диагностика: показать пользователю, почему ИИ не распознал данные (при использовании локального разбора)
-        if (mounted && parsed.isNotEmpty) {
-          final aiError = AiServiceSupabase.lastParseProductListError;
-          final hint = context.read<LocalizationService>().t('ai_fallback_hint') ?? 'ИИ не распознал данные. Использован локальный разбор.';
-          final reason = aiError != null && aiError.isNotEmpty
-              ? (context.read<LocalizationService>().t('ai_error_reason') ?? 'Причина: %s').replaceAll('%s', aiError)
-              : null;
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(reason != null ? '$hint $reason' : hint),
-                duration: const Duration(seconds: 6),
-              ),
-            );
-          });
-        }
+        // Уведомление о неудаче ИИ скрыто по запросу
       }
 
       // Не вызываем normalizeProductNames для всех: ai-parse-product-list уже исправляет опечатки.
@@ -845,12 +828,8 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         _cancelLoadingTimeout();
         if (mounted) {
           setState(() => _isLoading = false);
-          final aiErr = AiServiceSupabase.lastParseProductListError;
-          final msg = aiErr != null && aiErr.isNotEmpty
-              ? 'Не удалось извлечь продукты. ${context.read<LocalizationService>().t('ai_error_reason')?.replaceAll('%s', aiErr) ?? 'Причина ИИ: $aiErr'}'
-              : 'Не удалось извлечь продукты. Проверьте формат данных.';
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(msg), duration: const Duration(seconds: 8)),
+            const SnackBar(content: Text('Не удалось извлечь продукты. Проверьте формат данных.'), duration: Duration(seconds: 6)),
           );
         }
         return;
@@ -928,6 +907,15 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     }
   }
 
+  /// Нормализация названия для сопоставления (латиница + кириллица, без пунктуации)
+  static String _normalizeForMatch(String text) {
+    return text
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-zA-Zа-яёЁ0-9\s]'), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+  }
+
   Future<({String? existingId, String? existingName, double? existingPrice, bool existingPriceFromEstablishment, bool priceDiff})> _findMatch(
     String name,
     double? price,
@@ -936,11 +924,11 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     String establishmentId,
     ProductStoreSupabase store,
   ) async {
-    final normalized = name.toLowerCase().replaceAll(RegExp(r'[^\w\s]'), '').replaceAll(RegExp(r'\s+'), ' ').trim();
+    final normalized = _normalizeForMatch(name);
     for (final p in nomenclature) {
       final pNames = [p.name, ...(p.names?.values ?? [])];
       for (final n in pNames) {
-        final nNorm = n.toLowerCase().replaceAll(RegExp(r'[^\w\s]'), '').replaceAll(RegExp(r'\s+'), ' ').trim();
+        final nNorm = _normalizeForMatch(n);
         if (nNorm == normalized) {
           // Цена из establishment_products (номенклатура заведения), fallback — basePrice из карточки продукта
           final ep = store.getEstablishmentPrice(p.id, establishmentId);
@@ -960,7 +948,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     print('=== _uploadExcelSimple called ===');
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['csv', 'txt', 'rtf', 'doc', 'docx', 'xls', 'xlsx'],
+      allowedExtensions: ['xls', 'xlsx'],
       allowMultiple: false,
     );
     print('Excel simple picker result: ${result != null ? "files selected" : "cancelled"}');
@@ -987,7 +975,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       final loc = context.read<LocalizationService>();
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['csv', 'txt', 'rtf', 'doc', 'docx', 'xls', 'xlsx'],
+        allowedExtensions: ['xls', 'xlsx'],
         withData: true,
       );
 
@@ -1168,7 +1156,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'ИИ автоматически разберет любой формат списка продуктов.\n'
+                  'Формат списка продуктов распознаётся автоматически.\n'
                   'Просто вставьте текст в любом формате:',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
@@ -1232,7 +1220,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['csv', 'txt', 'rtf', 'doc', 'docx', 'xls', 'xlsx'],
+        allowedExtensions: ['xls', 'xlsx'],
         withData: true,
       );
 
@@ -1479,7 +1467,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   Future<void> _processTextWithAI(String text, LocalizationService loc, bool addToNomenclature) async {
     print('=== _processTextWithAI called ===');
     _addDebugLog('=== STARTING AI TEXT PROCESSING ===');
-    _setLoadingMessage('Обрабатываем текст через ИИ...');
+    _setLoadingMessage('Обрабатываем текст...');
 
     setState(() => _isLoading = true);
 
@@ -1606,7 +1594,7 @@ ${text}
         await _addProductsToNomenclature(items, loc, addToNomenclature, processingResults);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('AI не смог извлечь продукты из текста')),
+          const SnackBar(content: Text('Не удалось извлечь продукты из текста. Проверьте формат данных.'), duration: Duration(seconds: 5)),
         );
       }
 
@@ -1707,7 +1695,7 @@ ${text}
 
     if (items.isEmpty) {
       _addDebugLog('WARNING: Basic parsing failed, trying AI processing');
-      _setLoadingMessage('Обычный парсинг не сработал, пробуем ИИ...');
+      _setLoadingMessage('Разбор данных...');
       // Если обычный парсинг не сработал, пробуем AI
       return await _processTextWithAI(text, loc, addToNomenclature);
     }
@@ -3259,14 +3247,14 @@ class _UploadSchoolCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Название и цена — через Tab или пробелы. ИИ распознаёт запятые, символы валюты.',
+                    'Название и цена — через Tab или пробелы. Распознаются запятые, символы валюты.',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
                   ),
                   const SizedBox(height: 16),
                   Text('Поддерживаемые файлы:', style: Theme.of(context).textTheme.titleSmall),
                   const SizedBox(height: 4),
                   Text(
-                    'Excel (.xlsx, .xls), CSV, текст (.txt, .rtf), Word (.docx), Apple Pages, Numbers.',
+                    'Вставка текста или файл Excel (.xlsx, .xls).',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
                   ),
                   const SizedBox(height: 16),
@@ -3276,7 +3264,7 @@ class _UploadSchoolCard extends StatelessWidget {
                     'После загрузки откроется экран проверки. Там можно:\n'
                     '• Подтвердить или отклонить изменение цен\n'
                     '• Добавить новые продукты в номенклатуру\n'
-                    '• Исправить названия, предложенные ИИ',
+                    '• Исправить предложенные названия',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
                   ),
                 ],
@@ -3427,7 +3415,7 @@ class _TipsSection extends StatelessWidget {
             const SizedBox(height: 12),
             _buildTip('Экспортируйте продукты из Excel в текстовый файл'),
             _buildTip('Или просто скопируйте список из любой таблицы'),
-            _buildTip('ИИ автоматически исправит названия и определит категории'),
+            _buildTip('Названия и категории определяются автоматически'),
             _buildTip('Продукты добавятся в общую базу и вашу номенклатуру'),
           ],
         ),

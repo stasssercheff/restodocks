@@ -85,9 +85,11 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
         if (!mounted) return;
 
         if (item.existingProductId != null) {
-          if (item.displayPrice != null) {
+          // Для priceUpdate: явно применяем новую цену; displayPrice = suggestedPrice ?? price (новая из файла)
+          final newPrice = item.displayPrice ?? item.price;
+          if (newPrice != null) {
             final cur = item.currency ?? defCur;
-            await store.addToNomenclature(est.id, item.existingProductId!, price: item.displayPrice, currency: cur);
+            await store.setEstablishmentPrice(est.id, item.existingProductId!, newPrice, cur);
             updated++;
           }
         } else {
@@ -309,18 +311,30 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
     } else {
       parts.add(loc.t('new_product_label') ?? 'Новый продукт');
     }
-    if (item.displayPrice != null) {
-      final cur = item.currency != null ? ' ${item.currency}' : '';
+    final cur = item.currency != null ? ' ${item.currency}' : '';
+    // Для priceUpdate: всегда показываем реальную старую и реальную новую цену
+    if (item.category == ModerationCategory.priceUpdate &&
+        item.existingProductId != null &&
+        (item.existingPrice != null || item.displayPrice != null || item.price != null)) {
+      final oldPrice = item.existingPrice;
+      final newPrice = item.displayPrice ?? item.price;
+      if (oldPrice != null && newPrice != null) {
+        parts.add('Было: $oldPrice$cur → Станет: $newPrice$cur');
+      } else if (newPrice != null) {
+        parts.add('Новая цена: $newPrice$cur');
+      } else if (oldPrice != null) {
+        parts.add('Цена: $oldPrice$cur');
+      }
+    } else if (item.displayPrice != null) {
       final hasPriceChange = item.existingProductId != null && item.existingPrice != null &&
-          item.existingPriceFromEstablishment &&
           (item.existingPrice! - item.displayPrice!).abs() > 0.01;
       if (hasPriceChange) {
-        parts.add('Новая цена: ${item.displayPrice}$cur (сейчас: ${item.existingPrice})');
+        parts.add('Было: ${item.existingPrice}$cur → Станет: ${item.displayPrice}$cur');
       } else {
         parts.add('Цена: ${item.displayPrice}$cur');
       }
-    } else if (item.existingProductId != null && item.existingPrice != null && item.existingPriceFromEstablishment) {
-      parts.add('Цена: ${item.existingPrice}');
+    } else if (item.existingProductId != null && item.existingPrice != null) {
+      parts.add('Цена: ${item.existingPrice}$cur');
     }
     if (item.unit != null) parts.add(item.unit!);
     if (item.normalizedName != null && item.normalizedName != item.name) {

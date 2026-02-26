@@ -250,13 +250,13 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
     final progress = widget.items.isEmpty ? 1.0 : _processed / widget.items.length;
 
     return AlertDialog(
-      title: Text('ИИ обрабатывает продукты'),
+      title: Text('Обработка продуктов'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Text('Обработано $_processed из ${widget.items.length} продуктов'),
           const SizedBox(height: 8),
-          Text('ИИ проверяет названия, категории и цены...', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+          Text('Проверка названий, категорий и цен...', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
           const SizedBox(height: 16),
           LinearProgressIndicator(value: progress),
           const SizedBox(height: 8),
@@ -1200,7 +1200,7 @@ class _DuplicatesDialogState extends State<_DuplicatesDialog> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              widget.loc.t('duplicates_hint') ?? 'ИИ нашёл похожие названия. Выберите, какие удалить (останется один эталон).',
+              widget.loc.t('duplicates_hint') ?? 'Найдены похожие названия. Выберите, какие удалить (останется один эталон).',
               style: theme.textTheme.bodySmall,
             ),
             const SizedBox(height: 12),
@@ -2666,7 +2666,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
         final ok = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: Text(widget.loc.t('ai_suggest_correction') ?? 'ИИ предлагает исправление'),
+            title: Text(widget.loc.t('ai_suggest_correction') ?? 'Предлагается исправление'),
             content: Text(
               '${widget.loc.t('ai_suggested_name') ?? 'Возможно, вы имели в виду'}: "${result.normalizedName}"',
             ),

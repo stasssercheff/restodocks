@@ -23,9 +23,16 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
   Checklist? _checklist;
   bool _loading = true;
   String? _error;
+  List<TechCard> _techCards = [];
   late final TextEditingController _nameController;
+  late final TextEditingController _additionalNameController;
   late final TextEditingController _newItemController;
+  late final TextEditingController _dropdownOptionsController;
   final List<ChecklistItem> _items = [];
+  ChecklistType _type = ChecklistType.tasks;
+  bool _actionHasNumeric = false;
+  bool _actionHasToggle = true;
+  List<String> _actionDropdownOptions = [];
 
   Future<void> _load() async {
     setState(() {
@@ -33,14 +40,28 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
       _error = null;
     });
     try {
+      final acc = context.read<AccountManagerSupabase>();
+      final est = acc.establishment;
       final svc = context.read<ChecklistServiceSupabase>();
+      final techSvc = context.read<TechCardServiceSupabase>();
       final c = await svc.getChecklistById(widget.checklistId);
+      List<TechCard> techs = [];
+      if (est != null) {
+        techs = await techSvc.getTechCardsForEstablishment(est.id);
+      }
       if (!mounted) return;
       setState(() {
         _checklist = c;
+        _techCards = techs;
         _loading = false;
         if (c != null) {
           _nameController.text = c.name;
+          _additionalNameController.text = c.additionalName ?? '';
+          _type = c.type ?? ChecklistType.tasks;
+          _actionHasNumeric = c.actionConfig.hasNumeric;
+          _actionHasToggle = c.actionConfig.hasToggle;
+          _actionDropdownOptions = List.from(c.actionConfig.dropdownOptions ?? []);
+          _dropdownOptionsController.text = _actionDropdownOptions.join(', ');
           _items
             ..clear()
             ..addAll(c.items);
@@ -58,9 +79,10 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
   void initState() {
     super.initState();
 
-    // Создать tracked контроллеры
     _nameController = createTrackedController();
+    _additionalNameController = createTrackedController();
     _newItemController = createTrackedController();
+    _dropdownOptionsController = TextEditingController();
 
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
 
@@ -69,27 +91,38 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
   }
 
   @override
-  String get draftKey => 'checklist';
+  String get draftKey => 'checklist_edit_${widget.checklistId}';
 
   @override
   Map<String, dynamic> getCurrentState() {
     return {
       'checklistId': widget.checklistId,
       'name': _nameController.text,
+      'additionalName': _additionalNameController.text,
+      'type': _type.code,
+      'actionHasNumeric': _actionHasNumeric,
+      'actionHasToggle': _actionHasToggle,
+      'actionDropdownOptions': _actionDropdownOptions,
       'items': _items.map((item) => {
         'id': item.id,
         'title': item.title,
         'sortOrder': item.sortOrder,
+        'techCardId': item.techCardId,
       }).toList(),
     };
   }
 
   @override
   Future<void> restoreState(Map<String, dynamic> data) async {
-    if (data['checklistId'] != widget.checklistId) return; // Не наш черновик
+    if (data['checklistId'] != widget.checklistId) return;
 
     setState(() {
       _nameController.text = data['name'] ?? '';
+      _additionalNameController.text = data['additionalName'] ?? '';
+      _type = ChecklistType.fromCode(data['type'] as String?) ?? ChecklistType.tasks;
+      _actionHasNumeric = data['actionHasNumeric'] == true;
+      _actionHasToggle = data['actionHasToggle'] != false;
+      _actionDropdownOptions = List<String>.from(data['actionDropdownOptions'] as List<dynamic>? ?? []);
       final itemsData = data['items'] as List<dynamic>? ?? [];
       _items.clear();
       for (final itemData in itemsData) {
@@ -98,7 +131,8 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
           id: itemMap['id'] ?? '',
           checklistId: widget.checklistId,
           title: itemMap['title'] ?? '',
-          sortOrder: itemMap['sortOrder'] ?? 0,
+          sortOrder: (itemMap['sortOrder'] as num?)?.toInt() ?? 0,
+          techCardId: itemMap['techCardId'] as String?,
         ));
       }
     });
@@ -107,7 +141,9 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
   @override
   void dispose() {
     _nameController.dispose();
+    _additionalNameController.dispose();
     _newItemController.dispose();
+    _dropdownOptionsController.dispose();
     super.dispose();
   }
 
@@ -121,8 +157,21 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
       );
       return;
     }
+    final opts = _dropdownOptionsController.text
+        .split(',')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+    final actionConfig = ChecklistActionConfig(
+      hasNumeric: _actionHasNumeric,
+      dropdownOptions: opts.isEmpty ? null : opts,
+      hasToggle: _actionHasToggle,
+    );
     final updated = c.copyWith(
       name: name,
+      additionalName: _additionalNameController.text.trim().isEmpty ? null : _additionalNameController.text.trim(),
+      type: _type,
+      actionConfig: actionConfig,
       assignedSection: c.assignedSection,
       items: _items
           .map((e) => ChecklistItem(
@@ -130,6 +179,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                 checklistId: c.id,
                 title: e.title,
                 sortOrder: e.sortOrder,
+                techCardId: e.techCardId,
               ))
           .toList(),
     );
@@ -210,17 +260,97 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
     }
   }
 
-  void _addItem() {
-    final t = _newItemController.text.trim();
+  void _addItem({String? title, String? techCardId}) {
+    final t = title ?? _newItemController.text.trim();
     if (t.isEmpty) return;
     setState(() {
       _items.add(ChecklistItem.template(
         title: t,
         sortOrder: _items.length,
+        techCardId: techCardId,
       ));
       _newItemController.clear();
     });
-    scheduleSave(); // Автосохранение при добавлении элемента
+    scheduleSave();
+  }
+
+  void _showAddItemDialog() {
+    final loc = context.read<LocalizationService>();
+    final lang = loc.currentLanguageCode;
+    if (_type == ChecklistType.prep && _techCards.isNotEmpty) {
+      showDialog<void>(
+        context: context,
+        builder: (ctx) {
+          String? selectedTechId;
+          final customController = TextEditingController();
+          return StatefulBuilder(
+            builder: (context, setDialogState) {
+              return AlertDialog(
+                title: Text(loc.t('add_item') ?? 'Добавить пункт'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      loc.t('checklist_item_prep_hint') ?? 'ТТК ПФ из списка или своё наименование',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String?>(
+                      value: selectedTechId,
+                      decoration: InputDecoration(
+                        labelText: loc.t('ttk_pf') ?? 'ТТК ПФ',
+                      ),
+                      items: [
+                        DropdownMenuItem<String?>(value: null, child: Text(loc.t('custom') ?? 'Своё (ввести текст)')),
+                        ..._techCards
+                            .where((tc) => tc.isSemiFinished)
+                            .map((tc) => DropdownMenuItem(
+                                  value: tc.id,
+                                  child: Text(tc.getDisplayNameInLists(lang)),
+                                )),
+                      ],
+                      onChanged: (v) => setDialogState(() => selectedTechId = v),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: customController,
+                      decoration: InputDecoration(
+                        labelText: selectedTechId == null ? (loc.t('custom') ?? 'Своё') : (loc.t('or_override') ?? 'Или переопределить'),
+                        hintText: loc.t('checklist_item_hint'),
+                      ),
+                      enabled: selectedTechId == null || customController.text.isNotEmpty,
+                      onChanged: (_) => setDialogState(() {}),
+                    ),
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    child: Text(loc.t('cancel')),
+                  ),
+                    FilledButton(
+                    onPressed: () {
+                      if (selectedTechId != null) {
+                        final tc = _techCards.firstWhere((t) => t.id == selectedTechId);
+                        _addItem(title: tc.getDisplayNameInLists(lang), techCardId: selectedTechId);
+                        Navigator.of(ctx).pop();
+                      } else if (customController.text.trim().isNotEmpty) {
+                        _addItem(title: customController.text.trim());
+                        Navigator.of(ctx).pop();
+                      }
+                    },
+                    child: Text(loc.t('add')),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+    } else {
+      _addItem();
+    }
   }
 
   void _removeItem(int i) {
@@ -334,6 +464,69 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                 hintText: loc.t('checklist_name_hint'),
               ),
             ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _additionalNameController,
+              readOnly: !canEdit,
+              decoration: InputDecoration(
+                labelText: loc.t('checklist_additional_name') ?? 'Дополнительное название',
+                hintText: loc.t('checklist_additional_name_hint') ?? 'Подзаголовок чеклиста',
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (canEdit)
+              DropdownButtonFormField<ChecklistType>(
+                value: _type,
+                decoration: InputDecoration(
+                  labelText: loc.t('checklist_type') ?? 'Тип чеклиста',
+                ),
+                items: ChecklistType.values
+                    .map((t) => DropdownMenuItem(value: t, child: Text(t.displayName)))
+                    .toList(),
+                onChanged: (v) => setState(() {
+                  if (v != null) _type = v;
+                  scheduleSave();
+                }),
+              ),
+            if (canEdit) const SizedBox(height: 16),
+            Wrap(
+              spacing: 16,
+              runSpacing: 8,
+              children: [
+                if (canEdit)
+                  FilterChip(
+                    label: Text(loc.t('checklist_action_numeric') ?? 'Цифра'),
+                    selected: _actionHasNumeric,
+                    onSelected: (v) {
+                      setState(() {
+                        _actionHasNumeric = v;
+                        scheduleSave();
+                      });
+                    },
+                  ),
+                if (canEdit)
+                  FilterChip(
+                    label: Text(loc.t('checklist_action_toggle') ?? 'Сделано/не сделано'),
+                    selected: _actionHasToggle,
+                    onSelected: (v) {
+                      setState(() {
+                        _actionHasToggle = v;
+                        scheduleSave();
+                      });
+                    },
+                  ),
+              ],
+            ),
+            if (canEdit) const SizedBox(height: 8),
+            if (canEdit)
+              TextField(
+                controller: _dropdownOptionsController,
+                decoration: InputDecoration(
+                  labelText: loc.t('checklist_dropdown_options') ?? 'Варианты выбора (через запятую)',
+                  hintText: 'Вариант 1, Вариант 2, Вариант 3',
+                ),
+                onChanged: (_) => scheduleSave(),
+              ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String?>(
               value: _checklist?.assignedSection?.isNotEmpty == true ? _checklist!.assignedSection : null,
@@ -357,14 +550,16 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                       controller: _newItemController,
                       decoration: InputDecoration(
                         labelText: loc.t('add_item'),
-                        hintText: context.read<LocalizationService>().t('checklist_item_hint'),
+                        hintText: _type == ChecklistType.tasks
+                            ? (loc.t('checklist_item_hint') ?? 'Введите наименование')
+                            : (loc.t('checklist_item_prep_hint') ?? 'ТТК ПФ или своё'),
                       ),
-                      onSubmitted: (_) => _addItem(),
+                      onSubmitted: (_) => _type == ChecklistType.prep ? _showAddItemDialog() : _addItem(),
                     ),
                   ),
                   const SizedBox(width: 8),
                   IconButton.filled(
-                    onPressed: _addItem,
+                    onPressed: () => _type == ChecklistType.prep ? _showAddItemDialog() : _addItem(),
                     icon: const Icon(Icons.add),
                     tooltip: loc.t('add_item'),
                   ),
@@ -377,7 +572,11 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
               return Card(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: ListTile(
+                  leading: it.techCardId != null
+                      ? Icon(Icons.link, size: 20, color: Theme.of(context).colorScheme.primary)
+                      : null,
                   title: Text(it.title),
+                  subtitle: it.techCardId != null ? Text(loc.t('ttk_pf') ?? 'ТТК ПФ', style: Theme.of(context).textTheme.labelSmall) : null,
                   trailing: canEdit
                       ? IconButton(
                           icon: const Icon(Icons.remove_circle_outline),

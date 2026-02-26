@@ -7,7 +7,7 @@ import 'translation_service.dart';
 
 /// Универсальный менеджер переводов
 class TranslationManager {
-  static const List<String> _supportedLanguages = ['ru', 'en', 'de', 'fr', 'es'];
+  static const List<String> _supportedLanguages = ['ru', 'en'];
 
   final AiServiceSupabase _aiService;
   final TranslationService _translationService;

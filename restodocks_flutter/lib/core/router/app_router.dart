@@ -302,7 +302,13 @@ class AppRouter {
       ),
       GoRoute(
         path: '/nomenclature',
-        pageBuilder: (context, state) => _slideTransitionPage(state, const NomenclatureScreen()),
+        pageBuilder: (context, state) {
+          final refresh = state.queryParameters['refresh'] == '1';
+          return _slideTransitionPage(
+            state,
+            NomenclatureScreen(key: refresh ? ValueKey('nom_refresh_${DateTime.now().millisecondsSinceEpoch}') : null),
+          );
+        },
       ),
       GoRoute(
         path: '/nomenclature/:department',

@@ -745,7 +745,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
           // 4. Выявление дубликатов с ИИ
           PopupMenuButton<String>(
             icon: const Icon(Icons.auto_awesome),
-            tooltip: 'Дубликаты с ИИ',
+            tooltip: 'Поиск дубликатов',
             onSelected: (v) async {
               if (v == 'by_name_ai') await _findDuplicatesWithAI(_DuplicateMode.byName);
               else if (v == 'full') await _findDuplicatesWithAI(_DuplicateMode.full);
@@ -1325,7 +1325,7 @@ class _SmartDuplicatesDialogState extends State<_SmartDuplicatesDialog> {
             Text(
               widget.mode == _DuplicateMode.full
                   ? "Найдены продукты с полностью идентичными данными. Выберите, какие удалить."
-                  : "ИИ нашел похожие названия продуктов. Выберите, какие удалить.",
+                  : "Найдены похожие названия продуктов. Выберите, какие удалить.",
               style: theme.textTheme.bodyMedium,
             ),
             const SizedBox(height: 16),

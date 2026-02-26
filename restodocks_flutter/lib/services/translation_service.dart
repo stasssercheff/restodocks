@@ -1,11 +1,21 @@
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/translation.dart';
 import 'ai_service_supabase.dart';
 import 'supabase_service.dart';
 
-/// Сервис для переводов с кешированием
+/// Сервис для переводов с кешированием.
+/// Источники: 1) кеш и БД, 2) внешний API (MyMemory, бесплатно), 3) ИИ (если включено).
 class TranslationService {
+  /// Если false — при отсутствии в кеше/БД используется MyMemory API. Если true — вызывается ИИ.
+  static bool useAiForTranslation = false;
+
+  /// Если true — при отсутствии в кеше/БД вызывается внешний API (MyMemory). По умолчанию включено.
+  static bool useTranslationApi = true;
+
   final AiServiceSupabase _aiService;
   final SupabaseService _supabase;
 
@@ -62,35 +72,83 @@ class TranslationService {
       // Продолжаем без кеша
     }
 
-    // Выполняем перевод через AI
-    try {
-      final translatedText = await _translateWithAI(text, from, to);
-
-      if (translatedText != null && translatedText.trim().isNotEmpty) {
-        // Сохраняем в базу данных
-        final translation = Translation(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          entityType: entityType,
-          entityId: entityId,
-          fieldName: fieldName,
-          sourceText: text,
-          sourceLanguage: from,
-          targetLanguage: to,
-          translatedText: translatedText,
-          createdAt: DateTime.now(),
-          createdBy: userId,
-          isManualOverride: false,
-        );
-
-        await saveToDatabase(translation);
-        _cache[cacheKey] = translation;
-
-        return translatedText;
-      }
-    } catch (e) {
-      // Возвращаем null в случае ошибки
+    // 1. Перевод через внешний API (MyMemory) — бесплатно, без ИИ
+    if (useTranslationApi && !useAiForTranslation) {
+      try {
+        final translatedText = await _translateWithMyMemory(text, from, to);
+        if (translatedText != null && translatedText.trim().isNotEmpty) {
+          final translation = Translation(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            entityType: entityType,
+            entityId: entityId,
+            fieldName: fieldName,
+            sourceText: text,
+            sourceLanguage: from,
+            targetLanguage: to,
+            translatedText: translatedText,
+            createdAt: DateTime.now(),
+            createdBy: userId,
+            isManualOverride: false,
+          );
+          await saveToDatabase(translation);
+          _cache[cacheKey] = translation;
+          return translatedText;
+        }
+      } catch (_) {}
     }
 
+    // 2. Перевод через AI (только если useAiForTranslation == true)
+    if (useAiForTranslation) {
+      try {
+        final translatedText = await _translateWithAI(text, from, to);
+
+        if (translatedText != null && translatedText.trim().isNotEmpty) {
+          final translation = Translation(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            entityType: entityType,
+            entityId: entityId,
+            fieldName: fieldName,
+            sourceText: text,
+            sourceLanguage: from,
+            targetLanguage: to,
+            translatedText: translatedText,
+            createdAt: DateTime.now(),
+            createdBy: userId,
+            isManualOverride: false,
+          );
+          await saveToDatabase(translation);
+          _cache[cacheKey] = translation;
+          return translatedText;
+        }
+      } catch (e) {
+        // Возвращаем null в случае ошибки
+      }
+    }
+
+    return null;
+  }
+
+  /// Перевести через MyMemory API (бесплатно, ~5000 символов/день анонимно)
+  Future<String?> _translateWithMyMemory(String text, String from, String to) async {
+    if (text.trim().isEmpty) return null;
+    // MyMemory лимит ~500 байт на запрос; для длинных текстов режем
+    final trimmed = text.length > 450 ? text.substring(0, 450) : text;
+    final langPair = '$from|$to';
+    final uri = Uri.parse(
+      'https://api.mymemory.translated.net/get'
+      '?q=${Uri.encodeComponent(trimmed)}'
+      '&langpair=$langPair',
+    );
+    try {
+      final response = await http.get(uri).timeout(const Duration(seconds: 10));
+      if (response.statusCode != 200) return null;
+      final json = jsonDecode(response.body) as Map<String, dynamic>?;
+      final respData = json?['responseData'] as Map<String, dynamic>?;
+      final translated = respData?['translatedText']?.toString().trim();
+      if (translated != null && translated.isNotEmpty && translated != trimmed) {
+        return translated;
+      }
+    } catch (_) {}
     return null;
   }
 

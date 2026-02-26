@@ -17,13 +17,28 @@ class ChecklistSubmissionService {
     required String submittedByEmployeeId,
     required String submittedByName,
     required String checklistName,
+    String? additionalName,
     String? section,
-    required List<({String title, bool done})> items,
+    DateTime? startTime,
+    DateTime? endTime,
+    String? department,
+    String? position,
+    String? workshop,
+    required List<Map<String, dynamic>> items,
+    String? comments,
     required List<String> recipientChefIds,
   }) async {
     final payload = <String, dynamic>{
       'submittedByName': submittedByName,
-      'items': items.map((e) => {'title': e.title, 'done': e.done}).toList(),
+      'additionalName': additionalName,
+      'section': section,
+      'startTime': startTime?.toIso8601String(),
+      'endTime': endTime?.toIso8601String(),
+      'department': department,
+      'position': position,
+      'workshop': workshop,
+      'comments': comments,
+      'items': items,
     };
     for (final rid in recipientChefIds) {
       await _supabase.client.from(_table).insert({

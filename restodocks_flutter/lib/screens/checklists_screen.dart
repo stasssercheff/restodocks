@@ -108,7 +108,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
             children: [
               Icon(Icons.auto_awesome, color: Theme.of(ctx).colorScheme.primary),
               const SizedBox(width: 8),
-              Expanded(child: Text(loc.t('checklist_with_ai') ?? 'Чеклист с ИИ')),
+              Expanded(child: Text(loc.t('checklist_with_ai') ?? 'Чеклист')),
             ],
           ),
           content: Column(
@@ -116,7 +116,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                loc.t('checklist_ai_context_hint') ?? 'ИИ учтёт ваши продукты, сотрудников, график и ТТК. Опишите, какой чеклист нужен:',
+                loc.t('checklist_ai_context_hint') ?? 'Учитываются продукты, сотрудники, график и ТТК. Опишите, какой чеклист нужен:',
                 style: Theme.of(ctx).textTheme.bodySmall?.copyWith(color: Theme.of(ctx).colorScheme.onSurfaceVariant),
               ),
               const SizedBox(height: 12),
@@ -195,35 +195,76 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
 
   Future<void> _createNew() async {
     final loc = context.read<LocalizationService>();
-    final name = await showDialog<String>(
+    ChecklistType type = ChecklistType.tasks;
+    String name = '';
+    String additionalName = '';
+    final nameCtrl = TextEditingController();
+    final addNameCtrl = TextEditingController();
+    final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) {
-        final c = TextEditingController();
-        return AlertDialog(
-          title: Text(loc.t('create_checklist')),
-          content: TextField(
-            controller: c,
-            decoration: InputDecoration(
-              labelText: loc.t('checklist_name'),
-              hintText: loc.t('checklist_name_hint'),
-            ),
-            autofocus: true,
-            onSubmitted: (_) => Navigator.of(ctx).pop(c.text.trim()),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: Text(loc.t('back')),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(ctx).pop(c.text.trim()),
-              child: Text(loc.t('save')),
-            ),
-          ],
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text(loc.t('create_checklist')),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    DropdownButtonFormField<ChecklistType>(
+                      value: type,
+                      decoration: InputDecoration(
+                        labelText: loc.t('checklist_type') ?? 'Тип',
+                      ),
+                      items: ChecklistType.values
+                          .map((t) => DropdownMenuItem(value: t, child: Text(t.displayName)))
+                          .toList(),
+                      onChanged: (v) => setDialogState(() => type = v ?? type),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: nameCtrl,
+                      decoration: InputDecoration(
+                        labelText: loc.t('checklist_name'),
+                        hintText: loc.t('checklist_name_hint'),
+                      ),
+                      autofocus: true,
+                      onChanged: (_) => setDialogState(() {}),
+                    ),
+                    if (type == ChecklistType.prep) ...[
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: addNameCtrl,
+                        decoration: InputDecoration(
+                          labelText: loc.t('checklist_additional_name') ?? 'Дополнительное название',
+                          hintText: loc.t('checklist_additional_name_hint'),
+                        ),
+                        onChanged: (_) => setDialogState(() {}),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  child: Text(loc.t('cancel')),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(ctx).pop(nameCtrl.text.trim().isNotEmpty),
+                  child: Text(loc.t('save')),
+                ),
+              ],
+            );
+          },
         );
       },
     );
-    if (name == null || name.isEmpty || !mounted) return;
+    if (ok != true || !mounted) return;
+    final finalName = nameCtrl.text.trim();
+    final finalAdditional = addNameCtrl.text.trim();
+    if (finalName.isEmpty) return;
     final acc = context.read<AccountManagerSupabase>();
     final est = acc.establishment!;
     final emp = acc.currentEmployee!;
@@ -232,7 +273,9 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
       final created = await svc.createChecklist(
         establishmentId: est.id,
         createdBy: emp.id,
-        name: name,
+        name: finalName,
+        additionalName: finalAdditional.isEmpty ? null : finalAdditional,
+        type: type,
       );
       if (mounted) {
         await _load();
@@ -345,12 +388,12 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      loc.t('checklist_with_ai') ?? 'Чеклист с ИИ',
+                      loc.t('checklist_with_ai') ?? 'Чеклист',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      loc.t('checklist_ai_short_hint') ?? 'Опишите запрос — ИИ создаст чеклист с учётом продуктов, сотрудников, графика',
+                      loc.t('checklist_ai_short_hint') ?? 'Опишите запрос — чеклист создастся с учётом продуктов, сотрудников, графика',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
                     ),
                   ],

@@ -132,6 +132,12 @@ mixin AutoSaveMixin<T extends StatefulWidget> on State<T> {
       await _draftStorage.saveInventoryDraft(data);
     } else if (draftKey == 'checklist') {
       await _draftStorage.saveChecklistDraft(data);
+    } else if (draftKey.startsWith('checklist_edit_')) {
+      final id = draftKey.replaceFirst('checklist_edit_', '');
+      await _draftStorage.saveChecklistEditDraft(id, data);
+    } else if (draftKey.startsWith('checklist_fill_')) {
+      final id = draftKey.replaceFirst('checklist_fill_', '');
+      await _draftStorage.saveChecklistFillDraft(id, data);
     }
   }
 
@@ -140,6 +146,12 @@ mixin AutoSaveMixin<T extends StatefulWidget> on State<T> {
       return await _draftStorage.loadInventoryDraft();
     } else if (draftKey == 'checklist') {
       return await _draftStorage.loadChecklistDraft();
+    } else if (draftKey.startsWith('checklist_edit_')) {
+      final id = draftKey.replaceFirst('checklist_edit_', '');
+      return await _draftStorage.loadChecklistEditDraft(id);
+    } else if (draftKey.startsWith('checklist_fill_')) {
+      final id = draftKey.replaceFirst('checklist_fill_', '');
+      return await _draftStorage.loadChecklistFillDraft(id);
     }
     return null;
   }
@@ -149,6 +161,12 @@ mixin AutoSaveMixin<T extends StatefulWidget> on State<T> {
       await _draftStorage.clearInventoryDraft();
     } else if (draftKey == 'checklist') {
       await _draftStorage.clearChecklistDraft();
+    } else if (draftKey.startsWith('checklist_edit_')) {
+      final id = draftKey.replaceFirst('checklist_edit_', '');
+      await _draftStorage.clearChecklistEditDraft(id);
+    } else if (draftKey.startsWith('checklist_fill_')) {
+      final id = draftKey.replaceFirst('checklist_fill_', '');
+      await _draftStorage.clearChecklistFillDraft(id);
     }
   }
 
@@ -157,6 +175,12 @@ mixin AutoSaveMixin<T extends StatefulWidget> on State<T> {
       return await _draftStorage.hasInventoryDraft();
     } else if (draftKey == 'checklist') {
       return await _draftStorage.hasChecklistDraft();
+    } else if (draftKey.startsWith('checklist_edit_')) {
+      final data = await _loadFromStorage();
+      return data != null;
+    } else if (draftKey.startsWith('checklist_fill_')) {
+      final data = await _loadFromStorage();
+      return data != null;
     }
     return false;
   }
