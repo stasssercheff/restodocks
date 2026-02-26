@@ -150,7 +150,10 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Таблица на всю ширину
+              // Таблица: Stack для объединённой ячейки «Название»
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
               Table(
             border: TableBorder.all(color: Colors.black, width: 1),
             defaultVerticalAlignment: TableCellVerticalAlignment.top,
@@ -207,26 +210,10 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                       ),
                     ),
 
-                    // Название (в каждой строке) — ValueListenableBuilder только здесь,
-                    // чтобы при вводе названия оно обновлялось в строке
+                    // Название — placeholder (объединённая ячейка рисуется поверх в Stack)
                     Container(
                       height: 44,
-                      alignment: Alignment.centerLeft,
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: widget.dishNameController != null
-                          ? ValueListenableBuilder<TextEditingValue>(
-                              valueListenable: widget.dishNameController!,
-                              builder: (_, value, __) => Text(
-                                value.text,
-                                style: const TextStyle(fontSize: 12),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            )
-                          : Text(
-                              widget.dishName,
-                              style: const TextStyle(fontSize: 12),
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                      color: Colors.grey.shade200,
                     ),
 
                     // Продукт
@@ -365,6 +352,39 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   const SizedBox.shrink(), // Удаление
                 ],
               ),
+                ],
+              ),
+                  // Объединённая ячейка «Название» поверх всех строк продуктов
+                  Positioned(
+                    left: 50 + 1,
+                    top: 44 + 1,
+                    width: 120,
+                    height: indexedRows.length * 44,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade200,
+                        border: Border.all(color: Colors.black, width: 1),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                      alignment: Alignment.topLeft,
+                      child: widget.dishNameController != null
+                          ? ValueListenableBuilder<TextEditingValue>(
+                              valueListenable: widget.dishNameController!,
+                              builder: (_, value, __) => Text(
+                                value.text,
+                                style: const TextStyle(fontSize: 12),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 10,
+                              ),
+                            )
+                          : Text(
+                              widget.dishName,
+                              style: const TextStyle(fontSize: 12),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 10,
+                            ),
+                    ),
+                  ),
                 ],
               ),
 

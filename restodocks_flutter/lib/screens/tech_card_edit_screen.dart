@@ -2467,8 +2467,13 @@ class _TtkCookTableState extends State<_TtkCookTable> {
 
   @override
   Widget build(BuildContext context) {
-    return Table(
-      border: TableBorder.all(width: 0.5, color: Colors.grey),
+    final theme = Theme.of(context);
+    final borderColor = Colors.grey;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+    Table(
+      border: TableBorder.all(width: 0.5, color: borderColor),
       columnWidths: {
         0: const FixedColumnWidth(_TtkCookTable._colDish),
         1: const FixedColumnWidth(_TtkCookTable._colProduct),
@@ -2482,7 +2487,7 @@ class _TtkCookTableState extends State<_TtkCookTable> {
         TableRow(
           decoration: BoxDecoration(color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3)),
           children: [
-            _cell(widget.loc.t('ttk_dish'), bold: true),
+            _cell(widget.loc.t('ttk_name'), bold: true),
             _cell(widget.loc.t('ttk_product'), bold: true),
             _cell(widget.loc.t('ttk_gross_gr'), bold: true),
             _cell(widget.loc.t('ttk_net_gr'), bold: true),
@@ -2499,26 +2504,15 @@ class _TtkCookTableState extends State<_TtkCookTable> {
         ..._ingredients.asMap().entries.map((e) {
           final i = e.key;
           final ing = e.value;
-          final firstColText = i == 0 ? widget.dishName : (ing.sourceTechCardName ?? widget.loc.t('dash'));
-          final isPfLink = ing.sourceTechCardId != null && ing.sourceTechCardId!.isNotEmpty;
+          // Название — placeholder (объединённая ячейка рисуется поверх в Stack)
           return TableRow(
             children: [
-              isPfLink && widget.onTapPfIngredient != null
-                  ? TableCell(
-                      child: InkWell(
-                        onTap: () => widget.onTapPfIngredient!(ing.sourceTechCardId!),
-                        child: Padding(
-                          padding: _TtkCookTable._cellPad,
-                          child: Text(
-                            firstColText,
-                            style: const TextStyle(fontSize: 12),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 2,
-                          ),
-                        ),
-                      ),
-                    )
-                  : _cell(firstColText),
+              TableCell(
+                child: Container(
+                  height: 44,
+                  color: theme.colorScheme.surfaceContainerHighest,
+                ),
+              ),
               _cell(ing.productName),
               TableCell(
                 child: Padding(
@@ -2538,6 +2532,22 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                   ),
                 ),
               ),
+              ing.sourceTechCardId != null && ing.sourceTechCardId!.isNotEmpty && widget.onTapPfIngredient != null
+                  ? TableCell(
+                      child: InkWell(
+                        onTap: () => widget.onTapPfIngredient!(ing.sourceTechCardId!),
+                        child: Padding(
+                          padding: _TtkCookTable._cellPad,
+                          child: Text(
+                            ing.productName,
+                            style: const TextStyle(fontSize: 12),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 2,
+                          ),
+                        ),
+                      ),
+                    )
+                  : _cell(ing.productName),
               _cell(ing.cookingProcessName ?? widget.loc.t('dash')),
               _cell(ing.outputWeight.toStringAsFixed(0)),
               _cell(_portionsAmount(ing)),
@@ -2624,6 +2634,30 @@ class _TtkCookTableState extends State<_TtkCookTable> {
             ],
           ),
         ],
+      ],
+    ),
+        // Объединённая ячейка «Название» поверх всех строк продуктов
+        if (_ingredients.isNotEmpty)
+          Positioned(
+            left: 1,
+            top: 44 + 1,
+            width: _TtkCookTable._colDish,
+            height: _ingredients.length * 44,
+            child: Container(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+                border: Border.all(width: 0.5, color: borderColor),
+              ),
+              padding: _TtkCookTable._cellPad,
+              alignment: Alignment.topLeft,
+              child: Text(
+                widget.dishName,
+                style: const TextStyle(fontSize: 12),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 10,
+              ),
+            ),
+          ),
       ],
     );
   }
