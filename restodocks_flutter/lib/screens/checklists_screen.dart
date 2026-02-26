@@ -506,7 +506,22 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                 if (sectionLabel != null) sectionLabel,
                 '${c.items.length} ${loc.t('items_count')}',
               ].join(' • ')),
-              trailing: Icon(Icons.chevron_right),
+              trailing: canEdit
+                  ? PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert),
+                      onSelected: (v) {
+                        if (v == 'edit') {
+                          context.push('/checklists/${c.id}');
+                        } else {
+                          context.push('/checklists/${c.id}/fill');
+                        }
+                      },
+                      itemBuilder: (_) => [
+                        PopupMenuItem(value: 'edit', child: Text(loc.t('edit') ?? 'Редактировать')),
+                        PopupMenuItem(value: 'fill', child: Text(loc.t('fill_checklist') ?? 'Заполнить')),
+                      ],
+                    )
+                  : const Icon(Icons.chevron_right),
               onTap: () => context.push(canEdit ? '/checklists/${c.id}' : '/checklists/${c.id}/fill'),
             ),
           );

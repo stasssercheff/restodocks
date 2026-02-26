@@ -345,12 +345,18 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
           ),
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: FilledButton.icon(
-                onPressed: _allActionCellsFilled ? _submit : null,
-                icon: const Icon(Icons.check_circle),
-                label: Text(loc.t('checklist_complete') ?? 'Завершить'),
-                style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+              padding: const EdgeInsets.all(20),
+              child: SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: FilledButton.icon(
+                  onPressed: _allActionCellsFilled ? _submit : null,
+                  icon: const Icon(Icons.check_circle, size: 24),
+                  label: Text(loc.t('checklist_complete') ?? 'Завершить', style: const TextStyle(fontSize: 18)),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  ),
+                ),
               ),
             ),
           ),

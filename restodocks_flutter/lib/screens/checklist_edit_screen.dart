@@ -274,83 +274,34 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
     scheduleSave();
   }
 
-  void _showAddItemDialog() {
+  void _showSelectPfDropdown() {
     final loc = context.read<LocalizationService>();
     final lang = loc.currentLanguageCode;
-    if (_type == ChecklistType.prep) {
-      showDialog<void>(
-        context: context,
-        builder: (ctx) {
-          String? selectedTechId;
-          final customController = TextEditingController();
-          return StatefulBuilder(
-            builder: (context, setDialogState) {
-              return AlertDialog(
-                title: Text(loc.t('add_item') ?? 'Добавить пункт'),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      loc.t('checklist_item_prep_hint') ?? 'ТТК ПФ из списка или своё наименование',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String?>(
-                      value: selectedTechId,
-                      decoration: InputDecoration(
-                        labelText: loc.t('ttk_pf') ?? 'ТТК ПФ',
-                      ),
-                      items: [
-                        DropdownMenuItem<String?>(value: null, child: Text(loc.t('custom') ?? 'Своё (ввести текст)')),
-                        ..._techCards
-                            .where((tc) => tc.isSemiFinished)
-                            .map((tc) => DropdownMenuItem(
-                                  value: tc.id,
-                                  child: Text(tc.getDisplayNameInLists(lang)),
-                                )),
-                      ],
-                      onChanged: (v) => setDialogState(() => selectedTechId = v),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: customController,
-                      decoration: InputDecoration(
-                        labelText: selectedTechId == null ? (loc.t('custom') ?? 'Своё') : (loc.t('or_override') ?? 'Или переопределить'),
-                        hintText: loc.t('checklist_item_hint'),
-                      ),
-                      enabled: selectedTechId == null || customController.text.isNotEmpty,
-                      onChanged: (_) => setDialogState(() {}),
-                    ),
-                  ],
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(ctx).pop(),
-                    child: Text(loc.t('cancel')),
-                  ),
-                    FilledButton(
-                    onPressed: () {
-                      if (selectedTechId != null) {
-                        final tc = _techCards.firstWhere((t) => t.id == selectedTechId);
-                        _addItem(title: tc.getDisplayNameInLists(lang), techCardId: selectedTechId);
-                        Navigator.of(ctx).pop();
-                      } else if (customController.text.trim().isNotEmpty) {
-                        _addItem(title: customController.text.trim());
-                        Navigator.of(ctx).pop();
-                      }
+    final pfs = _techCards.where((tc) => tc.isSemiFinished).toList();
+    if (pfs.isEmpty) return;
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Text(loc.t('select_pf') ?? 'Выбрать ПФ', style: Theme.of(context).textTheme.titleMedium),
+              ),
+              ...pfs.map((tc) => ListTile(
+                    title: Text(tc.getDisplayNameInLists(lang)),
+                    onTap: () {
+                      Navigator.of(ctx).pop();
+                      _addItem(title: tc.getDisplayNameInLists(lang), techCardId: tc.id);
                     },
-                    child: Text(loc.t('add')),
-                  ),
-                ],
-              );
-            },
-          );
-        },
-      );
-    } else {
-      _addItem();
-    }
+                  )),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   void _removeItem(int i) {
@@ -544,7 +495,17 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
             if (canEdit) ...[
               const SizedBox(height: 24),
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (_type == ChecklistType.prep)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 16),
+                      child: TextButton(
+                        onPressed: _showSelectPfDropdown,
+                        child: Text(loc.t('select_pf') ?? 'Выбрать ПФ'),
+                      ),
+                    ),
+                  if (_type == ChecklistType.prep) const SizedBox(width: 8),
                   Expanded(
                     child: TextField(
                       controller: _newItemController,
@@ -552,14 +513,14 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                         labelText: loc.t('add_item'),
                         hintText: _type == ChecklistType.tasks
                             ? (loc.t('checklist_item_hint') ?? 'Введите наименование')
-                            : (loc.t('checklist_item_prep_hint') ?? 'ТТК ПФ или своё'),
+                            : (loc.t('checklist_item_prep_hint') ?? 'Введите своё или выберите ПФ'),
                       ),
-                      onSubmitted: (_) => _type == ChecklistType.prep ? _showAddItemDialog() : _addItem(),
+                      onSubmitted: (_) => _addItem(),
                     ),
                   ),
                   const SizedBox(width: 8),
                   IconButton.filled(
-                    onPressed: () => _type == ChecklistType.prep ? _showAddItemDialog() : _addItem(),
+                    onPressed: () => _addItem(),
                     icon: const Icon(Icons.add),
                     tooltip: loc.t('add_item'),
                   ),
