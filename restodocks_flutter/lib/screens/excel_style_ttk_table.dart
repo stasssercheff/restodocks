@@ -158,12 +158,12 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
               0: FixedColumnWidth(50),   // Тип ТТК
               1: FixedColumnWidth(120),  // Название
               2: FixedColumnWidth(160),  // Продукт
-              3: FixedColumnWidth(80),   // Брутто
+              3: FixedColumnWidth(40),   // Брутто г.
               4: FixedColumnWidth(80),   // % отхода
-              5: FixedColumnWidth(80),   // Нетто
+              5: FixedColumnWidth(40),   // Нетто г.
               6: FixedColumnWidth(80),   // Способ
               7: FixedColumnWidth(80),   // % ужарки
-              8: FixedColumnWidth(60),   // Выход
+              8: FixedColumnWidth(30),   // Выход г.
               9: FixedColumnWidth(70),   // вес прц
               10: FixedColumnWidth(75),  // порций(шт)
               11: FixedColumnWidth(70), // Стоимость
@@ -178,12 +178,12 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   _buildHeaderCell('Тип ТТК'),
                   _buildHeaderCell('Название'),
                   _buildHeaderCell('Продукт'),
-                  _buildHeaderCell('Брутто'),
+                  _buildHeaderCell(widget.loc.t('ttk_gross_gr')),
                   _buildHeaderCell('% отхода'),
-                  _buildHeaderCell('Нетто'),
+                  _buildHeaderCell(widget.loc.t('ttk_net_gr')),
                   _buildHeaderCell('Способ'),
                   _buildHeaderCell('% ужарки'),
-                  _buildHeaderCell('Выход'),
+                  _buildHeaderCell(widget.loc.t('ttk_output_gr')),
                   _buildHeaderCell('вес прц'),
                   _buildHeaderCell('порций(шт)'),
                   _buildHeaderCell('Цена'),

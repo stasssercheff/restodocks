@@ -707,7 +707,19 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           context.go('/tech-cards');
         }
       } else {
-        final updated = _applyEdits(tc, dishName: name, category: category, section: _selectedSection, isSemiFinished: _isSemiFinished, portionWeight: _portionWeight, yieldGrams: yieldVal, technologyLocalized: techMap, photoUrls: _photoUrls, ingredients: toSaveIngredients);
+        var photoUrls = List<String>.from(_photoUrls);
+        if (_pendingPhotoBytes.isNotEmpty) {
+          for (var i = 0; i < _pendingPhotoBytes.length; i++) {
+            final url = await svc.uploadTechCardPhoto(
+              establishmentId: est.id,
+              techCardId: tc.id,
+              index: photoUrls.length + i,
+              bytes: _pendingPhotoBytes[i],
+            );
+            if (url != null) photoUrls.add(url);
+          }
+        }
+        final updated = _applyEdits(tc, dishName: name, category: category, section: _selectedSection, isSemiFinished: _isSemiFinished, portionWeight: _portionWeight, yieldGrams: yieldVal, technologyLocalized: techMap, photoUrls: photoUrls, ingredients: toSaveIngredients);
         await svc.saveTechCard(updated);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.read<LocalizationService>().t('save') + ' ✓')));
@@ -1138,9 +1150,139 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     setState(() => _ingredients[i] = ing.copyWith(primaryWastePct: waste, netWeight: net, isNetWeightManual: false));
   }
 
-  /// Блок фото: ПФ — сетка до 10, блюдо — 1 фото.
+  /// Блок фото: ПФ — сетка до 10, блюдо — 1 фото. Под технологией.
   Widget _buildPhotoSection(LocalizationService loc, bool effectiveCanEdit) {
-    return const SizedBox.shrink(); // TODO: реализовать отображение/добавление фото
+    final maxPhotos = _maxPhotos;
+    final existing = _photoUrls.length + _pendingPhotoBytes.length;
+    if (existing == 0 && !effectiveCanEdit) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(top: 16),
+      decoration: BoxDecoration(
+        border: Border.all(color: Theme.of(context).colorScheme.outline),
+        color: Theme.of(context).colorScheme.surfaceContainerLowest,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              border: const Border(bottom: BorderSide(color: Colors.grey, width: 1)),
+            ),
+            child: Row(
+              children: [
+                Text(loc.t('photo'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                if (effectiveCanEdit) ...[
+                  const Spacer(),
+                  TextButton.icon(
+                    icon: const Icon(Icons.add_photo_alternate, size: 20),
+                    label: Text(loc.t('add')),
+                    onPressed: existing >= maxPhotos
+                        ? null
+                        : () => _pickPhotoForTechCard(loc),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                ..._photoUrls.asMap().entries.map((e) => _photoThumb(url: e.value, onRemove: effectiveCanEdit ? () => _removePhotoByIndex(e.key, isUrl: true) : null)),
+                ..._pendingPhotoBytes.asMap().entries.map((e) => _photoThumb(bytes: e.value, onRemove: effectiveCanEdit ? () => _removePhotoByIndex(e.key, isUrl: false) : null)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _photoThumb({String? url, Uint8List? bytes, VoidCallback? onRemove}) {
+    return Stack(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: SizedBox(
+            width: 80,
+            height: 80,
+            child: url != null
+                ? CachedNetworkImage(
+                    imageUrl: url,
+                    fit: BoxFit.cover,
+                    placeholder: (_, __) => const Center(child: CircularProgressIndicator()),
+                    errorWidget: (_, __, e) => const Icon(Icons.image_not_supported)),
+                : bytes != null
+                    ? Image.memory(bytes, fit: BoxFit.cover)
+                    : const SizedBox(),
+          ),
+        ),
+        if (onRemove != null)
+          Positioned(
+            top: 0,
+            right: 0,
+            child: GestureDetector(
+              onTap: onRemove,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                child: const Icon(Icons.close, color: Colors.white, size: 16),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Future<void> _pickPhotoForTechCard(LocalizationService loc) async {
+    final source = await showModalBottomSheet<bool>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(leading: const Icon(Icons.photo_library), title: Text(loc.t('photo_from_gallery')), onTap: () => Navigator.pop(ctx, true)),
+            ListTile(leading: const Icon(Icons.camera_alt), title: Text(loc.t('photo_from_camera')), onTap: () => Navigator.pop(ctx, false)),
+          ],
+        ),
+      ),
+    );
+    if (source == null || !mounted) return;
+    try {
+      final picker = ImagePicker();
+      final file = await picker.pickImage(
+        source: source ? ImageSource.gallery : ImageSource.camera,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 85,
+      );
+      if (file == null || !mounted) return;
+      final bytes = await file.readAsBytes();
+      if (!mounted) return;
+      setState(() {
+        if (_pendingPhotoBytes.length + _photoUrls.length < _maxPhotos) {
+          _pendingPhotoBytes.add(bytes);
+        }
+      });
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${loc.t('photo_upload_error')}: $e')));
+    }
+  }
+
+  void _removePhotoByIndex(int index, {required bool isUrl}) {
+    setState(() {
+      if (isUrl) {
+        _photoUrls.removeAt(index);
+      } else {
+        _pendingPhotoBytes.removeAt(index);
+      }
+    });
   }
 
   @override
@@ -1602,12 +1744,12 @@ class _TtkTableState extends State<_TtkTable> {
     const colType = 64.0;   // Тип ТТК
     const colName = 100.0;  // Наименование
     const colProduct = 120.0;
-    const colGross = 70.0;  // Брутто г
+    const colGross = 35.0;  // Брутто г.
     const colWaste = 64.0;  // Отход %
-    const colNet = 70.0;    // Нетто г
+    const colNet = 35.0;    // Нетто г
     const colMethod = 100.0;// Способ
     const colShrink = 64.0; // Ужарка %
-    const colOutput = 70.0; // Выход г
+    const colOutput = 35.0; // Выход г.
     const colCost = 82.0;   // Стоимость
     const colPriceKg = 88.0;// Цена за 1 кг/шт
     const colTech = 180.0;  // Технология
@@ -2238,10 +2380,10 @@ class _TtkCookTable extends StatefulWidget {
   // Ширины как в _TtkTable (таблица создания)
   static const _colDish = 100.0;
   static const _colProduct = 120.0;
-  static const _colGross = 70.0;
-  static const _colNet = 70.0;
+  static const _colGross = 35.0;
+  static const _colNet = 35.0;
   static const _colMethod = 100.0;
-  static const _colOutput = 70.0;
+  static const _colOutput = 35.0;
   static const _colPortions = 56.0;
 
   @override
@@ -2338,10 +2480,10 @@ class _TtkCookTableState extends State<_TtkCookTable> {
           children: [
             _cell(widget.loc.t('ttk_dish'), bold: true),
             _cell(widget.loc.t('ttk_product'), bold: true),
-            _cell(widget.loc.t('ttk_gross'), bold: true),
-            _cell(widget.loc.t('ttk_net'), bold: true),
+            _cell(widget.loc.t('ttk_gross_gr'), bold: true),
+            _cell(widget.loc.t('ttk_net_gr'), bold: true),
             _cell(widget.loc.t('ttk_cooking_method'), bold: true),
-            _cell(widget.loc.t('ttk_output'), bold: true),
+            _cell(widget.loc.t('ttk_output_gr'), bold: true),
             _cell(widget.loc.t('ttk_portions_pcs'), bold: true),
           ],
         ),
