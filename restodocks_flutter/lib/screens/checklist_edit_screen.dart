@@ -363,9 +363,9 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
     final loc = context.watch<LocalizationService>();
     final acc = context.watch<AccountManagerSupabase>();
     final emp = acc.currentEmployee;
-    final canEdit = emp?.canEditChecklistsAndTechCards ?? false;
-    // Шеф, су-шеф, владелец и руководство кухни — доступ как у линейных сотрудников
+    // Доступ к чеклистам: владелец, шеф, су-шеф, кухня. Редактирование — тем же, кто может создавать.
     final canAccessChecklists = emp?.canViewDepartment('kitchen') ?? false;
+    final canEdit = canAccessChecklists;
 
     if (emp != null && !canAccessChecklists) {
       return Scaffold(
