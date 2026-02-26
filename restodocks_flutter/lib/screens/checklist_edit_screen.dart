@@ -277,7 +277,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
   void _showAddItemDialog() {
     final loc = context.read<LocalizationService>();
     final lang = loc.currentLanguageCode;
-    if (_type == ChecklistType.prep && _techCards.isNotEmpty) {
+    if (_type == ChecklistType.prep) {
       showDialog<void>(
         context: context,
         builder: (ctx) {
