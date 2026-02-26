@@ -7,7 +7,7 @@ import '../core/config/roles_config.dart';
 import '../models/models.dart';
 import '../services/services.dart';
 
-/// Список сотрудников. Владелец видит всех; остальные — по своему отделу. Редактирование и добавление для шефа/владельца.
+/// Список сотрудников. Владелец видит всех; остальные — по своему отделу. Редактирование для шефа/владельца. Добавление — только личная регистрация по PIN.
 class EmployeesScreen extends StatefulWidget {
   const EmployeesScreen({super.key});
 
@@ -110,6 +110,18 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                 style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                 textAlign: TextAlign.center,
               ),
+              const SizedBox(height: 16),
+              Text(
+                loc.t('employees_register_by_pin_hint') ?? 'Сотрудники регистрируются самостоятельно по PIN компании.',
+                style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                icon: const Icon(Icons.person_add),
+                label: Text(loc.t('register_employee') ?? 'Регистрация сотрудника'),
+                onPressed: () => context.push('/register'),
+              ),
             ],
           ),
         ),
@@ -187,23 +199,6 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
       context: context,
       builder: (ctx) => _EmployeeEditSheet(
         employee: employee,
-        onSaved: () {
-          Navigator.of(ctx).pop();
-          _load();
-        },
-        onCancel: () => Navigator.of(ctx).pop(),
-      ),
-    );
-  }
-
-  void _openAddEmployee(BuildContext context) {
-    final acc = context.read<AccountManagerSupabase>();
-    final est = acc.establishment;
-    if (est == null) return;
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => _EmployeeAddSheet(
-        establishment: est,
         onSaved: () {
           Navigator.of(ctx).pop();
           _load();
@@ -578,244 +573,3 @@ ALTER TABLE employees ADD COLUMN IF NOT EXISTS hourly_rate REAL;''';
   }
 }
 
-// --- Добавление сотрудника ---
-
-class _EmployeeAddSheet extends StatefulWidget {
-  const _EmployeeAddSheet({required this.establishment, required this.onSaved, required this.onCancel});
-
-  final Establishment establishment;
-  final VoidCallback onSaved;
-  final VoidCallback onCancel;
-
-  @override
-  State<_EmployeeAddSheet> createState() => _EmployeeAddSheetState();
-}
-
-class _EmployeeAddSheetState extends State<_EmployeeAddSheet> {
-  final _nameController = TextEditingController();
-  final _surnameController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  String _department = 'kitchen';
-  String? _section = 'hot_kitchen';
-  final List<String> _roles = ['cook'];
-  bool _saving = false;
-  String? _error;
-
-  List<String> _roleOptionsForAdd() {
-    switch (_department) {
-      case 'management':
-        return RolesConfig.managementRoles().map((r) => r.roleCode).toList();
-      case 'bar':
-        return RolesConfig.barRoles().map((r) => r.roleCode).toList();
-      case 'dining_room':
-        return RolesConfig.hallRoles().map((r) => r.roleCode).toList();
-      case 'kitchen':
-        return RolesConfig.kitchenRolesForSection(_section ?? 'hot_kitchen').map((r) => r.roleCode).toList();
-      default:
-        return _roleOptions;
-    }
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _surnameController.dispose();
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _create() async {
-    final name = _nameController.text.trim();
-    final email = _emailController.text.trim();
-    final password = _passwordController.text;
-    if (name.isEmpty) {
-      setState(() => _error = 'Введите ФИО');
-      return;
-    }
-    if (email.isEmpty) {
-      setState(() => _error = 'Введите email');
-      return;
-    }
-    if (password.length < 6) {
-      setState(() => _error = 'Пароль не менее 6 символов');
-      return;
-    }
-    if (_roles.isEmpty) {
-      setState(() => _error = 'Выберите роль');
-      return;
-    }
-    setState(() { _saving = true; _error = null; });
-    try {
-      final acc = context.read<AccountManagerSupabase>();
-      final taken = await acc.isEmailTakenInEstablishment(email, widget.establishment.id);
-      if (taken && mounted) {
-        setState(() { _error = 'Этот email уже зарегистрирован'; _saving = false; });
-        return;
-      }
-      final signUpRes = await acc.signUpToSupabaseAuth(email, password);
-      final authUserId = signUpRes.userId;
-      await acc.createEmployeeForCompany(
-        company: widget.establishment,
-        fullName: name,
-        surname: _surnameController.text.trim().isEmpty ? null : _surnameController.text.trim(),
-        email: email,
-        password: password,
-        department: _department,
-        section: _department == 'kitchen' ? _section : null,
-        roles: _roles,
-        authUserId: authUserId,
-      );
-      if (mounted) {
-        final loc = context.read<LocalizationService>();
-        final msg = signUpRes.hasSession
-            ? (loc.t('employee_added') ?? 'Сотрудник добавлен.')
-            : (loc.t('employee_added_confirm_email') ?? 'Сотрудник добавлен. Ему отправлено письмо для подтверждения email.');
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-      }
-      widget.onSaved();
-    } catch (e) {
-      if (mounted) setState(() { _error = e.toString(); _saving = false; });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final loc = context.watch<LocalizationService>();
-    final theme = Theme.of(context);
-
-    final media = MediaQuery.of(context);
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: 420, maxHeight: media.size.height * 0.85),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(loc.t('add_employee') ?? 'Добавить сотрудника', style: theme.textTheme.titleLarge),
-                  TextButton(onPressed: widget.onCancel, child: Text(MaterialLocalizations.of(context).cancelButtonLabel)),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Flexible(
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: _nameController,
-                        decoration: InputDecoration(
-                          labelText: loc.t('full_name') ?? 'ФИО',
-                          border: const OutlineInputBorder(),
-                          filled: true,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _surnameController,
-                        decoration: InputDecoration(
-                          labelText: loc.t('surname') ?? 'Фамилия',
-                          border: const OutlineInputBorder(),
-                          filled: true,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        decoration: InputDecoration(
-                          labelText: loc.t('email') ?? 'Email',
-                          border: const OutlineInputBorder(),
-                          filled: true,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _passwordController,
-                        obscureText: true,
-                        decoration: InputDecoration(
-                          labelText: loc.t('password'),
-                          hintText: loc.t('password_too_short') ?? 'мин. 6 символов',
-                          border: const OutlineInputBorder(),
-                          filled: true,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      DropdownButtonFormField<String>(
-                        value: _department,
-                        decoration: InputDecoration(labelText: loc.t('department') ?? 'Отдел', border: const OutlineInputBorder(), filled: true),
-                        items: _departmentKeys.map((k) => DropdownMenuItem(value: k, child: Text(_departmentLabels[k] ?? k))).toList(),
-                        onChanged: (v) => setState(() {
-                          _department = v ?? _department;
-                          if (_department != 'kitchen') _section = null; else _section = 'hot_kitchen';
-                          if (_department == 'management') {
-                            final mgmt = RolesConfig.managementRoles();
-                            if (mgmt.isNotEmpty && !_roles.any((r) => mgmt.any((sr) => sr.roleCode == r))) {
-                              _roles.clear();
-                              _roles.add(mgmt.first.roleCode);
-                            }
-                          }
-                        }),
-                      ),
-                      if (_department == 'kitchen') ...[
-                        const SizedBox(height: 12),
-                        DropdownButtonFormField<String?>(
-                          value: _section,
-                          decoration: InputDecoration(labelText: loc.t('section') ?? 'Цех', border: const OutlineInputBorder(), filled: true),
-                          items: [
-                            const DropdownMenuItem(value: null, child: Text('—')),
-                            ...RolesConfig.kitchenSections().map((s) => DropdownMenuItem(value: s, child: Text(s))),
-                          ],
-                          onChanged: (v) => setState(() {
-                            _section = v;
-                            final opts = RolesConfig.kitchenRolesForSection(v ?? 'hot_kitchen');
-                            if (opts.isNotEmpty && !_roles.any((r) => opts.any((sr) => sr.roleCode == r))) {
-                              _roles.clear();
-                              _roles.add(opts.first.roleCode);
-                            }
-                          }),
-                        ),
-                      ],
-                      const SizedBox(height: 12),
-                      Text(loc.t('roles') ?? 'Роли', style: theme.textTheme.titleSmall),
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: _roleOptionsForAdd().map((code) {
-                          final selected = _roles.contains(code);
-                          return FilterChip(
-                            label: Text(_roleLabels[code] ?? loc.t(code) ?? code),
-                            selected: selected,
-                            onSelected: (v) => setState(() {
-                              if (v) _roles.add(code); else _roles.remove(code);
-                            }),
-                          );
-                        }).toList(),
-                      ),
-                      if (_error != null) ...[
-                        const SizedBox(height: 12),
-                        Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
-                      ],
-                      const SizedBox(height: 24),
-                      FilledButton(
-                        onPressed: _saving ? null : _create,
-                        child: _saving ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2)) : Text(loc.t('save')),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
