@@ -1371,7 +1371,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                     decoration: InputDecoration(
                       labelText: loc.t('ttk_name'),
                       isDense: true,
-                      filled: true,
+                      filled: false,
                       border: const OutlineInputBorder(),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                     ),
@@ -1412,15 +1412,25 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                           ],
                           onChanged: (v) => setState(() => _isSemiFinished = v ?? true),
                         )
-                      : ListTile(
-                          dense: true,
-                          leading: Icon(_isSemiFinished ? Icons.inventory_2 : Icons.restaurant, size: 20),
-                          title: Text(_isSemiFinished ? loc.t('tt_type_pf') : loc.t('tt_type_dish')),
+                      : InputDecorator(
+                          decoration: InputDecoration(
+                            labelText: loc.t('tt_type_hint'),
+                            isDense: true,
+                            border: const OutlineInputBorder(),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(_isSemiFinished ? Icons.inventory_2 : Icons.restaurant, size: 20, color: Theme.of(context).colorScheme.onSurface),
+                              const SizedBox(width: 8),
+                              Text(_isSemiFinished ? loc.t('tt_type_pf') : loc.t('tt_type_dish')),
+                            ],
+                          ),
                         ),
                 ] else
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         SizedBox(
                           width: 200,
@@ -1432,7 +1442,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                             decoration: InputDecoration(
                               labelText: loc.t('ttk_name'),
                               isDense: true,
-                              filled: true,
+                              filled: false,
                               border: const OutlineInputBorder(),
                               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                             ),
@@ -1441,37 +1451,43 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                         const SizedBox(width: 8),
                         SizedBox(
                           width: 140,
+                          height: 56,
                           child: effectiveCanEdit
                               ? DropdownButtonFormField<String>(
                                   value: _selectedCategory,
-                                  decoration: InputDecoration(labelText: loc.t('category'), isDense: true, contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                                  decoration: InputDecoration(labelText: loc.t('category'), isDense: true, border: const OutlineInputBorder(), contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
                                   items: _categoryOptions.map((c) => DropdownMenuItem(value: c, child: Text(_categoryLabel(c, loc.currentLanguageCode)))).toList(),
                                   onChanged: (v) => setState(() => _selectedCategory = v ?? 'misc'),
                                 )
                               : InputDecorator(
-                                  decoration: InputDecoration(labelText: loc.t('category'), isDense: true),
+                                  decoration: InputDecoration(labelText: loc.t('category'), isDense: true, border: const OutlineInputBorder()),
                                   child: Text(_categoryLabel(_selectedCategory, loc.currentLanguageCode)),
                                 ),
                         ),
                         const SizedBox(width: 8),
                         SizedBox(
                           width: 140,
+                          height: 56,
                           child: effectiveCanEdit
                               ? DropdownButtonFormField<String>(
                                   value: _selectedSection,
-                                  decoration: InputDecoration(labelText: 'Цех', isDense: true, contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                                  decoration: InputDecoration(labelText: 'Цех', isDense: true, border: const OutlineInputBorder(), contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
                                   items: _getAvailableSections(context.read<AccountManagerSupabase>().hasProSubscription).entries.map((entry) =>
                                     DropdownMenuItem(value: entry.key, child: Text(entry.value))).toList(),
                                   onChanged: (v) => setState(() => _selectedSection = v),
                                 )
                               : _selectedSection != null ? InputDecorator(
-                                  decoration: InputDecoration(labelText: 'Цех', isDense: true),
+                                  decoration: InputDecoration(labelText: 'Цех', isDense: true, border: const OutlineInputBorder()),
                                   child: Text(_sectionOptions[_selectedSection!] ?? _selectedSection!),
                                 ) : const SizedBox.shrink(),
                         ),
                         const SizedBox(width: 8),
-                        if (effectiveCanEdit)
-                          Tooltip(
+                        SizedBox(
+                          height: 56,
+                          child: Align(
+                            alignment: Alignment.center,
+                            child: effectiveCanEdit
+                        ? Tooltip(
                             message: loc.t('tt_type_hint'),
                             child: SegmentedButton<bool>(
                               segments: [
@@ -1483,11 +1499,23 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                               showSelectedIcon: false,
                             ),
                           )
-                        else
-                          Chip(
-                            avatar: Icon(_isSemiFinished ? Icons.inventory_2 : Icons.restaurant, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                            label: Text(_isSemiFinished ? loc.t('tt_type_pf') : loc.t('tt_type_dish'), style: const TextStyle(fontSize: 12)),
+                        : InputDecorator(
+                            decoration: InputDecoration(
+                              labelText: loc.t('tt_type_hint'),
+                              isDense: true,
+                              border: const OutlineInputBorder(),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(_isSemiFinished ? Icons.inventory_2 : Icons.restaurant, size: 20, color: Theme.of(context).colorScheme.onSurface),
+                                const SizedBox(width: 8),
+                                Text(_isSemiFinished ? loc.t('tt_type_pf') : loc.t('tt_type_dish')),
+                              ],
+                            ),
                           ),
+                        ),
                       ],
                     ),
                   ),
