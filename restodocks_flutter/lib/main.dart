@@ -23,7 +23,13 @@ void main() async {
 
   print('=== SUPABASE INIT: url=${_supabaseUrl.substring(0, 20)}... key=${_supabaseAnonKey.substring(0, 15)}... ===');
 
-  await Supabase.initialize(url: _supabaseUrl, anonKey: _supabaseAnonKey);
+  await Supabase.initialize(
+    url: _supabaseUrl,
+    anonKey: _supabaseAnonKey,
+    authOptions: const FlutterAuthClientOptions(
+      detectSessionInUri: true, // автоматический вход при переходе по ссылке подтверждения
+    ),
+  );
   await AccountManagerSupabase().initialize();
   await LocalizationService.initialize();
   await ThemeService().initialize();

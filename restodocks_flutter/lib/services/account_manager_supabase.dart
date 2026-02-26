@@ -440,8 +440,13 @@ class AccountManagerSupabase {
         }
 
         await _supabase.signOut();
+        // Вход в Auth успешен, но записи в employees нет — не маскировать под «неверный пароль»
+        throw Exception('employee_not_found');
       }
     } catch (authErr) {
+      if (authErr is Exception && authErr.toString().contains('employee_not_found')) {
+        rethrow;
+      }
       if (kDebugMode) {
         debugPrint('🔐 Login: Supabase Auth failed: $authErr');
       }

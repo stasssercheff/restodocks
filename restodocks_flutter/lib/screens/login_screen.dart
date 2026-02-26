@@ -234,9 +234,18 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       if (!mounted) return;
       final loc = context.read<LocalizationService>();
-      final errStr = _safeErrorString(e, loc.t('invalid_email_or_password'));
+      final errStr = e.toString();
+      if (errStr.contains('employee_not_found')) {
+        setState(() => _errorMessage = loc.t('employee_not_found_use_fix_script'));
+        return;
+      }
+      final msg = _safeErrorString(
+        e,
+        loc.t('invalid_email_or_password'),
+        confirmEmailMsg: loc.t('confirm_email_then_login'),
+      );
       setState(() {
-        _errorMessage = loc.t('login_error', args: {'error': errStr});
+        _errorMessage = loc.t('login_error', args: {'error': msg});
       });
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -303,20 +312,26 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   /// Безопасное преобразование ошибки в строку (избегаем JSNull на Web)
-  /// Для ошибок Auth (400, invalid_grant) показываем [authErrorFallback]
-  String _safeErrorString(Object? e, String authErrorFallback) {
+  /// Для ошибок Auth (400, invalid_grant) — [authErrorFallback]
+  /// Для "Email not confirmed" — [confirmEmailMsg]
+  String _safeErrorString(Object? e, String authErrorFallback, {String? confirmEmailMsg}) {
     if (e == null) return authErrorFallback;
     try {
-      final s = e.toString();
+      final s = e.toString().toLowerCase();
       if (s.isEmpty) return authErrorFallback;
-      // Ошибки Auth при 400/token — показываем понятное сообщение
-      if (s.contains('JSNull') ||
+      // Email не подтверждён — подсказка перейти по ссылке
+      if ((s.contains('not confirmed') || s.contains('email_not_confirmed')) &&
+          confirmEmailMsg != null) {
+        return confirmEmailMsg;
+      }
+      // Ошибки Auth при 400/token
+      if (s.contains('jsnull') ||
           s.contains('invalid_grant') ||
-          s.contains('Invalid login credentials') ||
-          (s.contains('400') && s.toLowerCase().contains('token'))) {
+          s.contains('invalid login credentials') ||
+          (s.contains('400') && s.contains('token'))) {
         return authErrorFallback;
       }
-      return s;
+      return e.toString();
     } catch (_) {
       return authErrorFallback;
     }

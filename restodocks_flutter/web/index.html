@@ -34,46 +34,17 @@
   <link rel="manifest" href="manifest.json">
   <script src="theme-icons.js" defer></script>
   <style>
-    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #fff; }
     #loading-screen {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: url('welcome_logo.png') center center no-repeat;
-      background-size: cover;
+      background: #fff url('welcome_logo.png') center center no-repeat;
+      background-size: contain;
       z-index: 9999;
       transition: opacity 0.2s ease;
     }
-    /* При F5 на внутренней странице — не показывать полноэкранный логотип, только лёгкий индикатор */
-    body.loading-refresh #loading-screen {
-      background: rgba(255,255,255,0.95);
-      background-image: none;
-    }
-    body.loading-refresh #loading-screen::after {
-      content: '';
-      position: absolute;
-      top: 50%; left: 50%;
-      width: 32px; height: 32px;
-      margin: -16px 0 0 -16px;
-      border: 3px solid #e0e0e0;
-      border-top-color: #AD292C;
-      border-radius: 50%;
-      animation: loading-spin 0.8s linear infinite;
-    }
-    @keyframes loading-spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
-  <script>
-    (function() {
-      // Логотип при первой загрузке (/, #/, #/splash, #/home). Лёгкий спиннер только при F5 на «глубокой» странице.
-      var path = (window.location.pathname || '').replace(/\/$/, '');
-      var hash = (window.location.hash || '').replace(/^#/, '').split('?')[0].replace(/\/$/, '');
-      var isRootOrStart = (path === '' || path === '/') && (!hash || hash === '' || hash === '/' || hash === '/splash' || hash === '/home');
-      var pathDeep = path.length > 1 && path !== '/';
-      var hashDeep = hash.length > 1 && hash !== '/' && hash !== '/splash' && hash !== '/home';
-      var sameOrigin = document.referrer && document.referrer.indexOf(window.location.origin) === 0;
-      if (!isRootOrStart && (pathDeep || hashDeep || sameOrigin)) document.body.classList.add('loading-refresh');
-    })();
-  </script>
   <div id="loading-screen"></div>
   <script src="flutter_bootstrap.js" async></script>
   <script>
