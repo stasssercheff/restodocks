@@ -16,6 +16,12 @@
           sessionStorage.setItem('restodocks_last_path', p);
           document.documentElement.dataset.initialPath = p;
         }
+        // При обновлении (F5) не показывать экран с лого — пользователь уже в приложении
+        if (sessionStorage.getItem('restodocks_loaded_before')) {
+          var s = document.createElement('style');
+          s.textContent = '#loading-screen { display: none !important; }';
+          document.head.appendChild(s);
+        }
       } catch(e) {}
     })();
   </script>
@@ -67,6 +73,7 @@
   <script src="flutter_bootstrap.js" async></script>
   <script>
     function hideLoadingScreen() {
+      try { sessionStorage.setItem('restodocks_loaded_before', '1'); } catch(e) {}
       var el = document.getElementById('loading-screen');
       if (el) el.remove();
     }
