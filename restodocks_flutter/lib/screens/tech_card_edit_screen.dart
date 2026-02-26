@@ -1486,7 +1486,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                           width: 140,
                           height: 56,
                           child: Align(
-                            alignment: Alignment.center,
+                            alignment: Alignment.bottomCenter,
                             child: effectiveCanEdit
                         ? Tooltip(
                             message: loc.t('tt_type_hint'),
