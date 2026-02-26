@@ -3,5 +3,5 @@
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 
 void initUrlStrategy() {
-  setUrlStrategy(const PathUrlStrategy());
+  setUrlStrategy(PathUrlStrategy());
 }
