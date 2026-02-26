@@ -158,12 +158,12 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
               0: FixedColumnWidth(50),   // Тип ТТК
               1: FixedColumnWidth(120),  // Название
               2: FixedColumnWidth(160),  // Продукт
-              3: FixedColumnWidth(40),   // Брутто г.
+              3: FixedColumnWidth(70),   // Брутто г. (как столбец Цена)
               4: FixedColumnWidth(80),   // % отхода
-              5: FixedColumnWidth(40),   // Нетто г.
+              5: FixedColumnWidth(70),   // Нетто г. (как столбец Цена)
               6: FixedColumnWidth(80),   // Способ
               7: FixedColumnWidth(80),   // % ужарки
-              8: FixedColumnWidth(30),   // Выход г.
+              8: FixedColumnWidth(70),   // Выход г. (как столбец Цена)
               9: FixedColumnWidth(70),   // вес прц
               10: FixedColumnWidth(75),  // порций(шт)
               11: FixedColumnWidth(70), // Стоимость

@@ -1544,23 +1544,26 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                             onSuggestWaste: _suggestWasteForRow,
                             hideTechnologyBlock: true,
                           )
-                        : _TtkCookTable(
-                            loc: loc,
-                            dishName: _nameController.text,
-                            ingredients: _ingredients.where((i) => !i.isPlaceholder || i.hasData).toList(),
-                            technology: _technologyController.text,
-                            weightPerPortion: _portionWeight,
-                            hideTechnologyInTable: true,
-                            onTapPfIngredient: (id) => context.push('/tech-cards/$id?view=1'),
-                            onIngredientsChanged: (list) {
-                              WidgetsBinding.instance.addPostFrameCallback((_) {
-                                if (!mounted) return;
-                                setState(() {
-                                  _ingredients.clear();
-                                  _ingredients.addAll(list);
+                        : ConstrainedBox(
+                            constraints: const BoxConstraints(minWidth: 1145), // как в режиме создания
+                            child: _TtkCookTable(
+                              loc: loc,
+                              dishName: _nameController.text,
+                              ingredients: _ingredients.where((i) => !i.isPlaceholder || i.hasData).toList(),
+                              technology: _technologyController.text,
+                              weightPerPortion: _portionWeight,
+                              hideTechnologyInTable: true,
+                              onTapPfIngredient: (id) => context.push('/tech-cards/$id?view=1'),
+                              onIngredientsChanged: (list) {
+                                WidgetsBinding.instance.addPostFrameCallback((_) {
+                                  if (!mounted) return;
+                                  setState(() {
+                                    _ingredients.clear();
+                                    _ingredients.addAll(list);
+                                  });
                                 });
-                              });
-                            },
+                              },
+                            ),
                           ),
                   ),
                 ),
@@ -1745,12 +1748,12 @@ class _TtkTableState extends State<_TtkTable> {
     const colType = 64.0;   // Тип ТТК
     const colName = 100.0;  // Наименование
     const colProduct = 120.0;
-    const colGross = 35.0;  // Брутто г.
+    const colGross = 70.0;  // Брутто г. (как столбец Цена)
     const colWaste = 64.0;  // Отход %
-    const colNet = 35.0;    // Нетто г
+    const colNet = 70.0;    // Нетто г.
     const colMethod = 100.0;// Способ
     const colShrink = 64.0; // Ужарка %
-    const colOutput = 35.0; // Выход г.
+    const colOutput = 70.0; // Выход г. (как столбец Цена)
     const colCost = 82.0;   // Стоимость
     const colPriceKg = 88.0;// Цена за 1 кг/шт
     const colTech = 180.0;  // Технология
@@ -2381,10 +2384,10 @@ class _TtkCookTable extends StatefulWidget {
   // Ширины как в _TtkTable (таблица создания)
   static const _colDish = 100.0;
   static const _colProduct = 120.0;
-  static const _colGross = 35.0;
-  static const _colNet = 35.0;
+  static const _colGross = 70.0;   // как столбец Цена
+  static const _colNet = 70.0;
   static const _colMethod = 100.0;
-  static const _colOutput = 35.0;
+  static const _colOutput = 70.0;
   static const _colPortions = 56.0;
 
   @override
