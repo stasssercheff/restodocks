@@ -140,15 +140,64 @@ Deno.serve(async (req: Request) => {
       comment: comment ?? null,
     };
 
+    // Получатели: owner, executive_chef, sous_chef (по аналогии с checklist_submissions)
+    const { data: empRows } = await supabase
+      .from("employees")
+      .select("id, email, roles")
+      .eq("establishment_id", establishmentId);
+
+    const recipientRoles = ["owner", "executive_chef", "sous_chef"];
+    const recipients = (empRows || []).filter((e: { id: string; email?: string; roles?: string[] }) => {
+      const roles = Array.isArray(e.roles) ? e.roles : [];
+      return roles.some((r: string) => recipientRoles.includes(r));
+    });
+
+    // Если нет шефов/владельцев — берём owner_id заведения
+    if (recipients.length === 0) {
+      const { data: estab } = await supabase
+        .from("establishments")
+        .select("owner_id")
+        .eq("id", establishmentId)
+        .single();
+      const ownerId = estab?.owner_id;
+      if (ownerId) {
+        const { data: owner } = await supabase
+          .from("employees")
+          .select("id, email")
+          .eq("id", ownerId)
+          .single();
+        if (owner) recipients.push(owner);
+      }
+    }
+
+    if (recipients.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "Нет получателей (шеф, владелец) в заведении" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Уникальные получатели (один сотрудник может иметь несколько ролей)
+    const seen = new Set<string>();
+    const unique = recipients.filter((r: { id: string }) => {
+      if (seen.has(r.id)) return false;
+      seen.add(r.id);
+      return true;
+    });
+
+    const rows = unique.map((r: { id: string; email?: string }) => ({
+      establishment_id: establishmentId,
+      created_by_employee_id: createdByEmployeeId,
+      recipient_chef_id: r.id,
+      recipient_email: r.email ?? "",
+      payload,
+    }));
+
     const { data: inserted, error } = await supabase
       .from("order_documents")
-      .insert({
-        establishment_id: establishmentId,
-        created_by_employee_id: createdByEmployeeId,
-        payload,
-      })
+      .insert(rows)
       .select("id")
-      .single();
+      .limit(1);
 
     if (error) {
       console.error("order_documents insert error:", error);
@@ -158,8 +207,9 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    const firstId = Array.isArray(inserted) && inserted.length > 0 ? (inserted[0] as { id: string })?.id : null;
     return new Response(
-      JSON.stringify({ ok: true, id: (inserted as { id: string })?.id }),
+      JSON.stringify({ ok: true, id: firstId }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
