@@ -1516,6 +1516,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                             ),
                           ),
                         ),
+                      ),
                       ],
                     ),
                   ),
