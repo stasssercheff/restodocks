@@ -38,6 +38,8 @@ class _OrderListProductsScreenState extends State<OrderListProductsScreen> {
     final loc = context.read<LocalizationService>();
     final estId = acc.establishment?.id;
     if (estId == null) return;
+    // getNomenclatureProducts использует _allProducts — нужно загрузить и продукты, и номенклатуру
+    await store.loadProducts();
     await store.loadNomenclature(estId);
     final products = store.getNomenclatureProducts(estId);
     if (products.isEmpty) {
