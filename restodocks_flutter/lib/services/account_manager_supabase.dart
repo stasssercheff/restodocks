@@ -322,21 +322,21 @@ class AccountManagerSupabase {
     return Employee.fromJson(data);
   }
 
-  /// Регистрация в Supabase Auth (для сотрудников). Возвращает auth.uid() при успехе.
-  Future<String?> signUpToSupabaseAuth(String email, String password) async {
+  /// Регистрация в Supabase Auth (для сотрудников). Возвращает (userId, hasSession).
+  Future<({String? userId, bool hasSession})> signUpToSupabaseAuth(String email, String password) async {
     final emailTrim = email.trim();
     print('DEBUG: signUpToSupabaseAuth called with email: $emailTrim');
 
     // Сначала попробуем войти - вдруг пользователь уже существует
     try {
       print('DEBUG: Attempting signIn first...');
-      await _supabase.signInWithEmail(emailTrim, password);
+      final signInRes = await _supabase.signInWithEmail(emailTrim, password);
       if (_supabase.currentUser != null) {
-        print('DEBUG: User already exists, signed in successfully: ${_supabase.currentUser!.id}');
-        return _supabase.currentUser!.id;
+        print('DEBUG: User already exists, signed in: ${_supabase.currentUser!.id}');
+        return (userId: _supabase.currentUser!.id, hasSession: signInRes.session != null);
       }
     } catch (signInError) {
-      print('DEBUG: signIn failed (user doesn\'t exist or wrong password): $signInError');
+      print('DEBUG: signIn failed: $signInError');
       // Продолжаем к signUp
     }
 
@@ -345,8 +345,9 @@ class AccountManagerSupabase {
       print('DEBUG: Attempting signUp...');
       final res = await _supabase.signUpWithEmail(emailTrim, password);
       final uid = res.user?.id ?? _supabase.currentUser?.id;
-      print('DEBUG: signUpWithEmail completed, userId: $uid (session: ${res.session != null})');
-      return uid;
+      final hasSession = res.session != null;
+      print('DEBUG: signUp completed, userId: $uid, hasSession: $hasSession');
+      return (userId: uid, hasSession: hasSession);
     } catch (signUpError) {
       print('DEBUG: signUpWithEmail failed: $signUpError');
 
@@ -354,10 +355,9 @@ class AccountManagerSupabase {
       if (signUpError.toString().contains('already') || signUpError.toString().contains('exists')) {
         try {
           print('DEBUG: signUp failed with "already exists", trying signIn again...');
-          await _supabase.signInWithEmail(emailTrim, password);
+          final signInRes = await _supabase.signInWithEmail(emailTrim, password);
           if (_supabase.currentUser != null) {
-            print('DEBUG: Successfully signed in existing user: ${_supabase.currentUser!.id}');
-            return _supabase.currentUser!.id;
+            return (userId: _supabase.currentUser!.id, hasSession: signInRes.session != null);
           }
         } catch (finalSignInError) {
           print('DEBUG: Final signIn also failed: $finalSignInError');

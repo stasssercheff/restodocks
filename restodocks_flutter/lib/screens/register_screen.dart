@@ -130,15 +130,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       final password = _passwordController.text;
 
-      // Регистрация в Supabase Auth (для привязки auth_user_id)
+      // Регистрация в Supabase Auth (employees.id = auth.users.id)
       String? authUserId;
+      bool hasSession = false;
       try {
         print('DEBUG: Attempting Supabase Auth signUp for email: $email');
-        authUserId = await accountManager.signUpToSupabaseAuth(email, password);
-        print('DEBUG: Supabase Auth signUp successful, authUserId: $authUserId');
+        final signUpRes = await accountManager.signUpToSupabaseAuth(email, password);
+        authUserId = signUpRes.userId;
+        hasSession = signUpRes.hasSession;
+        print('DEBUG: Supabase Auth signUp: userId=$authUserId, hasSession=$hasSession');
       } catch (e) {
         print('DEBUG: Supabase Auth signUp failed: $e');
-        // Если signUp не удался (подтверждение email и т.п.), продолжаем без auth
       }
 
       final employee = await accountManager.createEmployeeForCompany(
@@ -153,9 +155,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
         authUserId: authUserId,
       );
 
-      await accountManager.login(employee, establishment);
-
-      // Отправка письма сотруднику
       final emailService = EmailService();
       emailService.sendRegistrationEmail(
         isOwner: false,
@@ -166,7 +165,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
       );
 
       if (!mounted) return;
-      context.go('/home');
+      if (hasSession) {
+        await accountManager.login(employee, establishment);
+        context.go('/home');
+      } else {
+        // Confirm Email — экран «Подтвердите учётную запись»
+        context.go('/confirm-email?email=${Uri.encodeComponent(email)}');
+      }
     } catch (e) {
       if (!mounted) return;
       final loc = context.read<LocalizationService>();

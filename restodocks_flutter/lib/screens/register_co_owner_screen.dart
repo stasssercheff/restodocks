@@ -73,8 +73,9 @@ class _RegisterCoOwnerScreenState extends State<RegisterCoOwnerScreen> {
         updatedAt: DateTime.parse(establishment['updated_at'] as String),
       );
 
-      await accountManager.signUpWithEmailForOwner(email, password);
-      final authUserId = accountManager.supabase.currentUser?.id;
+      final accSupabase = accountManager as AccountManagerSupabase;
+      final signUpResult = await accSupabase.signUpWithEmailForOwner(email, password);
+      final authUserId = signUpResult.userId;
       if (authUserId == null) throw Exception('Не удалось создать учётную запись');
 
       final employee = await accountManager.createEmployeeForCompany(
@@ -89,9 +90,13 @@ class _RegisterCoOwnerScreenState extends State<RegisterCoOwnerScreen> {
         authUserId: authUserId,
       );
 
-      await accountManager.login(employee, estab);
-
-      if (mounted) context.go('/home');
+      if (!mounted) return;
+      if (signUpResult.hasSession) {
+        await accountManager.login(employee, estab);
+        context.go('/home');
+      } else {
+        context.go('/confirm-email?email=${Uri.encodeComponent(email)}');
+      }
     } catch (e) {
       if (mounted) setState(() {
         _error = e.toString();
