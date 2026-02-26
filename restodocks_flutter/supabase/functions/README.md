@@ -57,6 +57,7 @@
    supabase functions deploy ai-recognize-product
    supabase functions deploy ai-refine-nutrition
    supabase functions deploy ai-verify-product
+   supabase functions deploy save-order-document
    ```
    Или из папки, где лежит `supabase/`:
    ```bash
@@ -75,6 +76,7 @@
 | `ai-recognize-product` | Нормализация названия, категория, единица | GigaChat / OpenAI |
 | `ai-refine-nutrition` | КБЖУ по названию продукта | GigaChat / OpenAI |
 | `ai-verify-product` | Верификация продукта (цена, КБЖУ, название) | GigaChat / OpenAI |
+| `save-order-document` | Сохранение заказа во входящие с ценами из БД (Edge Function, без AI) | — |
 
 ## Локальный запуск (опционально)
 

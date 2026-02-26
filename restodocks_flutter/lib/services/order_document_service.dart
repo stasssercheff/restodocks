@@ -9,7 +9,45 @@ class OrderDocumentService {
   final SupabaseService _supabase = SupabaseService();
   static const _table = 'order_documents';
 
-  /// Сохранить документ заказа (после «Сохранить с количествами»).
+  /// Сохранить документ заказа через Edge Function — цены подставляются на сервере из establishment_products/products.
+  Future<Map<String, dynamic>?> saveWithServerPrices({
+    required String establishmentId,
+    required String createdByEmployeeId,
+    required Map<String, dynamic> header,
+    required List<Map<String, dynamic>> items,
+    String? comment,
+  }) async {
+    try {
+      final body = <String, dynamic>{
+        'establishmentId': establishmentId,
+        'createdByEmployeeId': createdByEmployeeId,
+        'header': header,
+        'items': items.map((e) => {
+          'productId': e['productId'],
+          'productName': e['productName'],
+          'unit': e['unit'],
+          'quantity': e['quantity'],
+        }).toList(),
+        'comment': comment,
+      };
+      final res = await _supabase.client.functions.invoke('save-order-document', body: body);
+      final data = res.data;
+      if (res.status != 200 || data == null) {
+        final err = data is Map ? (data['error'] ?? res.data) : res.data;
+        print('Ошибка Edge Function save-order-document: $err');
+        return null;
+      }
+      final ok = data is Map && data['ok'] == true;
+      final id = data is Map ? data['id'] as String? : null;
+      if (!ok || id == null) return null;
+      return getById(id);
+    } catch (e) {
+      print('Ошибка сохранения документа заказа (Edge Function): $e');
+      return null;
+    }
+  }
+
+  /// Сохранить документ заказа с готовым payload (legacy, цены считаются на клиенте).
   Future<Map<String, dynamic>?> save({
     required String establishmentId,
     required String createdByEmployeeId,

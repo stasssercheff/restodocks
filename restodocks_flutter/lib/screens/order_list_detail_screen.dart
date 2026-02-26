@@ -39,7 +39,7 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
       return;
     }
     _establishmentId = est.id;
-    // Загружаем номенклатуру с ценами для расчёта итоговой суммы заказа
+    // Загружаем номенклатуру для отображения локализованных имён при экспорте
     final store = context.read<ProductStoreSupabase>();
     await store.loadNomenclature(est.id);
     final lists = await loadOrderLists(est.id);
@@ -113,8 +113,7 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
     final lists = await loadOrderLists(_establishmentId!);
     await saveOrderLists(_establishmentId!, [...lists, saved]);
 
-    // Сохранить во входящие (шефу и собственнику) с ценами и итогами
-    final store = context.read<ProductStoreSupabase>();
+    // Сохранить во входящие (шефу и собственнику) — цены подставляются на сервере через Edge Function
     final orderForDateStr = saved.orderForDate != null ? DateFormat('yyyy-MM-dd').format(saved.orderForDate!) : null;
     final header = {
       'supplierName': saved.supplierName,
@@ -123,40 +122,18 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
       'createdAt': now.toIso8601String(),
       'orderForDate': orderForDateStr,
     };
-    double grandTotal = 0;
-    final itemsPayload = <Map<String, dynamic>>[];
-    for (final item in itemsWithQty) {
-      double pricePerKg = 0;
-      if (item.productId != null) {
-        final ep = store.getEstablishmentPrice(item.productId!, establishment.id);
-        pricePerKg = ep?.$1 ?? 0;
-      }
-      double pricePerUnit = pricePerKg;
-      if (item.unit == 'g' || item.unit == 'г') {
-        pricePerUnit = pricePerKg / 1000;
-      } else if (item.unit != 'kg' && item.unit != 'кг') {
-        pricePerUnit = pricePerKg;
-      }
-      final lineTotal = item.quantity * pricePerUnit;
-      grandTotal += lineTotal;
-      itemsPayload.add({
-        'productName': item.productName,
-        'unit': item.unit,
-        'quantity': item.quantity,
-        'pricePerUnit': pricePerUnit,
-        'lineTotal': lineTotal,
-      });
-    }
-    final payload = {
-      'header': header,
-      'items': itemsPayload,
-      'grandTotal': grandTotal,
-      'comment': saved.comment,
-    };
-    final orderDoc = await OrderDocumentService().save(
+    final itemsPayload = itemsWithQty.map((item) => {
+      'productId': item.productId,
+      'productName': item.productName,
+      'unit': item.unit,
+      'quantity': item.quantity,
+    }).toList();
+    final orderDoc = await OrderDocumentService().saveWithServerPrices(
       establishmentId: establishment.id,
       createdByEmployeeId: employee.id,
-      payload: payload,
+      header: header,
+      items: itemsPayload,
+      comment: saved.comment,
     );
 
     if (mounted) {
@@ -198,13 +175,13 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
   }
 
   /// Сохранить текущий заказ во входящие (шефу и собственнику). Возвращает true при успехе.
+  /// Цены подставляются на сервере через Edge Function.
   Future<bool> _saveOrderToInbox() async {
     if (_list == null || _establishmentId == null) return false;
     final account = context.read<AccountManagerSupabase>();
     final employee = account.currentEmployee;
     final establishment = account.establishment;
     if (employee == null || establishment == null) return false;
-    final store = context.read<ProductStoreSupabase>();
     final itemsWithQty = _getItemsWithQuantities();
     final now = DateTime.now();
     final orderForDateStr = _list!.orderForDate != null ? DateFormat('yyyy-MM-dd').format(_list!.orderForDate!) : null;
@@ -215,32 +192,18 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
       'createdAt': now.toIso8601String(),
       'orderForDate': orderForDateStr,
     };
-    double grandTotal = 0;
-    final itemsPayload = <Map<String, dynamic>>[];
-    for (final item in itemsWithQty) {
-      double pricePerKg = 0;
-      if (item.productId != null) {
-        final ep = store.getEstablishmentPrice(item.productId!, establishment.id);
-        pricePerKg = ep?.$1 ?? 0;
-      }
-      double pricePerUnit = pricePerKg;
-      if (item.unit == 'g' || item.unit == 'г') pricePerUnit = pricePerKg / 1000;
-      else if (item.unit != 'kg' && item.unit != 'кг') pricePerUnit = pricePerKg;
-      final lineTotal = item.quantity * pricePerUnit;
-      grandTotal += lineTotal;
-      itemsPayload.add({
-        'productName': item.productName,
-        'unit': item.unit,
-        'quantity': item.quantity,
-        'pricePerUnit': pricePerUnit,
-        'lineTotal': lineTotal,
-      });
-    }
-    final payload = {'header': header, 'items': itemsPayload, 'grandTotal': grandTotal, 'comment': _list!.comment};
-    final orderDoc = await OrderDocumentService().save(
+    final itemsPayload = itemsWithQty.map((item) => {
+      'productId': item.productId,
+      'productName': item.productName,
+      'unit': item.unit,
+      'quantity': item.quantity,
+    }).toList();
+    final orderDoc = await OrderDocumentService().saveWithServerPrices(
       establishmentId: establishment.id,
       createdByEmployeeId: employee.id,
-      payload: payload,
+      header: header,
+      items: itemsPayload,
+      comment: _list!.comment,
     );
     return orderDoc != null;
   }
