@@ -2645,7 +2645,6 @@ class _TtkCookTableState extends State<_TtkCookTable> {
             child: Container(
               decoration: BoxDecoration(
                 color: theme.colorScheme.surfaceContainerHighest,
-                border: Border.all(width: 0.5, color: borderColor),
               ),
               padding: _TtkCookTable._cellPad,
               alignment: Alignment.topLeft,
