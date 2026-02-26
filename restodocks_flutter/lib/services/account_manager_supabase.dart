@@ -270,7 +270,8 @@ class AccountManagerSupabase {
   }
 
   /// Регистрация сотрудника в компании
-  /// [authUserId] — ID из Supabase Auth. Если задан или owner — пароль только в Auth, password_hash не сохраняем.
+  /// [authUserId] — ID из Supabase Auth (обязательно: employees.id = auth.users.id).
+  /// При подтверждении email нет сессии нового юзера — вставка через RPC create_employee_for_company.
   Future<Employee> createEmployeeForCompany({
     required Establishment company,
     required String fullName,
@@ -282,45 +283,43 @@ class AccountManagerSupabase {
     required List<String> roles,
     String? authUserId,
   }) async {
-    final useSupabaseAuth = authUserId != null || roles.contains('owner');
-    final passwordHash = useSupabaseAuth ? null : BCrypt.hashpw(password, BCrypt.gensalt());
+    if (authUserId == null || authUserId.isEmpty) {
+      throw Exception('employees.id = auth.users.id — требуется authUserId от signUp');
+    }
 
-    final employee = Employee.create(
-      fullName: fullName,
-      surname: surname,
-      email: email,
-      password: passwordHash ?? '',
-      department: department,
-      section: section,
-      roles: roles,
-      establishmentId: company.id,
-    );
-
-    final employeeData = employee.toJson();
-    employeeData['password_hash'] = passwordHash;
-    employeeData.remove('password');
-    employeeData.remove('created_at');
-    employeeData.remove('updated_at');
-    _stripAvatarFromPayload(employeeData);
-    // employees.id = auth.users.id — обязательно передаём при вставке
-    if (authUserId != null) employeeData['id'] = authUserId;
-
-    final response = await _supabase.insertData('employees', employeeData);
-    final resp = Map<String, dynamic>.from(response);
-    resp['password_hash'] = resp['password_hash'] ?? '';
-    final createdEmployee = Employee.fromJson(resp);
-
-    // Обновляем establishment с ownerId, если это владелец
+    // Владелец — через create_owner_employee (вызов без сессии после Confirm Email)
     if (roles.contains('owner')) {
-      await _supabase.updateData(
-        'establishments',
-        {'owner_id': createdEmployee.id},
-        'id',
-        company.id,
+      return createOwnerEmployeeViaRpc(
+        authUserId: authUserId,
+        establishment: company,
+        fullName: fullName,
+        surname: surname,
+        email: email,
+        roles: roles,
       );
     }
 
-    return createdEmployee;
+    // Обычный сотрудник: RLS требует id = auth.uid(), при Confirm Email сессии нет — через RPC.
+    // Владелец добавляет (authenticated) → create_employee_for_company.
+    // Саморегистрация (anon) → create_employee_self_register.
+    final rpcName = _supabase.isAuthenticated ? 'create_employee_for_company' : 'create_employee_self_register';
+    final res = await _supabase.client.rpc(
+      rpcName,
+      params: {
+        'p_auth_user_id': authUserId,
+        'p_establishment_id': company.id,
+        'p_full_name': fullName,
+        'p_surname': surname ?? '',
+        'p_email': email,
+        'p_department': department,
+        'p_section': section ?? '',
+        'p_roles': roles,
+      },
+    );
+    final data = Map<String, dynamic>.from(res as Map);
+    data['password'] = '';
+    data['password_hash'] = '';
+    return Employee.fromJson(data);
   }
 
   /// Регистрация в Supabase Auth (для сотрудников). Возвращает auth.uid() при успехе.
@@ -344,9 +343,10 @@ class AccountManagerSupabase {
     // Если вход не удался, пробуем зарегистрировать нового пользователя
     try {
       print('DEBUG: Attempting signUp...');
-      await _supabase.signUpWithEmail(emailTrim, password);
-      print('DEBUG: signUpWithEmail completed, currentUser: ${_supabase.currentUser?.id}');
-      return _supabase.currentUser?.id;
+      final res = await _supabase.signUpWithEmail(emailTrim, password);
+      final uid = res.user?.id ?? _supabase.currentUser?.id;
+      print('DEBUG: signUpWithEmail completed, userId: $uid (session: ${res.session != null})');
+      return uid;
     } catch (signUpError) {
       print('DEBUG: signUpWithEmail failed: $signUpError');
 
