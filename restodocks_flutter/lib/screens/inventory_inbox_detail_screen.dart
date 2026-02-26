@@ -50,36 +50,49 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
     final payload = doc['payload'] as Map<String, dynamic>? ?? {};
     final header = payload['header'] as Map<String, dynamic>? ?? {};
     final rows = payload['rows'] as List<dynamic>? ?? [];
+    final aggregated = payload['aggregatedProducts'] as List<dynamic>? ?? [];
 
     try {
-      final excel = Excel.createExcel();
-      final sheet = excel[excel.getDefaultSheet()!];
-
       var maxCols = 0;
       for (var i = 0; i < rows.length; i++) {
         final r = rows[i] as Map<String, dynamic>;
         final quantities = r['quantities'] as List<dynamic>? ?? [];
         if (quantities.length > maxCols) maxCols = quantities.length;
       }
-      final headerCells = <CellValue>[
-        TextCellValue(loc.t('inventory_excel_number')),
-        TextCellValue(loc.t('inventory_item_name')),
-        TextCellValue(loc.t('inventory_unit')),
-        TextCellValue(loc.t('inventory_excel_total')),
-      ];
+      if (maxCols < 1) maxCols = 1;
+
+      final excel = Excel.createExcel();
+      final numLabel = loc.t('inventory_excel_number');
+      final nameLabel = loc.t('inventory_item_name');
+      final unitLabel = loc.t('inventory_unit');
+      final totalLabel = loc.t('inventory_excel_total');
       final fillLabel = loc.t('inventory_excel_fill_data');
+
+      final headerCells = <CellValue>[
+        TextCellValue(numLabel),
+        TextCellValue(nameLabel),
+        TextCellValue(unitLabel),
+        TextCellValue(totalLabel),
+      ];
       for (var c = 0; c < maxCols; c++) {
         headerCells.add(TextCellValue('$fillLabel ${c + 1}'));
       }
-      sheet.appendRow(headerCells);
-      for (var i = 0; i < rows.length; i++) {
-        final r = rows[i] as Map<String, dynamic>;
+
+      // ЛИСТ 1: Продукты + ПФ с итогами + перерасчёт ПФ в брутто
+      final sheet1 = excel['Продукты + ПФ'];
+      sheet1.appendRow(headerCells);
+
+      final rowsSorted = List<Map<String, dynamic>>.from(rows.map((e) => e as Map<String, dynamic>))
+        ..sort((a, b) => ((a['productName'] as String?) ?? '').toLowerCase().compareTo(((b['productName'] as String?) ?? '').toLowerCase()));
+      var rowNum = 1;
+      for (var i = 0; i < rowsSorted.length; i++) {
+        final r = rowsSorted[i];
         final name = r['productName'] as String? ?? '';
         final unit = r['unit'] as String? ?? '';
         final total = (r['total'] as num?)?.toDouble() ?? 0.0;
         final quantities = r['quantities'] as List<dynamic>? ?? [];
         final rowCells = <CellValue>[
-          IntCellValue(i + 1),
+          IntCellValue(rowNum++),
           TextCellValue(name),
           TextCellValue(unit),
           DoubleCellValue(total),
@@ -88,27 +101,110 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
           final q = c < quantities.length ? (quantities[c] as num?)?.toDouble() ?? 0.0 : 0.0;
           rowCells.add(DoubleCellValue(q));
         }
-        sheet.appendRow(rowCells);
+        sheet1.appendRow(rowCells);
       }
-      final aggregated = payload['aggregatedProducts'] as List<dynamic>? ?? [];
+
       if (aggregated.isNotEmpty) {
-        sheet.appendRow([]);
-        sheet.appendRow([TextCellValue(loc.t('inventory_pf_products_title'))]);
-        sheet.appendRow([
-          TextCellValue(loc.t('inventory_excel_number')),
-          TextCellValue(loc.t('inventory_item_name')),
+        sheet1.appendRow([]);
+        sheet1.appendRow([TextCellValue(loc.t('inventory_pf_products_title'))]);
+        sheet1.appendRow([
+          TextCellValue(numLabel),
+          TextCellValue(nameLabel),
           TextCellValue(loc.t('inventory_pf_gross_g')),
           TextCellValue(loc.t('inventory_pf_net_g')),
         ]);
-        for (var i = 0; i < aggregated.length; i++) {
-          final p = aggregated[i] as Map<String, dynamic>;
-          sheet.appendRow([
+        final groupedProducts = <String, Map<String, dynamic>>{};
+        for (final p in aggregated) {
+          final name = (p['productName'] as String? ?? '').trim();
+          final gross = (p['grossGrams'] as num?)?.toDouble() ?? 0.0;
+          final net = (p['netGrams'] as num?)?.toDouble() ?? 0.0;
+          if (groupedProducts.containsKey(name)) {
+            groupedProducts[name]!['grossGrams'] = (groupedProducts[name]!['grossGrams'] as double) + gross;
+            groupedProducts[name]!['netGrams'] = (groupedProducts[name]!['netGrams'] as double) + net;
+          } else {
+            groupedProducts[name] = {'productName': name, 'grossGrams': gross, 'netGrams': net};
+          }
+        }
+        final groupedList = groupedProducts.values.toList()
+          ..sort((a, b) => ((a['productName'] as String?) ?? '').toLowerCase().compareTo(((b['productName'] as String?) ?? '').toLowerCase()));
+        for (var i = 0; i < groupedList.length; i++) {
+          final p = groupedList[i];
+          sheet1.appendRow([
             IntCellValue(i + 1),
             TextCellValue((p['productName'] as String? ?? '').toString()),
-            IntCellValue(((p['grossGrams'] as num?)?.toDouble() ?? 0).round()),
-            IntCellValue(((p['netGrams'] as num?)?.toDouble() ?? 0).round()),
+            IntCellValue((p['grossGrams'] as double).round()),
+            IntCellValue((p['netGrams'] as double).round()),
           ]);
         }
+      }
+
+      // ЛИСТ 2: Все продукты включая данные из ПФ
+      final sheet2 = excel['Все продукты с ПФ'];
+      sheet2.appendRow(headerCells);
+
+      final allProducts = <String, Map<String, dynamic>>{};
+      for (var i = 0; i < rows.length; i++) {
+        final r = rows[i] as Map<String, dynamic>;
+        final name = r['productName'] as String? ?? '';
+        final unit = r['unit'] as String? ?? '';
+        final total = (r['total'] as num?)?.toDouble() ?? 0.0;
+        final quantities = r['quantities'] as List<dynamic>? ?? [];
+        if (allProducts.containsKey(name)) {
+          final existing = allProducts[name]!;
+          existing['total'] = (existing['total'] as double) + total;
+          final existingQ = existing['quantities'] as List<double>;
+          for (var c = 0; c < quantities.length && c < existingQ.length; c++) {
+            existingQ[c] += (quantities[c] as num?)?.toDouble() ?? 0.0;
+          }
+        } else {
+          allProducts[name] = {
+            'productName': name,
+            'unit': unit,
+            'total': total,
+            'quantities': List<double>.from(quantities.map((q) => (q as num?)?.toDouble() ?? 0.0)),
+          };
+        }
+      }
+      for (final p in aggregated) {
+        final name = (p['productName'] as String?)?.trim() ?? '';
+        final grossGrams = (p['grossGrams'] as num?)?.toDouble() ?? 0.0;
+        if (allProducts.containsKey(name)) {
+          final existing = allProducts[name]!;
+          existing['total'] = (existing['total'] as double) + grossGrams;
+          final quantities = existing['quantities'] as List<double>;
+          if (quantities.isNotEmpty) {
+            quantities[0] += grossGrams;
+          } else {
+            quantities.add(grossGrams);
+          }
+        } else {
+          allProducts[name] = {
+            'productName': name,
+            'unit': 'g',
+            'total': grossGrams,
+            'quantities': [grossGrams],
+          };
+        }
+      }
+
+      final sortedProducts = allProducts.values.toList()
+        ..sort((a, b) => ((a['productName'] as String?) ?? '').toLowerCase().compareTo(((b['productName'] as String?) ?? '').toLowerCase()));
+      for (var i = 0; i < sortedProducts.length; i++) {
+        final p = sortedProducts[i];
+        final name = p['productName'] as String;
+        final unit = p['unit'] as String;
+        final total = p['total'] as double;
+        final quantities = p['quantities'] as List<double>;
+        final rowCells = <CellValue>[
+          IntCellValue(i + 1),
+          TextCellValue(name),
+          TextCellValue(unit),
+          DoubleCellValue(total),
+        ];
+        for (var c = 0; c < maxCols; c++) {
+          rowCells.add(DoubleCellValue(c < quantities.length ? quantities[c] : 0.0));
+        }
+        sheet2.appendRow(rowCells);
       }
 
       final out = excel.encode();
