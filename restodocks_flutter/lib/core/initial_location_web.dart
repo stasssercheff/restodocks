@@ -54,10 +54,17 @@ String? _pathFromDataset() {
   return null;
 }
 
-/// Читает путь из адресной строки. HashUrlStrategy: путь в # (site.com/#/schedule).
+/// Читает путь из адресной строки. PathUrlStrategy: путь в pathname (site.com/schedule).
 String _pathFromWindow() {
   try {
-    // Сначала hash — при HashUrlStrategy путь всегда там
+    // PathUrlStrategy: путь в pathname. Hash — fallback для старых закладок.
+    String path = html.window.location.pathname ?? '';
+    path = path.trim();
+    if (path.endsWith('/') && path.length > 1) path = path.substring(0, path.length - 1);
+    final search = html.window.location.search ?? '';
+    if (path.isNotEmpty && path != '/') {
+      return search.isNotEmpty ? '$path$search' : path;
+    }
     final hash = html.window.location.hash ?? '';
     if (hash.isNotEmpty) {
       String h = hash.startsWith('#') ? hash.substring(1) : hash;
@@ -66,14 +73,6 @@ String _pathFromWindow() {
         final p = h.contains('?') ? h.substring(0, h.indexOf('?')) : h;
         if (p != '/' && p.isNotEmpty) return q.isNotEmpty ? '$p$q' : p;
       }
-    }
-    // pathname как fallback (первая загрузка на корень)
-    String path = html.window.location.pathname ?? '';
-    path = path.trim();
-    if (path.endsWith('/') && path.length > 1) path = path.substring(0, path.length - 1);
-    final search = html.window.location.search ?? '';
-    if (path.isNotEmpty && path != '/') {
-      return search.isNotEmpty ? '$path$search' : path;
     }
     final href = html.window.location.href ?? '';
     if (href.isNotEmpty) {
