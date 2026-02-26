@@ -85,6 +85,7 @@ flutter:
     - assets/translations/
     - assets/products/
     - assets/data/
+    - assets/fonts/Roboto-Regular.ttf
 
 flutter_launcher_icons:
   android: false

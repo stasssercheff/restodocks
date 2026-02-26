@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:excel/excel.dart' hide TextSpan;
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -51,6 +52,16 @@ class OrderListExportService {
     return lines.join('\n');
   }
 
+  /// Шрифт с поддержкой кириллицы для PDF.
+  static pw.ThemeData? _pdfTheme;
+
+  static Future<pw.ThemeData> _getPdfTheme() async {
+    if (_pdfTheme != null) return _pdfTheme!;
+    final fontData = await rootBundle.load('assets/fonts/Roboto-Regular.ttf');
+    _pdfTheme = pw.ThemeData.withFont(base: pw.Font.ttf(fontData));
+    return _pdfTheme!;
+  }
+
   /// Построить PDF заказа (для вложения в письмо или сохранения).
   static Future<Uint8List> buildOrderPdfBytes({
     required OrderList list,
@@ -60,7 +71,8 @@ class OrderListExportService {
     required DateTime documentDate,
     required String Function(String) t,
   }) async {
-    final doc = pw.Document();
+    final theme = await _getPdfTheme();
+    final doc = pw.Document(theme: theme);
     final orderForStr = list.orderForDate != null
         ? DateFormat('dd.MM.yyyy').format(list.orderForDate!)
         : '—';
@@ -215,7 +227,8 @@ class OrderListExportService {
     required Map<String, dynamic> payload,
     required String Function(String) t,
   }) async {
-    final doc = pw.Document();
+    final theme = await _getPdfTheme();
+    final doc = pw.Document(theme: theme);
     final header = payload['header'] as Map<String, dynamic>? ?? {};
     final items = payload['items'] as List<dynamic>? ?? [];
     final grandTotal = (payload['grandTotal'] as num?)?.toDouble() ?? 0;
