@@ -412,6 +412,42 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     );
   }
 
+  void _showCreateProductDialog(LocalizationService loc) {
+    final account = context.read<AccountManagerSupabase>();
+    final estId = account.establishment?.id;
+    if (estId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('no_establishment'))));
+      return;
+    }
+    final store = context.read<ProductStoreSupabase>();
+    final allLangs = LocalizationService.productLanguageCodes;
+    final names = <String, String>{for (final c in allLangs) c: ''};
+    final emptyProduct = Product(
+      id: const Uuid().v4(),
+      name: '',
+      category: 'manual',
+      names: names,
+      calories: null,
+      protein: null,
+      fat: null,
+      carbs: null,
+      unit: 'g',
+      basePrice: null,
+      currency: account.establishment?.defaultCurrency ?? 'VND',
+    );
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => _ProductEditDialog(
+        product: emptyProduct,
+        store: store,
+        loc: loc,
+        establishmentId: estId,
+        onSaved: () => _ensureLoaded().then((_) => setState(() {})),
+        isCreate: true,
+      ),
+    );
+  }
+
   Future<void> _confirmRemoveForNomenclature(BuildContext context, Product p, ProductStoreSupabase store, LocalizationService loc, VoidCallback onRefresh, String estId) async {
     // Проверяем, используется ли продукт в ТТК — блокируем удаление из номенклатуры
     try {
@@ -777,7 +813,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
               onSortChanged: (s) => setState(() => _nomSort = s),
               onFilterTypeChanged: (f) => setState(() => _nomFilter = f),
               onRefresh: () => _ensureLoaded().then((_) => setState(() {})),
-              onSwitchToCatalog: () {}, // Не используется
+              onSwitchToCatalog: () => _showCreateProductDialog(loc),
               onEditProduct: (ctx, p) => _showEditProductForNomenclature(ctx, p, store, loc, () => _ensureLoaded().then((_) => setState(() {})), estId ?? ''),
               onRemoveProduct: (ctx, p) => _confirmRemoveForNomenclature(ctx, p, store, loc, () => _ensureLoaded().then((_) => setState(() {})), estId ?? ''),
               onLoadKbju: (ctx, list) => _loadKbjuForAll(ctx, list),
@@ -2521,7 +2557,7 @@ class _Chip extends StatelessWidget {
   }
 }
 
-/// Карточка продукта — редактирование единицы измерения, КБЖУ, стоимости
+/// Карточка продукта — редактирование или создание (пустая карточка)
 class _ProductEditDialog extends StatefulWidget {
   const _ProductEditDialog({
     required this.product,
@@ -2529,12 +2565,14 @@ class _ProductEditDialog extends StatefulWidget {
     required this.loc,
     this.establishmentId,
     required this.onSaved,
+    this.isCreate = false,
   });
 
   final Product product;
   final ProductStoreSupabase store;
   final LocalizationService loc;
   final String? establishmentId;
+  final bool isCreate;
   final VoidCallback onSaved;
 
   static const _currencies = ['RUB', 'USD', 'EUR', 'VND'];
@@ -2546,6 +2584,7 @@ class _ProductEditDialog extends StatefulWidget {
 class _ProductEditDialogState extends State<_ProductEditDialog> {
   late final TextEditingController _nameController;
   late final TextEditingController _priceController;
+  bool _checkingName = false;
   late final TextEditingController _caloriesController;
   late final TextEditingController _proteinController;
   late final TextEditingController _fatController;
@@ -2613,6 +2652,44 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
     return double.tryParse(s);
   }
 
+  /// ИИ проверяет название на опечатки и предлагает исправление
+  Future<void> _checkNameWithAi() async {
+    final name = _nameController.text.trim();
+    if (name.isEmpty) return;
+    setState(() => _checkingName = true);
+    try {
+      final ai = context.read<AiService>();
+      final result = await ai.recognizeProduct(name);
+      if (!mounted) return;
+      if (result != null && result.normalizedName != name) {
+        final ok = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text(widget.loc.t('ai_suggest_correction') ?? 'ИИ предлагает исправление'),
+            content: Text(
+              '${widget.loc.t('ai_suggested_name') ?? 'Возможно, вы имели в виду'}: "${result.normalizedName}"',
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(widget.loc.t('cancel'))),
+              FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(widget.loc.t('apply') ?? 'Применить')),
+            ],
+          ),
+        );
+        if (ok == true && mounted) {
+          _nameController.text = result.normalizedName;
+          if (result.suggestedUnit != null && CulinaryUnits.all.any((e) => e.id == result.suggestedUnit)) {
+            setState(() => _unit = result.suggestedUnit!);
+          }
+        }
+      } else if (result != null && result.normalizedName == name && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(widget.loc.t('ai_name_ok') ?? 'Название в порядке')),
+        );
+      }
+    } catch (_) {}
+    if (mounted) setState(() => _checkingName = false);
+  }
+
   Future<void> _save() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) {
@@ -2641,22 +2718,35 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
       containsLactose: _containsLactose,
     );
     try {
-      await widget.store.updateProduct(updated);
-      if (widget.establishmentId != null && widget.establishmentId!.isNotEmpty) {
-        final price = _parseNum(_priceController.text);
-        if (price != null) {
-          await widget.store.setEstablishmentPrice(
+      if (widget.isCreate) {
+        await widget.store.addProduct(updated);
+        if (widget.establishmentId != null && widget.establishmentId!.isNotEmpty) {
+          final price = _parseNum(_priceController.text);
+          await widget.store.addToNomenclature(
             widget.establishmentId!,
-            widget.product.id,
-            price,
-            _currency,
+            updated.id,
+            price: price,
+            currency: _currency,
           );
+        }
+      } else {
+        await widget.store.updateProduct(updated);
+        if (widget.establishmentId != null && widget.establishmentId!.isNotEmpty) {
+          final price = _parseNum(_priceController.text);
+          if (price != null) {
+            await widget.store.setEstablishmentPrice(
+              widget.establishmentId!,
+              widget.product.id,
+              price,
+              _currency,
+            );
+          }
         }
       }
       if (!mounted) return;
       Navigator.of(context).pop();
       widget.onSaved();
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(widget.loc.t('product_saved'))));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(widget.loc.t(widget.isCreate ? 'product_added' : 'product_saved'))));
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(widget.loc.t('error_with_message').replaceAll('%s', e.toString()))));
@@ -2668,7 +2758,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
   Widget build(BuildContext context) {
     final lang = widget.loc.currentLanguageCode;
     return AlertDialog(
-      title: Text(widget.loc.t('edit_product')),
+      title: Text(widget.loc.t(widget.isCreate ? 'add_from_catalog' : 'edit_product')),
       content: SingleChildScrollView(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 400),
@@ -2681,7 +2771,15 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                 decoration: InputDecoration(
                   labelText: widget.loc.t('product_name'),
                   border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: _checkingName
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.auto_awesome, size: 20),
+                    tooltip: widget.loc.t('ai_product_recognize'),
+                    onPressed: _checkingName ? null : _checkNameWithAi,
+                  ),
                 ),
+                onFieldSubmitted: (_) => _checkNameWithAi(),
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
