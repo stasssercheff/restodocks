@@ -1,7 +1,7 @@
-// HashStrategy: URL с # (site.com/#/inventory).
-// F5 работает без настройки сервера — хэш не отправляется на сервер.
+// PathUrlStrategy: URL без # (site.com/schedule). F5 сохраняет путь.
+// Vercel rewrites все пути на index.html — SPA routing работает.
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 
 void initUrlStrategy() {
-  setUrlStrategy(const HashUrlStrategy());
+  setUrlStrategy(PathUrlStrategy());
 }

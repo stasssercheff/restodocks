@@ -444,8 +444,8 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _runSequence() async {
-    // Сначала только логотип на пустом экране
-    await Future.delayed(const Duration(milliseconds: 1200));
+    // Короткая задержка для отображения логотипа
+    await Future.delayed(const Duration(milliseconds: 300));
     if (!mounted) return;
     await _checkAuthStatus();
   }

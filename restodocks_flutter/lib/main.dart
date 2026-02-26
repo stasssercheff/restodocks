@@ -18,9 +18,9 @@ const String _supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOi
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  url_strategy.initUrlStrategy();
-  // Фиксируем путь из URL до Supabase (detectSessionInUri может менять URL)
+  // Кэшируем путь из URL до любых изменений (Supabase, роутер)
   if (kIsWeb) initial_loc.getInitialLocation();
+  url_strategy.initUrlStrategy();
   FlutterError.onError = (details) {
     debugPrint('FlutterError: ${details.exception}');
     debugPrint('Stack: ${details.stack}');
