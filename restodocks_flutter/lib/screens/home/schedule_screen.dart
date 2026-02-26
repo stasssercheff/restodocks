@@ -12,11 +12,13 @@ import '../../widgets/app_bar_home_button.dart';
 /// График: слоты (должности/имена) задаются вручную, можно выбрать сотрудника из списка или вписать имя.
 /// Один график на заведение, прокрутка по неделям (неделя влезает на экран, ограничений нет).
 class ScheduleScreen extends StatefulWidget {
-  const ScheduleScreen({super.key, this.department = 'all', this.personalOnly = false});
+  const ScheduleScreen({super.key, this.department = 'all', this.personalOnly = false, this.embedded = false});
 
   final String department;
   /// Личный график — только строка текущего сотрудника.
   final bool personalOnly;
+  /// Вложен в главный экран (вкладка «График») — без кнопки «назад».
+  final bool embedded;
 
   @override
   State<ScheduleScreen> createState() => _ScheduleScreenState();
@@ -630,7 +632,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: appBarBackButton(context),
+        leading: widget.embedded ? null : appBarBackButton(context),
         title: Text(widget.personalOnly ? loc.t('personal_schedule') : loc.t('schedule')),
         actions: [
           if (canEdit)

@@ -5,9 +5,14 @@ import 'package:provider/provider.dart';
 import 'home/owner_home_content.dart';
 import 'home/staff_home_content.dart';
 import 'home/management_home_content.dart';
+import 'home/schedule_screen.dart';
+import 'home/inbox_screen.dart';
 import '../services/services.dart';
 import '../models/models.dart';
 import '../widgets/app_bar_home_button.dart';
+import 'checklists_screen.dart';
+import 'tech_cards_list_screen.dart';
+import 'order_lists_screen.dart';
 
 /// Главный экран: 3 вкладки (Домой, График/Уведомления, Личный кабинет), контент по роли.
 class HomeScreen extends StatefulWidget {
@@ -55,13 +60,18 @@ class _HomeScreenState extends State<HomeScreen> {
     final isOwner = currentEmployee.hasRole('owner');
     final homeBtnConfig = context.watch<HomeButtonConfigService>();
     final middleAction = homeBtnConfig.action;
-    final middleLabel = _labelForAction(loc, middleAction);
+    final noDataAccess = !isOwner && !currentEmployee.dataAccessEnabled;
+    final middleLabel = noDataAccess
+        ? (loc.t('personal_schedule') ?? 'Личный график')
+        : _labelForAction(loc, middleAction);
 
     return Scaffold(
-      appBar: AppBar(
-        leading: GoRouter.of(context).canPop() ? appBarBackButton(context) : null,
-        title: Text(_appBarTitle(loc, isOwner)),
-      ),
+      appBar: _selectedIndex == 1
+          ? null
+          : AppBar(
+              leading: GoRouter.of(context).canPop() ? appBarBackButton(context) : null,
+              title: Text(_appBarTitle(loc, isOwner, noDataAccess, middleLabel)),
+            ),
       body: IndexedStack(
         index: _selectedIndex,
         children: [
@@ -73,10 +83,6 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: (i) {
-          if (i == 1) {
-            context.go(middleAction.route);
-            return;
-          }
           setState(() => _selectedIndex = i);
         },
         destinations: [
@@ -86,8 +92,8 @@ class _HomeScreenState extends State<HomeScreen> {
             label: loc.t('home'),
           ),
           NavigationDestination(
-            icon: Icon(middleAction.iconOutlined),
-            selectedIcon: Icon(middleAction.icon),
+            icon: Icon(noDataAccess ? Icons.calendar_month_outlined : middleAction.iconOutlined),
+            selectedIcon: Icon(noDataAccess ? Icons.calendar_month : middleAction.icon),
             label: middleLabel,
           ),
           NavigationDestination(
@@ -100,14 +106,12 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  String _appBarTitle(LocalizationService loc, bool isOwner) {
-    final homeBtnConfig = context.read<HomeButtonConfigService>();
-    final middleAction = homeBtnConfig.action;
+  String _appBarTitle(LocalizationService loc, bool isOwner, bool noDataAccess, String middleLabel) {
     switch (_selectedIndex) {
       case 0:
         return loc.t('app_name');
       case 1:
-        return _labelForAction(loc, middleAction);
+        return middleLabel;
       case 2:
         return loc.t('personal_cabinet');
       default:
@@ -151,45 +155,25 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildMiddleTab(Employee employee, bool isOwner, LocalizationService loc) {
     final homeBtnConfig = context.read<HomeButtonConfigService>();
     final action = homeBtnConfig.action;
-    return _MiddleTabBody(
-      icon: action.icon,
-      title: _labelForAction(loc, action),
-      onTap: () => context.go(action.route),
-    );
+    final noDataAccess = !isOwner && !employee.dataAccessEnabled;
+
+    if (noDataAccess) {
+      return ScheduleScreen(personalOnly: true, embedded: true);
+    }
+    switch (action) {
+      case HomeButtonAction.schedule:
+        return ScheduleScreen(embedded: true);
+      case HomeButtonAction.inbox:
+        return const InboxScreen(embedded: true);
+      case HomeButtonAction.checklists:
+        return const ChecklistsScreen(embedded: true);
+      case HomeButtonAction.ttk:
+        return TechCardsListScreen(embedded: true);
+      case HomeButtonAction.productOrder:
+        return const OrderListsScreen(embedded: true);
+    }
   }
 
-}
-
-class _MiddleTabBody extends StatelessWidget {
-  const _MiddleTabBody({
-    required this.icon,
-    required this.title,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String title;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 80, color: Colors.grey.shade400),
-          const SizedBox(height: 16),
-          Text(title, style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: onTap,
-            icon: const Icon(Icons.open_in_new),
-            label: Text(title),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 /// Личный кабинет — только меню: Профиль | Настройки | Выход. Без карточки с данными (они в «Профиль»).

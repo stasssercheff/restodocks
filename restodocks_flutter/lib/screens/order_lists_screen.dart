@@ -10,7 +10,9 @@ import '../widgets/app_bar_home_button.dart';
 
 /// Заказ продуктов: при нажатии не список продуктов, а «Создать» и список созданных списков заказов.
 class OrderListsScreen extends StatefulWidget {
-  const OrderListsScreen({super.key});
+  const OrderListsScreen({super.key, this.embedded = false});
+
+  final bool embedded;
 
   @override
   State<OrderListsScreen> createState() => _OrderListsScreenState();
@@ -95,7 +97,7 @@ class _OrderListsScreenState extends State<OrderListsScreen> {
     );
     return Scaffold(
       appBar: AppBar(
-        leading: appBarBackButton(context),
+        leading: widget.embedded ? null : appBarBackButton(context),
         title: Text(loc.t('product_order')),
       ),
       body: Column(

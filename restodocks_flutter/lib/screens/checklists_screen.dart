@@ -12,7 +12,9 @@ import '../widgets/app_bar_home_button.dart';
 
 /// Список чеклистов-шаблонов. Шеф может править и создавать по аналогии.
 class ChecklistsScreen extends StatefulWidget {
-  const ChecklistsScreen({super.key});
+  const ChecklistsScreen({super.key, this.embedded = false});
+
+  final bool embedded;
 
   @override
   State<ChecklistsScreen> createState() => _ChecklistsScreenState();
@@ -257,7 +259,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
     if (emp != null && !canAccessChecklists) {
       return Scaffold(
         appBar: AppBar(
-          leading: appBarBackButton(context),
+          leading: widget.embedded ? null : appBarBackButton(context),
           title: GestureDetector(
             onTap: () => _scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut),
             child: Text(loc.t('checklists')),
@@ -291,7 +293,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: appBarBackButton(context),
+        leading: widget.embedded ? null : appBarBackButton(context),
         title: GestureDetector(
           onTap: () => _scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut),
           child: Text(loc.t('checklists')),

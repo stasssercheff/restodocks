@@ -17,9 +17,10 @@ import '../services/excel_export_service.dart';
 
 /// Список ТТК заведения. Создание и переход к редактированию.
 class TechCardsListScreen extends StatefulWidget {
-  const TechCardsListScreen({super.key, this.department = 'kitchen'});
+  const TechCardsListScreen({super.key, this.department = 'kitchen', this.embedded = false});
 
   final String department;
+  final bool embedded;
 
   @override
   State<TechCardsListScreen> createState() => _TechCardsListScreenState();
@@ -308,7 +309,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                 onPressed: _toggleSelectionMode,
                 tooltip: 'Отмена выбора',
               )
-            : appBarBackButton(context),
+            : (widget.embedded ? null : appBarBackButton(context)),
         title: Text(_selectionMode ? 'Выберите ТТК (${_selectedTechCards.length})' : loc.t('tech_cards')),
         actions: [
           // Счетчик ТТК

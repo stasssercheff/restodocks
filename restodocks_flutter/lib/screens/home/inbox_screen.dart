@@ -11,7 +11,9 @@ import '../../widgets/app_bar_home_button.dart';
 
 /// Входящие: Документы по отделам (Инвентаризация, Заказы продуктов, Подтверждения смен)
 class InboxScreen extends StatefulWidget {
-  const InboxScreen({super.key});
+  const InboxScreen({super.key, this.embedded = false});
+
+  final bool embedded;
 
   @override
   State<InboxScreen> createState() => _InboxScreenState();
@@ -69,7 +71,7 @@ class _InboxScreenState extends State<InboxScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: appBarBackButton(context),
+        leading: widget.embedded ? null : appBarBackButton(context),
         title: Text(loc.t('inbox')),
         actions: [
           IconButton(
