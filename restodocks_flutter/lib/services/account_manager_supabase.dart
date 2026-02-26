@@ -343,7 +343,8 @@ class AccountManagerSupabase {
     // Если вход не удался, пробуем зарегистрировать нового пользователя
     try {
       print('DEBUG: Attempting signUp...');
-      final res = await _supabase.signUpWithEmail(emailTrim, password);
+      final redirectUrl = _getEmailRedirectUrl();
+      final res = await _supabase.signUpWithEmail(emailTrim, password, emailRedirectTo: redirectUrl);
       final uid = res.user?.id ?? _supabase.currentUser?.id;
       final hasSession = res.session != null;
       print('DEBUG: signUp completed, userId: $uid, hasSession: $hasSession');
@@ -368,11 +369,28 @@ class AccountManagerSupabase {
     }
   }
 
+  /// URL для редиректа после подтверждения email. Web: Uri.base.origin; мобильные: production URL.
+  static String? _getEmailRedirectUrl() {
+    if (kIsWeb) {
+      try {
+        final u = Uri.base;
+        if (u.host.isNotEmpty && u.scheme.startsWith('http')) {
+          return u.origin;
+        }
+      } catch (_) {}
+    }
+    return 'https://www.restodocks.com';
+  }
+
   /// Регистрация владельца в Supabase Auth (employees.id = auth.users.id — создаём auth первым)
   /// Возвращает (auth user id, есть ли сессия).
   /// При Confirm Email session = null — пользователь должен подтвердить почту.
   Future<({String? userId, bool hasSession})> signUpWithEmailForOwner(String email, String password) async {
-    final res = await _supabase.signUpWithEmail(email.trim(), password);
+    final res = await _supabase.signUpWithEmail(
+      email.trim(),
+      password,
+      emailRedirectTo: _getEmailRedirectUrl(),
+    );
     final uid = res.user?.id ?? _supabase.currentUser?.id;
     final hasSession = res.session != null;
     return (userId: uid, hasSession: hasSession);

@@ -1,0 +1,49 @@
+# Настройка Supabase Auth для подтверждения email
+
+## Проблема
+После регистрации пользователь переходит по ссылке из письма, но Supabase не подтверждает email. При попытке входа показывается «Неверный пароль» — это общая ошибка, Supabase также возвращает её, когда email ещё не подтверждён.
+
+## Причина
+Неправильно настроены **Site URL** и **Redirect URLs** в Supabase Dashboard. Ссылка подтверждения должна вести на ваш сайт, и URL должен быть в списке разрешённых.
+
+## Решение
+
+### 1. Откройте URL Configuration в Supabase
+1. Войдите в [Supabase Dashboard](https://supabase.com/dashboard)
+2. Выберите проект
+3. **Authentication** → **URL Configuration**
+
+### 2. Установите Site URL
+- **Site URL**: `https://www.restodocks.com`
+- Это основной URL, куда Supabase будет редиректить по умолчанию.
+
+### 3. Добавьте Redirect URLs
+В поле **Redirect URLs** добавьте (каждая с новой строки):
+
+```
+https://www.restodocks.com
+https://www.restodocks.com/
+https://restodocks.com
+https://restodocks.com/
+http://localhost:3000
+http://localhost:8080
+http://127.0.0.1:3000
+http://127.0.0.1:8080
+```
+
+- `www.restodocks.com` и `restodocks.com` — production
+- `localhost` — для локальной разработки
+
+### 4. Сохраните изменения
+Нажмите **Save**.
+
+### 5. Проверка
+1. Зарегистрируйте нового сотрудника (с новым email)
+2. Откройте письмо подтверждения
+3. Нажмите на ссылку
+4. Должно открыться приложение с авторизацией (или страница входа — тогда войдите с паролем)
+5. Вход должен пройти успешно
+
+## Дополнительно
+- В коде используется `emailRedirectTo` — при signUp передаётся URL текущего сайта (на web — `Uri.base.origin`).
+- Если Site URL и Redirect URLs настроены верно, Supabase добавляет токены в URL при редиректе, и Flutter с `detectSessionInUri: true` автоматически создаёт сессию.

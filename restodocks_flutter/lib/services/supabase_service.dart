@@ -34,11 +34,15 @@ class SupabaseService {
     );
   }
 
-  /// Регистрация нового пользователя
-  Future<AuthResponse> signUpWithEmail(String email, String password) async {
+  /// Регистрация нового пользователя.
+  /// [emailRedirectTo] — URL для редиректа после подтверждения email (должен быть в Supabase Redirect URLs).
+  Future<AuthResponse> signUpWithEmail(String email, String password, {String? emailRedirectTo}) async {
     return await client.auth.signUp(
       email: email,
       password: password,
+      options: emailRedirectTo != null
+          ? SignUpOptions(emailRedirectTo: emailRedirectTo)
+          : null,
     );
   }
 
