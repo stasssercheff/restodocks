@@ -19,12 +19,16 @@ class ManagementHomeContent extends StatelessWidget {
     final isBarManager = roles.contains('bar_manager');
     final isGeneral = roles.contains('general_manager');
 
-    // Без доступа к данным — только график (владелец всегда имеет полный доступ)
+    // Без доступа к данным — только личный график (как в личном кабинете)
     if (!employee.hasRole('owner') && !employee.dataAccessEnabled) {
       return ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _Tile(icon: Icons.calendar_month, title: loc.t('schedule'), onTap: () => context.go('/schedule')),
+          _Tile(
+            icon: Icons.calendar_month,
+            title: loc.t('personal_schedule'),
+            onTap: () => context.go('/schedule?personal=1'),
+          ),
           Padding(
             padding: const EdgeInsets.only(top: 16),
             child: Text(
