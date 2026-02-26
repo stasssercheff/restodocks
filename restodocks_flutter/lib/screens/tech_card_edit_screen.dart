@@ -1357,7 +1357,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
             children: [
               Expanded(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                  padding: const EdgeInsets.fromLTRB(12, 24, 12, 12),
                   keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                   child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1433,7 +1433,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         SizedBox(
-                          width: 200,
+                          width: 140,
                           height: 56,
                           child: TextField(
                             controller: _nameController,
@@ -1483,6 +1483,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                         ),
                         const SizedBox(width: 8),
                         SizedBox(
+                          width: 140,
                           height: 56,
                           child: Align(
                             alignment: Alignment.center,
@@ -2672,11 +2673,11 @@ class _TtkCookTableState extends State<_TtkCookTable> {
             left: 0,
             top: 44,
             width: _TtkCookTable._colDish,
-            height: _ingredients.length * 44,
+            height: _ingredients.length * 44 + 1,
             child: Container(
               decoration: BoxDecoration(
                 color: Colors.white,
-                border: Border.all(color: Colors.black, width: 1),
+                border: Border.all(color: Colors.grey, width: 0.5),
               ),
               padding: _TtkCookTable._cellPad,
               alignment: Alignment.topLeft,
