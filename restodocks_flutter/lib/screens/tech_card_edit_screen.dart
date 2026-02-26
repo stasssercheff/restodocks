@@ -1217,7 +1217,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                     imageUrl: url,
                     fit: BoxFit.cover,
                     placeholder: (_, __) => const Center(child: CircularProgressIndicator()),
-                    errorWidget: (_, __, e) => const Icon(Icons.image_not_supported)),
+                    errorWidget: (_, __, e) => const Icon(Icons.image_not_supported),
+                  )
                 : bytes != null
                     ? Image.memory(bytes, fit: BoxFit.cover)
                     : const SizedBox(),
