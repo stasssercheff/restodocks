@@ -87,6 +87,26 @@ else
   echo "==> Source maps found: flutter.js.map"
 fi
 
+# Отключаем service worker: подменяем на cleanup, отключаем регистрацию в bootstrap
+# Решает кэширование старых версий и проблемы с F5/маршрутизацией
+echo "==> Replacing service worker with cleanup (disables SW caching)"
+cp scripts/sw_cleanup.js build/web/flutter_service_worker.js
+
+echo "==> Disabling service worker registration in bootstrap"
+# Убираем serviceWorkerSettings из вызова load() — SW больше не регистрируется
+python3 -c "
+import re
+p = 'build/web/flutter_bootstrap.js'
+with open(p) as f: c = f.read()
+# load({serviceWorkerSettings:{serviceWorkerVersion:\"NNN\"}}) -> load({})
+c2 = re.sub(r'load\(\{\s*serviceWorkerSettings:\s*\{\s*serviceWorkerVersion:\s*\"[^\"]*\"\s*\}\s*\}\)', 'load({})', c)
+if c == c2:
+    print('WARNING: Could not patch bootstrap (pattern not found)')
+else:
+    with open(p, 'w') as f: f.write(c2)
+    print('Bootstrap patched: SW registration disabled')
+"
+
 echo "==> Build OK: build/web ready"
 echo "==> Deploy triggered at: $(date)"
 echo "==> All fixes applied: inventory buttons, fixed columns, product loading"
