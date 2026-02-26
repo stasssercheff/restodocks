@@ -2795,17 +2795,6 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                 onChanged: (v) => setState(() => _unit = v ?? _unit),
               ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _wastePctController,
-                decoration: InputDecoration(
-                  labelText: widget.loc.t('waste_pct'),
-                  hintText: '0',
-                  border: const OutlineInputBorder(),
-                  helperText: widget.loc.t('waste_pct_product_hint'),
-                ),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              ),
-              const SizedBox(height: 16),
               Row(
                 children: [
                   Expanded(
@@ -2832,59 +2821,6 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                     ),
                   ),
                 ],
-              ),
-              const SizedBox(height: 16),
-              Text(widget.loc.t('kbju_per_100g'), style: Theme.of(context).textTheme.titleSmall),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _caloriesController,
-                      decoration: InputDecoration(labelText: widget.loc.t('kcal'), border: const OutlineInputBorder(), isDense: true),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _proteinController,
-                      decoration: InputDecoration(labelText: widget.loc.t('protein_short'), border: const OutlineInputBorder(), isDense: true),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _fatController,
-                      decoration: InputDecoration(labelText: widget.loc.t('fat_short'), border: const OutlineInputBorder(), isDense: true),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _carbsController,
-                      decoration: InputDecoration(labelText: widget.loc.t('carbs_short'), border: const OutlineInputBorder(), isDense: true),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              CheckboxListTile(
-                value: !_containsGluten,
-                onChanged: (v) => setState(() => _containsGluten = !(v ?? true)),
-                title: Text(widget.loc.t('filter_gluten_free'), style: const TextStyle(fontSize: 13)),
-                contentPadding: EdgeInsets.zero,
-                controlAffinity: ListTileControlAffinity.leading,
-              ),
-              CheckboxListTile(
-                value: !_containsLactose,
-                onChanged: (v) => setState(() => _containsLactose = !(v ?? true)),
-                title: Text(widget.loc.t('filter_lactose_free'), style: const TextStyle(fontSize: 13)),
-                contentPadding: EdgeInsets.zero,
-                controlAffinity: ListTileControlAffinity.leading,
               ),
               if (widget.establishmentId != null && widget.establishmentId!.isNotEmpty) ...[
                 const SizedBox(height: 16),
