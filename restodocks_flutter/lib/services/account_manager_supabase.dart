@@ -457,8 +457,27 @@ class AccountManagerSupabase {
           return (employee: employee, establishment: establishment);
         }
 
+        // Вход в Auth успешен, но employee нет — пробуем авто-исправление (владелец без записи)
+        try {
+          final fixRes = await _supabase.client.rpc('fix_owner_without_employee', params: {'p_email': emailTrim});
+          if (fixRes != null) {
+            final empData = Map<String, dynamic>.from(fixRes as Map);
+            empData['password'] = empData['password_hash'] ?? '';
+            final employee = Employee.fromJson(empData);
+            final estData = await _supabase.client
+                .from('establishments')
+                .select()
+                .eq('id', employee.establishmentId)
+                .limit(1)
+                .single();
+            final establishment = Establishment.fromJson(estData);
+            return (employee: employee, establishment: establishment);
+          }
+        } catch (fixErr) {
+          if (kDebugMode) debugPrint('🔐 fix_owner_without_employee failed: $fixErr');
+        }
+
         await _supabase.signOut();
-        // Вход в Auth успешен, но записи в employees нет — не маскировать под «неверный пароль»
         throw Exception('employee_not_found');
       }
     } catch (authErr) {
