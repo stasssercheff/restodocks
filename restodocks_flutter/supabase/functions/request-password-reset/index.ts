@@ -67,7 +67,7 @@ Deno.serve(async (req: Request) => {
 
     const resetUrl = `${appUrl}/reset-password?token=${encodeURIComponent(token)}`;
 
-    const from = Deno.env.get("RESEND_FROM_EMAIL")?.trim() || "Restodocks <onboarding@resend.dev>";
+    const from = Deno.env.get("RESEND_FROM_EMAIL")?.trim() || "Restodocks <noreply@restodocks.com>";
 
     const emailRes = await fetch("https://api.resend.com/emails", {
       method: "POST",

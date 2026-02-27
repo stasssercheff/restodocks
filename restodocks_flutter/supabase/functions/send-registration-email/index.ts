@@ -28,7 +28,7 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  const from = Deno.env.get("RESEND_FROM_EMAIL")?.trim() || "Restodocks <onboarding@resend.dev>";
+  const from = Deno.env.get("RESEND_FROM_EMAIL")?.trim() || "Restodocks <noreply@restodocks.com>";
 
   try {
     const body = (await req.json()) as {
