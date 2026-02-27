@@ -158,7 +158,18 @@ class ProductStoreSupabase {
   }
 
   /// Добавить новый продукт. Возвращает сохранённый продукт с ID, подтверждённым сервером.
+  /// Если продукт с таким именем уже существует — возвращает его без дублирования.
   Future<Product> addProduct(Product product) async {
+    // Проверяем локальный кэш перед запросом к БД
+    final nameLower = product.name.trim().toLowerCase();
+    final existingLocal = _allProducts.where(
+      (p) => p.name.trim().toLowerCase() == nameLower,
+    ).toList();
+    if (existingLocal.isNotEmpty) {
+      print('DEBUG ProductStore: Product "${product.name}" already exists locally, skipping insert');
+      return existingLocal.first;
+    }
+
     try {
       print('DEBUG ProductStore: Adding product "${product.name}" to database...');
       // Убираем null-поля перед вставкой, чтобы БД использовала DEFAULT значения
@@ -181,6 +192,27 @@ class ProductStoreSupabase {
 
       return saved;
     } catch (e) {
+      // Уникальный индекс сработал — продукт уже есть в БД, ищем его
+      final errStr = e.toString().toLowerCase();
+      if (errStr.contains('duplicate') || errStr.contains('unique') || errStr.contains('already exists')) {
+        print('DEBUG ProductStore: Duplicate detected for "${product.name}", fetching existing...');
+        try {
+          final existing = await _supabase.client
+              .from('products')
+              .select()
+              .ilike('name', product.name.trim())
+              .limit(1);
+          if (existing.isNotEmpty) {
+            final saved = Product.fromJson(existing[0] as Map<String, dynamic>);
+            if (!_allProducts.any((p) => p.id == saved.id)) {
+              _allProducts.add(saved);
+            }
+            return saved;
+          }
+        } catch (fetchErr) {
+          print('DEBUG ProductStore: Failed to fetch existing product: $fetchErr');
+        }
+      }
       print('DEBUG ProductStore: Error adding product: $e');
       rethrow;
     }
