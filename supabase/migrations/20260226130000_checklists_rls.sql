@@ -11,8 +11,11 @@ DROP POLICY IF EXISTS "anon_checklists_insert" ON checklists;
 DROP POLICY IF EXISTS "anon_checklists_update" ON checklists;
 DROP POLICY IF EXISTS "anon_checklists_delete" ON checklists;
 
-CREATE POLICY "anon_checklists_all" ON checklists
-  FOR ALL TO anon USING (true) WITH CHECK (true);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'checklists' AND policyname = 'anon_checklists_all') THEN
+    CREATE POLICY "anon_checklists_all" ON checklists FOR ALL TO anon USING (true) WITH CHECK (true);
+  END IF;
+END $$;
 
 -- checklist_items: anon-доступ
 DROP POLICY IF EXISTS "checklist_items_checklist_access" ON checklist_items;
@@ -21,12 +24,18 @@ DROP POLICY IF EXISTS "anon_checklist_items_insert" ON checklist_items;
 DROP POLICY IF EXISTS "anon_checklist_items_update" ON checklist_items;
 DROP POLICY IF EXISTS "anon_checklist_items_delete" ON checklist_items;
 
-CREATE POLICY "anon_checklist_items_all" ON checklist_items
-  FOR ALL TO anon USING (true) WITH CHECK (true);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'checklist_items' AND policyname = 'anon_checklist_items_all') THEN
+    CREATE POLICY "anon_checklist_items_all" ON checklist_items FOR ALL TO anon USING (true) WITH CHECK (true);
+  END IF;
+END $$;
 
 -- authenticated: на случай если приложение использует Supabase Auth
-CREATE POLICY "auth_checklists_all" ON checklists
-  FOR ALL TO authenticated USING (true) WITH CHECK (true);
-
-CREATE POLICY "auth_checklist_items_all" ON checklist_items
-  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'checklists' AND policyname = 'auth_checklists_all') THEN
+    CREATE POLICY "auth_checklists_all" ON checklists FOR ALL TO authenticated USING (true) WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'checklist_items' AND policyname = 'auth_checklist_items_all') THEN
+    CREATE POLICY "auth_checklist_items_all" ON checklist_items FOR ALL TO authenticated USING (true) WITH CHECK (true);
+  END IF;
+END $$;

@@ -1,7 +1,7 @@
-// Supabase Edge Function: перевод текста через Google Cloud Translation API v2
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "jsr:@supabase/supabase-js@2";
 
-const GOOGLE_TRANSLATE_URL = "https://translation.googleapis.com/language/translate/v2";
+const DEEPL_URL = "https://api-free.deepl.com/v2/translate";
 
 function corsHeaders(origin: string | null) {
   return {
@@ -11,102 +11,113 @@ function corsHeaders(origin: string | null) {
   };
 }
 
+function jsonResponse(data: unknown, status = 200, origin: string | null = null) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { ...corsHeaders(origin), "Content-Type": "application/json" },
+  });
+}
+
 Deno.serve(async (req: Request) => {
+  const origin = req.headers.get("Origin");
+
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders(req.headers.get("Origin")) });
+    return new Response(null, { headers: corsHeaders(origin) });
   }
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), {
-      status: 405,
-      headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
-    });
+    return jsonResponse({ error: "Method not allowed" }, 405, origin);
   }
 
-  const apiKey = Deno.env.get("GOOGLE_TRANSLATE_API_KEY")?.trim();
-  if (!apiKey) {
-    return new Response(
-      JSON.stringify({ error: "GOOGLE_TRANSLATE_API_KEY not set in Supabase secrets" }),
-      {
-        status: 500,
-        headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
-      }
-    );
+  const deeplKey = Deno.env.get("DEEPL_API_KEY")?.trim();
+  if (!deeplKey) {
+    return jsonResponse({ error: "DEEPL_API_KEY not set in Supabase secrets" }, 500, origin);
   }
 
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const supabase = createClient(supabaseUrl, supabaseKey);
+
+  let body: { text?: string; from?: string; to?: string };
   try {
-    const body = (await req.json()) as { text?: string; from?: string; to?: string };
-    const { text, from, to } = body;
-    if (!text || typeof text !== "string" || !to || typeof to !== "string") {
-      return new Response(
-        JSON.stringify({ error: "text and to (target language) are required" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    const trimmed = text.trim();
-    if (!trimmed) {
-      return new Response(JSON.stringify({ translatedText: "" }), {
-        headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
-      });
-    }
-
-    const payload: Record<string, unknown> = {
-      q: [trimmed],
-      target: to,
-      format: "text",
-    };
-    if (from && typeof from === "string" && from.trim()) {
-      payload.source = from.trim();
-    }
-
-    const url = `${GOOGLE_TRANSLATE_URL}?key=${encodeURIComponent(apiKey)}`;
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error("[translate-text] Google API error:", res.status, errText);
-      return new Response(
-        JSON.stringify({
-          error: `Google Translate API: ${res.status}`,
-          details: res.status === 403 ? "Check API key and enable Cloud Translation API" : errText.slice(0, 200),
-        }),
-        {
-          status: 502,
-          headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    const data = (await res.json()) as { data?: { translations?: Array<{ translatedText?: string }> } };
-    const translated = data?.data?.translations?.[0]?.translatedText?.trim();
-    if (!translated) {
-      return new Response(
-        JSON.stringify({ error: "Empty translation from Google" }),
-        {
-          status: 502,
-          headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    return new Response(
-      JSON.stringify({ translatedText: translated }),
-      {
-        headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
-      }
-    );
-  } catch (e) {
-    console.error("[translate-text]", e);
-    return new Response(JSON.stringify({ error: String(e) }), {
-      status: 500,
-      headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
-    });
+    body = await req.json();
+  } catch {
+    return jsonResponse({ error: "Invalid JSON body" }, 400, origin);
   }
+
+  const { text, from = "RU", to } = body;
+
+  if (!text || typeof text !== "string" || !to || typeof to !== "string") {
+    return jsonResponse({ error: "text and to (target language) are required" }, 400, origin);
+  }
+
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return jsonResponse({ translatedText: "" }, 200, origin);
+  }
+
+  const sourceLang = from.toUpperCase();
+  const targetLang = to.toUpperCase();
+
+  // Если исходный и целевой язык совпадают — возвращаем как есть
+  if (sourceLang === targetLang) {
+    return jsonResponse({ translatedText: trimmed }, 200, origin);
+  }
+
+  // Проверяем кеш
+  const { data: cached } = await supabase
+    .from("translation_cache")
+    .select("translated")
+    .eq("source_text", trimmed)
+    .eq("source_lang", sourceLang)
+    .eq("target_lang", targetLang)
+    .maybeSingle();
+
+  if (cached?.translated) {
+    return jsonResponse({ translatedText: cached.translated, cached: true }, 200, origin);
+  }
+
+  // Кеша нет — идём в DeepL
+  const deeplRes = await fetch(DEEPL_URL, {
+    method: "POST",
+    headers: {
+      "Authorization": `DeepL-Auth-Key ${deeplKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      text: [trimmed],
+      source_lang: sourceLang,
+      target_lang: targetLang,
+    }),
+  });
+
+  if (!deeplRes.ok) {
+    const errText = await deeplRes.text();
+    console.error("[translate-text] DeepL error:", deeplRes.status, errText);
+
+    // Fallback — возвращаем оригинал чтобы не сломать UI
+    return jsonResponse({
+      translatedText: trimmed,
+      fallback: true,
+      error: `DeepL API: ${deeplRes.status}`,
+    }, 200, origin);
+  }
+
+  const deeplData = await deeplRes.json() as {
+    translations?: Array<{ text?: string }>;
+  };
+  const translated = deeplData?.translations?.[0]?.text?.trim();
+
+  if (!translated) {
+    return jsonResponse({ translatedText: trimmed, fallback: true }, 200, origin);
+  }
+
+  // Сохраняем в кеш (upsert на случай race condition)
+  await supabase.from("translation_cache").upsert({
+    source_text: trimmed,
+    source_lang: sourceLang,
+    target_lang: targetLang,
+    translated,
+  }, { onConflict: "source_text,source_lang,target_lang" });
+
+  return jsonResponse({ translatedText: translated }, 200, origin);
 });
