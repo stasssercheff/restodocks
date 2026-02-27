@@ -170,22 +170,14 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
               style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
           ),
-          // Заголовок со стрелкой "выбрать/снять все" — CheckboxListTile без карточки,
-          // чтобы чекбокс точно совпадал по горизонтали с чекбоксами карточек ниже.
+          // Строка с кнопками цен (слева) + чекбокс "выбрать/снять все" (справа, над чекбоксами продуктов)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-            child: CheckboxListTile(
-              value: approved == _items.length
-                  ? true
-                  : approved == 0
-                      ? false
-                      : null,
-              tristate: true,
-              onChanged: _saving ? null : (_) => _toggleAll(),
-              controlAffinity: ListTileControlAffinity.leading,
-              contentPadding: EdgeInsets.zero,
-              title: _items.any((i) => i.category == ModerationCategory.priceUpdate)
-                  ? Builder(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Row(
+              children: [
+                if (_items.any((i) => i.category == ModerationCategory.priceUpdate)) ...[
+                  Expanded(
+                    child: Builder(
                       builder: (context) {
                         final priceUpdateItems = _items.where((i) => i.category == ModerationCategory.priceUpdate).toList();
                         final allApproved = priceUpdateItems.isNotEmpty && priceUpdateItems.every((i) => i.approved);
@@ -232,8 +224,25 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
                           ],
                         );
                       },
-                    )
-                  : null,
+                    ),
+                  ),
+                ] else
+                  const Spacer(),
+                // Чекбокс "выбрать/снять все" — справа, точно над колонкой чекбоксов продуктов
+                SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: Checkbox(
+                    value: approved == _items.length
+                        ? true
+                        : approved == 0
+                            ? false
+                            : null,
+                    tristate: true,
+                    onChanged: _saving ? null : (_) => _toggleAll(),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 4),
@@ -248,20 +257,12 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
                   child: CheckboxListTile(
                     value: item.approved,
                     onChanged: (v) => _toggle(i, v ?? true),
-                    controlAffinity: ListTileControlAffinity.leading,
-                    title: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            item.displayName,
-                            style: theme.textTheme.bodyLarge,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        _categoryChip(item.category, theme),
-                      ],
+                    title: Text(
+                      item.displayName,
+                      style: theme.textTheme.bodyLarge,
                     ),
                     subtitle: _buildSubtitle(item, theme),
+                    secondary: _categoryChip(item.category, theme),
                   ),
                 );
               },
