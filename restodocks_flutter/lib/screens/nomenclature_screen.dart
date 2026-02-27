@@ -61,7 +61,14 @@ enum _NomenclatureFilter { all, products, semiFinished }
 
 /// Единица измерения для отображения в номенклатуре: кг, шт, г, л и т.д. (не сырой "pcs"/"kg" из БД).
 String _unitDisplay(String? unit, String lang) {
-  return CulinaryUnits.displayName((unit ?? 'g').trim().toLowerCase(), lang);
+  const ruToId = {
+    'г': 'g', 'кг': 'kg', 'мг': 'mg', 'л': 'l', 'мл': 'ml',
+    'шт': 'pcs', 'штука': 'pcs', 'штуки': 'pcs', 'штук': 'pcs',
+    'грамм': 'g', 'килограмм': 'kg',
+  };
+  final raw = (unit ?? 'g').trim().toLowerCase();
+  final id = ruToId[raw] ?? raw;
+  return CulinaryUnits.displayName(id, lang);
 }
 
 /// Диалог с прогрессом загрузки продуктов
