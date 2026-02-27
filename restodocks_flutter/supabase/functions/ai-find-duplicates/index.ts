@@ -62,7 +62,9 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const userContent = `Find duplicate groups in:\n${JSON.stringify(products.slice(0, 300), null, 0)}`;
+    // Ограничиваем до 150 — большие списки превышают лимиты токенов ИИ
+    const limited = products.slice(0, 150);
+    const userContent = `Find duplicate groups in:\n${JSON.stringify(limited, null, 0)}`;
 
     const content = await chatText({
       messages: [

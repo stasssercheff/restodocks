@@ -368,6 +368,10 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       return;
     }
 
+    // Ограничиваем до 150 — Edge Function не справляется с большими списками
+    final productsForAI = products.length > 150 ? products.sublist(0, 150) : products;
+
+    bool dialogOpen = false;
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -384,15 +388,23 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
           ),
         ),
       ),
-    );
+    ).then((_) { dialogOpen = false; });
+    dialogOpen = true;
+
+    void closeDialog() {
+      if (dialogOpen && mounted) {
+        dialogOpen = false;
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+    }
 
     List<List<String>> groups = [];
     try {
       final ai = context.read<AiService>();
-      groups = await ai.findDuplicates(products);
+      groups = await ai.findDuplicates(productsForAI);
     } catch (e) {
+      closeDialog();
       if (mounted) {
-        Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('${loc.t('error') ?? 'Ошибка'}: $e')),
         );
@@ -400,11 +412,8 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       return;
     }
 
-    if (!mounted) {
-      Navigator.of(context).pop();
-      return;
-    }
-    Navigator.of(context).pop();
+    closeDialog();
+    if (!mounted) return;
 
     if (groups.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
