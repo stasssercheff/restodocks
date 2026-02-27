@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/models.dart';
 import '../services/countries_cities_data.dart';
@@ -20,12 +21,12 @@ class CompanyRegistrationScreen extends StatefulWidget {
 class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
+  final _promoController = TextEditingController();
 
   late String _pinCode;
   bool _isLoading = false;
   String? _errorMessage;
   CountryItem? _selectedCountry;
-  CityItem? _selectedCity;
 
   @override
   void initState() {
@@ -36,6 +37,7 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
   @override
   void dispose() {
     _nameController.dispose();
+    _promoController.dispose();
     super.dispose();
   }
 
@@ -77,49 +79,86 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
       _errorMessage = null;
     });
 
-    const maxRetries = 3;
-    String? errorMsg;
     final loc = context.read<LocalizationService>();
     final lang = loc.currentLanguageCode;
 
-    for (var attempt = 0; attempt < maxRetries; attempt++) {
-      try {
-        final accountManager = context.read<AccountManagerSupabase>();
-        final name = _nameController.text.trim();
+    try {
+      // Проверяем промокод до создания заведения
+      final promoCode = _promoController.text.trim().toUpperCase();
+      final supabase = Supabase.instance.client;
+      final promoCheck = await supabase.rpc('check_promo_code', params: {'p_code': promoCode});
 
-        if (_selectedCountry == null || _selectedCity == null) {
-          throw Exception('Страна и город должны быть выбраны');
-        }
-
-        final country = _selectedCountry!;
-        final city = _selectedCity!;
-        final address = '${city.name(lang)}, ${country.name(lang)}';
-
-        final establishment = await accountManager.createEstablishment(
-          name: name,
-          pinCode: _pinCode,
-          address: address,
-        );
-
-        if (!mounted) return;
-        context.push('/register-owner', extra: establishment);
+      if (promoCheck == 'invalid') {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = loc.t('promo_code_invalid');
+        });
         return;
-      } catch (e) {
-        if (!mounted) return;
-        if (attempt < maxRetries - 1 && _isDuplicatePinError(e)) {
-          setState(() => _pinCode = Establishment.generatePinCode());
-          continue;
-        }
-        errorMsg = loc.t('register_error', args: {'error': e.toString()});
-        break;
       }
-    }
+      if (promoCheck == 'used') {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = loc.t('promo_code_used');
+        });
+        return;
+      }
 
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-        if (errorMsg != null) _errorMessage = errorMsg;
-      });
+      if (_selectedCountry == null) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = loc.t('country_required');
+        });
+        return;
+      }
+
+      const maxRetries = 3;
+      String? errorMsg;
+
+      for (var attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          final accountManager = context.read<AccountManagerSupabase>();
+          final name = _nameController.text.trim();
+          final address = _selectedCountry!.name(lang);
+
+          final establishment = await accountManager.createEstablishment(
+            name: name,
+            pinCode: _pinCode,
+            address: address,
+          );
+
+          // Помечаем промокод как использованный
+          await supabase.rpc('use_promo_code', params: {
+            'p_code': promoCode,
+            'p_establishment_id': establishment.id,
+          });
+
+          if (!mounted) return;
+          context.push('/register-owner', extra: establishment);
+          return;
+        } catch (e) {
+          if (!mounted) return;
+          if (attempt < maxRetries - 1 && _isDuplicatePinError(e)) {
+            setState(() => _pinCode = Establishment.generatePinCode());
+            continue;
+          }
+          errorMsg = loc.t('register_error', args: {'error': e.toString()});
+          break;
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          if (errorMsg != null) _errorMessage = errorMsg;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = loc.t('register_error', args: {'error': e.toString()});
+        });
+      }
     }
   }
 
@@ -252,34 +291,18 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
                   },
                 ),
                 const SizedBox(height: 16),
-                DropdownSearch<CityItem>(
-                  selectedItem: _selectedCity,
-                  enabled: _selectedCountry != null,
-                  decoratorProps: DropDownDecoratorProps(
-                    decoration: InputDecoration(
-                      labelText: loc.t('city'),
-                      hintText: loc.t('enter_city'),
-                      prefixIcon: const Icon(Icons.location_city),
-                      border: const OutlineInputBorder(),
-                    ),
+                TextFormField(
+                  controller: _promoController,
+                  decoration: InputDecoration(
+                    labelText: loc.t('promo_code'),
+                    hintText: loc.t('enter_promo_code'),
+                    prefixIcon: const Icon(Icons.confirmation_number_outlined),
                   ),
-                  items: (filter, loadProps) async {
-                    if (_selectedCountry == null) return <CityItem>[];
-                    final list = await CountriesCitiesData.citiesForCountry(_selectedCountry!.code);
-                    if (filter.trim().isEmpty) return list;
-                    final f = filter.trim().toLowerCase();
-                    return list.where((c) => c.name(lang).toLowerCase().contains(f)).toList();
+                  textCapitalization: TextCapitalization.characters,
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return loc.t('promo_code_required');
+                    return null;
                   },
-                  itemAsString: (c) => c.name(lang),
-                  compareFn: (a, b) => a?.id == b?.id,
-                  popupProps: PopupProps.menu(
-                    showSearchBox: true,
-                    searchFieldProps: TextFieldProps(
-                      decoration: InputDecoration(hintText: searchHint),
-                    ),
-                  ),
-                  validator: (v) => v == null ? loc.t('city_required') : null,
-                  onChanged: (c) => setState(() => _selectedCity = c),
                 ),
                 const SizedBox(height: 20),
                 Text(loc.t('generated_pin'), style: Theme.of(context).textTheme.titleSmall),
