@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'translation_manager.dart';
 
 const _keyLocale = 'restodocks_locale';
 
@@ -21,6 +22,11 @@ class LocalizationService extends ChangeNotifier {
 
   Locale _currentLocale = const Locale('ru', 'RU');
   Map<String, Map<String, String>> _translations = {};
+  TranslationManager? _translationManager;
+
+  void setTranslationManager(TranslationManager manager) {
+    _translationManager = manager;
+  }
 
   // Геттеры
   Locale get currentLocale => _currentLocale;
@@ -167,8 +173,7 @@ class LocalizationService extends ChangeNotifier {
     }
   }
 
-  /// Получить локализованный текст для сущности
-  /// Используется для динамической локализации продуктов, ТТК и чек-листов
+  /// Получить локализованный текст для сущности (продукты, ТТК, чеклисты)
   Future<String> getLocalizedEntityText({
     required String entityType,
     required String entityId,
@@ -176,12 +181,25 @@ class LocalizationService extends ChangeNotifier {
     required String sourceText,
     required String sourceLanguage,
   }) async {
-    // Пока возвращаем исходный текст - интеграция с TranslationManager
-    // будет добавлена позже
-    return sourceText;
+    final targetLanguage = currentLanguageCode;
+    if (targetLanguage == sourceLanguage) return sourceText;
+    if (_translationManager == null) return sourceText;
+
+    try {
+      return await _translationManager!.getLocalizedText(
+        entityType: TranslationEntityTypeExtension.fromString(entityType),
+        entityId: entityId,
+        fieldName: fieldName,
+        sourceText: sourceText,
+        sourceLanguage: sourceLanguage,
+        targetLanguage: targetLanguage,
+      );
+    } catch (_) {
+      return sourceText;
+    }
   }
 
-  /// Обработать сохранение сущности (триггер автоперевода)
+  /// Обработать сохранение сущности (триггер автоперевода на все языки)
   Future<void> handleEntitySave({
     required String entityType,
     required String entityId,
@@ -189,7 +207,15 @@ class LocalizationService extends ChangeNotifier {
     required String sourceLanguage,
     String? userId,
   }) async {
-    // Пока пустая реализация - интеграция с TranslationManager
-    // будет добавлена позже
+    if (_translationManager == null) return;
+    try {
+      await _translationManager!.handleEntitySave(
+        entityType: TranslationEntityTypeExtension.fromString(entityType),
+        entityId: entityId,
+        textFields: textFields,
+        sourceLanguage: sourceLanguage,
+        userId: userId,
+      );
+    } catch (_) {}
   }
 }

@@ -11,6 +11,7 @@ import 'core/core.dart';
 import 'core/initial_location_stub.dart'
     if (dart.library.html) 'core/initial_location_web.dart' as initial_loc;
 import 'services/services.dart';
+import 'services/translation_manager.dart';
 import 'screens/screens.dart';
 
 const String _supabaseUrl = 'https://osglfptwbuqqmqunttha.supabase.co';
@@ -51,7 +52,8 @@ class RestodocksApp extends StatelessWidget {
     // RestodocksApp.build() called
     return MultiProvider(
       providers: AppProviders.providers,
-      child: Consumer2<LocalizationService, ThemeService>(
+      child: _TranslationManagerConnector(
+        child: Consumer2<LocalizationService, ThemeService>(
         builder: (context, localization, themeService, child) {
           return MaterialApp.router(
             title: localization.t('app_name'),
@@ -71,7 +73,31 @@ class RestodocksApp extends StatelessWidget {
           );
         },
       ),
+      ),
     );
   }
-}// Force rebuild trigger
+}
+
+/// Подключает TranslationManager к LocalizationService после старта провайдеров
+class _TranslationManagerConnector extends StatefulWidget {
+  final Widget child;
+  const _TranslationManagerConnector({required this.child});
+
+  @override
+  State<_TranslationManagerConnector> createState() => _TranslationManagerConnectorState();
+}
+
+class _TranslationManagerConnectorState extends State<_TranslationManagerConnector> {
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final manager = context.read<TranslationManager>();
+    LocalizationService().setTranslationManager(manager);
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
+// Force rebuild trigger
 // Test deploy Wed Feb 18 21:21:55 +07 2026

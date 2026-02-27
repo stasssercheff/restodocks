@@ -6,6 +6,8 @@ import '../../services/ai_service.dart';
 import '../../services/ai_service_supabase.dart';
 import '../../services/order_history_service.dart';
 import '../../services/inventory_history_service.dart';
+import '../../services/translation_service.dart';
+import '../../services/translation_manager.dart';
 
 /// Настройка всех провайдеров приложения
 class AppProviders {
@@ -47,6 +49,18 @@ class AppProviders {
         ),
         Provider<AiService>(
           create: (context) => context.read<AiServiceSupabase>(),
+        ),
+        Provider<TranslationService>(
+          create: (context) => TranslationService(
+            aiService: context.read<AiServiceSupabase>(),
+            supabase: SupabaseService(),
+          ),
+        ),
+        Provider<TranslationManager>(
+          create: (context) => TranslationManager(
+            aiService: context.read<AiServiceSupabase>(),
+            translationService: context.read<TranslationService>(),
+          ),
         ),
         Provider<OrderHistoryService>(
           create: (_) => OrderHistoryService(),

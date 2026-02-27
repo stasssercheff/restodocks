@@ -8,6 +8,15 @@ enum TranslationEntityType {
   ui,
 }
 
+extension TranslationEntityTypeExtension on TranslationEntityType {
+  static TranslationEntityType fromString(String value) {
+    return TranslationEntityType.values.firstWhere(
+      (e) => e.name == value,
+      orElse: () => TranslationEntityType.product,
+    );
+  }
+}
+
 /// Модель для хранения переводов
 class Translation extends Equatable {
   final String id;
