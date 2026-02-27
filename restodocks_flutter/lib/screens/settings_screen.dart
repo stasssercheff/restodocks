@@ -6,6 +6,9 @@ import '../models/models.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
 
+const _adminEmails = <String>{'stasssercheff@gmail.com'};
+bool _isPlatformAdminEmail(String email) => _adminEmails.contains(email.toLowerCase().trim());
+
 /// Экран только настроек: язык, тема, валюта и т.д. Без данных профиля (профиль — отдельная кнопка).
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -647,6 +650,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 title: Text(localization.t('invite_co_owner')),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => _showInviteCoOwnerDialog(context, localization, accountManager),
+              ),
+            ],
+            // Кнопка платформенного кабинета — видна только владельцу платформы
+            if (_isPlatformAdminEmail(currentEmployee.email)) ...[
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.admin_panel_settings, color: Colors.deepPurple),
+                title: const Text('Platform Admin', style: TextStyle(color: Colors.deepPurple)),
+                subtitle: const Text('Промокоды и управление'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/admin'),
               ),
             ],
             const Divider(),

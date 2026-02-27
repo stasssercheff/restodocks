@@ -29,9 +29,17 @@ import '../../screens/order_list_detail_screen.dart';
 import '../../screens/accept_co_owner_invitation_screen.dart';
 import '../../screens/register_co_owner_screen.dart';
 import '../../screens/confirm_email_screen.dart';
+import '../../screens/admin_screen.dart';
 import '../../models/order_list.dart';
 import '../../services/ai_service.dart';
 import '../../services/services.dart';
+
+/// Emails владельцев платформы — единственные кто видит /admin
+const _platformAdminEmails = <String>{
+  'stasssercheff@gmail.com', // замени на свой email
+};
+
+bool _isPlatformAdmin(String email) => _platformAdminEmails.contains(email.toLowerCase().trim());
 
 /// Публичные пути (без проверки авторизации). Не использовать startsWith('/') — иначе все пути считаются публичными.
 bool _isPublicPath(String loc) {
@@ -433,6 +441,19 @@ class AppRouter {
       GoRoute(
         path: '/supabase-test',
         pageBuilder: (context, state) => _slideTransitionPage(state, const SupabaseTestScreen()),
+      ),
+
+      // Платформенный кабинет администратора (только для владельца платформы)
+      GoRoute(
+        path: '/admin',
+        redirect: (context, state) {
+          final account = context.read<AccountManagerSupabase>();
+          final email = account.currentEmployee?.email ?? '';
+          if (!_isPlatformAdmin(email)) return '/home';
+          return null;
+        },
+
+        pageBuilder: (context, state) => _slideTransitionPage(state, const AdminScreen()),
       ),
 
       // Регистрация соучредителя после принятия приглашения
