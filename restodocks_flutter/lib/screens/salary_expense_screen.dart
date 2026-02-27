@@ -8,6 +8,34 @@ import '../services/schedule_storage_service.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
 
+enum _AdjustmentType { bonus, fine, advance }
+
+class _EmployeeAdjustment {
+  final _AdjustmentType type;
+  final double amount;
+
+  const _EmployeeAdjustment({required this.type, required this.amount});
+
+  /// Премия добавляется, штраф и аванс — вычитаются.
+  double get signedAmount => type == _AdjustmentType.bonus ? amount : -amount;
+
+  String label(String currency) {
+    final sign = type == _AdjustmentType.bonus ? '+' : '-';
+    return '$sign${amount.toStringAsFixed(0)} $currency';
+  }
+
+  String get typeName {
+    switch (type) {
+      case _AdjustmentType.bonus:
+        return 'Премия';
+      case _AdjustmentType.fine:
+        return 'Штраф';
+      case _AdjustmentType.advance:
+        return 'Аванс';
+    }
+  }
+}
+
 /// ФЗП: список сотрудников с оплатой за смену/час. Часы/смены подтягиваются из графика.
 /// Собственник без должности не отображается. Toggle — включать ли в итог.
 class SalaryExpenseScreen extends StatefulWidget {
@@ -29,6 +57,12 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
 
   /// Включить ли сотрудника в итоговую сумму (по умолчанию — да).
   final Map<String, bool> _includeInTotal = {};
+
+  /// Удержания и поощрения по каждому сотруднику.
+  final Map<String, List<_EmployeeAdjustment>> _adjustments = {};
+
+  /// Раскрыта ли панель удержаний/поощрений по каждому сотруднику.
+  final Map<String, bool> _adjustmentsExpanded = {};
 
   @override
   void initState() {
@@ -129,7 +163,7 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
     return (end - start) / 60.0;
   }
 
-  double _totalForEmployee(Employee e) {
+  double _baseForEmployee(Employee e) {
     final val = _shiftsOrHoursFromSchedule(e);
     if (e.paymentType == 'hourly') {
       final rate = e.hourlyRate ?? 0;
@@ -139,11 +173,85 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
     return rate * val;
   }
 
+  double _adjustmentsTotal(String employeeId) {
+    return (_adjustments[employeeId] ?? [])
+        .fold<double>(0, (s, a) => s + a.signedAmount);
+  }
+
+  double _totalForEmployee(Employee e) {
+    return _baseForEmployee(e) + _adjustmentsTotal(e.id);
+  }
+
   double _totalIncluded() {
     if (_employees == null) return 0;
     return _employees!
         .where((e) => _includeInTotal[e.id] ?? true)
         .fold<double>(0, (s, e) => s + _totalForEmployee(e));
+  }
+
+  void _showAddAdjustmentDialog(BuildContext context, Employee e, String currency) {
+    _AdjustmentType selectedType = _AdjustmentType.bonus;
+    final amountController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Добавить удержание / поощрение'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              DropdownButtonFormField<_AdjustmentType>(
+                value: selectedType,
+                decoration: const InputDecoration(
+                  labelText: 'Причина',
+                  border: OutlineInputBorder(),
+                  filled: true,
+                ),
+                items: const [
+                  DropdownMenuItem(value: _AdjustmentType.bonus, child: Text('Премия')),
+                  DropdownMenuItem(value: _AdjustmentType.fine, child: Text('Штраф')),
+                  DropdownMenuItem(value: _AdjustmentType.advance, child: Text('Аванс')),
+                ],
+                onChanged: (v) => setDialogState(() => selectedType = v ?? selectedType),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: amountController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  labelText: 'Сумма ($currency)',
+                  border: const OutlineInputBorder(),
+                  filled: true,
+                ),
+                autofocus: true,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Отмена'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final amount = double.tryParse(amountController.text.trim());
+                if (amount == null || amount <= 0) return;
+                setState(() {
+                  _adjustments.putIfAbsent(e.id, () => []).add(
+                    _EmployeeAdjustment(type: selectedType, amount: amount),
+                  );
+                  _adjustmentsExpanded[e.id] = true;
+                });
+                Navigator.pop(ctx);
+              },
+              child: const Text('Добавить'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showPeriodPicker(BuildContext context, LocalizationService loc) {
@@ -237,10 +345,14 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
                               final isHourly = e.paymentType == 'hourly';
                               final rate = isHourly ? (e.hourlyRate ?? 0) : (e.ratePerShift ?? 0);
                               final val = _shiftsOrHoursFromSchedule(e);
-                              final total = _totalForEmployee(e);
+                              final base = _baseForEmployee(e);
+                              final adjTotal = _adjustmentsTotal(e.id);
+                              final total = base + adjTotal;
                               final label = isHourly ? loc.t('hourly_rate') : loc.t('rate_per_shift');
                               final unitLabel = isHourly ? loc.t('salary_hours') : loc.t('salary_shifts');
                               final included = _includeInTotal[e.id] ?? true;
+                              final adjustments = _adjustments[e.id] ?? [];
+                              final expanded = _adjustmentsExpanded[e.id] ?? false;
 
                               return Card(
                                 margin: const EdgeInsets.only(bottom: 12),
@@ -280,8 +392,161 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
                                               ],
                                             ),
                                             const SizedBox(height: 8),
+                                            // Базовая сумма
                                             Text(
-                                              '${loc.t('ttk_total')}: ${total.toStringAsFixed(0)} $currency',
+                                              '${loc.t('ttk_total')}: ${base.toStringAsFixed(0)} $currency',
+                                              style: theme.textTheme.bodyMedium?.copyWith(
+                                                color: theme.colorScheme.onSurfaceVariant,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 8),
+                                            // Панель удержаний и поощрений
+                                            InkWell(
+                                              borderRadius: BorderRadius.circular(8),
+                                              onTap: () => setState(() => _adjustmentsExpanded[e.id] = !expanded),
+                                              child: Padding(
+                                                padding: const EdgeInsets.symmetric(vertical: 4),
+                                                child: Row(
+                                                  children: [
+                                                    Icon(
+                                                      Icons.tune,
+                                                      size: 16,
+                                                      color: theme.colorScheme.primary,
+                                                    ),
+                                                    const SizedBox(width: 6),
+                                                    Text(
+                                                      'Удержания и поощрения',
+                                                      style: theme.textTheme.bodySmall?.copyWith(
+                                                        color: theme.colorScheme.primary,
+                                                        fontWeight: FontWeight.w600,
+                                                      ),
+                                                    ),
+                                                    if (adjustments.isNotEmpty) ...[
+                                                      const SizedBox(width: 6),
+                                                      Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                        decoration: BoxDecoration(
+                                                          color: theme.colorScheme.primaryContainer,
+                                                          borderRadius: BorderRadius.circular(10),
+                                                        ),
+                                                        child: Text(
+                                                          '${adjustments.length}',
+                                                          style: theme.textTheme.labelSmall?.copyWith(
+                                                            color: theme.colorScheme.onPrimaryContainer,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                    const Spacer(),
+                                                    Icon(
+                                                      expanded ? Icons.expand_less : Icons.expand_more,
+                                                      size: 18,
+                                                      color: theme.colorScheme.primary,
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                            if (expanded) ...[
+                                              const SizedBox(height: 8),
+                                              Container(
+                                                decoration: BoxDecoration(
+                                                  color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                                                  borderRadius: BorderRadius.circular(8),
+                                                  border: Border.all(
+                                                    color: theme.colorScheme.outlineVariant,
+                                                  ),
+                                                ),
+                                                child: Column(
+                                                  children: [
+                                                    if (adjustments.isEmpty)
+                                                      Padding(
+                                                        padding: const EdgeInsets.all(12),
+                                                        child: Text(
+                                                          'Нет записей',
+                                                          style: theme.textTheme.bodySmall?.copyWith(
+                                                            color: theme.colorScheme.onSurfaceVariant,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ...adjustments.asMap().entries.map((entry) {
+                                                      final idx = entry.key;
+                                                      final adj = entry.value;
+                                                      final isPositive = adj.type == _AdjustmentType.bonus;
+                                                      return ListTile(
+                                                        dense: true,
+                                                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                                                        leading: CircleAvatar(
+                                                          radius: 14,
+                                                          backgroundColor: isPositive
+                                                              ? Colors.green.withOpacity(0.15)
+                                                              : Colors.red.withOpacity(0.15),
+                                                          child: Icon(
+                                                            isPositive ? Icons.add : Icons.remove,
+                                                            size: 14,
+                                                            color: isPositive ? Colors.green : Colors.red,
+                                                          ),
+                                                        ),
+                                                        title: Text(adj.typeName, style: theme.textTheme.bodySmall),
+                                                        trailing: Row(
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          children: [
+                                                            Text(
+                                                              adj.label(currency),
+                                                              style: theme.textTheme.bodySmall?.copyWith(
+                                                                color: isPositive ? Colors.green : Colors.red,
+                                                                fontWeight: FontWeight.w600,
+                                                              ),
+                                                            ),
+                                                            const SizedBox(width: 4),
+                                                            InkWell(
+                                                              onTap: () => setState(() {
+                                                                _adjustments[e.id]!.removeAt(idx);
+                                                                if (_adjustments[e.id]!.isEmpty) {
+                                                                  _adjustments.remove(e.id);
+                                                                }
+                                                              }),
+                                                              child: Icon(
+                                                                Icons.close,
+                                                                size: 16,
+                                                                color: theme.colorScheme.onSurfaceVariant,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      );
+                                                    }),
+                                                    Padding(
+                                                      padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+                                                      child: OutlinedButton.icon(
+                                                        onPressed: () => _showAddAdjustmentDialog(context, e, currency),
+                                                        icon: const Icon(Icons.add, size: 16),
+                                                        label: const Text('Добавить'),
+                                                        style: OutlinedButton.styleFrom(
+                                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                                          minimumSize: const Size(0, 32),
+                                                          textStyle: theme.textTheme.bodySmall,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              if (adjustments.isNotEmpty) ...[
+                                                const SizedBox(height: 6),
+                                                Text(
+                                                  'Корректировка: ${adjTotal >= 0 ? '+' : ''}${adjTotal.toStringAsFixed(0)} $currency',
+                                                  style: theme.textTheme.bodySmall?.copyWith(
+                                                    color: adjTotal >= 0 ? Colors.green : Colors.red,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
+                                            const SizedBox(height: 8),
+                                            // Итоговая сумма
+                                            Text(
+                                              'К выплате: ${total.toStringAsFixed(0)} $currency',
                                               style: theme.textTheme.titleSmall?.copyWith(
                                                 color: theme.colorScheme.primary,
                                                 fontWeight: FontWeight.bold,
