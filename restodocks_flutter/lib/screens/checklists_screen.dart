@@ -326,17 +326,21 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                       children: [
                         IconButton(
                           icon: const Icon(Icons.task_alt),
-                          onPressed: () => context.push('/checklists/${c.id}/fill'),
+                          onPressed: () async {
+                            await context.push('/checklists/${c.id}/fill');
+                            if (mounted) _load();
+                          },
                           tooltip: loc.t('fill_checklist') ?? 'Заполнить',
                         ),
                         PopupMenuButton<String>(
                           icon: const Icon(Icons.more_vert),
-                          onSelected: (v) {
+                          onSelected: (v) async {
                             if (v == 'edit') {
-                              context.push('/checklists/${c.id}');
+                              await context.push('/checklists/${c.id}');
                             } else {
-                              context.push('/checklists/${c.id}/fill');
+                              await context.push('/checklists/${c.id}/fill');
                             }
+                            if (mounted) _load();
                           },
                           itemBuilder: (_) => [
                             PopupMenuItem(value: 'edit', child: Text(loc.t('edit') ?? 'Редактировать')),
@@ -346,7 +350,10 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                       ],
                     )
                   : const Icon(Icons.chevron_right),
-              onTap: () => context.push(canEdit ? '/checklists/${c.id}' : '/checklists/${c.id}/fill'),
+              onTap: () async {
+                await context.push(canEdit ? '/checklists/${c.id}' : '/checklists/${c.id}/fill');
+                if (mounted) _load();
+              },
             ),
           );
         },

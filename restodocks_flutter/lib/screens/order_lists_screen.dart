@@ -2,13 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:uuid/uuid.dart';
 
 import '../models/models.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
 
-/// Заказ продуктов: при нажатии не список продуктов, а «Создать» и список созданных списков заказов.
+/// Экран «Заказ продуктов» — две вкладки: Поставщики (шаблоны) и Списки заказа (сохранённые с количествами).
 class OrderListsScreen extends StatefulWidget {
   const OrderListsScreen({super.key, this.embedded = false});
 
@@ -18,10 +17,21 @@ class OrderListsScreen extends StatefulWidget {
   State<OrderListsScreen> createState() => _OrderListsScreenState();
 }
 
-class _OrderListsScreenState extends State<OrderListsScreen> {
-  List<OrderList> _lists = [];
+class _OrderListsScreenState extends State<OrderListsScreen>
+    with SingleTickerProviderStateMixin {
+  List<OrderList> _allLists = [];
   bool _loading = true;
   String? _establishmentId;
+  late TabController _tabController;
+
+  /// Поставщики — шаблоны (нет savedAt)
+  List<OrderList> get _suppliers =>
+      _allLists.where((l) => !l.isSavedWithQuantities).toList();
+
+  /// Сохранённые списки заказа (есть savedAt)
+  List<OrderList> get _savedOrders =>
+      _allLists.where((l) => l.isSavedWithQuantities).toList()
+        ..sort((a, b) => (b.savedAt ?? DateTime(0)).compareTo(a.savedAt ?? DateTime(0)));
 
   Future<void> _load() async {
     final acc = context.read<AccountManagerSupabase>();
@@ -29,7 +39,7 @@ class _OrderListsScreenState extends State<OrderListsScreen> {
     if (est == null) {
       setState(() {
         _loading = false;
-        _lists = [];
+        _allLists = [];
       });
       return;
     }
@@ -41,160 +51,471 @@ class _OrderListsScreenState extends State<OrderListsScreen> {
       final list = await loadOrderLists(est.id);
       if (mounted) {
         setState(() {
-          _lists = list;
+          _allLists = list;
           _loading = false;
         });
       }
     } catch (_) {
-      if (mounted) setState(() {
-        _lists = [];
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _allLists = [];
+          _loading = false;
+        });
+      }
     }
   }
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _deleteList(OrderList list) async {
+    final estId = _establishmentId;
+    if (estId == null) return;
+    final updated = _allLists.where((l) => l.id != list.id).toList();
+    await saveOrderLists(estId, updated);
+    if (mounted) setState(() => _allLists = updated);
   }
 
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
-    final account = context.watch<AccountManagerSupabase>();
-    final establishment = account.establishment;
-    final employee = account.currentEmployee;
-    final dateStr = DateFormat('dd.MM.yyyy').format(DateTime.now());
-    final header = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(child: Text(loc.t('inbox_header_date') ?? 'Дата', style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
-              Expanded(child: Text(loc.t('inbox_header_section') ?? 'Цех', style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
-              Expanded(child: Text(loc.t('inbox_header_employee') ?? 'Сотрудник', style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
-              Expanded(child: Text(loc.t('inbox_header_supplier') ?? 'Поставщик', style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Expanded(child: Text(dateStr, style: Theme.of(context).textTheme.bodyMedium)),
-              Expanded(child: Text(establishment?.name ?? '—', style: Theme.of(context).textTheme.bodyMedium, overflow: TextOverflow.ellipsis)),
-              Expanded(child: Text(employee?.fullName ?? '—', style: Theme.of(context).textTheme.bodyMedium, overflow: TextOverflow.ellipsis)),
-              Expanded(child: Text('—', style: Theme.of(context).textTheme.bodyMedium)),
-            ],
-          ),
-        ],
-      ),
-    );
+
     return Scaffold(
       appBar: AppBar(
         leading: widget.embedded ? null : appBarBackButton(context),
         title: Text(loc.t('product_order')),
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: [
+            Tab(
+              icon: const Icon(Icons.store_outlined),
+              text: loc.t('order_tab_suppliers') ?? 'Поставщики',
+            ),
+            Tab(
+              icon: const Icon(Icons.list_alt_outlined),
+              text: loc.t('order_tab_orders') ?? 'Списки заказа',
+            ),
+          ],
+        ),
       ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          header,
-          Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator())
-                : _lists.isEmpty
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : TabBarView(
+              controller: _tabController,
+              children: [
+                _SuppliersTab(
+                  suppliers: _suppliers,
+                  onTap: (supplier) async {
+                    await context.push('/product-order/${supplier.id}');
+                    if (mounted) _load();
+                  },
+                  onDelete: _deleteList,
+                  onCreate: () async {
+                    await context.push('/product-order/new');
+                    if (mounted) _load();
+                  },
+                  loc: loc,
+                ),
+                _OrderListsTab(
+                  orders: _savedOrders,
+                  onTap: (order) async {
+                    await context.push('/product-order/${order.id}');
+                    if (mounted) _load();
+                  },
+                  onDelete: _deleteList,
+                  onCreate: () {
+                    if (_suppliers.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            loc.t('order_no_suppliers_hint') ??
+                                'Сначала создайте поставщика во вкладке «Поставщики»',
+                          ),
+                        ),
+                      );
+                      _tabController.animateTo(0);
+                    } else {
+                      _showSupplierPicker(context, loc);
+                    }
+                  },
+                  loc: loc,
+                ),
+              ],
+            ),
+    );
+  }
+
+  void _showSupplierPicker(BuildContext context, LocalizationService loc) {
+    showModalBottomSheet<OrderList>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text(
+                loc.t('order_select_supplier') ?? 'Выберите поставщика',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            ..._suppliers.map((s) => ListTile(
+                  leading: const Icon(Icons.store_outlined),
+                  title: Text(s.name),
+                  subtitle: s.email != null || s.phone != null
+                      ? Text(s.email ?? s.phone ?? '')
+                      : null,
+                  onTap: () => Navigator.of(ctx).pop(s),
+                )),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    ).then((supplier) async {
+      if (supplier == null || !mounted) return;
+      await context.push('/product-order/${supplier.id}');
+      if (mounted) _load();
+    });
+  }
+}
+
+// ────────────────────────────────────────────────────────────────
+// Вкладка «Поставщики»
+// ────────────────────────────────────────────────────────────────
+
+class _SuppliersTab extends StatelessWidget {
+  const _SuppliersTab({
+    required this.suppliers,
+    required this.onTap,
+    required this.onDelete,
+    required this.onCreate,
+    required this.loc,
+  });
+
+  final List<OrderList> suppliers;
+  final void Function(OrderList) onTap;
+  final void Function(OrderList) onDelete;
+  final VoidCallback onCreate;
+  final LocalizationService loc;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Expanded(
+          child: suppliers.isEmpty
               ? Center(
                   child: Padding(
                     padding: const EdgeInsets.all(24),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.add_shopping_cart, size: 80, color: Theme.of(context).colorScheme.primary),
-                        const SizedBox(height: 24),
+                        Icon(Icons.store_outlined,
+                            size: 72,
+                            color: Theme.of(context).colorScheme.primary),
+                        const SizedBox(height: 20),
                         Text(
-                          loc.t('order_list_empty'),
+                          loc.t('order_suppliers_empty') ??
+                              'Нет поставщиков',
                           style: Theme.of(context).textTheme.titleLarge,
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          loc.t('order_list_empty_hint'),
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                          loc.t('order_suppliers_empty_hint') ??
+                              'Создайте поставщика — укажите название, контакты и список продуктов из номенклатуры',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
                           textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 32),
-                        FilledButton.icon(
-                          onPressed: () async {
-                            await context.push('/product-order/new');
-                            if (mounted) _load();
-                          },
-                          icon: const Icon(Icons.add, size: 24),
-                          label: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            child: Text(loc.t('order_list_create'), style: const TextStyle(fontSize: 18)),
-                          ),
                         ),
                       ],
                     ),
                   ),
                 )
-              : RefreshIndicator(
-                  onRefresh: _load,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                    itemCount: _lists.length,
-                    itemBuilder: (_, i) {
-                      final list = _lists[i];
-                      final dateStr = list.savedAt != null
-                          ? DateFormat('dd.MM.yyyy').format(list.savedAt!)
-                          : null;
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        child: ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: list.isSavedWithQuantities
-                                ? Colors.amber.shade100
-                                : Theme.of(context).colorScheme.primaryContainer,
-                            child: Icon(
-                              list.isSavedWithQuantities ? Icons.check_circle : Icons.shopping_cart,
-                              color: list.isSavedWithQuantities ? Colors.amber.shade800 : Theme.of(context).colorScheme.onPrimaryContainer,
-                            ),
-                          ),
-                          title: Text(
-                            list.name,
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          subtitle: Text(
-                            list.supplierName + (dateStr != null ? ' · $dateStr' : ''),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          trailing: const Icon(Icons.chevron_right),
-                          onTap: () async {
-                            await context.push('/product-order/${list.id}');
-                            if (mounted) _load();
-                          },
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                  itemCount: suppliers.length,
+                  itemBuilder: (_, i) {
+                    final s = suppliers[i];
+                    final contacts = [s.email, s.phone, s.telegram, s.whatsapp, s.zalo]
+                        .where((v) => v != null && v.isNotEmpty)
+                        .join(' · ');
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor:
+                              Theme.of(context).colorScheme.primaryContainer,
+                          child: Icon(Icons.store_outlined,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onPrimaryContainer),
                         ),
-                      );
-                    },
-                  ),
+                        title: Text(s.name,
+                            style:
+                                const TextStyle(fontWeight: FontWeight.w600),
+                            overflow: TextOverflow.ellipsis),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(s.supplierName,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w500),
+                                overflow: TextOverflow.ellipsis),
+                            if (contacts.isNotEmpty)
+                              Text(contacts,
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant),
+                                  overflow: TextOverflow.ellipsis),
+                            Text(
+                              '${s.items.length} ${loc.t('order_products_count') ?? 'продуктов'}',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant),
+                            ),
+                          ],
+                        ),
+                        isThreeLine: true,
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.chevron_right),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline),
+                              color: Theme.of(context).colorScheme.error,
+                              tooltip: loc.t('delete') ?? 'Удалить',
+                              onPressed: () => _confirmDelete(context, s),
+                            ),
+                          ],
+                        ),
+                        onTap: () => onTap(s),
+                      ),
+                    );
+                  },
                 ),
+        ),
+        _BottomCreateButton(
+          label: loc.t('order_create_supplier') ?? 'Создать поставщика',
+          onPressed: onCreate,
+        ),
+      ],
+    );
+  }
+
+  void _confirmDelete(BuildContext context, OrderList s) {
+    showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('delete') ?? 'Удалить'),
+        content: Text(
+            '${loc.t('order_delete_supplier_confirm') ?? 'Удалить поставщика'} «${s.name}»?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(loc.t('cancel') ?? 'Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(loc.t('delete') ?? 'Удалить'),
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          await context.push('/product-order/new');
-          if (mounted) _load();
-        },
-        icon: const Icon(Icons.add),
-        label: Text(loc.t('order_list_create')),
+    ).then((confirmed) {
+      if (confirmed == true) onDelete(s);
+    });
+  }
+}
+
+// ────────────────────────────────────────────────────────────────
+// Вкладка «Списки заказа»
+// ────────────────────────────────────────────────────────────────
+
+class _OrderListsTab extends StatelessWidget {
+  const _OrderListsTab({
+    required this.orders,
+    required this.onTap,
+    required this.onDelete,
+    required this.onCreate,
+    required this.loc,
+  });
+
+  final List<OrderList> orders;
+  final void Function(OrderList) onTap;
+  final void Function(OrderList) onDelete;
+  final VoidCallback onCreate;
+  final LocalizationService loc;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Expanded(
+          child: orders.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.list_alt_outlined,
+                            size: 72,
+                            color: Theme.of(context).colorScheme.primary),
+                        const SizedBox(height: 20),
+                        Text(
+                          loc.t('order_list_empty') ?? 'Нет списков заказа',
+                          style: Theme.of(context).textTheme.titleLarge,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          loc.t('order_list_empty_hint') ??
+                              'Выберите поставщика, заполните количества и сохраните или отправьте заказ',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                              ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                  itemCount: orders.length,
+                  itemBuilder: (_, i) {
+                    final order = orders[i];
+                    final dateStr = order.savedAt != null
+                        ? DateFormat('dd.MM.yyyy HH:mm')
+                            .format(order.savedAt!)
+                        : null;
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: Colors.amber.shade100,
+                          child: Icon(Icons.check_circle,
+                              color: Colors.amber.shade800),
+                        ),
+                        title: Text(order.name,
+                            style:
+                                const TextStyle(fontWeight: FontWeight.w600),
+                            overflow: TextOverflow.ellipsis),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(order.supplierName,
+                                overflow: TextOverflow.ellipsis),
+                            if (dateStr != null)
+                              Text(dateStr,
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant)),
+                          ],
+                        ),
+                        isThreeLine: true,
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.chevron_right),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline),
+                              color: Theme.of(context).colorScheme.error,
+                              tooltip: loc.t('delete') ?? 'Удалить',
+                              onPressed: () => _confirmDelete(context, order),
+                            ),
+                          ],
+                        ),
+                        onTap: () => onTap(order),
+                      ),
+                    );
+                  },
+                ),
+        ),
+        _BottomCreateButton(
+          label: loc.t('order_list_create') ?? 'Создать заказ',
+          onPressed: onCreate,
+        ),
+      ],
+    );
+  }
+
+  void _confirmDelete(BuildContext context, OrderList order) {
+    showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('delete') ?? 'Удалить'),
+        content: Text(
+            '${loc.t('order_delete_order_confirm') ?? 'Удалить список заказа'} «${order.name}»?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(loc.t('cancel') ?? 'Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(loc.t('delete') ?? 'Удалить'),
+          ),
+        ],
+      ),
+    ).then((confirmed) {
+      if (confirmed == true) onDelete(order);
+    });
+  }
+}
+
+// ────────────────────────────────────────────────────────────────
+// Кнопка «Создать» внизу экрана
+// ────────────────────────────────────────────────────────────────
+
+class _BottomCreateButton extends StatelessWidget {
+  const _BottomCreateButton({
+    required this.label,
+    required this.onPressed,
+  });
+
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        border: Border(
+            top: BorderSide(color: Theme.of(context).dividerColor)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: FilledButton.icon(
+          onPressed: onPressed,
+          icon: const Icon(Icons.add),
+          label: Text(label),
+          style: FilledButton.styleFrom(
+            minimumSize: const Size(double.infinity, 48),
+          ),
+        ),
       ),
     );
   }

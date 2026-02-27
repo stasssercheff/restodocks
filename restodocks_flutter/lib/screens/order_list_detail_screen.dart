@@ -219,21 +219,34 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(loc.t('order_export_language_title')),
-        content: Text(loc.t('order_export_language_subtitle')),
-        contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-        actionsPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-        actions: [
-          _LangButton(
-            flag: '🇷🇺',
-            label: loc.t('order_export_language_ru'),
-            onTap: () => Navigator.of(ctx).pop('ru'),
-          ),
-          _LangButton(
-            flag: '🇬🇧',
-            label: loc.t('order_export_language_en'),
-            onTap: () => Navigator.of(ctx).pop('en'),
-          ),
-        ],
+        contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 20),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(loc.t('order_export_language_subtitle')),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: _LangButton(
+                    flag: '🇷🇺',
+                    label: loc.t('order_export_language_ru'),
+                    onTap: () => Navigator.of(ctx).pop('ru'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _LangButton(
+                    flag: '🇬🇧',
+                    label: loc.t('order_export_language_en'),
+                    onTap: () => Navigator.of(ctx).pop('en'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
     if (exportLang == null || !mounted) return;
@@ -457,20 +470,18 @@ class _LangButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: FilledButton.tonal(
-          onPressed: onTap,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(flag, style: const TextStyle(fontSize: 28)),
-              const SizedBox(height: 4),
-              Text(label, style: Theme.of(context).textTheme.labelLarge),
-            ],
-          ),
-        ),
+    return FilledButton.tonal(
+      onPressed: onTap,
+      style: FilledButton.styleFrom(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(flag, style: const TextStyle(fontSize: 28)),
+          const SizedBox(height: 4),
+          Text(label, style: Theme.of(context).textTheme.labelLarge),
+        ],
       ),
     );
   }
