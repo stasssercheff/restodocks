@@ -200,14 +200,10 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                 final ingredient = entry.value;
                 return TableRow(
                   children: [
-                    // Тип ТТК (в каждой строке)
+                    // Тип ТТК — placeholder (объединённая ячейка рисуется поверх в Stack)
                     Container(
                       height: 44,
-                      alignment: Alignment.center,
-                      child: Text(
-                        widget.isSemiFinished ? 'ПФ' : 'Блюдо',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                      ),
+                      color: Colors.white,
                     ),
 
                     // Название — placeholder (объединённая ячейка рисуется поверх в Stack)
@@ -354,6 +350,24 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
               ),
                 ],
               ),
+                  // Объединённая ячейка «Тип ТТК» — позиция и размеры по границам столбца 0
+                  Positioned(
+                    left: 0,
+                    top: 44,
+                    width: 50,
+                    height: indexedRows.length * 44 + 2,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        border: Border.all(color: Colors.black, width: 1),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        widget.isSemiFinished ? 'ПФ' : 'Блюдо',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
                   // Объединённая ячейка «Название» — позиция и размеры по границам столбца 1
                   Positioned(
                     left: 50,  // граница между колонками 0 и 1
