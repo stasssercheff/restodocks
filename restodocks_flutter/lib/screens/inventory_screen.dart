@@ -991,12 +991,22 @@ class _InventoryScreenState extends State<InventoryScreen>
       });
     }
 
-    // collapseLayout только на десктопе при клавиатуре. На мобильной — не трогаем layout, иначе клавиатура пропадает.
-    // Не добавляем SizedBox(viewInsetsBottom) — он забирал место у таблицы и вместо полей показывал белый фон.
+    // collapseLayout только на десктопе при клавиатуре. На мобильной — не трогаем layout, иначе клавиатура закрывается.
     final collapseLayout = _isInputMode && !isNarrow;
+    // На мобильном при открытой клавиатуре скрываем строку с датой/именем (верхняя шапка),
+    // но оставляем строку с фильтром — это делается без setState через isKeyboardOpen.
+    final mobileKeyboardOpen = isNarrow && isKeyboardOpen;
 
     return Scaffold(
-      appBar: _isInputMode ? AppBar(
+      appBar: (isNarrow && isKeyboardOpen) ? AppBar(
+        leading: appBarBackButton(context),
+        title: Text(
+          loc.t('inventory_blank_title'),
+          style: const TextStyle(fontSize: 16),
+        ),
+        toolbarHeight: 40,
+        elevation: 0,
+      ) : _isInputMode ? AppBar(
         leading: appBarBackButton(context),
         title: Text(
           loc.t('inventory_blank_title'),
@@ -1008,21 +1018,26 @@ class _InventoryScreenState extends State<InventoryScreen>
         leading: appBarBackButton(context),
         title: Text(loc.t('inventory_blank_title')),
       ),
+      // Кнопка "Завершить" в bottomNavigationBar — Flutter поднимает её над клавиатурой автоматически.
+      // Браузерный URL-бар (Safari/Chrome) остаётся ниже неё и не перекрывает таблицу.
+      bottomNavigationBar: _buildFooter(loc, collapseLayout),
       body: Stack(
         children: [
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (!collapseLayout) _buildHeader(loc, establishment, employee, collapseLayout: false),
-              if (!collapseLayout) const Divider(height: 1),
+              _buildHeader(
+                loc, establishment, employee,
+                collapseLayout: collapseLayout,
+                hideInfoRow: mobileKeyboardOpen,
+              ),
+              const Divider(height: 1),
               Expanded(
                 child: _buildTable(loc),
               ),
-              if (!collapseLayout) const Divider(height: 1),
-              _buildFooter(loc, collapseLayout),
             ],
           ),
-          if (!collapseLayout) DataSafetyIndicator(isVisible: true),
+          if (!collapseLayout && !mobileKeyboardOpen) DataSafetyIndicator(isVisible: true),
         ],
       ),
     );
@@ -1034,8 +1049,8 @@ class _InventoryScreenState extends State<InventoryScreen>
     Establishment? establishment,
     Employee? employee, {
     bool collapseLayout = false,
+    bool hideInfoRow = false,
   }) {
-    // collapseLayout передаётся снаружи; при вызове из body он всегда false (уже отфильтровано)
     final theme = Theme.of(context);
     final narrow = MediaQuery.sizeOf(context).width < 420;
     final dateStr = '${_date.day.toString().padLeft(2, '0')}.${_date.month.toString().padLeft(2, '0')}.${_date.year}';
@@ -1086,7 +1101,8 @@ class _InventoryScreenState extends State<InventoryScreen>
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        headerRow,
+        // Строка с именем/должностью скрывается на мобильном при открытой клавиатуре
+        if (!hideInfoRow) headerRow,
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
@@ -1101,7 +1117,8 @@ class _InventoryScreenState extends State<InventoryScreen>
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (!collapseLayout) Row(
+                  // Строка с названием заведения и временем — скрывается при открытой клавиатуре
+                  if (!collapseLayout && !hideInfoRow) Row(
                     children: [
                       Icon(Icons.store, size: 16, color: theme.colorScheme.primary),
                       const SizedBox(width: 4),
@@ -1130,7 +1147,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                     ],
                   ),
                   if (sortAlphabetButton != null && nameFilterField != null) ...[
-                    const SizedBox(height: 6),
+                    if (!hideInfoRow) const SizedBox(height: 6),
                     Row(
                       children: [
                         if (!collapseLayout) ...[sortAlphabetButton!, const SizedBox(width: 8)],
@@ -1218,12 +1235,10 @@ class _InventoryScreenState extends State<InventoryScreen>
 
   /// Компактный нижний блок: не перекрывает таблицу, минимум высоты.
   /// [collapseLayout] — на десктопе при вводе скрываем футер. На мобильной при клавиатуре футер сдвигается вниз отступом (SizedBox выше), уходит под клавиатуру.
-  Widget _buildFooter(LocalizationService loc, bool collapseLayout) {
-    final theme = Theme.of(context);
-    if (collapseLayout) {
-      return const SizedBox.shrink();
-    }
+  Widget? _buildFooter(LocalizationService loc, bool collapseLayout) {
+    if (collapseLayout) return null;
 
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
