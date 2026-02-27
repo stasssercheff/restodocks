@@ -21,6 +21,8 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
   Map<String, dynamic>? _doc;
   bool _loading = true;
   String? _error;
+  // Локализованные имена продуктов: productId -> localizedName
+  final Map<String, String> _localizedNames = {};
 
   @override
   void initState() {
@@ -40,6 +42,51 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
       _loading = false;
       if (doc == null) _error = 'Документ не найден';
     });
+    // После загрузки документа — подгружаем локализованные имена продуктов
+    if (doc != null) {
+      _loadLocalizedNames(doc);
+    }
+  }
+
+  Future<void> _loadLocalizedNames(Map<String, dynamic> doc) async {
+    if (!mounted) return;
+    final loc = context.read<LocalizationService>();
+    final lang = loc.currentLanguageCode;
+    if (lang == 'ru') return; // продукты хранятся на русском — переводить не нужно
+
+    final acc = context.read<AccountManagerSupabase>();
+    final estId = acc.establishment?.id;
+    if (estId == null) return;
+
+    final store = context.read<ProductStoreSupabase>();
+    if (store.allProducts.isEmpty) await store.loadProducts();
+    await store.loadNomenclature(estId);
+
+    final payload = doc['payload'] as Map<String, dynamic>? ?? {};
+    final items = payload['items'] as List<dynamic>? ?? [];
+    final updated = <String, String>{};
+    for (final raw in items) {
+      final item = raw as Map<String, dynamic>;
+      final productId = item['productId'] as String?;
+      if (productId == null || productId.isEmpty) continue;
+      final product = store.allProducts.where((p) => p.id == productId).firstOrNull;
+      if (product == null) continue;
+      final localizedName = product.getLocalizedName(lang);
+      if (localizedName != product.name) {
+        updated[productId] = localizedName;
+      }
+    }
+    if (mounted && updated.isNotEmpty) {
+      setState(() => _localizedNames.addAll(updated));
+    }
+  }
+
+  String _getItemName(Map<String, dynamic> item) {
+    final productId = item['productId'] as String?;
+    if (productId != null && _localizedNames.containsKey(productId)) {
+      return _localizedNames[productId]!;
+    }
+    return (item['productName'] ?? '').toString();
   }
 
   Future<void> _showSaveFormatDialog() async {
@@ -54,6 +101,49 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
         : DateFormat('yyyy-MM-dd').format(DateTime.now());
     final supplier = (header['supplierName'] ?? 'order').toString().replaceAll(RegExp(r'[^\w\-.\s]'), '_');
 
+    // Шаг 1: выбор языка документа
+    final exportLang = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('order_export_language_title') ?? 'Язык документа'),
+        contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 20),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(loc.t('order_export_language_subtitle') ?? 'Выберите язык для файла'),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(ctx).pop('ru'),
+                    child: const Text('🇷🇺  Русский'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(ctx).pop('en'),
+                    child: const Text('🇬🇧  English'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+          ),
+        ],
+      ),
+    );
+
+    if (exportLang == null || !mounted) return;
+
+    // Шаг 2: выбор формата
     final format = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -84,17 +174,19 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
 
     if (format == null || !mounted) return;
 
+    final tLang = (String key) => loc.tForLanguage(exportLang, key);
+
     try {
       if (format == 'pdf') {
         final bytes = await OrderListExportService.buildOrderPdfBytesFromPayload(
           payload: payload,
-          t: loc.t,
+          t: tLang,
         );
         await saveFileBytes('order_${supplier}_$dateStr.pdf', bytes);
       } else {
         final bytes = await OrderListExportService.buildOrderExcelBytesFromPayload(
           payload: payload,
-          t: loc.t,
+          t: tLang,
         );
         await saveFileBytes('order_${supplier}_$dateStr.xlsx', bytes);
       }

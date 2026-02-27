@@ -85,29 +85,62 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
         if (!mounted) return;
 
         if (item.existingProductId != null) {
-          // Для priceUpdate: явно применяем новую цену; displayPrice = suggestedPrice ?? price (новая из файла)
+          // Продукт уже существует в базе — обновляем цену И добавляем в номенклатуру если ещё нет
           final newPrice = item.displayPrice ?? item.price;
-          if (newPrice != null) {
-            final cur = item.currency ?? defCur;
+          final cur = item.currency ?? defCur;
+
+          // Убедимся что продукт есть в номенклатуре заведения
+          if (!store.isInNomenclature(item.existingProductId!)) {
+            await store.addToNomenclature(
+              est.id,
+              item.existingProductId!,
+              price: newPrice,
+              currency: newPrice != null ? cur : null,
+            );
+          } else if (newPrice != null) {
             await store.setEstablishmentPrice(est.id, item.existingProductId!, newPrice, cur);
-            updated++;
           }
+          updated++;
         } else {
           final cur = item.currency ?? defCur;
-          final product = Product.create(
-            name: item.displayName,
-            category: 'imported',
-            basePrice: item.displayPrice ?? 0.0,
-            currency: item.displayPrice != null ? cur : null,
-          );
-          final savedProduct = await store.addProduct(product);
-          await store.addToNomenclature(
-            est.id,
-            savedProduct.id,
-            price: item.displayPrice,
-            currency: item.displayPrice != null ? cur : null,
-          );
-          created++;
+          final nameLower = item.displayName.trim().toLowerCase();
+
+          // Дедупликация: проверяем не существует ли продукт с таким именем
+          final existingInStore = store.allProducts.where(
+            (p) => p.name.trim().toLowerCase() == nameLower,
+          ).toList();
+
+          if (existingInStore.isNotEmpty) {
+            // Продукт есть в глобальной базе — просто добавляем в номенклатуру
+            final existingId = existingInStore.first.id;
+            if (!store.isInNomenclature(existingId)) {
+              await store.addToNomenclature(
+                est.id,
+                existingId,
+                price: item.displayPrice,
+                currency: item.displayPrice != null ? cur : null,
+              );
+            } else if (item.displayPrice != null) {
+              await store.setEstablishmentPrice(est.id, existingId, item.displayPrice!, cur);
+            }
+            created++;
+          } else {
+            // Новый продукт — создаём и добавляем в номенклатуру
+            final product = Product.create(
+              name: item.displayName,
+              category: 'imported',
+              basePrice: item.displayPrice ?? 0.0,
+              currency: item.displayPrice != null ? cur : null,
+            );
+            final savedProduct = await store.addProduct(product);
+            await store.addToNomenclature(
+              est.id,
+              savedProduct.id,
+              price: item.displayPrice,
+              currency: item.displayPrice != null ? cur : null,
+            );
+            created++;
+          }
         }
 
         if (mounted) {
@@ -115,6 +148,7 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
         }
       }
 
+      await store.loadProducts();
       await store.loadNomenclature(est.id);
 
       if (mounted) {
