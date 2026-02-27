@@ -211,19 +211,11 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
                       OutlinedButton(
                         onPressed: _saving ? null : _deselectAllPriceUpdates,
                         style: OutlinedButton.styleFrom(
-                          backgroundColor: noneApproved ? theme.colorScheme.surfaceContainerHighest : null,
-                          foregroundColor: noneApproved ? theme.colorScheme.onSurface : null,
+                          backgroundColor: theme.colorScheme.onSurface,
+                          foregroundColor: theme.colorScheme.surface,
+                          side: BorderSide.none,
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (noneApproved) ...[
-                              Icon(Icons.cancel_outlined, size: 18, color: theme.colorScheme.onSurface),
-                              const SizedBox(width: 6),
-                            ],
-                            Text(loc.t('deselect_price_updates') ?? 'Снять обновления цен'),
-                          ],
-                        ),
+                        child: const Text('Все'),
                       ),
                     ],
                   );
