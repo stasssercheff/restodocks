@@ -286,7 +286,6 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
                   onChanged: (c) {
                     setState(() {
                       _selectedCountry = c;
-                      _selectedCity = null;
                     });
                   },
                 ),
