@@ -862,7 +862,10 @@
     "kitchen_hub": "Кухня",
     "inventory_pf": "Инвентаризация ПФ",
     "no_inventory_docs": "Нет отправленных документов инвентаризации",
-    "checklist_not_found": "Чеклист не найден"
+    "checklist_not_found": "Чеклист не найден",
+    "product_order_desc": "Управление заказами продуктов и поставщиками",
+    "inventory_desc": "Проведение инвентаризации продуктов и полуфабрикатов",
+    "checklists_desc": "Ежедневные чеклисты для кухни"
   },
   "en": {
     "app_name": "Restodocks",
@@ -1726,7 +1729,10 @@
     "kitchen_hub": "Kitchen",
     "inventory_pf": "Semi-finished inventory",
     "no_inventory_docs": "No submitted inventory documents",
-    "checklist_not_found": "Checklist not found"
+    "checklist_not_found": "Checklist not found",
+    "product_order_desc": "Manage product orders and suppliers",
+    "inventory_desc": "Conduct inventory of products and semi-finished items",
+    "checklists_desc": "Daily kitchen checklists"
   },
   "es": {
     "app_name": "Restodocks",

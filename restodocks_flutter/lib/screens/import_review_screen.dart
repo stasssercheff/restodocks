@@ -174,17 +174,21 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: Row(
               children: [
-                FilterChip(
-                  label: Text(
-                    approved == _items.length
-                        ? (loc.t('deselect_all') ?? 'Снять все')
-                        : (loc.t('accept_all') ?? 'Принять всё'),
-                  ),
-                  selected: approved == _items.length,
-                  onSelected: _saving ? null : (_) => _toggleAll(),
-                  avatar: Icon(
-                    approved == _items.length ? Icons.check_circle : Icons.check_circle_outline,
-                    size: 18,
+                // Кнопка выбрать/снять все — только иконка
+                InkWell(
+                  onTap: _saving ? null : _toggleAll,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: Icon(
+                      approved == _items.length
+                          ? Icons.check_box
+                          : Icons.check_box_outline_blank,
+                      size: 26,
+                      color: approved == _items.length
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
                 if (_items.any((i) => i.category == ModerationCategory.priceUpdate)) ...[
