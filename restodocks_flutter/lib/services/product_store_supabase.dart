@@ -666,20 +666,9 @@ class ProductStoreSupabase {
   Future<List<NomenclatureItem>> getAllNomenclatureItems(String establishmentId, dynamic techCardService) async {
     final products = getNomenclatureProducts(establishmentId);
 
-    // Загружаем ТТК с типом ПФ для этого заведения
-    final techCards = await techCardService.getTechCardsForEstablishment(establishmentId);
-    final semiFinishedTechCards = techCards.where((tc) => tc.isSemiFinished).toList();
-
     final items = <NomenclatureItem>[];
-
-    // Добавляем продукты
     for (final product in products) {
       items.add(NomenclatureItem.product(product));
-    }
-
-    // Добавляем ТТК ПФ
-    for (final techCard in semiFinishedTechCards) {
-      items.add(NomenclatureItem.techCard(techCard));
     }
 
     return items;

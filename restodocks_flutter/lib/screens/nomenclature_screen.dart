@@ -57,7 +57,7 @@ class NomenclatureScreen extends StatefulWidget {
 }
 
 enum _CatalogSort { nameAz, nameZa, priceAsc, priceDesc }
-enum _NomenclatureFilter { all, products, semiFinished }
+enum _NomenclatureFilter { all, products }
 
 /// Единица измерения для отображения в номенклатуре: кг, шт, г, л и т.д. (не сырой "pcs"/"kg" из БД).
 String _unitDisplay(String? unit, String lang) {
@@ -728,9 +728,8 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
 
     // Фильтруем элементы номенклатуры
     var nomItems = _nomenclatureItems.where((item) {
-      // Фильтр по типу (продукты/ПФ)
+      // Фильтр по типу
       if (_nomFilter == _NomenclatureFilter.products && item.isTechCard) return false;
-      if (_nomFilter == _NomenclatureFilter.semiFinished && item.isProduct) return false;
 
       // Фильтр по категории (только для продуктов)
       if (_category != null && item.isProduct && item.product!.category != _category) return false;
@@ -1530,15 +1529,6 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
                   widget.filterType == _NomenclatureFilter.products
                       ? _NomenclatureFilter.all
                       : _NomenclatureFilter.products,
-                ),
-              ),
-              FilterChip(
-                label: Text(widget.loc.t('filter_pf'), style: const TextStyle(fontSize: 11)),
-                selected: widget.filterType == _NomenclatureFilter.semiFinished,
-                onSelected: (_) => widget.onFilterTypeChanged(
-                  widget.filterType == _NomenclatureFilter.semiFinished
-                      ? _NomenclatureFilter.all
-                      : _NomenclatureFilter.semiFinished,
                 ),
               ),
             ],
