@@ -133,7 +133,7 @@ class _OrderListsScreenState extends State<OrderListsScreen>
                     if (mounted) _load();
                   },
                   onDelete: _deleteList,
-                  onCreate: () {
+                  onCreate: () async {
                     if (_suppliers.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
@@ -145,7 +145,8 @@ class _OrderListsScreenState extends State<OrderListsScreen>
                       );
                       _tabController.animateTo(0);
                     } else {
-                      _showSupplierPicker(context, loc);
+                      await context.push('/product-order/create-order');
+                      if (mounted) _load();
                     }
                   },
                   loc: loc,
@@ -155,39 +156,6 @@ class _OrderListsScreenState extends State<OrderListsScreen>
     );
   }
 
-  void _showSupplierPicker(BuildContext context, LocalizationService loc) {
-    showModalBottomSheet<OrderList>(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Text(
-                loc.t('order_select_supplier') ?? 'Выберите поставщика',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-            ),
-            ..._suppliers.map((s) => ListTile(
-                  leading: const Icon(Icons.store_outlined),
-                  title: Text(s.name),
-                  subtitle: s.email != null || s.phone != null
-                      ? Text(s.email ?? s.phone ?? '')
-                      : null,
-                  onTap: () => Navigator.of(ctx).pop(s),
-                )),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    ).then((supplier) async {
-      if (supplier == null || !mounted) return;
-      await context.push('/product-order/${supplier.id}');
-      if (mounted) _load();
-    });
-  }
 }
 
 // ────────────────────────────────────────────────────────────────

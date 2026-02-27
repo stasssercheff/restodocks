@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
@@ -8,7 +7,8 @@ import '../models/models.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
 
-/// Шаг 1 создания списка заказа: название списка, поставщик (наименование), контакты (почта, телефон, TG, Zalo, WhatsApp).
+/// Создание поставщика: наименование поставщика, контакты (почта, телефон, TG, Zalo, WhatsApp).
+/// Название списка не вводится — используется наименование поставщика.
 class OrderListCreateScreen extends StatefulWidget {
   const OrderListCreateScreen({super.key});
 
@@ -17,18 +17,15 @@ class OrderListCreateScreen extends StatefulWidget {
 }
 
 class _OrderListCreateScreenState extends State<OrderListCreateScreen> {
-  final _nameCtrl = TextEditingController();
   final _supplierCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _telegramCtrl = TextEditingController();
   final _zaloCtrl = TextEditingController();
   final _whatsappCtrl = TextEditingController();
-  DateTime? _orderForDate;
 
   @override
   void dispose() {
-    _nameCtrl.dispose();
     _supplierCtrl.dispose();
     _emailCtrl.dispose();
     _phoneCtrl.dispose();
@@ -39,24 +36,22 @@ class _OrderListCreateScreenState extends State<OrderListCreateScreen> {
   }
 
   void _next() {
-    final name = _nameCtrl.text.trim();
     final supplier = _supplierCtrl.text.trim();
-    if (name.isEmpty || supplier.isEmpty) {
+    if (supplier.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.read<LocalizationService>().t('order_list_name'))),
+        SnackBar(content: Text(context.read<LocalizationService>().t('order_list_supplier_name'))),
       );
       return;
     }
     final draft = OrderList(
       id: const Uuid().v4(),
-      name: name,
+      name: supplier,
       supplierName: supplier,
       email: _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim(),
       phone: _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
       telegram: _telegramCtrl.text.trim().isEmpty ? null : _telegramCtrl.text.trim(),
       zalo: _zaloCtrl.text.trim().isEmpty ? null : _zaloCtrl.text.trim(),
       whatsapp: _whatsappCtrl.text.trim().isEmpty ? null : _whatsappCtrl.text.trim(),
-      orderForDate: _orderForDate,
     );
     context.push('/product-order/new/products', extra: draft);
   }
@@ -67,23 +62,13 @@ class _OrderListCreateScreenState extends State<OrderListCreateScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text(loc.t('order_list_create')),
+        title: Text(loc.t('order_create_supplier') ?? 'Создать поставщика'),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            TextField(
-              controller: _nameCtrl,
-              decoration: InputDecoration(
-                labelText: loc.t('order_list_name'),
-                border: const OutlineInputBorder(),
-                filled: true,
-              ),
-              textCapitalization: TextCapitalization.sentences,
-            ),
-            const SizedBox(height: 16),
             TextField(
               controller: _supplierCtrl,
               decoration: InputDecoration(
@@ -92,28 +77,11 @@ class _OrderListCreateScreenState extends State<OrderListCreateScreen> {
                 filled: true,
               ),
               textCapitalization: TextCapitalization.words,
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(child: Text(loc.t('order_export_order_for'))),
-                TextButton(
-                  onPressed: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: _orderForDate ?? DateTime.now().add(const Duration(days: 1)),
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime.now().add(const Duration(days: 365)),
-                    );
-                    if (picked != null) setState(() => _orderForDate = picked);
-                  },
-                  child: Text(_orderForDate != null ? DateFormat('dd.MM.yyyy').format(_orderForDate!) : '...'),
-                ),
-              ],
+              autofocus: true,
             ),
             const SizedBox(height: 20),
             Text(
-              loc.t('order_list_supplier'),
+              loc.t('order_list_supplier') ?? 'Контакты',
               style: Theme.of(context).textTheme.titleSmall?.copyWith(color: Theme.of(context).colorScheme.primary),
             ),
             const SizedBox(height: 8),

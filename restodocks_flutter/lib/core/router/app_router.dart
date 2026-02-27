@@ -25,6 +25,7 @@ import '../../screens/order_lists_screen.dart';
 import '../../screens/order_list_create_screen.dart';
 import '../../screens/order_list_products_screen.dart';
 import '../../screens/order_list_detail_screen.dart';
+import '../../screens/order_create_screen.dart';
 import '../../screens/accept_co_owner_invitation_screen.dart';
 import '../../screens/register_co_owner_screen.dart';
 import '../../screens/confirm_email_screen.dart';
@@ -410,6 +411,10 @@ class AppRouter {
           GoRoute(
             path: '/product-order/new',
             pageBuilder: (context, state) => _slideTransitionPage(state, const OrderListCreateScreen()),
+          ),
+          GoRoute(
+            path: '/product-order/create-order',
+            pageBuilder: (context, state) => _slideTransitionPage(state, const OrderCreateScreen()),
           ),
           GoRoute(
             path: '/product-order/new/products',
