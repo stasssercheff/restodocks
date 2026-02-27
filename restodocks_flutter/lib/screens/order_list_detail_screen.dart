@@ -140,7 +140,7 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
       if (orderDoc == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${loc.t('error_short') ?? 'Ошибка'}: не удалось сохранить заказ во входящие. Проверьте подключение.'),
+            content: Text('${loc.t('error_short')}: ${loc.t('order_save_inbox_error')}'),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
@@ -256,7 +256,7 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
           if (mounted && !ok) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('${loc.t('error_short') ?? 'Ошибка'}: не удалось сохранить заказ во входящие.'),
+                content: Text('${loc.t('error_short')}: ${loc.t('order_save_inbox_error')}'),
                 backgroundColor: Theme.of(context).colorScheme.error,
               ),
             );
@@ -285,7 +285,7 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
           leading: appBarBackButton(context),
           title: Text(loc.t('product_order')),
         ),
-        body: const Center(child: Text('Список не найден')),
+        body: Center(child: Text(loc.t('order_not_found'))),
       );
     }
     final list = _list!;
@@ -406,9 +406,9 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
                   const SizedBox(height: 4),
                   TextField(
                     controller: _commentCtrl,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      hintText: 'Комментарий к заказу',
+                    decoration: InputDecoration(
+                      border: const OutlineInputBorder(),
+                      hintText: loc.t('order_comment_hint'),
                       alignLabelWithHint: true,
                     ),
                     maxLines: 3,

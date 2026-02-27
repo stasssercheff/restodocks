@@ -96,14 +96,16 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     try {
       await ExcelExportService().exportSingleTechCard(techCard);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('ТТК "${techCard.dishName}" успешно экспортирована')),
-        );
-      }
+          final loc = context.read<LocalizationService>();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(loc.t('ttk_exported').replaceFirst('%s', techCard.dishName))),
+          );
+        }
     } catch (e) {
       if (mounted) {
+        final loc = context.read<LocalizationService>();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка экспорта: $e')),
+          SnackBar(content: Text(loc.t('ttk_export_error').replaceFirst('%s', '$e'))),
         );
       }
     }
@@ -113,8 +115,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   Future<void> _exportSelectedTechCards() async {
     final selectedCards = _list.where((card) => _selectedTechCards.contains(card.id)).toList();
     if (selectedCards.isEmpty) {
+      final loc = context.read<LocalizationService>();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Выберите хотя бы одну ТТК')),
+        SnackBar(content: Text(loc.t('ttk_select_at_least_one'))),
       );
       return;
     }
@@ -122,18 +125,20 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     try {
       await ExcelExportService().exportSelectedTechCards(selectedCards);
       if (mounted) {
+        final loc = context.read<LocalizationService>();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Выбранные ТТК (${selectedCards.length} шт.) успешно экспортированы')),
+          SnackBar(content: Text(loc.t('ttk_exported_selected').replaceFirst('%s', '${selectedCards.length}'))),
         );
         setState(() {
           _selectedTechCards.clear();
           _selectionMode = false;
         });
       }
-    } catch (e) {
+      } catch (e) {
       if (mounted) {
+        final loc = context.read<LocalizationService>();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка экспорта: $e')),
+          SnackBar(content: Text(loc.t('ttk_export_error').replaceFirst('%s', '$e'))),
         );
       }
     }
@@ -141,9 +146,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
 
   /// Экспорт всех ТТК
   Future<void> _exportAllTechCards() async {
+    final loc = context.read<LocalizationService>();
     if (_list.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Нет ТТК для экспорта')),
+        SnackBar(content: Text(loc.t('ttk_none_to_export'))),
       );
       return;
     }
@@ -152,13 +158,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       await ExcelExportService().exportAllTechCards(_list);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Все ТТК (${_list.length} шт.) успешно экспортированы')),
+          SnackBar(content: Text(loc.t('ttk_exported_all').replaceFirst('%s', '${_list.length}'))),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка экспорта: $e')),
+          SnackBar(content: Text(loc.t('ttk_export_error').replaceFirst('%s', '$e'))),
         );
       }
     }
@@ -308,10 +314,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
             ? IconButton(
                 icon: const Icon(Icons.close),
                 onPressed: _toggleSelectionMode,
-                tooltip: 'Отмена выбора',
+                tooltip: loc.t('ttk_cancel_selection'),
               )
             : (widget.embedded ? null : appBarBackButton(context)),
-        title: Text(_selectionMode ? 'Выберите ТТК (${_selectedTechCards.length})' : loc.t('tech_cards')),
+        title: Text(_selectionMode ? loc.t('ttk_select_count').replaceFirst('%s', '${_selectedTechCards.length}') : loc.t('tech_cards')),
         actions: [
           // Счетчик ТТК
           if (!_selectionMode) Center(
@@ -351,40 +357,42 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           // Кнопка экспорта
           PopupMenuButton<String>(
             icon: const Icon(Icons.download),
-            tooltip: 'Экспорт в Excel',
+            tooltip: loc.t('ttk_export_excel'),
             onSelected: (value) async {
               switch (value) {
                 case 'single':
-                  // Показать диалог выбора ТТК для экспорта одной
                   showDialog(
                     context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('Выберите ТТК для экспорта'),
-                      content: SizedBox(
-                        width: double.maxFinite,
-                        height: 300,
-                        child: ListView.builder(
-                          itemCount: _list.length,
-                          itemBuilder: (context, index) {
-                            final techCard = _list[index];
-                            return ListTile(
-                              title: Text(techCard.dishName),
-                              subtitle: Text(techCard.isSemiFinished ? 'Полуфабрикат' : 'Блюдо'),
-                              onTap: () {
-                                Navigator.of(context).pop();
-                                _exportSingleTechCard(techCard);
-                              },
-                            );
-                          },
+                    builder: (ctx) {
+                      final l = ctx.read<LocalizationService>();
+                      return AlertDialog(
+                        title: Text(l.t('ttk_select_for_export')),
+                        content: SizedBox(
+                          width: double.maxFinite,
+                          height: 300,
+                          child: ListView.builder(
+                            itemCount: _list.length,
+                            itemBuilder: (context, index) {
+                              final techCard = _list[index];
+                              return ListTile(
+                                title: Text(techCard.getDisplayNameInLists(l.currentLanguageCode)),
+                                subtitle: Text(techCard.isSemiFinished ? l.t('ttk_semi_finished') : l.t('ttk_dish_label')),
+                                onTap: () {
+                                  Navigator.of(context).pop();
+                                  _exportSingleTechCard(techCard);
+                                },
+                              );
+                            },
+                          ),
                         ),
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: const Text('Отмена'),
-                        ),
-                      ],
-                    ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            child: Text(l.t('cancel')),
+                          ),
+                        ],
+                      );
+                    },
                   );
                   break;
                 case 'selected':
@@ -400,17 +408,19 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
               }
             },
             itemBuilder: (_) => [
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'single',
-                child: Text('Экспорт одной ТТК'),
+                child: Text(loc.t('ttk_export_single')),
               ),
               PopupMenuItem(
                 value: 'selected',
-                child: Text(_selectionMode ? 'Экспорт выбранных (${_selectedTechCards.length})' : 'Экспорт выбранных'),
+                child: Text(_selectionMode
+                    ? loc.t('ttk_export_selected').replaceFirst('%s', '${_selectedTechCards.length}')
+                    : loc.t('ttk_export_selected_short')),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'all',
-                child: Text('Экспорт всех ТТК'),
+                child: Text(loc.t('ttk_export_all')),
               ),
             ],
           ),
@@ -502,9 +512,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       child: Column(
         children: [
           TabBar(
-            tabs: const [
-              Tab(text: 'ПФ'),
-              Tab(text: 'Блюда'),
+            tabs: [
+              Tab(text: loc.t('ttk_tab_pf')),
+              Tab(text: loc.t('ttk_tab_dishes')),
             ],
           ),
           // Поиск по названию
@@ -514,7 +524,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
               controller: _searchController,
               focusNode: _searchFocusNode,
               decoration: InputDecoration(
-                hintText: 'Поиск по названию',
+                hintText: loc.t('ttk_search_hint'),
                 isDense: true,
                 prefixIcon: const Icon(Icons.search, size: 20),
                 suffixIcon: _searchController.text.isNotEmpty
@@ -562,6 +572,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
               colCostWidth: colCostWidth,
               color: Theme.of(context).colorScheme.primaryContainer,
               onColor: Theme.of(context).colorScheme.onPrimaryContainer,
+              labelName: loc.t('ttk_col_name'),
+              labelCat: loc.t('column_category').substring(0, loc.t('column_category').length.clamp(0, 4)),
+              labelCost: '${context.read<AccountManagerSupabase>().establishment?.currencySymbol ?? ''}/${loc.t('kg')}',
             ),
           ),
           SliverList(
@@ -631,8 +644,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                                   children: [
                                     if (canEdit)
                                       IconButton(
-                                        icon: const Icon(Icons.visibility_outlined, size: 20),
-                                        tooltip: 'Просмотр ТТК',
+                        icon: const Icon(Icons.visibility_outlined, size: 20),
+                        tooltip: loc.t('ttk_view'),
                                         onPressed: () => context.push('/tech-cards/${tc.id}?view=1'),
                                         style: IconButton.styleFrom(
                                           minimumSize: const Size(36, 36),
@@ -669,9 +682,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           child: DataTable(
             headingRowColor: WidgetStateProperty.all(Theme.of(context).colorScheme.primaryContainer),
             columns: [
-              DataColumn(label: Text('Название', style: const TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('Категория', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('Стоимость за кг', style: TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(label: Text(loc.t('ttk_col_name'), style: const TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(label: Text(loc.t('ttk_col_category'), style: const TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(label: Text(loc.t('ttk_col_cost_per_kg'), style: const TextStyle(fontWeight: FontWeight.bold))),
             ],
             rows: List.generate(techCards.length, (i) {
               final tc = techCards[i];
@@ -692,19 +705,25 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   }
 }
 
-/// Делегат для липкой шапки таблицы ТТК (Название | Кат. | ₽/кг).
+/// Делегат для липкой шапки таблицы ТТК (Название | Кат. | /кг).
 class _TableHeaderDelegate extends SliverPersistentHeaderDelegate {
   _TableHeaderDelegate({
     required this.colCatWidth,
     required this.colCostWidth,
     required this.color,
     required this.onColor,
+    required this.labelName,
+    required this.labelCat,
+    required this.labelCost,
   });
 
   final double colCatWidth;
   final double colCostWidth;
   final Color color;
   final Color onColor;
+  final String labelName;
+  final String labelCat;
+  final String labelCost;
 
   @override
   double get minExtent => 40;
@@ -722,17 +741,17 @@ class _TableHeaderDelegate extends SliverPersistentHeaderDelegate {
         children: [
           Expanded(
             child: Text(
-              'Название',
+              labelName,
               style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: onColor),
             ),
           ),
           SizedBox(
             width: colCatWidth,
-            child: Text('Кат.', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: onColor)),
+            child: Text(labelCat, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: onColor)),
           ),
           SizedBox(
             width: colCostWidth,
-            child: Text('₽/кг', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: onColor)),
+            child: Text(labelCost, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: onColor)),
           ),
           const SizedBox(width: 24),
         ],
@@ -745,6 +764,9 @@ class _TableHeaderDelegate extends SliverPersistentHeaderDelegate {
     return oldDelegate.colCatWidth != colCatWidth ||
         oldDelegate.colCostWidth != colCostWidth ||
         oldDelegate.color != color ||
-        oldDelegate.onColor != onColor;
+        oldDelegate.onColor != onColor ||
+        oldDelegate.labelName != labelName ||
+        oldDelegate.labelCat != labelCat ||
+        oldDelegate.labelCost != labelCost;
   }
 }

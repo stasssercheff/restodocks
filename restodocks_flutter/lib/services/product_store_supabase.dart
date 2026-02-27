@@ -34,7 +34,8 @@ class ProductStoreSupabase {
       final data = await _supabase.client
           .from('products')
           .select()
-          .order('name');
+          .order('name')
+          .limit(10000);
 
       print('DEBUG ProductStore: Loaded ${data.length} products from database');
       _allProducts = (data as List)
@@ -279,13 +280,15 @@ class ProductStoreSupabase {
       response = await _supabase.client
           .from('establishment_products')
           .select('product_id, price, currency')
-          .eq('establishment_id', establishmentId);
+          .eq('establishment_id', establishmentId)
+          .limit(10000);
     } catch (e) {
       print('⚠️ ProductStore: Full select failed (price/currency columns may not exist), trying product_id only: $e');
       response = await _supabase.client
           .from('establishment_products')
           .select('product_id')
-          .eq('establishment_id', establishmentId);
+          .eq('establishment_id', establishmentId)
+          .limit(10000);
     }
 
     final list = response is List ? response : <dynamic>[];

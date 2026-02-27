@@ -328,8 +328,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         // Личный график (1 строка — только этот сотрудник)
         ListTile(
           leading: const Icon(Icons.calendar_month),
-          title: const Text('Личный график'),
-          subtitle: const Text('График непосредственно этого сотрудника'),
+          title: Text(localization.t('personal_schedule')),
+          subtitle: Text(localization.t('personal_schedule_subtitle')),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => context.push('/schedule?personal=1'),
         ),
@@ -337,23 +337,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
         // ЗП за отработанный период
         ListTile(
           leading: const Icon(Icons.payments),
-          title: const Text('ЗП за отработанный период'),
+          title: Text(localization.t('earned_salary')),
           subtitle: _loadingSalary
-              ? const Text('Загрузка...')
+              ? Text(localization.t('loading'))
               : Text(_earnedSalary != null
                   ? ProfileService.formatSalary(_earnedSalary!, currencySymbol)
-                  : 'Недоступно'),
+                  : localization.t('salary_unavailable')),
         ),
 
         // ЗП за текущий календарный месяц
         ListTile(
           leading: const Icon(Icons.account_balance_wallet),
-          title: const Text('ЗП за текущий календарный месяц'),
+          title: Text(localization.t('current_month_salary')),
           subtitle: _loadingSalary
-              ? const Text('Загрузка...')
+              ? Text(localization.t('loading'))
               : Text(_currentMonthSalary != null
                   ? ProfileService.formatSalary(_currentMonthSalary!, currencySymbol)
-                  : 'Недоступно'),
+                  : localization.t('salary_unavailable')),
         ),
       ],
     );
@@ -362,9 +362,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildLogoutSection(LocalizationService localization) {
     return ListTile(
       leading: const Icon(Icons.logout, color: Colors.red),
-      title: const Text(
-        'Выход',
-        style: TextStyle(color: Colors.red),
+      title: Text(
+        localization.t('logout'),
+        style: const TextStyle(color: Colors.red),
       ),
       onTap: () => _logout(context),
     );

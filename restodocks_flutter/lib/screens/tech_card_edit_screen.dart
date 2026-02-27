@@ -1389,19 +1389,21 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
               try {
                 await ExcelExportService().exportSingleTechCard(_techCard!);
                 if (mounted) {
+                  final loc = context.read<LocalizationService>();
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('ТТК "${_techCard!.dishName}" успешно экспортирована')),
+                    SnackBar(content: Text(loc.t('ttk_exported').replaceFirst('%s', _techCard!.dishName))),
                   );
                 }
               } catch (e) {
                 if (mounted) {
+                  final loc = context.read<LocalizationService>();
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Ошибка экспорта: $e')),
+                    SnackBar(content: Text(loc.t('ttk_export_error').replaceFirst('%s', '$e'))),
                   );
                 }
               }
             },
-            tooltip: 'Экспорт в Excel',
+            tooltip: context.read<LocalizationService>().t('ttk_export_excel'),
             style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
           ),
         ],
@@ -1845,7 +1847,7 @@ class _TtkTableState extends State<_TtkTable> {
     final totalCarbs = ingredients.fold<double>(0, (s, ing) => s + ing.finalCarbs);
     final accountManager = context.read<AccountManagerSupabase>();
     final currency = accountManager.currentEmployee?.currency ?? accountManager.establishment?.defaultCurrency ?? 'RUB';
-    final sym = currency == 'RUB' ? '₽' : currency == 'VND' ? '₫' : currency == 'USD' ? '\$' : currency;
+    final sym = Establishment.currencySymbolFor(currency);
     final hasProSubscription = context.read<AccountManagerSupabase>().currentEmployee?.hasProSubscription ?? false;
 
     final hasDeleteCol = widget.effectiveCanEdit;
@@ -1950,10 +1952,10 @@ class _TtkTableState extends State<_TtkTable> {
             headerCell(loc.t('ttk_name')),
             headerCell(loc.t('ttk_product')),
             headerCell(loc.t('ttk_gross_gr')),
-            headerCell('Отход %'),
+            headerCell(loc.t('ttk_waste_pct')),
             headerCell(loc.t('ttk_net_gr')),
             headerCell(loc.t('ttk_cooking_method')),
-            headerCell('Ужарка %'),
+            headerCell(loc.t('ttk_shrink_pct')),
             headerCell(loc.t('ttk_output_gr')),
             headerCell(loc.t('ttk_cost')),
             headerCell(loc.t('ttk_price_per_1kg_dish')),
@@ -1975,7 +1977,7 @@ class _TtkTableState extends State<_TtkTable> {
             decoration: BoxDecoration(color: cellBg),
             children: [
               // Тип ТТК — ПФ или Блюдо (светло-серый как в образце)
-              TableCell(child: wrapCell(Container(color: firstColsBg, constraints: const BoxConstraints(minHeight: 44), padding: _cellPad, alignment: Alignment.center, child: Text(widget.isSemiFinished ? 'ПФ' : loc.t('ttk_dish'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))), fillColor: firstColsBg, dataCell: true)),
+              TableCell(child: wrapCell(Container(color: firstColsBg, constraints: const BoxConstraints(minHeight: 44), padding: _cellPad, alignment: Alignment.center, child: Text(widget.isSemiFinished ? loc.t('filter_pf') : loc.t('ttk_dish'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))), fillColor: firstColsBg, dataCell: true)),
               // Название — одна объединённая ячейка поверх всех строк (рисуется в Stack ниже); здесь — пустая ячейка без границы
               TableCell(
                 verticalAlignment: TableCellVerticalAlignment.fill,
@@ -2348,7 +2350,7 @@ class _TtkTableState extends State<_TtkTable> {
                     Icon(Icons.restaurant, color: Colors.blue.shade700),
                     const SizedBox(width: 8),
                     Text(
-                      'Питательная ценность блюда (на 100г)',
+                      loc.t('ttk_nutrition_title'),
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: Colors.blue.shade700,
@@ -2359,13 +2361,13 @@ class _TtkTableState extends State<_TtkTable> {
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    _nutritionChip('Калории', '${totalCalories.round()} ккал', Colors.orange),
+                    _nutritionChip(loc.t('ttk_calories'), '${totalCalories.round()} ${loc.t('kcal')}', Colors.orange),
                     const SizedBox(width: 12),
-                    _nutritionChip('Белки', '${totalProtein.toStringAsFixed(1)} г', Colors.red),
+                    _nutritionChip(loc.t('ttk_protein'), '${totalProtein.toStringAsFixed(1)} ${loc.t('gram')}', Colors.red),
                     const SizedBox(width: 12),
-                    _nutritionChip('Жиры', '${totalFat.toStringAsFixed(1)} г', Colors.yellow.shade700),
+                    _nutritionChip(loc.t('ttk_fat'), '${totalFat.toStringAsFixed(1)} ${loc.t('gram')}', Colors.yellow.shade700),
                     const SizedBox(width: 12),
-                    _nutritionChip('Углеводы', '${totalCarbs.toStringAsFixed(1)} г', Colors.green),
+                    _nutritionChip(loc.t('ttk_carbs'), '${totalCarbs.toStringAsFixed(1)} ${loc.t('gram')}', Colors.green),
                   ],
                 ),
               ],

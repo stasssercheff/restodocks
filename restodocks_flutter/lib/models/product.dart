@@ -2,6 +2,8 @@ import 'package:equatable/equatable.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:uuid/uuid.dart';
 
+import 'establishment.dart';
+
 part 'product.g.dart';
 
 /// Модель продукта с питательной ценностью и характеристиками
@@ -178,25 +180,8 @@ class Product extends Equatable {
   String get priceInfo {
     if (basePrice == null) return '';
 
-    final currencySymbol = _getCurrencySymbol(currency ?? 'RUB');
+    final currencySymbol = Establishment.currencySymbolFor(currency ?? 'RUB');
     return '$basePrice $currencySymbol';
-  }
-
-  String _getCurrencySymbol(String currency) {
-    switch (currency.toUpperCase()) {
-      case 'RUB':
-        return '₽';
-      case 'USD':
-        return '\$';
-      case 'EUR':
-        return '€';
-      case 'GBP':
-        return '£';
-      case 'VND':
-        return '₫';
-      default:
-        return currency;
-    }
   }
 
   /// Проверка на наличие аллергенов
