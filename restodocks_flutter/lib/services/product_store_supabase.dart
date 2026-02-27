@@ -135,33 +135,25 @@ class ProductStoreSupabase {
     }).firstOrNull;
   }
 
-  /// Добавить новый продукт
-  Future<void> addProduct(Product product) async {
+  /// Добавить новый продукт. Возвращает сохранённый продукт с ID, подтверждённым сервером.
+  Future<Product> addProduct(Product product) async {
     try {
       print('DEBUG ProductStore: Adding product "${product.name}" to database...');
       final response = await _supabase.insertData('products', product.toJson());
       print('DEBUG ProductStore: Insert response: $response');
 
-      Product saved = product;
-      if (response != null && response.containsKey('id')) {
-        saved = Product.fromJson(response);
-        _allProducts.add(saved);
-        print('DEBUG ProductStore: Product added successfully, total products: ${_allProducts.length}');
-        if (!_categories.contains(saved.category)) {
-          _categories.add(saved.category);
-          _categories.sort();
-        }
-      } else {
-        print('DEBUG ProductStore: No response data, adding locally created product');
-        _allProducts.add(product);
-        if (!_categories.contains(product.category)) {
-          _categories.add(product.category);
-          _categories.sort();
-        }
+      final saved = Product.fromJson(response);
+      _allProducts.add(saved);
+      print('DEBUG ProductStore: Product added successfully, total products: ${_allProducts.length}');
+      if (!_categories.contains(saved.category)) {
+        _categories.add(saved.category);
+        _categories.sort();
       }
 
       // Запускаем перевод фоново через Edge Function
       _translateProductInBackground(saved.id);
+
+      return saved;
     } catch (e) {
       print('DEBUG ProductStore: Error adding product: $e');
       rethrow;

@@ -2147,9 +2147,10 @@ ${text}
           print('DEBUG: Created product: ${product.toJson()}');
 
           // Пытаемся добавить продукт
+          Product savedProduct;
           try {
             print('DEBUG: Adding product "${product.name}" to database...');
-            await store.addProduct(product);
+            savedProduct = await store.addProduct(product);
             print('DEBUG: Successfully added product "${product.name}"');
 
             // Запускаем автоматический перевод для нового продукта
@@ -2163,11 +2164,11 @@ ${text}
 
             await translationManager.handleEntitySave(
               entityType: TranslationEntityType.product,
-              entityId: product.id,
+              entityId: savedProduct.id,
               textFields: {
                 'name': normalizedName,
-                if (product.names != null)
-                  for (final entry in product.names!.entries)
+                if (savedProduct.names != null)
+                  for (final entry in savedProduct.names!.entries)
                     'name_${entry.key}': entry.value,
               },
               sourceLanguage: 'ru',
@@ -2194,9 +2195,9 @@ ${text}
               print('DEBUG: Adding product "${product.name}" to nomenclature...');
               await store.addToNomenclature(
                 estId,
-                product.id,
-                price: product.basePrice,
-                currency: product.currency ?? defCur,
+                savedProduct.id,
+                price: savedProduct.basePrice,
+                currency: savedProduct.currency ?? defCur,
               );
               added++;
               print('DEBUG: Successfully added "${product.name}" to nomenclature');

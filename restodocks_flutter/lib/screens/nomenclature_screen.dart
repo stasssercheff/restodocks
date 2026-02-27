@@ -178,8 +178,9 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
           currency: (verification?.suggestedPrice ?? item.price) != null ? defCur : null,
         );
 
+          Product savedProduct;
           try {
-            await store.addProduct(product);
+            savedProduct = await store.addProduct(product);
           } catch (e) {
             if (e.toString().contains('duplicate key') ||
                 e.toString().contains('already exists') ||
@@ -211,7 +212,7 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
           }
 
           try {
-            await store.addToNomenclature(estId, product.id, price: product.basePrice, currency: product.currency);
+            await store.addToNomenclature(estId, savedProduct.id, price: savedProduct.basePrice, currency: savedProduct.currency);
           } catch (e) {
             // Возможно продукт уже в номенклатуре - считаем это успехом
             if (e.toString().contains('duplicate key') ||
@@ -996,13 +997,13 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       currency: null,
     );
     try {
-      await store.addProduct(product);
-      await store.addToNomenclature(estId, product.id);
+      final savedProduct = await store.addProduct(product);
+      await store.addToNomenclature(estId, savedProduct.id);
       // Запускаем перевод фоново — не блокируем UI
       translationManager.generateTranslationsForProduct(sourceName, sourceLang).then((translations) async {
         if (translations.length > 1) {
-          final updatedNames = Map<String, String>.from(product.names ?? {})..addAll(translations);
-          final updatedProduct = product.copyWith(names: updatedNames);
+          final updatedNames = Map<String, String>.from(savedProduct.names ?? {})..addAll(translations);
+          final updatedProduct = savedProduct.copyWith(names: updatedNames);
           try {
             await store.updateProduct(updatedProduct);
           } catch (_) {}
@@ -2784,11 +2785,11 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
     );
     try {
       if (widget.isCreate) {
-        await widget.store.addProduct(updated);
+        final savedUpdated = await widget.store.addProduct(updated);
         if (widget.establishmentId != null && widget.establishmentId!.isNotEmpty) {
           await widget.store.addToNomenclature(
             widget.establishmentId!,
-            updated.id,
+            savedUpdated.id,
             price: pricePerKg,
             currency: _currency,
           );

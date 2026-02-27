@@ -100,10 +100,10 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
             basePrice: item.displayPrice ?? 0.0,
             currency: item.displayPrice != null ? cur : null,
           );
-          await store.addProduct(product);
+          final savedProduct = await store.addProduct(product);
           await store.addToNomenclature(
             est.id,
-            product.id,
+            savedProduct.id,
             price: item.displayPrice,
             currency: item.displayPrice != null ? cur : null,
           );

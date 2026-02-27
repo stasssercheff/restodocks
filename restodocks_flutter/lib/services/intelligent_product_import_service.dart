@@ -141,12 +141,12 @@ class IntelligentProductImportService {
             currency: result.filePrice != null ? defaultCurrency : null,
           );
 
-          await _productStore.addProduct(product);
-          createdProducts.add(product);
+          final savedProduct = await _productStore.addProduct(product);
+          createdProducts.add(savedProduct);
 
           // Генерируем и сохраняем переводы
           await _generateAndSaveTranslations(
-            product.id,
+            savedProduct.id,
             productName,
             result.detectedLanguage ?? 'en',
           );
@@ -181,8 +181,8 @@ class IntelligentProductImportService {
               currency: result.filePrice != null ? defaultCurrency : null,
             );
 
-            await _productStore.addProduct(product);
-            createdProducts.add(product);
+            final savedProduct2 = await _productStore.addProduct(product);
+            createdProducts.add(savedProduct2);
           }
           break;
 
