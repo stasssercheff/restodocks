@@ -36,20 +36,36 @@ class ProductStoreSupabase {
     _isLoading = true;
 
     try {
-      print('DEBUG ProductStore: Loading products from database...');
-      final data = await _supabase.client
-          .from('products')
-          .select()
-          .order('name')
-          .limit(10000);
+      print('DEBUG ProductStore: Loading ALL products from database (paginated)...');
+      // PostgREST ограничивает ответ 1000 строками по умолчанию.
+      // Грузим постранично пока не получим все записи.
+      const pageSize = 1000;
+      final allData = <Map<String, dynamic>>[];
+      var offset = 0;
 
-      print('DEBUG ProductStore: Loaded ${data.length} products from database');
-      _allProducts = (data as List)
-          .map((json) => Product.fromJson(json as Map<String, dynamic>))
-          .toList();
+      while (true) {
+        final page = await _supabase.client
+            .from('products')
+            .select()
+            .order('name')
+            .range(offset, offset + pageSize - 1);
+
+        final pageList = page as List;
+        for (final item in pageList) {
+          allData.add(item as Map<String, dynamic>);
+        }
+
+        print('DEBUG ProductStore: Page offset=$offset, got ${pageList.length} rows, total so far: ${allData.length}');
+
+        if (pageList.length < pageSize) break; // последняя страница
+        offset += pageSize;
+        if (offset > 50000) break; // защита от бесконечного цикла
+      }
+
+      print('DEBUG ProductStore: Loaded ${allData.length} products total');
+      _allProducts = allData.map((json) => Product.fromJson(json)).toList();
       print('DEBUG ProductStore: Parsed ${_allProducts.length} products successfully');
 
-      // Обновляем категории
       _categories = _allProducts
           .map((product) => product.category)
           .toSet()
