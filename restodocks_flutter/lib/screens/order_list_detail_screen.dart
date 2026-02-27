@@ -213,7 +213,32 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
     final account = context.read<AccountManagerSupabase>();
     final companyName = account.establishment?.name ?? '—';
     final loc = context.read<LocalizationService>();
-    final itemsWithNames = await _getItemsWithLocalizedNames(loc.currentLanguageCode);
+
+    // Диалог выбора языка документа
+    final exportLang = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('order_export_language_title')),
+        content: Text(loc.t('order_export_language_subtitle')),
+        contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+        actionsPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        actions: [
+          _LangButton(
+            flag: '🇷🇺',
+            label: loc.t('order_export_language_ru'),
+            onTap: () => Navigator.of(ctx).pop('ru'),
+          ),
+          _LangButton(
+            flag: '🇬🇧',
+            label: loc.t('order_export_language_en'),
+            onTap: () => Navigator.of(ctx).pop('en'),
+          ),
+        ],
+      ),
+    );
+    if (exportLang == null || !mounted) return;
+
+    final itemsWithNames = await _getItemsWithLocalizedNames(exportLang);
     if (!mounted) return;
 
     showModalBottomSheet<void>(
@@ -224,6 +249,7 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
         itemsWithQuantities: itemsWithNames,
         companyName: companyName,
         loc: loc,
+        exportLang: exportLang,
         onSaved: (msg) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg))),
         onExportToInbox: () async {
           final ok = await _saveOrderToInbox();
@@ -413,6 +439,38 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _LangButton extends StatelessWidget {
+  const _LangButton({
+    required this.flag,
+    required this.label,
+    required this.onTap,
+  });
+
+  final String flag;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: FilledButton.tonal(
+          onPressed: onTap,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(flag, style: const TextStyle(fontSize: 28)),
+              const SizedBox(height: 4),
+              Text(label, style: Theme.of(context).textTheme.labelLarge),
+            ],
+          ),
+        ),
       ),
     );
   }

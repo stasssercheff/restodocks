@@ -15,6 +15,7 @@ class OrderExportSheet extends StatelessWidget {
     required this.companyName,
     required this.loc,
     required this.onSaved,
+    this.exportLang,
     this.onExportToInbox,
   });
 
@@ -23,10 +24,14 @@ class OrderExportSheet extends StatelessWidget {
   final String companyName;
   final LocalizationService loc;
   final void Function(String message) onSaved;
+  /// Язык документа (может отличаться от языка UI). Если null — используется текущий язык UI.
+  final String? exportLang;
   /// Вызывается после успешного экспорта — сохраняет заказ во входящие
   final Future<void> Function()? onExportToInbox;
 
-  String _t(String key) => loc.t(key);
+  String get _docLang => exportLang ?? loc.currentLanguageCode;
+
+  String _t(String key) => loc.tForLanguage(_docLang, key);
 
   List<OrderListItem> get _items => itemsWithQuantities;
 
@@ -36,7 +41,7 @@ class OrderExportSheet extends StatelessWidget {
       list: list,
       companyName: companyName,
       itemsWithQuantities: _items,
-      lang: loc.currentLanguageCode,
+      lang: _docLang,
       documentDate: docDate,
       t: _t,
     );
@@ -48,7 +53,7 @@ class OrderExportSheet extends StatelessWidget {
         list: list,
         companyName: companyName,
         itemsWithQuantities: _items,
-        lang: loc.currentLanguageCode,
+        lang: _docLang,
         documentDate: DateTime.now(),
         t: _t,
       );
@@ -117,7 +122,7 @@ class OrderExportSheet extends StatelessWidget {
       list: list,
       companyName: companyName,
       itemsWithQuantities: _items,
-      lang: loc.currentLanguageCode,
+      lang: _docLang,
       documentDate: DateTime.now(),
       t: _t,
     );
