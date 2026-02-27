@@ -789,11 +789,6 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
             },
             tooltip: loc.t('refresh'),
           ),
-          IconButton(
-            icon: const Icon(Icons.home),
-            onPressed: () => context.go('/home'),
-            tooltip: loc.t('home'),
-          ),
         ],
       ),
       body: Column(
