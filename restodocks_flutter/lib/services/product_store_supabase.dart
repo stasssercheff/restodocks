@@ -24,8 +24,14 @@ class ProductStoreSupabase {
   bool get isLoading => _isLoading;
 
   /// Загрузка продуктов из Supabase
-  Future<void> loadProducts() async {
-    if (_isLoading) return;
+  Future<void> loadProducts({bool force = false}) async {
+    if (_isLoading && !force) return;
+    if (_isLoading) {
+      // Ждём окончания текущей загрузки перед новой
+      while (_isLoading) {
+        await Future.delayed(const Duration(milliseconds: 50));
+      }
+    }
 
     _isLoading = true;
 

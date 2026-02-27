@@ -115,6 +115,8 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
         }
       }
 
+      // Полная принудительная перезагрузка после сохранения
+      await store.loadProducts(force: true);
       await store.loadNomenclature(est.id);
 
       if (mounted) {

@@ -336,9 +336,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
 
     final techCardService = context.read<TechCardServiceSupabase>();
 
-    if (!store.isLoading) {
-      await store.loadProducts();
-    }
+    await store.loadProducts(force: true);
     await store.loadNomenclature(estId);
 
     // Загружаем элементы номенклатуры (продукты + ТТК ПФ)
