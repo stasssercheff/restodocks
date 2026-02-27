@@ -356,84 +356,50 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
 
   Future<void> _showDuplicates() async {
     final loc = context.read<LocalizationService>();
-    final products = _nomenclatureItems
-        .where((i) => i.isProduct)
-        .map((i) => (id: i.id, name: i.getLocalizedName(loc.currentLanguageCode)))
-        .toList();
+    final productItems = _nomenclatureItems.where((i) => i.isProduct).toList();
 
-    if (products.length < 2) {
+    if (productItems.length < 2) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(loc.t('duplicates_need_more') ?? 'Нужно минимум 2 продукта для поиска дубликатов')),
       );
       return;
     }
 
-    // Ограничиваем до 150 — Edge Function не справляется с большими списками
-    final productsForAI = products.length > 150 ? products.sublist(0, 150) : products;
+    // Локальный поиск дублей по названию — без ИИ, мгновенно
+    String _norm(String s) => s.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
 
-    bool dialogOpen = false;
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => Dialog(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const CircularProgressIndicator(),
-              const SizedBox(height: 16),
-              Text(loc.t('duplicates_title') ?? 'Поиск дубликатов'),
-            ],
-          ),
-        ),
-      ),
-    ).then((_) { dialogOpen = false; });
-    dialogOpen = true;
-
-    void closeDialog() {
-      if (dialogOpen && mounted) {
-        dialogOpen = false;
-        Navigator.of(context, rootNavigator: true).pop();
+    final Map<String, List<NomenclatureItem>> grouped = {};
+    for (final item in productItems) {
+      // Проверяем по локализованному имени
+      final localName = _norm(item.getLocalizedName(loc.currentLanguageCode));
+      grouped.putIfAbsent(localName, () => []).add(item);
+      // Также по базовому имени из БД (может отличаться от локализованного)
+      if (item.product != null) {
+        final baseName = _norm(item.product!.name);
+        if (baseName != localName) {
+          grouped.putIfAbsent(baseName, () => []).add(item);
+        }
       }
     }
 
-    List<List<String>> groups = [];
-    try {
-      final ai = context.read<AiService>();
-      groups = await ai.findDuplicates(productsForAI);
-    } catch (e) {
-      closeDialog();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${loc.t('error') ?? 'Ошибка'}: $e')),
-        );
-      }
-      return;
-    }
+    // Оставляем только группы с дублями, дедуплицируем элементы внутри группы
+    final duplicateGroups = grouped.values
+        .map((g) {
+          final seen = <String>{};
+          return g.where((item) => seen.add(item.id)).toList();
+        })
+        .where((g) => g.length >= 2)
+        .toList()
+      ..sort((a, b) => b.length.compareTo(a.length)); // самые большие группы первыми
 
-    closeDialog();
-    if (!mounted) return;
-
-    if (groups.isEmpty) {
+    if (duplicateGroups.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.t('duplicates_none') ?? 'Похожих дубликатов не найдено')),
+        SnackBar(content: Text(loc.t('duplicates_none') ?? 'Дубликатов не найдено')),
       );
       return;
     }
 
     final idToItem = {for (final i in _nomenclatureItems) i.id: i};
-    final duplicateGroups = groups
-        .map((ids) => ids.map((id) => idToItem[id]).whereType<NomenclatureItem>().toList())
-        .where((g) => g.length >= 2)
-        .toList();
-
-    if (duplicateGroups.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.t('duplicates_none') ?? 'Похожих дубликатов не найдено')),
-      );
-      return;
-    }
 
     if (!mounted) return;
     await showDialog(
