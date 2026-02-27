@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const DEEPL_URL = "https://api-free.deepl.com/v2/translate";
+const DEEPL_USAGE_URL = "https://api-free.deepl.com/v2/usage";
 
 function corsHeaders(origin: string | null) {
   return {
@@ -37,11 +38,32 @@ Deno.serve(async (req: Request) => {
   const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabase = createClient(supabaseUrl, supabaseKey);
 
-  let body: { text?: string; from?: string; to?: string };
+  let body: { text?: string; from?: string; to?: string; usage?: boolean };
   try {
     body = await req.json();
   } catch {
     return jsonResponse({ error: "Invalid JSON body" }, 400, origin);
+  }
+
+  // Режим проверки лимита: {"usage": true}
+  if (body.usage) {
+    const usageRes = await fetch(DEEPL_USAGE_URL, {
+      headers: { "Authorization": `DeepL-Auth-Key ${deeplKey}` },
+    });
+    if (!usageRes.ok) {
+      return jsonResponse({ error: "Failed to fetch DeepL usage" }, 500, origin);
+    }
+    const usageData = await usageRes.json() as { character_count: number; character_limit: number };
+    const used = usageData.character_count;
+    const limit = usageData.character_limit;
+    const pct = Math.round((used / limit) * 100);
+    return jsonResponse({
+      used,
+      limit,
+      remaining: limit - used,
+      percent_used: pct,
+      warning: pct >= 80,
+    }, 200, origin);
   }
 
   const { text, from = "RU", to } = body;
