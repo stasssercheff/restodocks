@@ -141,18 +141,16 @@ class ProductStoreSupabase {
       final response = await _supabase.insertData('products', product.toJson());
       print('DEBUG ProductStore: Insert response: $response');
 
-      // Если получили данные обратно, используем их
+      Product saved = product;
       if (response != null && response.containsKey('id')) {
-        final created = Product.fromJson(response);
-        _allProducts.add(created);
+        saved = Product.fromJson(response);
+        _allProducts.add(saved);
         print('DEBUG ProductStore: Product added successfully, total products: ${_allProducts.length}');
-
-        if (!_categories.contains(created.category)) {
-          _categories.add(created.category);
+        if (!_categories.contains(saved.category)) {
+          _categories.add(saved.category);
           _categories.sort();
         }
       } else {
-        // Если не получили данные, добавляем локально созданный продукт
         print('DEBUG ProductStore: No response data, adding locally created product');
         _allProducts.add(product);
         if (!_categories.contains(product.category)) {
@@ -160,11 +158,40 @@ class ProductStoreSupabase {
           _categories.sort();
         }
       }
+
+      // Запускаем перевод фоново через Edge Function
+      _translateProductInBackground(saved.id);
     } catch (e) {
       print('DEBUG ProductStore: Error adding product: $e');
-      // Error adding product
       rethrow;
     }
+  }
+
+  /// Публичный метод для запуска перевода извне (например при добавлении в номенклатуру)
+  void triggerTranslation(String productId) => _translateProductInBackground(productId);
+
+  /// Запустить перевод продукта фоново через Edge Function auto-translate-product
+  void _translateProductInBackground(String productId) {
+    Supabase.instance.client.functions
+        .invoke('auto-translate-product', body: {'product_id': productId})
+        .then((res) {
+      if (res.status == 200 && res.data != null) {
+        final data = res.data as Map<String, dynamic>?;
+        if (data?['updated'] == true) {
+          final names = data?['names'];
+          if (names is Map) {
+            final idx = _allProducts.indexWhere((p) => p.id == productId);
+            if (idx != -1) {
+              _allProducts[idx] = _allProducts[idx].copyWith(
+                names: Map<String, String>.from(names),
+              );
+            }
+          }
+        }
+      }
+    }).catchError((e) {
+      print('DEBUG ProductStore: Background translation failed for $productId: $e');
+    });
   }
 
   /// Обновить продукт

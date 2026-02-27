@@ -2513,6 +2513,12 @@ class _CatalogTab extends StatelessWidget {
       final establishmentPrice = store.getEstablishmentPrice(p.id, estId);
       final price = establishmentPrice?.$1 ?? p.basePrice;
       await store.addToNomenclature(estId, p.id, price: price, currency: establishmentPrice?.$2 ?? p.currency);
+      // Если продукт ещё не переведён — запускаем перевод фоново
+      final names = p.names ?? {};
+      final hasAllLangs = names['ru'] != null && names['en'] != null && names['ru'] != names['en'];
+      if (!hasAllLangs) {
+        store.triggerTranslation(p.id);
+      }
       if (context.mounted) onRefresh();
     } catch (e) {
       if (context.mounted) {

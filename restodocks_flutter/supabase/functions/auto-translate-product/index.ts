@@ -1,0 +1,201 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "jsr:@supabase/supabase-js@2";
+
+const DEEPL_URL = "https://api-free.deepl.com/v2/translate";
+const SUPPORTED_LANGS = ["ru", "en"];
+
+function corsHeaders(origin: string | null) {
+  return {
+    "Access-Control-Allow-Origin": origin || "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  };
+}
+
+function jsonResponse(data: unknown, status = 200, origin: string | null = null) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { ...corsHeaders(origin), "Content-Type": "application/json" },
+  });
+}
+
+async function translateWithDeepL(
+  text: string,
+  sourceLang: string,
+  targetLang: string,
+  deeplKey: string,
+  supabase: ReturnType<typeof createClient>,
+): Promise<string | null> {
+  if (!text.trim() || sourceLang.toUpperCase() === targetLang.toUpperCase()) return null;
+
+  const src = sourceLang.toUpperCase();
+  const tgt = targetLang.toUpperCase();
+
+  // Проверяем кэш
+  const { data: cached } = await supabase
+    .from("translation_cache")
+    .select("translated")
+    .eq("source_text", text.trim())
+    .eq("source_lang", src)
+    .eq("target_lang", tgt)
+    .maybeSingle();
+
+  if (cached?.translated) return cached.translated as string;
+
+  // Запрашиваем DeepL
+  const res = await fetch(DEEPL_URL, {
+    method: "POST",
+    headers: {
+      "Authorization": `DeepL-Auth-Key ${deeplKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ text: [text.trim()], source_lang: src, target_lang: tgt }),
+  });
+
+  if (!res.ok) {
+    console.error("[auto-translate-product] DeepL error:", res.status, await res.text());
+    return null;
+  }
+
+  const data = await res.json() as { translations?: Array<{ text?: string }> };
+  const translated = data?.translations?.[0]?.text?.trim();
+  if (!translated) return null;
+
+  // Сохраняем в кэш
+  await supabase.from("translation_cache").upsert(
+    { source_text: text.trim(), source_lang: src, target_lang: tgt, translated },
+    { onConflict: "source_text,source_lang,target_lang" },
+  );
+
+  return translated;
+}
+
+Deno.serve(async (req: Request) => {
+  const origin = req.headers.get("Origin");
+
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(origin) });
+  if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405, origin);
+
+  const deeplKey = Deno.env.get("DEEPL_API_KEY")?.trim();
+  if (!deeplKey) return jsonResponse({ error: "DEEPL_API_KEY not set" }, 500, origin);
+
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
+
+  let body: { product_id?: string; batch?: boolean };
+  try {
+    body = await req.json();
+  } catch {
+    return jsonResponse({ error: "Invalid JSON" }, 400, origin);
+  }
+
+  // Режим batch: переводим продукты постранично (limit/offset для обхода таймаута)
+  if (body.batch) {
+    const limit = (body as { batch: boolean; limit?: number; offset?: number }).limit ?? 50;
+    const offset = (body as { batch: boolean; limit?: number; offset?: number }).offset ?? 0;
+
+    const { data: products, error } = await supabase
+      .from("products")
+      .select("id, name, names")
+      .order("name")
+      .range(offset, offset + limit - 1);
+
+    if (error) return jsonResponse({ error: error.message }, 500, origin);
+
+    let translated = 0;
+    let skipped = 0;
+    let failed = 0;
+
+    for (const product of (products ?? [])) {
+      const names = (product.names ?? {}) as Record<string, string>;
+      const name = (product.name as string)?.trim();
+      if (!name) { skipped++; continue; }
+
+      // Определяем исходный язык — берём первый заполненный ключ, иначе 'ru'
+      const sourceLang = Object.keys(names).find(k => names[k]?.trim()) ?? "ru";
+      const sourceText = names[sourceLang]?.trim() || name;
+
+      let needsUpdate = false;
+      const updatedNames: Record<string, string> = { ...names };
+
+      // Убеждаемся что исходный язык заполнен
+      if (!updatedNames[sourceLang]) updatedNames[sourceLang] = sourceText;
+
+      for (const targetLang of SUPPORTED_LANGS) {
+        if (targetLang === sourceLang) continue;
+        // Пропускаем если уже переведено и не совпадает с исходным
+        if (updatedNames[targetLang]?.trim() && updatedNames[targetLang] !== sourceText) continue;
+
+        const result = await translateWithDeepL(sourceText, sourceLang, targetLang, deeplKey, supabase);
+        if (result && result !== sourceText) {
+          updatedNames[targetLang] = result;
+          needsUpdate = true;
+        }
+      }
+
+      if (needsUpdate) {
+        const { error: updateError } = await supabase
+          .from("products")
+          .update({ names: updatedNames })
+          .eq("id", product.id);
+
+        if (updateError) {
+          console.error("[auto-translate-product] Update error:", updateError.message);
+          failed++;
+        } else {
+          translated++;
+        }
+      } else {
+        skipped++;
+      }
+
+      // Небольшая пауза чтобы не перегружать DeepL
+      if (translated % 50 === 0 && translated > 0) {
+        await new Promise(r => setTimeout(r, 500));
+      }
+    }
+
+    const batchSize = (products ?? []).length;
+    return jsonResponse({ translated, skipped, failed, batch_size: batchSize, offset, has_more: batchSize === limit }, 200, origin);
+  }
+
+  // Режим одного продукта: product_id
+  const { product_id } = body;
+  if (!product_id) return jsonResponse({ error: "product_id or batch required" }, 400, origin);
+
+  const { data: product, error: fetchError } = await supabase
+    .from("products")
+    .select("id, name, names")
+    .eq("id", product_id)
+    .maybeSingle();
+
+  if (fetchError || !product) return jsonResponse({ error: "Product not found" }, 404, origin);
+
+  const names = ((product.names ?? {}) as Record<string, string>);
+  const name = (product.name as string)?.trim();
+  if (!name) return jsonResponse({ skipped: true }, 200, origin);
+
+  const sourceLang = Object.keys(names).find(k => names[k]?.trim()) ?? "ru";
+  const sourceText = names[sourceLang]?.trim() || name;
+  const updatedNames: Record<string, string> = { ...names, [sourceLang]: sourceText };
+  let needsUpdate = false;
+
+  for (const targetLang of SUPPORTED_LANGS) {
+    if (targetLang === sourceLang) continue;
+    if (updatedNames[targetLang]?.trim() && updatedNames[targetLang] !== sourceText) continue;
+
+    const result = await translateWithDeepL(sourceText, sourceLang, targetLang, deeplKey, supabase);
+    if (result && result !== sourceText) {
+      updatedNames[targetLang] = result;
+      needsUpdate = true;
+    }
+  }
+
+  if (needsUpdate) {
+    await supabase.from("products").update({ names: updatedNames }).eq("id", product.id);
+  }
+
+  return jsonResponse({ product_id, names: updatedNames, updated: needsUpdate }, 200, origin);
+});
