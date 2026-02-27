@@ -62,8 +62,7 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
   Future<void> _save({bool onlyNew = false}) async {
     final acc = context.read<AccountManagerSupabase>();
     final est = acc.establishment;
-    final emp = acc.currentEmployee;
-    if (est == null || emp == null) return;
+    if (est == null) return;
 
     final store = context.read<ProductStoreSupabase>();
     final loc = context.read<LocalizationService>();
@@ -144,7 +143,10 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
           _saveTotal = 0;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))),
+          SnackBar(
+            content: Text('Ошибка сохранения: $e'),
+            duration: const Duration(seconds: 8),
+          ),
         );
       }
     }
