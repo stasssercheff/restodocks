@@ -250,7 +250,7 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
   Widget build(BuildContext context) {
     final progress = widget.items.isEmpty ? 1.0 : _processed / widget.items.length;
 
-    final loc = context.read<LocalizationService>();
+    final loc = widget.loc;
     return AlertDialog(
       title: Text(loc.t('upload_products_processing')),
       content: Column(
@@ -1722,7 +1722,7 @@ class _AddAllProgressDialogState extends State<_AddAllProgressDialog> {
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
-                '${loc.t('error')}: $_error',
+                '${widget.loc.t('error')}: $_error',
                 style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 12),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
