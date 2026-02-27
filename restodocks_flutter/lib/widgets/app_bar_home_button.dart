@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-/// Кнопка «назад»: если есть стек — pop(), иначе — переход на главную.
-/// Решает проблему, когда после F5 или go() в стеке нечего pop'ать.
+/// Кнопка «назад»: если есть стек — pop(), иначе — переход на главную
+/// с обратной анимацией (экран уходит вправо).
 Widget appBarBackButton(BuildContext context) {
   return IconButton(
     icon: const Icon(Icons.arrow_back),
@@ -10,7 +10,7 @@ Widget appBarBackButton(BuildContext context) {
       if (GoRouter.of(context).canPop()) {
         context.pop();
       } else {
-        context.go('/home');
+        context.go('/home', extra: {'back': true});
       }
     },
     tooltip: MaterialLocalizations.of(context).backButtonTooltip,

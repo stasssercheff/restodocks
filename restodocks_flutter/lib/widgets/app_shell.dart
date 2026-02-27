@@ -92,15 +92,22 @@ class AppShell extends StatelessWidget {
   }
 
   void _onTap(BuildContext context, int index, HomeButtonAction action, bool noDataAccess) {
+    final location = GoRouterState.of(context).matchedLocation;
+    final currentIndex = _indexForLocation(location, action, noDataAccess);
+
+    // Если переходим на вкладку с меньшим индексом — анимируем как «назад» (вправо)
+    final isBackward = index < currentIndex;
+    final extra = isBackward ? {'back': true} : null;
+
     switch (index) {
       case 0:
-        context.go('/home');
+        context.go('/home', extra: extra);
       case 1:
-        context.go(noDataAccess ? '/schedule?personal=1' : action.route);
+        context.go(noDataAccess ? '/schedule?personal=1' : action.route, extra: extra);
       case 2:
-        context.go('/personal-cabinet');
+        context.go('/personal-cabinet', extra: extra);
       default:
-        context.go('/home');
+        context.go('/home', extra: extra);
     }
   }
 }

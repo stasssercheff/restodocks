@@ -66,12 +66,35 @@ String _getInitialLocation() {
   return '/';
 }
 
-/// Страница с анимацией: использует MaterialPage, чтобы тема (CupertinoPageTransitionsBuilder)
-/// автоматически применяла правильное направление — справа при push, влево при pop.
+/// Страница с анимацией.
+/// Если в state.extra передан {'back': true} — анимация обратная (экран уходит вправо),
+/// имитируя нажатие «назад». Иначе — стандартная MaterialPage (Cupertino, слева направо).
 Page<void> _slideTransitionPage(GoRouterState state, Widget child) {
-  return MaterialPage<void>(
+  final isBack = (state.extra is Map) && (state.extra as Map)['back'] == true;
+  if (!isBack) {
+    return MaterialPage<void>(key: state.pageKey, child: child);
+  }
+  return CustomTransitionPage<void>(
     key: state.pageKey,
     child: child,
+    transitionDuration: const Duration(milliseconds: 300),
+    reverseTransitionDuration: const Duration(milliseconds: 300),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      // Новый экран (возврат «назад»): приходит слева, уходит влево
+      final slideIn = Tween<Offset>(
+        begin: const Offset(-1.0, 0.0),
+        end: Offset.zero,
+      ).animate(CurvedAnimation(parent: animation, curve: Curves.easeInOut));
+      // Текущий экран уходит вправо (как при pop)
+      final slideOut = Tween<Offset>(
+        begin: Offset.zero,
+        end: const Offset(1.0, 0.0),
+      ).animate(CurvedAnimation(parent: secondaryAnimation, curve: Curves.easeInOut));
+      return SlideTransition(
+        position: slideOut,
+        child: SlideTransition(position: slideIn, child: child),
+      );
+    },
   );
 }
 
