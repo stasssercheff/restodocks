@@ -347,7 +347,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     await _processWithDeferredModeration(text: result, source: 'вставленный текст');
   }
 
-  /// 2. Загрузить из файла — выбор файла → извлечение данных → _processWithDeferredModeration
+  /// 2. Загрузить из файла — выбор файла → SheetJS Edge Function → _processWithDeferredModeration
   Future<void> _uploadFromFileUnified() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
@@ -357,23 +357,15 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     if (result == null || result.files.isEmpty || result.files.single.bytes == null) return;
 
     final bytes = result.files.single.bytes!;
-    final name = result.files.single.name.toLowerCase();
-    List<String> rows = _extractRowsFromFile(bytes, name);
+    final loc = context.read<LocalizationService>();
 
-    if (rows.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Не удалось извлечь данные. Попробуйте сохранить файл как .xlsx.',
-            ),
-          ),
-        );
-      }
-      return;
-    }
-
-    await _processWithDeferredModeration(rows: rows, source: _sourceFromFileName(name));
+    // Всегда используем _processExcel: он сначала пробует SheetJS Edge Function
+    // (корректно читает BIFF8/.xls, Windows-1251, любые шрифты и кодировки),
+    // и только при ошибке падает на локальный парсинг.
+    setState(() => _isLoading = true);
+    _startLoadingTimeout();
+    _setLoadingMessage('Чтение файла...');
+    await _processExcel(bytes, loc);
   }
 
   String _sourceFromFileName(String name) {

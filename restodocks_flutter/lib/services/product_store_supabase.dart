@@ -139,7 +139,11 @@ class ProductStoreSupabase {
   Future<Product> addProduct(Product product) async {
     try {
       print('DEBUG ProductStore: Adding product "${product.name}" to database...');
-      final response = await _supabase.insertData('products', product.toJson());
+      // Убираем null-поля перед вставкой, чтобы БД использовала DEFAULT значения
+      final json = Map<String, dynamic>.fromEntries(
+        product.toJson().entries.where((e) => e.value != null),
+      );
+      final response = await _supabase.insertData('products', json);
       print('DEBUG ProductStore: Insert response: $response');
 
       final saved = Product.fromJson(response);

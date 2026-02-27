@@ -1,9 +1,11 @@
 // Supabase Edge Function: парсинг XLS/XLSX из бинарных байт через SheetJS
 // Поддерживает: BIFF8 (.xls, включая Windows-1251/cp1251), XLSX (.xlsx)
 // Принимает JSON: { "bytes": "<base64>" }
-// @deno-types="https://cdn.sheetjs.com/xlsx-0.20.3/package/types/index.d.ts"
-import * as XLSX from "https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs";
-import * as cptable from "https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/cpexcel.full.mjs";
+// deno-lint-ignore-file
+// @ts-ignore
+import * as XLSX from "npm:xlsx@0.18.5";
+// @ts-ignore
+import * as cptable from "npm:xlsx@0.18.5/dist/cpexcel.full.mjs";
 
 XLSX.set_cptable(cptable);
 
@@ -46,13 +48,24 @@ Deno.serve(async (req: Request) => {
 
     const data = base64ToUint8Array(body.bytes);
 
-    const workbook = XLSX.read(data, {
-      type: "array",
-      codepage: 1251,
-      cellText: true,
-      cellDates: false,
-      raw: false,
-    });
+    // Пробуем все возможные кодировки для старых .xls файлов
+    let workbook;
+    try {
+      workbook = XLSX.read(data, {
+        type: "array",
+        codepage: 1251,
+        cellText: true,
+        cellDates: false,
+        raw: false,
+        dense: false,
+      });
+    } catch (_e1) {
+      try {
+        workbook = XLSX.read(data, { type: "array", raw: true });
+      } catch (_e2) {
+        workbook = XLSX.read(data, { type: "array" });
+      }
+    }
 
     if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
       return new Response(JSON.stringify({ error: "No sheets found", rows: [] }), {
@@ -67,18 +80,25 @@ Deno.serve(async (req: Request) => {
       const sheet = workbook.Sheets[sheetName];
       if (!sheet) continue;
 
-      const csvText = XLSX.utils.sheet_to_csv(sheet, { FS: "\t", RS: "\n", blankrows: false });
-      const lines = csvText
-        .split("\n")
-        .map((l) => l.trim())
-        .filter((l) => l.length > 0 && l !== "\t".repeat(10));
+      // sheet_to_json даёт массив строк — более надёжно чем CSV для ячеек с переносами и спецсимволами
+      const jsonRows = XLSX.utils.sheet_to_json<string[]>(sheet, {
+        header: 1,
+        defval: "",
+        blankrows: false,
+        raw: false,
+      }) as string[][];
 
-      rows.push(...lines);
+      for (const row of jsonRows) {
+        if (!Array.isArray(row)) continue;
+        const line = row.map((c) => (c ?? "").toString().trim()).join("\t").trim();
+        if (line.length === 0 || line === "\t".repeat(row.length - 1)) continue;
+        rows.push(line);
+      }
 
-      if (rows.length >= 500) break;
+      if (rows.length >= 2000) break;
     }
 
-    return new Response(JSON.stringify({ rows: rows.slice(0, 500) }), {
+    return new Response(JSON.stringify({ rows: rows.slice(0, 2000) }), {
       headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
     });
   } catch (e) {
