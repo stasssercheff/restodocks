@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../models/models.dart';
 import '../services/services.dart';
 import '../services/inventory_download.dart';
 import '../widgets/app_bar_home_button.dart';
@@ -332,8 +333,8 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
           return TableRow(
             children: [
               _cell(theme, '${e.key + 1}'),
-              _cell(theme, (item['productName'] ?? '').toString()),
-              _cell(theme, (item['unit'] ?? '').toString()),
+              _cell(theme, _getItemName(item)),
+              _cell(theme, CulinaryUnits.displayName((item['unit'] ?? '').toString(), loc.currentLanguageCode)),
               _cell(theme, _fmtNum(item['quantity'])),
               _cell(theme, _fmtNum(item['pricePerUnit'])),
               _cell(theme, _fmtNum(item['lineTotal'])),

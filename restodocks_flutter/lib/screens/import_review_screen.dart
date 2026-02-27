@@ -85,62 +85,29 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
         if (!mounted) return;
 
         if (item.existingProductId != null) {
-          // Продукт уже существует в базе — обновляем цену И добавляем в номенклатуру если ещё нет
+          // Для priceUpdate: явно применяем новую цену; displayPrice = suggestedPrice ?? price (новая из файла)
           final newPrice = item.displayPrice ?? item.price;
-          final cur = item.currency ?? defCur;
-
-          // Убедимся что продукт есть в номенклатуре заведения
-          if (!store.isInNomenclature(item.existingProductId!)) {
-            await store.addToNomenclature(
-              est.id,
-              item.existingProductId!,
-              price: newPrice,
-              currency: newPrice != null ? cur : null,
-            );
-          } else if (newPrice != null) {
+          if (newPrice != null) {
+            final cur = item.currency ?? defCur;
             await store.setEstablishmentPrice(est.id, item.existingProductId!, newPrice, cur);
+            updated++;
           }
-          updated++;
         } else {
           final cur = item.currency ?? defCur;
-          final nameLower = item.displayName.trim().toLowerCase();
-
-          // Дедупликация: проверяем не существует ли продукт с таким именем
-          final existingInStore = store.allProducts.where(
-            (p) => p.name.trim().toLowerCase() == nameLower,
-          ).toList();
-
-          if (existingInStore.isNotEmpty) {
-            // Продукт есть в глобальной базе — просто добавляем в номенклатуру
-            final existingId = existingInStore.first.id;
-            if (!store.isInNomenclature(existingId)) {
-              await store.addToNomenclature(
-                est.id,
-                existingId,
-                price: item.displayPrice,
-                currency: item.displayPrice != null ? cur : null,
-              );
-            } else if (item.displayPrice != null) {
-              await store.setEstablishmentPrice(est.id, existingId, item.displayPrice!, cur);
-            }
-            created++;
-          } else {
-            // Новый продукт — создаём и добавляем в номенклатуру
-            final product = Product.create(
-              name: item.displayName,
-              category: 'imported',
-              basePrice: item.displayPrice ?? 0.0,
-              currency: item.displayPrice != null ? cur : null,
-            );
-            final savedProduct = await store.addProduct(product);
-            await store.addToNomenclature(
-              est.id,
-              savedProduct.id,
-              price: item.displayPrice,
-              currency: item.displayPrice != null ? cur : null,
-            );
-            created++;
-          }
+          final product = Product.create(
+            name: item.displayName,
+            category: 'imported',
+            basePrice: item.displayPrice ?? 0.0,
+            currency: item.displayPrice != null ? cur : null,
+          );
+          final savedProduct = await store.addProduct(product);
+          await store.addToNomenclature(
+            est.id,
+            savedProduct.id,
+            price: item.displayPrice,
+            currency: item.displayPrice != null ? cur : null,
+          );
+          created++;
         }
 
         if (mounted) {
@@ -148,7 +115,6 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
         }
       }
 
-      await store.loadProducts();
       await store.loadNomenclature(est.id);
 
       if (mounted) {
@@ -204,47 +170,81 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
               style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
           ),
-          // Заголовок с «выбрать/снять все» — checkbox над столбцом чекбоксов у продуктов
-          CheckboxListTile(
-            value: approved == _items.length
-                ? true
-                : approved == 0
-                    ? false
-                    : null,
-            tristate: true,
-            onChanged: _saving ? null : (_) => _toggleAll(),
-            title: Wrap(
-              spacing: 12,
-              runSpacing: 4,
-              crossAxisAlignment: WrapCrossAlignment.center,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Row(
               children: [
-                Text(
-                  '${loc.t('accept_all') ?? 'Принять всё'} / ${loc.t('deselect_all') ?? 'Снять все'}',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w500,
+                // Чекбокс "выбрать/снять все" — только иконка
+                InkWell(
+                  onTap: _saving ? null : _toggleAll,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: Icon(
+                      approved == _items.length
+                          ? Icons.check_box
+                          : Icons.check_box_outline_blank,
+                      size: 26,
+                      color: approved == _items.length
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
-                if (_items.any((i) => i.category == ModerationCategory.priceUpdate))
+                if (_items.any((i) => i.category == ModerationCategory.priceUpdate)) ...[
+                  const SizedBox(width: 8),
                   Builder(
                     builder: (context) {
                       final priceUpdateItems = _items.where((i) => i.category == ModerationCategory.priceUpdate).toList();
                       final allApproved = priceUpdateItems.isNotEmpty && priceUpdateItems.every((i) => i.approved);
-                      return FilterChip(
-                        label: Text(loc.t('apply_all_price_updates') ?? 'Принять все обновления цен'),
-                        selected: allApproved,
-                        onSelected: _saving ? null : (_) => allApproved ? _deselectAllPriceUpdates() : _approveAllPriceUpdates(),
-                        avatar: Icon(
-                          allApproved ? Icons.price_check : Icons.price_change_outlined,
-                          size: 18,
-                        ),
-                        visualDensity: VisualDensity.compact,
+                      final noneApproved = priceUpdateItems.every((i) => !i.approved);
+                      return Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          FilledButton.tonal(
+                            onPressed: _saving ? null : _approveAllPriceUpdates,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: allApproved ? theme.colorScheme.primaryContainer : null,
+                              foregroundColor: allApproved ? theme.colorScheme.onPrimaryContainer : null,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (allApproved) ...[
+                                  Icon(Icons.check_circle, size: 18, color: theme.colorScheme.onPrimaryContainer),
+                                  const SizedBox(width: 6),
+                                ],
+                                Text(loc.t('apply_all_price_updates') ?? 'Принять все обновления цен'),
+                              ],
+                            ),
+                          ),
+                          OutlinedButton(
+                            onPressed: _saving ? null : _deselectAllPriceUpdates,
+                            style: OutlinedButton.styleFrom(
+                              backgroundColor: noneApproved ? theme.colorScheme.surfaceContainerHighest : null,
+                              foregroundColor: noneApproved ? theme.colorScheme.onSurface : null,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (noneApproved) ...[
+                                  Icon(Icons.cancel_outlined, size: 18, color: theme.colorScheme.onSurface),
+                                  const SizedBox(width: 6),
+                                ],
+                                Text(loc.t('deselect_price_updates') ?? 'Снять обновления цен'),
+                              ],
+                            ),
+                          ),
+                        ],
                       );
                     },
                   ),
+                ],
               ],
             ),
           ),
+          const SizedBox(height: 4),
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
