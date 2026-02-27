@@ -21,6 +21,8 @@ Product _$ProductFromJson(Map<String, dynamic> json) => Product(
       containsLactose: json['contains_lactose'] as bool?,
       basePrice: (json['base_price'] as num?)?.toDouble(),
       currency: json['currency'] as String?,
+      packagePrice: (json['package_price'] as num?)?.toDouble(),
+      packageWeightGrams: (json['package_weight_grams'] as num?)?.toDouble(),
       unit: json['unit'] as String?,
       primaryWastePct: (json['primary_waste_pct'] as num?)?.toDouble(),
       supplierIds: (json['supplier_ids'] as List<dynamic>?)
@@ -41,6 +43,8 @@ Map<String, dynamic> _$ProductToJson(Product instance) => <String, dynamic>{
       'contains_lactose': instance.containsLactose,
       'base_price': instance.basePrice,
       'currency': instance.currency,
+      'package_price': instance.packagePrice,
+      'package_weight_grams': instance.packageWeightGrams,
       'unit': instance.unit,
       'primary_waste_pct': instance.primaryWastePct,
       'supplier_ids': instance.supplierIds,

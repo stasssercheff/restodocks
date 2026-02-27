@@ -67,23 +67,45 @@ class _InventoryRow {
     if (product != null) return product!.unit ?? 'g';
     return freeUnit ?? 'g';
   }
+
+  /// Продукт заведён по упаковке: есть вес упаковки.
+  bool get hasPackage => product?.packageWeightGrams != null && product!.packageWeightGrams! > 0;
+
+  /// Текущая единица — упаковка.
+  bool get isCountedByPackage => unitOverride == 'pkg';
+
+  /// Вес одной упаковки в граммах.
+  double get packageWeightGrams => product?.packageWeightGrams ?? 1.0;
+
   /// Для ПФ используем pfUnit: g → гр/g, иначе порц./pcs.
   String unitDisplay(String lang) {
     if (isPf) {
       final u = pfUnit ?? _pfUnitPcs;
       return u == _pfUnitGrams ? (lang == 'ru' ? 'гр' : 'g') : (lang == 'ru' ? 'порц.' : 'pcs');
     }
+    if (isCountedByPackage) return lang == 'ru' ? 'упак.' : 'pkg';
     return CulinaryUnits.displayName(unit.toLowerCase(), lang);
   }
 
   /// В бланке инвентаризации вес показываем в граммах, не в кг.
   bool get isWeightInKg =>
-      !isPf && (unit.toLowerCase() == 'kg' || unit == 'кг');
-  String unitDisplayForBlank(String lang) =>
-      isWeightInKg ? (lang == 'ru' ? 'гр' : 'g') : unitDisplay(lang);
+      !isPf && !isCountedByPackage && (unit.toLowerCase() == 'kg' || unit == 'кг');
+
+  String unitDisplayForBlank(String lang) {
+    if (isCountedByPackage) return lang == 'ru' ? 'упак.' : 'pkg';
+    return isWeightInKg ? (lang == 'ru' ? 'гр' : 'g') : unitDisplay(lang);
+  }
+
   double quantityDisplayAt(int i) =>
       isWeightInKg ? quantities[i] * 1000 : quantities[i];
   double get totalDisplay => isWeightInKg ? total * 1000 : total;
+
+  /// Итоговый вес в граммах (для выгрузки): упаковки × вес упаковки
+  double get totalWeightGrams {
+    if (isCountedByPackage) return total * packageWeightGrams;
+    if (isWeightInKg) return total * 1000.0;
+    return total;
+  }
 
   /// Сумма всех числовых значений строки (включая вторую ячейку и далее; последняя пустая — буфер для n+1).
   double get total {
@@ -1499,8 +1521,9 @@ class _InventoryScreenState extends State<InventoryScreen>
                         ),
                       )
                     : _ProductUnitDropdown(
-                        value: row.unit,
+                        value: row.isCountedByPackage ? 'pkg' : row.unit,
                         lang: loc.currentLanguageCode,
+                        hasPackage: row.hasPackage,
                         onChanged: (v) => _setProductUnit(actualIndex, v),
                         theme: theme,
                       ))
@@ -1744,14 +1767,22 @@ class _InventoryScreenState extends State<InventoryScreen>
           : r.techCard != null
               ? 'pf_${r.techCard!.id}'
               : 'free_${_rows.indexOf(r)}';
-      final useGrams = r.isWeightInKg;
       final map = <String, dynamic>{
         'productId': id,
         'productName': r.productName(lang),
-        'unit': r.unitDisplayForBlank(lang),
-        'quantities': useGrams ? r.quantities.map((q) => q * 1000).toList() : r.quantities,
-        'total': useGrams ? r.total * 1000 : r.total,
+        'unit': r.isCountedByPackage ? (lang == 'ru' ? 'г' : 'g') : r.unitDisplayForBlank(lang),
+        'quantities': r.isCountedByPackage
+            ? r.quantities.map((q) => q * r.packageWeightGrams).toList()
+            : r.isWeightInKg
+                ? r.quantities.map((q) => q * 1000).toList()
+                : r.quantities,
+        'total': r.totalWeightGrams,
       };
+      if (r.isCountedByPackage) {
+        map['packageCount'] = r.total;
+        map['packageWeightGrams'] = r.packageWeightGrams;
+        map['unitRaw'] = lang == 'ru' ? 'упак.' : 'pkg';
+      }
       if (r.isPf) map['pfUnit'] = r.pfUnit ?? _pfUnitPcs;
       return map;
     }).toList();
@@ -1770,18 +1801,23 @@ class _ProductUnitDropdown extends StatelessWidget {
     required this.lang,
     required this.onChanged,
     required this.theme,
+    this.hasPackage = false,
   });
 
   final String value;
   final String lang;
   final void Function(String) onChanged;
   final ThemeData theme;
+  final bool hasPackage;
 
   static const List<String> _commonUnits = ['g', 'kg', 'pcs', 'шт', 'ml', 'l'];
 
   @override
   Widget build(BuildContext context) {
-    final options = _commonUnits;
+    final options = [
+      ..._commonUnits,
+      if (hasPackage) 'pkg',
+    ];
     final normalized = value.trim().toLowerCase();
     final match = options.where((u) => u.toLowerCase() == normalized).firstOrNull;
     final displayValue = match ?? 'g';
@@ -1793,7 +1829,9 @@ class _ProductUnitDropdown extends StatelessWidget {
         items: options.map((u) => DropdownMenuItem(
           value: u,
           child: Text(
-            CulinaryUnits.displayName(u, lang),
+            u == 'pkg'
+                ? (lang == 'ru' ? 'упак.' : 'pkg')
+                : CulinaryUnits.displayName(u, lang),
             style: theme.textTheme.bodySmall,
             overflow: TextOverflow.ellipsis,
           ),

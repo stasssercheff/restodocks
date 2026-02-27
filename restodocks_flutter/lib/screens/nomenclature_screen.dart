@@ -2617,6 +2617,8 @@ class _ProductEditDialog extends StatefulWidget {
 class _ProductEditDialogState extends State<_ProductEditDialog> {
   late final TextEditingController _nameController;
   late final TextEditingController _priceController;
+  late final TextEditingController _packagePriceController;
+  late final TextEditingController _packageWeightController;
   bool _checkingName = false;
   late final TextEditingController _caloriesController;
   late final TextEditingController _proteinController;
@@ -2627,6 +2629,8 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
   late String _currency;
   late bool _containsGluten;
   late bool _containsLactose;
+  // true = цена за упаковку (pkg), false = цена за кг/ед
+  bool _priceByPackage = false;
   List<PriceHistoryEntry> _priceHistory = [];
   bool _priceHistoryLoaded = false;
 
@@ -2641,7 +2645,11 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
       if (ep?.$1 != null) initialPrice = ep!.$1;
     }
     _priceController = TextEditingController(text: initialPrice?.toString() ?? '');
-    // Подставить адекватные калории при открытии карточки (грудка 0 → 165, авокадо 655 → 160)
+    // Инициализация полей упаковки
+    _priceByPackage = p.packagePrice != null || p.packageWeightGrams != null;
+    _packagePriceController = TextEditingController(text: p.packagePrice?.toString() ?? '');
+    _packageWeightController = TextEditingController(text: p.packageWeightGrams?.toStringAsFixed(0) ?? '');
+    // Подставить адекватные калории при открытии карточки
     final saneCal = NutritionApiService.saneCaloriesForProduct(p.name, p.calories);
     final initialCal = saneCal ?? p.calories;
     _caloriesController = TextEditingController(text: initialCal?.toString() ?? '');
@@ -2671,12 +2679,24 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
   void dispose() {
     _nameController.dispose();
     _priceController.dispose();
+    _packagePriceController.dispose();
+    _packageWeightController.dispose();
     _caloriesController.dispose();
     _proteinController.dispose();
     _fatController.dispose();
     _carbsController.dispose();
     _wastePctController.dispose();
     super.dispose();
+  }
+
+  /// Расчётная цена за кг из упаковки
+  double? get _computedPricePerKg {
+    final pkgPrice = _parseNum(_packagePriceController.text);
+    final pkgWeight = _parseNum(_packageWeightController.text);
+    if (pkgPrice != null && pkgWeight != null && pkgWeight > 0) {
+      return pkgPrice / pkgWeight * 1000.0;
+    }
+    return null;
   }
 
   double? _parseNum(String v) {
@@ -2736,11 +2756,20 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
     for (final c in allLangs) {
       merged.putIfAbsent(c, () => name);
     }
+    // Цена за кг: если включён режим упаковки — рассчитываем из packagePrice/packageWeight
+    final double? pricePerKg = _priceByPackage ? _computedPricePerKg : _parseNum(_priceController.text);
+    final double? pkgPrice = _priceByPackage ? _parseNum(_packagePriceController.text) : null;
+    final double? pkgWeight = _priceByPackage ? _parseNum(_packageWeightController.text) : null;
+
     final updated = widget.product.copyWith(
       name: name,
       names: merged,
-      basePrice: _parseNum(_priceController.text),
+      basePrice: pricePerKg,
       currency: _currency,
+      packagePrice: pkgPrice,
+      clearPackagePrice: !_priceByPackage,
+      packageWeightGrams: pkgWeight,
+      clearPackageWeight: !_priceByPackage,
       unit: _unit,
       primaryWastePct: _parseNum(_wastePctController.text)?.clamp(0.0, 99.9),
       calories: _parseNum(_caloriesController.text),
@@ -2754,23 +2783,21 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
       if (widget.isCreate) {
         await widget.store.addProduct(updated);
         if (widget.establishmentId != null && widget.establishmentId!.isNotEmpty) {
-          final price = _parseNum(_priceController.text);
           await widget.store.addToNomenclature(
             widget.establishmentId!,
             updated.id,
-            price: price,
+            price: pricePerKg,
             currency: _currency,
           );
         }
       } else {
         await widget.store.updateProduct(updated);
         if (widget.establishmentId != null && widget.establishmentId!.isNotEmpty) {
-          final price = _parseNum(_priceController.text);
-          if (price != null) {
+          if (pricePerKg != null) {
             await widget.store.setEstablishmentPrice(
               widget.establishmentId!,
               widget.product.id,
-              price,
+              pricePerKg,
               _currency,
             );
           }
@@ -2828,33 +2855,115 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                 onChanged: (v) => setState(() => _unit = v ?? _unit),
               ),
               const SizedBox(height: 16),
+              // Переключатель: цена за кг/ед vs цена за упаковку
               Row(
                 children: [
                   Expanded(
-                    flex: 2,
-                    child: TextFormField(
-                      controller: _priceController,
-                      decoration: InputDecoration(
-                        labelText: widget.loc.t('price'),
-                        border: const OutlineInputBorder(),
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      value: _currency,
-                      decoration: InputDecoration(
-                        labelText: widget.loc.t('currency'),
-                        border: const OutlineInputBorder(),
-                      ),
-                      items: _ProductEditDialog._currencies.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                      onChanged: (v) => setState(() => _currency = v ?? _currency),
+                    child: SegmentedButton<bool>(
+                      segments: [
+                        ButtonSegment(
+                          value: false,
+                          label: Text(widget.loc.t('price_per_unit_label') ?? 'За кг / ед'),
+                          icon: const Icon(Icons.scale_outlined, size: 16),
+                        ),
+                        ButtonSegment(
+                          value: true,
+                          label: Text(widget.loc.t('price_per_package_label') ?? 'За упаковку'),
+                          icon: const Icon(Icons.inventory_2_outlined, size: 16),
+                        ),
+                      ],
+                      selected: {_priceByPackage},
+                      onSelectionChanged: (s) => setState(() => _priceByPackage = s.first),
+                      style: const ButtonStyle(visualDensity: VisualDensity.compact),
                     ),
                   ),
                 ],
               ),
+              const SizedBox(height: 12),
+              if (!_priceByPackage) ...[
+                // Режим: цена за единицу (кг/шт)
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: TextFormField(
+                        controller: _priceController,
+                        decoration: InputDecoration(
+                          labelText: widget.loc.t('price'),
+                          border: const OutlineInputBorder(),
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: _currency,
+                        decoration: InputDecoration(
+                          labelText: widget.loc.t('currency'),
+                          border: const OutlineInputBorder(),
+                        ),
+                        items: _ProductEditDialog._currencies.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                        onChanged: (v) => setState(() => _currency = v ?? _currency),
+                      ),
+                    ),
+                  ],
+                ),
+              ] else ...[
+                // Режим: цена за упаковку (шт)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _packagePriceController,
+                        decoration: InputDecoration(
+                          labelText: widget.loc.t('package_price_label') ?? 'Цена упаковки',
+                          border: const OutlineInputBorder(),
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _packageWeightController,
+                        decoration: InputDecoration(
+                          labelText: widget.loc.t('package_weight_label') ?? 'Вес упаковки, г',
+                          border: const OutlineInputBorder(),
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: _currency,
+                        decoration: InputDecoration(
+                          labelText: widget.loc.t('currency'),
+                          border: const OutlineInputBorder(),
+                        ),
+                        items: _ProductEditDialog._currencies.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                        onChanged: (v) => setState(() => _currency = v ?? _currency),
+                      ),
+                    ),
+                  ],
+                ),
+                // Показываем расчётную цену за кг
+                if (_computedPricePerKg != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      '${widget.loc.t('price_per_kg_computed') ?? 'Цена за кг'}: ${_computedPricePerKg!.toStringAsFixed(2)} $_currency',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+              ],
               if (widget.establishmentId != null && widget.establishmentId!.isNotEmpty) ...[
                 const SizedBox(height: 16),
                 Text(widget.loc.t('price_history') ?? 'История изменений цены', style: Theme.of(context).textTheme.titleSmall),

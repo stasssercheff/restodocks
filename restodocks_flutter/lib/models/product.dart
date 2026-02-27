@@ -44,10 +44,17 @@ class Product extends Equatable {
 
   // Ценообразование
   @JsonKey(name: 'base_price')
-  final double? basePrice; // базовая цена
+  final double? basePrice; // базовая цена за единицу (кг / шт)
 
   @JsonKey(name: 'currency')
   final String? currency;
+
+  // Упаковка: цена за упаковку и вес (граммы) одной упаковки
+  @JsonKey(name: 'package_price')
+  final double? packagePrice; // цена за 1 упаковку
+
+  @JsonKey(name: 'package_weight_grams')
+  final double? packageWeightGrams; // вес упаковки в граммах
 
   // Единица измерения
   @JsonKey(name: 'unit')
@@ -74,12 +81,27 @@ class Product extends Equatable {
     this.containsLactose,
     this.basePrice,
     this.currency,
+    this.packagePrice,
+    this.packageWeightGrams,
     this.unit,
     this.primaryWastePct,
     this.supplierIds,
   });
 
-  /// Создание копии с изменениями
+  /// Цена за кг, рассчитанная из упаковки (если заданы packagePrice и packageWeightGrams)
+  double? get computedPricePerKg {
+    if (packagePrice != null && packageWeightGrams != null && packageWeightGrams! > 0) {
+      return packagePrice! / packageWeightGrams! * 1000.0;
+    }
+    return null;
+  }
+
+  /// Эффективная цена за единицу: если задана цена упаковки — считаем через неё, иначе basePrice
+  double? get effectiveBasePrice => computedPricePerKg ?? basePrice;
+
+  /// Создание копии с изменениями.
+  /// Для сброса nullable полей используй Object() sentinel: copyWith(packagePrice: null) не сбросит поле,
+  /// передай clearPackagePrice: true.
   Product copyWith({
     String? id,
     String? name,
@@ -93,6 +115,10 @@ class Product extends Equatable {
     bool? containsLactose,
     double? basePrice,
     String? currency,
+    double? packagePrice,
+    double? packageWeightGrams,
+    bool clearPackagePrice = false,
+    bool clearPackageWeight = false,
     String? unit,
     double? primaryWastePct,
     List<String>? supplierIds,
@@ -110,6 +136,8 @@ class Product extends Equatable {
       containsLactose: containsLactose ?? this.containsLactose,
       basePrice: basePrice ?? this.basePrice,
       currency: currency ?? this.currency,
+      packagePrice: clearPackagePrice ? null : (packagePrice ?? this.packagePrice),
+      packageWeightGrams: clearPackageWeight ? null : (packageWeightGrams ?? this.packageWeightGrams),
       unit: unit ?? this.unit,
       primaryWastePct: primaryWastePct ?? this.primaryWastePct,
       supplierIds: supplierIds ?? this.supplierIds,
@@ -232,6 +260,8 @@ class Product extends Equatable {
     containsLactose,
     basePrice,
     currency,
+    packagePrice,
+    packageWeightGrams,
     unit,
     primaryWastePct,
     supplierIds,
@@ -250,6 +280,8 @@ class Product extends Equatable {
     bool? containsLactose,
     double? basePrice,
     String? currency,
+    double? packagePrice,
+    double? packageWeightGrams,
     String? unit,
     List<String>? supplierIds,
   }) {
@@ -266,6 +298,8 @@ class Product extends Equatable {
       containsLactose: containsLactose,
       basePrice: basePrice,
       currency: currency,
+      packagePrice: packagePrice,
+      packageWeightGrams: packageWeightGrams,
       unit: unit,
       primaryWastePct: null,
       supplierIds: supplierIds,
