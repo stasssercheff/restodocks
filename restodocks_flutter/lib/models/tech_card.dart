@@ -141,10 +141,12 @@ class TechCard extends Equatable {
     return dishName;
   }
 
-  /// Название для списков (инвентаризация, выбор ПФ и т.д.): для ПФ — «ПФ Название», для блюда — просто название.
-  String getDisplayNameInLists(String languageCode) {
+  /// Название для списков (инвентаризация, выбор ПФ и т.д.): для ПФ — «ПФ/SF Название», для блюда — просто название.
+  String getDisplayNameInLists(String languageCode, {String? sfPrefix}) {
     final name = getLocalizedDishName(languageCode);
-    return isSemiFinished ? 'ПФ $name' : name;
+    if (!isSemiFinished) return name;
+    final prefix = sfPrefix ?? (languageCode == 'en' ? 'SF' : 'ПФ');
+    return '$prefix $name';
   }
 
   /// Общий вес брутто всех ингредиентов

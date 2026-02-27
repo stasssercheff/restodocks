@@ -197,7 +197,7 @@ class _MenuScreenState extends State<MenuScreen> {
               subtitle: InkWell(
                 onTap: () => context.push('/tech-cards/${tc.id}?view=1'),
                 child: Text(
-                  '${_categoryLabel(tc.category, lang)} • Себестоимость: ${totalCost.toStringAsFixed(2)} $currencySym',
+                  '${_categoryLabel(tc.category, lang)} • ${loc.t('cost_price')}: ${totalCost.toStringAsFixed(2)} $currencySym',
                   style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                 ),
               ),
@@ -292,11 +292,11 @@ class _MenuDishTable extends StatelessWidget {
             decoration: BoxDecoration(color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3)),
             children: [
               _cell(context, loc.t('ttk_product'), bold: true),
-              _cell(context, 'Брутто', bold: true),
+              _cell(context, loc.t('ttk_gross'), bold: true),
               _cell(context, loc.t('ttk_net'), bold: true),
               _cell(context, loc.t('ttk_cooking_method'), bold: true),
               _cell(context, loc.t('ttk_output'), bold: true),
-              _cell(context, 'Стоимость', bold: true),
+              _cell(context, loc.t('ttk_cost'), bold: true),
             ],
           ),
           if (ingredients.isEmpty)

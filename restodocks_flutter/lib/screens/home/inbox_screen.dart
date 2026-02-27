@@ -77,7 +77,7 @@ class _InboxScreenState extends State<InboxScreen> {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadDocuments,
-            tooltip: 'Обновить',
+            tooltip: loc.t('inbox_refresh'),
           ),
         ],
       ),
@@ -164,12 +164,12 @@ class _InboxScreenState extends State<InboxScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            'Нет документов',
+            loc.t('inbox_empty_title'),
             style: Theme.of(context).textTheme.headlineSmall,
           ),
           const SizedBox(height: 8),
           Text(
-            'Документы появятся здесь после проведения инвентаризаций и получения заказов',
+            loc.t('inbox_empty_subtitle'),
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
@@ -202,7 +202,7 @@ class _InboxScreenState extends State<InboxScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Text(
-                docs.first.departmentName,
+                docs.first.getDepartmentName(context.read<LocalizationService>()),
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w600,
                   color: Theme.of(context).colorScheme.primary,
@@ -224,14 +224,16 @@ class _InboxScreenState extends State<InboxScreen> {
     try {
       await _inboxService.downloadDocument(document);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Документ "${document.title}" сохранен')),
-        );
-      }
+          final loc = context.read<LocalizationService>();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(loc.t('inbox_doc_saved').replaceFirst('%s', document.title))),
+          );
+        }
     } catch (e) {
       if (mounted) {
+        final loc = context.read<LocalizationService>();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка сохранения: $e')),
+          SnackBar(content: Text(loc.t('inbox_doc_save_error').replaceFirst('%s', '$e'))),
         );
       }
     }
@@ -267,7 +269,7 @@ class _DocumentTile extends StatelessWidget {
             color: Theme.of(context).colorScheme.onPrimaryContainer,
           ),
         ),
-        title: Text(document.title),
+        title: Text(document.getLocalizedTitle(loc)),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -310,28 +312,31 @@ class _DocumentTile extends StatelessWidget {
                 break;
             }
           },
-          itemBuilder: (context) => [
-            const PopupMenuItem(
-              value: 'view',
-              child: Row(
-                children: [
-                  Icon(Icons.visibility),
-                  SizedBox(width: 8),
-                  Text('Просмотреть'),
-                ],
+          itemBuilder: (context) {
+            final loc = context.read<LocalizationService>();
+            return [
+              PopupMenuItem(
+                value: 'view',
+                child: Row(
+                  children: [
+                    const Icon(Icons.visibility),
+                    const SizedBox(width: 8),
+                    Text(loc.t('inbox_view')),
+                  ],
+                ),
               ),
-            ),
-            const PopupMenuItem(
-              value: 'download',
-              child: Row(
-                children: [
-                  Icon(Icons.download),
-                  SizedBox(width: 8),
-                  Text('Сохранить'),
-                ],
+              PopupMenuItem(
+                value: 'download',
+                child: Row(
+                  children: [
+                    const Icon(Icons.download),
+                    const SizedBox(width: 8),
+                    Text(loc.t('inbox_save')),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ];
+          },
         ),
         onTap: () => _viewDocument(context),
       ),
@@ -351,18 +356,19 @@ class _DocumentTile extends StatelessWidget {
       context.push('/inbox/checklist/${document.id}');
       return;
     }
+    final loc = context.read<LocalizationService>();
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(document.title),
+        title: Text(document.getLocalizedTitle(loc)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Тип: ${document.typeName}'),
-            Text('Отдел: ${document.departmentName}'),
-            Text('Сотрудник: ${document.employeeName}'),
-            Text('Дата: ${DateFormat('dd.MM.yyyy HH:mm').format(document.createdAt)}'),
+            Text('${loc.t('inbox_doc_type')}: ${document.getTypeName(loc)}'),
+            Text('${loc.t('inbox_doc_dept')}: ${document.getDepartmentName(loc)}'),
+            Text('${loc.t('inbox_doc_employee')}: ${document.employeeName}'),
+            Text('${loc.t('inbox_doc_date')}: ${DateFormat('dd.MM.yyyy HH:mm').format(document.createdAt)}'),
             const SizedBox(height: 8),
             Text(document.description),
           ],
@@ -370,7 +376,7 @@ class _DocumentTile extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Закрыть'),
+            child: Text(loc.t('close')),
           ),
           if (document.fileUrl != null)
             ElevatedButton(
@@ -378,7 +384,7 @@ class _DocumentTile extends StatelessWidget {
                 Navigator.of(ctx).pop();
                 onDownload(document);
               },
-              child: const Text('Сохранить'),
+              child: Text(loc.t('inbox_save')),
             ),
         ],
       ),
