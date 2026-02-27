@@ -170,29 +170,28 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
               style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: Row(
+          // Заголовок с «выбрать/снять все» — checkbox над столбцом чекбоксов у продуктов
+          CheckboxListTile(
+            value: approved == _items.length
+                ? true
+                : approved == 0
+                    ? false
+                    : null,
+            tristate: true,
+            onChanged: _saving ? null : (_) => _toggleAll(),
+            title: Wrap(
+              spacing: 12,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                // Кнопка выбрать/снять все — только иконка
-                InkWell(
-                  onTap: _saving ? null : _toggleAll,
-                  borderRadius: BorderRadius.circular(8),
-                  child: Padding(
-                    padding: const EdgeInsets.all(6),
-                    child: Icon(
-                      approved == _items.length
-                          ? Icons.check_box
-                          : Icons.check_box_outline_blank,
-                      size: 26,
-                      color: approved == _items.length
-                          ? theme.colorScheme.primary
-                          : theme.colorScheme.onSurfaceVariant,
-                    ),
+                Text(
+                  '${loc.t('accept_all') ?? 'Принять всё'} / ${loc.t('deselect_all') ?? 'Снять все'}',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-                if (_items.any((i) => i.category == ModerationCategory.priceUpdate)) ...[
-                  const SizedBox(width: 8),
+                if (_items.any((i) => i.category == ModerationCategory.priceUpdate))
                   Builder(
                     builder: (context) {
                       final priceUpdateItems = _items.where((i) => i.category == ModerationCategory.priceUpdate).toList();
@@ -205,14 +204,13 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
                           allApproved ? Icons.price_check : Icons.price_change_outlined,
                           size: 18,
                         ),
+                        visualDensity: VisualDensity.compact,
                       );
                     },
                   ),
-                ],
               ],
             ),
           ),
-          const SizedBox(height: 4),
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
