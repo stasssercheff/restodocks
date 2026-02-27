@@ -336,11 +336,20 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
 
     final techCardService = context.read<TechCardServiceSupabase>();
 
-    await store.loadProducts(force: true);
-    await store.loadNomenclature(estId);
+    try {
+      await store.loadProducts(force: true);
+      await store.loadNomenclature(estId);
 
-    // Загружаем элементы номенклатуры (продукты + ТТК ПФ)
-    _nomenclatureItems = await store.getAllNomenclatureItems(estId, techCardService);
+      // Загружаем элементы номенклатуры (продукты + ТТК ПФ)
+      _nomenclatureItems = await store.getAllNomenclatureItems(estId, techCardService);
+    } catch (e) {
+      print('❌ NomenclatureScreen: _ensureLoaded error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка загрузки номенклатуры: $e'), duration: const Duration(seconds: 6)),
+        );
+      }
+    }
 
     if (mounted) setState(() => _isLoading = false);
   }

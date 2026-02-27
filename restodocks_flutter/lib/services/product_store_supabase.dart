@@ -26,7 +26,7 @@ class ProductStoreSupabase {
   /// Загрузка продуктов из Supabase
   Future<void> loadProducts({bool force = false}) async {
     if (_isLoading && !force) return;
-    if (_isLoading) {
+    if (_isLoading && force) {
       // Ждём окончания текущей загрузки перед новой
       while (_isLoading) {
         await Future.delayed(const Duration(milliseconds: 50));
@@ -45,7 +45,7 @@ class ProductStoreSupabase {
 
       print('DEBUG ProductStore: Loaded ${data.length} products from database');
       _allProducts = (data as List)
-          .map((json) => Product.fromJson(json))
+          .map((json) => Product.fromJson(json as Map<String, dynamic>))
           .toList();
       print('DEBUG ProductStore: Parsed ${_allProducts.length} products successfully');
 
@@ -56,9 +56,9 @@ class ProductStoreSupabase {
           .toList()
         ..sort();
 
-      // Products loaded successfully
     } catch (e) {
-      // Error loading products
+      print('❌ ProductStore: Error loading products: $e');
+      rethrow;
     } finally {
       _isLoading = false;
     }
