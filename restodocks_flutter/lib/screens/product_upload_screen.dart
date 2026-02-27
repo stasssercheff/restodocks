@@ -844,7 +844,6 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       }
 
       if (newNames.isNotEmpty) {
-        _setLoadingMessage('Исправление названий...');
         final ai = context.read<AiService>();
         final normalized = await ai.normalizeProductNames(newNames);
         if (mounted && normalized.length == newNames.length) {
@@ -1743,137 +1742,81 @@ ${text}
     return 'simple';
   }
 
-  Future<void> _processExcel(Uint8List bytes, LocalizationService loc) async {
-    print('=== _processExcel called ===');
+  /// Определяет, является ли файл устаревшим BIFF/OLE форматом (.xls)
+  bool _isOleXls(Uint8List bytes) {
+    return bytes.length >= 2 && bytes[0] == 0xD0 && bytes[1] == 0xCF;
+  }
+
+  /// Парсит XLS/XLSX через Supabase Edge Function (SheetJS) — корректно читает BIFF8 и любые кодировки
+  Future<List<String>?> _parseXlsViaServer(Uint8List bytes) async {
     try {
-      _addDebugLog('=== STARTING EXCEL PROCESSING ===');
-      _addDebugLog('File size: ${bytes.length} bytes');
-
-      // Проверка заголовка файла для определения типа
-      String fileType = 'unknown';
-      if (bytes.length >= 4) {
-        final header = bytes.sublist(0, 4);
-        if (header[0] == 0x50 && header[1] == 0x4B) {
-          fileType = 'xlsx/zip'; // ZIP-based format (xlsx, docx, etc.)
-        } else if (header[0] == 0xD0 && header[1] == 0xCF) {
-          fileType = 'xls/ole'; // OLE format (xls)
-        }
-      }
-      _addDebugLog('Detected file type: $fileType');
-
-      late Excel excel;
-      bool excelDecoded = false;
-      try {
-        excel = Excel.decodeBytes(bytes);
-        _addDebugLog('Excel file decoded successfully');
-        excelDecoded = true;
-      } catch (excelError) {
-        _addDebugLog('Excel decode error: $excelError');
-        // Пробуем обработать как текст (CSV-подобный формат)
-        _addDebugLog('Trying to process as text/CSV...');
-        try {
-          final textContent = String.fromCharCodes(bytes);
-          await _processText(textContent, loc, widget.defaultAddToNomenclature);
-          return;
-        } catch (textError) {
-          _addDebugLog('Text processing also failed: $textError');
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Ошибка чтения Excel файла: $excelError\nПопытка обработки как текст тоже неудачна.\nВозможно файл поврежден или имеет неподдерживаемый формат.\nТип файла: $fileType')),
-          );
-          return;
-        }
-      }
-
-      if (!excelDecoded) return;
-
-      if (excel.tables.isEmpty) {
-        _addDebugLog('ERROR: No tables found in Excel file');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: файл Excel не содержит таблиц')),
-        );
-        return;
-      }
-
-      final sheetName = excel.tables.keys.first;
-      final sheet = excel.tables[sheetName];
-      _addDebugLog('Processing sheet: $sheetName');
-
-      if (sheet == null || sheet.rows.isEmpty) {
-        _addDebugLog('ERROR: Sheet is null or empty');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: лист Excel пустой или недоступен')),
-        );
-        return;
-      }
-
-      _addDebugLog('Sheet has ${sheet.rows.length} rows');
-
-      final lines = <String>[];
-      int processedRows = 0;
-      int errorRows = 0;
-
-      try {
-        for (var i = 0; i < sheet.rows.length; i++) {
-          try {
-            final row = sheet.rows[i];
-            if (row == null || row.isEmpty) continue;
-
-            final name = row.length > 0 ? row[0]?.value?.toString() ?? '' : '';
-            final price = row.length > 1 ? row[1]?.value?.toString() ?? '' : '';
-            final unit = row.length > 2 ? row[2]?.value?.toString() ?? '' : 'г';
-
-            if (name.trim().isNotEmpty) {
-              lines.add('$name\t$price\t$unit');
-              processedRows++;
-            }
-          } catch (rowError) {
-            _addDebugLog('Error processing row $i: $rowError');
-            errorRows++;
-            // Продолжаем обработку других строк
-          }
-        }
-      } catch (sheetError) {
-        _addDebugLog('Error accessing sheet rows: $sheetError');
-        // Пробуем обработать как текст
-        try {
-          final textContent = String.fromCharCodes(bytes);
-          await _processText(textContent, loc, widget.defaultAddToNomenclature);
-          return;
-        } catch (textError) {
-          _addDebugLog('Text processing fallback also failed: $textError');
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Ошибка доступа к данным Excel: $sheetError\nFallback на текст тоже неудачен.')),
-          );
-          return;
-        }
-      }
-
-      _addDebugLog('Processed $processedRows rows successfully, $errorRows rows had errors');
-      _addDebugLog('Generated ${lines.length} product lines');
-
-      if (lines.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: не удалось извлечь ни одной строки с продуктами из Excel файла')),
-        );
-        return;
-      }
-
-      // Показываем превью первых строк
-      final preview = lines.take(3).join('\n');
-      _addDebugLog('Preview of extracted data:\n$preview');
-
-      await _processText(lines.join('\n'), loc, widget.defaultAddToNomenclature);
+      final b64 = base64Encode(bytes);
+      final res = await Supabase.instance.client.functions.invoke(
+        'parse-xls-bytes',
+        body: {'bytes': b64},
+      );
+      if (res.status != 200) return null;
+      final data = res.data;
+      if (data is! Map) return null;
+      final rows = data['rows'];
+      if (rows is! List) return null;
+      return rows.map((e) => e.toString()).where((s) => s.isNotEmpty).toList();
     } catch (e) {
-      _addDebugLog('Standard Excel processing failed: $e');
+      _addDebugLog('parse-xls-bytes error: $e');
+      return null;
+    }
+  }
 
-      // Пробуем альтернативный метод
-      _addDebugLog('Trying alternative CSV conversion method...');
-      try {
-        await _processExcelAsCsv(bytes, loc);
-      } catch (csvError) {
-        _addDebugLog('Alternative method also failed: $csvError');
+  Future<void> _processExcel(Uint8List bytes, LocalizationService loc) async {
+    _addDebugLog('=== STARTING EXCEL PROCESSING ===');
+    _addDebugLog('File size: ${bytes.length} bytes');
+
+    final isOle = _isOleXls(bytes);
+    _addDebugLog('Detected file type: ${isOle ? "xls/ole (BIFF)" : "xlsx/zip"}');
+
+    try {
+      // Для OLE (.xls) и как основной путь — сервер-сайд парсинг через SheetJS
+      _setLoadingMessage('Чтение файла...');
+      final serverRows = await _parseXlsViaServer(bytes);
+
+      if (serverRows != null && serverRows.isNotEmpty) {
+        _addDebugLog('Server-side parse returned ${serverRows.length} rows');
+        await _processWithDeferredModeration(
+          rows: serverRows,
+          source: isOle ? 'xls' : 'xlsx',
+        );
+        return;
+      }
+
+      _addDebugLog('Server-side parse returned empty/null, falling back to local parsing');
+
+      // Fallback: локальный парсинг для xlsx через excel/spreadsheet_decoder
+      if (!isOle) {
+        final localRows = _extractRowsFromExcel(bytes);
+        if (localRows.isNotEmpty) {
+          _addDebugLog('Local Excel parse: ${localRows.length} rows');
+          await _processWithDeferredModeration(rows: localRows, source: 'xlsx');
+          return;
+        }
+      }
+
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка обработки Excel файла: $e\nАльтернативный метод также не сработал: $csvError\nПопробуйте:\n1. Сохранить файл как .xlsx из Excel\n2. Или скопируйте данные в текстовый формат')),
+          SnackBar(
+            content: Text(
+              isOle
+                  ? 'Не удалось прочитать .xls файл. Попробуйте пересохранить его как .xlsx в Excel.'
+                  : 'Не удалось извлечь данные из файла. Проверьте формат.',
+            ),
+            duration: const Duration(seconds: 6),
+          ),
+        );
+      }
+    } catch (e) {
+      _addDebugLog('Excel processing error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка обработки файла: $e')),
         );
       }
     }
