@@ -34,4 +34,3 @@ export 'order_list_detail_screen.dart';
 export 'product_order_received_screen.dart';
 export 'salary_expense_screen.dart';
 export 'admin_screen.dart';
-export 'kitchen_hub_screen.dart';

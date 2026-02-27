@@ -429,25 +429,17 @@ class AppRouter {
 
           GoRoute(
             path: '/checklists',
-            pageBuilder: (context, state) {
-              final tab = state.queryParameters['tab'];
-              final initialTab = tab != null ? (int.tryParse(tab) ?? 2) : 2;
-              return _slideTransitionPage(state, KitchenHubScreen(initialTab: initialTab));
-            },
-          ),
-          GoRoute(
-            path: '/checklists-list',
             pageBuilder: (context, state) => _slideTransitionPage(state, const ChecklistsScreen()),
           ),
           GoRoute(
-            path: '/checklists-list/:id',
+            path: '/checklists/:id',
             pageBuilder: (context, state) {
               final id = state.pathParameters['id'] ?? '';
               return _slideTransitionPage(state, ChecklistEditScreen(checklistId: id));
             },
           ),
           GoRoute(
-            path: '/checklists-list/:id/fill',
+            path: '/checklists/:id/fill',
             pageBuilder: (context, state) {
               final id = state.pathParameters['id'] ?? '';
               return _slideTransitionPage(state, ChecklistFillScreen(checklistId: id));
