@@ -151,6 +151,8 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
               onTap: () => context.push('/shift-confirmation'),
             ),
           ),
+        _EmployeeTableHeader(loc: loc, canEdit: canEdit, canToggleDataAccess: canToggleDataAccess),
+        const SizedBox(height: 4),
         ...List.generate(_list.length, (i) => _EmployeeCard(
         employee: _list[i],
         loc: loc,
@@ -240,6 +242,45 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
   }
 }
 
+class _EmployeeTableHeader extends StatelessWidget {
+  const _EmployeeTableHeader({
+    required this.loc,
+    required this.canEdit,
+    required this.canToggleDataAccess,
+  });
+
+  final LocalizationService loc;
+  final bool canEdit;
+  final bool canToggleDataAccess;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final style = theme.textTheme.labelSmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+      fontWeight: FontWeight.w600,
+      letterSpacing: 0.5,
+    );
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: Row(
+        children: [
+          const SizedBox(width: 36 + 10), // аватар + отступ
+          Expanded(flex: 5, child: Text(loc.t('full_name') ?? 'Сотрудник', style: style)),
+          const SizedBox(width: 8),
+          Expanded(flex: 3, child: Text(loc.t('department') ?? 'Отдел', style: style)),
+          const SizedBox(width: 8),
+          Expanded(flex: 3, child: Text(loc.t('position') ?? 'Должность', style: style)),
+          const SizedBox(width: 8),
+          Expanded(flex: 2, child: Text(loc.t('rate') ?? 'Ставка', style: style)),
+          if (canToggleDataAccess) const SizedBox(width: 56),
+          if (canEdit) const SizedBox(width: 64),
+        ],
+      ),
+    );
+  }
+}
+
 class _EmployeeCard extends StatelessWidget {
   const _EmployeeCard({
     required this.employee,
@@ -281,88 +322,138 @@ class _EmployeeCard extends StatelessWidget {
     final theme = Theme.of(context);
     final isPerShift = employee.paymentType == 'per_shift';
     final rate = isPerShift ? employee.ratePerShift : employee.hourlyRate;
-    final rateLabel = isPerShift ? loc.t('payment_per_shift') : loc.t('payment_hourly');
     final rateStr = rate != null && rate > 0
         ? '${rate.toStringAsFixed(0)} ${loc.t('currency_rub_short')}'
         : '—';
+    final sectionStr = (employee.department == 'kitchen' && employee.section != null && employee.section!.isNotEmpty)
+        ? (loc.t('section_${employee.section}') != 'section_${employee.section}'
+            ? loc.t('section_${employee.section}')
+            : (employee.sectionDisplayName ?? employee.section!))
+        : null;
+    final deptStr = sectionStr != null
+        ? '${employee.departmentDisplayName} · $sectionStr'
+        : employee.departmentDisplayName;
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 6),
       child: InkWell(
         onTap: canEdit ? onEdit : null,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Row(
-                children: [
-                  CircleAvatar(
-                    backgroundColor: theme.colorScheme.primaryContainer,
-                    child: Text(
-                      (employee.fullName.isNotEmpty ? employee.fullName[0] : '?').toUpperCase(),
-                      style: TextStyle(color: theme.colorScheme.onPrimaryContainer),
-                    ),
+              // Аватар
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: theme.colorScheme.primaryContainer,
+                child: Text(
+                  (employee.fullName.isNotEmpty ? employee.fullName[0] : '?').toUpperCase(),
+                  style: TextStyle(
+                    color: theme.colorScheme.onPrimaryContainer,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
                   ),
-                  const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(employee.fullName, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
-                            if (employee.email.isNotEmpty)
-                              Text(employee.email, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-                            const SizedBox(height: 4),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 2,
-                              children: [
-                                _labelChip(theme, loc.t('department') ?? 'Подразделение', employee.departmentDisplayName),
-                                if (employee.department == 'kitchen' && employee.section != null && employee.section!.isNotEmpty)
-                                  _labelChip(theme, loc.t('section') ?? 'Цех', loc.t('section_${employee.section}') ?? employee.sectionDisplayName ?? employee.section!),
-                                _labelChip(theme, loc.t('position') ?? 'Должность', positionDisplay(employee, loc)),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                  if (canEdit) ...[
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline, color: Colors.red),
-                      onPressed: onDelete,
-                      tooltip: loc.t('delete'),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.edit_outlined),
-                      onPressed: onEdit,
-                      tooltip: loc.t('edit'),
-                    ),
-                  ],
-                ],
+                ),
               ),
-              if (canToggleDataAccess && !employee.hasRole('owner')) ...[
-                const Divider(height: 24),
-                Row(
+              const SizedBox(width: 10),
+              // Имя + email
+              Expanded(
+                flex: 5,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.lock_outline, size: 18, color: theme.colorScheme.primary),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(loc.t('data_access') ?? 'Доступ к данным', style: theme.textTheme.bodyMedium)),
-                    Switch(
-                      value: employee.dataAccessEnabled,
-                      onChanged: (v) => onToggleDataAccess(employee, v),
+                    Text(
+                      employee.fullName,
+                      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (employee.email.isNotEmpty)
+                      Text(
+                        employee.email,
+                        style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Отдел (+ цех)
+              Expanded(
+                flex: 3,
+                child: Text(
+                  deptStr,
+                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Должность
+              Expanded(
+                flex: 3,
+                child: Text(
+                  positionDisplay(employee, loc),
+                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Ставка
+              Expanded(
+                flex: 2,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.payments_outlined, size: 14, color: theme.colorScheme.primary),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        rateStr,
+                        style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                 ),
-              ],
-              const Divider(height: 24),
-              Row(
-                children: [
-                  Icon(Icons.payments_outlined, size: 18, color: theme.colorScheme.primary),
-                  const SizedBox(width: 8),
-                  Text('$rateLabel: $rateStr', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500)),
-                ],
               ),
+              // Доступ к данным
+              if (canToggleDataAccess && !employee.hasRole('owner')) ...[
+                const SizedBox(width: 4),
+                Tooltip(
+                  message: loc.t('data_access') ?? 'Доступ к данным',
+                  child: Switch(
+                    value: employee.dataAccessEnabled,
+                    onChanged: (v) => onToggleDataAccess(employee, v),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+              ],
+              // Кнопки редактирования
+              if (canEdit) ...[
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  onPressed: onEdit,
+                  tooltip: loc.t('edit'),
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                  onPressed: onDelete,
+                  tooltip: loc.t('delete'),
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                ),
+              ],
             ],
           ),
         ),

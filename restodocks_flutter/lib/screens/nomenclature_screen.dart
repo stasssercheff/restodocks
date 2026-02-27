@@ -250,23 +250,28 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
   Widget build(BuildContext context) {
     final progress = widget.items.isEmpty ? 1.0 : _processed / widget.items.length;
 
+    final loc = context.read<LocalizationService>();
     return AlertDialog(
-      title: Text('Обработка продуктов'),
+      title: Text(loc.t('upload_products_processing')),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('Обработано $_processed из ${widget.items.length} продуктов'),
+          Text(loc.t('upload_products_progress').replaceFirst('%s', '$_processed').replaceFirst('%s', '${widget.items.length}')),
           const SizedBox(height: 8),
-          Text('Проверка названий, категорий и цен...', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+          Text(loc.t('upload_products_checking'), style: TextStyle(fontSize: 12, color: Colors.grey[600])),
           const SizedBox(height: 16),
           LinearProgressIndicator(value: progress),
           const SizedBox(height: 8),
-            Text('Добавлено: $_added${_skipped > 0 ? ', Пропущено: $_skipped' : ''}${_failed > 0 ? ', Ошибок: $_failed' : ''}'),
+          Text(
+            loc.t('upload_products_added').replaceFirst('%s', '$_added') +
+            (_skipped > 0 ? loc.t('upload_products_skipped').replaceFirst('%s', '$_skipped') : '') +
+            (_failed > 0 ? loc.t('upload_products_failed').replaceFirst('%s', '$_failed') : ''),
+          ),
           if (_isCompleted) ...[
             const SizedBox(height: 16),
             const Icon(Icons.check_circle, color: Colors.green, size: 48),
             const SizedBox(height: 8),
-            const Text('Все продукты успешно добавлены!'),
+            Text(loc.t('upload_products_done')),
           ],
         ],
       ),
@@ -274,7 +279,7 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
           ? [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Закрыть'),
+                child: Text(loc.t('close')),
               ),
             ]
           : null,
@@ -509,12 +514,12 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       final unit = (p.unit ?? 'g').trim().toLowerCase();
       if (unit == 'g' || unit == 'грамм') {
         final pricePerKg = rawPrice * 1000;
-        priceText = '${pricePerKg.toStringAsFixed(0)} $currencySymbol/кг';
+        priceText = loc.t('price_per_kg').replaceFirst('%s', pricePerKg.toStringAsFixed(0)).replaceFirst('%s', currencySymbol);
       } else {
         priceText = '${rawPrice.toStringAsFixed(0)} $currencySymbol/${_unitDisplay(p.unit, loc.currentLanguageCode)}';
       }
     } else {
-      priceText = 'Цена не установлена';
+      priceText = loc.t('price_not_set');
     }
 
     final hideCategory = p.category == 'misc' || p.category == 'manual' || p.category == 'imported';
@@ -528,8 +533,8 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     }
 
     return hideCategory
-        ? '${p.calories?.round() ?? 0} ккал · $priceText'
-        : '${_categoryLabel(p.category)} · ${p.calories?.round() ?? 0} ккал · $priceText';
+        ? '${p.calories?.round() ?? 0} ${loc.t('kcal')} · $priceText'
+        : '${_categoryLabel(p.category)} · ${p.calories?.round() ?? 0} ${loc.t('kcal')} · $priceText';
   }
 
   String _currencySymbol(String currency) {
@@ -544,9 +549,10 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
   }
 
   String _buildTechCardSubtitle(BuildContext context, TechCard tc) {
+    final loc = context.read<LocalizationService>();
     // Рассчитываем стоимость за кг для ТТК
     if (tc.ingredients.isEmpty) {
-      return 'ПФ · Цена не рассчитана · Выход: ${tc.yield.toStringAsFixed(0)}г';
+      return loc.t('pf_price_not_calculated').replaceFirst('%s', tc.yield.toStringAsFixed(0));
     }
 
     final totalCost = tc.ingredients.fold<double>(0, (sum, ing) => sum + ing.cost);
@@ -554,7 +560,10 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     final costPerKg = totalOutput > 0 ? (totalCost / totalOutput) * 1000 : 0;
     final sym = _currencySymbol(context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'VND');
 
-    return 'ПФ · ${costPerKg.toStringAsFixed(0)} $sym/кг · Выход: ${tc.yield.toStringAsFixed(0)}г';
+    return loc.t('pf_price_per_kg')
+        .replaceFirst('%s', costPerKg.toStringAsFixed(0))
+        .replaceFirst('%s', sym)
+        .replaceFirst('%s', tc.yield.toStringAsFixed(0));
   }
 
   bool _needsKbju(NomenclatureItem item) {
@@ -744,7 +753,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
           IconButton(
             icon: const Icon(Icons.warning),
             onPressed: () => _showDuplicates(),
-            tooltip: 'Показать дубликаты',
+            tooltip: loc.t('tooltip_show_duplicates'),
           ),
           // Temporarily disabled - method has compilation issues
           // IconButton(
@@ -754,7 +763,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
           // ),
           IconButton(
             icon: const Icon(Icons.upload_file),
-            tooltip: 'Загрузить продукты',
+            tooltip: loc.t('tooltip_upload_products'),
             onPressed: () {
               print('=== Nomenclature upload button pressed ===');
               try {
@@ -763,7 +772,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
               } catch (e) {
                 print('=== Navigation error: $e ===');
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Ошибка навигации: $e')),
+                  SnackBar(content: Text(loc.t('error_navigation').replaceFirst('%s', '$e'))),
                 );
               }
             },
@@ -1493,17 +1502,17 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
                 ],
               ),
               FilterChip(
-                label: Text('Продукты', style: const TextStyle(fontSize: 11)),
+                label: Text(widget.loc.t('filter_products'), style: const TextStyle(fontSize: 11)),
                 selected: widget.filterType == _NomenclatureFilter.products,
                 onSelected: (_) => widget.onFilterTypeChanged(_NomenclatureFilter.products),
               ),
               FilterChip(
-                label: Text('ПФ', style: const TextStyle(fontSize: 11)),
+                label: Text(widget.loc.t('filter_pf'), style: const TextStyle(fontSize: 11)),
                 selected: widget.filterType == _NomenclatureFilter.semiFinished,
                 onSelected: (_) => widget.onFilterTypeChanged(_NomenclatureFilter.semiFinished),
               ),
               FilterChip(
-                label: Text('Все', style: const TextStyle(fontSize: 11)),
+                label: Text(widget.loc.t('filter_all'), style: const TextStyle(fontSize: 11)),
                 selected: widget.filterType == _NomenclatureFilter.all,
                 onSelected: (_) => widget.onFilterTypeChanged(_NomenclatureFilter.all),
               ),
@@ -1608,7 +1617,7 @@ class _NomenclatureEmpty extends StatelessWidget {
               Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey[400]),
               const SizedBox(height: 16),
               Text(
-                '${loc.t('nomenclature')}: пусто',
+                loc.t('nomenclature_empty'),
                 style: Theme.of(context).textTheme.titleMedium,
                 textAlign: TextAlign.center,
               ),
@@ -1713,7 +1722,7 @@ class _AddAllProgressDialogState extends State<_AddAllProgressDialog> {
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
-                'Ошибка: $_error',
+                '${loc.t('error')}: $_error',
                 style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 12),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
