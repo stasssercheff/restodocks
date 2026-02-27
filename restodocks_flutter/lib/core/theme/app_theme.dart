@@ -7,6 +7,19 @@ class AppTheme {
   static const Color accentColor = Color(0xFFAD292C);
   static const Color secondaryColor = Color(0xFF4CAF50);
 
+  // Стандартный iOS-переход: push — слайд справа, pop — слайд влево.
+  // Используется на всех платформах для консистентности.
+  static const _transitions = PageTransitionsTheme(
+    builders: {
+      TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+      TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+      TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+      TargetPlatform.windows: CupertinoPageTransitionsBuilder(),
+      TargetPlatform.linux: CupertinoPageTransitionsBuilder(),
+      TargetPlatform.fuchsia: CupertinoPageTransitionsBuilder(),
+    },
+  );
+
   // Светлая тема (те же цвета бренда, что и тёмная)
   static ThemeData lightTheme = ThemeData(
     useMaterial3: true,
@@ -16,6 +29,7 @@ class AppTheme {
     ),
     primaryColor: primaryColor,
     scaffoldBackgroundColor: const Color(0xFFFAFAFA),
+    pageTransitionsTheme: _transitions,
     appBarTheme: const AppBarTheme(
       backgroundColor: primaryColor,
       foregroundColor: Colors.white,
@@ -67,6 +81,7 @@ class AppTheme {
     ),
     primaryColor: primaryColor,
     scaffoldBackgroundColor: const Color(0xFF121212),
+    pageTransitionsTheme: _transitions,
     appBarTheme: const AppBarTheme(
       backgroundColor: Color(0xFF1E1E1E),
       foregroundColor: Colors.white,

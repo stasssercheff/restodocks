@@ -66,29 +66,12 @@ String _getInitialLocation() {
   return '/';
 }
 
-/// Страница с анимацией: при push — вход справа, при pop — возврат влево (стандартный Material/iOS).
-CustomTransitionPage<void> _slideTransitionPage(GoRouterState state, Widget child) {
-  return CustomTransitionPage<void>(
+/// Страница с анимацией: использует MaterialPage, чтобы тема (CupertinoPageTransitionsBuilder)
+/// автоматически применяла правильное направление — справа при push, влево при pop.
+Page<void> _slideTransitionPage(GoRouterState state, Widget child) {
+  return MaterialPage<void>(
     key: state.pageKey,
     child: child,
-    transitionDuration: const Duration(milliseconds: 280),
-    reverseTransitionDuration: const Duration(milliseconds: 280),
-    transitionsBuilder: (context, animation, secondaryAnimation, child) {
-      // Новая страница въезжает справа
-      final slideIn = Tween<Offset>(
-        begin: const Offset(1.0, 0),
-        end: Offset.zero,
-      ).chain(CurveTween(curve: Curves.easeInOutCubic)).animate(animation);
-      // Предыдущая страница уезжает влево (при push) / возвращается справа (при pop)
-      final slideOut = Tween<Offset>(
-        begin: Offset.zero,
-        end: const Offset(-0.25, 0),
-      ).chain(CurveTween(curve: Curves.easeInOutCubic)).animate(secondaryAnimation);
-      return SlideTransition(
-        position: slideOut,
-        child: SlideTransition(position: slideIn, child: child),
-      );
-    },
   );
 }
 
