@@ -341,38 +341,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     final controller = TextEditingController();
     final result = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Вставить список продуктов'),
-        content: SizedBox(
-          width: 500,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Вставьте список: из Excel (Ctrl+C), мессенджера, заметок. Формат распознаётся автоматически.',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: controller,
-                maxLines: 10,
-                decoration: const InputDecoration(
-                  hintText: 'Авокадо 99000\nБазилик 267000\nМолоко 38000',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Отмена')),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(controller.text),
-            child: const Text('Анализ'),
-          ),
-        ],
-      ),
+      builder: (ctx) => _PasteTextDialog(controller: controller),
     );
     if (result == null || result.trim().isEmpty || !mounted) return;
     await _processWithDeferredModeration(text: result, source: 'вставленный текст');
@@ -3437,6 +3406,80 @@ class _TipsSection extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Диалог вставки текстового списка продуктов.
+/// Использует StatefulWidget + MediaQuery.viewInsetsOf чтобы корректно
+/// подниматься над клавиатурой на мобильных устройствах.
+class _PasteTextDialog extends StatefulWidget {
+  const _PasteTextDialog({required this.controller});
+  final TextEditingController controller;
+
+  @override
+  State<_PasteTextDialog> createState() => _PasteTextDialogState();
+}
+
+class _PasteTextDialogState extends State<_PasteTextDialog> {
+  @override
+  Widget build(BuildContext context) {
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 24, 16, keyboardInset + 16),
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: Material(
+          borderRadius: BorderRadius.circular(16),
+          color: theme.dialogBackgroundColor,
+          elevation: 6,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Вставить список продуктов',
+                  style: theme.textTheme.titleMedium,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Вставьте список: из Excel (Ctrl+C), мессенджера, заметок. Формат распознаётся автоматически.',
+                  style: theme.textTheme.bodySmall,
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: widget.controller,
+                  maxLines: 6,
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                    hintText: 'Авокадо 99000\nБазилик 267000\nМолоко 38000',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Отмена'),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      onPressed: () => Navigator.of(context).pop(widget.controller.text),
+                      child: const Text('Анализ'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
