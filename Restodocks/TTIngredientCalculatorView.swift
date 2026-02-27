@@ -129,7 +129,7 @@ struct TTIngredientCalculatorView: View {
                                 HStack {
                                     Text(lang.t("cost") + ":")
                                     Spacer()
-                                    Text("\(String(format: "%.2f", (processed.finalWeight / 1000.0) * basePrice)) \(appState.defaultCurrency)")
+                                    Text("\(appState.currencySymbol)\(String(format: "%.2f", (processed.finalWeight / 1000.0) * basePrice))")
                                         .foregroundColor(.green)
                                 }
                                 .font(.subheadline)

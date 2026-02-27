@@ -162,13 +162,13 @@ struct TTIngredient: Identifiable, Codable {
     }
 
     var nutritionSummary: String {
-        String(format: "%.1f ккал, Б:%.1f Ж:%.1f У:%.1f",
+        String(format: "%.1f kcal, P:%.1f F:%.1f C:%.1f",
                finalCalories, finalProtein, finalFat, finalCarbs)
     }
 
-    var grossWeightInfo: String { String(format: "%.1f г", grossWeight) }
-    var netWeightInfo: String { String(format: "%.1f г", netWeight) }
-    var costInfo: String { String(format: "%.2f ₽", cost) }
+    var grossWeightInfo: String { String(format: "%.1f g", grossWeight) }
+    var netWeightInfo: String { String(format: "%.1f g", netWeight) }
+    var costInfo: String { String(format: "%.2f", cost) }
 
     /// Ужарка ранее считалась от брутто–нетто; теперь используем shrinkagePercentage(process:).
     var weightLossPercentage: Double {

@@ -38,11 +38,13 @@ struct ProfileView: View {
 
     private var currencies: [(String, String)] = [
         ("RUB", "₽ Рубль (RUB)"),
-        ("USD", "$ Доллар (USD)"),
-        ("EUR", "€ Евро (EUR)"),
-        ("GBP", "£ Фунт (GBP)"),
-        ("JPY", "¥ Йена (JPY)"),
-        ("CNY", "¥ Юань (CNY)")
+        ("USD", "$ Dollar (USD)"),
+        ("EUR", "€ Euro (EUR)"),
+        ("GBP", "£ Pound (GBP)"),
+        ("JPY", "¥ Yen (JPY)"),
+        ("CNY", "¥ Yuan (CNY)"),
+        ("THB", "฿ Baht (THB)"),
+        ("KZT", "₸ Tenge (KZT)")
     ]
 
     var body: some View {
@@ -103,7 +105,7 @@ struct ProfileView: View {
                             showingCurrencyPicker = true
                         } label: {
                             HStack {
-                                Text("Текущая валюта: \(currencies.first { $0.0 == appState.defaultCurrency }?.1 ?? "₽ Рубль (RUB)")")
+                                Text("\(lang.t("current_currency")): \(currencies.first { $0.0 == appState.defaultCurrency }?.1 ?? "₽ Рубль (RUB)")")
                                     .foregroundColor(AppTheme.textPrimary)
                                 Spacer()
                                 Image(systemName: "chevron.right")
@@ -136,7 +138,7 @@ struct ProfileView: View {
                 if let employee = accounts.currentEmployee,
                    employee.rolesArray.contains("owner") {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Управление заведением")
+                        Text(lang.t("management_establishment"))
                             .font(.headline)
 
                         NavigationLink {
@@ -145,7 +147,7 @@ struct ProfileView: View {
                             HStack {
                                 Image(systemName: "building.2")
                                     .foregroundColor(AppTheme.primary)
-                                Text("Панель собственника")
+                                Text(lang.t("owner_panel"))
                                     .foregroundColor(AppTheme.textPrimary)
                                 Spacer()
                                 Image(systemName: "chevron.right")
@@ -174,7 +176,7 @@ struct ProfileView: View {
 
                     // 5. Просмотр ТТК (для всех сотрудников)
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Технологические карты")
+                        Text(lang.t("tech_cards_title"))
                             .font(.headline)
 
                         if let dept = employeeDepartment {
@@ -327,7 +329,7 @@ struct ProfileView: View {
 
             // Поля редактирования
             VStack(spacing: 12) {
-                TextField("Имя", text: $editedName)
+                TextField(lang.t("name"), text: $editedName)
                     .padding()
                     .background(AppTheme.secondaryBackground)
                     .cornerRadius(8)
@@ -373,15 +375,14 @@ struct ProfileView: View {
     // Личный график сотрудника
     private var personalScheduleView: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if accounts.currentEmployee != nil {
-                // TODO: Реализовать отображение личного графика
-                Text("График сотрудника будет отображаться здесь")
-                    .foregroundColor(AppTheme.textSecondary)
-                    .padding()
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .background(AppTheme.secondaryBackground)
-                    .cornerRadius(8)
-            }
+                if accounts.currentEmployee != nil {
+                        Text(lang.t("schedule_placeholder"))
+                            .foregroundColor(AppTheme.textSecondary)
+                            .padding()
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .background(AppTheme.secondaryBackground)
+                            .cornerRadius(8)
+                    }
         }
         .padding()
         .background(AppTheme.cardBackground)
@@ -473,27 +474,25 @@ struct ProfileView: View {
     }
 
     private func getRoleDisplayName(_ role: String) -> String {
-        // TODO: Добавить локализацию ролей
         switch role {
-        case "owner": return "Владелец"
-        case "executive_chef": return "Шеф-повар"
-        case "sous_chef": return "Су-шеф"
-        case "cook": return "Повар"
-        case "brigadier": return "Бригадир"
-        case "bartender": return "Бармен"
-        case "waiter": return "Официант"
-        default: return "Сотрудник"
+        case "owner": return lang.t("role_owner")
+        case "executive_chef": return lang.t("role_executive_chef")
+        case "sous_chef": return lang.t("role_sous_chef")
+        case "cook": return lang.t("role_cook")
+        case "brigadier": return lang.t("role_brigadier")
+        case "bartender": return lang.t("role_bartender")
+        case "waiter": return lang.t("role_waiter")
+        default: return lang.t("role_employee")
         }
     }
 
     private func getDepartmentDisplayName(_ department: String) -> String {
-        // TODO: Добавить локализацию отделов
         switch department {
-        case "kitchen": return "Кухня"
-        case "bar": return "Бар"
-        case "dining_room": return "Зал"
-        case "management": return "Управление"
-        default: return "Неизвестно"
+        case "kitchen": return lang.t("dept_kitchen")
+        case "bar": return lang.t("dept_bar")
+        case "dining_room": return lang.t("dept_dining_room")
+        case "management": return lang.t("dept_management")
+        default: return lang.t("dept_unknown")
         }
     }
 
@@ -536,11 +535,7 @@ struct ProfileView: View {
     }
 
     private func departmentTTKTitle(for department: String) -> String {
-        switch department {
-        case "kitchen": return "ТТК кухни"
-        case "bar": return "ТТК бара"
-        case "dining_room": return "ТТК зала"
-        default: return lang.t("view_ttk")
-        }
+        let deptName = getDepartmentDisplayName(department)
+        return "\(lang.t("ttk")) \(deptName)"
     }
 }

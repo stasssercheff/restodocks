@@ -20,7 +20,11 @@ final class AccountManager: ObservableObject {
     }
 
     @Published var establishment: Establishment?
-    @Published var currentEmployee: Employee?
+    @Published var currentEmployee: Employee? {
+        didSet {
+            LocalizationManager.shared.currentEmployeeId = currentEmployee?.id.uuidString
+        }
+    }
     @Published var employees: [Employee] = []
     @Published var shifts: [Shift] = []
     @Published var suppliers: [Supplier] = []
@@ -164,6 +168,53 @@ final class AccountManager: ObservableObject {
             try await client.from("employees")
                 .update(["cost_per_unit": costPerUnit, "payroll_counting_mode": payrollCountingMode])
                 .eq("id", value: employeeId.uuidString)
+                .execute()
+            await fetchEmployees()
+        } catch {
+            print("❌ Update employee error:", error)
+        }
+    }
+
+    @MainActor
+    func deleteEmployee(_ employee: Employee) async {
+        do {
+            try await client.from("employees")
+                .delete()
+                .eq("id", value: employee.id.uuidString)
+                .execute()
+            await fetchEmployees()
+        } catch {
+            print("❌ Delete employee error:", error)
+        }
+    }
+
+    @MainActor
+    func updateEmployee(
+        _ employee: Employee,
+        fullName: String,
+        department: String,
+        role: String,
+        payMode: String,
+        costPerUnit: Double
+    ) async {
+        struct EmployeeUpdate: Encodable {
+            let full_name: String
+            let department: String
+            let roles: [String]
+            let payroll_counting_mode: String
+            let cost_per_unit: Double
+        }
+        do {
+            let update = EmployeeUpdate(
+                full_name: fullName,
+                department: department,
+                roles: [role],
+                payroll_counting_mode: payMode,
+                cost_per_unit: costPerUnit
+            )
+            try await client.from("employees")
+                .update(update)
+                .eq("id", value: employee.id.uuidString)
                 .execute()
             await fetchEmployees()
         } catch {

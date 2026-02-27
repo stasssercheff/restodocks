@@ -184,6 +184,8 @@ struct ProductCatalogView: View {
 
 struct ProductRowView: View {
     let product: Product
+    @ObservedObject private var lang = LocalizationManager.shared
+    @EnvironmentObject var appState: AppState
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -192,7 +194,6 @@ struct ProductRowView: View {
                     Text(product.localizedName)
                         .font(.headline)
 
-                    // Category
                     Text(product.category.capitalized)
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -200,7 +201,6 @@ struct ProductRowView: View {
 
                 Spacer()
 
-                // Allergen badges
                 HStack(spacing: 4) {
                     if product.glutenFree {
                         Text("🌾")
@@ -213,30 +213,28 @@ struct ProductRowView: View {
                 }
             }
 
-            // Nutrition info
             if !product.nutritionInfo.isEmpty {
                 Text(product.nutritionInfo)
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
 
-            // Allergens info
             if !product.allergensInfo.isEmpty {
                 Text(product.allergensInfo)
                     .font(.caption)
                     .foregroundColor(.orange)
             }
 
-            // Price and unit
             HStack {
-                if let price = product.basePrice, let currency = product.currency {
-                    Text(String(format: "%.2f %@", price, currency))
+                if let price = product.basePrice {
+                    let symbol = currencySymbol(for: product.currency ?? appState.defaultCurrency)
+                    Text("\(symbol)\(String(format: "%.2f", price))")
                         .font(.subheadline)
                         .foregroundColor(.green)
                 }
 
                 if let unit = product.unit {
-                    Text("за \(unit)")
+                    Text("\(lang.t("per_unit_prefix")) \(localizedUnit(unit))")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -244,11 +242,62 @@ struct ProductRowView: View {
         }
         .padding(.vertical, 4)
     }
+
+    private func localizedUnit(_ unit: String) -> String {
+        switch unit {
+        case "кг": return lang.t("unit_kg")
+        case "г": return lang.t("unit_g")
+        case "л": return lang.t("unit_l")
+        case "мл": return lang.t("unit_ml")
+        case "шт": return lang.t("unit_pcs")
+        default: return unit
+        }
+    }
+
+    private func currencySymbol(for code: String) -> String {
+        switch code {
+        case "RUB": return "₽"
+        case "USD": return "$"
+        case "EUR": return "€"
+        case "GBP": return "£"
+        case "JPY": return "¥"
+        case "CNY": return "¥"
+        case "THB": return "฿"
+        case "KZT": return "₸"
+        default: return code + " "
+        }
+    }
 }
 
 struct ProductDetailView: View {
     @EnvironmentObject var lang: LocalizationManager
+    @EnvironmentObject var appState: AppState
     let product: Product
+
+    private func localizedUnit(_ unit: String) -> String {
+        switch unit {
+        case "кг": return lang.t("unit_kg")
+        case "г": return lang.t("unit_g")
+        case "л": return lang.t("unit_l")
+        case "мл": return lang.t("unit_ml")
+        case "шт": return lang.t("unit_pcs")
+        default: return unit
+        }
+    }
+
+    private func currencySymbolFor(_ code: String) -> String {
+        switch code {
+        case "RUB": return "₽"
+        case "USD": return "$"
+        case "EUR": return "€"
+        case "GBP": return "£"
+        case "JPY": return "¥"
+        case "CNY": return "¥"
+        case "THB": return "฿"
+        case "KZT": return "₸"
+        default: return code + " "
+        }
+    }
 
     var body: some View {
         ScrollView {
@@ -263,14 +312,15 @@ struct ProductDetailView: View {
                         .font(.subheadline)
                         .foregroundColor(.secondary)
 
-                    if let price = product.basePrice, let currency = product.currency {
+                    if let price = product.basePrice {
                         HStack {
-                            Text(String(format: "%.2f %@", price, currency))
+                            let symbol = currencySymbolFor(product.currency ?? "RUB")
+                            Text("\(symbol)\(String(format: "%.2f", price))")
                                 .font(.title2)
                                 .foregroundColor(.green)
 
                             if let unit = product.unit {
-                                Text("за \(unit)")
+                                Text("\(lang.t("per_unit_prefix")) \(localizedUnit(unit))")
                                     .foregroundColor(.secondary)
                             }
                         }

@@ -66,6 +66,25 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// символ текущей валюты
+    var currencySymbol: String {
+        AppState.symbol(for: defaultCurrency)
+    }
+
+    static func symbol(for code: String) -> String {
+        switch code {
+        case "RUB": return "₽"
+        case "USD": return "$"
+        case "EUR": return "€"
+        case "GBP": return "£"
+        case "JPY": return "¥"
+        case "CNY": return "¥"
+        case "THB": return "฿"
+        case "KZT": return "₸"
+        default: return code + " "
+        }
+    }
+
     /// Режим отображения для собственника с должностью: "owner" = интерфейс владельца, "position" = интерфейс выбранной должности
     var ownerViewMode: String {
         get { userDefaults.string(forKey: "owner_view_mode") ?? "owner" }

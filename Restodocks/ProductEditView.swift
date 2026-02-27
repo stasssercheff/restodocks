@@ -32,11 +32,11 @@ struct ProductEditView: View {
                     get: { product.unit ?? "кг" },
                     set: { product.unit = $0 }
                 )) {
-                    Text("кг").tag("кг")
-                    Text("г").tag("г")
-                    Text("л").tag("л")
-                    Text("мл").tag("мл")
-                    Text("шт").tag("шт")
+                    Text(lang.t("unit_kg")).tag("кг")
+                    Text(lang.t("unit_g")).tag("г")
+                    Text(lang.t("unit_l")).tag("л")
+                    Text(lang.t("unit_ml")).tag("мл")
+                    Text(lang.t("unit_pcs")).tag("шт")
                 }
 
                 HStack {

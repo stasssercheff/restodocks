@@ -3250,5 +3250,292 @@
     "es": "Ver TTK",
     "de": "TTK ansehen",
     "fr": "Voir TTK"
+  },
+  "unit_kg": {
+    "ru": "кг",
+    "en": "kg",
+    "es": "kg",
+    "de": "kg",
+    "fr": "kg"
+  },
+  "unit_g": {
+    "ru": "г",
+    "en": "g",
+    "es": "g",
+    "de": "g",
+    "fr": "g"
+  },
+  "unit_l": {
+    "ru": "л",
+    "en": "L",
+    "es": "L",
+    "de": "L",
+    "fr": "L"
+  },
+  "unit_ml": {
+    "ru": "мл",
+    "en": "ml",
+    "es": "ml",
+    "de": "ml",
+    "fr": "ml"
+  },
+  "unit_pcs": {
+    "ru": "шт",
+    "en": "pcs",
+    "es": "uds",
+    "de": "Stk",
+    "fr": "pce"
+  },
+  "per_unit_prefix": {
+    "ru": "за",
+    "en": "per",
+    "es": "por",
+    "de": "je",
+    "fr": "par"
+  },
+  "dept_kitchen": {
+    "ru": "Кухня",
+    "en": "Kitchen",
+    "es": "Cocina",
+    "de": "Küche",
+    "fr": "Cuisine"
+  },
+  "dept_bar": {
+    "ru": "Бар",
+    "en": "Bar",
+    "es": "Bar",
+    "de": "Bar",
+    "fr": "Bar"
+  },
+  "dept_dining_room": {
+    "ru": "Зал",
+    "en": "Hall",
+    "es": "Salón",
+    "de": "Saal",
+    "fr": "Salle"
+  },
+  "dept_management": {
+    "ru": "Управление",
+    "en": "Management",
+    "es": "Gestión",
+    "de": "Management",
+    "fr": "Gestion"
+  },
+  "dept_unknown": {
+    "ru": "Неизвестно",
+    "en": "Unknown",
+    "es": "Desconocido",
+    "de": "Unbekannt",
+    "fr": "Inconnu"
+  },
+  "role_owner": {
+    "ru": "Владелец",
+    "en": "Owner",
+    "es": "Propietario",
+    "de": "Eigentümer",
+    "fr": "Propriétaire"
+  },
+  "role_executive_chef": {
+    "ru": "Шеф-повар",
+    "en": "Executive Chef",
+    "es": "Chef ejecutivo",
+    "de": "Küchenchef",
+    "fr": "Chef exécutif"
+  },
+  "role_sous_chef": {
+    "ru": "Су-шеф",
+    "en": "Sous Chef",
+    "es": "Sous chef",
+    "de": "Sous-Chef",
+    "fr": "Sous-chef"
+  },
+  "role_cook": {
+    "ru": "Повар",
+    "en": "Cook",
+    "es": "Cocinero",
+    "de": "Koch",
+    "fr": "Cuisinier"
+  },
+  "role_brigadier": {
+    "ru": "Бригадир",
+    "en": "Team Leader",
+    "es": "Jefe de equipo",
+    "de": "Teamleiter",
+    "fr": "Chef d'équipe"
+  },
+  "role_bartender": {
+    "ru": "Бармен",
+    "en": "Bartender",
+    "es": "Barman",
+    "de": "Barkeeper",
+    "fr": "Barman"
+  },
+  "role_waiter": {
+    "ru": "Официант",
+    "en": "Waiter",
+    "es": "Camarero",
+    "de": "Kellner",
+    "fr": "Serveur"
+  },
+  "role_employee": {
+    "ru": "Сотрудник",
+    "en": "Employee",
+    "es": "Empleado",
+    "de": "Mitarbeiter",
+    "fr": "Employé"
+  },
+  "tab_products": {
+    "ru": "Продукты",
+    "en": "Products",
+    "es": "Productos",
+    "de": "Produkte",
+    "fr": "Produits"
+  },
+  "tab_semi_finished": {
+    "ru": "ПФ",
+    "en": "Semi",
+    "es": "Semi",
+    "de": "HF",
+    "fr": "Semi"
+  },
+  "tab_all": {
+    "ru": "Все",
+    "en": "All",
+    "es": "Todo",
+    "de": "Alle",
+    "fr": "Tout"
+  },
+  "search_by_name": {
+    "ru": "Поиск по названию",
+    "en": "Search by name",
+    "es": "Buscar por nombre",
+    "de": "Nach Name suchen",
+    "fr": "Rechercher par nom"
+  },
+  "col_name": {
+    "ru": "Название",
+    "en": "Name",
+    "es": "Nombre",
+    "de": "Name",
+    "fr": "Nom"
+  },
+  "col_semi_finished": {
+    "ru": "ПФ",
+    "en": "Semi-finished",
+    "es": "Semielaborado",
+    "de": "Halbfertig",
+    "fr": "Semi-fini"
+  },
+  "col_dishes": {
+    "ru": "Блюд",
+    "en": "Dishes",
+    "es": "Platos",
+    "de": "Gerichte",
+    "fr": "Plats"
+  },
+  "cost_price": {
+    "ru": "Себестоимость",
+    "en": "Cost price",
+    "es": "Precio de coste",
+    "de": "Selbstkosten",
+    "fr": "Coût de revient"
+  },
+  "payroll_mode": {
+    "ru": "Система оплаты",
+    "en": "Pay system",
+    "es": "Sistema de pago",
+    "de": "Lohnsystem",
+    "fr": "Système de paie"
+  },
+  "payroll_mode_hourly": {
+    "ru": "час",
+    "en": "hour",
+    "es": "hora",
+    "de": "Stunde",
+    "fr": "heure"
+  },
+  "payroll_mode_shift": {
+    "ru": "смена",
+    "en": "shift",
+    "es": "turno",
+    "de": "Schicht",
+    "fr": "équipe"
+  },
+  "rate_per_unit": {
+    "ru": "Ставка",
+    "en": "Rate",
+    "es": "Tarifa",
+    "de": "Satz",
+    "fr": "Taux"
+  },
+  "workshop": {
+    "ru": "Цех",
+    "en": "Workshop",
+    "es": "Taller",
+    "de": "Werkstatt",
+    "fr": "Atelier"
+  },
+  "settings_action": {
+    "ru": "Настройки",
+    "en": "Settings",
+    "es": "Configuración",
+    "de": "Einstellungen",
+    "fr": "Paramètres"
+  },
+  "access": {
+    "ru": "Доступ",
+    "en": "Access",
+    "es": "Acceso",
+    "de": "Zugang",
+    "fr": "Accès"
+  },
+  "delete": {
+    "ru": "Удалить",
+    "en": "Delete",
+    "es": "Eliminar",
+    "de": "Löschen",
+    "fr": "Supprimer"
+  },
+  "management_establishment": {
+    "ru": "Управление заведением",
+    "en": "Establishment management",
+    "es": "Gestión del establecimiento",
+    "de": "Betriebsverwaltung",
+    "fr": "Gestion de l'établissement"
+  },
+  "owner_panel": {
+    "ru": "Панель собственника",
+    "en": "Owner panel",
+    "es": "Panel del propietario",
+    "de": "Eigentümerbereich",
+    "fr": "Panneau propriétaire"
+  },
+  "tech_cards_title": {
+    "ru": "Технологические карты",
+    "en": "Tech Cards",
+    "es": "Fichas técnicas",
+    "de": "Technologiekarten",
+    "fr": "Fiches techniques"
+  },
+  "schedule_placeholder": {
+    "ru": "График сотрудника будет отображаться здесь",
+    "en": "Employee schedule will be displayed here",
+    "es": "El horario del empleado se mostrará aquí",
+    "de": "Der Mitarbeiterplan wird hier angezeigt",
+    "fr": "Le planning de l'employé s'affichera ici"
+  },
+  "current_currency": {
+    "ru": "Текущая валюта",
+    "en": "Current currency",
+    "es": "Moneda actual",
+    "de": "Aktuelle Währung",
+    "fr": "Devise actuelle"
+  },
+  "confirm_delete": {
+    "ru": "Вы уверены, что хотите удалить этого сотрудника?",
+    "en": "Are you sure you want to delete this employee?",
+    "es": "¿Estás seguro de que deseas eliminar a este empleado?",
+    "de": "Sind Sie sicher, dass Sie diesen Mitarbeiter löschen möchten?",
+    "fr": "Êtes-vous sûr de vouloir supprimer cet employé ?"
   }
 }

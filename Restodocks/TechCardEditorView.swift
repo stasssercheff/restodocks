@@ -213,19 +213,19 @@ struct TechCardEditorView: View {
                         HStack {
                             Text(lang.t("total_gross_weight") + ":")
                             Spacer()
-                            Text(String(format: "%.1f г", totalGrossWeight))
+                            Text(String(format: "%.1f \(lang.t("unit_g"))", totalGrossWeight))
                                 .bold()
                         }
                         HStack {
                             Text(lang.t("total_net_weight") + ":")
                             Spacer()
-                            Text(String(format: "%.1f г", totalNetWeight))
+                            Text(String(format: "%.1f \(lang.t("unit_g"))", totalNetWeight))
                                 .bold()
                         }
                         HStack {
                             Text(lang.t("output_weight") + ":")
                             Spacer()
-                            Text(String(format: "%.1f г", totalYield))
+                            Text(String(format: "%.1f \(lang.t("unit_g"))", totalYield))
                                 .bold()
                         }
 
@@ -234,26 +234,26 @@ struct TechCardEditorView: View {
                         HStack {
                             Text(lang.t("total_calories") + ":")
                             Spacer()
-                            Text(String(format: "%.1f ккал", totalCalories))
+                            Text(String(format: "%.1f \(lang.t("kcal"))", totalCalories))
                                 .bold()
                                 .foregroundColor(.orange)
                         }
                         HStack {
                             Text(lang.t("total_protein") + ":")
                             Spacer()
-                            Text(String(format: "%.1f г", totalProtein))
+                            Text(String(format: "%.1f \(lang.t("unit_g"))", totalProtein))
                                 .bold()
                         }
                         HStack {
                             Text(lang.t("total_fat") + ":")
                             Spacer()
-                            Text(String(format: "%.1f г", totalFat))
+                            Text(String(format: "%.1f \(lang.t("unit_g"))", totalFat))
                                 .bold()
                         }
                         HStack {
                             Text(lang.t("total_carbs") + ":")
                             Spacer()
-                            Text(String(format: "%.1f г", totalCarbs))
+                            Text(String(format: "%.1f \(lang.t("unit_g"))", totalCarbs))
                                 .bold()
                         }
 
@@ -262,7 +262,7 @@ struct TechCardEditorView: View {
                         HStack {
                             Text(lang.t("total_cost") + ":")
                             Spacer()
-                            Text(String(format: "%.2f %@", totalCost, appState.defaultCurrency))
+                            Text("\(appState.currencySymbol)\(String(format: "%.2f", totalCost))")
                                 .bold()
                                 .foregroundColor(.green)
                         }

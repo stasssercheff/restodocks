@@ -5,45 +5,50 @@ import Combine
 final class LocalizationManager: ObservableObject {
     static let shared = LocalizationManager()
 
-    // Используем @AppStorage для автоматической синхронизации с UserDefaults
-    @AppStorage("selected_language") var currentLang: String = "" {
+    private let supportedLanguages = ["ru", "en", "es", "de", "fr"]
+
+    // Текущий сотрудник (устанавливается при входе)
+    var currentEmployeeId: String? {
         didSet {
-            // При смене языка принудительно уведомляем SwiftUI об обновлении
             objectWillChange.send()
         }
     }
 
-    // Проверяем, выбран ли язык при запуске
-    var isLanguageSelected: Bool {
-        !currentLang.isEmpty
+    // Ключ UserDefaults для текущего аккаунта
+    private var langKey: String {
+        if let employeeId = currentEmployeeId {
+            return "selected_language_\(employeeId)"
+        }
+        return "selected_language_default"
     }
 
-    // Устанавливаем язык по умолчанию при первом запуске
-    func initializeLanguage() {
-        if currentLang.isEmpty {
-            // Определяем язык системы
-            let preferredLanguage = Locale.preferredLanguages.first?.prefix(2).lowercased() ?? "en"
-
-            // Поддерживаемые языки
-            let supportedLanguages = ["ru", "en", "es", "de", "fr"]
-
-            if supportedLanguages.contains(preferredLanguage) {
-                currentLang = String(preferredLanguage)
-            } else {
-                currentLang = "en" // Английский по умолчанию
-            }
+    var currentLang: String {
+        get {
+            let stored = UserDefaults.standard.string(forKey: langKey) ?? ""
+            return stored.isEmpty ? defaultLanguage() : stored
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: langKey)
+            objectWillChange.send()
         }
     }
+
+    private func defaultLanguage() -> String {
+        let preferred = Locale.preferredLanguages.first?.prefix(2).lowercased() ?? "en"
+        return supportedLanguages.contains(String(preferred)) ? String(preferred) : "en"
+    }
+
+    var isLanguageSelected: Bool { true }
+
+    func initializeLanguage() {}
 
     @Published private var translations: [String: [String: String]] = [:]
 
     private init() {
         loadJSON()
-        initializeLanguage()
     }
 
     private func loadJSON() {
-        // Убедитесь, что файл в Xcode называется именно Localizable.json (с большой L)
         guard let url = Bundle.main.url(forResource: "Localizable", withExtension: "json") else {
             print("❌ ОШИБКА: Файл Localizable.json не найден в Bundle. Проверьте Target Membership!")
             return
@@ -51,10 +56,7 @@ final class LocalizationManager: ObservableObject {
 
         do {
             let data = try Data(contentsOf: url)
-            // Декодируем словарь [Ключ: [Язык: Перевод]]
             let decoded = try JSONDecoder().decode([String: [String: String]].self, from: data)
-            
-            // Выполняем обновление в основном потоке для безопасности UI
             DispatchQueue.main.async {
                 self.translations = decoded
                 print("✅ Словари успешно загружены. Ключей: \(decoded.count)")
@@ -65,26 +67,18 @@ final class LocalizationManager: ObservableObject {
         }
     }
 
-    // Функция перевода
     func t(_ key: String) -> String {
         guard !translations.isEmpty else { return key }
 
-        // Сначала пробуем текущий язык
         if let translation = translations[key]?[currentLang], !translation.isEmpty {
             return translation
         }
-
-        // Fallback на русский
         if let russian = translations[key]?["ru"], !russian.isEmpty {
             return russian
         }
-
-        // Fallback на английский
         if let english = translations[key]?["en"], !english.isEmpty {
             return english
         }
-
-        // Возвращаем ключ если ничего не найдено
         return key
     }
 
