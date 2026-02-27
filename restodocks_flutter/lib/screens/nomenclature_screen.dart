@@ -1475,6 +1475,9 @@ class _NomenclatureTab extends StatefulWidget {
 class _NomenclatureTabState extends State<_NomenclatureTab> {
   @override
   Widget build(BuildContext context) {
+    // Слушаем изменения валюты, чтобы цены в подзаголовках обновились без перезахода
+    context.watch<AccountManagerSupabase>();
+
     if (widget.items.isEmpty) {
       return _NomenclatureEmpty(
         loc: widget.loc,
