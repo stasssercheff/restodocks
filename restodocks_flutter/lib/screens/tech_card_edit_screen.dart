@@ -1976,8 +1976,14 @@ class _TtkTableState extends State<_TtkTable> {
           return TableRow(
             decoration: BoxDecoration(color: cellBg),
             children: [
-              // Тип ТТК — ПФ или Блюдо (светло-серый как в образце)
-              TableCell(child: wrapCell(Container(color: firstColsBg, constraints: const BoxConstraints(minHeight: 44), padding: _cellPad, alignment: Alignment.center, child: Text(widget.isSemiFinished ? loc.t('filter_pf') : loc.t('ttk_dish'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))), fillColor: firstColsBg, dataCell: true)),
+              // Тип ТТК — пустая ячейка (объединённая ячейка рисуется в Stack ниже)
+              TableCell(
+                verticalAlignment: TableCellVerticalAlignment.fill,
+                child: Container(
+                  color: firstColsBg,
+                  constraints: const BoxConstraints(minHeight: 44),
+                ),
+              ),
               // Название — одна объединённая ячейка поверх всех строк (рисуется в Stack ниже); здесь — пустая ячейка без границы
               TableCell(
                 verticalAlignment: TableCellVerticalAlignment.fill,
@@ -2292,6 +2298,26 @@ class _TtkTableState extends State<_TtkTable> {
         ),
       ],
     ),
+          // Объединённая ячейка «Тип» — отображается один раз для всех строк
+          Positioned(
+            left: 1,
+            top: 44 + 1,
+            width: colType,
+            height: mergedNameHeight(ingredients.length),
+            child: Container(
+              decoration: BoxDecoration(
+                color: firstColsBg,
+                border: Border.all(width: 1, color: borderColor),
+              ),
+              padding: _cellPad,
+              alignment: Alignment.center,
+              child: Text(
+                widget.isSemiFinished ? loc.t('filter_pf') : loc.t('ttk_dish'),
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
           // Объединённая ячейка «Название» поверх всех строк данных (название задаётся при создании и дублируется сюда)
           Positioned(
             left: colType + 1,

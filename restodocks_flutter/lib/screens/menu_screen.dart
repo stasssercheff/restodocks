@@ -70,9 +70,50 @@ class _MenuScreenState extends State<MenuScreen> {
           _dishes = enriched;
           _loading = false;
         });
+        // Фоновый перевод для ТТК без локализованного названия
+        _translateMissingDishNames(enriched, est.id);
       }
     } catch (e) {
       if (mounted) setState(() { _error = e.toString(); _loading = false; });
+    }
+  }
+
+  /// Запускает фоновый перевод названий для ТТК, у которых нет dishNameLocalized
+  Future<void> _translateMissingDishNames(List<TechCard> cards, String establishmentId) async {
+    if (!mounted) return;
+    final curLang = context.read<LocalizationService>().currentLanguageCode;
+    final translationManager = context.read<TranslationManager>();
+    final svc = context.read<TechCardServiceSupabase>();
+    final emp = context.read<AccountManagerSupabase>().currentEmployee;
+    if (emp == null) return;
+
+    for (final tc in cards) {
+      final targetLang = curLang == 'ru' ? 'en' : 'ru';
+      if (tc.dishNameLocalized == null || !tc.dishNameLocalized!.containsKey(targetLang)) {
+        try {
+          final translated = await translationManager.getLocalizedText(
+            entityType: TranslationEntityType.techCard,
+            entityId: tc.id,
+            fieldName: 'dish_name',
+            sourceText: tc.dishName,
+            sourceLanguage: curLang,
+            targetLanguage: targetLang,
+          );
+          if (translated != tc.dishName && mounted) {
+            final nameMap = Map<String, String>.from(tc.dishNameLocalized ?? {});
+            nameMap[curLang] = tc.dishName;
+            nameMap[targetLang] = translated;
+            final updated = tc.copyWith(dishNameLocalized: nameMap);
+            await svc.saveTechCard(updated);
+            if (mounted) {
+              setState(() {
+                final idx = _dishes.indexWhere((d) => d.id == tc.id);
+                if (idx != -1) _dishes[idx] = updated;
+              });
+            }
+          }
+        } catch (_) {}
+      }
     }
   }
 
