@@ -255,6 +255,10 @@ class _EmployeeTableHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // На мобильном заголовок таблицы не нужен — карточки многострочные
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    if (isMobile) return const SizedBox.shrink();
+
     final theme = Theme.of(context);
     final style = theme.textTheme.labelSmall?.copyWith(
       color: theme.colorScheme.onSurfaceVariant,
@@ -268,7 +272,7 @@ class _EmployeeTableHeader extends StatelessWidget {
           const SizedBox(width: 36 + 10), // аватар + отступ
           Expanded(flex: 5, child: Text(loc.t('full_name') ?? 'Сотрудник', style: style)),
           const SizedBox(width: 8),
-          Expanded(flex: 3, child: Text(loc.t('department') ?? 'Отдел', style: style)),
+          Expanded(flex: 3, child: Text(loc.t('subdivision') ?? 'Подразделение', style: style)),
           const SizedBox(width: 8),
           Expanded(flex: 3, child: Text(loc.t('position') ?? 'Должность', style: style)),
           const SizedBox(width: 8),
@@ -310,15 +314,14 @@ class _EmployeeCard extends StatelessWidget {
     return (t != key && t.isNotEmpty) ? t : pos;
   }
 
-  static Widget _labelChip(ThemeData theme, String label, String value) {
-    return Text(
-      '$label: $value',
-      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    return isMobile ? _buildMobile(context) : _buildDesktop(context);
+  }
+
+  /// ПК: одна горизонтальная строка, все колонки вертикально по центру
+  Widget _buildDesktop(BuildContext context) {
     final theme = Theme.of(context);
     final isPerShift = employee.paymentType == 'per_shift';
     final rate = isPerShift ? employee.ratePerShift : employee.hourlyRate;
@@ -340,7 +343,7 @@ class _EmployeeCard extends StatelessWidget {
         onTap: canEdit ? onEdit : null,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -382,13 +385,13 @@ class _EmployeeCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              // Отдел (+ цех)
+              // Подразделение (+ цех)
               Expanded(
                 flex: 3,
                 child: Text(
                   deptStr,
                   style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                  maxLines: 2,
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -399,7 +402,7 @@ class _EmployeeCard extends StatelessWidget {
                 child: Text(
                   positionDisplay(employee, loc),
                   style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                  maxLines: 2,
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -454,6 +457,133 @@ class _EmployeeCard extends StatelessWidget {
                   constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                 ),
               ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Мобильный: компактная карточка в несколько строк
+  Widget _buildMobile(BuildContext context) {
+    final theme = Theme.of(context);
+    final isPerShift = employee.paymentType == 'per_shift';
+    final rate = isPerShift ? employee.ratePerShift : employee.hourlyRate;
+    final rateStr = rate != null && rate > 0
+        ? '${rate.toStringAsFixed(0)} ${loc.t('currency_rub_short')}'
+        : '—';
+    final sectionStr = (employee.department == 'kitchen' && employee.section != null && employee.section!.isNotEmpty)
+        ? (loc.t('section_${employee.section}') != 'section_${employee.section}'
+            ? loc.t('section_${employee.section}')
+            : (employee.sectionDisplayName ?? employee.section!))
+        : null;
+    final deptStr = sectionStr != null
+        ? '${employee.departmentDisplayName} · $sectionStr'
+        : employee.departmentDisplayName;
+    final posStr = positionDisplay(employee, loc);
+    final subStyle = theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant);
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        onTap: canEdit ? onEdit : null,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Аватар
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: theme.colorScheme.primaryContainer,
+                child: Text(
+                  (employee.fullName.isNotEmpty ? employee.fullName[0] : '?').toUpperCase(),
+                  style: TextStyle(
+                    color: theme.colorScheme.onPrimaryContainer,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              // Информация
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Имя
+                    Text(
+                      employee.fullName,
+                      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    if (employee.email.isNotEmpty) ...[
+                      const SizedBox(height: 1),
+                      Text(employee.email, style: subStyle),
+                    ],
+                    const SizedBox(height: 4),
+                    // Подразделение + должность в одну строку
+                    Row(
+                      children: [
+                        Icon(Icons.business_outlined, size: 12, color: theme.colorScheme.onSurfaceVariant),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            deptStr + (posStr != '—' ? ' · $posStr' : ''),
+                            style: subStyle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    // Ставка
+                    Row(
+                      children: [
+                        Icon(Icons.payments_outlined, size: 12, color: theme.colorScheme.primary),
+                        const SizedBox(width: 4),
+                        Text(rateStr, style: subStyle?.copyWith(fontWeight: FontWeight.w500)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              // Правая часть: переключатель + кнопки
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (canToggleDataAccess && !employee.hasRole('owner'))
+                    Switch(
+                      value: employee.dataAccessEnabled,
+                      onChanged: (v) => onToggleDataAccess(employee, v),
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  if (canEdit)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit_outlined, size: 18),
+                          onPressed: onEdit,
+                          tooltip: loc.t('edit'),
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                          onPressed: onDelete,
+                          tooltip: loc.t('delete'),
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
             ],
           ),
         ),
