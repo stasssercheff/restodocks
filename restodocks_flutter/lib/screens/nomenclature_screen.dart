@@ -363,53 +363,26 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
 
     showDialog(
       context: context,
-      builder: (ctx) => const Center(child: CircularProgressIndicator()),
+      barrierDismissible: false,
+      builder: (ctx) => Dialog(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              Text(loc.t('duplicates_title') ?? 'Поиск дубликатов'),
+            ],
+          ),
+        ),
+      ),
     );
 
+    List<List<String>> groups = [];
     try {
       final ai = context.read<AiService>();
-      final groups = await ai.findDuplicates(products);
-      if (!mounted) return;
-      Navigator.of(context).pop();
-
-      if (groups.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('duplicates_none') ?? 'Похожих дубликатов не найдено')),
-        );
-        return;
-      }
-
-      final idToItem = {for (final i in _nomenclatureItems) i.id: i};
-      final duplicateGroups = groups.map((ids) => ids.map((id) => idToItem[id]).whereType<NomenclatureItem>().toList()).where((g) => g.length >= 2).toList();
-
-      if (duplicateGroups.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('duplicates_none') ?? 'Похожих дубликатов не найдено')),
-        );
-        return;
-      }
-
-      if (!mounted) return;
-      await showDialog(
-        context: context,
-        builder: (ctx) => _DuplicatesDialog(
-          groups: duplicateGroups,
-          loc: loc,
-          onRemove: (idsToRemove) async {
-            final store = context.read<ProductStoreSupabase>();
-            final estId = context.read<AccountManagerSupabase>().establishment?.id;
-            if (estId == null) return;
-            for (final id in idsToRemove) {
-              final item = idToItem[id];
-              if (item?.isProduct == true) {
-                await store.removeFromNomenclature(estId, id);
-              }
-            }
-            await _ensureLoaded();
-            if (mounted) setState(() {});
-          },
-        ),
-      );
+      groups = await ai.findDuplicates(products);
     } catch (e) {
       if (mounted) {
         Navigator.of(context).pop();
@@ -417,7 +390,56 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
           SnackBar(content: Text('${loc.t('error') ?? 'Ошибка'}: $e')),
         );
       }
+      return;
     }
+
+    if (!mounted) {
+      Navigator.of(context).pop();
+      return;
+    }
+    Navigator.of(context).pop();
+
+    if (groups.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('duplicates_none') ?? 'Похожих дубликатов не найдено')),
+      );
+      return;
+    }
+
+    final idToItem = {for (final i in _nomenclatureItems) i.id: i};
+    final duplicateGroups = groups
+        .map((ids) => ids.map((id) => idToItem[id]).whereType<NomenclatureItem>().toList())
+        .where((g) => g.length >= 2)
+        .toList();
+
+    if (duplicateGroups.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('duplicates_none') ?? 'Похожих дубликатов не найдено')),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    await showDialog(
+      context: context,
+      builder: (ctx) => _DuplicatesDialog(
+        groups: duplicateGroups,
+        loc: loc,
+        onRemove: (idsToRemove) async {
+          final store = context.read<ProductStoreSupabase>();
+          final estId = context.read<AccountManagerSupabase>().establishment?.id;
+          if (estId == null) return;
+          for (final id in idsToRemove) {
+            final item = idToItem[id];
+            if (item?.isProduct == true) {
+              await store.removeFromNomenclature(estId, id);
+            }
+          }
+          await _ensureLoaded();
+          if (mounted) setState(() {});
+        },
+      ),
+    );
   }
 
   Widget _buildNomenclatureSkeletonLoading() {
