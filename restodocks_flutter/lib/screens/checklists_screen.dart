@@ -218,11 +218,6 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
             onPressed: _loading ? null : _load,
             tooltip: loc.t('refresh'),
           ),
-          IconButton(
-            icon: const Icon(Icons.home),
-            onPressed: () => context.go('/home'),
-            tooltip: loc.t('home'),
-          ),
         ],
       ),
       body: _body(loc, canEdit, canAccessChecklists, _scrollController),

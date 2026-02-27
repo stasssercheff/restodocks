@@ -120,13 +120,6 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
           onPressed: () => context.pop(),
         ),
         title: Text(loc.t('register_owner')),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.home),
-            onPressed: () => context.go('/home'),
-            tooltip: loc.t('home'),
-          ),
-        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(

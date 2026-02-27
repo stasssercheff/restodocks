@@ -17,11 +17,7 @@ class ConfirmEmailScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(loc.t('confirm_email_title')),
-        leading: IconButton(
-          icon: const Icon(Icons.home),
-          onPressed: () => context.go('/login'),
-          tooltip: loc.t('home'),
-        ),
+        automaticallyImplyLeading: false,
       ),
       body: SafeArea(
         child: Padding(

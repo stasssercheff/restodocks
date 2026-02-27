@@ -201,11 +201,6 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
             },
             tooltip: 'Очистить тестовые данные',
           ),
-          IconButton(
-            icon: const Icon(Icons.home),
-            onPressed: () => context.go('/home'),
-            tooltip: loc.t('home'),
-          ),
         ],
       ),
       body: SafeArea(

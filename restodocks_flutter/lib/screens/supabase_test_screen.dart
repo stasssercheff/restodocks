@@ -58,13 +58,7 @@ class _SupabaseTestScreenState extends State<SupabaseTestScreen> {
           onPressed: () => context.pop(),
         ),
         title: Text(localization.t('supabase_test')),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.home),
-            onPressed: () => context.go('/home'),
-            tooltip: localization.t('home'),
-          ),
-        ],
+        actions: [],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
