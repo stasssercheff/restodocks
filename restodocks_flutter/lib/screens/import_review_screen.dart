@@ -56,10 +56,7 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
     });
   }
 
-  /// Сохранить только продукты, которых ещё нет в номенклатуре (новые).
-  void _saveOnlyNew() => _save(onlyNew: true);
-
-  Future<void> _save({bool onlyNew = false}) async {
+  Future<void> _save() async {
     final acc = context.read<AccountManagerSupabase>();
     final est = acc.establishment;
     final emp = acc.currentEmployee;
@@ -69,9 +66,7 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
     final loc = context.read<LocalizationService>();
     final defCur = est.defaultCurrency ?? 'RUB';
 
-    final toSave = onlyNew
-        ? _items.where((i) => i.approved && i.existingProductId == null).toList()
-        : _items.where((i) => i.approved).toList();
+    final toSave = _items.where((i) => i.approved).toList();
     setState(() {
       _saving = true;
       _saveTotal = toSave.length;
@@ -84,30 +79,46 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
       for (final item in toSave) {
         if (!mounted) return;
 
-        if (item.existingProductId != null) {
-          // Для priceUpdate: явно применяем новую цену; displayPrice = suggestedPrice ?? price (новая из файла)
-          final newPrice = item.displayPrice ?? item.price;
-          if (newPrice != null) {
-            final cur = item.currency ?? defCur;
-            await store.setEstablishmentPrice(est.id, item.existingProductId!, newPrice, cur);
-            updated++;
-          }
-        } else {
+        try {
           final cur = item.currency ?? defCur;
-          final product = Product.create(
-            name: item.displayName,
-            category: 'imported',
-            basePrice: item.displayPrice ?? 0.0,
-            currency: item.displayPrice != null ? cur : null,
-          );
-          final savedProduct = await store.addProduct(product);
-          await store.addToNomenclature(
-            est.id,
-            savedProduct.id,
-            price: item.displayPrice,
-            currency: item.displayPrice != null ? cur : null,
-          );
-          created++;
+          if (item.existingProductId != null && item.category == ModerationCategory.priceUpdate) {
+            // Обновляем цену уже существующего продукта
+            final newPrice = item.displayPrice ?? item.price;
+            if (newPrice != null) {
+              await store.setEstablishmentPrice(est.id, item.existingProductId!, newPrice, cur);
+              // Убеждаемся что продукт есть в номенклатуре
+              await store.addToNomenclature(est.id, item.existingProductId!, price: newPrice, currency: cur);
+              updated++;
+            }
+          } else if (item.existingProductId != null) {
+            // Продукт уже есть в базе — просто добавляем в номенклатуру
+            await store.addToNomenclature(
+              est.id,
+              item.existingProductId!,
+              price: item.displayPrice ?? item.price,
+              currency: (item.displayPrice ?? item.price) != null ? cur : null,
+            );
+            created++;
+          } else {
+            // Новый продукт — создаём и добавляем в номенклатуру
+            final product = Product.create(
+              name: item.displayName,
+              category: 'imported',
+              basePrice: item.displayPrice ?? 0.0,
+              currency: item.displayPrice != null ? cur : null,
+            );
+            final savedProduct = await store.addProduct(product);
+            await store.addToNomenclature(
+              est.id,
+              savedProduct.id,
+              price: item.displayPrice,
+              currency: item.displayPrice != null ? cur : null,
+            );
+            created++;
+          }
+        } catch (itemError) {
+          print('Error saving item "${item.displayName}": $itemError');
+          // Продолжаем с остальными продуктами
         }
 
         if (mounted) {
@@ -260,33 +271,27 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
                   valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  '$_saveProgress / $_saveTotal',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 12),
               ],
-              FilledButton(
-                onPressed: _saving || approved == 0 ? null : () => _save(),
-                child: _saving
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : Text(loc.t('save') ?? 'Сохранить'),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: _saving || approved == 0 ? null : _save,
+                  child: _saving
+                      ? Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const SizedBox(
+                              height: 18,
+                              width: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            ),
+                            const SizedBox(width: 10),
+                            Text('$_saveProgress / $_saveTotal'),
+                          ],
+                        )
+                      : Text(loc.t('save') ?? 'Сохранить'),
+                ),
               ),
-              if (_items.any((i) => i.existingProductId == null)) ...[
-                const SizedBox(height: 8),
-                OutlinedButton(
-                  onPressed: _saving || _items.where((i) => i.approved && i.existingProductId == null).isEmpty
-                      ? null
-                      : _saveOnlyNew,
-                  child: Text(loc.t('save_only_new_products') ?? 'Сохранить только новые продукты'),
-                ),
-              ],
             ],
           ),
         ),
