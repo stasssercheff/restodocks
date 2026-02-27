@@ -858,7 +858,11 @@
     "duplicates_apply": "Применить",
     "duplicates_none": "Похожих дубликатов не найдено",
     "duplicates_need_more": "Нужно минимум 2 продукта для поиска дубликатов",
-    "error": "Ошибка"
+    "error": "Ошибка",
+    "kitchen_hub": "Кухня",
+    "inventory_pf": "Инвентаризация ПФ",
+    "no_inventory_docs": "Нет отправленных документов инвентаризации",
+    "checklist_not_found": "Чеклист не найден"
   },
   "en": {
     "app_name": "Restodocks",
@@ -1718,7 +1722,11 @@
     "order_save_inbox_error": "Failed to save order to inbox. Check connection.",
     "order_not_found": "Order list not found",
     "order_comment_hint": "Order comment",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "kitchen_hub": "Kitchen",
+    "inventory_pf": "Semi-finished inventory",
+    "no_inventory_docs": "No submitted inventory documents",
+    "checklist_not_found": "Checklist not found"
   },
   "es": {
     "app_name": "Restodocks",

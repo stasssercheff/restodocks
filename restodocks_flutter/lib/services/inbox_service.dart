@@ -66,7 +66,7 @@ class InboxService {
             title: 'Чеклист: ${sub.checklistName}',
             description: '$submittedName${sub.section != null ? ' • ${sub.section}' : ''}',
             createdAt: sub.createdAt,
-            employeeId: sub.submittedByEmployeeId,
+            employeeId: sub.submittedByEmployeeId ?? '',
             employeeName: submittedName,
             department: 'kitchen',
             fileUrl: null,

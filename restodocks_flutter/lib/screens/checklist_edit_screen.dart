@@ -235,7 +235,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(context.read<LocalizationService>().t('checklist_created_duplicate'))),
         );
-        context.pushReplacement('/checklists/${created.id}');
+        context.pushReplacement('/checklists-list/${created.id}');
       }
     } catch (e) {
       if (mounted) {
@@ -418,7 +418,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
         actions: [
           if (canEdit)
             TextButton.icon(
-              onPressed: () => context.push('/checklists/${widget.checklistId}/fill'),
+              onPressed: () => context.push('/checklists-list/${widget.checklistId}/fill'),
               icon: const Icon(Icons.task_alt, size: 18),
               label: Text(loc.t('fill_checklist') ?? 'Заполнить'),
             ),

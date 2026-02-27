@@ -176,34 +176,6 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
     final emp = acc.currentEmployee;
     if (est == null || emp == null) return;
 
-    final employees = await acc.getEmployeesForEstablishment(est.id);
-    final chefs = employees.where((e) => e.hasRole('executive_chef') || e.hasRole('sous_chef')).map((e) => e.id).toSet().toList();
-    if (chefs.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.t('no_chef_sous_chef') ?? 'Нет шефа/су-шефа в заведении')),
-      );
-      return;
-    }
-
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.t('checklist_complete_confirm') ?? 'Завершить чеклист?'),
-        content: Text(loc.t('checklist_complete_confirm_detail') ?? 'Чеклист будет отправлен су-шефу и шефу во входящие.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(loc.t('cancel')),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(loc.t('checklist_complete') ?? 'Завершить'),
-          ),
-        ],
-      ),
-    );
-    if (ok != true || !mounted) return;
-
     _endTime = DateTime.now();
 
     final items = <Map<String, dynamic>>[];
@@ -234,14 +206,10 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
         workshop: emp.section,
         items: items,
         comments: _commentsController.text.trim(),
-        recipientChefIds: chefs,
       );
       if (mounted) {
         setState(() => _completed = true);
         clearDraft();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('checklist_sent') ?? 'Чеклист отправлен шефу и су-шефу')),
-        );
         context.pop();
       }
     } catch (e) {

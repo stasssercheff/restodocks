@@ -5,8 +5,8 @@ class ChecklistSubmission extends Equatable {
   final String id;
   final String establishmentId;
   final String checklistId;
-  final String submittedByEmployeeId;
-  final String recipientChefId;
+  final String? submittedByEmployeeId;
+  final String? recipientChefId;
   final String checklistName;
   final String? section;
   final Map<String, dynamic> payload;
@@ -16,8 +16,8 @@ class ChecklistSubmission extends Equatable {
     required this.id,
     required this.establishmentId,
     required this.checklistId,
-    required this.submittedByEmployeeId,
-    required this.recipientChefId,
+    this.submittedByEmployeeId,
+    this.recipientChefId,
     required this.checklistName,
     this.section,
     required this.payload,
@@ -29,9 +29,9 @@ class ChecklistSubmission extends Equatable {
       id: json['id'] as String,
       establishmentId: json['establishment_id'] as String,
       checklistId: json['checklist_id'] as String,
-      submittedByEmployeeId: json['submitted_by_employee_id'] as String,
-      recipientChefId: json['recipient_chef_id'] as String,
-      checklistName: json['checklist_name'] as String,
+      submittedByEmployeeId: json['submitted_by_employee_id'] as String?,
+      recipientChefId: json['recipient_chef_id'] as String?,
+      checklistName: (json['checklist_name'] as String?) ?? '',
       section: json['section'] as String?,
       payload: json['payload'] as Map<String, dynamic>? ?? {},
       createdAt: DateTime.parse(json['created_at'] as String),

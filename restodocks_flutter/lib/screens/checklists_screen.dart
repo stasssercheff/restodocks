@@ -150,7 +150,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
       );
       if (mounted) {
         await _load();
-        context.push('/checklists/${created.id}');
+        context.push('/checklists-list/${created.id}');
       }
     } catch (e) {
       if (mounted) {
@@ -327,7 +327,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                         IconButton(
                           icon: const Icon(Icons.task_alt),
                           onPressed: () async {
-                            await context.push('/checklists/${c.id}/fill');
+                            await context.push('/checklists-list/${c.id}/fill');
                             if (mounted) _load();
                           },
                           tooltip: loc.t('fill_checklist') ?? 'Заполнить',
@@ -336,9 +336,9 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                           icon: const Icon(Icons.more_vert),
                           onSelected: (v) async {
                             if (v == 'edit') {
-                              await context.push('/checklists/${c.id}');
+                              await context.push('/checklists-list/${c.id}');
                             } else {
-                              await context.push('/checklists/${c.id}/fill');
+                              await context.push('/checklists-list/${c.id}/fill');
                             }
                             if (mounted) _load();
                           },
@@ -351,7 +351,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                     )
                   : const Icon(Icons.chevron_right),
               onTap: () async {
-                await context.push(canEdit ? '/checklists/${c.id}' : '/checklists/${c.id}/fill');
+                await context.push(canEdit ? '/checklists-list/${c.id}' : '/checklists-list/${c.id}/fill');
                 if (mounted) _load();
               },
             ),

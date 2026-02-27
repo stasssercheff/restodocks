@@ -10,7 +10,7 @@ class ChecklistSubmissionService {
   final SupabaseService _supabase = SupabaseService();
   static const _table = 'checklist_submissions';
 
-  /// Отправить заполненный чеклист шефу и су-шефу (по одному ряду на получателя).
+  /// Сохранить заполненный чеклист (один документ на заведение, без обязательного получателя).
   Future<void> submit({
     required String establishmentId,
     required String checklistId,
@@ -26,7 +26,7 @@ class ChecklistSubmissionService {
     String? workshop,
     required List<Map<String, dynamic>> items,
     String? comments,
-    required List<String> recipientChefIds,
+    List<String>? recipientChefIds,
   }) async {
     final payload = <String, dynamic>{
       'submittedByName': submittedByName,
@@ -40,12 +40,23 @@ class ChecklistSubmissionService {
       'comments': comments,
       'items': items,
     };
-    for (final rid in recipientChefIds) {
+    if (recipientChefIds != null && recipientChefIds.isNotEmpty) {
+      for (final rid in recipientChefIds) {
+        await _supabase.client.from(_table).insert({
+          'establishment_id': establishmentId,
+          'checklist_id': checklistId,
+          'submitted_by_employee_id': submittedByEmployeeId,
+          'recipient_chef_id': rid,
+          'checklist_name': checklistName,
+          'section': section,
+          'payload': payload,
+        });
+      }
+    } else {
       await _supabase.client.from(_table).insert({
         'establishment_id': establishmentId,
         'checklist_id': checklistId,
         'submitted_by_employee_id': submittedByEmployeeId,
-        'recipient_chef_id': rid,
         'checklist_name': checklistName,
         'section': section,
         'payload': payload,

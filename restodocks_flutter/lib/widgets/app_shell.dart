@@ -85,7 +85,8 @@ class AppShell extends StatelessWidget {
         location.startsWith('/notifications') ||
         location.startsWith('/checklists') ||
         location.startsWith('/tech-cards') ||
-        location.startsWith('/product-order')) {
+        location.startsWith('/product-order') ||
+        location.startsWith('/inventory')) {
       return 1;
     }
     return 0;
