@@ -59,7 +59,7 @@ Deno.serve(async (req: Request) => {
     // Ищем сотрудников по email
     let query = supabase
       .from("employees")
-      .select("id, email, full_name, surname, roles, establishment_id, department, section, is_active, password_hash, avatar_url, preferred_language, auth_user_id, created_at, payment_type, rate_per_shift, hourly_rate")
+      .select("id, email, full_name, surname, roles, establishment_id, department, section, is_active, password_hash, preferred_language, data_access_enabled, created_at")
       .ilike("email", email)
       .eq("is_active", true);
 
