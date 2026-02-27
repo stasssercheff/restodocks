@@ -1,4 +1,3 @@
-import 'package:bcrypt/bcrypt.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -492,115 +491,92 @@ class AccountManagerSupabase extends ChangeNotifier {
       } catch (_) { /* игнор при ошибке выхода */ }
     }
 
-    // 2. Legacy: поиск по employees и проверка password_hash
-    return _findEmployeeByPasswordHash(emailTrim, passwordTrimmed);
+    // 2. Legacy: проверка password_hash через Edge Function на сервере
+    return _findEmployeeByPasswordHashViaEdgeFunction(emailTrim, passwordTrimmed);
   }
 
-  /// Legacy: поиск по employees.password_hash (BCrypt или plain)
-  Future<({Employee employee, Establishment establishment})?> _findEmployeeByPasswordHash(
-    String emailTrim,
+  /// Legacy: BCrypt-проверка пароля через Edge Function authenticate-employee.
+  /// password_hash никогда не покидает сервер — клиент получает только данные сотрудника.
+  Future<({Employee employee, Establishment establishment})?> _findEmployeeByPasswordHashViaEdgeFunction(
+    String email,
     String password,
   ) async {
     try {
-      final empList = await _supabase.client
-          .from('employees')
-          .select()
-          .ilike('email', emailTrim)
-          .eq('is_active', true);
+      if (kDebugMode) debugPrint('🔐 Login: Legacy — calling authenticate-employee Edge Function');
 
-      if (empList == null || (empList as List).isEmpty) {
-        if (kDebugMode) {
-          debugPrint('🔐 Login: Legacy - no employees found for email');
-        }
+      final res = await _supabase.client.functions.invoke(
+        'authenticate-employee',
+        body: {'email': email, 'password': password},
+      );
+
+      if (res.status == 401) {
+        if (kDebugMode) debugPrint('🔐 Login: Legacy — invalid credentials (401)');
         return null;
       }
 
-      if (kDebugMode) {
-        debugPrint('🔐 Login: Legacy - found ${(empList as List).length} employee(s)');
+      if (res.status != 200) {
+        if (kDebugMode) debugPrint('🔐 Login: Legacy — Edge Function error: ${res.status}');
+        return null;
       }
 
-      for (final empRaw in empList) {
-        final employeeData = Map<String, dynamic>.from(empRaw);
-        final hash = employeeData['password_hash'] as String?;
-        if (hash == null || hash.isEmpty) {
-          if (kDebugMode) {
-            debugPrint('🔐 Login: Legacy - employee has no password_hash (uses Auth?)');
-          }
-          continue;
-        }
-        employeeData['password'] = hash;
-        final employee = Employee.fromJson(employeeData);
-        bool ok = false;
-        if (hash.startsWith(r'$2a$') || hash.startsWith(r'$2b$')) {
-          ok = BCrypt.checkpw(password, hash);
-          if (kDebugMode && !ok) {
-            debugPrint('🔐 Login: Legacy - BCrypt check failed for employee');
-          }
-        } else {
-          ok = (hash == password);
-          if (kDebugMode && !ok) {
-            debugPrint('🔐 Login: Legacy - plain password mismatch');
-          }
-        }
-        if (!ok) continue;
+      final data = res.data;
+      if (data is! Map<String, dynamic>) return null;
+      if (data.containsKey('error')) {
+        if (kDebugMode) debugPrint('🔐 Login: Legacy — error: ${data['error']}');
+        return null;
+      }
 
-        final estId = employee.establishmentId;
-        final estData = await _supabase.client
-            .from('establishments')
-            .select()
-            .eq('id', estId)
-            .limit(1)
-            .single();
-        final establishment = Establishment.fromJson(estData);
-        return (employee: employee, establishment: establishment);
-      }
-      if (kDebugMode) {
-        debugPrint('🔐 Login: Legacy - no matching password for any employee');
-      }
-      return null;
+      final empRaw = data['employee'];
+      final estRaw = data['establishment'];
+      if (empRaw == null || estRaw == null) return null;
+
+      final empData = Map<String, dynamic>.from(empRaw as Map);
+      empData['password'] = '';
+      empData['password_hash'] = '';
+      final employee = Employee.fromJson(empData);
+      final establishment = Establishment.fromJson(Map<String, dynamic>.from(estRaw as Map));
+
+      if (kDebugMode) debugPrint('🔐 Login: Legacy — success for ${employee.email}');
+      return (employee: employee, establishment: establishment);
     } catch (e, st) {
       if (kDebugMode) {
-        debugPrint('🔐 Login: Legacy error: $e');
+        debugPrint('🔐 Login: Legacy Edge Function error: $e');
         debugPrint('🔐 Login: Stack: $st');
       }
-      rethrow; // чтобы не маскировать ошибку как «неверный пароль»
+      rethrow;
     }
   }
 
-  /// Поиск сотрудника по email и паролю (в рамках заведения)
+  /// Поиск сотрудника по email и паролю (в рамках заведения) — через Edge Function
   Future<Employee?> findEmployeeByEmailAndPassword({
     required String email,
     required String password,
     required Establishment company,
   }) async {
     try {
-      final data = await _supabase.client
-          .from('employees')
-          .select()
-          .eq('email', email)
-          .eq('establishment_id', company.id)
-          .eq('is_active', true)
-          .limit(1)
-          .single();
+      final res = await _supabase.client.functions.invoke(
+        'authenticate-employee',
+        body: {
+          'email': email.trim(),
+          'password': password.trim(),
+          'establishment_id': company.id,
+        },
+      );
 
-      final employeeData = Map<String, dynamic>.from(data);
-      final hash = employeeData['password_hash'] as String?;
-      if (hash == null || hash.isEmpty) return null;
-      employeeData['password'] = hash;
+      if (res.status != 200) return null;
+      final data = res.data;
+      if (data is! Map<String, dynamic>) return null;
+      if (data.containsKey('error')) return null;
 
-      final employee = Employee.fromJson(employeeData);
-      if ((hash.startsWith(r'$2a$') || hash.startsWith(r'$2b$')) && BCrypt.checkpw(password, hash)) return employee;
-      // Миграция: раньше пароли хранились в открытом виде
-      if (hash == password) {
-        try {
-          final newHash = BCrypt.hashpw(password, BCrypt.gensalt());
-          await _supabase.updateData('employees', {'password_hash': newHash}, 'id', employee.id);
-        } catch (_) { /* игнор */ }
-        return employee;
-      }
-      return null;
+      final empRaw = data['employee'];
+      if (empRaw == null) return null;
+
+      final empData = Map<String, dynamic>.from(empRaw as Map);
+      empData['password'] = '';
+      empData['password_hash'] = '';
+      return Employee.fromJson(empData);
     } catch (e) {
-      print('Ошибка поиска сотрудника: $e');
+      if (kDebugMode) debugPrint('🔐 findEmployeeByEmailAndPassword error: $e');
       return null;
     }
   }

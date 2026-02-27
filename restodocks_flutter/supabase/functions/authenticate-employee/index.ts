@@ -1,0 +1,149 @@
+// Edge Function: legacy-аутентификация сотрудника по email + password_hash (BCrypt)
+// Проверка пароля происходит на сервере — клиент никогда не видит password_hash
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import bcrypt from "npm:bcryptjs@2";
+
+function corsHeaders(origin: string | null) {
+  return {
+    "Access-Control-Allow-Origin": origin || "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  };
+}
+
+Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders(req.headers.get("Origin")) });
+  }
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method not allowed" }), {
+      status: 405,
+      headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+    });
+  }
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    return new Response(
+      JSON.stringify({ error: "Server configuration error" }),
+      { status: 500, headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" } }
+    );
+  }
+
+  // service_role клиент — нужен для чтения password_hash (RLS bypassed на сервере)
+  const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: { persistSession: false },
+  });
+
+  try {
+    const body = (await req.json()) as {
+      email?: string;
+      password?: string;
+      establishment_id?: string; // опционально — для входа в рамках одного заведения
+    };
+
+    const email = body.email?.trim().toLowerCase();
+    const password = body.password?.trim();
+    const establishmentId = body.establishment_id?.trim();
+
+    if (!email || !password) {
+      return new Response(
+        JSON.stringify({ error: "email and password are required" }),
+        { status: 400, headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" } }
+      );
+    }
+
+    // Ищем сотрудников по email
+    let query = supabase
+      .from("employees")
+      .select("id, email, full_name, surname, roles, establishment_id, department, section, is_active, password_hash, avatar_url, preferred_language, auth_user_id, created_at, payment_type, rate_per_shift, hourly_rate")
+      .ilike("email", email)
+      .eq("is_active", true);
+
+    if (establishmentId) {
+      query = query.eq("establishment_id", establishmentId);
+    }
+
+    const { data: employees, error: empError } = await query;
+
+    if (empError) {
+      console.error("[authenticate-employee] DB error:", empError.message);
+      return new Response(
+        JSON.stringify({ error: "Database error" }),
+        { status: 500, headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!employees || employees.length === 0) {
+      // Одинаковый ответ независимо от причины — не раскрываем существование email
+      return new Response(
+        JSON.stringify({ error: "invalid_credentials" }),
+        { status: 401, headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" } }
+      );
+    }
+
+    // Перебираем — может быть несколько заведений с одним email
+    for (const emp of employees) {
+      const hash = emp.password_hash as string | null;
+      if (!hash) continue;
+
+      let passwordMatch = false;
+
+      if (hash.startsWith("$2a$") || hash.startsWith("$2b$")) {
+        // BCrypt
+        passwordMatch = await bcrypt.compare(password, hash);
+      } else {
+        // plain text (legacy) — сравниваем и сразу мигрируем на BCrypt
+        passwordMatch = (hash === password);
+        if (passwordMatch) {
+          const newHash = await bcrypt.hash(password, 10);
+          await supabase
+            .from("employees")
+            .update({ password_hash: newHash })
+            .eq("id", emp.id);
+        }
+      }
+
+      if (!passwordMatch) continue;
+
+      // Нашли — загружаем заведение
+      const { data: estData, error: estError } = await supabase
+        .from("establishments")
+        .select("*")
+        .eq("id", emp.establishment_id)
+        .limit(1)
+        .single();
+
+      if (estError || !estData) {
+        console.error("[authenticate-employee] Establishment not found for employee:", emp.id);
+        continue;
+      }
+
+      // Возвращаем данные БЕЗ password_hash
+      const { password_hash: _omit, ...employeeWithoutHash } = emp;
+      return new Response(
+        JSON.stringify({
+          employee: employeeWithoutHash,
+          establishment: estData,
+        }),
+        { status: 200, headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" } }
+      );
+    }
+
+    // Ни один пароль не подошёл
+    return new Response(
+      JSON.stringify({ error: "invalid_credentials" }),
+      { status: 401, headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" } }
+    );
+
+  } catch (e) {
+    console.error("[authenticate-employee] Unexpected error:", e);
+    return new Response(
+      JSON.stringify({ error: "Internal server error" }),
+      { status: 500, headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" } }
+    );
+  }
+});
