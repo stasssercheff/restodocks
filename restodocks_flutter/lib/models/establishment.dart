@@ -88,20 +88,36 @@ class Establishment extends Equatable {
   }
 
   /// Символ валюты
-  String get currencySymbol {
-    switch (defaultCurrency.toUpperCase()) {
-      case 'RUB':
-        return '₽';
-      case 'USD':
-        return '\$';
-      case 'EUR':
-        return '€';
-      case 'GBP':
-        return '£';
-      case 'VND':
-        return '₫';
-      default:
-        return defaultCurrency;
+  String get currencySymbol => currencySymbolFor(defaultCurrency);
+
+  /// Статический хелпер — символ для любого кода валюты
+  static String currencySymbolFor(String code) {
+    switch (code.toUpperCase()) {
+      case 'RUB': return '₽';
+      case 'USD': return '\$';
+      case 'EUR': return '€';
+      case 'GBP': return '£';
+      case 'VND': return '₫';
+      case 'THB': return '฿';
+      case 'KZT': return '₸';
+      case 'UAH': return '₴';
+      case 'JPY': return '¥';
+      case 'CNY': return '¥';
+      case 'KRW': return '₩';
+      case 'INR': return '₹';
+      case 'TRY': return '₺';
+      case 'PHP': return '₱';
+      case 'BYN': return 'Br';
+      case 'CHF': return 'Fr';
+      case 'PLN': return 'zł';
+      case 'SGD': return 'S\$';
+      case 'HKD': return 'HK\$';
+      case 'CAD': return 'C\$';
+      case 'AUD': return 'A\$';
+      case 'MXN': return '\$';
+      case 'IDR': return 'Rp';
+      case 'MYR': return 'RM';
+      default: return code;
     }
   }
 

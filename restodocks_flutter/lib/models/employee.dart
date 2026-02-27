@@ -1,6 +1,8 @@
 import 'package:equatable/equatable.dart';
 import 'package:json_annotation/json_annotation.dart';
 
+import 'establishment.dart';
+
 part 'employee.g.dart';
 
 /// Роли сотрудников
@@ -317,26 +319,7 @@ class Employee extends Equatable {
   String get currency => preferredCurrency ?? 'RUB';
 
   /// Символ валюты для отображения
-  String get currencySymbol {
-    switch (currency) {
-      case 'RUB':
-        return '₽';
-      case 'USD':
-        return '\$';
-      case 'EUR':
-        return '€';
-      case 'VND':
-        return '₫';
-      case 'GBP':
-        return '£';
-      case 'JPY':
-        return '¥';
-      case 'CNY':
-        return '¥';
-      default:
-        return currency; // Возвращаем код валюты если символ неизвестен
-    }
-  }
+  String get currencySymbol => Establishment.currencySymbolFor(currency);
 
   /// Отображаемое имя отдела
 

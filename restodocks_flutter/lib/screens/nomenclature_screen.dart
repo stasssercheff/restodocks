@@ -537,16 +537,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         : '${_categoryLabel(p.category)} · ${p.calories?.round() ?? 0} ${loc.t('kcal')} · $priceText';
   }
 
-  String _currencySymbol(String currency) {
-    switch (currency.toUpperCase()) {
-      case 'RUB': return '₽';
-      case 'USD': return '\$';
-      case 'EUR': return '€';
-      case 'GBP': return '£';
-      case 'VND': return '₫';
-      default: return currency;
-    }
-  }
+  String _currencySymbol(String currency) => Establishment.currencySymbolFor(currency);
 
   String _buildTechCardSubtitle(BuildContext context, TechCard tc) {
     final loc = context.read<LocalizationService>();
@@ -726,7 +717,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     }).toList();
 
     // Сортируем
-    nomItems = _sortNomenclatureItems(nomItems, _nomSort);
+    nomItems = _sortNomenclatureItems(nomItems, _nomSort, lang: loc.currentLanguageCode);
 
     return Scaffold(
       appBar: AppBar(
@@ -843,14 +834,14 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     );
   }
 
-  List<Product> _sortProducts(List<Product> list, _CatalogSort sort) {
+  List<Product> _sortProducts(List<Product> list, _CatalogSort sort, {String lang = 'ru'}) {
     final copy = List<Product>.from(list);
     switch (sort) {
       case _CatalogSort.nameAz:
-        copy.sort((a, b) => _sortKeyForName(a.getLocalizedName('ru')).compareTo(_sortKeyForName(b.getLocalizedName('ru'))));
+        copy.sort((a, b) => _sortKeyForName(a.getLocalizedName(lang)).compareTo(_sortKeyForName(b.getLocalizedName(lang))));
         break;
       case _CatalogSort.nameZa:
-        copy.sort((a, b) => _sortKeyForName(b.getLocalizedName('ru')).compareTo(_sortKeyForName(a.getLocalizedName('ru'))));
+        copy.sort((a, b) => _sortKeyForName(b.getLocalizedName(lang)).compareTo(_sortKeyForName(a.getLocalizedName(lang))));
         break;
       case _CatalogSort.priceAsc:
         copy.sort((a, b) => (a.basePrice ?? 0).compareTo(b.basePrice ?? 0));
@@ -862,33 +853,38 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     return copy;
   }
 
-  /// Ключ сортировки: соус/специя и т.п. идут по букве слова-типа (С)
+  /// Ключ сортировки: для русского — соус/специя и т.п. идут по слову-типу;
+  /// для других языков — простая алфавитная.
   static String _sortKeyForName(String name) {
-    const words = ['соус', 'специя', 'смесь', 'приправа', 'маринад', 'подлива', 'паста', 'масло'];
     final lower = name.trim().toLowerCase();
-    for (final w in words) {
-      final idx = lower.indexOf(w);
-      if (idx >= 0) {
-        final before = idx > 0 ? lower.substring(0, idx).trim() : '';
-        final after = idx + w.length < lower.length ? lower.substring(idx + w.length).trim() : '';
-        final rest = [before, after].where((s) => s.isNotEmpty).join(' ');
-        return '$w ${rest.isEmpty ? '' : rest}'.trim();
+    // Применяем русскую логику только если текст содержит кириллицу
+    final hasCyrillic = lower.runes.any((r) => r >= 0x0400 && r <= 0x04FF);
+    if (hasCyrillic) {
+      const words = ['соус', 'специя', 'смесь', 'приправа', 'маринад', 'подлива', 'паста', 'масло'];
+      for (final w in words) {
+        final idx = lower.indexOf(w);
+        if (idx >= 0) {
+          final before = idx > 0 ? lower.substring(0, idx).trim() : '';
+          final after = idx + w.length < lower.length ? lower.substring(idx + w.length).trim() : '';
+          final rest = [before, after].where((s) => s.isNotEmpty).join(' ');
+          return '$w ${rest.isEmpty ? '' : rest}'.trim();
+        }
       }
     }
     return lower;
   }
 
-  List<NomenclatureItem> _sortNomenclatureItems(List<NomenclatureItem> list, _CatalogSort sort) {
+  List<NomenclatureItem> _sortNomenclatureItems(List<NomenclatureItem> list, _CatalogSort sort, {String lang = 'ru'}) {
     final products = list.where((item) => item.isProduct).toList();
     final techCards = list.where((item) => item.isTechCard).toList();
 
     void sortGroup(List<NomenclatureItem> group) {
       switch (sort) {
         case _CatalogSort.nameAz:
-          group.sort((a, b) => _sortKeyForName(a.getLocalizedName('ru')).compareTo(_sortKeyForName(b.getLocalizedName('ru'))));
+          group.sort((a, b) => _sortKeyForName(a.getLocalizedName(lang)).compareTo(_sortKeyForName(b.getLocalizedName(lang))));
           break;
         case _CatalogSort.nameZa:
-          group.sort((a, b) => _sortKeyForName(b.getLocalizedName('ru')).compareTo(_sortKeyForName(a.getLocalizedName('ru'))));
+          group.sort((a, b) => _sortKeyForName(b.getLocalizedName(lang)).compareTo(_sortKeyForName(a.getLocalizedName(lang))));
           break;
         case _CatalogSort.priceAsc:
           group.sort((a, b) => (a.price ?? 0).compareTo(b.price ?? 0));
@@ -2605,7 +2601,7 @@ class _ProductEditDialog extends StatefulWidget {
   final bool isCreate;
   final VoidCallback onSaved;
 
-  static const _currencies = ['RUB', 'USD', 'EUR', 'VND'];
+  static const _currencies = ['RUB', 'USD', 'EUR', 'VND', 'THB', 'KZT', 'GBP', 'UAH'];
 
   @override
   State<_ProductEditDialog> createState() => _ProductEditDialogState();
@@ -2907,7 +2903,7 @@ class _CurrencySettingsDialog extends StatefulWidget {
   final Future<void> Function(Establishment) onSaved;
   final Future<void> Function(String) onApplyToAll;
 
-  static const _presetCurrencies = ['RUB', 'USD', 'EUR', 'VND', 'GBP'];
+  static const _presetCurrencies = ['RUB', 'USD', 'EUR', 'VND', 'THB', 'KZT', 'GBP', 'UAH'];
 
   @override
   State<_CurrencySettingsDialog> createState() => _CurrencySettingsDialogState();
