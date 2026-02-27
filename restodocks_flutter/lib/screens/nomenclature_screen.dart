@@ -336,7 +336,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
 
     final techCardService = context.read<TechCardServiceSupabase>();
 
-    if (store.allProducts.isEmpty && !store.isLoading) {
+    if (!store.isLoading) {
       await store.loadProducts();
     }
     await store.loadNomenclature(estId);
