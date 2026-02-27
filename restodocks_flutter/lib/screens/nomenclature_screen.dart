@@ -38,6 +38,7 @@ import '../services/supabase_service.dart';
 import '../services/secure_storage_service.dart';
 import '../services/theme_service.dart';
 import '../services/translation_service.dart';
+import '../services/translation_manager.dart';
 import '../services/ai_service.dart';
 import '../services/ai_service_supabase.dart';
 import '../services/order_list_storage_service.dart';
@@ -964,12 +965,14 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     );
     if (result == null || result.name.trim().isEmpty || !mounted) return;
     final store = context.read<ProductStoreSupabase>();
+    final translationManager = context.read<TranslationManager>();
     final defCur = account.establishment?.defaultCurrency ?? 'VND';
-    final allLangs = LocalizationService.productLanguageCodes;
-    final names = <String, String>{for (final c in allLangs) c: result.name.trim()};
+    final sourceName = result.name.trim();
+    final sourceLang = loc.currentLanguageCode;
+    final names = <String, String>{sourceLang: sourceName};
     final product = Product(
       id: const Uuid().v4(),
-      name: result.name.trim(),
+      name: sourceName,
       category: result.category,
       names: names,
       calories: null,
@@ -983,6 +986,16 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     try {
       await store.addProduct(product);
       await store.addToNomenclature(estId, product.id);
+      // Запускаем перевод фоново — не блокируем UI
+      translationManager.generateTranslationsForProduct(sourceName, sourceLang).then((translations) async {
+        if (translations.length > 1) {
+          final updatedNames = Map<String, String>.from(product.names ?? {})..addAll(translations);
+          final updatedProduct = product.copyWith(names: updatedNames);
+          try {
+            await store.updateProduct(updatedProduct);
+          } catch (_) {}
+        }
+      });
       await store.loadProducts();
       await store.loadNomenclature(estId);
       if (mounted) setState(() {});

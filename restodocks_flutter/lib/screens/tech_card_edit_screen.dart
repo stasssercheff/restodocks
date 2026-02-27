@@ -677,6 +677,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     }
     final svc = context.read<TechCardServiceSupabase>();
 
+    final translationManager = context.read<TranslationManager>();
     try {
       if (_isNew || tc == null) {
         final created = await svc.createTechCard(
@@ -702,6 +703,33 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           if (urls.isNotEmpty) updated = updated.copyWith(photoUrls: urls);
         }
         await svc.saveTechCard(updated);
+        // Переводим название и технологию фоново
+        final techText = _technologyController.text.trim();
+        final fieldsToTranslate = <String, String>{'dish_name': name};
+        if (techText.isNotEmpty) fieldsToTranslate['technology'] = techText;
+        translationManager.handleEntitySave(
+          entityType: TranslationEntityType.techCard,
+          entityId: created.id,
+          textFields: fieldsToTranslate,
+          sourceLanguage: curLang,
+          userId: emp.id,
+        ).then((_) async {
+          // После перевода обновляем dishNameLocalized
+          final translatedName = await translationManager.getLocalizedText(
+            entityType: TranslationEntityType.techCard,
+            entityId: created.id,
+            fieldName: 'dish_name',
+            sourceText: name,
+            sourceLanguage: curLang,
+            targetLanguage: curLang == 'ru' ? 'en' : 'ru',
+          );
+          final nameMap = Map<String, String>.from(created.dishNameLocalized ?? {});
+          nameMap[curLang] = name;
+          if (translatedName != name) nameMap[curLang == 'ru' ? 'en' : 'ru'] = translatedName;
+          try {
+            await svc.saveTechCard(created.copyWith(dishNameLocalized: nameMap));
+          } catch (_) {}
+        });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('tech_card_created'))));
           context.go('/tech-cards');
@@ -721,6 +749,34 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
         }
         final updated = _applyEdits(tc, dishName: name, category: category, section: _selectedSection, isSemiFinished: _isSemiFinished, portionWeight: _portionWeight, yieldGrams: yieldVal, technologyLocalized: techMap, photoUrls: photoUrls, ingredients: toSaveIngredients);
         await svc.saveTechCard(updated);
+        // Переводим название и технологию фоново
+        final techText = _technologyController.text.trim();
+        final fieldsToTranslate = <String, String>{'dish_name': name};
+        if (techText.isNotEmpty) fieldsToTranslate['technology'] = techText;
+        translationManager.handleEntitySave(
+          entityType: TranslationEntityType.techCard,
+          entityId: tc.id,
+          textFields: fieldsToTranslate,
+          sourceLanguage: curLang,
+          userId: emp.id,
+        ).then((_) async {
+          final translatedName = await translationManager.getLocalizedText(
+            entityType: TranslationEntityType.techCard,
+            entityId: tc.id,
+            fieldName: 'dish_name',
+            sourceText: name,
+            sourceLanguage: curLang,
+            targetLanguage: curLang == 'ru' ? 'en' : 'ru',
+          );
+          if (translatedName != name) {
+            final nameMap = Map<String, String>.from(updated.dishNameLocalized ?? {});
+            nameMap[curLang] = name;
+            nameMap[curLang == 'ru' ? 'en' : 'ru'] = translatedName;
+            try {
+              await svc.saveTechCard(updated.copyWith(dishNameLocalized: nameMap));
+            } catch (_) {}
+          }
+        });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.read<LocalizationService>().t('save') + ' ✓')));
           context.go('/tech-cards');

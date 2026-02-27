@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../models/models.dart';
+import '../models/translation.dart';
 import '../services/services.dart';
 import '../mixins/auto_save_mixin.dart';
 import '../mixins/input_change_listener_mixin.dart';
@@ -185,12 +186,31 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
     );
     try {
       final svc = context.read<ChecklistServiceSupabase>();
+      final translationManager = context.read<TranslationManager>();
+      final loc = context.read<LocalizationService>();
+      final emp = context.read<AccountManagerSupabase>().currentEmployee;
       await svc.saveChecklist(updated);
+      // Переводим название и пункты чеклиста фоново
+      final sourceLang = loc.currentLanguageCode;
+      final fieldsToTranslate = <String, String>{'name': name};
+      if (updated.additionalName != null && updated.additionalName!.isNotEmpty) {
+        fieldsToTranslate['additional_name'] = updated.additionalName!;
+      }
+      for (var i = 0; i < _items.length; i++) {
+        final t = _items[i].title.trim();
+        if (t.isNotEmpty) fieldsToTranslate['item_$i'] = t;
+      }
+      translationManager.handleEntitySave(
+        entityType: TranslationEntityType.checklist,
+        entityId: updated.id,
+        textFields: fieldsToTranslate,
+        sourceLanguage: sourceLang,
+        userId: emp?.id,
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.read<LocalizationService>().t('save') + ' ✓')),
+          SnackBar(content: Text(loc.t('save') + ' ✓')),
         );
-        // Очистка черновика после успешного сохранения
         clearDraft();
         _load();
       }
