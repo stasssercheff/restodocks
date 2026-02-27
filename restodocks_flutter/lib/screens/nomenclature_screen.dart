@@ -164,6 +164,23 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
           }
         }
 
+        final normalizedLower = normalizedName.trim().toLowerCase();
+
+        // Проверяем, существует ли продукт с таким именем в базе (дедупликация)
+        final existingInStore = store.allProducts.where(
+          (p) => p.name.trim().toLowerCase() == normalizedLower,
+        ).toList();
+
+        if (existingInStore.isNotEmpty) {
+          // Продукт уже есть — просто добавляем в номенклатуру
+          final existingId = existingInStore.first.id;
+          try {
+            await store.addToNomenclature(estId, existingId, price: item.price ?? existingInStore.first.basePrice, currency: defCur);
+          } catch (_) {}
+          setState(() => _skipped++);
+          continue;
+        }
+
         final product = Product(
           id: const Uuid().v4(),
           name: normalizedName,
@@ -185,8 +202,7 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
             if (e.toString().contains('duplicate key') ||
                 e.toString().contains('already exists') ||
                 e.toString().contains('unique constraint')) {
-              // Продукт уже существует, просто добавляем в номенклатуру
-              // Сначала попробуем найти продукт по имени
+              // Продукт уже существует в БД, ищем по имени
               try {
                 final supabaseClient = Supabase.instance.client;
                 final existingProducts = await supabaseClient
@@ -1506,17 +1522,20 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
               FilterChip(
                 label: Text(widget.loc.t('filter_products'), style: const TextStyle(fontSize: 11)),
                 selected: widget.filterType == _NomenclatureFilter.products,
-                onSelected: (_) => widget.onFilterTypeChanged(_NomenclatureFilter.products),
+                onSelected: (_) => widget.onFilterTypeChanged(
+                  widget.filterType == _NomenclatureFilter.products
+                      ? _NomenclatureFilter.all
+                      : _NomenclatureFilter.products,
+                ),
               ),
               FilterChip(
                 label: Text(widget.loc.t('filter_pf'), style: const TextStyle(fontSize: 11)),
                 selected: widget.filterType == _NomenclatureFilter.semiFinished,
-                onSelected: (_) => widget.onFilterTypeChanged(_NomenclatureFilter.semiFinished),
-              ),
-              FilterChip(
-                label: Text(widget.loc.t('filter_all'), style: const TextStyle(fontSize: 11)),
-                selected: widget.filterType == _NomenclatureFilter.all,
-                onSelected: (_) => widget.onFilterTypeChanged(_NomenclatureFilter.all),
+                onSelected: (_) => widget.onFilterTypeChanged(
+                  widget.filterType == _NomenclatureFilter.semiFinished
+                      ? _NomenclatureFilter.all
+                      : _NomenclatureFilter.semiFinished,
+                ),
               ),
             ],
           ),
