@@ -55,17 +55,35 @@ class OrderListExportService {
   /// Шрифт с поддержкой кириллицы для PDF.
   static pw.ThemeData? _pdfTheme;
 
+  // Кешированные шрифты — переиспользуются между вызовами
+  static pw.Font? _fontRegular;
+  static pw.Font? _fontBold;
+  static pw.Font? _fontItalic;
+
   static Future<pw.ThemeData> _getPdfTheme() async {
     if (_pdfTheme != null) return _pdfTheme!;
-    final baseFont = await rootBundle.load('assets/fonts/Roboto-Regular.ttf');
-    final boldFont = await rootBundle.load('assets/fonts/Roboto-Bold.ttf');
-    final italicFont = await rootBundle.load('assets/fonts/Roboto-Italic.ttf');
+    final baseData = await rootBundle.load('assets/fonts/Roboto-Regular.ttf');
+    final boldData = await rootBundle.load('assets/fonts/Roboto-Bold.ttf');
+    final italicData = await rootBundle.load('assets/fonts/Roboto-Italic.ttf');
+    _fontRegular = pw.Font.ttf(baseData);
+    _fontBold = pw.Font.ttf(boldData);
+    _fontItalic = pw.Font.ttf(italicData);
     _pdfTheme = pw.ThemeData.withFont(
-      base: pw.Font.ttf(baseFont),
-      bold: pw.Font.ttf(boldFont),
-      italic: pw.Font.ttf(italicFont),
+      base: _fontRegular!,
+      bold: _fontBold!,
+      italic: _fontItalic!,
+      // boldItalic = используем italic (у нас нет отдельного файла)
+      boldItalic: _fontItalic!,
     );
     return _pdfTheme!;
+  }
+
+  /// Получить italic-шрифт с гарантией кириллицы.
+  static pw.TextStyle _italicStyle({double fontSize = 9}) {
+    return pw.TextStyle(
+      font: _fontItalic,
+      fontSize: fontSize,
+    );
   }
 
   /// Построить PDF заказа (для вложения в письмо или сохранения).
@@ -145,7 +163,7 @@ class OrderListExportService {
             pw.SizedBox(height: 16),
             pw.Paragraph(
               text: '${t('order_list_comment')}: ${list.comment.trim()}',
-              style: pw.TextStyle(fontStyle: pw.FontStyle.italic),
+              style: _italicStyle(fontSize: 10),
             ),
           ],
         ],
@@ -330,7 +348,7 @@ class OrderListExportService {
             pw.SizedBox(height: 16),
             pw.Paragraph(
               text: '${t('order_list_comment')}: $comment',
-              style: pw.TextStyle(fontStyle: pw.FontStyle.italic),
+              style: _italicStyle(fontSize: 10),
             ),
           ],
         ],
