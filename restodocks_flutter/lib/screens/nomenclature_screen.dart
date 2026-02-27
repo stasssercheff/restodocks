@@ -1058,7 +1058,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
           } catch (_) {}
         }
       });
-      await store.loadProducts();
+      await store.loadProducts(force: true);
       await store.loadNomenclature(estId);
       if (mounted) setState(() {});
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('product_added'))));
@@ -1193,7 +1193,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     final account = context.read<AccountManagerSupabase>();
     final estId = account.establishment?.id;
     if (estId != null) {
-      await store.loadProducts();
+      await store.loadProducts(force: true);
       await store.loadNomenclature(estId);
     }
     if (mounted) setState(() {});
@@ -1218,7 +1218,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         },
         onApplyToAll: (currency) async {
           await store.bulkUpdateCurrency(currency);
-          await store.loadProducts();
+          await store.loadProducts(force: true);
           if (context.mounted) setState(() {});
         },
       ),
