@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { Resend } from "npm:resend@2.0.0"
+import { Resend } from "npm:resend@4.0.0"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,12 +10,21 @@ interface EmailRequest {
   to: string
   subject: string
   html: string
-  /** Optional: attachments as base64. Resend expects content as base64 string or buffer. */
+  /** Optional: attachments — content as base64 string */
   attachments?: Array<{ filename: string; content: string }>
 }
 
+/** Decode base64 string to Uint8Array (works in Deno) */
+function base64ToUint8Array(base64: string): Uint8Array {
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+  return bytes
+}
+
 serve(async (req) => {
-  // Handle CORS
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -25,42 +34,45 @@ serve(async (req) => {
 
     const { to, subject, html, attachments }: EmailRequest = await req.json()
 
-    const payload: {
-      from: string
-      to: string[]
-      subject: string
-      html: string
-      attachments?: Array<{ filename: string; content: string }>
-    } = {
+    // Resend SDK in Deno requires content as Uint8Array for binary attachments
+    const resolvedAttachments = attachments?.length
+      ? attachments.map((a) => ({
+          filename: a.filename,
+          content: base64ToUint8Array(a.content),
+        }))
+      : undefined
+
+    const payload = {
       from: Deno.env.get('RESEND_FROM_EMAIL')?.trim() || 'Restodocks <noreply@restodocks.com>',
       to: [to],
-      subject: subject,
-      html: html,
+      subject,
+      html,
+      ...(resolvedAttachments ? { attachments: resolvedAttachments } : {}),
     }
-    if (attachments?.length) {
-      payload.attachments = attachments.map((a) => ({ filename: a.filename, content: a.content }))
-    }
+
+    console.log(`Sending email to=${to} subject="${subject}" attachments=${resolvedAttachments?.length ?? 0}`)
 
     const { data, error } = await resend.emails.send(payload)
 
     if (error) {
-      console.error('Resend error:', error)
-      return new Response(JSON.stringify({ error: error.message }), {
+      console.error('Resend error:', JSON.stringify(error))
+      return new Response(JSON.stringify({ error: (error as { message?: string }).message ?? String(error) }), {
         status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    console.log('Email sent successfully:', data)
-    return new Response(JSON.stringify({ success: true, data }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    console.log('Email sent successfully, id:', (data as { id?: string })?.id)
+    return new Response(JSON.stringify({ ok: true, data }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
 
-  } catch (error) {
-    console.error('Email function error:', error)
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
+  } catch (err) {
+    console.error('Email function error:', err)
+    return new Response(JSON.stringify({ error: String(err) }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
 })
