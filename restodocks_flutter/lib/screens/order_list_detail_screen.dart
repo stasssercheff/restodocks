@@ -261,9 +261,8 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
     final itemsWithNames = await _getItemsWithLocalizedNames(exportLang);
     if (!mounted) return;
 
-    showModalBottomSheet<void>(
+    showDialog<void>(
       context: context,
-      isScrollControlled: true,
       builder: (ctx) => OrderExportSheet(
         list: _list!,
         itemsWithQuantities: itemsWithNames,

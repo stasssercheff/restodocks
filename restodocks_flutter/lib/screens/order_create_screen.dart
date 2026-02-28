@@ -299,9 +299,8 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
     );
 
     if (!mounted) return;
-    showModalBottomSheet<void>(
+    showDialog<void>(
       context: context,
-      isScrollControlled: true,
       builder: (ctx) => OrderExportSheet(
         list: tempList,
         itemsWithQuantities: itemsWithQty,
@@ -711,32 +710,31 @@ class _SupplierSelector extends StatelessWidget {
   }
 
   void _showPicker(BuildContext context) {
-    showModalBottomSheet<OrderList>(
+    showDialog<OrderList>(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Text(
-                loc.t('order_select_supplier') ?? 'Выберите поставщика',
-                style: Theme.of(ctx).textTheme.titleMedium,
-              ),
-            ),
-            ...suppliers.map((s) => ListTile(
-                  leading: const Icon(Icons.store_outlined),
-                  title: Text(s.supplierName),
-                  subtitle: s.email != null || s.phone != null
-                      ? Text(s.email ?? s.phone ?? '')
+      builder: (ctx) => SimpleDialog(
+        title: Text(loc.t('order_select_supplier') ?? 'Выберите поставщика'),
+        children: [
+          ...suppliers.map((s) => SimpleDialogOption(
+                onPressed: () => Navigator.of(ctx).pop(s),
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: CircleAvatar(
+                    backgroundColor: Theme.of(ctx).colorScheme.primaryContainer,
+                    child: Icon(Icons.store_outlined,
+                        color: Theme.of(ctx).colorScheme.onPrimaryContainer, size: 20),
+                  ),
+                  title: Text(s.supplierName,
+                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: (s.email ?? s.phone) != null
+                      ? Text(s.email ?? s.phone ?? '',
+                          overflow: TextOverflow.ellipsis)
                       : null,
                   selected: selected?.id == s.id,
-                  onTap: () => Navigator.of(ctx).pop(s),
-                )),
-            const SizedBox(height: 8),
-          ],
-        ),
+                ),
+              )),
+          const SizedBox(height: 4),
+        ],
       ),
     ).then((s) {
       if (s != null) onSelect(s);

@@ -349,89 +349,105 @@ class _OrderExportSheetState extends State<OrderExportSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.55,
-      minChildSize: 0.3,
-      maxChildSize: 0.9,
-      expand: false,
-      builder: (_, scrollController) => Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              _t('order_export_title'),
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              _t('order_export_subtitle'),
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-            ),
-            if (_translating) ...[
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-                  const SizedBox(width: 8),
-                  Text(
-                    _t('loading'),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                _t('order_export_title'),
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _t('order_export_subtitle'),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
+              ),
+              if (_translating) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                    const SizedBox(width: 8),
+                    Text(
+                      _t('loading'),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 8),
+              // Скроллируемый список действий с ограниченной высотой
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.5,
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _ActionTile(
+                        icon: Icons.table_chart,
+                        label: _t('order_export_save_excel'),
+                        onTap: _translating ? null : () => _runAction(context, _saveExcelBg),
+                      ),
+                      _ActionTile(
+                        icon: Icons.picture_as_pdf,
+                        label: _t('order_export_save_pdf'),
+                        onTap: _translating ? null : () => _runAction(context, _savePdfBg),
+                      ),
+                      _ActionTile(
+                        icon: Icons.description,
+                        label: _t('order_export_save_text'),
+                        onTap: _translating ? null : () => _runAction(context, _saveTextBg),
+                      ),
+                      _ActionTile(
+                        icon: Icons.copy,
+                        label: _t('order_export_copy'),
+                        onTap: _translating ? null : () => _runAction(context, _copyToClipboardBg),
+                      ),
+                      if (_hasEmail)
+                        _ActionTile(
+                          icon: Icons.email,
+                          label: '${_t('order_export_send_email')} (${widget.list.email})',
+                          onTap: _translating ? null : () => _runAction(context, _sendEmailBg),
+                        ),
+                      if (_hasWhatsApp)
+                        _ActionTile(
+                          icon: Icons.chat,
+                          label: _t('order_export_send_whatsapp'),
+                          onTap: _translating ? null : () => _runAction(context, _sendWhatsAppBg),
+                        ),
+                      if (_hasTelegram)
+                        _ActionTile(
+                          icon: Icons.send,
+                          label: _t('order_export_send_telegram'),
+                          onTap: _translating ? null : () => _runAction(context, _sendTelegramBg),
+                        ),
+                    ],
                   ),
-                ],
+                ),
+              ),
+              const SizedBox(height: 4),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(_t('cancel')),
+                ),
               ),
             ],
-            const SizedBox(height: 16),
-            Expanded(
-              child: ListView(
-                controller: scrollController,
-                children: [
-                  _ActionTile(
-                    icon: Icons.table_chart,
-                    label: _t('order_export_save_excel'),
-                    onTap: _translating ? null : () => _runAction(context, _saveExcelBg),
-                  ),
-                  _ActionTile(
-                    icon: Icons.picture_as_pdf,
-                    label: _t('order_export_save_pdf'),
-                    onTap: _translating ? null : () => _runAction(context, _savePdfBg),
-                  ),
-                  _ActionTile(
-                    icon: Icons.description,
-                    label: _t('order_export_save_text'),
-                    onTap: _translating ? null : () => _runAction(context, _saveTextBg),
-                  ),
-                  _ActionTile(
-                    icon: Icons.copy,
-                    label: _t('order_export_copy'),
-                    onTap: _translating ? null : () => _runAction(context, _copyToClipboardBg),
-                  ),
-                  if (_hasEmail)
-                    _ActionTile(
-                      icon: Icons.email,
-                      label: '${_t('order_export_send_email')} (${widget.list.email})',
-                      onTap: _translating ? null : () => _runAction(context, _sendEmailBg),
-                    ),
-                  if (_hasWhatsApp)
-                    _ActionTile(
-                      icon: Icons.chat,
-                      label: _t('order_export_send_whatsapp'),
-                      onTap: _translating ? null : () => _runAction(context, _sendWhatsAppBg),
-                    ),
-                  if (_hasTelegram)
-                    _ActionTile(
-                      icon: Icons.send,
-                      label: _t('order_export_send_telegram'),
-                      onTap: _translating ? null : () => _runAction(context, _sendTelegramBg),
-                    ),
-                ],
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

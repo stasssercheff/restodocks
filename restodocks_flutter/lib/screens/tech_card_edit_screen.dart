@@ -455,25 +455,24 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   /// 'photo' | 'excel' — какая кнопка сейчас загружает (чтобы показывать правильный текст).
   final _nameController = TextEditingController();
   static const _categoryOptions = ['sauce', 'vegetables', 'salad', 'meat', 'seafood', 'side', 'subside', 'bakery', 'dessert', 'decor', 'soup', 'misc', 'beverages'];
-  static const _sectionOptions = {
-    'hot_kitchen': 'Горячий цех',
-    'cold_kitchen': 'Холодный цех',
-    'grill': 'Гриль (PRO)',
-    'pizza': 'Пицца (PRO)',
-    'sushi': 'Сушибар (PRO)',
-    'preparation': 'Заготовка',
-    'bakery': 'Выпечка (PRO)',
-    'confectionery': 'Кондитерский цех',
+  // Ключи секций: id → (localization_key, requiresPro)
+  static const _sectionKeys = <String, (String, bool)>{
+    'hot_kitchen':   ('section_hot_kitchen', false),
+    'cold_kitchen':  ('section_cold_kitchen', false),
+    'preparation':   ('section_prep', false),
+    'confectionery': ('section_pastry', false),
+    'grill':         ('section_grill', true),
+    'pizza':         ('section_pizza', true),
+    'sushi':         ('section_sushi', true),
+    'bakery':        ('section_bakery', true),
   };
 
-  Map<String, String> _getAvailableSections(bool hasPro) {
-    return Map.fromEntries(_sectionOptions.entries.where((entry) {
-      if (!hasPro) {
-        // Без PRO показываем только не-PRO цехи
-        return !entry.value.contains('(PRO)');
-      }
-      return true;
-    }));
+  Map<String, String> _getAvailableSections(bool hasPro, LocalizationService loc) {
+    return Map.fromEntries(
+      _sectionKeys.entries
+          .where((e) => hasPro || !e.value.$2)
+          .map((e) => MapEntry(e.key, loc.t(e.value.$1))),
+    );
   }
   String _selectedCategory = 'misc';
   String? _selectedSection; // цех
@@ -1542,14 +1541,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                   effectiveCanEdit
                       ? DropdownButtonFormField<String>(
                           value: _selectedSection,
-                          decoration: InputDecoration(labelText: 'Цех', isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
-                          items: _getAvailableSections(context.read<AccountManagerSupabase>().hasProSubscription).entries.map((entry) =>
+                          decoration: InputDecoration(labelText: loc.t('kitchen_section'), isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
+                          items: _getAvailableSections(context.read<AccountManagerSupabase>().hasProSubscription, loc).entries.map((entry) =>
                             DropdownMenuItem(value: entry.key, child: Text(entry.value))).toList(),
                           onChanged: (v) => setState(() => _selectedSection = v),
                         )
                       : _selectedSection != null ? InputDecorator(
-                          decoration: InputDecoration(labelText: 'Цех', isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
-                          child: Text(_sectionOptions[_selectedSection!] ?? _selectedSection!, overflow: TextOverflow.ellipsis),
+                          decoration: InputDecoration(labelText: loc.t('kitchen_section'), isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
+                          child: Text(_getAvailableSections(context.read<AccountManagerSupabase>().hasProSubscription, loc)[_selectedSection!] ?? _selectedSection!, overflow: TextOverflow.ellipsis),
                         ) : const SizedBox.shrink(),
                   const SizedBox(height: 12),
                   effectiveCanEdit
@@ -1621,14 +1620,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                           child: effectiveCanEdit
                               ? DropdownButtonFormField<String>(
                                   value: _selectedSection,
-                                  decoration: InputDecoration(labelText: 'Цех', isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)), contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
-                                  items: _getAvailableSections(context.read<AccountManagerSupabase>().hasProSubscription).entries.map((entry) =>
+                                  decoration: InputDecoration(labelText: loc.t('kitchen_section'), isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)), contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                                  items: _getAvailableSections(context.read<AccountManagerSupabase>().hasProSubscription, loc).entries.map((entry) =>
                                     DropdownMenuItem(value: entry.key, child: Text(entry.value))).toList(),
                                   onChanged: (v) => setState(() => _selectedSection = v),
                                 )
                               : _selectedSection != null ? InputDecorator(
-                                  decoration: InputDecoration(labelText: 'Цех', isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
-                                  child: Text(_sectionOptions[_selectedSection!] ?? _selectedSection!, overflow: TextOverflow.ellipsis),
+                                  decoration: InputDecoration(labelText: loc.t('kitchen_section'), isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
+                                  child: Text(_getAvailableSections(context.read<AccountManagerSupabase>().hasProSubscription, loc)[_selectedSection!] ?? _selectedSection!, overflow: TextOverflow.ellipsis),
                                 ) : const SizedBox.shrink(),
                         ),
                         const SizedBox(width: 8),
@@ -3029,7 +3028,15 @@ class _ProductSelectDialogState extends State<_ProductSelectDialog> {
 
     if (missing.isNotEmpty) {
       setState(() => _translating = true);
-      await Future.wait(missing.map((p) => store.translateProductAwait(p.id)));
+      // Переводим по одному с таймаутом 5 сек — если зависнет, не блокируем UI
+      for (final p in missing) {
+        if (!mounted) break;
+        try {
+          await store.translateProductAwait(p.id)
+              .timeout(const Duration(seconds: 5), onTimeout: () => null);
+        } catch (_) {}
+        if (mounted) setState(() {});
+      }
       if (!mounted) return;
       setState(() => _translating = false);
     }
