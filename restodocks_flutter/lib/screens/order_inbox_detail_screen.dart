@@ -439,7 +439,7 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
     if (v == null) return '—';
     if (v is num) {
       final nf = NumberFormat('#,##0.##', 'en_US');
-      return nf.format(v);
+      return nf.format(v).replaceAll(',', ' ');
     }
     return v.toString();
   }
