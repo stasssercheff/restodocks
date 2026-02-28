@@ -52,17 +52,19 @@ class OrderListExportService {
     return lines.join('\n');
   }
 
-  /// Шрифт с поддержкой кириллицы для PDF.
+  /// Полная тема PDF (Regular + Bold + Italic) — для сохранения файла.
   static pw.ThemeData? _pdfTheme;
+  /// Лёгкая тема PDF (только Regular) — для вложения в письмо (меньший размер файла).
+  static pw.ThemeData? _pdfThemeLite;
 
   // Кешированные шрифты — переиспользуются между вызовами
   static pw.Font? _fontRegular;
   static pw.Font? _fontBold;
   static pw.Font? _fontItalic;
 
+  /// Полная тема (все три шрифта): ~1.5MB в PDF — для сохранения.
   static Future<pw.ThemeData> _getPdfTheme() async {
     if (_pdfTheme != null) return _pdfTheme!;
-    // Загружаем шрифты атомарно — если что-то упадёт, кэш не обновится
     final baseData = await rootBundle.load('assets/fonts/Roboto-Regular.ttf');
     final boldData = await rootBundle.load('assets/fonts/Roboto-Bold.ttf');
     final italicData = await rootBundle.load('assets/fonts/Roboto-Italic.ttf');
@@ -82,15 +84,32 @@ class OrderListExportService {
     return _pdfTheme!;
   }
 
+  /// Лёгкая тема (только Regular шрифт): ~500KB в PDF — для вложения в письмо.
+  static Future<pw.ThemeData> _getPdfThemeLite() async {
+    if (_pdfThemeLite != null) return _pdfThemeLite!;
+    final baseData = await rootBundle.load('assets/fonts/Roboto-Regular.ttf');
+    final fontRegular = pw.Font.ttf(baseData);
+    _fontRegular = fontRegular;
+    _pdfThemeLite = pw.ThemeData.withFont(
+      base: fontRegular,
+      bold: fontRegular, // используем Regular вместо Bold — меньший файл
+      italic: fontRegular,
+      boldItalic: fontRegular,
+    );
+    return _pdfThemeLite!;
+  }
+
   /// Получить italic-шрифт с гарантией кириллицы.
-  static pw.TextStyle _italicStyle({double fontSize = 9}) {
+  static pw.TextStyle _italicStyle({double fontSize = 9, pw.Font? font}) {
     return pw.TextStyle(
-      font: _fontItalic,
+      font: font ?? _fontItalic ?? _fontRegular,
       fontSize: fontSize,
     );
   }
 
-  /// Построить PDF заказа (для вложения в письмо или сохранения).
+  /// Построить PDF заказа.
+  /// [lightweight] = true — только Regular шрифт (~500KB), для вложения в письмо.
+  /// [lightweight] = false — все шрифты (~1.5MB), для сохранения файла.
   static Future<Uint8List> buildOrderPdfBytes({
     required OrderList list,
     required String companyName,
@@ -98,8 +117,11 @@ class OrderListExportService {
     required String lang,
     required DateTime documentDate,
     required String Function(String) t,
+    bool lightweight = false,
   }) async {
-    final theme = await _getPdfTheme();
+    final theme = lightweight ? await _getPdfThemeLite() : await _getPdfTheme();
+    // В лёгком режиме italic = regular шрифт (Bold/Italic не загружены)
+    final italicFont = lightweight ? _fontRegular : _fontItalic;
     final doc = pw.Document(theme: theme);
     final orderForStr = list.orderForDate != null
         ? DateFormat('dd.MM.yyyy').format(list.orderForDate!)
@@ -167,7 +189,7 @@ class OrderListExportService {
             pw.SizedBox(height: 16),
             pw.Paragraph(
               text: '${t('order_list_comment')}: ${list.comment.trim()}',
-              style: _italicStyle(fontSize: 10),
+              style: _italicStyle(fontSize: 10, font: italicFont),
             ),
           ],
         ],

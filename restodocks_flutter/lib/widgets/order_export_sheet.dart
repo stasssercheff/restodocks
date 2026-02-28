@@ -80,55 +80,58 @@ class _OrderExportSheetState extends State<OrderExportSheet> {
   }
 
   /// Переводим названия продуктов и комментарий.
-  /// Продукты: всегда ищем по productId в store и берём getLocalizedName(_docLang),
-  /// независимо от языка в котором сохранялось productName — это надёжнее, чем
-  /// сравнивать itemsSourceLang с _docLang.
+  /// Если docLang == 'ru' — продукты уже хранятся на русском, перевод не нужен.
+  /// Если docLang != 'ru' — берём getLocalizedName(_docLang) по productId.
   /// Комментарий: переводим если commentSourceLang != _docLang.
   Future<void> _preTranslate() async {
     final uiLang = widget.loc.currentLanguageCode;
     final commentSrcLang = widget.commentSourceLang ?? uiLang;
     if (!mounted) return;
 
-    // Продукты переводим всегда когда docLang задан — независимо от языка исходных названий
-    final hasProducts = widget.itemsWithQuantities.any((i) => i.productName.trim().isNotEmpty);
-    final needCommentTranslation = commentSrcLang != _docLang && widget.list.comment.trim().isNotEmpty;
+    // Продукты переводим только если docLang != 'ru' (имена хранятся на русском)
+    final needProductTranslation = _docLang != 'ru' &&
+        widget.itemsWithQuantities.any((i) => i.productName.trim().isNotEmpty);
+    final needCommentTranslation = commentSrcLang != _docLang &&
+        widget.list.comment.trim().isNotEmpty;
 
-    if (!hasProducts && !needCommentTranslation) return;
+    if (!needProductTranslation && !needCommentTranslation) return;
 
     setState(() => _translating = true);
     try {
       final translationSvc = context.read<TranslationService>();
       final productStore = context.read<ProductStoreSupabase>();
 
-      // Загружаем продукты если ещё не загружены
-      if (productStore.allProducts.isEmpty) await productStore.loadProducts();
+      if (needProductTranslation) {
+        // Загружаем продукты если ещё не загружены
+        if (productStore.allProducts.isEmpty) await productStore.loadProducts();
 
-      // Переводим каждый продукт по productId → getLocalizedName(_docLang)
-      for (final item in widget.itemsWithQuantities) {
-        if (!mounted) break;
-        final name = item.productName.trim();
-        if (name.isEmpty) continue;
+        // Переводим каждый продукт по productId → getLocalizedName(_docLang)
+        for (final item in widget.itemsWithQuantities) {
+          if (!mounted) break;
+          final name = item.productName.trim();
+          if (name.isEmpty) continue;
 
-        final productId = item.productId;
-        final product = (productId != null && productId.isNotEmpty)
-            ? productStore.allProducts.where((p) => p.id == productId).firstOrNull
-            : null;
+          final productId = item.productId;
+          final product = (productId != null && productId.isNotEmpty)
+              ? productStore.allProducts.where((p) => p.id == productId).firstOrNull
+              : null;
 
-        if (product != null) {
-          // Продукт из номенклатуры — берём перевод из names[]
-          final locName = product.getLocalizedName(_docLang);
-          if (locName != name && mounted) {
-            setState(() => _translatedNames[name] = locName);
-          } else if (locName == name) {
-            // Перевод на _docLang отсутствует в names[] — запрашиваем через pipeline
-            final updatedNames = await productStore.translateProductAwait(productId!);
-            final translated = updatedNames?[_docLang];
-            if (translated != null && translated != name && mounted) {
-              setState(() => _translatedNames[name] = translated);
+          if (product != null) {
+            final locName = product.getLocalizedName(_docLang);
+            if (locName != name && mounted) {
+              setState(() => _translatedNames[name] = locName);
+            } else if (locName == name) {
+              // Перевода нет в names[] — запрашиваем через pipeline с таймаутом
+              final updatedNames = await productStore
+                  .translateProductAwait(productId!)
+                  .timeout(const Duration(seconds: 5), onTimeout: () => null);
+              final translated = updatedNames?[_docLang];
+              if (translated != null && translated != name && mounted) {
+                setState(() => _translatedNames[name] = translated);
+              }
             }
           }
         }
-        // Продукты без productId в заказах из номенклатуры не встречаются
       }
 
       // Переводим комментарий (язык написания → язык документа)
@@ -253,7 +256,8 @@ class _OrderExportSheetState extends State<OrderExportSheet> {
     final safeListName = s.list.name.replaceAll(RegExp(r'[^\w\-.\s]'), '_');
     final pdfFileName = 'order_${safeCompany}_${safeListName}_$dateStr.pdf';
 
-    // Генерируем PDF — если не получилось, письмо уйдёт без вложения
+    // Генерируем PDF — если не получилось, письмо уйдёт без вложения.
+    // lightweight=true: только Regular шрифт (~500KB вместо ~1.7MB) — меньший base64 в запросе.
     List<int>? pdfBytes;
     String? pdfError;
     try {
@@ -264,8 +268,9 @@ class _OrderExportSheetState extends State<OrderExportSheet> {
         lang: s.docLang,
         documentDate: DateTime.now(),
         t: s.t,
+        lightweight: true,
       );
-      debugPrint('OrderExportSheet: PDF generated, size=${pdfBytes.length} bytes');
+      debugPrint('OrderExportSheet: PDF generated (lightweight), size=${pdfBytes.length} bytes');
     } catch (e) {
       pdfError = e.toString();
       debugPrint('OrderExportSheet: PDF generation failed: $e');
