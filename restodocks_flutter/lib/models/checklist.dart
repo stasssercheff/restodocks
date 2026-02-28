@@ -11,6 +11,14 @@ enum ChecklistType {
   final String code;
   final String displayName;
 
+  static const _translations = <String, Map<String, String>>{
+    'prep': {'ru': 'Заготовки', 'en': 'Prep', 'es': 'Preparación', 'de': 'Vorbereitung', 'fr': 'Préparation'},
+    'tasks': {'ru': 'Задачи', 'en': 'Tasks', 'es': 'Tareas', 'de': 'Aufgaben', 'fr': 'Tâches'},
+  };
+
+  String getLocalizedName(String lang) =>
+      _translations[code]?[lang] ?? _translations[code]?['en'] ?? displayName;
+
   static ChecklistType? fromCode(String? code) {
     if (code == null || code.isEmpty) return null;
     return ChecklistType.values.where((t) => t.code == code).firstOrNull;

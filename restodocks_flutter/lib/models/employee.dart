@@ -56,6 +56,21 @@ enum KitchenSection {
   final String code;
   final String displayName;
 
+  static const _translations = <String, Map<String, String>>{
+    'hot_kitchen':  {'ru': 'Горячий цех',    'en': 'Hot Kitchen',   'es': 'Cocina caliente', 'de': 'Warme Küche',    'fr': 'Cuisine chaude'},
+    'cold_kitchen': {'ru': 'Холодный цех',   'en': 'Cold Kitchen',  'es': 'Cocina fría',     'de': 'Kalte Küche',    'fr': 'Cuisine froide'},
+    'grill':        {'ru': 'Гриль',          'en': 'Grill',         'es': 'Parrilla',        'de': 'Grill',          'fr': 'Grill'},
+    'pizza':        {'ru': 'Пицца',          'en': 'Pizza',         'es': 'Pizza',           'de': 'Pizza',          'fr': 'Pizza'},
+    'sushi':        {'ru': 'Суши',           'en': 'Sushi',         'es': 'Sushi',           'de': 'Sushi',          'fr': 'Sushi'},
+    'prep':         {'ru': 'Заготовки',      'en': 'Prep',          'es': 'Preparación',     'de': 'Vorbereitung',   'fr': 'Préparation'},
+    'pastry':       {'ru': 'Кондитерский',   'en': 'Pastry',        'es': 'Pastelería',      'de': 'Konditorei',     'fr': 'Pâtisserie'},
+    'bakery':       {'ru': 'Пекарня',        'en': 'Bakery',        'es': 'Panadería',       'de': 'Bäckerei',       'fr': 'Boulangerie'},
+    'cleaning':     {'ru': 'Уборка',         'en': 'Cleaning',      'es': 'Limpieza',        'de': 'Reinigung',      'fr': 'Nettoyage'},
+  };
+
+  String getLocalizedName(String lang) =>
+      _translations[code]?[lang] ?? _translations[code]?['en'] ?? displayName;
+
   static KitchenSection? fromCode(String code) {
     return KitchenSection.values.where((section) => section.code == code).firstOrNull;
   }

@@ -89,7 +89,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                         labelText: loc.t('checklist_type') ?? 'Тип',
                       ),
                       items: ChecklistType.values
-                          .map((t) => DropdownMenuItem(value: t, child: Text(t.displayName)))
+                          .map((t) => DropdownMenuItem(value: t, child: Text(t.getLocalizedName(loc.currentLanguageCode))))
                           .toList(),
                       onChanged: (v) => setDialogState(() => type = v ?? type),
                     ),
@@ -296,8 +296,9 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
         itemCount: _list.length,
         itemBuilder: (context, i) {
           final c = _list[i];
+          final lang = loc.currentLanguageCode;
           final sectionLabel = c.assignedSection != null
-              ? (KitchenSection.fromCode(c.assignedSection!)?.displayName ?? c.assignedSection)
+              ? (KitchenSection.fromCode(c.assignedSection!)?.getLocalizedName(lang) ?? c.assignedSection)
               : null;
           return Card(
             margin: const EdgeInsets.only(bottom: 8),

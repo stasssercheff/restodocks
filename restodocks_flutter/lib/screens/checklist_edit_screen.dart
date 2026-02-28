@@ -552,6 +552,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
+    final lang = loc.currentLanguageCode;
     final acc = context.watch<AccountManagerSupabase>();
     final emp = acc.currentEmployee;
     // Доступ к чеклистам: владелец, шеф, су-шеф, кухня. Редактирование — тем же, кто может создавать.
@@ -672,7 +673,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                   labelText: loc.t('checklist_type') ?? 'Тип чеклиста',
                 ),
                 items: ChecklistType.values
-                    .map((t) => DropdownMenuItem(value: t, child: Text(t.displayName)))
+                    .map((t) => DropdownMenuItem(value: t, child: Text(t.getLocalizedName(lang))))
                     .toList(),
                 onChanged: (v) => setState(() {
                   if (v != null) _type = v;
@@ -726,7 +727,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
               ),
               items: [
                 DropdownMenuItem(value: null, child: Text(loc.t('not_specified') ?? 'Не указан')),
-                ...KitchenSection.values.map((s) => DropdownMenuItem(value: s.code, child: Text(s.displayName))),
+                ...KitchenSection.values.map((s) => DropdownMenuItem(value: s.code, child: Text(s.getLocalizedName(lang)))),
               ],
               onChanged: canEdit ? (v) {
                 setState(() => _checklist = _checklist?.copyWith(assignedSection: v));
