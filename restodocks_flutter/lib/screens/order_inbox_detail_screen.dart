@@ -103,10 +103,9 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
 
     if (items.isEmpty) return;
 
-    // 1. Пробуем через productStore (быстро, без сети)
+    // 1. Пробуем через productStore (быстро, без сети — продукты в номенклатуре уже имеют names)
     final store = context.read<ProductStoreSupabase>();
     if (store.allProducts.isEmpty) await store.loadProducts();
-    if (estId != null) await store.loadNomenclature(estId);
 
     final updated = <String, String>{};
     final needDeepL = <Map<String, dynamic>>[];
@@ -120,20 +119,16 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
       // Если язык совпадает — перевод не нужен
       if (sourceLang == lang) continue;
 
-      // Ищем в store по productId
+      // Ищем в store по productId — продукты в номенклатуре уже имеют переводы в names
       if (productId != null && productId.isNotEmpty) {
-        final product = store.allProducts.where((p) => p.id == productId).firstOrNull
-            ?? (estId != null ? store.getNomenclatureProducts(estId).where((p) => p.id == productId).firstOrNull : null);
+        final product = store.allProducts.where((p) => p.id == productId).firstOrNull;
         if (product != null) {
-          final localizedName = product.getLocalizedName(lang);
-          // getLocalizedName возвращает оригинал если перевода нет — тогда нужен DeepL
-          if (localizedName != product.name || (product.names?.containsKey(lang) ?? false)) {
-            updated[productId] = localizedName;
-            continue;
-          }
+          // Продукт найден — всегда берём из names, DeepL не нужен
+          updated[productId] = product.getLocalizedName(lang);
+          continue;
         }
       }
-      // Продукт не найден в store или нет перевода — запросим DeepL
+      // Продукт не найден в store — запросим DeepL
       needDeepL.add(item);
     }
 

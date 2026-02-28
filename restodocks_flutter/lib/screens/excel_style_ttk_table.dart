@@ -363,7 +363,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                       ),
                       alignment: Alignment.center,
                       child: Text(
-                        widget.isSemiFinished ? 'ПФ' : 'Блюдо',
+                        widget.isSemiFinished ? widget.loc.t('tt_type_pf') : widget.loc.t('tt_type_dish'),
                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                       ),
                     ),

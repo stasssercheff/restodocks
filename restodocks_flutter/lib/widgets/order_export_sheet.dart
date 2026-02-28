@@ -94,14 +94,41 @@ class _OrderExportSheetState extends State<OrderExportSheet> {
     setState(() => _translating = true);
     try {
       final translationSvc = context.read<TranslationService>();
+      final productStore = context.read<ProductStoreSupabase>();
 
       // Переводим названия продуктов (если язык источника отличается от языка документа)
       if (needProductTranslation) {
+        // Загружаем продукты если ещё не загружены
+        if (productStore.allProducts.isEmpty) await productStore.loadProducts();
+
         final seen = <String>{};
+        final needDeepL = <OrderListItem>[];
+
         for (final item in widget.itemsWithQuantities) {
           final name = item.productName.trim();
           if (name.isEmpty || seen.contains(name)) continue;
           seen.add(name);
+
+          // Сначала ищем в store — продукты в номенклатуре уже имеют names[]
+          final productId = item.productId;
+          final product = (productId != null && productId.isNotEmpty)
+              ? productStore.allProducts.where((p) => p.id == productId).firstOrNull
+              : null;
+
+          if (product != null) {
+            final locName = product.getLocalizedName(_docLang);
+            if (locName != name && mounted) {
+              setState(() => _translatedNames[name] = locName);
+            }
+          } else {
+            needDeepL.add(item);
+          }
+        }
+
+        // DeepL только для продуктов не найденных в store
+        for (final item in needDeepL) {
+          if (!mounted) break;
+          final name = item.productName.trim();
           final entityId = item.productId ?? name;
           final translated = await translationSvc.translate(
             entityType: TranslationEntityType.product,
