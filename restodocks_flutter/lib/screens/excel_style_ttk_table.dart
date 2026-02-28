@@ -69,8 +69,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   @override
   void didUpdateWidget(ExcelStyleTtkTable oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.establishmentId != widget.establishmentId ||
-        oldWidget.ingredients.length != widget.ingredients.length) {
+    if (oldWidget.establishmentId != widget.establishmentId) {
       _ensureProductTranslations();
     }
   }
@@ -81,16 +80,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     final store = widget.productStore;
     final estId = widget.establishmentId;
     if (estId == null) return;
-
-    // Collect products from nomenclature + all products store
-    final nomenclature = store.getNomenclatureProducts(estId);
-    final allProds = store.allProducts;
-    final seen = <String>{};
-    final products = <Product>[];
-    for (final p in [...nomenclature, ...allProds]) {
-      if (seen.add(p.id)) products.add(p);
-    }
-
+    final products = store.getNomenclatureProducts(estId);
     final missing = products.where(
       (p) => !(p.names?.containsKey(lang) == true && (p.names![lang]?.trim().isNotEmpty ?? false)),
     ).toList();
@@ -600,7 +590,6 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
       if (ingredient.productId != null || ingredient.productName.isNotEmpty) {
         final product = widget.productStore.findProductForIngredient(ingredient.productId, ingredient.productName);
-        final lang = widget.loc.currentLanguageCode;
         return InkWell(
           onTap: () {
             // При клике на выбранный продукт открываем dropdown для изменения
@@ -623,7 +612,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
               children: [
                 Expanded(
                   child: Text(
-                    product?.getLocalizedName(lang) ?? ingredient.sourceTechCardName ?? ingredient.productName,
+                    product?.name ?? ingredient.productName,
                     style: const TextStyle(fontSize: 12),
                     textAlign: TextAlign.center,
                   ),
@@ -658,39 +647,34 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       // Создаем объединенный список: продукты + ПФ
       final allItems = <SelectableItem>[];
 
-      final lang = widget.loc.currentLanguageCode;
-
-      // Use nomenclature products first; fall back to all products if empty
-      var products = widget.establishmentId != null
+      // Добавляем продукты только из номенклатуры (где есть стоимость за кг/шт)
+      var nomenclatureProducts = widget.establishmentId != null
           ? widget.productStore.getNomenclatureProducts(widget.establishmentId!)
-          : <Product>[];
-      if (products.isEmpty) {
-        products = List.from(widget.productStore.allProducts);
-      }
-      // Supplement with any all-products not already in the list
-      final productIds = products.map((p) => p.id).toSet();
-      for (final p in widget.productStore.allProducts) {
-        if (!productIds.contains(p.id)) products.add(p);
+          : <Product>[]; // Пустой список, если establishmentId null
+
+      // Fallback: если номенклатурные продукты пустые, используем все продукты
+      if (nomenclatureProducts.isEmpty) {
+        nomenclatureProducts = List.from(widget.productStore.allProducts);
       }
 
-      for (final product in products) {
+      final lang = widget.loc.currentLanguageCode;
+      for (final product in nomenclatureProducts) {
         allItems.add(SelectableItem(
           type: 'product',
           item: product,
           displayName: product.getLocalizedName(lang),
-          searchName: '${product.name.toLowerCase()} ${product.getLocalizedName(lang).toLowerCase()}',
+          searchName: product.name.toLowerCase(),
         ));
       }
 
       // Добавляем ПФ
       if (widget.semiFinishedProducts != null) {
         for (final pf in widget.semiFinishedProducts!) {
-          final pfDisplayName = pf.getDisplayNameInLists(lang);
           allItems.add(SelectableItem(
             type: 'pf',
             item: pf,
-            displayName: pfDisplayName,
-            searchName: '${pf.dishName.toLowerCase()} ${pfDisplayName.toLowerCase()}',
+            displayName: pf.getDisplayNameInLists(widget.loc.currentLanguageCode),
+            searchName: pf.dishName.toLowerCase(),
           ));
         }
       }
