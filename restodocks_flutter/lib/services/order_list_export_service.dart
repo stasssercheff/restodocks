@@ -87,12 +87,14 @@ class OrderListExportService {
   /// Лёгкая тема (только Regular шрифт): ~500KB в PDF — для вложения в письмо.
   static Future<pw.ThemeData> _getPdfThemeLite() async {
     if (_pdfThemeLite != null) return _pdfThemeLite!;
-    final baseData = await rootBundle.load('assets/fonts/Roboto-Regular.ttf');
-    final fontRegular = pw.Font.ttf(baseData);
-    _fontRegular = fontRegular;
+    // Переиспользуем уже загруженный Regular если полная тема уже была загружена
+    final fontRegular = _fontRegular ?? pw.Font.ttf(
+      await rootBundle.load('assets/fonts/Roboto-Regular.ttf'),
+    );
+    _fontRegular ??= fontRegular;
     _pdfThemeLite = pw.ThemeData.withFont(
       base: fontRegular,
-      bold: fontRegular, // используем Regular вместо Bold — меньший файл
+      bold: fontRegular,
       italic: fontRegular,
       boldItalic: fontRegular,
     );
