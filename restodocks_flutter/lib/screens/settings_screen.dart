@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/models.dart';
 import '../services/services.dart';
@@ -553,6 +554,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ).then((_) => customController.dispose());
   }
 
+  void _showSupportDialog(BuildContext context, LocalizationService loc) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('contact_support')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.telegram, color: Color(0xFF2AABEE)),
+              title: const Text('Telegram'),
+              subtitle: const Text('@restodocks'),
+              onTap: () async {
+                final uri = Uri.parse('https://t.me/restodocks');
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+                if (ctx.mounted) Navigator.of(ctx).pop();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.email_outlined, color: Colors.redAccent),
+              title: Text(loc.t('email')),
+              subtitle: const Text('stassserchef@gmail.com'),
+              onTap: () async {
+                final uri = Uri(
+                  scheme: 'mailto',
+                  path: 'stassserchef@gmail.com',
+                  query: 'subject=Restodocks%20Support',
+                );
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri);
+                }
+                if (ctx.mounted) Navigator.of(ctx).pop();
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(MaterialLocalizations.of(ctx).closeButtonLabel),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final accountManager = context.watch<AccountManagerSupabase>();
@@ -668,6 +717,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onTap: () => context.push('/admin'),
               ),
             ],
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.support_agent),
+              title: Text(localization.t('contact_support')),
+              subtitle: Text(localization.t('contact_support_subtitle')),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _showSupportDialog(context, localization),
+            ),
             const Divider(),
             ListTile(
               leading: const Icon(Icons.logout, color: Colors.red),
