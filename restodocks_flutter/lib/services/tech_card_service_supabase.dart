@@ -439,4 +439,36 @@ class TechCardServiceSupabase {
 
     return techCards;
   }
+
+  /// Перевести название ТТК на указанный язык через DeepL (translate-text edge function).
+  /// Обновляет dishNameLocalized в БД и возвращает переведённое имя, либо null при ошибке.
+  Future<String?> translateTechCardName(String techCardId, String dishName, String targetLang) async {
+    if (targetLang == 'ru') return null;
+    try {
+      final res = await _supabase.client.functions.invoke(
+        'translate-text',
+        body: {'text': dishName.trim(), 'from': 'ru', 'to': targetLang},
+      );
+      final data = res.data as Map<String, dynamic>?;
+      final translated = data?['translatedText'] as String?;
+      if (translated == null || translated.isEmpty || translated == dishName.trim()) return null;
+
+      // Загружаем текущие данные карты чтобы обновить только dishNameLocalized
+      final rows = await _supabase.client
+          .from('tech_cards')
+          .select('dish_name_localized')
+          .eq('id', techCardId)
+          .maybeSingle();
+      final existing = (rows?['dish_name_localized'] as Map<String, dynamic>?)?.cast<String, String>() ?? {};
+      final updated = {...existing, 'ru': dishName.trim(), targetLang: translated};
+      await _supabase.client
+          .from('tech_cards')
+          .update({'dish_name_localized': updated})
+          .eq('id', techCardId);
+      return translated;
+    } catch (e) {
+      print('TechCardServiceSupabase.translateTechCardName: $e');
+      return null;
+    }
+  }
 }

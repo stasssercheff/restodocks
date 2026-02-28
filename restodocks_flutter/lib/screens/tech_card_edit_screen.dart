@@ -540,6 +540,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
         if (mounted) {
           _pickerTechCards = _isNew ? tcs : tcs.where((t) => t.id != widget.techCardId).toList();
           _semiFinishedProducts = tcs.where((t) => t.isSemiFinished).toList();
+          _ensureTechCardTranslations(tcs);
         }
       }
       if (_isNew) {
@@ -1146,6 +1147,40 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
         },
       ),
     );
+  }
+
+  Future<void> _ensureTechCardTranslations(List<TechCard> cards) async {
+    if (!mounted) return;
+    final lang = context.read<LocalizationService>().currentLanguageCode;
+    if (lang == 'ru') return;
+    final svc = context.read<TechCardServiceSupabase>();
+    final missing = cards.where(
+      (tc) => !(tc.dishNameLocalized?.containsKey(lang) == true &&
+               (tc.dishNameLocalized![lang]?.trim().isNotEmpty ?? false)),
+    ).toList();
+    for (final tc in missing) {
+      if (!mounted) break;
+      try {
+        final translated = await svc.translateTechCardName(tc.id, tc.dishName, lang)
+            .timeout(const Duration(seconds: 5), onTimeout: () => null);
+        if (translated != null && mounted) {
+          setState(() {
+            final idx = _semiFinishedProducts.indexWhere((c) => c.id == tc.id);
+            if (idx >= 0) {
+              _semiFinishedProducts[idx] = _semiFinishedProducts[idx].copyWith(
+                dishNameLocalized: {...(_semiFinishedProducts[idx].dishNameLocalized ?? {}), lang: translated},
+              );
+            }
+            final idx2 = _pickerTechCards.indexWhere((c) => c.id == tc.id);
+            if (idx2 >= 0) {
+              _pickerTechCards[idx2] = _pickerTechCards[idx2].copyWith(
+                dishNameLocalized: {...(_pickerTechCards[idx2].dishNameLocalized ?? {}), lang: translated},
+              );
+            }
+          });
+        }
+      } catch (_) {}
+    }
   }
 
   void _addProductIngredient(Product p, double value, CookingProcess? cookingProcess, double primaryWastePct, String unit, double? gramsPerPiece, {int? replaceIndex, double? cookingLossPctOverride, bool popNavigator = true}) {

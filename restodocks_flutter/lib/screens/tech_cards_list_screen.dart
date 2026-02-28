@@ -85,9 +85,37 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     try {
       final svc = context.read<TechCardServiceSupabase>();
       final list = await svc.getTechCardsForEstablishment(est.id);
-      if (mounted) setState(() { _list = list; _loading = false; });
+      if (mounted) {
+        setState(() { _list = list; _loading = false; });
+        _ensureTechCardTranslations(svc, list);
+      }
     } catch (e) {
       if (mounted) setState(() { _error = e.toString(); _loading = false; });
+    }
+  }
+
+  Future<void> _ensureTechCardTranslations(TechCardServiceSupabase svc, List<TechCard> cards) async {
+    final lang = context.read<LocalizationService>().currentLanguageCode;
+    if (lang == 'ru') return;
+    final missing = cards.where(
+      (tc) => !(tc.dishNameLocalized?.containsKey(lang) == true &&
+               (tc.dishNameLocalized![lang]?.trim().isNotEmpty ?? false)),
+    ).toList();
+    for (final tc in missing) {
+      if (!mounted) break;
+      try {
+        final translated = await svc.translateTechCardName(tc.id, tc.dishName, lang)
+            .timeout(const Duration(seconds: 5), onTimeout: () => null);
+        if (translated != null && mounted) {
+          final idx = _list.indexWhere((c) => c.id == tc.id);
+          if (idx >= 0) {
+            final updated = _list[idx].copyWith(
+              dishNameLocalized: {...(_list[idx].dishNameLocalized ?? {}), lang: translated},
+            );
+            setState(() => _list[idx] = updated);
+          }
+        }
+      } catch (_) {}
     }
   }
 

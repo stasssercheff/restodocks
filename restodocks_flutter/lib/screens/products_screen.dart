@@ -60,6 +60,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
           _products = deduplicatedProducts;
           _isLoading = false;
         });
+        _ensureTranslations(store, deduplicatedProducts);
       }
     } catch (e) {
       if (mounted) {
@@ -68,6 +69,22 @@ class _ProductsScreenState extends State<ProductsScreen> {
           SnackBar(content: Text('Ошибка загрузки продуктов: $e')),
         );
       }
+    }
+  }
+
+  Future<void> _ensureTranslations(ProductStoreSupabase store, List<Product> products) async {
+    final lang = _currentLang;
+    if (lang == 'ru') return;
+    final missing = products.where(
+      (p) => !(p.names?.containsKey(lang) == true && (p.names![lang]?.trim().isNotEmpty ?? false)),
+    ).toList();
+    for (final p in missing) {
+      if (!mounted) break;
+      try {
+        await store.translateProductAwait(p.id)
+            .timeout(const Duration(seconds: 5), onTimeout: () => null);
+      } catch (_) {}
+      if (mounted) setState(() {});
     }
   }
 
@@ -655,21 +672,30 @@ class _ProductsScreenState extends State<ProductsScreen> {
   }
 
   List<Product> get _filteredProducts {
+    final lang = _currentLang;
     var list = _products;
     if (_query.isNotEmpty) {
       final query = _query.toLowerCase();
       list = list.where((product) {
         return product.name.toLowerCase().contains(query) ||
-               product.getLocalizedName('ru').toLowerCase().contains(query);
+               product.getLocalizedName(lang).toLowerCase().contains(query);
       }).toList();
     }
     list = List<Product>.from(list);
     list.sort((a, b) {
-      final ka = _sortKeyForProduct(a.getLocalizedName('ru'));
-      final kb = _sortKeyForProduct(b.getLocalizedName('ru'));
+      final ka = _sortKeyForProduct(a.getLocalizedName(lang));
+      final kb = _sortKeyForProduct(b.getLocalizedName(lang));
       return _sort == _ProductSort.az ? ka.compareTo(kb) : kb.compareTo(ka);
     });
     return list;
+  }
+
+  String get _currentLang {
+    try {
+      return context.read<LocalizationService>().currentLanguageCode;
+    } catch (_) {
+      return 'ru';
+    }
   }
 
   void _showProductDetails(Product product) {

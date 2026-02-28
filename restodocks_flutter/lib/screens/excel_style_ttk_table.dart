@@ -57,9 +57,42 @@ class ExcelStyleTtkTable extends StatefulWidget {
 class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   static const _cellPad = EdgeInsets.symmetric(horizontal: 6, vertical: 6);
 
-
   // Контроллеры для полей ввода
   final Map<String, TextEditingController> _controllers = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _ensureProductTranslations();
+  }
+
+  @override
+  void didUpdateWidget(ExcelStyleTtkTable oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.establishmentId != widget.establishmentId) {
+      _ensureProductTranslations();
+    }
+  }
+
+  Future<void> _ensureProductTranslations() async {
+    final lang = widget.loc.currentLanguageCode;
+    if (lang == 'ru') return;
+    final store = widget.productStore;
+    final estId = widget.establishmentId;
+    if (estId == null) return;
+    final products = store.getNomenclatureProducts(estId);
+    final missing = products.where(
+      (p) => !(p.names?.containsKey(lang) == true && (p.names![lang]?.trim().isNotEmpty ?? false)),
+    ).toList();
+    for (final p in missing) {
+      if (!mounted) break;
+      try {
+        await store.translateProductAwait(p.id)
+            .timeout(const Duration(seconds: 5), onTimeout: () => null);
+      } catch (_) {}
+    }
+    if (mounted) setState(() {});
+  }
 
   @override
   void dispose() {
@@ -178,19 +211,19 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
               TableRow(
                 decoration: BoxDecoration(color: Colors.grey.shade200),
                 children: [
-                  _buildHeaderCell('Тип ТТК'),
-                  _buildHeaderCell('Название'),
-                  _buildHeaderCell('Продукт'),
+                  _buildHeaderCell(widget.loc.t('ttk_type')),
+                  _buildHeaderCell(widget.loc.t('ttk_name')),
+                  _buildHeaderCell(widget.loc.t('ttk_product')),
                   _buildHeaderCell(widget.loc.t('ttk_gross_gr')),
-                  _buildHeaderCell('% отхода'),
+                  _buildHeaderCell(widget.loc.t('ttk_waste_pct')),
                   _buildHeaderCell(widget.loc.t('ttk_net_gr')),
-                  _buildHeaderCell('Способ'),
-                  _buildHeaderCell('% ужарки'),
+                  _buildHeaderCell(widget.loc.t('ttk_cooking_method')),
+                  _buildHeaderCell(widget.loc.t('ttk_cooking_loss_pct')),
                   _buildHeaderCell(widget.loc.t('ttk_output_gr')),
-                  _buildHeaderCell('вес прц'),
-                  _buildHeaderCell('порций(шт)'),
-                  _buildHeaderCell('Цена'),
-                  _buildHeaderCell('Стоимость (за кг/прц)'),
+                  _buildHeaderCell(widget.loc.t('ttk_weight_prc')),
+                  _buildHeaderCell(widget.loc.t('ttk_portions_pcs')),
+                  _buildHeaderCell(widget.loc.t('ttk_price')),
+                  _buildHeaderCell(widget.loc.t('ttk_cost')),
                   _buildHeaderCell(''), // Столбец удаления
                 ],
               ),
@@ -320,7 +353,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
               TableRow(
                 decoration: BoxDecoration(color: Colors.red.shade50),
                 children: [
-                  _buildTotalCell('Итого'),
+                  _buildTotalCell(widget.loc.t('ttk_total')),
                   const SizedBox.shrink(), // Тип ТТК в итоге не показываем
                   const SizedBox.shrink(), // Название (пусто)
                   const SizedBox.shrink(), // Продукт (пусто)
@@ -624,11 +657,12 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         nomenclatureProducts = List.from(widget.productStore.allProducts);
       }
 
+      final lang = widget.loc.currentLanguageCode;
       for (final product in nomenclatureProducts) {
         allItems.add(SelectableItem(
           type: 'product',
           item: product,
-          displayName: product.getLocalizedName('ru'),
+          displayName: product.getLocalizedName(lang),
           searchName: product.name.toLowerCase(),
         ));
       }
@@ -995,7 +1029,7 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
                         controller: searchCtrl,
                         autofocus: true,
                         decoration: InputDecoration(
-                          hintText: 'Поиск по названию',
+                          hintText: widget.loc.t('search'),
                           prefixIcon: const Icon(Icons.search, size: 20),
                           isDense: true,
                           border: const OutlineInputBorder(),
@@ -1023,7 +1057,7 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
                       padding: const EdgeInsets.all(8),
                       child: TextButton(
                         onPressed: () => Navigator.of(ctx).pop(),
-                        child: const Text('Отмена'),
+                        child: Text(widget.loc.t('cancel')),
                       ),
                     ),
                   ],
@@ -1059,7 +1093,7 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(
-              _searchController.text.isEmpty ? 'Выберите продукт' : _searchController.text,
+              _searchController.text.isEmpty ? widget.loc.t('ttk_choose_product') : _searchController.text,
               style: TextStyle(
                 fontSize: 12,
                 color: _searchController.text.isEmpty ? Colors.grey : Colors.black,

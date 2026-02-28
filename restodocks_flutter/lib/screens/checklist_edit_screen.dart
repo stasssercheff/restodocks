@@ -71,11 +71,38 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
             ..addAll(c.items);
         }
       });
+      _ensureTechCardTranslations(techSvc, techs);
     } catch (e) {
       if (mounted) setState(() {
         _error = e.toString();
         _loading = false;
       });
+    }
+  }
+
+  Future<void> _ensureTechCardTranslations(TechCardServiceSupabase svc, List<TechCard> cards) async {
+    if (!mounted) return;
+    final lang = context.read<LocalizationService>().currentLanguageCode;
+    if (lang == 'ru') return;
+    final missing = cards.where(
+      (tc) => !(tc.dishNameLocalized?.containsKey(lang) == true &&
+               (tc.dishNameLocalized![lang]?.trim().isNotEmpty ?? false)),
+    ).toList();
+    for (final tc in missing) {
+      if (!mounted) break;
+      try {
+        final translated = await svc.translateTechCardName(tc.id, tc.dishName, lang)
+            .timeout(const Duration(seconds: 5), onTimeout: () => null);
+        if (translated != null && mounted) {
+          final idx = _techCards.indexWhere((c) => c.id == tc.id);
+          if (idx >= 0) {
+            final updated = _techCards[idx].copyWith(
+              dishNameLocalized: {...(_techCards[idx].dishNameLocalized ?? {}), lang: translated},
+            );
+            setState(() => _techCards[idx] = updated);
+          }
+        }
+      } catch (_) {}
     }
   }
 

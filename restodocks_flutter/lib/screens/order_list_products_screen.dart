@@ -178,10 +178,17 @@ class _OrderListProductsScreenState extends State<OrderListProductsScreen> {
                     itemCount: _list.items.length,
                     itemBuilder: (_, i) {
                       final item = _list.items[i];
+                      final store = context.read<ProductStoreSupabase>();
+                      final product = item.productId != null
+                          ? store.allProducts.where((p) => p.id == item.productId).firstOrNull
+                          : null;
+                      final displayName = product != null
+                          ? product.getLocalizedName(lang)
+                          : item.productName;
                       return Card(
                         margin: const EdgeInsets.only(bottom: 8),
                         child: ListTile(
-                          title: Text(item.productName, overflow: TextOverflow.ellipsis),
+                          title: Text(displayName, overflow: TextOverflow.ellipsis),
                           subtitle: Text(_unitLabel(item.unit, lang)),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -260,17 +267,65 @@ class _ProductSelectDialog extends StatefulWidget {
 
 class _ProductSelectDialogState extends State<_ProductSelectDialog> {
   String _query = '';
+  bool _translating = false;
   final _ctrl = TextEditingController();
+  final _searchFocus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _ensureTranslations());
+  }
+
+  Future<void> _ensureTranslations() async {
+    if (!mounted) return;
+    final lang = widget.lang;
+    if (lang == 'ru') {
+      _searchFocus.requestFocus();
+      return;
+    }
+    final store = context.read<ProductStoreSupabase>();
+    final missing = widget.products.where(
+      (p) => !(p.names?.containsKey(lang) == true && (p.names![lang]?.trim().isNotEmpty ?? false)),
+    ).toList();
+    if (missing.isNotEmpty) {
+      setState(() => _translating = true);
+      for (final p in missing) {
+        if (!mounted) break;
+        try {
+          await store.translateProductAwait(p.id)
+              .timeout(const Duration(seconds: 5), onTimeout: () => null);
+        } catch (_) {}
+        if (mounted) setState(() {});
+      }
+      if (!mounted) return;
+      setState(() => _translating = false);
+    }
+    _searchFocus.requestFocus();
+  }
 
   @override
   void dispose() {
     _ctrl.dispose();
+    _searchFocus.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final loc = context.read<LocalizationService>();
+
+    if (_translating) {
+      return AlertDialog(
+        title: Text(loc.t('ttk_choose_product')),
+        content: const SizedBox(
+          width: 400,
+          height: 120,
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
+
     final q = _query.trim().toLowerCase();
     final filtered = q.isEmpty
         ? widget.products
@@ -286,6 +341,7 @@ class _ProductSelectDialogState extends State<_ProductSelectDialog> {
           children: [
             TextField(
               controller: _ctrl,
+              focusNode: _searchFocus,
               decoration: InputDecoration(
                 labelText: loc.t('search'),
                 prefixIcon: const Icon(Icons.search),
