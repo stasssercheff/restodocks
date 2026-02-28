@@ -36,7 +36,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
   bool _actionHasToggle = true;
   List<String> _actionDropdownOptions = [];
   /// Единица для нового пункта
-  String _newItemUnit = 'кг';
+  String _newItemUnit = 'kg';
 
   Future<void> _load() async {
     setState(() {
@@ -388,9 +388,10 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
   /// Диалог ввода количества после выбора ПФ или при добавлении любого пункта.
   void _showQuantityDialog({required String title, String? techCardId}) {
     final loc = context.read<LocalizationService>();
+    final lang = loc.currentLanguageCode;
     final qtyCtrl = TextEditingController();
-    String selectedUnit = 'кг';
-    const units = ['г', 'кг', 'мл', 'л', 'шт', 'порц.', 'упак.', 'пачка'];
+    String selectedUnit = 'kg';
+    final units = CulinaryUnits.all.map((u) => u.id).toList();
 
     showDialog<void>(
       context: context,
@@ -427,7 +428,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                         isDense: true,
                         border: const OutlineInputBorder(),
                       ),
-                      items: units.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
+                      items: units.map((u) => DropdownMenuItem(value: u, child: Text(CulinaryUnits.displayName(u, lang)))).toList(),
                       onChanged: (v) {
                         if (v != null) setInner(() => selectedUnit = v);
                       },
@@ -467,11 +468,12 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
   /// Редактирование количества/единицы у существующего пункта.
   void _editItemQuantity(int index) {
     final loc = context.read<LocalizationService>();
+    final lang = loc.currentLanguageCode;
     final item = _items[index];
     final qtyCtrl = TextEditingController(text: item.targetQuantity?.toString() ?? '');
-    String selectedUnit = item.targetUnit ?? 'кг';
-    const units = ['г', 'кг', 'мл', 'л', 'шт', 'порц.', 'упак.', 'пачка'];
-    if (!units.contains(selectedUnit)) selectedUnit = 'кг';
+    final units = CulinaryUnits.all.map((u) => u.id).toList();
+    String selectedUnit = item.targetUnit ?? 'kg';
+    if (!units.contains(selectedUnit)) selectedUnit = 'kg';
 
     showDialog<void>(
       context: context,
@@ -505,7 +507,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                         isDense: true,
                         border: const OutlineInputBorder(),
                       ),
-                      items: units.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
+                      items: units.map((u) => DropdownMenuItem(value: u, child: Text(CulinaryUnits.displayName(u, lang)))).toList(),
                       onChanged: (v) {
                         if (v != null) setInner(() => selectedUnit = v);
                       },
@@ -789,20 +791,39 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
             const SizedBox(height: 16),
             ...List.generate(_items.length, (i) {
               final it = _items[i];
+              final lang = loc.currentLanguageCode;
+              // Resolve PF display name from tech cards list if available
+              final techCard = it.techCardId != null
+                  ? _techCards.where((tc) => tc.id == it.techCardId).firstOrNull
+                  : null;
+              final displayTitle = techCard != null
+                  ? techCard.getDisplayNameInLists(lang)
+                  : it.title;
+              // Build localized quantity label
+              String? localizedQuantityLabel;
+              if (it.targetQuantity != null) {
+                final qty = it.targetQuantity! == it.targetQuantity!.truncateToDouble()
+                    ? it.targetQuantity!.toInt().toString()
+                    : it.targetQuantity!.toStringAsFixed(1);
+                final unit = it.targetUnit?.isNotEmpty == true
+                    ? ' ${CulinaryUnits.displayName(it.targetUnit!, lang)}'
+                    : '';
+                localizedQuantityLabel = '$qty$unit';
+              }
               return Card(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: ListTile(
                   leading: it.techCardId != null
                       ? Icon(Icons.link, size: 20, color: Theme.of(context).colorScheme.primary)
                       : null,
-                  title: Text(it.title),
+                  title: Text(displayTitle),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (it.techCardId != null)
                         Text(loc.t('ttk_pf') ?? 'ТТК ПФ', style: Theme.of(context).textTheme.labelSmall),
-                      if (it.quantityLabel != null)
+                      if (localizedQuantityLabel != null)
                         GestureDetector(
                           onTap: canEdit ? () => _editItemQuantity(i) : null,
                           child: Container(
@@ -813,7 +834,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
-                              it.quantityLabel!,
+                              localizedQuantityLabel,
                               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                                     color: Theme.of(context).colorScheme.onSecondaryContainer,
                                     fontWeight: FontWeight.bold,
