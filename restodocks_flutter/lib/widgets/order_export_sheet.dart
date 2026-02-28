@@ -277,7 +277,7 @@ class _OrderExportSheetState extends State<OrderExportSheet> {
       );
     } catch (e) {
       pdfError = e.toString();
-      print('OrderExportSheet: PDF generation failed: $e');
+      debugPrint('OrderExportSheet: PDF generation failed: $e');
     }
 
     try {
@@ -290,8 +290,13 @@ class _OrderExportSheetState extends State<OrderExportSheet> {
       );
       if (result.ok) {
         await s.onExportToInbox?.call();
-        final suffix = pdfError != null ? ' (PDF: $pdfError)' : '';
-        s.onSaved('${s.t('order_export_email_sent')}$suffix');
+        if (pdfError != null) {
+          s.onSaved('${s.t('order_export_email_sent')} (PDF error: $pdfError)');
+        } else if (pdfBytes == null || pdfBytes.isEmpty) {
+          s.onSaved('${s.t('order_export_email_sent')} (no PDF)');
+        } else {
+          s.onSaved(s.t('order_export_email_sent'));
+        }
       } else {
         s.onSaved('${s.t('error_short')}: ${result.error}');
       }
@@ -398,24 +403,23 @@ class _OrderExportSheetState extends State<OrderExportSheet> {
                   _ActionTile(
                     icon: Icons.table_chart,
                     label: _t('order_export_save_excel'),
-                    onTap: () => _runAction(context, _saveExcelBg),
+                    onTap: _translating ? null : () => _runAction(context, _saveExcelBg),
                   ),
                   _ActionTile(
                     icon: Icons.picture_as_pdf,
                     label: _t('order_export_save_pdf'),
-                    onTap: () => _runAction(context, _savePdfBg),
+                    onTap: _translating ? null : () => _runAction(context, _savePdfBg),
                   ),
                   _ActionTile(
                     icon: Icons.description,
                     label: _t('order_export_save_text'),
-                    onTap: () => _runAction(context, _saveTextBg),
+                    onTap: _translating ? null : () => _runAction(context, _saveTextBg),
                   ),
                   _ActionTile(
                     icon: Icons.copy,
                     label: _t('order_export_copy'),
-                    onTap: () => _runAction(context, _copyToClipboardBg),
+                    onTap: _translating ? null : () => _runAction(context, _copyToClipboardBg),
                   ),
-                  // Для отправки: ждём завершения перевода (иначе комментарий может быть непереведён)
                   if (_hasEmail)
                     _ActionTile(
                       icon: Icons.email,

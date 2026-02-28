@@ -443,12 +443,12 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
                         children: [
                           Icon(Icons.link, size: 16, color: Theme.of(context).colorScheme.primary),
                           const SizedBox(width: 4),
-                          Expanded(child: Text(it.title, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.primary, decoration: TextDecoration.underline))),
+                          Expanded(child: Text(_getTitle(it), style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.primary, decoration: TextDecoration.underline))),
                         ],
                       ),
                     )
                   else
-                    Text(it.title, style: Theme.of(context).textTheme.bodyMedium),
+                    Text(_getTitle(it), style: Theme.of(context).textTheme.bodyMedium),
                   if (it.quantityLabel != null) ...[
                     const SizedBox(height: 4),
                     Container(

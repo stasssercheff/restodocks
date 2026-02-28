@@ -1917,6 +1917,71 @@ class _TtkTable extends StatefulWidget {
 class _TtkTableState extends State<_TtkTable> {
   static const _cellPad = EdgeInsets.symmetric(horizontal: 6, vertical: 6);
 
+  // Переведённые имена ингредиентов без productId: productName -> translatedName
+  final Map<String, String> _translatedIngredientNames = {};
+
+  @override
+  void didUpdateWidget(_TtkTable oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final loc = widget.loc;
+    final lang = loc.currentLanguageCode;
+    if (lang != 'ru') _translateMissingIngredientNames(lang);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final lang = widget.loc.currentLanguageCode;
+      if (lang != 'ru') _translateMissingIngredientNames(lang);
+    });
+  }
+
+  /// Переводим имена ингредиентов без productId через TranslationService.
+  Future<void> _translateMissingIngredientNames(String targetLang) async {
+    if (!mounted) return;
+    final translationSvc = context.read<TranslationService>();
+    final updated = <String, String>{};
+
+    for (final ing in widget.ingredients) {
+      if (ing.isPlaceholder || ing.productName.trim().isEmpty) continue;
+      // Если продукт есть в store — он уже переведён через getLocalizedName
+      final product = widget.productStore.findProductForIngredient(ing.productId, ing.productName);
+      if (product != null) continue;
+      // Ингредиент введён вручную без productId — переводим
+      final name = ing.productName.trim();
+      if (_translatedIngredientNames.containsKey(name)) continue;
+
+      try {
+        final translated = await translationSvc.translate(
+          entityType: TranslationEntityType.product,
+          entityId: 'ttk_ing_$name',
+          fieldName: 'name',
+          text: name,
+          from: 'ru',
+          to: targetLang,
+        );
+        if (translated != null && translated.trim().isNotEmpty && translated != name) {
+          updated[name] = translated;
+        }
+      } catch (_) {}
+      if (!mounted) return;
+    }
+
+    if (mounted && updated.isNotEmpty) {
+      setState(() => _translatedIngredientNames.addAll(updated));
+    }
+  }
+
+  /// Возвращает отображаемое имя ингредиента: локализованное из store или переведённое.
+  String _getIngredientDisplayName(TTIngredient ing, String lang) {
+    final product = widget.productStore.findProductForIngredient(ing.productId, ing.productName);
+    if (product != null) return ing.sourceTechCardName ?? product.getLocalizedName(lang);
+    final translated = _translatedIngredientNames[ing.productName.trim()];
+    return translated ?? ing.productName;
+  }
+
   /// Ячейка по шаблону: граница, фон, мин. высота и мин. ширина (чтобы ячейки данных и «Итого» не схлопывались).
   Widget wrapCell(Widget child, {Color? fillColor, bool dataCell = true}) {
     final theme = Theme.of(context);
@@ -2127,7 +2192,7 @@ class _TtkTableState extends State<_TtkTable> {
                               alignment: Alignment.centerLeft,
                               child: Row(
                                 children: [
-                                  Expanded(child: Text(product?.getLocalizedName(lang) ?? ing.productName, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
+                                  Expanded(child: Text(_getIngredientDisplayName(ing, lang), style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
                                   if (widget.getProductsForDropdown != null && widget.onProductSelectedFromDropdown != null) ...[
                                     const SizedBox(width: 6),
                                     _ProductDropdownInCell(
@@ -2145,7 +2210,7 @@ class _TtkTableState extends State<_TtkTable> {
                             dataCell: true,
                           ),
                         )
-                      : TableCell(child: wrapCell(Container(color: firstColsBg, constraints: const BoxConstraints(minHeight: 44), padding: _cellPad, alignment: Alignment.centerLeft, child: Text(ing.sourceTechCardName ?? product?.getLocalizedName(lang) ?? ing.productName, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)), fillColor: firstColsBg, dataCell: true)),
+                      : TableCell(child: wrapCell(Container(color: firstColsBg, constraints: const BoxConstraints(minHeight: 44), padding: _cellPad, alignment: Alignment.centerLeft, child: Text(_getIngredientDisplayName(ing, lang), style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)), fillColor: firstColsBg, dataCell: true)),
               widget.effectiveCanEdit
                   ? TableCell(
                       child: wrapCell(ConstrainedBox(
