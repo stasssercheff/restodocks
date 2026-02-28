@@ -704,8 +704,15 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         return true;
       });
 
-      // Сортируем по displayName
-      allItems.sort((a, b) => a.displayName.compareTo(b.displayName));
+      // Сортируем: сначала продукты А-Я, потом ПФ А-Я
+      allItems.sort((a, b) {
+        if (a.type != b.type) {
+          // продукты ('product') идут перед ПФ ('pf')
+          if (a.type == 'product') return -1;
+          return 1;
+        }
+        return a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase());
+      });
 
       return _ProductSearchDropdown(
         items: allItems,
