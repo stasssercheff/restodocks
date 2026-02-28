@@ -438,8 +438,8 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
   String _fmtNum(dynamic v) {
     if (v == null) return '—';
     if (v is num) {
-      if (v == v.truncateToDouble()) return v.toInt().toString();
-      return v.toStringAsFixed(2);
+      final nf = NumberFormat('#,##0.##', 'en_US');
+      return nf.format(v);
     }
     return v.toString();
   }

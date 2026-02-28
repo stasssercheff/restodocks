@@ -172,7 +172,7 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Fallback: если нет шефов/владельцев — используем создателя документа
+    // Финальный fallback: используем создателя документа
     if (recipients.length === 0) {
       const { data: creator } = await supabase
         .from("employees")
@@ -182,21 +182,9 @@ Deno.serve(async (req: Request) => {
       if (creator) recipients.push(creator);
     }
 
-    // Fallback: если нет шефов/владельцев — используем создателя документа
+    // Крайний fallback: создаём запись с id создателя без email
     if (recipients.length === 0) {
-      const { data: creator } = await supabase
-        .from("employees")
-        .select("id, email")
-        .eq("id", createdByEmployeeId)
-        .single();
-      if (creator) recipients.push(creator);
-    }
-
-    if (recipients.length === 0) {
-      return new Response(
-        JSON.stringify({ error: "Нет получателей (шеф, владелец) в заведении" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      recipients.push({ id: createdByEmployeeId, email: "" });
     }
 
     // Уникальные получатели (один сотрудник может иметь несколько ролей)

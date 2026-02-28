@@ -235,8 +235,10 @@ class _OrderExportSheetState extends State<OrderExportSheet> {
     final safeListName = s.list.name.replaceAll(RegExp(r'[^\w\-.\s]'), '_');
     final pdfFileName = 'order_${safeCompany}_${safeListName}_$dateStr.pdf';
 
+    // Генерируем PDF — если не получилось, письмо уйдёт без вложения
+    List<int>? pdfBytes;
     try {
-      final pdfBytes = await OrderListExportService.buildOrderPdfBytes(
+      pdfBytes = await OrderListExportService.buildOrderPdfBytes(
         list: s.list,
         companyName: s.companyName,
         itemsWithQuantities: s.items,
@@ -244,6 +246,9 @@ class _OrderExportSheetState extends State<OrderExportSheet> {
         documentDate: DateTime.now(),
         t: s.t,
       );
+    } catch (_) {}
+
+    try {
       final result = await EmailService().sendOrderEmail(
         to: to,
         subject: subject,
@@ -377,23 +382,24 @@ class _OrderExportSheetState extends State<OrderExportSheet> {
                     label: _t('order_export_copy'),
                     onTap: () => _runAction(context, _copyToClipboardBg),
                   ),
+                  // Для отправки: ждём завершения перевода (иначе комментарий может быть непереведён)
                   if (_hasEmail)
                     _ActionTile(
                       icon: Icons.email,
                       label: '${_t('order_export_send_email')} (${widget.list.email})',
-                      onTap: () => _runAction(context, _sendEmailBg),
+                      onTap: _translating ? null : () => _runAction(context, _sendEmailBg),
                     ),
                   if (_hasWhatsApp)
                     _ActionTile(
                       icon: Icons.chat,
                       label: _t('order_export_send_whatsapp'),
-                      onTap: () => _runAction(context, _sendWhatsAppBg),
+                      onTap: _translating ? null : () => _runAction(context, _sendWhatsAppBg),
                     ),
                   if (_hasTelegram)
                     _ActionTile(
                       icon: Icons.send,
                       label: _t('order_export_send_telegram'),
-                      onTap: () => _runAction(context, _sendTelegramBg),
+                      onTap: _translating ? null : () => _runAction(context, _sendTelegramBg),
                     ),
                 ],
               ),
@@ -409,12 +415,12 @@ class _ActionTile extends StatelessWidget {
   const _ActionTile({
     required this.icon,
     required this.label,
-    required this.onTap,
+    this.onTap,
   });
 
   final IconData icon;
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {

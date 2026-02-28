@@ -161,13 +161,15 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
 
       if (mounted) {
         if (orderDoc == null) {
+          // Заказ сохранён локально, но входящие не созданы — показываем предупреждение, но не блокируем
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('${loc.t('error_short')}: ${loc.t('order_save_inbox_error')}'),
-              backgroundColor: Theme.of(context).colorScheme.error,
+              content: Text(loc.t('order_save_inbox_warning') ?? '${loc.t('order_list_save_with_quantities')} ✓ (входящие: ошибка — нет получателей)'),
+              duration: const Duration(seconds: 5),
             ),
           );
           setState(() => _saving = false);
+          if (context.canPop()) context.pop();
           return;
         }
         ScaffoldMessenger.of(context).showSnackBar(
