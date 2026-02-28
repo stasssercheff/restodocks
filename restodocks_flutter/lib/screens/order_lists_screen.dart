@@ -7,7 +7,8 @@ import '../models/models.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
 
-/// Экран «Заказ продуктов» — две вкладки: Поставщики (шаблоны) и Списки заказа (сохранённые с количествами).
+/// Экран «Заказ продуктов» — две вкладки: Заказы и Поставщики.
+/// Переключение через FilterChip-кнопки под AppBar, как во «Входящих».
 class OrderListsScreen extends StatefulWidget {
   const OrderListsScreen({super.key, this.embedded = false});
 
@@ -17,12 +18,13 @@ class OrderListsScreen extends StatefulWidget {
   State<OrderListsScreen> createState() => _OrderListsScreenState();
 }
 
-class _OrderListsScreenState extends State<OrderListsScreen>
-    with SingleTickerProviderStateMixin {
+enum _OrderTab { orders, suppliers }
+
+class _OrderListsScreenState extends State<OrderListsScreen> {
   List<OrderList> _allLists = [];
   bool _loading = true;
   String? _establishmentId;
-  late TabController _tabController;
+  _OrderTab _selectedTab = _OrderTab.orders;
 
   /// Поставщики — шаблоны (нет savedAt)
   List<OrderList> get _suppliers =>
@@ -68,14 +70,7 @@ class _OrderListsScreenState extends State<OrderListsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
   }
 
   Future<void> _deleteList(OrderList list) async {
@@ -94,67 +89,92 @@ class _OrderListsScreenState extends State<OrderListsScreen>
       appBar: AppBar(
         leading: widget.embedded ? null : appBarBackButton(context),
         title: Text(loc.t('product_order')),
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: [
-            Tab(
-              icon: const Icon(Icons.list_alt_outlined),
-              text: loc.t('order_tab_orders') ?? 'Заказы',
-            ),
-            Tab(
-              icon: const Icon(Icons.store_outlined),
-              text: loc.t('order_tab_suppliers') ?? 'Поставщики',
-            ),
+      ),
+      body: Column(
+        children: [
+          // Фильтр-кнопки под AppBar — как во «Входящих»
+          _buildTabFilter(loc),
+
+          // Содержимое выбранной вкладки
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _selectedTab == _OrderTab.orders
+                    ? _OrderListsTab(
+                        orders: _savedOrders,
+                        onTap: (order) async {
+                          await context.push('/product-order/${order.id}');
+                          if (mounted) _load();
+                        },
+                        onDelete: _deleteList,
+                        onCreate: () async {
+                          if (_suppliers.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  loc.t('order_no_suppliers_hint') ??
+                                      'Сначала создайте поставщика во вкладке «Поставщики»',
+                                ),
+                              ),
+                            );
+                            setState(() => _selectedTab = _OrderTab.suppliers);
+                          } else {
+                            await context.push('/product-order/create-order');
+                            if (mounted) _load();
+                          }
+                        },
+                        loc: loc,
+                      )
+                    : _SuppliersTab(
+                        suppliers: _suppliers,
+                        onTap: (supplier) async {
+                          await context.push('/product-order/${supplier.id}');
+                          if (mounted) _load();
+                        },
+                        onDelete: _deleteList,
+                        onCreate: () async {
+                          await context.push('/product-order/new');
+                          if (mounted) _load();
+                        },
+                        loc: loc,
+                      ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabFilter(LocalizationService loc) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        border: Border(
+          bottom: BorderSide(color: Theme.of(context).dividerColor),
+        ),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _buildChip(_OrderTab.orders, loc.t('order_tab_orders'), loc),
+            const SizedBox(width: 8),
+            _buildChip(_OrderTab.suppliers, loc.t('order_tab_suppliers'), loc),
           ],
         ),
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : TabBarView(
-              controller: _tabController,
-              children: [
-                // Вкладка 0: Заказы (сохранённые шаблоны с количествами)
-                _OrderListsTab(
-                  orders: _savedOrders,
-                  onTap: (order) async {
-                    await context.push('/product-order/${order.id}');
-                    if (mounted) _load();
-                  },
-                  onDelete: _deleteList,
-                  onCreate: () async {
-                    if (_suppliers.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            loc.t('order_no_suppliers_hint') ??
-                                'Сначала создайте поставщика во вкладке «Поставщики»',
-                          ),
-                        ),
-                      );
-                      _tabController.animateTo(1); // поставщики теперь на вкладке 1
-                    } else {
-                      await context.push('/product-order/create-order');
-                      if (mounted) _load();
-                    }
-                  },
-                  loc: loc,
-                ),
-                // Вкладка 1: Поставщики (карточки с контактами и списком продуктов)
-                _SuppliersTab(
-                  suppliers: _suppliers,
-                  onTap: (supplier) async {
-                    await context.push('/product-order/${supplier.id}');
-                    if (mounted) _load();
-                  },
-                  onDelete: _deleteList,
-                  onCreate: () async {
-                    await context.push('/product-order/new');
-                    if (mounted) _load();
-                  },
-                  loc: loc,
-                ),
-              ],
-            ),
+    );
+  }
+
+  Widget _buildChip(_OrderTab tab, String label, LocalizationService loc) {
+    final isSelected = _selectedTab == tab;
+    return FilterChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (_) => setState(() => _selectedTab = tab),
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      selectedColor: Theme.of(context).colorScheme.primaryContainer,
+      checkmarkColor: Theme.of(context).colorScheme.onPrimaryContainer,
     );
   }
 
