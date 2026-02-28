@@ -76,6 +76,7 @@ class AccountManagerSupabase extends ChangeNotifier {
       final ok = await _loadCurrentUserFromAuth();
       if (ok) {
         print('🔐 AccountManager: User data loaded from Auth, logged in: $isLoggedInSync');
+        await _checkPromoAccess();
         return;
       }
     }
@@ -85,6 +86,26 @@ class AccountManagerSupabase extends ChangeNotifier {
       print('🔐 AccountManager: Restoring session from storage...');
       await _restoreSession(employeeId, establishmentId);
       print('🔐 AccountManager: Session restored, logged in: $isLoggedInSync');
+      await _checkPromoAccess();
+    }
+  }
+
+  /// Проверяет не истёк ли промокод заведения. Если истёк — разлогинивает.
+  Future<void> _checkPromoAccess() async {
+    final estId = _establishment?.id;
+    if (estId == null) return;
+    try {
+      final result = await _supabase.client.rpc(
+        'check_establishment_access',
+        params: {'p_establishment_id': estId},
+      );
+      if (result == 'expired') {
+        print('🔐 AccountManager: Promo code expired for establishment $estId — logging out');
+        await logout();
+      }
+    } catch (e) {
+      print('🔐 AccountManager: _checkPromoAccess error (ignored): $e');
+      // Не блокируем доступ при ошибке сети
     }
   }
 
