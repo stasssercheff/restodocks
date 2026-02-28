@@ -1,0 +1,822 @@
+[
+  {
+    "name": "Конфи из томатов",
+    "en": "Tomato Confit Slow Roasted",
+    "category": "vegetables",
+    "unit": "g",
+    "calories": 85,
+    "protein": 1.0,
+    "fat": 6.5,
+    "carbs": 6.5
+  },
+  {
+    "name": "Пюре из каштана",
+    "en": "Chestnut Puree Sweetened",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 245,
+    "protein": 2.0,
+    "fat": 1.5,
+    "carbs": 54.0
+  },
+  {
+    "name": "Пюре из маракуйи",
+    "en": "Passion Fruit Puree Frozen",
+    "category": "fruits",
+    "unit": "g",
+    "calories": 97,
+    "protein": 2.2,
+    "fat": 0.7,
+    "carbs": 23.4
+  },
+  {
+    "name": "Пюре из малины замороженное",
+    "en": "Raspberry Coulis Puree",
+    "category": "fruits",
+    "unit": "g",
+    "calories": 52,
+    "protein": 1.2,
+    "fat": 0.7,
+    "carbs": 11.9
+  },
+  {
+    "name": "Пюре из клубники",
+    "en": "Strawberry Fruit Puree",
+    "category": "fruits",
+    "unit": "g",
+    "calories": 32,
+    "protein": 0.7,
+    "fat": 0.3,
+    "carbs": 7.7
+  },
+  {
+    "name": "Пюре из манго замороженное",
+    "en": "Frozen Mango Fruit Puree",
+    "category": "fruits",
+    "unit": "g",
+    "calories": 60,
+    "protein": 0.8,
+    "fat": 0.4,
+    "carbs": 15.0
+  },
+  {
+    "name": "Пюре из черной смородины",
+    "en": "Blackcurrant Fruit Puree",
+    "category": "fruits",
+    "unit": "g",
+    "calories": 63,
+    "protein": 1.4,
+    "fat": 0.4,
+    "carbs": 15.4
+  },
+  {
+    "name": "Пюре из персика",
+    "en": "White Peach Fruit Puree",
+    "category": "fruits",
+    "unit": "g",
+    "calories": 39,
+    "protein": 0.9,
+    "fat": 0.3,
+    "carbs": 9.5
+  },
+  {
+    "name": "Пюре из груши",
+    "en": "Pear Fruit Puree Smooth",
+    "category": "fruits",
+    "unit": "g",
+    "calories": 57,
+    "protein": 0.4,
+    "fat": 0.1,
+    "carbs": 15.0
+  },
+  {
+    "name": "Пюре из дыни",
+    "en": "Cantaloupe Melon Puree",
+    "category": "fruits",
+    "unit": "g",
+    "calories": 34,
+    "protein": 0.8,
+    "fat": 0.2,
+    "carbs": 8.2
+  },
+  {
+    "name": "Пюре из вишни",
+    "en": "Sour Cherry Morello Puree",
+    "category": "fruits",
+    "unit": "g",
+    "calories": 50,
+    "protein": 1.0,
+    "fat": 0.3,
+    "carbs": 12.2
+  },
+  {
+    "name": "Пюре из ежевики",
+    "en": "Blackberry Seedless Puree",
+    "category": "fruits",
+    "unit": "g",
+    "calories": 43,
+    "protein": 1.4,
+    "fat": 0.5,
+    "carbs": 9.6
+  },
+  {
+    "name": "Пюре из банана",
+    "en": "Banana Smooth Puree",
+    "category": "fruits",
+    "unit": "g",
+    "calories": 89,
+    "protein": 1.1,
+    "fat": 0.3,
+    "carbs": 22.8
+  },
+  {
+    "name": "Пюре из киви",
+    "en": "Kiwi Fruit Smooth Puree",
+    "category": "fruits",
+    "unit": "g",
+    "calories": 61,
+    "protein": 1.1,
+    "fat": 0.5,
+    "carbs": 14.7
+  },
+  {
+    "name": "Пюре из граната",
+    "en": "Pomegranate Juice Puree",
+    "category": "fruits",
+    "unit": "g",
+    "calories": 83,
+    "protein": 1.7,
+    "fat": 1.2,
+    "carbs": 18.7
+  },
+  {
+    "name": "Соус демигляс телячий",
+    "en": "Veal Demi Glace Sauce Concentrate",
+    "category": "sauces",
+    "unit": "g",
+    "calories": 50,
+    "protein": 4.0,
+    "fat": 1.0,
+    "carbs": 5.5
+  },
+  {
+    "name": "Паста из вяленых помидоров",
+    "en": "Sun Dried Tomato Paste Pesto",
+    "category": "sauces",
+    "unit": "g",
+    "calories": 215,
+    "protein": 5.1,
+    "fat": 14.1,
+    "carbs": 19.0
+  },
+  {
+    "name": "Песто красное",
+    "en": "Red Pepper Pesto Rosso",
+    "category": "sauces",
+    "unit": "g",
+    "calories": 230,
+    "protein": 5.5,
+    "fat": 20.0,
+    "carbs": 8.5
+  },
+  {
+    "name": "Песто базилик классическое",
+    "en": "Classic Basil Pesto Genovese",
+    "category": "sauces",
+    "unit": "g",
+    "calories": 424,
+    "protein": 6.8,
+    "fat": 41.0,
+    "carbs": 6.5
+  },
+  {
+    "name": "Жареный лук-шалот",
+    "en": "Crispy Fried Shallots Ready",
+    "category": "vegetables",
+    "unit": "g",
+    "calories": 455,
+    "protein": 6.0,
+    "fat": 30.0,
+    "carbs": 45.0
+  },
+  {
+    "name": "Чесночные гренки",
+    "en": "Garlic Croutons Toasted",
+    "category": "bakery",
+    "unit": "g",
+    "calories": 380,
+    "protein": 9.0,
+    "fat": 14.5,
+    "carbs": 57.0
+  },
+  {
+    "name": "Хлебная крошка с травами",
+    "en": "Herb Breadcrumbs Seasoned",
+    "category": "bakery",
+    "unit": "g",
+    "calories": 395,
+    "protein": 12.0,
+    "fat": 7.5,
+    "carbs": 68.0
+  },
+  {
+    "name": "Ореховая крошка",
+    "en": "Mixed Nut Crumble Topping",
+    "category": "nuts",
+    "unit": "g",
+    "calories": 620,
+    "protein": 16.0,
+    "fat": 55.0,
+    "carbs": 22.0
+  },
+  {
+    "name": "Шоколадная стружка темная",
+    "en": "Dark Chocolate Shavings",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 569,
+    "protein": 6.8,
+    "fat": 40.2,
+    "carbs": 45.2
+  },
+  {
+    "name": "Шоколадные чипсы молочные",
+    "en": "Milk Chocolate Chips Baking",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 535,
+    "protein": 7.7,
+    "fat": 30.4,
+    "carbs": 59.2
+  },
+  {
+    "name": "Шоколадные чипсы белые",
+    "en": "White Chocolate Chips Baking",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 539,
+    "protein": 5.9,
+    "fat": 32.1,
+    "carbs": 59.2
+  },
+  {
+    "name": "Кленовый сахар",
+    "en": "Maple Sugar Dried",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 354,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 90.5
+  },
+  {
+    "name": "Ванильный сахар",
+    "en": "Vanilla Sugar Flavored",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 388,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 99.4
+  },
+  {
+    "name": "Лавандовый сахар",
+    "en": "Lavender Infused Sugar",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 388,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 99.0
+  },
+  {
+    "name": "Какао-нибсы",
+    "en": "Raw Cacao Nibs Criollo",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 496,
+    "protein": 12.5,
+    "fat": 46.0,
+    "carbs": 34.0
+  },
+  {
+    "name": "Марципановая масса",
+    "en": "Marzipan Almond Paste Block",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 443,
+    "protein": 8.5,
+    "fat": 22.5,
+    "carbs": 54.5
+  },
+  {
+    "name": "Пастила яблочная",
+    "en": "Apple Pastila Russian Sweet",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 321,
+    "protein": 0.5,
+    "fat": 0.5,
+    "carbs": 80.4
+  },
+  {
+    "name": "Чернила кальмара",
+    "en": "Squid Cuttlefish Ink Bag",
+    "category": "seafood",
+    "unit": "g",
+    "calories": 25,
+    "protein": 4.0,
+    "fat": 0.8,
+    "carbs": 1.5
+  },
+  {
+    "name": "Перец горошком смесь",
+    "en": "Mixed Whole Peppercorn Blend",
+    "category": "spices",
+    "unit": "g",
+    "calories": 271,
+    "protein": 10.0,
+    "fat": 3.5,
+    "carbs": 64.0
+  },
+  {
+    "name": "Масло ореховое микс",
+    "en": "Mixed Nut Butter Spread",
+    "category": "nuts",
+    "unit": "g",
+    "calories": 620,
+    "protein": 18.0,
+    "fat": 54.0,
+    "carbs": 20.0
+  },
+  {
+    "name": "Орехи жареные ассорти",
+    "en": "Roasted Mixed Nut Snack",
+    "category": "nuts",
+    "unit": "g",
+    "calories": 625,
+    "protein": 16.0,
+    "fat": 56.5,
+    "carbs": 19.5
+  },
+  {
+    "name": "Семечки ассорти",
+    "en": "Mixed Seed Blend Superfood",
+    "category": "nuts",
+    "unit": "g",
+    "calories": 545,
+    "protein": 22.0,
+    "fat": 44.0,
+    "carbs": 21.0
+  },
+  {
+    "name": "Мука из фундука",
+    "en": "Hazelnut Flour Meal",
+    "category": "nuts",
+    "unit": "g",
+    "calories": 628,
+    "protein": 14.9,
+    "fat": 60.8,
+    "carbs": 16.7
+  },
+  {
+    "name": "Чай хибискус",
+    "en": "Hibiscus Flower Roselle Tea",
+    "category": "beverages",
+    "unit": "g",
+    "calories": 37,
+    "protein": 0.4,
+    "fat": 0.1,
+    "carbs": 11.5
+  },
+  {
+    "name": "Чай каркаде",
+    "en": "Karkade Sour Tea Dried",
+    "category": "beverages",
+    "unit": "g",
+    "calories": 37,
+    "protein": 0.4,
+    "fat": 0.1,
+    "carbs": 11.5
+  },
+  {
+    "name": "Иван-чай горный",
+    "en": "Fireweed Ivan Chai Russian Tea",
+    "category": "beverages",
+    "unit": "g",
+    "calories": 0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.0
+  },
+  {
+    "name": "Цветки ромашки сухие",
+    "en": "Dried Chamomile Flowers Whole",
+    "category": "spices",
+    "unit": "g",
+    "calories": 1,
+    "protein": 0.1,
+    "fat": 0.1,
+    "carbs": 0.3
+  },
+  {
+    "name": "Сухоцвет настурция",
+    "en": "Dried Nasturtium Flowers",
+    "category": "spices",
+    "unit": "g",
+    "calories": 28,
+    "protein": 2.0,
+    "fat": 0.2,
+    "carbs": 5.7
+  },
+  {
+    "name": "Порошок ягод асаи",
+    "en": "Freeze Dried Acai Berry Powder",
+    "category": "fruits",
+    "unit": "g",
+    "calories": 534,
+    "protein": 8.1,
+    "fat": 32.5,
+    "carbs": 52.2
+  },
+  {
+    "name": "Порошок голубики",
+    "en": "Freeze Dried Blueberry Powder",
+    "category": "fruits",
+    "unit": "g",
+    "calories": 340,
+    "protein": 4.1,
+    "fat": 2.5,
+    "carbs": 85.0
+  },
+  {
+    "name": "Порошок клубники",
+    "en": "Freeze Dried Strawberry Powder",
+    "category": "fruits",
+    "unit": "g",
+    "calories": 341,
+    "protein": 6.5,
+    "fat": 3.3,
+    "carbs": 79.7
+  },
+  {
+    "name": "Порошок малины",
+    "en": "Freeze Dried Raspberry Powder",
+    "category": "fruits",
+    "unit": "g",
+    "calories": 308,
+    "protein": 5.0,
+    "fat": 3.0,
+    "carbs": 75.0
+  },
+  {
+    "name": "Порошок вишни",
+    "en": "Freeze Dried Cherry Powder",
+    "category": "fruits",
+    "unit": "g",
+    "calories": 345,
+    "protein": 4.0,
+    "fat": 1.5,
+    "carbs": 85.0
+  },
+  {
+    "name": "Порошок граната",
+    "en": "Freeze Dried Pomegranate Powder",
+    "category": "fruits",
+    "unit": "g",
+    "calories": 325,
+    "protein": 4.0,
+    "fat": 2.0,
+    "carbs": 80.0
+  },
+  {
+    "name": "Концентрат сока облепихи",
+    "en": "Sea Buckthorn Juice Concentrate",
+    "category": "beverages",
+    "unit": "g",
+    "calories": 82,
+    "protein": 1.2,
+    "fat": 5.4,
+    "carbs": 9.0
+  },
+  {
+    "name": "Концентрат сока граната",
+    "en": "Pomegranate Juice Concentrate",
+    "category": "beverages",
+    "unit": "g",
+    "calories": 265,
+    "protein": 1.5,
+    "fat": 0.3,
+    "carbs": 65.0
+  },
+  {
+    "name": "Концентрат сока клюквы",
+    "en": "Cranberry Juice Concentrate",
+    "category": "beverages",
+    "unit": "g",
+    "calories": 190,
+    "protein": 0.4,
+    "fat": 0.1,
+    "carbs": 49.0
+  },
+  {
+    "name": "Концентрат малинового сока",
+    "en": "Raspberry Juice Concentrate",
+    "category": "beverages",
+    "unit": "g",
+    "calories": 230,
+    "protein": 1.5,
+    "fat": 0.5,
+    "carbs": 58.0
+  },
+  {
+    "name": "Топпинг карамельный",
+    "en": "Caramel Topping Syrup Bottle",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 320,
+    "protein": 0.5,
+    "fat": 1.0,
+    "carbs": 79.0
+  },
+  {
+    "name": "Топпинг шоколадный",
+    "en": "Chocolate Fudge Topping Syrup",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 305,
+    "protein": 2.5,
+    "fat": 4.5,
+    "carbs": 66.0
+  },
+  {
+    "name": "Топпинг клубничный",
+    "en": "Strawberry Dessert Topping",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 270,
+    "protein": 0.5,
+    "fat": 0.5,
+    "carbs": 66.5
+  },
+  {
+    "name": "Кокосовая стружка поджаренная",
+    "en": "Toasted Coconut Flakes Chips",
+    "category": "nuts",
+    "unit": "g",
+    "calories": 660,
+    "protein": 6.9,
+    "fat": 64.5,
+    "carbs": 23.7
+  },
+  {
+    "name": "Безе мини меренги",
+    "en": "Mini Meringue Kisses Baked",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 380,
+    "protein": 3.5,
+    "fat": 0.2,
+    "carbs": 94.5
+  },
+  {
+    "name": "Брынза рассольная",
+    "en": "Bryndza Pickled Brine Cheese",
+    "category": "dairy",
+    "unit": "g",
+    "calories": 262,
+    "protein": 17.9,
+    "fat": 20.1,
+    "carbs": 0.0
+  },
+  {
+    "name": "Сыр имеретинский",
+    "en": "Imeruli Georgian Fresh Cheese",
+    "category": "dairy",
+    "unit": "g",
+    "calories": 240,
+    "protein": 18.5,
+    "fat": 17.5,
+    "carbs": 0.0
+  },
+  {
+    "name": "Тан кисломолочный напиток",
+    "en": "Tan Armenian Kefir Drink",
+    "category": "dairy",
+    "unit": "g",
+    "calories": 28,
+    "protein": 1.4,
+    "fat": 1.5,
+    "carbs": 2.0
+  },
+  {
+    "name": "Кумыс кобылий",
+    "en": "Kumiss Mare Milk Fermented",
+    "category": "dairy",
+    "unit": "g",
+    "calories": 50,
+    "protein": 2.0,
+    "fat": 2.0,
+    "carbs": 4.5
+  },
+  {
+    "name": "Катык кисломолочный",
+    "en": "Katyk Uzbek Fermented Milk",
+    "category": "dairy",
+    "unit": "g",
+    "calories": 60,
+    "protein": 2.8,
+    "fat": 3.5,
+    "carbs": 4.0
+  },
+  {
+    "name": "Кисель клюквенный",
+    "en": "Russian Cranberry Kissel Jelly",
+    "category": "beverages",
+    "unit": "g",
+    "calories": 62,
+    "protein": 0.1,
+    "fat": 0.0,
+    "carbs": 16.0
+  },
+  {
+    "name": "Морс брусничный",
+    "en": "Lingonberry Morse Drink",
+    "category": "beverages",
+    "unit": "g",
+    "calories": 42,
+    "protein": 0.1,
+    "fat": 0.0,
+    "carbs": 10.5
+  },
+  {
+    "name": "Морс клюквенный",
+    "en": "Cranberry Morse Juice Drink",
+    "category": "beverages",
+    "unit": "g",
+    "calories": 39,
+    "protein": 0.1,
+    "fat": 0.0,
+    "carbs": 9.5
+  },
+  {
+    "name": "Квас белый домашний",
+    "en": "White Homemade Kvass Bread",
+    "category": "beverages",
+    "unit": "g",
+    "calories": 27,
+    "protein": 0.2,
+    "fat": 0.0,
+    "carbs": 5.9
+  },
+  {
+    "name": "Протеин горохового белка",
+    "en": "Pea Protein Isolate Powder",
+    "category": "legumes",
+    "unit": "g",
+    "calories": 357,
+    "protein": 83.0,
+    "fat": 6.0,
+    "carbs": 3.0
+  },
+  {
+    "name": "Протеин соевый изолят",
+    "en": "Soy Protein Isolate Powder",
+    "category": "legumes",
+    "unit": "g",
+    "calories": 374,
+    "protein": 88.0,
+    "fat": 1.5,
+    "carbs": 3.0
+  },
+  {
+    "name": "Дрожжи пивные питательные",
+    "en": "Nutritional Yeast Flakes",
+    "category": "grains",
+    "unit": "g",
+    "calories": 325,
+    "protein": 40.4,
+    "fat": 7.6,
+    "carbs": 41.2
+  },
+  {
+    "name": "Каша тыквенная молочная",
+    "en": "Pumpkin Milk Porridge",
+    "category": "grains",
+    "unit": "g",
+    "calories": 70,
+    "protein": 2.5,
+    "fat": 2.5,
+    "carbs": 11.0
+  },
+  {
+    "name": "Холодец свиной",
+    "en": "Pork Aspic Kholodets Russian",
+    "category": "processed_meat",
+    "unit": "g",
+    "calories": 130,
+    "protein": 18.0,
+    "fat": 6.5,
+    "carbs": 0.0
+  },
+  {
+    "name": "Соус нарсараб гранатовый",
+    "en": "Narsharab Pomegranate Sauce",
+    "category": "sauces",
+    "unit": "g",
+    "calories": 260,
+    "protein": 0.5,
+    "fat": 0.5,
+    "carbs": 65.0
+  },
+  {
+    "name": "Паста лимонная",
+    "en": "Lemon Curd Spread Tart",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 270,
+    "protein": 3.0,
+    "fat": 14.0,
+    "carbs": 34.0
+  },
+  {
+    "name": "Соус из чернослива",
+    "en": "Prune Plum Sauce Compote",
+    "category": "sauces",
+    "unit": "g",
+    "calories": 195,
+    "protein": 1.0,
+    "fat": 0.2,
+    "carbs": 51.0
+  },
+  {
+    "name": "Соус ткемали красный",
+    "en": "Red Cherry Plum Tkemali",
+    "category": "sauces",
+    "unit": "g",
+    "calories": 60,
+    "protein": 0.7,
+    "fat": 0.3,
+    "carbs": 13.5
+  },
+  {
+    "name": "Сыр пекорино романо",
+    "en": "Pecorino Romano Hard Sheep",
+    "category": "dairy",
+    "unit": "g",
+    "calories": 387,
+    "protein": 31.8,
+    "fat": 28.0,
+    "carbs": 3.6
+  },
+  {
+    "name": "Сыр грана падано",
+    "en": "Grana Padano Hard Italian",
+    "category": "dairy",
+    "unit": "g",
+    "calories": 384,
+    "protein": 33.0,
+    "fat": 25.8,
+    "carbs": 0.0
+  },
+  {
+    "name": "Вафельные конусы",
+    "en": "Ice Cream Cone Sugar Waffle",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 410,
+    "protein": 7.0,
+    "fat": 9.0,
+    "carbs": 74.0
+  },
+  {
+    "name": "Вино Марсала для готовки",
+    "en": "Marsala Cooking Wine Sicily",
+    "category": "beverages",
+    "unit": "g",
+    "calories": 154,
+    "protein": 0.1,
+    "fat": 0.0,
+    "carbs": 14.0
+  },
+  {
+    "name": "Вино Порто для готовки",
+    "en": "Ruby Port Wine Cooking",
+    "category": "beverages",
+    "unit": "g",
+    "calories": 154,
+    "protein": 0.1,
+    "fat": 0.0,
+    "carbs": 12.0
+  },
+  {
+    "name": "Узвар сухофрукты компот",
+    "en": "Ukrainian Uzvar Dried Fruit",
+    "category": "beverages",
+    "unit": "g",
+    "calories": 78,
+    "protein": 0.5,
+    "fat": 0.0,
+    "carbs": 20.0
+  }
+]

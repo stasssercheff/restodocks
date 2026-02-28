@@ -1,0 +1,1892 @@
+[
+  {
+    "name": "Лосятина",
+    "en": "Elk Moose Meat",
+    "category": "meat",
+    "unit": "g",
+    "calories": 109,
+    "protein": 22.0,
+    "fat": 1.9,
+    "carbs": 0.0
+  },
+  {
+    "name": "Оленина молодая",
+    "en": "Young Venison Deer Meat",
+    "category": "meat",
+    "unit": "g",
+    "calories": 149,
+    "protein": 26.0,
+    "fat": 3.5,
+    "carbs": 0.0
+  },
+  {
+    "name": "Кабан дикий",
+    "en": "Wild Boar Meat",
+    "category": "meat",
+    "unit": "g",
+    "calories": 122,
+    "protein": 21.5,
+    "fat": 3.8,
+    "carbs": 0.0
+  },
+  {
+    "name": "Медвежье мясо",
+    "en": "Bear Meat Game",
+    "category": "meat",
+    "unit": "g",
+    "calories": 155,
+    "protein": 20.1,
+    "fat": 8.3,
+    "carbs": 0.0
+  },
+  {
+    "name": "Нутрия тушка",
+    "en": "Nutria Coypu Meat",
+    "category": "meat",
+    "unit": "g",
+    "calories": 148,
+    "protein": 23.5,
+    "fat": 5.7,
+    "carbs": 0.0
+  },
+  {
+    "name": "Страусиная грудка",
+    "en": "Ostrich Breast Fillet",
+    "category": "meat",
+    "unit": "g",
+    "calories": 116,
+    "protein": 22.0,
+    "fat": 2.4,
+    "carbs": 0.0
+  },
+  {
+    "name": "Мясо косули",
+    "en": "Roe Deer Venison",
+    "category": "meat",
+    "unit": "g",
+    "calories": 138,
+    "protein": 23.5,
+    "fat": 4.2,
+    "carbs": 0.0
+  },
+  {
+    "name": "Зубрятина",
+    "en": "European Bison Meat",
+    "category": "meat",
+    "unit": "g",
+    "calories": 103,
+    "protein": 20.2,
+    "fat": 2.3,
+    "carbs": 0.0
+  },
+  {
+    "name": "Мясо альпаки",
+    "en": "Alpaca Camelid Meat",
+    "category": "meat",
+    "unit": "g",
+    "calories": 149,
+    "protein": 23.8,
+    "fat": 5.1,
+    "carbs": 0.0
+  },
+  {
+    "name": "Верблюжье мясо",
+    "en": "Camel Dromedary Meat",
+    "category": "meat",
+    "unit": "g",
+    "calories": 103,
+    "protein": 20.5,
+    "fat": 2.2,
+    "carbs": 0.0
+  },
+  {
+    "name": "Мясо буйвола",
+    "en": "Water Buffalo Meat",
+    "category": "meat",
+    "unit": "g",
+    "calories": 131,
+    "protein": 23.8,
+    "fat": 3.5,
+    "carbs": 0.0
+  },
+  {
+    "name": "Мясо як",
+    "en": "Yak Highland Meat",
+    "category": "meat",
+    "unit": "g",
+    "calories": 130,
+    "protein": 22.5,
+    "fat": 4.0,
+    "carbs": 0.0
+  },
+  {
+    "name": "Конина жирная",
+    "en": "Fat Horse Meat",
+    "category": "meat",
+    "unit": "g",
+    "calories": 175,
+    "protein": 18.2,
+    "fat": 11.0,
+    "carbs": 0.0
+  },
+  {
+    "name": "Конская колбаса казы",
+    "en": "Kazy Horse Sausage",
+    "category": "processed_meat",
+    "unit": "g",
+    "calories": 378,
+    "protein": 18.3,
+    "fat": 33.4,
+    "carbs": 0.0
+  },
+  {
+    "name": "Куропатка тушка",
+    "en": "Partridge Game Bird",
+    "category": "poultry",
+    "unit": "g",
+    "calories": 150,
+    "protein": 23.0,
+    "fat": 6.0,
+    "carbs": 0.0
+  },
+  {
+    "name": "Рябчик тушка",
+    "en": "Hazel Grouse Wild Bird",
+    "category": "poultry",
+    "unit": "g",
+    "calories": 172,
+    "protein": 23.3,
+    "fat": 8.9,
+    "carbs": 0.0
+  },
+  {
+    "name": "Глухарь мясо",
+    "en": "Capercaillie Game Meat",
+    "category": "poultry",
+    "unit": "g",
+    "calories": 154,
+    "protein": 25.0,
+    "fat": 5.6,
+    "carbs": 0.0
+  },
+  {
+    "name": "Тетерев тушка",
+    "en": "Black Grouse Game Bird",
+    "category": "poultry",
+    "unit": "g",
+    "calories": 162,
+    "protein": 24.7,
+    "fat": 7.1,
+    "carbs": 0.0
+  },
+  {
+    "name": "Голубь мясо",
+    "en": "Pigeon Squab Meat",
+    "category": "poultry",
+    "unit": "g",
+    "calories": 187,
+    "protein": 24.5,
+    "fat": 9.5,
+    "carbs": 0.0
+  },
+  {
+    "name": "Цесарка тушка",
+    "en": "Guinea Fowl Whole",
+    "category": "poultry",
+    "unit": "g",
+    "calories": 158,
+    "protein": 23.4,
+    "fat": 6.5,
+    "carbs": 0.0
+  },
+  {
+    "name": "Икра белуги",
+    "en": "Beluga Sturgeon Caviar",
+    "category": "seafood",
+    "unit": "g",
+    "calories": 264,
+    "protein": 26.8,
+    "fat": 17.1,
+    "carbs": 4.0
+  },
+  {
+    "name": "Икра осетра чёрная",
+    "en": "Osetra Black Caviar",
+    "category": "seafood",
+    "unit": "g",
+    "calories": 251,
+    "protein": 25.5,
+    "fat": 16.3,
+    "carbs": 3.6
+  },
+  {
+    "name": "Икра севрюги",
+    "en": "Sevruga Grey Caviar",
+    "category": "seafood",
+    "unit": "g",
+    "calories": 230,
+    "protein": 24.5,
+    "fat": 14.2,
+    "carbs": 3.2
+  },
+  {
+    "name": "Икра лосося красная",
+    "en": "Sockeye Salmon Red Caviar",
+    "category": "seafood",
+    "unit": "g",
+    "calories": 252,
+    "protein": 31.5,
+    "fat": 13.8,
+    "carbs": 0.0
+  },
+  {
+    "name": "Икра сига",
+    "en": "Whitefish Roe",
+    "category": "seafood",
+    "unit": "g",
+    "calories": 238,
+    "protein": 28.5,
+    "fat": 13.0,
+    "carbs": 0.0
+  },
+  {
+    "name": "Икра трески",
+    "en": "Cod Roe",
+    "category": "seafood",
+    "unit": "g",
+    "calories": 118,
+    "protein": 20.9,
+    "fat": 3.4,
+    "carbs": 0.5
+  },
+  {
+    "name": "Икра мойвы",
+    "en": "Capelin Fish Roe",
+    "category": "seafood",
+    "unit": "g",
+    "calories": 130,
+    "protein": 15.5,
+    "fat": 7.5,
+    "carbs": 0.0
+  },
+  {
+    "name": "Тобико летучая рыба",
+    "en": "Flying Fish Roe Tobiko",
+    "category": "seafood",
+    "unit": "g",
+    "calories": 71,
+    "protein": 13.0,
+    "fat": 2.5,
+    "carbs": 0.0
+  },
+  {
+    "name": "Масаго мойва икра",
+    "en": "Masago Smelt Roe",
+    "category": "seafood",
+    "unit": "g",
+    "calories": 71,
+    "protein": 13.0,
+    "fat": 2.5,
+    "carbs": 0.0
+  },
+  {
+    "name": "Фуа-гра утиная",
+    "en": "Duck Foie Gras Whole Lobe",
+    "category": "poultry",
+    "unit": "g",
+    "calories": 462,
+    "protein": 11.4,
+    "fat": 43.8,
+    "carbs": 3.7
+  },
+  {
+    "name": "Трюфель перигор чёрный",
+    "en": "Perigord Black Truffle Fresh",
+    "category": "vegetables",
+    "unit": "g",
+    "calories": 92,
+    "protein": 9.5,
+    "fat": 0.5,
+    "carbs": 17.3
+  },
+  {
+    "name": "Трюфель пьемонтский белый",
+    "en": "Piedmont White Alba Truffle",
+    "category": "vegetables",
+    "unit": "g",
+    "calories": 98,
+    "protein": 9.5,
+    "fat": 0.5,
+    "carbs": 17.4
+  },
+  {
+    "name": "Трюфель летний",
+    "en": "Summer Burgundy Truffle",
+    "category": "vegetables",
+    "unit": "g",
+    "calories": 90,
+    "protein": 9.0,
+    "fat": 0.4,
+    "carbs": 17.0
+  },
+  {
+    "name": "Масло трюфеля чёрного",
+    "en": "Black Truffle Infused Oil",
+    "category": "oils",
+    "unit": "g",
+    "calories": 824,
+    "protein": 0.0,
+    "fat": 92.0,
+    "carbs": 0.5
+  },
+  {
+    "name": "Паста из трюфеля чёрного",
+    "en": "Black Truffle Paste Condiment",
+    "category": "sauces",
+    "unit": "g",
+    "calories": 116,
+    "protein": 2.5,
+    "fat": 10.5,
+    "carbs": 4.0
+  },
+  {
+    "name": "Хамон иберико де беллота",
+    "en": "Iberico Bellota Acorn Ham",
+    "category": "processed_meat",
+    "unit": "g",
+    "calories": 241,
+    "protein": 30.1,
+    "fat": 13.0,
+    "carbs": 0.3
+  },
+  {
+    "name": "Хамон серрано курадо",
+    "en": "Serrano Curado Spanish Ham",
+    "category": "processed_meat",
+    "unit": "g",
+    "calories": 241,
+    "protein": 30.1,
+    "fat": 13.0,
+    "carbs": 0.0
+  },
+  {
+    "name": "Кулателло",
+    "en": "Culatello di Zibello Italian",
+    "category": "processed_meat",
+    "unit": "g",
+    "calories": 153,
+    "protein": 28.4,
+    "fat": 3.8,
+    "carbs": 0.3
+  },
+  {
+    "name": "Спек Альто Адидже",
+    "en": "Speck Alto Adige Cured Ham",
+    "category": "processed_meat",
+    "unit": "g",
+    "calories": 197,
+    "protein": 30.0,
+    "fat": 8.5,
+    "carbs": 0.0
+  },
+  {
+    "name": "Лардо ди Колоннато",
+    "en": "Lardo di Colonnata",
+    "category": "processed_meat",
+    "unit": "g",
+    "calories": 891,
+    "protein": 0.5,
+    "fat": 99.0,
+    "carbs": 0.0
+  },
+  {
+    "name": "Сыр рокфор AOP",
+    "en": "Roquefort AOP French Blue",
+    "category": "dairy",
+    "unit": "g",
+    "calories": 369,
+    "protein": 21.5,
+    "fat": 30.6,
+    "carbs": 2.0
+  },
+  {
+    "name": "Сыр стилтон английский",
+    "en": "English Stilton Blue Cheese",
+    "category": "dairy",
+    "unit": "g",
+    "calories": 411,
+    "protein": 23.7,
+    "fat": 35.0,
+    "carbs": 0.1
+  },
+  {
+    "name": "Сыр горгонзола дольче",
+    "en": "Gorgonzola Dolce Soft Italian",
+    "category": "dairy",
+    "unit": "g",
+    "calories": 334,
+    "protein": 17.1,
+    "fat": 27.8,
+    "carbs": 4.5
+  },
+  {
+    "name": "Сыр конте",
+    "en": "Comte Gruyere French Cheese",
+    "category": "dairy",
+    "unit": "g",
+    "calories": 413,
+    "protein": 29.0,
+    "fat": 32.5,
+    "carbs": 0.4
+  },
+  {
+    "name": "Сыр реблошон",
+    "en": "Reblochon French Alpine",
+    "category": "dairy",
+    "unit": "g",
+    "calories": 334,
+    "protein": 20.6,
+    "fat": 26.9,
+    "carbs": 0.5
+  },
+  {
+    "name": "Сыр томм де савуа",
+    "en": "Tomme de Savoie French",
+    "category": "dairy",
+    "unit": "g",
+    "calories": 315,
+    "protein": 25.0,
+    "fat": 24.0,
+    "carbs": 0.0
+  },
+  {
+    "name": "Сыр эпуас",
+    "en": "Epoisses Washed Rind Cheese",
+    "category": "dairy",
+    "unit": "g",
+    "calories": 322,
+    "protein": 17.5,
+    "fat": 26.0,
+    "carbs": 2.2
+  },
+  {
+    "name": "Сыр мюнстер",
+    "en": "Munster Alsatian French Cheese",
+    "category": "dairy",
+    "unit": "g",
+    "calories": 313,
+    "protein": 21.0,
+    "fat": 24.9,
+    "carbs": 0.2
+  },
+  {
+    "name": "Сыр монте энебро",
+    "en": "Monte Enebro Spanish Goat",
+    "category": "dairy",
+    "unit": "g",
+    "calories": 285,
+    "protein": 16.0,
+    "fat": 23.0,
+    "carbs": 2.5
+  },
+  {
+    "name": "Сыр шевр козий",
+    "en": "Chevre Fresh Goat Cheese",
+    "category": "dairy",
+    "unit": "g",
+    "calories": 264,
+    "protein": 18.5,
+    "fat": 21.0,
+    "carbs": 0.0
+  },
+  {
+    "name": "Сыр манчего куратов",
+    "en": "Aged Manchego Sheep Cheese",
+    "category": "dairy",
+    "unit": "g",
+    "calories": 391,
+    "protein": 25.1,
+    "fat": 32.0,
+    "carbs": 0.5
+  },
+  {
+    "name": "Сыр хаварти",
+    "en": "Havarti Danish Cheese",
+    "category": "dairy",
+    "unit": "g",
+    "calories": 369,
+    "protein": 23.2,
+    "fat": 29.3,
+    "carbs": 2.4
+  },
+  {
+    "name": "Сыр джарлсберг",
+    "en": "Jarlsberg Norwegian Swiss",
+    "category": "dairy",
+    "unit": "g",
+    "calories": 363,
+    "protein": 27.0,
+    "fat": 27.0,
+    "carbs": 0.5
+  },
+  {
+    "name": "Сыр колби",
+    "en": "Colby Cheddar American Cheese",
+    "category": "dairy",
+    "unit": "g",
+    "calories": 394,
+    "protein": 23.8,
+    "fat": 32.1,
+    "carbs": 2.6
+  },
+  {
+    "name": "Сыр монтерей джек",
+    "en": "Monterey Jack American",
+    "category": "dairy",
+    "unit": "g",
+    "calories": 373,
+    "protein": 24.5,
+    "fat": 29.8,
+    "carbs": 0.7
+  },
+  {
+    "name": "Сыр пепер джек перечный",
+    "en": "Pepper Jack Spicy Cheese",
+    "category": "dairy",
+    "unit": "g",
+    "calories": 373,
+    "protein": 23.7,
+    "fat": 30.0,
+    "carbs": 1.8
+  },
+  {
+    "name": "Рис нишики",
+    "en": "Nishiki Premium Short Grain Rice",
+    "category": "grains",
+    "unit": "g",
+    "calories": 344,
+    "protein": 6.6,
+    "fat": 0.5,
+    "carbs": 78.2
+  },
+  {
+    "name": "Рис каролина",
+    "en": "Carolina Long Grain Rice",
+    "category": "grains",
+    "unit": "g",
+    "calories": 363,
+    "protein": 6.6,
+    "fat": 0.6,
+    "carbs": 79.6
+  },
+  {
+    "name": "Рис бомба паэлья",
+    "en": "Bomba Valencia Paella Rice",
+    "category": "grains",
+    "unit": "g",
+    "calories": 348,
+    "protein": 7.2,
+    "fat": 0.6,
+    "carbs": 76.0
+  },
+  {
+    "name": "Киноа красная",
+    "en": "Red Quinoa Grain",
+    "category": "grains",
+    "unit": "g",
+    "calories": 368,
+    "protein": 14.1,
+    "fat": 6.1,
+    "carbs": 64.2
+  },
+  {
+    "name": "Киноа трёхцветная",
+    "en": "Tri-Color Quinoa Mix",
+    "category": "grains",
+    "unit": "g",
+    "calories": 368,
+    "protein": 14.1,
+    "fat": 6.1,
+    "carbs": 64.2
+  },
+  {
+    "name": "Амарант семена",
+    "en": "Amaranth Grain Seeds",
+    "category": "grains",
+    "unit": "g",
+    "calories": 371,
+    "protein": 13.6,
+    "fat": 7.0,
+    "carbs": 65.3
+  },
+  {
+    "name": "Фрике пшеница молодая",
+    "en": "Freekeh Young Green Wheat",
+    "category": "grains",
+    "unit": "g",
+    "calories": 343,
+    "protein": 16.5,
+    "fat": 2.7,
+    "carbs": 72.5
+  },
+  {
+    "name": "Полба однозернянка",
+    "en": "Einkorn Ancient Wheat",
+    "category": "grains",
+    "unit": "g",
+    "calories": 341,
+    "protein": 15.6,
+    "fat": 2.5,
+    "carbs": 67.7
+  },
+  {
+    "name": "Камут пшеница хоразан",
+    "en": "Kamut Khorasan Wheat",
+    "category": "grains",
+    "unit": "g",
+    "calories": 337,
+    "protein": 14.7,
+    "fat": 2.2,
+    "carbs": 70.6
+  },
+  {
+    "name": "Теф абиссинская трава",
+    "en": "Teff Ethiopian Grain",
+    "category": "grains",
+    "unit": "g",
+    "calories": 367,
+    "protein": 13.3,
+    "fat": 2.4,
+    "carbs": 73.1
+  },
+  {
+    "name": "Сорго зерно",
+    "en": "Whole Sorghum Grain",
+    "category": "grains",
+    "unit": "g",
+    "calories": 329,
+    "protein": 11.3,
+    "fat": 3.3,
+    "carbs": 72.1
+  },
+  {
+    "name": "Тритикале зерно",
+    "en": "Triticale Grain Hybrid",
+    "category": "grains",
+    "unit": "g",
+    "calories": 336,
+    "protein": 13.1,
+    "fat": 2.1,
+    "carbs": 73.0
+  },
+  {
+    "name": "Дикий рис северный",
+    "en": "Northern Wild Rice Grain",
+    "category": "grains",
+    "unit": "g",
+    "calories": 357,
+    "protein": 14.7,
+    "fat": 1.1,
+    "carbs": 74.9
+  },
+  {
+    "name": "Фасоль маш зелёная",
+    "en": "Green Mung Bean Whole",
+    "category": "legumes",
+    "unit": "g",
+    "calories": 347,
+    "protein": 23.9,
+    "fat": 1.2,
+    "carbs": 62.6
+  },
+  {
+    "name": "Горох нут кабули",
+    "en": "Kabuli Chickpea Large White",
+    "category": "legumes",
+    "unit": "g",
+    "calories": 364,
+    "protein": 19.3,
+    "fat": 6.0,
+    "carbs": 60.7
+  },
+  {
+    "name": "Горох нут дези мелкий",
+    "en": "Desi Chickpea Small Brown",
+    "category": "legumes",
+    "unit": "g",
+    "calories": 360,
+    "protein": 20.5,
+    "fat": 5.9,
+    "carbs": 60.1
+  },
+  {
+    "name": "Чечевица французская пюи",
+    "en": "French Puy Green Lentils",
+    "category": "legumes",
+    "unit": "g",
+    "calories": 116,
+    "protein": 9.1,
+    "fat": 0.4,
+    "carbs": 20.1
+  },
+  {
+    "name": "Чечевица белуга чёрная",
+    "en": "Beluga Black Lentils Caviar",
+    "category": "legumes",
+    "unit": "g",
+    "calories": 116,
+    "protein": 9.0,
+    "fat": 0.4,
+    "carbs": 20.0
+  },
+  {
+    "name": "Вигна чёрная азиатская",
+    "en": "Black Eyed Pea Cowpea",
+    "category": "legumes",
+    "unit": "g",
+    "calories": 336,
+    "protein": 23.5,
+    "fat": 1.3,
+    "carbs": 57.3
+  },
+  {
+    "name": "Долихос бобы гиацинтовые",
+    "en": "Lablab Hyacinth Bean",
+    "category": "legumes",
+    "unit": "g",
+    "calories": 344,
+    "protein": 22.8,
+    "fat": 1.8,
+    "carbs": 61.1
+  },
+  {
+    "name": "Спирулина пресноводная",
+    "en": "Freshwater Spirulina Blue Green",
+    "category": "vegetables",
+    "unit": "g",
+    "calories": 290,
+    "protein": 57.5,
+    "fat": 7.7,
+    "carbs": 23.9
+  },
+  {
+    "name": "Хидзики морские водоросли",
+    "en": "Hijiki Black Seaweed",
+    "category": "vegetables",
+    "unit": "g",
+    "calories": 180,
+    "protein": 10.6,
+    "fat": 1.5,
+    "carbs": 46.4
+  },
+  {
+    "name": "Дульсе атлантические водоросли",
+    "en": "Dulse Atlantic Red Seaweed",
+    "category": "vegetables",
+    "unit": "g",
+    "calories": 148,
+    "protein": 21.0,
+    "fat": 3.2,
+    "carbs": 46.6
+  },
+  {
+    "name": "Аонори зелёные водоросли",
+    "en": "Aonori Green Seaweed Flakes",
+    "category": "vegetables",
+    "unit": "g",
+    "calories": 130,
+    "protein": 22.0,
+    "fat": 0.6,
+    "carbs": 41.0
+  },
+  {
+    "name": "Морской виноград умибудо",
+    "en": "Sea Grapes Umibudo Seaweed",
+    "category": "vegetables",
+    "unit": "g",
+    "calories": 6,
+    "protein": 0.5,
+    "fat": 0.1,
+    "carbs": 1.5
+  },
+  {
+    "name": "Водоросль фукус",
+    "en": "Fucus Bladder Wrack Seaweed",
+    "category": "vegetables",
+    "unit": "g",
+    "calories": 43,
+    "protein": 1.7,
+    "fat": 0.6,
+    "carbs": 9.6
+  },
+  {
+    "name": "Водоросль ламинария свежая",
+    "en": "Fresh Kelp Kombu Laminaria",
+    "category": "vegetables",
+    "unit": "g",
+    "calories": 43,
+    "protein": 1.7,
+    "fat": 0.6,
+    "carbs": 9.6
+  },
+  {
+    "name": "Цветки настурции",
+    "en": "Nasturtium Edible Flowers",
+    "category": "vegetables",
+    "unit": "g",
+    "calories": 28,
+    "protein": 2.0,
+    "fat": 0.2,
+    "carbs": 5.7
+  },
+  {
+    "name": "Цветки бораго",
+    "en": "Borage Star Flowers Edible",
+    "category": "vegetables",
+    "unit": "g",
+    "calories": 21,
+    "protein": 1.8,
+    "fat": 0.7,
+    "carbs": 3.3
+  },
+  {
+    "name": "Цветки лаванды",
+    "en": "Dried Lavender Flowers Culinary",
+    "category": "spices",
+    "unit": "g",
+    "calories": 49,
+    "protein": 1.8,
+    "fat": 0.7,
+    "carbs": 11.8
+  },
+  {
+    "name": "Цветки розы лепестки",
+    "en": "Dried Rose Petals Culinary",
+    "category": "spices",
+    "unit": "g",
+    "calories": 35,
+    "protein": 1.0,
+    "fat": 0.2,
+    "carbs": 10.0
+  },
+  {
+    "name": "Цветки фиалки",
+    "en": "Viola Pansy Edible Flowers",
+    "category": "vegetables",
+    "unit": "g",
+    "calories": 20,
+    "protein": 1.2,
+    "fat": 0.3,
+    "carbs": 4.5
+  },
+  {
+    "name": "Цветки бузины",
+    "en": "Elderflower Blossom Culinary",
+    "category": "spices",
+    "unit": "g",
+    "calories": 37,
+    "protein": 0.7,
+    "fat": 0.4,
+    "carbs": 9.6
+  },
+  {
+    "name": "Микрозелень редиса",
+    "en": "Radish Daikon Microgreens",
+    "category": "vegetables",
+    "unit": "g",
+    "calories": 32,
+    "protein": 3.8,
+    "fat": 0.5,
+    "carbs": 5.7
+  },
+  {
+    "name": "Микрозелень подсолнуха",
+    "en": "Sunflower Shoots Microgreens",
+    "category": "vegetables",
+    "unit": "g",
+    "calories": 142,
+    "protein": 7.5,
+    "fat": 9.5,
+    "carbs": 8.0
+  },
+  {
+    "name": "Микрозелень гороха",
+    "en": "Pea Tendril Shoots",
+    "category": "vegetables",
+    "unit": "g",
+    "calories": 42,
+    "protein": 3.5,
+    "fat": 0.4,
+    "carbs": 7.5
+  },
+  {
+    "name": "Микрозелень брокколи",
+    "en": "Broccoli Brassica Microgreens",
+    "category": "vegetables",
+    "unit": "g",
+    "calories": 36,
+    "protein": 3.0,
+    "fat": 0.5,
+    "carbs": 5.5
+  },
+  {
+    "name": "Побеги бамбука маринованные",
+    "en": "Pickled Bamboo Shoot Menma",
+    "category": "vegetables",
+    "unit": "g",
+    "calories": 29,
+    "protein": 2.7,
+    "fat": 0.5,
+    "carbs": 5.2
+  },
+  {
+    "name": "Ростки пшеницы",
+    "en": "Wheat Grass Sprouts",
+    "category": "vegetables",
+    "unit": "g",
+    "calories": 25,
+    "protein": 2.5,
+    "fat": 0.6,
+    "carbs": 4.5
+  },
+  {
+    "name": "Ростки чечевицы",
+    "en": "Lentil Sprouts",
+    "category": "vegetables",
+    "unit": "g",
+    "calories": 106,
+    "protein": 9.0,
+    "fat": 0.5,
+    "carbs": 22.1
+  },
+  {
+    "name": "Ростки нута",
+    "en": "Chickpea Sprouts",
+    "category": "vegetables",
+    "unit": "g",
+    "calories": 164,
+    "protein": 8.9,
+    "fat": 2.6,
+    "carbs": 27.0
+  },
+  {
+    "name": "Ростки подсолнуха",
+    "en": "Sunflower Seed Sprouts",
+    "category": "vegetables",
+    "unit": "g",
+    "calories": 58,
+    "protein": 4.2,
+    "fat": 2.4,
+    "carbs": 6.8
+  },
+  {
+    "name": "Паста капеллини",
+    "en": "Capellini Angel Hair Pasta",
+    "category": "grains",
+    "unit": "g",
+    "calories": 351,
+    "protein": 12.5,
+    "fat": 1.4,
+    "carbs": 70.7
+  },
+  {
+    "name": "Паста букатини",
+    "en": "Bucatini Thick Spaghetti",
+    "category": "grains",
+    "unit": "g",
+    "calories": 351,
+    "protein": 12.5,
+    "fat": 1.4,
+    "carbs": 70.7
+  },
+  {
+    "name": "Паста ригатони",
+    "en": "Rigatoni Large Ridged Pasta",
+    "category": "grains",
+    "unit": "g",
+    "calories": 351,
+    "protein": 12.5,
+    "fat": 1.5,
+    "carbs": 70.2
+  },
+  {
+    "name": "Паста конкилье",
+    "en": "Conchiglie Shell Pasta",
+    "category": "grains",
+    "unit": "g",
+    "calories": 351,
+    "protein": 12.5,
+    "fat": 1.5,
+    "carbs": 70.2
+  },
+  {
+    "name": "Паста дижиталини",
+    "en": "Ditalini Tubetti Small Pasta",
+    "category": "grains",
+    "unit": "g",
+    "calories": 351,
+    "protein": 12.5,
+    "fat": 1.4,
+    "carbs": 70.7
+  },
+  {
+    "name": "Паста фарфалле бабочки",
+    "en": "Farfalle Bow Tie Pasta",
+    "category": "grains",
+    "unit": "g",
+    "calories": 351,
+    "protein": 12.5,
+    "fat": 1.5,
+    "carbs": 70.2
+  },
+  {
+    "name": "Паста тренетте",
+    "en": "Trenette Ligurian Pasta",
+    "category": "grains",
+    "unit": "g",
+    "calories": 351,
+    "protein": 12.5,
+    "fat": 1.4,
+    "carbs": 70.7
+  },
+  {
+    "name": "Паста малфальде",
+    "en": "Malfalde Mafaldine Pasta",
+    "category": "grains",
+    "unit": "g",
+    "calories": 351,
+    "protein": 12.5,
+    "fat": 1.5,
+    "carbs": 70.2
+  },
+  {
+    "name": "Паста писторе зубчатая",
+    "en": "Pappardelle Tricolore Pasta",
+    "category": "grains",
+    "unit": "g",
+    "calories": 340,
+    "protein": 13.0,
+    "fat": 3.0,
+    "carbs": 66.5
+  },
+  {
+    "name": "Паста шпинатная зелёная",
+    "en": "Spinach Green Pasta",
+    "category": "grains",
+    "unit": "g",
+    "calories": 349,
+    "protein": 13.5,
+    "fat": 1.6,
+    "carbs": 70.5
+  },
+  {
+    "name": "Паста чернильная тёмная",
+    "en": "Squid Ink Dark Pasta Dry",
+    "category": "grains",
+    "unit": "g",
+    "calories": 350,
+    "protein": 13.0,
+    "fat": 2.0,
+    "carbs": 69.0
+  },
+  {
+    "name": "Паста из муки кечапо",
+    "en": "Kamut Khorasan Pasta",
+    "category": "grains",
+    "unit": "g",
+    "calories": 355,
+    "protein": 14.7,
+    "fat": 2.2,
+    "carbs": 72.0
+  },
+  {
+    "name": "Мисо белое сёю",
+    "en": "White Shiro Miso",
+    "category": "sauces",
+    "unit": "g",
+    "calories": 199,
+    "protein": 11.7,
+    "fat": 6.0,
+    "carbs": 25.7
+  },
+  {
+    "name": "Мисо хатчо тёмное",
+    "en": "Hatcho Dark Brown Miso",
+    "category": "sauces",
+    "unit": "g",
+    "calories": 217,
+    "protein": 21.4,
+    "fat": 8.0,
+    "carbs": 18.5
+  },
+  {
+    "name": "Нато ферментированные бобы",
+    "en": "Natto Fermented Soybeans",
+    "category": "legumes",
+    "unit": "g",
+    "calories": 212,
+    "protein": 18.0,
+    "fat": 11.0,
+    "carbs": 14.4
+  },
+  {
+    "name": "Амазаке сладкий напиток",
+    "en": "Amazake Sweet Rice Drink",
+    "category": "beverages",
+    "unit": "g",
+    "calories": 81,
+    "protein": 1.7,
+    "fat": 0.1,
+    "carbs": 18.3
+  },
+  {
+    "name": "Кимчи из редиса",
+    "en": "Kkakdugi Radish Kimchi",
+    "category": "vegetables",
+    "unit": "g",
+    "calories": 43,
+    "protein": 2.5,
+    "fat": 1.5,
+    "carbs": 6.5
+  },
+  {
+    "name": "Солёные лимоны марокканские",
+    "en": "Moroccan Salted Preserved Lemons",
+    "category": "sauces",
+    "unit": "g",
+    "calories": 37,
+    "protein": 1.5,
+    "fat": 0.3,
+    "carbs": 13.0
+  },
+  {
+    "name": "Маринованный имбирь розовый",
+    "en": "Pink Pickled Sushi Ginger",
+    "category": "sauces",
+    "unit": "g",
+    "calories": 63,
+    "protein": 0.9,
+    "fat": 0.1,
+    "carbs": 14.8
+  },
+  {
+    "name": "Квашеная свёкла",
+    "en": "Fermented Beet Sauerkraut",
+    "category": "vegetables",
+    "unit": "g",
+    "calories": 43,
+    "protein": 1.6,
+    "fat": 0.1,
+    "carbs": 9.6
+  },
+  {
+    "name": "Чайный гриб комбуча",
+    "en": "Kombucha Fermented Tea",
+    "category": "beverages",
+    "unit": "g",
+    "calories": 20,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 5.0
+  },
+  {
+    "name": "Кефирные зёрна",
+    "en": "Milk Kefir Grains",
+    "category": "dairy",
+    "unit": "g",
+    "calories": 61,
+    "protein": 3.3,
+    "fat": 3.0,
+    "carbs": 4.8
+  },
+  {
+    "name": "Закваска для хлеба",
+    "en": "Sourdough Starter Culture",
+    "category": "bakery",
+    "unit": "g",
+    "calories": 180,
+    "protein": 5.0,
+    "fat": 0.5,
+    "carbs": 38.0
+  },
+  {
+    "name": "Масло аргановое марокканское",
+    "en": "Moroccan Argan Oil",
+    "category": "oils",
+    "unit": "g",
+    "calories": 884,
+    "protein": 0.0,
+    "fat": 100.0,
+    "carbs": 0.0
+  },
+  {
+    "name": "Масло черники",
+    "en": "Blueberry Seed Oil",
+    "category": "oils",
+    "unit": "g",
+    "calories": 884,
+    "protein": 0.0,
+    "fat": 100.0,
+    "carbs": 0.0
+  },
+  {
+    "name": "Масло облепихи",
+    "en": "Sea Buckthorn Berry Oil",
+    "category": "oils",
+    "unit": "g",
+    "calories": 884,
+    "protein": 0.0,
+    "fat": 100.0,
+    "carbs": 0.0
+  },
+  {
+    "name": "Масло шиповника",
+    "en": "Rosehip Seed Oil",
+    "category": "oils",
+    "unit": "g",
+    "calories": 884,
+    "protein": 0.0,
+    "fat": 100.0,
+    "carbs": 0.0
+  },
+  {
+    "name": "Масло ши карите",
+    "en": "Shea Butter Food Grade",
+    "category": "oils",
+    "unit": "g",
+    "calories": 884,
+    "protein": 0.0,
+    "fat": 100.0,
+    "carbs": 0.0
+  },
+  {
+    "name": "Масло амаранта",
+    "en": "Amaranth Seed Oil",
+    "category": "oils",
+    "unit": "g",
+    "calories": 884,
+    "protein": 0.0,
+    "fat": 100.0,
+    "carbs": 0.0
+  },
+  {
+    "name": "Масло из зародышей пшеницы",
+    "en": "Wheat Germ Oil Cold Pressed",
+    "category": "oils",
+    "unit": "g",
+    "calories": 884,
+    "protein": 0.0,
+    "fat": 100.0,
+    "carbs": 0.0
+  },
+  {
+    "name": "Масло черноморского ореха",
+    "en": "Black Walnut Oil",
+    "category": "oils",
+    "unit": "g",
+    "calories": 884,
+    "protein": 0.0,
+    "fat": 100.0,
+    "carbs": 0.0
+  },
+  {
+    "name": "Масло каннабиса пищевое",
+    "en": "Hemp Cannabis Seed Oil",
+    "category": "oils",
+    "unit": "g",
+    "calories": 884,
+    "protein": 0.0,
+    "fat": 100.0,
+    "carbs": 0.0
+  },
+  {
+    "name": "Масло нигеллы чернушки",
+    "en": "Black Seed Nigella Oil",
+    "category": "oils",
+    "unit": "g",
+    "calories": 884,
+    "protein": 0.0,
+    "fat": 100.0,
+    "carbs": 0.0
+  },
+  {
+    "name": "Жир гусиный натуральный",
+    "en": "Natural Rendered Goose Fat",
+    "category": "oils",
+    "unit": "g",
+    "calories": 900,
+    "protein": 0.0,
+    "fat": 100.0,
+    "carbs": 0.0
+  },
+  {
+    "name": "Жир бараний курдючный",
+    "en": "Lamb Tail Fat Kurdyuk",
+    "category": "oils",
+    "unit": "g",
+    "calories": 897,
+    "protein": 0.0,
+    "fat": 99.7,
+    "carbs": 0.0
+  },
+  {
+    "name": "Агар агар пищевой хлопья",
+    "en": "Agar Agar Food Grade Flakes",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 26,
+    "protein": 0.5,
+    "fat": 0.0,
+    "carbs": 7.7
+  },
+  {
+    "name": "Желатин рыбный",
+    "en": "Fish Gelatin Powder",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 335,
+    "protein": 84.4,
+    "fat": 0.1,
+    "carbs": 0.0
+  },
+  {
+    "name": "Мальтодекстрин таньяко",
+    "en": "Tapioca Maltodextrin N-Zorbit",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 380,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 95.0
+  },
+  {
+    "name": "Лецитин подсолнечника",
+    "en": "Sunflower Lecithin Emulsifier",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 763,
+    "protein": 3.3,
+    "fat": 97.3,
+    "carbs": 0.0
+  },
+  {
+    "name": "Альгинат натрия",
+    "en": "Sodium Alginate Molecular",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.0
+  },
+  {
+    "name": "Хлорид кальция пищевой",
+    "en": "Calcium Chloride Food Grade",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.0
+  },
+  {
+    "name": "Метилцеллюлоза горячее желе",
+    "en": "Methylcellulose Hot Gel",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.0
+  },
+  {
+    "name": "Каррагинан каппа",
+    "en": "Kappa Carrageenan Gel",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.0
+  },
+  {
+    "name": "Каррагинан йота",
+    "en": "Iota Carrageenan Elastic",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.0
+  },
+  {
+    "name": "Пектин LM цитрусовый",
+    "en": "Low Methoxyl LM Pectin",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 160,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 80.0
+  },
+  {
+    "name": "Пектин HM фруктовый",
+    "en": "High Methoxyl HM Fruit Pectin",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 160,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 80.0
+  },
+  {
+    "name": "Трансглутаминаза мясной клей",
+    "en": "Transglutaminase Meat Glue",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 0,
+    "protein": 88.0,
+    "fat": 0.5,
+    "carbs": 0.0
+  },
+  {
+    "name": "Азот жидкий кулинарный",
+    "en": "Liquid Nitrogen Food Use",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.0
+  },
+  {
+    "name": "Уксус модена IGP",
+    "en": "Balsamic Vinegar Modena IGP",
+    "category": "sauces",
+    "unit": "g",
+    "calories": 88,
+    "protein": 0.5,
+    "fat": 0.0,
+    "carbs": 17.0
+  },
+  {
+    "name": "Бальзамик крем-глазурь",
+    "en": "Balsamic Glaze Cream IGP",
+    "category": "sauces",
+    "unit": "g",
+    "calories": 180,
+    "protein": 0.8,
+    "fat": 0.1,
+    "carbs": 43.5
+  },
+  {
+    "name": "Уксус хересный выдержанный",
+    "en": "Aged Sherry Vinegar 25 Year",
+    "category": "sauces",
+    "unit": "g",
+    "calories": 20,
+    "protein": 0.1,
+    "fat": 0.0,
+    "carbs": 4.0
+  },
+  {
+    "name": "Уксус умебоши сливовый",
+    "en": "Umeboshi Plum Vinegar",
+    "category": "sauces",
+    "unit": "g",
+    "calories": 35,
+    "protein": 0.4,
+    "fat": 0.1,
+    "carbs": 8.0
+  },
+  {
+    "name": "Уксус кокосовый",
+    "en": "Coconut Palm Vinegar",
+    "category": "sauces",
+    "unit": "g",
+    "calories": 22,
+    "protein": 0.1,
+    "fat": 0.0,
+    "carbs": 0.9
+  },
+  {
+    "name": "Уксус малиновый",
+    "en": "Raspberry Fruit Vinegar",
+    "category": "sauces",
+    "unit": "g",
+    "calories": 18,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 4.5
+  },
+  {
+    "name": "Уксус апельсиновый",
+    "en": "Orange Citrus Vinegar",
+    "category": "sauces",
+    "unit": "g",
+    "calories": 15,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 3.0
+  },
+  {
+    "name": "Уксус тростниковый",
+    "en": "Sugarcane Cane Vinegar",
+    "category": "sauces",
+    "unit": "g",
+    "calories": 18,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.9
+  },
+  {
+    "name": "Золото пищевое листовое",
+    "en": "Edible Gold Leaf Sheet 23k",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.0
+  },
+  {
+    "name": "Серебро пищевое листовое",
+    "en": "Edible Silver Leaf Sheet",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.0
+  },
+  {
+    "name": "Кандурин золотой блеск",
+    "en": "Edible Lustre Dust Gold Shimmer",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.0
+  },
+  {
+    "name": "Велюр шоколадный спрей",
+    "en": "Chocolate Velvet Spray Cocoa Butter",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 884,
+    "protein": 0.0,
+    "fat": 99.0,
+    "carbs": 0.5
+  },
+  {
+    "name": "Глюкоза жидкая кукурузная",
+    "en": "Liquid Glucose Corn Syrup",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 316,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 79.0
+  },
+  {
+    "name": "Инвертный сахар тримолин",
+    "en": "Trimoline Invert Sugar",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 320,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 80.0
+  },
+  {
+    "name": "Нейтральная глазурь напаж",
+    "en": "Neutral Glaze Nappage Gel",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 148,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 37.0
+  },
+  {
+    "name": "Абрикосовый жемле мармелад",
+    "en": "Apricot Jam Jelly Glaze",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 241,
+    "protein": 0.4,
+    "fat": 0.1,
+    "carbs": 65.0
+  },
+  {
+    "name": "Мирабель слива жёлтая",
+    "en": "Yellow Mirabelle Plum",
+    "category": "fruits",
+    "unit": "g",
+    "calories": 52,
+    "protein": 0.7,
+    "fat": 0.2,
+    "carbs": 12.4
+  },
+  {
+    "name": "Ренклод зелёная слива",
+    "en": "Greengage Reine Claude Plum",
+    "category": "fruits",
+    "unit": "g",
+    "calories": 46,
+    "protein": 0.7,
+    "fat": 0.3,
+    "carbs": 11.4
+  },
+  {
+    "name": "Шелковица белая",
+    "en": "White Mulberry Fruit",
+    "category": "fruits",
+    "unit": "g",
+    "calories": 43,
+    "protein": 1.4,
+    "fat": 0.4,
+    "carbs": 9.8
+  },
+  {
+    "name": "Шелковица чёрная",
+    "en": "Black Mulberry Fruit",
+    "category": "fruits",
+    "unit": "g",
+    "calories": 43,
+    "protein": 1.4,
+    "fat": 0.4,
+    "carbs": 9.8
+  },
+  {
+    "name": "Зизифус ююба",
+    "en": "Jujube Chinese Date",
+    "category": "fruits",
+    "unit": "g",
+    "calories": 79,
+    "protein": 1.2,
+    "fat": 0.2,
+    "carbs": 20.2
+  },
+  {
+    "name": "Карамбола кислая",
+    "en": "Sour Starfruit Carambola",
+    "category": "fruits",
+    "unit": "g",
+    "calories": 31,
+    "protein": 1.0,
+    "fat": 0.3,
+    "carbs": 6.7
+  },
+  {
+    "name": "Пандан листья",
+    "en": "Pandan Screw Pine Leaves",
+    "category": "spices",
+    "unit": "g",
+    "calories": 32,
+    "protein": 2.0,
+    "fat": 0.7,
+    "carbs": 7.3
+  },
+  {
+    "name": "Кафрский лайм листья",
+    "en": "Kaffir Lime Leaves Dried",
+    "category": "spices",
+    "unit": "g",
+    "calories": 52,
+    "protein": 1.8,
+    "fat": 1.3,
+    "carbs": 10.8
+  },
+  {
+    "name": "Лемонграсс стебли",
+    "en": "Lemongrass Fresh Stalks",
+    "category": "spices",
+    "unit": "g",
+    "calories": 99,
+    "protein": 1.8,
+    "fat": 0.5,
+    "carbs": 25.3
+  },
+  {
+    "name": "Галангал свежий корень",
+    "en": "Fresh Galangal Rhizome",
+    "category": "spices",
+    "unit": "g",
+    "calories": 334,
+    "protein": 8.5,
+    "fat": 5.0,
+    "carbs": 70.0
+  },
+  {
+    "name": "Кориандр свежий корень",
+    "en": "Fresh Cilantro Coriander Root",
+    "category": "spices",
+    "unit": "g",
+    "calories": 23,
+    "protein": 2.1,
+    "fat": 0.5,
+    "carbs": 3.7
+  },
+  {
+    "name": "Куркума свежая корень",
+    "en": "Fresh Turmeric Root Rhizome",
+    "category": "spices",
+    "unit": "g",
+    "calories": 80,
+    "protein": 1.8,
+    "fat": 0.8,
+    "carbs": 17.8
+  },
+  {
+    "name": "Мака перуанская",
+    "en": "Maca Peruvian Root Powder",
+    "category": "spices",
+    "unit": "g",
+    "calories": 325,
+    "protein": 14.5,
+    "fat": 2.2,
+    "carbs": 71.4
+  },
+  {
+    "name": "Кэроб порошок рожкового дерева",
+    "en": "Carob Powder Locust Bean",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 222,
+    "protein": 4.6,
+    "fat": 0.7,
+    "carbs": 88.9
+  },
+  {
+    "name": "Мука из сверчков",
+    "en": "Cricket Insect Flour Protein",
+    "category": "grains",
+    "unit": "g",
+    "calories": 424,
+    "protein": 65.5,
+    "fat": 12.9,
+    "carbs": 5.1
+  },
+  {
+    "name": "Личинки съедобные хрущак",
+    "en": "Mealworm Larvae Dried",
+    "category": "grains",
+    "unit": "g",
+    "calories": 508,
+    "protein": 49.1,
+    "fat": 30.8,
+    "carbs": 2.4
+  },
+  {
+    "name": "Соль селёдочная нордическая",
+    "en": "Nordic Herring Salt Flakes",
+    "category": "spices",
+    "unit": "g",
+    "calories": 0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.0
+  },
+  {
+    "name": "Копчёный чеснок",
+    "en": "Smoked Garlic Bulbs",
+    "category": "vegetables",
+    "unit": "g",
+    "calories": 149,
+    "protein": 6.4,
+    "fat": 0.5,
+    "carbs": 33.1
+  },
+  {
+    "name": "Чёрный чеснок ферментированный",
+    "en": "Fermented Black Garlic",
+    "category": "vegetables",
+    "unit": "g",
+    "calories": 160,
+    "protein": 5.0,
+    "fat": 0.3,
+    "carbs": 37.0
+  },
+  {
+    "name": "Чеснок сушёный слайсы",
+    "en": "Dried Garlic Slices Chips",
+    "category": "spices",
+    "unit": "g",
+    "calories": 362,
+    "protein": 17.6,
+    "fat": 0.6,
+    "carbs": 80.7
+  },
+  {
+    "name": "Морская соль с розмарином",
+    "en": "Sea Salt with Rosemary",
+    "category": "spices",
+    "unit": "g",
+    "calories": 5,
+    "protein": 0.1,
+    "fat": 0.2,
+    "carbs": 0.3
+  },
+  {
+    "name": "Соль с трюфелем",
+    "en": "Truffle Salt Flakes",
+    "category": "spices",
+    "unit": "g",
+    "calories": 5,
+    "protein": 0.1,
+    "fat": 0.1,
+    "carbs": 0.5
+  },
+  {
+    "name": "Перец хаш хаш белый",
+    "en": "White Poppy Seed Khash",
+    "category": "nuts",
+    "unit": "g",
+    "calories": 525,
+    "protein": 17.9,
+    "fat": 41.6,
+    "carbs": 28.1
+  },
+  {
+    "name": "Мёд манука новозеландский",
+    "en": "New Zealand Manuka Honey",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 304,
+    "protein": 0.3,
+    "fat": 0.0,
+    "carbs": 82.4
+  },
+  {
+    "name": "Мёд сотовый",
+    "en": "Raw Honeycomb Comb Honey",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 304,
+    "protein": 0.3,
+    "fat": 0.0,
+    "carbs": 82.4
+  },
+  {
+    "name": "Прополис настойка",
+    "en": "Propolis Bee Glue Extract",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 155,
+    "protein": 4.0,
+    "fat": 3.0,
+    "carbs": 34.0
+  },
+  {
+    "name": "Перга пчелиная",
+    "en": "Bee Bread Perga Pollen",
+    "category": "sweets",
+    "unit": "g",
+    "calories": 220,
+    "protein": 17.0,
+    "fat": 3.5,
+    "carbs": 36.0
+  }
+]

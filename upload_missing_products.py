@@ -513,7 +513,7 @@ def main():
 
     import os
     extra = []
-    for fname in ["extra_products.json", "extra_products2.json"]:
+    for fname in ["extra_products.json", "extra_products2.json", "extra_products3.json", "extra_products4.json", "extra_products5.json", "extra_products6.json", "extra_products_last.json", "extra_products_final.json"]:
         if os.path.exists(fname):
             with open(fname, encoding="utf-8") as f:
                 part = json.load(f)

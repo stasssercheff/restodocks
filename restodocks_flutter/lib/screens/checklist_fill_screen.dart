@@ -36,6 +36,8 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
   late TextEditingController _commentsController;
   final Map<int, TextEditingController> _numericControllers = {};
   Timer? _serverAutoSaveTimer;
+  // Переведённые заголовки пунктов: оригинал -> перевод
+  final Map<String, String> _translatedTitles = {};
 
   void saveNow() => saveImmediately();
 
@@ -117,12 +119,55 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
         if (_dropdownValues.length != n) _dropdownValues = List.filled(n, null);
         _loading = false;
       });
+      // Переводим заголовки пунктов если язык UI != русский
+      if (c != null) _translateTitles(c);
     } catch (e) {
       if (mounted) setState(() {
         _error = e.toString();
         _loading = false;
       });
     }
+  }
+
+  /// Переводим title каждого пункта через TranslationService (кешируется).
+  Future<void> _translateTitles(Checklist checklist) async {
+    if (!mounted) return;
+    final loc = context.read<LocalizationService>();
+    final targetLang = loc.currentLanguageCode;
+    if (targetLang == 'ru') return; // title хранятся на русском
+
+    final translationSvc = context.read<TranslationService>();
+    final updated = <String, String>{};
+
+    for (final item in checklist.items) {
+      final title = item.title.trim();
+      if (title.isEmpty) continue;
+      if (_translatedTitles.containsKey(title)) continue;
+
+      try {
+        final translated = await translationSvc.translate(
+          entityType: TranslationEntityType.ui,
+          entityId: 'checklist_item_${item.id}',
+          fieldName: 'title',
+          text: title,
+          from: 'ru',
+          to: targetLang,
+        );
+        if (translated != null && translated.trim().isNotEmpty && translated != title) {
+          updated[title] = translated;
+        }
+      } catch (_) {}
+      if (!mounted) return;
+    }
+
+    if (mounted && updated.isNotEmpty) {
+      setState(() => _translatedTitles.addAll(updated));
+    }
+  }
+
+  String _getTitle(ChecklistItem item) {
+    final t = _translatedTitles[item.title.trim()];
+    return t ?? item.title;
   }
 
   Future<void> _autoSaveToServer() async {

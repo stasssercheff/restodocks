@@ -1,0 +1,512 @@
+[
+  {
+    "name": "Тальятелле яичные",
+    "en": "Egg Tagliatelle Pasta Nest",
+    "category": "grains",
+    "unit": "g",
+    "calories": 352,
+    "protein": 12.5,
+    "fat": 2.5,
+    "carbs": 70.0
+  },
+  {
+    "name": "Паста маффалде",
+    "en": "Mafalde Pasta Ripple Edge",
+    "category": "grains",
+    "unit": "g",
+    "calories": 349,
+    "protein": 12.0,
+    "fat": 1.5,
+    "carbs": 70.6
+  },
+  {
+    "name": "Паста каватаппи",
+    "en": "Cavatappi Corkscrew Pasta",
+    "category": "grains",
+    "unit": "g",
+    "calories": 348,
+    "protein": 12.2,
+    "fat": 1.8,
+    "carbs": 70.2
+  },
+  {
+    "name": "Паста рожки большие",
+    "en": "Large Elbow Macaroni Pasta",
+    "category": "grains",
+    "unit": "g",
+    "calories": 348,
+    "protein": 12.2,
+    "fat": 1.8,
+    "carbs": 70.2
+  },
+  {
+    "name": "Паста казаречче",
+    "en": "Casarecce Sicilian Pasta",
+    "category": "grains",
+    "unit": "g",
+    "calories": 349,
+    "protein": 12.0,
+    "fat": 1.5,
+    "carbs": 70.6
+  },
+  {
+    "name": "Паста граттони",
+    "en": "Grattoni Small Pasta Soup",
+    "category": "grains",
+    "unit": "g",
+    "calories": 349,
+    "protein": 11.9,
+    "fat": 1.5,
+    "carbs": 71.0
+  },
+  {
+    "name": "Паста лумаче",
+    "en": "Lumache Snail Shell Pasta",
+    "category": "grains",
+    "unit": "g",
+    "calories": 348,
+    "protein": 12.1,
+    "fat": 1.6,
+    "carbs": 70.4
+  },
+  {
+    "name": "Мука из зеленой гречки",
+    "en": "Green Buckwheat Raw Flour",
+    "category": "grains",
+    "unit": "g",
+    "calories": 330,
+    "protein": 12.6,
+    "fat": 3.0,
+    "carbs": 63.5
+  },
+  {
+    "name": "Мука теф",
+    "en": "Teff Grain Flour Ethiopian",
+    "category": "grains",
+    "unit": "g",
+    "calories": 366,
+    "protein": 13.3,
+    "fat": 3.4,
+    "carbs": 73.1
+  },
+  {
+    "name": "Мука из сорго",
+    "en": "Sorghum Flour Gluten Free",
+    "category": "grains",
+    "unit": "g",
+    "calories": 359,
+    "protein": 8.7,
+    "fat": 3.3,
+    "carbs": 75.5
+  },
+  {
+    "name": "Мука из кассавы",
+    "en": "Cassava Tapioca Flour White",
+    "category": "grains",
+    "unit": "g",
+    "calories": 334,
+    "protein": 0.6,
+    "fat": 0.1,
+    "carbs": 82.1
+  },
+  {
+    "name": "Мука из тигровых орехов",
+    "en": "Tiger Nut Horchata Flour",
+    "category": "nuts",
+    "unit": "g",
+    "calories": 397,
+    "protein": 6.0,
+    "fat": 19.5,
+    "carbs": 52.0
+  },
+  {
+    "name": "Крупа сорго",
+    "en": "Whole Sorghum Grain Cereal",
+    "category": "grains",
+    "unit": "g",
+    "calories": 329,
+    "protein": 10.6,
+    "fat": 3.5,
+    "carbs": 65.0
+  },
+  {
+    "name": "Крупа фрике",
+    "en": "Freekeh Roasted Green Wheat",
+    "category": "grains",
+    "unit": "g",
+    "calories": 346,
+    "protein": 12.6,
+    "fat": 2.7,
+    "carbs": 72.0
+  },
+  {
+    "name": "Гречневые хлопья",
+    "en": "Buckwheat Flakes Rolled",
+    "category": "grains",
+    "unit": "g",
+    "calories": 340,
+    "protein": 11.5,
+    "fat": 2.8,
+    "carbs": 68.5
+  },
+  {
+    "name": "Ячменные хлопья",
+    "en": "Barley Rolled Flakes",
+    "category": "grains",
+    "unit": "g",
+    "calories": 345,
+    "protein": 10.0,
+    "fat": 2.5,
+    "carbs": 71.5
+  },
+  {
+    "name": "Ржаные хлопья",
+    "en": "Rye Grain Flakes Rolled",
+    "category": "grains",
+    "unit": "g",
+    "calories": 337,
+    "protein": 9.5,
+    "fat": 2.0,
+    "carbs": 70.0
+  },
+  {
+    "name": "Хлопья зеленой гречки",
+    "en": "Raw Green Buckwheat Flakes",
+    "category": "grains",
+    "unit": "g",
+    "calories": 325,
+    "protein": 12.0,
+    "fat": 2.8,
+    "carbs": 63.0
+  },
+  {
+    "name": "Воздушный рис",
+    "en": "Puffed Rice Crispy Cereal",
+    "category": "grains",
+    "unit": "g",
+    "calories": 381,
+    "protein": 6.3,
+    "fat": 0.5,
+    "carbs": 89.5
+  },
+  {
+    "name": "Воздушная пшеница",
+    "en": "Puffed Wheat Grain Cereal",
+    "category": "grains",
+    "unit": "g",
+    "calories": 359,
+    "protein": 11.0,
+    "fat": 1.0,
+    "carbs": 78.5
+  },
+  {
+    "name": "Воздушная гречка",
+    "en": "Puffed Buckwheat Cereal",
+    "category": "grains",
+    "unit": "g",
+    "calories": 343,
+    "protein": 11.5,
+    "fat": 3.0,
+    "carbs": 67.0
+  },
+  {
+    "name": "Солод ячменный светлый",
+    "en": "Light Barley Malt Extract",
+    "category": "grains",
+    "unit": "g",
+    "calories": 318,
+    "protein": 6.8,
+    "fat": 1.8,
+    "carbs": 73.5
+  },
+  {
+    "name": "Черный солод ржаной",
+    "en": "Dark Rye Malt Powder",
+    "category": "grains",
+    "unit": "g",
+    "calories": 295,
+    "protein": 8.0,
+    "fat": 1.5,
+    "carbs": 67.0
+  },
+  {
+    "name": "Хлеб бородинский нарезка",
+    "en": "Borodinsky Dark Rye Bread",
+    "category": "bakery",
+    "unit": "g",
+    "calories": 207,
+    "protein": 6.8,
+    "fat": 1.3,
+    "carbs": 40.8
+  },
+  {
+    "name": "Хлеб дарницкий",
+    "en": "Darnitsky Wheat Rye Bread",
+    "category": "bakery",
+    "unit": "g",
+    "calories": 200,
+    "protein": 7.0,
+    "fat": 1.0,
+    "carbs": 40.7
+  },
+  {
+    "name": "Хлеб столичный",
+    "en": "Stolichniy Moscow Rye Bread",
+    "category": "bakery",
+    "unit": "g",
+    "calories": 208,
+    "protein": 6.5,
+    "fat": 1.2,
+    "carbs": 42.5
+  },
+  {
+    "name": "Хлеб зерновой с семенами",
+    "en": "Multigrain Seeded Bread Loaf",
+    "category": "bakery",
+    "unit": "g",
+    "calories": 252,
+    "protein": 9.5,
+    "fat": 5.5,
+    "carbs": 42.0
+  },
+  {
+    "name": "Лаваш армянский тонкий",
+    "en": "Armenian Thin Lavash Bread",
+    "category": "bakery",
+    "unit": "g",
+    "calories": 277,
+    "protein": 9.1,
+    "fat": 1.1,
+    "carbs": 57.6
+  },
+  {
+    "name": "Матнакаш хлеб армянский",
+    "en": "Matnakash Armenian Bread Round",
+    "category": "bakery",
+    "unit": "g",
+    "calories": 265,
+    "protein": 8.0,
+    "fat": 2.0,
+    "carbs": 54.5
+  },
+  {
+    "name": "Шотис пури грузинский хлеб",
+    "en": "Shoti Puri Georgian Boat Bread",
+    "category": "bakery",
+    "unit": "g",
+    "calories": 268,
+    "protein": 8.5,
+    "fat": 1.5,
+    "carbs": 55.5
+  },
+  {
+    "name": "Хачапури начинка сырная",
+    "en": "Khachapuri Cheese Filling",
+    "category": "bakery",
+    "unit": "g",
+    "calories": 285,
+    "protein": 14.0,
+    "fat": 16.5,
+    "carbs": 20.5
+  },
+  {
+    "name": "Осьминог вареный",
+    "en": "Octopus Boiled Tender",
+    "category": "seafood",
+    "unit": "g",
+    "calories": 164,
+    "protein": 29.8,
+    "fat": 2.1,
+    "carbs": 4.4
+  },
+  {
+    "name": "Осьминог сушеный",
+    "en": "Dried Octopus Snack",
+    "category": "seafood",
+    "unit": "g",
+    "calories": 266,
+    "protein": 56.0,
+    "fat": 2.5,
+    "carbs": 4.0
+  },
+  {
+    "name": "Морской гребешок замороженный",
+    "en": "Frozen Sea Scallop IQF",
+    "category": "seafood",
+    "unit": "g",
+    "calories": 88,
+    "protein": 16.8,
+    "fat": 0.8,
+    "carbs": 3.7
+  },
+  {
+    "name": "Морской еж икра",
+    "en": "Sea Urchin Roe Uni Fresh",
+    "category": "seafood",
+    "unit": "g",
+    "calories": 172,
+    "protein": 15.0,
+    "fat": 9.5,
+    "carbs": 4.0
+  },
+  {
+    "name": "Морской виноград",
+    "en": "Sea Grapes Green Caviar",
+    "category": "seafood",
+    "unit": "g",
+    "calories": 8,
+    "protein": 0.5,
+    "fat": 0.2,
+    "carbs": 1.0
+  },
+  {
+    "name": "Вобла вяленая",
+    "en": "Vobla Dried Salted Roach",
+    "category": "seafood",
+    "unit": "g",
+    "calories": 88,
+    "protein": 17.6,
+    "fat": 2.3,
+    "carbs": 0.0
+  },
+  {
+    "name": "Таранка вяленая",
+    "en": "Taranka Dried Salted Bream",
+    "category": "seafood",
+    "unit": "g",
+    "calories": 88,
+    "protein": 17.5,
+    "fat": 2.0,
+    "carbs": 0.0
+  },
+  {
+    "name": "Сом речной",
+    "en": "River Catfish Fresh Fillet",
+    "category": "seafood",
+    "unit": "g",
+    "calories": 115,
+    "protein": 17.2,
+    "fat": 5.1,
+    "carbs": 0.0
+  },
+  {
+    "name": "Налим речной",
+    "en": "Burbot River Fish Freshwater",
+    "category": "seafood",
+    "unit": "g",
+    "calories": 81,
+    "protein": 18.8,
+    "fat": 0.6,
+    "carbs": 0.0
+  },
+  {
+    "name": "Ленок рыба",
+    "en": "Lenok Siberian Trout Fish",
+    "category": "seafood",
+    "unit": "g",
+    "calories": 88,
+    "protein": 19.0,
+    "fat": 1.0,
+    "carbs": 0.0
+  },
+  {
+    "name": "Тугун рыба сибирская",
+    "en": "Tugun Siberian Whitefish",
+    "category": "seafood",
+    "unit": "g",
+    "calories": 88,
+    "protein": 17.5,
+    "fat": 2.5,
+    "carbs": 0.0
+  },
+  {
+    "name": "Пелядь рыба нельма",
+    "en": "Peled Northern Whitefish",
+    "category": "seafood",
+    "unit": "g",
+    "calories": 126,
+    "protein": 19.0,
+    "fat": 5.4,
+    "carbs": 0.0
+  },
+  {
+    "name": "Карась речной",
+    "en": "Crucian Carp River Fish",
+    "category": "seafood",
+    "unit": "g",
+    "calories": 87,
+    "protein": 17.7,
+    "fat": 1.8,
+    "carbs": 0.0
+  },
+  {
+    "name": "Ёрш речной",
+    "en": "Ruffe Perch Small River Fish",
+    "category": "seafood",
+    "unit": "g",
+    "calories": 88,
+    "protein": 18.0,
+    "fat": 2.0,
+    "carbs": 0.0
+  },
+  {
+    "name": "Чехонь рыба",
+    "en": "Sabrefish Bream River Fish",
+    "category": "seafood",
+    "unit": "g",
+    "calories": 88,
+    "protein": 17.5,
+    "fat": 2.5,
+    "carbs": 0.0
+  },
+  {
+    "name": "Подуст рыба",
+    "en": "Chub Roach Freshwater Fish",
+    "category": "seafood",
+    "unit": "g",
+    "calories": 92,
+    "protein": 18.5,
+    "fat": 2.0,
+    "carbs": 0.0
+  },
+  {
+    "name": "Вырезка оленья",
+    "en": "Venison Deer Tenderloin Loin",
+    "category": "meat",
+    "unit": "g",
+    "calories": 158,
+    "protein": 26.0,
+    "fat": 5.8,
+    "carbs": 0.0
+  },
+  {
+    "name": "Медвежатина мясо",
+    "en": "Bear Meat Wild Game",
+    "category": "meat",
+    "unit": "g",
+    "calories": 155,
+    "protein": 27.0,
+    "fat": 4.8,
+    "carbs": 0.0
+  },
+  {
+    "name": "Мясо нутрии",
+    "en": "Coypu Nutria Meat",
+    "category": "meat",
+    "unit": "g",
+    "calories": 153,
+    "protein": 21.4,
+    "fat": 7.3,
+    "carbs": 0.0
+  },
+  {
+    "name": "Говяжий костный мозг",
+    "en": "Beef Bone Marrow Raw",
+    "category": "meat",
+    "unit": "g",
+    "calories": 786,
+    "protein": 6.8,
+    "fat": 84.4,
+    "carbs": 0.0
+  }
+]
