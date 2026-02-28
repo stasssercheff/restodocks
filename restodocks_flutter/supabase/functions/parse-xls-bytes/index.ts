@@ -1,13 +1,8 @@
 // Supabase Edge Function: парсинг XLS/XLSX из бинарных байт через SheetJS
 // Поддерживает: BIFF8 (.xls, включая Windows-1251/cp1251), XLSX (.xlsx)
 // Принимает JSON: { "bytes": "<base64>" }
-// deno-lint-ignore-file
-// @ts-ignore
-import * as XLSX from "npm:xlsx@0.18.5";
-// @ts-ignore
-import * as cptable from "npm:xlsx@0.18.5/dist/cpexcel.full.mjs";
-
-XLSX.set_cptable(cptable);
+// deno-lint-ignore-file no-explicit-any
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 function corsHeaders(origin: string | null) {
   return {
@@ -27,13 +22,15 @@ function base64ToUint8Array(b64: string): Uint8Array {
 }
 
 Deno.serve(async (req: Request) => {
+  const origin = req.headers.get("Origin");
+
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders(req.headers.get("Origin")) });
+    return new Response(null, { status: 204, headers: corsHeaders(origin) });
   }
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
-      headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+      headers: { ...corsHeaders(origin), "Content-Type": "application/json" },
     });
   }
 
@@ -42,14 +39,26 @@ Deno.serve(async (req: Request) => {
     if (!body.bytes || body.bytes.length === 0) {
       return new Response(JSON.stringify({ error: "Missing 'bytes' field (base64)", rows: [] }), {
         status: 400,
-        headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+        headers: { ...corsHeaders(origin), "Content-Type": "application/json" },
       });
     }
 
     const data = base64ToUint8Array(body.bytes);
 
-    // Пробуем все возможные кодировки для старых .xls файлов
-    let workbook;
+    // Импортируем xlsx внутри обработчика — чтобы краш импорта не ронял весь сервер
+    // @ts-ignore
+    const XLSX = await import("npm:xlsx@0.18.5");
+
+    // Подключаем кодировочные таблицы для Windows-1251 (.xls из 1C/русских программ)
+    try {
+      // @ts-ignore
+      const cptable = await import("npm:xlsx@0.18.5/dist/cpexcel.full.mjs");
+      XLSX.set_cptable(cptable);
+    } catch (_) {
+      // Если не загрузился — продолжаем без него (xlsx всё равно будет работать)
+    }
+
+    let workbook: any;
     try {
       workbook = XLSX.read(data, {
         type: "array",
@@ -57,7 +66,6 @@ Deno.serve(async (req: Request) => {
         cellText: true,
         cellDates: false,
         raw: false,
-        dense: false,
       });
     } catch (_e1) {
       try {
@@ -67,10 +75,10 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+    if (!workbook?.SheetNames?.length) {
       return new Response(JSON.stringify({ error: "No sheets found", rows: [] }), {
         status: 200,
-        headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+        headers: { ...corsHeaders(origin), "Content-Type": "application/json" },
       });
     }
 
@@ -80,8 +88,7 @@ Deno.serve(async (req: Request) => {
       const sheet = workbook.Sheets[sheetName];
       if (!sheet) continue;
 
-      // sheet_to_json даёт массив строк — более надёжно чем CSV для ячеек с переносами и спецсимволами
-      const jsonRows = XLSX.utils.sheet_to_json<string[]>(sheet, {
+      const jsonRows = XLSX.utils.sheet_to_json(sheet, {
         header: 1,
         defval: "",
         blankrows: false,
@@ -90,27 +97,27 @@ Deno.serve(async (req: Request) => {
 
       for (const row of jsonRows) {
         if (!Array.isArray(row)) continue;
-        // Берём только непустые ячейки
-        const cells = row.map((c) => (c ?? "").toString().trim()).filter((c) => c.length > 0);
+        const cells = row.map((c: any) => (c ?? "").toString().trim()).filter((c: string) => c.length > 0);
         if (cells.length === 0) continue;
         const line = cells.join("\t");
-        // Пропускаем строки без хоть одной буквы (чисто числовые служебные строки — итоги, разделители)
+        // Пропускаем строки без букв (числа-итоги, разделители)
         if (!/[a-zA-Zа-яА-ЯёЁ]/.test(line)) continue;
         // Пропускаем слишком длинные строки (описания, примечания)
         if (line.length > 300) continue;
         rows.push(line);
+        if (rows.length >= 1000) break;
       }
 
       if (rows.length >= 1000) break;
     }
 
-    return new Response(JSON.stringify({ rows: rows.slice(0, 1000) }), {
-      headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+    return new Response(JSON.stringify({ rows }), {
+      headers: { ...corsHeaders(origin), "Content-Type": "application/json" },
     });
   } catch (e) {
     return new Response(JSON.stringify({ error: String(e), rows: [] }), {
       status: 500,
-      headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+      headers: { ...corsHeaders(origin), "Content-Type": "application/json" },
     });
   }
 });

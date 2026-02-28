@@ -1793,20 +1793,26 @@ ${text}
         return;
       }
 
+      _cancelLoadingTimeout();
       if (mounted) {
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Не удалось прочитать файл. Попробуйте пересохранить его как .xlsx в Excel или скопировать данные вручную.'),
-            duration: const Duration(seconds: 8),
+          const SnackBar(
+            content: Text('Не удалось прочитать файл. Попробуйте пересохранить его как .xlsx в Excel или скопировать данные вручную.'),
+            duration: Duration(seconds: 6),
           ),
         );
+        context.go('/nomenclature');
       }
     } catch (e) {
       _addDebugLog('Excel processing error: $e');
+      _cancelLoadingTimeout();
       if (mounted) {
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Ошибка обработки файла: $e')),
         );
+        context.go('/nomenclature');
       }
     }
   }
