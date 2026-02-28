@@ -62,19 +62,23 @@ class OrderListExportService {
 
   static Future<pw.ThemeData> _getPdfTheme() async {
     if (_pdfTheme != null) return _pdfTheme!;
+    // Загружаем шрифты атомарно — если что-то упадёт, кэш не обновится
     final baseData = await rootBundle.load('assets/fonts/Roboto-Regular.ttf');
     final boldData = await rootBundle.load('assets/fonts/Roboto-Bold.ttf');
     final italicData = await rootBundle.load('assets/fonts/Roboto-Italic.ttf');
-    _fontRegular = pw.Font.ttf(baseData);
-    _fontBold = pw.Font.ttf(boldData);
-    _fontItalic = pw.Font.ttf(italicData);
-    _pdfTheme = pw.ThemeData.withFont(
-      base: _fontRegular!,
-      bold: _fontBold!,
-      italic: _fontItalic!,
-      // boldItalic = используем italic (у нас нет отдельного файла)
-      boldItalic: _fontItalic!,
+    final fontRegular = pw.Font.ttf(baseData);
+    final fontBold = pw.Font.ttf(boldData);
+    final fontItalic = pw.Font.ttf(italicData);
+    final theme = pw.ThemeData.withFont(
+      base: fontRegular,
+      bold: fontBold,
+      italic: fontItalic,
+      boldItalic: fontItalic,
     );
+    _fontRegular = fontRegular;
+    _fontBold = fontBold;
+    _fontItalic = fontItalic;
+    _pdfTheme = theme;
     return _pdfTheme!;
   }
 

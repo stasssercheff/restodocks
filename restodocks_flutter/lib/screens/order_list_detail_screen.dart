@@ -53,7 +53,10 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
     setState(() {
       _list = found;
       _loading = false;
-      if (found != null) _commentCtrl.text = found.comment;
+      // Загружаем комментарий только из шаблона (savedAt == null).
+      // Сохранённые заказы (savedAt != null) — это архив, комментарий для
+      // новой отправки всегда начинается пустым, чтобы не тянуть старый текст.
+      _commentCtrl.text = (found != null && found.savedAt == null) ? found.comment : '';
     });
   }
 
@@ -102,7 +105,7 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
           ? (double.tryParse(_qtyControllers[e.key].text.replaceFirst(',', '.')) ?? 0)
           : e.value.quantity;
       return e.value.copyWith(quantity: q);
-    }).toList();
+    }).where((item) => item.quantity > 0).toList();
     final saved = _list!.copyWith(
       id: const Uuid().v4(),
       name: '${_list!.name} $dateStr',
@@ -148,6 +151,7 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${loc.t('order_list_save_with_quantities')} ✓')));
+      _commentCtrl.clear();
       // pop вместо go, чтобы разрешить await в OrderListsScreen и сразу показать новый заказ
       if (context.canPop()) context.pop();
     }
@@ -160,7 +164,7 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
           ? (double.tryParse(_qtyControllers[e.key].text.replaceFirst(',', '.')) ?? 0)
           : e.value.quantity;
       return e.value.copyWith(quantity: q);
-    }).toList();
+    }).where((item) => item.quantity > 0).toList();
   }
 
   Future<List<OrderListItem>> _getItemsWithLocalizedNames(String lang) async {

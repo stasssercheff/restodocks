@@ -505,26 +505,60 @@ def main():
     existing, current_total = fetch_existing_names()
     print(f"   Найдено в базе: {current_total} продуктов")
 
-    print("2. Читаем world_products.json...")
+    print("2. Читаем источники продуктов...")
+    # Основной список (английские названия)
     with open("world_products.json") as f:
         world = json.load(f)
-    print(f"   Всего в файле: {len(world)}")
+    print(f"   world_products.json: {len(world)}")
+
+    import os
+    extra = []
+    for fname in ["extra_products.json", "extra_products2.json"]:
+        if os.path.exists(fname):
+            with open(fname, encoding="utf-8") as f:
+                part = json.load(f)
+            extra.extend(part)
+            print(f"   {fname}: {len(part)}")
 
     print("3. Фильтруем дубликаты...")
     new_products = []
-    seen_in_batch = set()  # чтобы не добавлять дубликаты внутри новых
+    seen_in_batch = set()
+
+    # Обрабатываем world_products (en names)
     for p in world:
         en = p["name"].lower().strip()
         ru = EN_RU.get(p["name"], p["name"]).lower().strip()
-        # Проверяем en-имя и ru-имя против всех существующих
         if en in existing or ru in existing:
             continue
-        # Не дублируем внутри нового списка
         if ru in seen_in_batch or en in seen_in_batch:
             continue
         seen_in_batch.add(ru)
         seen_in_batch.add(en)
         new_products.append(make_product(p))
+
+    # Обрабатываем extra_products (ru names with en translations)
+    for p in extra:
+        ru = p["name"].lower().strip()
+        en = p.get("en", p["name"]).lower().strip()
+        if ru in existing or en in existing:
+            continue
+        if ru in seen_in_batch or en in seen_in_batch:
+            continue
+        seen_in_batch.add(ru)
+        seen_in_batch.add(en)
+        en_orig = p.get("en", p["name"])
+        ru_orig = p["name"]
+        new_products.append({
+            "id": str(uuid.uuid4()),
+            "name": ru_orig,
+            "names": {"ru": ru_orig, "en": en_orig},
+            "category": p.get("category", "misc"),
+            "unit": "g" if p.get("unit") in ("g", "gram", "гр", "г") else "kg",
+            "calories": p.get("calories", 0),
+            "protein": p.get("protein", 0),
+            "fat": p.get("fat", 0),
+            "carbs": p.get("carbs", 0),
+        })
 
     print(f"   Новых для добавления: {len(new_products)}")
 
