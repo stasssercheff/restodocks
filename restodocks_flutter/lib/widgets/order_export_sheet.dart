@@ -29,16 +29,39 @@ class OrderExportSheet extends StatefulWidget {
   final void Function(String message) onSaved;
   /// Язык документа (может отличаться от языка UI). Если null — используется текущий язык UI.
   final String? exportLang;
-  /// Вызывается после успешного экспорта — сохраняет заказ во входящие
+  /// Вызывается после успешного экспорта — сохраняет заказ во входящие.
   final Future<void> Function()? onExportToInbox;
 
   @override
   State<OrderExportSheet> createState() => _OrderExportSheetState();
 }
 
+/// Снимок всех данных, необходимых для фоновых операций после закрытия листа.
+class _ExportSnapshot {
+  final OrderList list;
+  final List<OrderListItem> items;  // уже переведённые
+  final String companyName;
+  final String docLang;
+  final String Function(String) t;
+  final void Function(String) onSaved;
+  final Future<void> Function()? onExportToInbox;
+
+  const _ExportSnapshot({
+    required this.list,
+    required this.items,
+    required this.companyName,
+    required this.docLang,
+    required this.t,
+    required this.onSaved,
+    required this.onExportToInbox,
+  });
+}
+
 class _OrderExportSheetState extends State<OrderExportSheet> {
   /// Переведённые названия продуктов: оригинал -> перевод
   final Map<String, String> _translatedNames = {};
+  /// Переведённый комментарий
+  String? _translatedComment;
   bool _translating = false;
 
   String get _docLang => widget.exportLang ?? widget.loc.currentLanguageCode;
@@ -47,11 +70,11 @@ class _OrderExportSheetState extends State<OrderExportSheet> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _preTranslateNames());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _preTranslate());
   }
 
-  /// Переводим названия продуктов заранее, чтобы PDF/письмо/текст были переведены
-  Future<void> _preTranslateNames() async {
+  /// Переводим названия продуктов и комментарий через DeepL
+  Future<void> _preTranslate() async {
     final sourceLang = widget.loc.currentLanguageCode;
     if (sourceLang == _docLang) return;
     if (!mounted) return;
@@ -59,12 +82,13 @@ class _OrderExportSheetState extends State<OrderExportSheet> {
     setState(() => _translating = true);
     try {
       final translationSvc = context.read<TranslationService>();
+
+      // Переводим названия продуктов
       final seen = <String>{};
       for (final item in widget.itemsWithQuantities) {
         final name = item.productName.trim();
         if (name.isEmpty || seen.contains(name)) continue;
         seen.add(name);
-        // Для ручного ввода (productId == null) используем имя как id
         final entityId = item.productId ?? name;
         final translated = await translationSvc.translate(
           entityType: TranslationEntityType.product,
@@ -78,6 +102,22 @@ class _OrderExportSheetState extends State<OrderExportSheet> {
           setState(() => _translatedNames[name] = translated);
         }
       }
+
+      // Переводим комментарий
+      final comment = widget.list.comment.trim();
+      if (comment.isNotEmpty && mounted) {
+        final translatedComment = await translationSvc.translate(
+          entityType: TranslationEntityType.ui,
+          entityId: 'order_comment_${widget.list.id}',
+          fieldName: 'comment',
+          text: comment,
+          from: sourceLang,
+          to: _docLang,
+        );
+        if (translatedComment != null && translatedComment != comment && mounted) {
+          setState(() => _translatedComment = translatedComment);
+        }
+      }
     } catch (_) {}
     if (mounted) setState(() => _translating = false);
   }
@@ -88,101 +128,109 @@ class _OrderExportSheetState extends State<OrderExportSheet> {
     return translated != null ? item.copyWith(productName: translated) : item;
   }).toList();
 
-  String _buildText() {
-    return OrderListExportService.buildOrderText(
-      list: widget.list,
+  /// OrderList с переведённым комментарием
+  OrderList get _translatedList {
+    final comment = _translatedComment ?? widget.list.comment;
+    return widget.list.copyWith(comment: comment);
+  }
+
+  // ─── Снимок состояния и закрытие листа ────────────────────────────────────
+
+  /// Снимаем всё необходимое ДО pop(), затем запускаем фоновую задачу.
+  void _runAction(BuildContext context, Future<void> Function(_ExportSnapshot) action) {
+    // Snapshot captured while State is still alive
+    final snap = _ExportSnapshot(
+      list: _translatedList,
+      items: _translatedItems,
       companyName: widget.companyName,
-      itemsWithQuantities: _translatedItems,
-      lang: _docLang,
-      documentDate: DateTime.now(),
+      docLang: _docLang,
       t: _t,
+      onSaved: widget.onSaved,
+      onExportToInbox: widget.onExportToInbox,
     );
-  }
-
-  // ─── Закрыть лист немедленно, затем выполнить action в фоне ───────────────
-
-  void _runAction(BuildContext context, Future<void> Function() action) {
     Navigator.of(context).pop();
-    action();
+    action(snap);
   }
 
-  Future<void> _saveExcelBg() async {
+  // ─── Фоновые задачи (получают snapshot, не обращаются к State) ───────────
+
+  static Future<void> _saveExcelBg(_ExportSnapshot s) async {
     try {
       final fileName = await OrderListExportService.saveExcelFile(
-        list: widget.list,
-        companyName: widget.companyName,
-        itemsWithQuantities: _translatedItems,
-        lang: _docLang,
+        list: s.list,
+        companyName: s.companyName,
+        itemsWithQuantities: s.items,
+        lang: s.docLang,
         documentDate: DateTime.now(),
-        t: _t,
+        t: s.t,
       );
-      await widget.onExportToInbox?.call();
-      widget.onSaved('${_t('order_export_excel_saved')}: $fileName');
+      await s.onExportToInbox?.call();
+      s.onSaved('${s.t('order_export_excel_saved')}: $fileName');
     } catch (e) {
-      widget.onSaved('${_t('error_short')}: $e');
+      s.onSaved('${s.t('error_short')}: $e');
     }
   }
 
-  Future<void> _saveTextBg() async {
+  static Future<void> _saveTextBg(_ExportSnapshot s) async {
     try {
-      final content = _buildText();
+      final content = _buildText(s);
       final fileName = await OrderListExportService.saveTextFile(
         content: content,
-        listName: widget.list.name,
+        listName: s.list.name,
       );
-      await widget.onExportToInbox?.call();
-      widget.onSaved('${_t('order_export_text_saved')}: $fileName');
+      await s.onExportToInbox?.call();
+      s.onSaved('${s.t('order_export_text_saved')}: $fileName');
     } catch (e) {
-      widget.onSaved('${_t('error_short')}: $e');
+      s.onSaved('${s.t('error_short')}: $e');
     }
   }
 
-  Future<void> _savePdfBg() async {
+  static Future<void> _savePdfBg(_ExportSnapshot s) async {
     try {
       final pdfBytes = await OrderListExportService.buildOrderPdfBytes(
-        list: widget.list,
-        companyName: widget.companyName,
-        itemsWithQuantities: _translatedItems,
-        lang: _docLang,
+        list: s.list,
+        companyName: s.companyName,
+        itemsWithQuantities: s.items,
+        lang: s.docLang,
         documentDate: DateTime.now(),
-        t: _t,
+        t: s.t,
       );
       final dateStr = DateTime.now().toIso8601String().split('T').first;
-      final safeName = widget.list.name.replaceAll(RegExp(r'[^\w\-.\s]'), '_');
+      final safeName = s.list.name.replaceAll(RegExp(r'[^\w\-.\s]'), '_');
       final fileName = 'order_${safeName}_$dateStr.pdf';
       await saveFileBytes(fileName, pdfBytes);
-      await widget.onExportToInbox?.call();
-      widget.onSaved('${_t('order_export_pdf_saved')}: $fileName');
+      await s.onExportToInbox?.call();
+      s.onSaved('${s.t('order_export_pdf_saved')}: $fileName');
     } catch (e) {
-      widget.onSaved('${_t('error_short')}: $e');
+      s.onSaved('${s.t('error_short')}: $e');
     }
   }
 
-  Future<void> _copyToClipboardBg() async {
-    final content = _buildText();
+  static Future<void> _copyToClipboardBg(_ExportSnapshot s) async {
+    final content = _buildText(s);
     await Clipboard.setData(ClipboardData(text: content));
-    await widget.onExportToInbox?.call();
-    widget.onSaved(_t('order_export_copied'));
+    await s.onExportToInbox?.call();
+    s.onSaved(s.t('order_export_copied'));
   }
 
-  Future<void> _sendEmailBg() async {
-    final to = widget.list.email!.trim();
-    final content = _buildText();
-    final subject = '${_t('product_order')}: ${widget.companyName}';
+  static Future<void> _sendEmailBg(_ExportSnapshot s) async {
+    final to = s.list.email!.trim();
+    final content = _buildText(s);
+    final subject = '${s.t('product_order')}: ${s.companyName}';
     final htmlBody = '<pre style="font-family: sans-serif; white-space: pre-wrap;">${_escapeHtml(content)}</pre>';
     final dateStr = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
-    final safeCompany = widget.companyName.replaceAll(RegExp(r'[^\w\-.\s]'), '_');
-    final safeListName = widget.list.name.replaceAll(RegExp(r'[^\w\-.\s]'), '_');
+    final safeCompany = s.companyName.replaceAll(RegExp(r'[^\w\-.\s]'), '_');
+    final safeListName = s.list.name.replaceAll(RegExp(r'[^\w\-.\s]'), '_');
     final pdfFileName = 'order_${safeCompany}_${safeListName}_$dateStr.pdf';
 
     try {
       final pdfBytes = await OrderListExportService.buildOrderPdfBytes(
-        list: widget.list,
-        companyName: widget.companyName,
-        itemsWithQuantities: _translatedItems,
-        lang: _docLang,
+        list: s.list,
+        companyName: s.companyName,
+        itemsWithQuantities: s.items,
+        lang: s.docLang,
         documentDate: DateTime.now(),
-        t: _t,
+        t: s.t,
       );
       final result = await EmailService().sendOrderEmail(
         to: to,
@@ -192,39 +240,52 @@ class _OrderExportSheetState extends State<OrderExportSheet> {
         pdfFileName: pdfFileName,
       );
       if (result.ok) {
-        await widget.onExportToInbox?.call();
-        widget.onSaved(_t('order_export_email_sent'));
+        await s.onExportToInbox?.call();
+        s.onSaved(s.t('order_export_email_sent'));
       } else {
-        widget.onSaved('${_t('error_short')}: ${result.error}');
+        s.onSaved('${s.t('error_short')}: ${result.error}');
       }
     } catch (e) {
-      widget.onSaved('${_t('error_short')}: $e');
+      s.onSaved('${s.t('error_short')}: $e');
     }
   }
 
-  Future<void> _sendWhatsAppBg() async {
-    final content = _buildText();
-    final phone = widget.list.whatsapp?.isNotEmpty == true ? widget.list.whatsapp! : widget.list.phone;
+  static Future<void> _sendWhatsAppBg(_ExportSnapshot s) async {
+    final content = _buildText(s);
+    final phone = s.list.whatsapp?.isNotEmpty == true ? s.list.whatsapp! : s.list.phone;
     final url = OrderListExportService.whatsAppUrl(phone, content);
     if (url != null) {
       final uri = Uri.parse(url);
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       }
-      await widget.onExportToInbox?.call();
+      await s.onExportToInbox?.call();
     }
   }
 
-  Future<void> _sendTelegramBg() async {
-    final content = _buildText();
-    final url = OrderListExportService.telegramUrl(widget.list.telegram, content);
+  static Future<void> _sendTelegramBg(_ExportSnapshot s) async {
+    final content = _buildText(s);
+    final url = OrderListExportService.telegramUrl(s.list.telegram, content);
     if (url != null) {
       final uri = Uri.parse(url);
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       }
-      await widget.onExportToInbox?.call();
+      await s.onExportToInbox?.call();
     }
+  }
+
+  // ─── Вспомогательные статические методы ───────────────────────────────────
+
+  static String _buildText(_ExportSnapshot s) {
+    return OrderListExportService.buildOrderText(
+      list: s.list,
+      companyName: s.companyName,
+      itemsWithQuantities: s.items,
+      lang: s.docLang,
+      documentDate: DateTime.now(),
+      t: s.t,
+    );
   }
 
   static String _escapeHtml(String s) {
