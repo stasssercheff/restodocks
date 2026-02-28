@@ -75,6 +75,39 @@ class EmailService {
     }
   }
 
+  /// Отправить обращение в службу поддержки на stassserchef@gmail.com.
+  Future<({bool ok, String? error})> sendSupportEmail({
+    required String fromEmail,
+    required String category,
+    required String subject,
+    required String message,
+  }) async {
+    try {
+      const supportEmail = 'stassserchef@gmail.com';
+      final html = '''
+<div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+  <h2 style="color:#333">Обращение в поддержку Restodocks</h2>
+  <table style="width:100%;border-collapse:collapse">
+    <tr><td style="padding:8px;font-weight:bold;width:120px">От:</td><td style="padding:8px">$fromEmail</td></tr>
+    <tr style="background:#f9f9f9"><td style="padding:8px;font-weight:bold">Категория:</td><td style="padding:8px">$category</td></tr>
+    <tr><td style="padding:8px;font-weight:bold">Тема:</td><td style="padding:8px">$subject</td></tr>
+  </table>
+  <div style="margin-top:16px;padding:16px;background:#f5f5f5;border-radius:8px;white-space:pre-wrap">$message</div>
+</div>
+''';
+      final res = await _client.functions.invoke('send-email', body: {
+        'to': supportEmail,
+        'subject': '[Поддержка] $category — $subject',
+        'html': html,
+      });
+      if (res.status == 200) return (ok: true, error: null);
+      final msg = (res.data as Map?)?['error']?.toString() ?? 'Unknown error';
+      return (ok: false, error: msg);
+    } catch (e) {
+      return (ok: false, error: e.toString());
+    }
+  }
+
   /// Отправить заказ продуктов на email через Resend (с вложением PDF).
   /// [pdfBytes] — сгенерированный PDF заказа (если null, письмо уходит только с html).
   Future<({bool ok, String? error})> sendOrderEmail({

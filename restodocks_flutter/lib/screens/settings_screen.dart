@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../models/models.dart';
 import '../services/services.dart';
@@ -555,51 +554,126 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showSupportDialog(BuildContext context, LocalizationService loc) {
+    final accountManager = context.read<AccountManagerSupabase>();
+    final userEmail = accountManager.currentEmployee?.email ?? '';
+
+    final categories = [
+      loc.t('support_category_bug'),
+      loc.t('support_category_question'),
+      loc.t('support_category_suggestion'),
+      loc.t('support_category_other'),
+    ];
+
+    String selectedCategory = categories.first;
+    final subjectController = TextEditingController();
+    final messageController = TextEditingController();
+    bool isSending = false;
+
     showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.t('contact_support')),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.telegram, color: Color(0xFF2AABEE)),
-              title: const Text('Telegram'),
-              subtitle: const Text('@restodocks'),
-              onTap: () async {
-                final uri = Uri.parse('https://t.me/restodocks');
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                }
-                if (ctx.mounted) Navigator.of(ctx).pop();
-              },
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx2, setDialogState) => AlertDialog(
+          title: Text(loc.t('support_form_title')),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(loc.t('support_category'), style: Theme.of(ctx2).textTheme.labelMedium),
+                const SizedBox(height: 6),
+                DropdownButtonFormField<String>(
+                  value: selectedCategory,
+                  isExpanded: true,
+                  decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
+                  items: categories
+                      .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                      .toList(),
+                  onChanged: isSending ? null : (v) => setDialogState(() => selectedCategory = v ?? selectedCategory),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: subjectController,
+                  enabled: !isSending,
+                  decoration: InputDecoration(
+                    labelText: loc.t('support_subject'),
+                    hintText: loc.t('support_subject_hint'),
+                    border: const OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: messageController,
+                  enabled: !isSending,
+                  maxLines: 5,
+                  decoration: InputDecoration(
+                    labelText: loc.t('support_message'),
+                    hintText: loc.t('support_message_hint'),
+                    border: const OutlineInputBorder(),
+                    alignLabelWithHint: true,
+                  ),
+                ),
+              ],
             ),
-            ListTile(
-              leading: const Icon(Icons.email_outlined, color: Colors.redAccent),
-              title: Text(loc.t('email')),
-              subtitle: const Text('stassserchef@gmail.com'),
-              onTap: () async {
-                final uri = Uri(
-                  scheme: 'mailto',
-                  path: 'stassserchef@gmail.com',
-                  query: 'subject=Restodocks%20Support',
-                );
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri);
-                }
-                if (ctx.mounted) Navigator.of(ctx).pop();
-              },
+          ),
+          actions: [
+            TextButton(
+              onPressed: isSending ? null : () => Navigator.of(ctx2).pop(),
+              child: Text(MaterialLocalizations.of(ctx2).cancelButtonLabel),
+            ),
+            FilledButton(
+              onPressed: isSending
+                  ? null
+                  : () async {
+                      final subject = subjectController.text.trim();
+                      final message = messageController.text.trim();
+                      if (subject.isEmpty || message.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(loc.t('support_fill_all'))),
+                        );
+                        return;
+                      }
+                      setDialogState(() => isSending = true);
+                      final result = await EmailService().sendSupportEmail(
+                        fromEmail: userEmail,
+                        category: selectedCategory,
+                        subject: subject,
+                        message: message,
+                      );
+                      if (ctx2.mounted) {
+                        Navigator.of(ctx2).pop();
+                        if (result.ok) {
+                          showDialog<void>(
+                            context: context,
+                            builder: (_) => AlertDialog(
+                              title: Text(loc.t('support_sent_title')),
+                              content: Text(loc.t('support_sent_body')),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(context).pop(),
+                                  child: Text(MaterialLocalizations.of(context).okButtonLabel),
+                                ),
+                              ],
+                            ),
+                          );
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(loc.t('support_error'))),
+                          );
+                        }
+                      }
+                    },
+              child: isSending
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  : Text(loc.t('support_send')),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(MaterialLocalizations.of(ctx).closeButtonLabel),
-          ),
-        ],
       ),
-    );
+    ).then((_) {
+      subjectController.dispose();
+      messageController.dispose();
+    });
   }
 
   @override
