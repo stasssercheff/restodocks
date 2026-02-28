@@ -450,6 +450,7 @@ class TechCardEditScreen extends StatefulWidget {
 class _TechCardEditScreenState extends State<TechCardEditScreen> {
   TechCard? _techCard;
   bool _loading = true;
+  bool _technologyTranslating = false;
   String? _error;
   /// 'photo' | 'excel' — какая кнопка сейчас загружает (чтобы показывать правильный текст).
   final _nameController = TextEditingController();
@@ -624,6 +625,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
             }
           }
         });
+        // Если перевод технологии ещё не сохранён — запросить через DeepL
+        if (tc != null) _translateTechnologyIfNeeded(tc);
       });
     } catch (e) {
       if (mounted) setState(() { _error = e.toString(); _loading = false; });
@@ -652,6 +655,63 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     _nameController.dispose();
     _technologyController.dispose();
     super.dispose();
+  }
+
+  /// Если для текущего языка перевод технологии отсутствует — запрашивает DeepL и
+  /// обновляет _technologyController + сохраняет в technologyLocalized в БД.
+  Future<void> _translateTechnologyIfNeeded(TechCard tc) async {
+    if (!mounted) return;
+    final loc = context.read<LocalizationService>();
+    final targetLang = loc.currentLanguageCode;
+
+    // Найти исходный язык технологии (первый непустой ключ в technologyLocalized)
+    final techMap = tc.technologyLocalized ?? {};
+    final sourceLang = techMap.entries
+        .where((e) => e.value.trim().isNotEmpty && e.key != targetLang)
+        .map((e) => e.key)
+        .firstOrNull;
+    final sourceText = sourceLang != null ? techMap[sourceLang]! : '';
+
+    // Уже есть перевод на целевой язык — ничего не делать
+    final existing = techMap[targetLang]?.trim() ?? '';
+    if (existing.isNotEmpty) return;
+
+    // Нет исходного текста — нечего переводить
+    if (sourceText.trim().isEmpty || sourceLang == null) return;
+    if (sourceLang == targetLang) return;
+
+    if (!mounted) return;
+    setState(() => _technologyTranslating = true);
+    try {
+      final translationManager = context.read<TranslationManager>();
+      final svc = context.read<TechCardServiceSupabase>();
+
+      final translated = await translationManager.getLocalizedText(
+        entityType: TranslationEntityType.techCard,
+        entityId: tc.id,
+        fieldName: 'technology',
+        sourceText: sourceText,
+        sourceLanguage: sourceLang,
+        targetLanguage: targetLang,
+      );
+
+      if (!mounted) return;
+      if (translated.trim().isNotEmpty && translated != sourceText) {
+        // Обновляем контроллер чтобы текст появился сразу
+        setState(() {
+          _technologyController.text = translated;
+        });
+        // Сохраняем перевод в technologyLocalized в БД
+        final newTechMap = Map<String, String>.from(techMap);
+        newTechMap[targetLang] = translated;
+        try {
+          final updated = tc.copyWith(technologyLocalized: newTechMap);
+          await svc.saveTechCard(updated);
+          if (mounted) setState(() => _techCard = updated);
+        } catch (_) {}
+      }
+    } catch (_) {}
+    if (mounted) setState(() => _technologyTranslating = false);
   }
 
   Future<void> _save() async {
@@ -1731,7 +1791,17 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                           color: Theme.of(context).colorScheme.surfaceContainerHighest,
                           border: const Border(bottom: BorderSide(color: Colors.grey, width: 1)),
                         ),
-                        child: Text(loc.t('ttk_technology'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                        child: Row(
+                          children: [
+                            Text(loc.t('ttk_technology'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                            if (_technologyTranslating) ...[
+                              const SizedBox(width: 8),
+                              const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
+                              const SizedBox(width: 6),
+                              Text(loc.t('loading'), style: const TextStyle(fontSize: 12)),
+                            ],
+                          ],
+                        ),
                       ),
                       SingleChildScrollView(
                         padding: const EdgeInsets.all(12),
