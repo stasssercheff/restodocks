@@ -45,9 +45,10 @@ Deno.serve(async (req: Request) => {
       header?: Record<string, unknown>;
       items?: OrderItemInput[];
       comment?: string;
+      sourceLang?: string;
     };
 
-    const { establishmentId, createdByEmployeeId, header, items, comment } = body;
+    const { establishmentId, createdByEmployeeId, header, items, comment, sourceLang } = body;
 
     if (!establishmentId || !createdByEmployeeId || !header || !Array.isArray(items)) {
       return new Response(
@@ -138,6 +139,7 @@ Deno.serve(async (req: Request) => {
       items: itemsPayload,
       grandTotal,
       comment: comment ?? null,
+      sourceLang: sourceLang ?? null,
     };
 
     // Получатели: owner, executive_chef, sous_chef (по аналогии с checklist_submissions)

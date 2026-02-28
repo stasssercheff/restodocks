@@ -16,6 +16,7 @@ class OrderDocumentService {
     required Map<String, dynamic> header,
     required List<Map<String, dynamic>> items,
     String? comment,
+    String? sourceLang,
   }) async {
     try {
       final body = <String, dynamic>{
@@ -29,6 +30,7 @@ class OrderDocumentService {
           'quantity': e['quantity'],
         }).toList(),
         'comment': comment,
+        if (sourceLang != null) 'sourceLang': sourceLang,
       };
       final res = await _supabase.client.functions.invoke('save-order-document', body: body);
       final data = res.data;

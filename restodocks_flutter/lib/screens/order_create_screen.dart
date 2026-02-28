@@ -156,6 +156,7 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
         header: header,
         items: itemsPayload,
         comment: saved.comment,
+        sourceLang: loc.currentLanguageCode,
       );
 
       if (mounted) {
@@ -215,6 +216,7 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
       header: header,
       items: itemsPayload,
       comment: _commentCtrl.text,
+      sourceLang: context.read<LocalizationService>().currentLanguageCode,
     );
     return orderDoc != null;
   }

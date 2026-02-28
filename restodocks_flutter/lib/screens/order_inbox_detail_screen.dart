@@ -24,6 +24,8 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
   String? _error;
   // Локализованные имена продуктов: productId -> localizedName
   final Map<String, String> _localizedNames = {};
+  // Переведённый комментарий (DeepL)
+  String? _translatedComment;
 
   @override
   void initState() {
@@ -43,10 +45,37 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
       _loading = false;
       if (doc == null) _error = 'Документ не найден';
     });
-    // После загрузки документа — подгружаем локализованные имена продуктов
+    // После загрузки документа — подгружаем локализованные имена и переводим комментарий
     if (doc != null) {
       _loadLocalizedNames(doc);
+      _translateComment(doc);
     }
+  }
+
+  Future<void> _translateComment(Map<String, dynamic> doc) async {
+    if (!mounted) return;
+    final loc = context.read<LocalizationService>();
+    final targetLang = loc.currentLanguageCode;
+    final payload = doc['payload'] as Map<String, dynamic>? ?? {};
+    final sourceLang = (payload['sourceLang'] as String?)?.isNotEmpty == true
+        ? payload['sourceLang'] as String
+        : (targetLang == 'ru' ? 'en' : 'ru');
+    final comment = (payload['comment'] as String?)?.trim() ?? '';
+    if (comment.isEmpty || sourceLang == targetLang) return;
+    try {
+      final translationSvc = context.read<TranslationService>();
+      final translated = await translationSvc.translate(
+        entityType: TranslationEntityType.ui,
+        entityId: 'order_comment_${doc['id'] ?? comment.hashCode}',
+        fieldName: 'comment',
+        text: comment,
+        from: sourceLang,
+        to: targetLang,
+      );
+      if (translated != null && translated != comment && mounted) {
+        setState(() => _translatedComment = translated);
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadLocalizedNames(Map<String, dynamic> doc) async {
@@ -235,7 +264,8 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
     final header = payload['header'] as Map<String, dynamic>? ?? {};
     final items = payload['items'] as List<dynamic>? ?? [];
     final grandTotal = (payload['grandTotal'] as num?)?.toDouble() ?? 0;
-    final comment = (payload['comment'] as String?)?.trim() ?? '';
+    final rawComment = (payload['comment'] as String?)?.trim() ?? '';
+    final comment = (_translatedComment?.isNotEmpty == true) ? _translatedComment! : rawComment;
 
     return Scaffold(
       appBar: AppBar(

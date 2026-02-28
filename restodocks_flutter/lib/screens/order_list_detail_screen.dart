@@ -134,6 +134,7 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
       header: header,
       items: itemsPayload,
       comment: saved.comment,
+      sourceLang: loc.currentLanguageCode,
     );
 
     if (mounted) {
@@ -205,6 +206,7 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
       header: header,
       items: itemsPayload,
       comment: _list!.comment,
+      sourceLang: context.read<LocalizationService>().currentLanguageCode,
     );
     return orderDoc != null;
   }
