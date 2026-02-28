@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { Resend } from "npm:resend@4.0.0"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -20,7 +19,8 @@ serve(async (req) => {
   }
 
   try {
-    const resend = new Resend(Deno.env.get('RESEND_API_KEY'))
+    const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
+    const RESEND_FROM = Deno.env.get('RESEND_FROM_EMAIL')?.trim() || 'Restodocks <noreply@restodocks.com>'
 
     const { to, subject, html, attachments }: EmailRequest = await req.json()
 
@@ -31,45 +31,53 @@ serve(async (req) => {
       })
     }
 
-    // Pass base64 content directly — Resend SDK accepts base64 string as attachment content
-    const resolvedAttachments = attachments?.length
-      ? attachments.map((a) => ({
-          filename: a.filename,
-          content: a.content, // base64 string, accepted by Resend
-        }))
-      : undefined
-
-    const payload = {
-      from: Deno.env.get('RESEND_FROM_EMAIL')?.trim() || 'Restodocks <noreply@restodocks.com>',
+    const payload: Record<string, unknown> = {
+      from: RESEND_FROM,
       to: [to],
       subject,
       html,
-      ...(resolvedAttachments ? { attachments: resolvedAttachments } : {}),
     }
 
-    console.log(`send-email: sending payload, from=${payload.from}, attachments=${resolvedAttachments?.length ?? 0}`)
-
-    const { data, error } = await resend.emails.send(payload)
-
-    if (error) {
-      console.error('Resend error:', JSON.stringify(error))
-      return new Response(JSON.stringify({ error: (error as { message?: string }).message ?? String(error) }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+    if (attachments?.length) {
+      // Resend REST API accepts content as base64 string directly
+      payload.attachments = attachments.map((a) => ({
+        filename: a.filename,
+        content: a.content,
+      }))
     }
 
-    console.log('Email sent successfully, id:', (data as { id?: string })?.id)
-    return new Response(JSON.stringify({ ok: true, data }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    console.log(`send-email: calling Resend API, from=${RESEND_FROM}, attachments=${attachments?.length ?? 0}`)
+
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${RESEND_API_KEY}`,
+      },
+      body: JSON.stringify(payload),
     })
+
+    const data = await res.json()
+    console.log(`send-email: Resend response status=${res.status} data=${JSON.stringify(data)}`)
+
+    if (!res.ok) {
+      console.error('Resend API error:', JSON.stringify(data))
+      return new Response(
+        JSON.stringify({ error: data?.message ?? data?.error ?? String(data) }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
+
+    return new Response(
+      JSON.stringify({ ok: true, data }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    )
 
   } catch (err) {
     console.error('Email function error:', err)
-    return new Response(JSON.stringify({ error: String(err) }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return new Response(
+      JSON.stringify({ error: String(err) }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    )
   }
 })
