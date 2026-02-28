@@ -1746,7 +1746,10 @@ ${text}
       final res = await Supabase.instance.client.functions.invoke(
         'parse-xls-bytes',
         body: {'bytes': b64},
-      );
+      ).timeout(const Duration(seconds: 20), onTimeout: () {
+        _addDebugLog('parse-xls-bytes timeout');
+        throw Exception('timeout');
+      });
       if (res.status != 200) return null;
       final data = res.data;
       if (data is! Map) return null;
@@ -1782,25 +1785,19 @@ ${text}
 
       _addDebugLog('Server-side parse returned empty/null, falling back to local parsing');
 
-      // Fallback: локальный парсинг для xlsx через excel/spreadsheet_decoder
-      if (!isOle) {
-        final localRows = _extractRowsFromExcel(bytes);
-        if (localRows.isNotEmpty) {
-          _addDebugLog('Local Excel parse: ${localRows.length} rows');
-          await _processWithDeferredModeration(rows: localRows, source: 'xlsx');
-          return;
-        }
+      // Fallback: локальный парсинг — работает для xlsx и иногда для xls
+      final localRows = _extractRowsFromExcel(bytes);
+      if (localRows.isNotEmpty) {
+        _addDebugLog('Local Excel parse: ${localRows.length} rows');
+        await _processWithDeferredModeration(rows: localRows, source: isOle ? 'xls' : 'xlsx');
+        return;
       }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              isOle
-                  ? 'Не удалось прочитать .xls файл. Попробуйте пересохранить его как .xlsx в Excel.'
-                  : 'Не удалось извлечь данные из файла. Проверьте формат.',
-            ),
-            duration: const Duration(seconds: 6),
+            content: const Text('Не удалось прочитать файл. Попробуйте пересохранить его как .xlsx в Excel или скопировать данные вручную.'),
+            duration: const Duration(seconds: 8),
           ),
         );
       }
