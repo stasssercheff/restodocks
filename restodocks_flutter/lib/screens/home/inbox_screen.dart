@@ -9,7 +9,7 @@ import '../../models/inbox_document.dart';
 import '../../services/inbox_service.dart';
 import '../../widgets/app_bar_home_button.dart';
 
-/// Входящие: Документы по отделам (Инвентаризация, Заказы продуктов, Подтверждения смен)
+/// Входящие: Документы по типам (Чеклисты, Заказы, Инвентаризация)
 class InboxScreen extends StatefulWidget {
   const InboxScreen({super.key, this.embedded = false});
 
@@ -19,20 +19,49 @@ class InboxScreen extends StatefulWidget {
   State<InboxScreen> createState() => _InboxScreenState();
 }
 
+/// Типы вкладок во входящих
+enum _InboxTab { checklist, order, inventory }
+
 class _InboxScreenState extends State<InboxScreen> {
   late InboxService _inboxService;
   List<InboxDocument> _documents = [];
   bool _loading = true;
-  String _selectedDepartment = 'all'; // all, kitchen, bar, hall, management
+  _InboxTab? _selectedTab;
 
   @override
   void initState() {
     super.initState();
-    // Инициализируем сервис позже, когда контекст будет доступен
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _inboxService = InboxService(context.read<AccountManagerSupabase>().supabase);
+      _initDefaultTab();
       _loadDocuments();
     });
+  }
+
+  /// Выбираем первую доступную вкладку для текущего сотрудника
+  void _initDefaultTab() {
+    final employee = context.read<AccountManagerSupabase>().currentEmployee;
+    if (employee == null) return;
+    final tabs = _visibleTabs(employee);
+    if (tabs.isNotEmpty) {
+      setState(() => _selectedTab = tabs.first);
+    }
+  }
+
+  /// Список вкладок, доступных данному сотруднику
+  List<_InboxTab> _visibleTabs(Employee employee) {
+    final isChef = employee.roles.contains('executive_chef');
+    final isSousChef = employee.roles.contains('sous_chef');
+    final isOwner = employee.roles.contains('owner');
+
+    final tabs = <_InboxTab>[];
+    // Чеклист — шеф и су-шеф
+    if (isChef || isSousChef) tabs.add(_InboxTab.checklist);
+    // Заказы — шеф и су-шеф
+    if (isChef || isSousChef) tabs.add(_InboxTab.order);
+    // Инвентаризация — шеф и собственник
+    if (isChef || isOwner) tabs.add(_InboxTab.inventory);
+    return tabs;
   }
 
   Future<void> _loadDocuments() async {
@@ -62,12 +91,24 @@ class _InboxScreenState extends State<InboxScreen> {
   }
 
   List<InboxDocument> get _filteredDocuments {
-    return _inboxService.filterByDepartment(_documents, _selectedDepartment);
+    switch (_selectedTab) {
+      case _InboxTab.checklist:
+        return _documents.where((d) => d.type == DocumentType.checklistSubmission).toList();
+      case _InboxTab.order:
+        return _documents.where((d) => d.type == DocumentType.productOrder).toList();
+      case _InboxTab.inventory:
+        return _documents.where((d) => d.type == DocumentType.inventory).toList();
+      case null:
+        return [];
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
+    final accountManager = context.watch<AccountManagerSupabase>();
+    final employee = accountManager.currentEmployee;
+    final visibleTabs = employee != null ? _visibleTabs(employee) : <_InboxTab>[];
 
     return Scaffold(
       appBar: AppBar(
@@ -83,23 +124,36 @@ class _InboxScreenState extends State<InboxScreen> {
       ),
       body: Column(
         children: [
-          // Фильтр по отделам
-          _buildDepartmentFilter(loc),
+          // Фильтр по типу документа
+          if (visibleTabs.isNotEmpty) _buildTypeFilter(loc, visibleTabs),
 
           // Список документов
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
-                : _filteredDocuments.isEmpty
+                : _selectedTab == null
                     ? _buildEmptyState(loc)
-                    : _buildDocumentsList(),
+                    : _filteredDocuments.isEmpty
+                        ? _buildEmptyState(loc)
+                        : _buildDocumentsList(),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildDepartmentFilter(LocalizationService loc) {
+  String _tabLabel(_InboxTab tab, LocalizationService loc) {
+    switch (tab) {
+      case _InboxTab.checklist:
+        return loc.t('inbox_tab_checklist');
+      case _InboxTab.order:
+        return loc.t('inbox_tab_order');
+      case _InboxTab.inventory:
+        return loc.t('inbox_tab_inventory');
+    }
+  }
+
+  Widget _buildTypeFilter(LocalizationService loc, List<_InboxTab> visibleTabs) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
@@ -111,39 +165,24 @@ class _InboxScreenState extends State<InboxScreen> {
           ),
         ),
       ),
-      child: Row(
-        children: [
-          Text(
-            '${loc.t('department') ?? 'Отдел'}:',
-            style: Theme.of(context).textTheme.labelLarge,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _buildDepartmentChip('all', loc.t('all') ?? 'Все'),
-                  _buildDepartmentChip('kitchen', loc.t('kitchen')),
-                  _buildDepartmentChip('management', loc.t('management')),
-                ],
-              ),
-            ),
-          ),
-        ],
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: visibleTabs.map((tab) => _buildTabChip(tab, loc)).toList(),
+        ),
       ),
     );
   }
 
-  Widget _buildDepartmentChip(String department, String label) {
-    final isSelected = _selectedDepartment == department;
+  Widget _buildTabChip(_InboxTab tab, LocalizationService loc) {
+    final isSelected = _selectedTab == tab;
     return Container(
       margin: const EdgeInsets.only(right: 8),
       child: FilterChip(
-        label: Text(label),
+        label: Text(_tabLabel(tab, loc)),
         selected: isSelected,
         onSelected: (selected) {
-          setState(() => _selectedDepartment = department);
+          setState(() => _selectedTab = tab);
         },
         backgroundColor: Theme.of(context).colorScheme.surface,
         selectedColor: Theme.of(context).colorScheme.primaryContainer,

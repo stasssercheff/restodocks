@@ -865,7 +865,10 @@
     "checklist_not_found": "Чеклист не найден",
     "product_order_desc": "Управление заказами продуктов и поставщиками",
     "inventory_desc": "Проведение инвентаризации продуктов и полуфабрикатов",
-    "checklists_desc": "Ежедневные чеклисты для кухни"
+    "checklists_desc": "Ежедневные чеклисты для кухни",
+    "inbox_tab_checklist": "Чеклист",
+    "inbox_tab_order": "Заказы",
+    "inbox_tab_inventory": "Инвентаризация"
   },
   "en": {
     "app_name": "Restodocks",
@@ -1732,7 +1735,10 @@
     "checklist_not_found": "Checklist not found",
     "product_order_desc": "Manage product orders and suppliers",
     "inventory_desc": "Conduct inventory of products and semi-finished items",
-    "checklists_desc": "Daily kitchen checklists"
+    "checklists_desc": "Daily kitchen checklists",
+    "inbox_tab_checklist": "Checklist",
+    "inbox_tab_order": "Orders",
+    "inbox_tab_inventory": "Inventory"
   },
   "es": {
     "app_name": "Restodocks",
@@ -1782,7 +1788,10 @@
     "add_ingredient": "Añadir ingrediente",
     "back": "Atrás",
     "tt_type_pf": "SF",
-    "tt_type_dish": "Plato"
+    "tt_type_dish": "Plato",
+    "inbox_tab_checklist": "Lista de verificación",
+    "inbox_tab_order": "Pedidos",
+    "inbox_tab_inventory": "Inventario"
   },
   "de": {
     "app_name": "Restodocks",
@@ -1835,7 +1844,10 @@
     "tt_type_dish": "Gericht",
     "upload_products": "Produkte hochladen",
     "upload_products_desc": "Aus Datei oder Text hinzufügen",
-    "product_database": "Produktdatenbank"
+    "product_database": "Produktdatenbank",
+    "inbox_tab_checklist": "Checkliste",
+    "inbox_tab_order": "Bestellungen",
+    "inbox_tab_inventory": "Inventar"
   },
   "fr": {
     "app_name": "Restodocks",
@@ -1888,6 +1900,9 @@
     "tt_type_dish": "Plat",
     "upload_products": "Télécharger produits",
     "upload_products_desc": "Ajouter depuis fichier ou texte",
-    "product_database": "Base de données produits"
+    "product_database": "Base de données produits",
+    "inbox_tab_checklist": "Liste de contrôle",
+    "inbox_tab_order": "Commandes",
+    "inbox_tab_inventory": "Inventaire"
   }
 }
