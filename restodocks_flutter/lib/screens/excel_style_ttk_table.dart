@@ -573,14 +573,29 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     return const SizedBox.shrink();
   }
 
+  /// Returns localized display name for an ingredient (product or PF tech card).
+  String _getIngredientDisplayName(TTIngredient ingredient, String lang) {
+    if (ingredient.sourceTechCardId != null && ingredient.sourceTechCardId!.isNotEmpty) {
+      final pf = widget.semiFinishedProducts
+          ?.where((tc) => tc.id == ingredient.sourceTechCardId)
+          .firstOrNull;
+      if (pf != null) return pf.getDisplayNameInLists(lang);
+      return ingredient.sourceTechCardName ?? ingredient.productName;
+    }
+    final product = widget.productStore.findProductForIngredient(ingredient.productId, ingredient.productName);
+    if (product != null) return product.getLocalizedName(lang);
+    return ingredient.productName;
+  }
+
   Widget _buildProductCell(TTIngredient ingredient, int rowIndex) {
     try {
+      final lang = widget.loc.currentLanguageCode;
       if (!widget.canEdit) {
         return Container(
           height: 44,
           child: Center(
             child: Text(
-              ingredient.sourceTechCardName ?? ingredient.productName,
+              _getIngredientDisplayName(ingredient, lang),
               style: const TextStyle(fontSize: 12),
               textAlign: TextAlign.center,
             ),
@@ -588,8 +603,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         );
       }
 
-      if (ingredient.productId != null || ingredient.productName.isNotEmpty) {
-        final product = widget.productStore.findProductForIngredient(ingredient.productId, ingredient.productName);
+      if (ingredient.productId != null || ingredient.productName.isNotEmpty ||
+          (ingredient.sourceTechCardId != null && ingredient.sourceTechCardId!.isNotEmpty)) {
         return InkWell(
           onTap: () {
             // При клике на выбранный продукт открываем dropdown для изменения
@@ -612,7 +627,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
               children: [
                 Expanded(
                   child: Text(
-                    product?.name ?? ingredient.productName,
+                    _getIngredientDisplayName(ingredient, lang),
                     style: const TextStyle(fontSize: 12),
                     textAlign: TextAlign.center,
                   ),
