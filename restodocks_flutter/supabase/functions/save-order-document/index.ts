@@ -17,6 +17,7 @@ interface OrderItemInput {
 }
 
 interface OrderItemOutput {
+  productId?: string | null;
   productName: string;
   unit: string;
   quantity: number;
@@ -126,6 +127,7 @@ Deno.serve(async (req: Request) => {
       grandTotal += lineTotal;
 
       itemsPayload.push({
+        productId: item.productId ?? null,
         productName: item.productName || "",
         unit: item.unit || "kg",
         quantity: qty,

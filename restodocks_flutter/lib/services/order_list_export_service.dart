@@ -265,8 +265,8 @@ class OrderListExportService {
     final companyName = header['establishmentName'] ?? '—';
     final supplierName = header['supplierName'] ?? '—';
     final employeeName = header['employeeName'] ?? '—';
-    final createdAt = header['createdAt'] != null ? DateTime.tryParse(header['createdAt'].toString()) : null;
-    final orderForDate = header['orderForDate'] != null ? DateTime.tryParse(header['orderForDate'].toString()) : null;
+    final createdAt = header['createdAt'] != null ? DateTime.tryParse(header['createdAt'].toString())?.toLocal() : null;
+    final orderForDate = header['orderForDate'] != null ? DateTime.tryParse(header['orderForDate'].toString())?.toLocal() : null;
     final dateStr = createdAt != null ? DateFormat('dd.MM.yyyy HH:mm').format(createdAt) : '—';
     final orderForStr = orderForDate != null ? DateFormat('dd.MM.yyyy').format(orderForDate) : '—';
 
@@ -382,8 +382,8 @@ class OrderListExportService {
     final companyName = header['establishmentName'] ?? '—';
     final supplierName = header['supplierName'] ?? '—';
     final employeeName = header['employeeName'] ?? '—';
-    final createdAt = header['createdAt'] != null ? DateTime.tryParse(header['createdAt'].toString()) : null;
-    final orderForDate = header['orderForDate'] != null ? DateTime.tryParse(header['orderForDate'].toString()) : null;
+    final createdAt = header['createdAt'] != null ? DateTime.tryParse(header['createdAt'].toString())?.toLocal() : null;
+    final orderForDate = header['orderForDate'] != null ? DateTime.tryParse(header['orderForDate'].toString())?.toLocal() : null;
 
     sheet.appendRow([TextCellValue('${t('order_export_from')}: $companyName')]);
     sheet.appendRow([TextCellValue('${t('order_export_to')}: $supplierName')]);

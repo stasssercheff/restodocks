@@ -268,6 +268,7 @@ class _OrderExportSheetState extends State<OrderExportSheet> {
 
     // Генерируем PDF — если не получилось, письмо уйдёт без вложения
     List<int>? pdfBytes;
+    String? pdfError;
     try {
       pdfBytes = await OrderListExportService.buildOrderPdfBytes(
         list: s.list,
@@ -277,7 +278,10 @@ class _OrderExportSheetState extends State<OrderExportSheet> {
         documentDate: DateTime.now(),
         t: s.t,
       );
-    } catch (_) {}
+    } catch (e) {
+      pdfError = e.toString();
+      print('OrderExportSheet: PDF generation failed: $e');
+    }
 
     try {
       final result = await EmailService().sendOrderEmail(
@@ -289,7 +293,8 @@ class _OrderExportSheetState extends State<OrderExportSheet> {
       );
       if (result.ok) {
         await s.onExportToInbox?.call();
-        s.onSaved(s.t('order_export_email_sent'));
+        final suffix = pdfError != null ? ' (PDF: $pdfError)' : '';
+        s.onSaved('${s.t('order_export_email_sent')}$suffix');
       } else {
         s.onSaved('${s.t('error_short')}: ${result.error}');
       }

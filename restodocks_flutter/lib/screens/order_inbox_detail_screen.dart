@@ -216,7 +216,7 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
     final payload = doc['payload'] as Map<String, dynamic>? ?? {};
     final header = payload['header'] as Map<String, dynamic>? ?? {};
     final dateStr = header['createdAt'] != null
-        ? DateFormat('yyyy-MM-dd').format(DateTime.tryParse(header['createdAt'].toString()) ?? DateTime.now())
+        ? DateFormat('yyyy-MM-dd').format((DateTime.tryParse(header['createdAt'].toString()) ?? DateTime.now()).toLocal())
         : DateFormat('yyyy-MM-dd').format(DateTime.now());
     final supplier = (header['supplierName'] ?? 'order').toString().replaceAll(RegExp(r'[^\w\-.\s]'), '_');
 
@@ -441,8 +441,8 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
   }
 
   Widget _buildHeader(LocalizationService loc, Map<String, dynamic> header) {
-    final createdAt = header['createdAt'] != null ? DateTime.tryParse(header['createdAt'].toString()) : null;
-    final orderFor = header['orderForDate'] != null ? DateTime.tryParse(header['orderForDate'].toString()) : null;
+    final createdAt = header['createdAt'] != null ? DateTime.tryParse(header['createdAt'].toString())?.toLocal() : null;
+    final orderFor = header['orderForDate'] != null ? DateTime.tryParse(header['orderForDate'].toString())?.toLocal() : null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
