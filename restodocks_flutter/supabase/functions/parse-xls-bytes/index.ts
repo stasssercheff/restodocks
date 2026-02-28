@@ -90,15 +90,21 @@ Deno.serve(async (req: Request) => {
 
       for (const row of jsonRows) {
         if (!Array.isArray(row)) continue;
-        const line = row.map((c) => (c ?? "").toString().trim()).join("\t").trim();
-        if (line.length === 0 || line === "\t".repeat(row.length - 1)) continue;
+        // Берём только непустые ячейки
+        const cells = row.map((c) => (c ?? "").toString().trim()).filter((c) => c.length > 0);
+        if (cells.length === 0) continue;
+        const line = cells.join("\t");
+        // Пропускаем строки без хоть одной буквы (чисто числовые служебные строки — итоги, разделители)
+        if (!/[a-zA-Zа-яА-ЯёЁ]/.test(line)) continue;
+        // Пропускаем слишком длинные строки (описания, примечания)
+        if (line.length > 300) continue;
         rows.push(line);
       }
 
-      if (rows.length >= 2000) break;
+      if (rows.length >= 1000) break;
     }
 
-    return new Response(JSON.stringify({ rows: rows.slice(0, 2000) }), {
+    return new Response(JSON.stringify({ rows: rows.slice(0, 1000) }), {
       headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
     });
   } catch (e) {
