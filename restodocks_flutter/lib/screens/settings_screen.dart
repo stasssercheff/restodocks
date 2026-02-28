@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/models.dart';
 import '../services/services.dart';
@@ -554,6 +555,47 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showSupportDialog(BuildContext context, LocalizationService loc) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('contact_support')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.telegram, color: Color(0xFF2AABEE)),
+              title: const Text('Telegram'),
+              subtitle: const Text('@restodocks'),
+              onTap: () async {
+                final uri = Uri.parse('https://t.me/restodocks');
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+                if (ctx.mounted) Navigator.of(ctx).pop();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.email_outlined, color: Colors.redAccent),
+              title: Text(loc.t('email')),
+              subtitle: const Text('stassserchef@gmail.com'),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                _showSupportEmailForm(context, loc);
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(MaterialLocalizations.of(ctx).closeButtonLabel),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSupportEmailForm(BuildContext context, LocalizationService loc) {
     final accountManager = context.read<AccountManagerSupabase>();
     final userEmail = accountManager.currentEmployee?.email ?? '';
 
