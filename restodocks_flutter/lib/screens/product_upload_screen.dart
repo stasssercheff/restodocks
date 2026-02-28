@@ -3159,6 +3159,43 @@ class _UploadSchoolCard extends StatelessWidget {
                     'Вставка текста или файл Excel (.xlsx, .xls).',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
                   ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerLowest,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.table_chart, size: 14, color: Theme.of(context).colorScheme.primary),
+                            const SizedBox(width: 6),
+                            Text('Формат Excel файла:', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Столбец A  |  Столбец B\n'
+                          '───────────────────────\n'
+                          'Авокадо    |  990\n'
+                          'Базилик    |  267\n'
+                          'Молоко     |  380',
+                          style: TextStyle(fontFamily: 'monospace', fontSize: 12),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          '• Столбец A — названия продуктов\n'
+                          '• Столбец B — цены напротив каждого продукта\n'
+                          '• Заголовки строк не нужны',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+                        ),
+                      ],
+                    ),
+                  ),
                   const SizedBox(height: 16),
                   Text('Модерация:', style: Theme.of(context).textTheme.titleSmall),
                   const SizedBox(height: 4),
