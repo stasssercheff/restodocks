@@ -538,7 +538,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
         await context.read<ProductStoreSupabase>().loadNomenclature(est.id);
         final tcs = await context.read<TechCardServiceSupabase>().getTechCardsForEstablishment(est.id);
         if (mounted) {
-          _pickerTechCards = _isNew ? tcs : tcs.where((t) => t.id != widget.techCardId).toList();
+          final filtered = _isNew ? tcs : tcs.where((t) => t.id != widget.techCardId).toList();
+          filtered.sort((a, b) => a.dishName.toLowerCase().compareTo(b.dishName.toLowerCase()));
+          _pickerTechCards = filtered;
           _semiFinishedProducts = tcs.where((t) => t.isSemiFinished).toList();
           _ensureTechCardTranslations(tcs);
         }
@@ -3419,32 +3421,61 @@ class _ProductPickerState extends State<_ProductPicker> {
   }
 }
 
-class _TechCardPicker extends StatelessWidget {
+class _TechCardPicker extends StatefulWidget {
   const _TechCardPicker({required this.techCards, required this.onPick});
 
   final List<TechCard> techCards;
   final void Function(TechCard t, double value, String unit, double? gramsPerPiece) onPick;
 
   @override
+  State<_TechCardPicker> createState() => _TechCardPickerState();
+}
+
+class _TechCardPickerState extends State<_TechCardPicker> {
+  String _query = '';
+
+  @override
   Widget build(BuildContext context) {
     final loc = context.read<LocalizationService>();
     final lang = loc.currentLanguageCode;
-    if (techCards.isEmpty) {
+
+    var list = widget.techCards;
+    if (_query.isNotEmpty) {
+      final q = _query.toLowerCase();
+      list = list.where((t) => t.dishName.toLowerCase().contains(q) || t.getDisplayNameInLists(lang).toLowerCase().contains(q)).toList();
+    }
+
+    if (widget.techCards.isEmpty) {
       return Center(child: Text(loc.t('ttk_no_other_pf'), textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium));
     }
-    return ListView.builder(
-      itemCount: techCards.length,
-      itemBuilder: (_, i) {
-        final t = techCards[i];
-        return GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () => _askWeight(context, t),
-          child: ListTile(
-            title: Text(t.getDisplayNameInLists(lang)),
-            subtitle: Text('${t.ingredients.length} ${loc.t('ingredients_short')} · ${t.totalCalories.round()} ${loc.t('kcal')}'),
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(8),
+          child: TextField(
+            decoration: InputDecoration(labelText: loc.t('search'), prefixIcon: const Icon(Icons.search)),
+            onChanged: (v) => setState(() => _query = v),
           ),
-        );
-      },
+        ),
+        Expanded(
+          child: list.isEmpty
+              ? Center(child: Text(loc.t('ttk_no_other_pf'), textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium))
+              : ListView.builder(
+                  itemCount: list.length,
+                  itemBuilder: (_, i) {
+                    final t = list[i];
+                    return GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => _askWeight(context, t),
+                      child: ListTile(
+                        title: Text(t.getDisplayNameInLists(lang)),
+                        subtitle: Text('${t.ingredients.length} ${loc.t('ingredients_short')} · ${t.totalCalories.round()} ${loc.t('kcal')}'),
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
     );
   }
 
