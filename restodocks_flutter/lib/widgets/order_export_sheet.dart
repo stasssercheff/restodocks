@@ -116,9 +116,17 @@ class _OrderExportSheetState extends State<OrderExportSheet> {
               : null;
 
           if (product != null) {
-            final locName = product.getLocalizedName(_docLang);
-            if (locName != name && mounted) {
-              setState(() => _translatedNames[name] = locName);
+            // Проверяем есть ли перевод именно для нужного языка (не fallback на ru/en)
+            final hasTranslation = product.names?.containsKey(_docLang) == true &&
+                (product.names![_docLang]?.trim().isNotEmpty ?? false);
+            if (hasTranslation) {
+              final locName = product.names![_docLang]!;
+              if (locName != name && mounted) {
+                setState(() => _translatedNames[name] = locName);
+              }
+            } else {
+              // Нет точного перевода для _docLang — запросим DeepL
+              needDeepL.add(item);
             }
           } else {
             needDeepL.add(item);
