@@ -30,7 +30,7 @@ class TechCardServiceSupabase {
           .from(kTechCardPhotosBucket)
           .uploadBinary(path, bytes, fileOptions: FileOptions(upsert: true));
       final url = _supabase.client.storage.from(kTechCardPhotosBucket).getPublicUrl(path);
-      return '$url?t=${DateTime.now().millisecondsSinceEpoch}';
+      return url;
     } catch (e) {
       print('TechCardServiceSupabase.uploadTechCardPhoto: $e');
       return null;

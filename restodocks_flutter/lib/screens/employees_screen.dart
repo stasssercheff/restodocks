@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -348,18 +349,7 @@ class _EmployeeCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               // Аватар
-              CircleAvatar(
-                radius: 18,
-                backgroundColor: theme.colorScheme.primaryContainer,
-                child: Text(
-                  (employee.fullName.isNotEmpty ? employee.fullName[0] : '?').toUpperCase(),
-                  style: TextStyle(
-                    color: theme.colorScheme.onPrimaryContainer,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
+              _EmployeeAvatar(employee: employee, radius: 18),
               const SizedBox(width: 10),
               // Имя + email
               Expanded(
@@ -494,18 +484,7 @@ class _EmployeeCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Аватар
-              CircleAvatar(
-                radius: 18,
-                backgroundColor: theme.colorScheme.primaryContainer,
-                child: Text(
-                  (employee.fullName.isNotEmpty ? employee.fullName[0] : '?').toUpperCase(),
-                  style: TextStyle(
-                    color: theme.colorScheme.onPrimaryContainer,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
+              _EmployeeAvatar(employee: employee, radius: 18),
               const SizedBox(width: 10),
               // Информация
               Expanded(
@@ -854,3 +833,41 @@ ALTER TABLE employees ADD COLUMN IF NOT EXISTS hourly_rate REAL;''';
   }
 }
 
+class _EmployeeAvatar extends StatelessWidget {
+  const _EmployeeAvatar({required this.employee, this.radius = 18});
+
+  final Employee employee;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final initials = (employee.fullName.isNotEmpty ? employee.fullName[0] : '?').toUpperCase();
+    final placeholder = CircleAvatar(
+      radius: radius,
+      backgroundColor: theme.colorScheme.primaryContainer,
+      child: Text(
+        initials,
+        style: TextStyle(
+          color: theme.colorScheme.onPrimaryContainer,
+          fontSize: radius * 0.78,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+
+    final url = employee.avatarUrl;
+    if (url == null || url.isEmpty) return placeholder;
+
+    return ClipOval(
+      child: CachedNetworkImage(
+        imageUrl: url,
+        width: radius * 2,
+        height: radius * 2,
+        fit: BoxFit.cover,
+        placeholder: (_, __) => placeholder,
+        errorWidget: (_, __, ___) => placeholder,
+      ),
+    );
+  }
+}

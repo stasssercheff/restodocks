@@ -476,7 +476,7 @@ class _ProfileEditDialogState extends State<_ProfileEditDialog> {
       final fileName = '${widget.employee.id}.jpg';
       await supabase.client.storage.from(bucket).uploadBinary(fileName, bytes, fileOptions: FileOptions(upsert: true));
       final url = supabase.client.storage.from(bucket).getPublicUrl(fileName);
-      if (mounted) setState(() => _avatarUrl = '$url?t=${DateTime.now().millisecondsSinceEpoch}');
+      if (mounted) setState(() => _avatarUrl = url);
     } catch (e) {
       if (mounted) {
         final errStr = e.toString();

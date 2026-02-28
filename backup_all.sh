@@ -52,7 +52,7 @@ if [ -z "$DB_PASSWORD" ]; then
     echo "      Добавь: SUPABASE_DB_URL=postgresql://postgres:ПАРОЛЬ@db.osglfptwbuqqmqunttha.supabase.co:5432/postgres"
     echo "      Пароль в Supabase Dashboard → Project Settings → Database → Database password"
 else
-    POOLER_URL="postgresql://postgres.osglfptwbuqqmqunttha:${DB_PASSWORD}@aws-1-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require"
+    POOLER_URL="postgresql://postgres.osglfptwbuqqmqunttha:${DB_PASSWORD}@aws-1-ap-south-1.pooler.supabase.com:6543/postgres?sslmode=require"
     if pg_dump "$POOLER_URL" --no-owner --no-privileges --clean --if-exists \
         -f "$BACKUP_DIR/database.sql" 2>"$BACKUP_DIR/db_dump_err.txt"; then
         if [ -s "$BACKUP_DIR/database.sql" ]; then
