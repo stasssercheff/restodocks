@@ -61,19 +61,20 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
     if (comment.isEmpty) return;
 
     // sourceLang — язык написания комментария, сохранённый при отправке заказа.
-    // Если старый документ без sourceLang — пробуем перевести с противоположного языка.
+    // Если старый документ без sourceLang — считаем что комментарий на русском
+    // (исторически все заказы создавались с русским интерфейсом).
     final sourceLangRaw = (payload['sourceLang'] as String?)?.trim() ?? '';
-    final sourceLang = sourceLangRaw.isNotEmpty
-        ? sourceLangRaw
-        : (targetLang == 'ru' ? 'en' : 'ru');
+    final sourceLang = sourceLangRaw.isNotEmpty ? sourceLangRaw : 'ru';
 
     if (sourceLang == targetLang) return;
 
     try {
       final translationSvc = context.read<TranslationService>();
+      // Включаем хеш текста в entityId — при изменении комментария кеш не применяется
+      final commentHash = comment.hashCode.toRadixString(16);
       final translated = await translationSvc.translate(
         entityType: TranslationEntityType.ui,
-        entityId: 'order_comment_${doc['id'] ?? comment.hashCode}',
+        entityId: 'order_comment_${doc['id'] ?? commentHash}_$commentHash',
         fieldName: 'comment',
         text: comment,
         from: sourceLang,
@@ -198,17 +199,19 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
     if (comment.isEmpty) return null;
     final sourceLangRaw = (payload['sourceLang'] as String?)?.trim() ?? '';
     final loc = context.read<LocalizationService>();
-    final sourceLang = sourceLangRaw.isNotEmpty ? sourceLangRaw : loc.currentLanguageCode;
+    // Fallback: если sourceLang не сохранён — считаем русский (исторически заказы на русском)
+    final sourceLang = sourceLangRaw.isNotEmpty ? sourceLangRaw : 'ru';
     if (sourceLang == targetLang) return null;
-    // Если уже переведено на нужный язык — используем
+    // Если уже переведено на нужный язык — используем кешированный результат
     if (targetLang == loc.currentLanguageCode && _translatedComment != null) {
       return _translatedComment;
     }
     try {
       final translationSvc = context.read<TranslationService>();
+      final commentHash = comment.hashCode.toRadixString(16);
       final translated = await translationSvc.translate(
         entityType: TranslationEntityType.ui,
-        entityId: 'order_comment_${doc['id'] ?? comment.hashCode}',
+        entityId: 'order_comment_${doc['id'] ?? commentHash}_$commentHash',
         fieldName: 'comment',
         text: comment,
         from: sourceLang,

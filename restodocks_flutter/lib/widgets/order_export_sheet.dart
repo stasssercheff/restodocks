@@ -137,9 +137,11 @@ class _OrderExportSheetState extends State<OrderExportSheet> {
       // Переводим комментарий (язык написания → язык документа)
       if (needCommentTranslation && mounted) {
         final comment = widget.list.comment.trim();
+        // Включаем хеш текста в entityId — при изменении комментария кеш не применяется
+        final commentHash = comment.hashCode.toRadixString(16);
         final translatedComment = await translationSvc.translate(
           entityType: TranslationEntityType.ui,
-          entityId: 'order_comment_${widget.list.id}',
+          entityId: 'order_comment_${widget.list.id}_$commentHash',
           fieldName: 'comment',
           text: comment,
           from: commentSrcLang,
