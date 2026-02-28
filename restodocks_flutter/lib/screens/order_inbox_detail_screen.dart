@@ -53,7 +53,6 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
     if (!mounted) return;
     final loc = context.read<LocalizationService>();
     final lang = loc.currentLanguageCode;
-    if (lang == 'ru') return; // продукты хранятся на русском — переводить не нужно
 
     final acc = context.read<AccountManagerSupabase>();
     final estId = acc.establishment?.id;
@@ -72,10 +71,9 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
       if (productId == null || productId.isEmpty) continue;
       final product = store.allProducts.where((p) => p.id == productId).firstOrNull;
       if (product == null) continue;
+      // Всегда берём локализованное имя для текущего языка интерфейса
       final localizedName = product.getLocalizedName(lang);
-      if (localizedName != product.name) {
-        updated[productId] = localizedName;
-      }
+      updated[productId] = localizedName;
     }
     if (mounted && updated.isNotEmpty) {
       setState(() => _localizedNames.addAll(updated));
@@ -306,62 +304,95 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
   }
 
   Widget _buildTable(ThemeData theme, LocalizationService loc, List<dynamic> items, double grandTotal) {
-    return Table(
-      border: TableBorder.all(color: theme.dividerColor),
-      columnWidths: const {
-        0: FlexColumnWidth(0.4),
-        1: FlexColumnWidth(2),
-        2: FlexColumnWidth(0.5),
-        3: FlexColumnWidth(0.5),
-        4: FlexColumnWidth(0.7),
-        5: FlexColumnWidth(0.7),
-      },
-      children: [
-        TableRow(
-          decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest),
-          children: [
-            _cell(theme, loc.t('order_export_no') ?? '#', bold: true),
-            _cell(theme, loc.t('inventory_item_name'), bold: true),
-            _cell(theme, loc.t('order_list_unit'), bold: true),
-            _cell(theme, loc.t('order_list_quantity'), bold: true),
-            _cell(theme, loc.t('order_list_unit_price') ?? 'Цена за ед.', bold: true),
-            _cell(theme, loc.t('order_list_line_total') ?? 'Сумма', bold: true),
-          ],
-        ),
-        ...items.asMap().entries.map((e) {
-          final item = e.value as Map<String, dynamic>;
-          return TableRow(
+    // Минимальные ширины колонок (px): #, наименование, ед., кол-во, цена, сумма
+    const colWidths = [28.0, 160.0, 48.0, 52.0, 68.0, 68.0];
+    final totalMinWidth = colWidths.fold(0.0, (a, b) => a + b);
+
+    return LayoutBuilder(
+      builder: (_, constraints) {
+        // Если экрана достаточно — растягиваем, иначе горизонтальный скролл
+        final availableWidth = constraints.maxWidth;
+        final useScroll = availableWidth < totalMinWidth;
+        final tableWidth = useScroll ? totalMinWidth : availableWidth;
+
+        Widget buildTable() => SizedBox(
+          width: tableWidth,
+          child: Table(
+            border: TableBorder.all(color: theme.dividerColor),
+            columnWidths: {
+              0: FixedColumnWidth(colWidths[0]),
+              1: useScroll
+                  ? FixedColumnWidth(colWidths[1])
+                  : FlexColumnWidth(colWidths[1]),
+              2: FixedColumnWidth(colWidths[2]),
+              3: FixedColumnWidth(colWidths[3]),
+              4: FixedColumnWidth(colWidths[4]),
+              5: FixedColumnWidth(colWidths[5]),
+            },
+            defaultVerticalAlignment: TableCellVerticalAlignment.middle,
             children: [
-              _cell(theme, '${e.key + 1}'),
-              _cell(theme, _getItemName(item)),
-              _cell(theme, CulinaryUnits.displayName((item['unit'] ?? '').toString(), loc.currentLanguageCode)),
-              _cell(theme, _fmtNum(item['quantity'])),
-              _cell(theme, _fmtNum(item['pricePerUnit'])),
-              _cell(theme, _fmtNum(item['lineTotal'])),
+              TableRow(
+                decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest),
+                children: [
+                  _cell(theme, loc.t('order_export_no') ?? '#', bold: true),
+                  _cell(theme, loc.t('inventory_item_name'), bold: true),
+                  _cell(theme, loc.t('order_list_unit'), bold: true),
+                  _cell(theme, loc.t('order_list_quantity'), bold: true),
+                  _cell(theme, loc.t('order_list_unit_price') ?? 'Цена', bold: true),
+                  _cell(theme, loc.t('order_list_line_total') ?? 'Сумма', bold: true),
+                ],
+              ),
+              ...items.asMap().entries.map((e) {
+                final item = e.value as Map<String, dynamic>;
+                return TableRow(
+                  children: [
+                    _cell(theme, '${e.key + 1}'),
+                    _cell(theme, _getItemName(item)),
+                    _cell(theme, CulinaryUnits.displayName((item['unit'] ?? '').toString(), loc.currentLanguageCode)),
+                    _cell(theme, _fmtNum(item['quantity'])),
+                    _cell(theme, _fmtNum(item['pricePerUnit'])),
+                    _cell(theme, _fmtNum(item['lineTotal'])),
+                  ],
+                );
+              }),
+              TableRow(
+                decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest),
+                children: [
+                  _cell(theme, '', bold: true),
+                  _cell(theme, loc.t('order_list_grand_total') ?? 'Итого:', bold: true),
+                  _cell(theme, '', bold: true),
+                  _cell(theme, '', bold: true),
+                  _cell(theme, '', bold: true),
+                  _cell(theme, _fmtNum(grandTotal), bold: true),
+                ],
+              ),
             ],
+          ),
+        );
+
+        if (useScroll) {
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: buildTable(),
           );
-        }),
-        TableRow(
-          decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest),
-          children: [
-            _cell(theme, '', bold: true),
-            _cell(theme, loc.t('order_list_grand_total') ?? 'Итого:', bold: true),
-            _cell(theme, '', bold: true),
-            _cell(theme, '', bold: true),
-            _cell(theme, '', bold: true),
-            _cell(theme, _fmtNum(grandTotal), bold: true),
-          ],
-        ),
-      ],
+        }
+        return buildTable();
+      },
     );
   }
 
   Widget _cell(ThemeData theme, String text, {bool bold = false}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
       child: Text(
         text,
-        style: theme.textTheme.bodyMedium?.copyWith(fontWeight: bold ? FontWeight.w600 : null),
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: bold ? FontWeight.w600 : FontWeight.normal,
+          color: theme.colorScheme.onSurface,
+          height: 1.3,
+        ),
+        softWrap: true,
       ),
     );
   }

@@ -98,12 +98,12 @@ class _OrderListsScreenState extends State<OrderListsScreen>
           controller: _tabController,
           tabs: [
             Tab(
-              icon: const Icon(Icons.store_outlined),
-              text: loc.t('order_tab_suppliers') ?? 'Поставщики',
+              icon: const Icon(Icons.list_alt_outlined),
+              text: loc.t('order_tab_orders') ?? 'Заказы',
             ),
             Tab(
-              icon: const Icon(Icons.list_alt_outlined),
-              text: loc.t('order_tab_orders') ?? 'Списки заказа',
+              icon: const Icon(Icons.store_outlined),
+              text: loc.t('order_tab_suppliers') ?? 'Поставщики',
             ),
           ],
         ),
@@ -113,19 +113,7 @@ class _OrderListsScreenState extends State<OrderListsScreen>
           : TabBarView(
               controller: _tabController,
               children: [
-                _SuppliersTab(
-                  suppliers: _suppliers,
-                  onTap: (supplier) async {
-                    await context.push('/product-order/${supplier.id}');
-                    if (mounted) _load();
-                  },
-                  onDelete: _deleteList,
-                  onCreate: () async {
-                    await context.push('/product-order/new');
-                    if (mounted) _load();
-                  },
-                  loc: loc,
-                ),
+                // Вкладка 0: Заказы (сохранённые шаблоны с количествами)
                 _OrderListsTab(
                   orders: _savedOrders,
                   onTap: (order) async {
@@ -143,11 +131,25 @@ class _OrderListsScreenState extends State<OrderListsScreen>
                           ),
                         ),
                       );
-                      _tabController.animateTo(0);
+                      _tabController.animateTo(1); // поставщики теперь на вкладке 1
                     } else {
                       await context.push('/product-order/create-order');
                       if (mounted) _load();
                     }
+                  },
+                  loc: loc,
+                ),
+                // Вкладка 1: Поставщики (карточки с контактами и списком продуктов)
+                _SuppliersTab(
+                  suppliers: _suppliers,
+                  onTap: (supplier) async {
+                    await context.push('/product-order/${supplier.id}');
+                    if (mounted) _load();
+                  },
+                  onDelete: _deleteList,
+                  onCreate: () async {
+                    await context.push('/product-order/new');
+                    if (mounted) _load();
                   },
                   loc: loc,
                 ),
