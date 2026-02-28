@@ -2998,54 +2998,29 @@ class _ProductSelectDialogState extends State<_ProductSelectDialog> {
   String _query = '';
   final _searchFocus = FocusNode();
   final _searchController = TextEditingController();
-  final Map<String, String> _extraNames = {};
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _searchFocus.requestFocus();
-      _translateMissingNames();
+      _triggerMissingTranslations();
     });
   }
 
-  Future<void> _translateMissingNames() async {
+  /// Запускаем auto-translate-product фоново для продуктов без names[lang].
+  void _triggerMissingTranslations() {
     if (!mounted) return;
     final lang = widget.lang;
     if (lang == 'ru') return;
-    final translationSvc = context.read<TranslationService>();
-    final productStore = context.read<ProductStoreSupabase>();
+    final store = context.read<ProductStoreSupabase>();
     for (final p in widget.products) {
-      if (!mounted) break;
       if (p.names != null && (p.names![lang]?.trim().isNotEmpty ?? false)) continue;
-      final sourceName = p.names?['ru']?.trim().isNotEmpty == true ? p.names!['ru']! : p.name;
-      if (sourceName.trim().isEmpty) continue;
-      try {
-        final translated = await translationSvc.translate(
-          entityType: TranslationEntityType.product,
-          entityId: p.id,
-          fieldName: 'name',
-          text: sourceName,
-          from: 'ru',
-          to: lang,
-        );
-        if (translated != null && translated != sourceName && mounted) {
-          setState(() => _extraNames[p.id] = translated);
-          if (p.names?.containsKey(lang) != true) {
-            final updatedNames = Map<String, String>.from(p.names ?? {'ru': p.name});
-            updatedNames[lang] = translated;
-            productStore.updateProduct(p.copyWith(names: updatedNames)).catchError((_) {});
-          }
-        }
-      } catch (_) {}
+      store.triggerTranslation(p.id);
     }
   }
 
-  String _getDisplayName(Product p) {
-    final extra = _extraNames[p.id];
-    if (extra != null && extra.isNotEmpty) return extra;
-    return p.getLocalizedName(widget.lang);
-  }
+  String _getDisplayName(Product p) => p.getLocalizedName(widget.lang);
 
   @override
   void dispose() {
@@ -3163,60 +3138,27 @@ class _ProductPicker extends StatefulWidget {
 
 class _ProductPickerState extends State<_ProductPicker> {
   String _query = '';
-  // Дополнительные переводы для продуктов без names[lang]: productId -> localizedName
-  final Map<String, String> _extraNames = {};
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _translateMissingNames());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _triggerMissingTranslations());
   }
 
-  Future<void> _translateMissingNames() async {
+  /// Для продуктов без names[lang] запускаем auto-translate-product фоново —
+  /// при следующем открытии пикера перевод уже будет в product.names.
+  void _triggerMissingTranslations() {
     if (!mounted) return;
-    final loc = context.read<LocalizationService>();
-    final lang = loc.currentLanguageCode;
-    if (lang == 'ru') return; // русский — исходный язык, перевод не нужен
-
-    final translationSvc = context.read<TranslationService>();
-    final productStore = context.read<ProductStoreSupabase>();
-
+    final lang = context.read<LocalizationService>().currentLanguageCode;
+    if (lang == 'ru') return;
+    final store = context.read<ProductStoreSupabase>();
     for (final p in widget.products) {
-      if (!mounted) break;
-      // Если в names уже есть нужный язык — пропускаем
       if (p.names != null && (p.names![lang]?.trim().isNotEmpty ?? false)) continue;
-      // Запрашиваем перевод через TranslationService (кеш в БД, DeepL только при первом запросе)
-      final sourceName = p.names?['ru']?.trim().isNotEmpty == true ? p.names!['ru']! : p.name;
-      if (sourceName.trim().isEmpty) continue;
-      try {
-        final translated = await translationSvc.translate(
-          entityType: TranslationEntityType.product,
-          entityId: p.id,
-          fieldName: 'name',
-          text: sourceName,
-          from: 'ru',
-          to: lang,
-        );
-        if (translated != null && translated != sourceName && mounted) {
-          setState(() => _extraNames[p.id] = translated);
-          // Обновляем product в store фоново чтобы в следующий раз не дёргать DeepL
-          if (p.names?.containsKey(lang) != true) {
-            final updatedNames = Map<String, String>.from(p.names ?? {'ru': p.name});
-            updatedNames[lang] = translated;
-            productStore.updateProduct(p.copyWith(names: updatedNames)).catchError((_) {});
-          }
-        }
-      } catch (_) {}
+      store.triggerTranslation(p.id);
     }
   }
 
-  String _getDisplayName(Product p, String lang) {
-    // 1. Уже переведено в этой сессии
-    final extra = _extraNames[p.id];
-    if (extra != null && extra.isNotEmpty) return extra;
-    // 2. Из сохранённых names
-    return p.getLocalizedName(lang);
-  }
+  String _getDisplayName(Product p, String lang) => p.getLocalizedName(lang);
 
   @override
   Widget build(BuildContext context) {

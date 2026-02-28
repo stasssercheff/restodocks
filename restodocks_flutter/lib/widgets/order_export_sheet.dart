@@ -101,53 +101,39 @@ class _OrderExportSheetState extends State<OrderExportSheet> {
         // Загружаем продукты если ещё не загружены
         if (productStore.allProducts.isEmpty) await productStore.loadProducts();
 
-        final seen = <String>{};
-        final needDeepL = <OrderListItem>[];
-
         for (final item in widget.itemsWithQuantities) {
           final name = item.productName.trim();
-          if (name.isEmpty || seen.contains(name)) continue;
-          seen.add(name);
+          if (name.isEmpty) continue;
 
-          // Сначала ищем в store — продукты в номенклатуре уже имеют names[]
+          // Продукты в номенклатуре уже содержат names[] со всеми языками —
+          // getLocalizedName вернёт нужный перевод без DeepL
           final productId = item.productId;
           final product = (productId != null && productId.isNotEmpty)
               ? productStore.allProducts.where((p) => p.id == productId).firstOrNull
               : null;
 
           if (product != null) {
-            // Проверяем есть ли перевод именно для нужного языка (не fallback на ru/en)
-            final hasTranslation = product.names?.containsKey(_docLang) == true &&
-                (product.names![_docLang]?.trim().isNotEmpty ?? false);
-            if (hasTranslation) {
-              final locName = product.names![_docLang]!;
-              if (locName != name && mounted) {
-                setState(() => _translatedNames[name] = locName);
-              }
-            } else {
-              // Нет точного перевода для _docLang — запросим DeepL
-              needDeepL.add(item);
+            final locName = product.getLocalizedName(_docLang);
+            if (locName != name && mounted) {
+              setState(() => _translatedNames[name] = locName);
+            } else if (locName == name) {
+              // names[docLang] отсутствует — запускаем auto-translate-product фоново
+              // чтобы в следующий раз перевод уже был в names[]
+              productStore.triggerTranslation(productId!);
             }
           } else {
-            needDeepL.add(item);
-          }
-        }
-
-        // DeepL только для продуктов не найденных в store
-        for (final item in needDeepL) {
-          if (!mounted) break;
-          final name = item.productName.trim();
-          final entityId = item.productId ?? name;
-          final translated = await translationSvc.translate(
-            entityType: TranslationEntityType.product,
-            entityId: entityId,
-            fieldName: 'name',
-            text: name,
-            from: productsSrcLang,
-            to: _docLang,
-          );
-          if (translated != null && translated != name && mounted) {
-            setState(() => _translatedNames[name] = translated);
+            // Продукт не найден в store (ручной ввод без id) — переводим через DeepL
+            final translated = await translationSvc.translate(
+              entityType: TranslationEntityType.product,
+              entityId: name,
+              fieldName: 'name',
+              text: name,
+              from: productsSrcLang,
+              to: _docLang,
+            );
+            if (translated != null && translated != name && mounted) {
+              setState(() => _translatedNames[name] = translated);
+            }
           }
         }
       }
