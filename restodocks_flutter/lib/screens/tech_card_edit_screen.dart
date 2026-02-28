@@ -714,20 +714,37 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           sourceLanguage: curLang,
           userId: emp.id,
         ).then((_) async {
-          // После перевода обновляем dishNameLocalized
+          final otherLang = curLang == 'ru' ? 'en' : 'ru';
+          // Обновляем dishNameLocalized
           final translatedName = await translationManager.getLocalizedText(
             entityType: TranslationEntityType.techCard,
             entityId: created.id,
             fieldName: 'dish_name',
             sourceText: name,
             sourceLanguage: curLang,
-            targetLanguage: curLang == 'ru' ? 'en' : 'ru',
+            targetLanguage: otherLang,
           );
           final nameMap = Map<String, String>.from(created.dishNameLocalized ?? {});
           nameMap[curLang] = name;
-          if (translatedName != name) nameMap[curLang == 'ru' ? 'en' : 'ru'] = translatedName;
+          if (translatedName != name) nameMap[otherLang] = translatedName;
+          // Обновляем technologyLocalized
+          final newTechMap = Map<String, String>.from(techMap);
+          if (techText.isNotEmpty) {
+            final translatedTech = await translationManager.getLocalizedText(
+              entityType: TranslationEntityType.techCard,
+              entityId: created.id,
+              fieldName: 'technology',
+              sourceText: techText,
+              sourceLanguage: curLang,
+              targetLanguage: otherLang,
+            );
+            if (translatedTech != techText) newTechMap[otherLang] = translatedTech;
+          }
           try {
-            await svc.saveTechCard(created.copyWith(dishNameLocalized: nameMap));
+            await svc.saveTechCard(created.copyWith(
+              dishNameLocalized: nameMap,
+              technologyLocalized: newTechMap,
+            ));
           } catch (_) {}
         });
         if (mounted) {
@@ -760,22 +777,37 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           sourceLanguage: curLang,
           userId: emp.id,
         ).then((_) async {
+          final otherLang = curLang == 'ru' ? 'en' : 'ru';
           final translatedName = await translationManager.getLocalizedText(
             entityType: TranslationEntityType.techCard,
             entityId: tc.id,
             fieldName: 'dish_name',
             sourceText: name,
             sourceLanguage: curLang,
-            targetLanguage: curLang == 'ru' ? 'en' : 'ru',
+            targetLanguage: otherLang,
           );
-          if (translatedName != name) {
-            final nameMap = Map<String, String>.from(updated.dishNameLocalized ?? {});
-            nameMap[curLang] = name;
-            nameMap[curLang == 'ru' ? 'en' : 'ru'] = translatedName;
-            try {
-              await svc.saveTechCard(updated.copyWith(dishNameLocalized: nameMap));
-            } catch (_) {}
+          final nameMap = Map<String, String>.from(updated.dishNameLocalized ?? {});
+          nameMap[curLang] = name;
+          if (translatedName != name) nameMap[otherLang] = translatedName;
+          // Обновляем technologyLocalized
+          final newTechMap = Map<String, String>.from(updated.technologyLocalized ?? techMap);
+          if (techText.isNotEmpty) {
+            final translatedTech = await translationManager.getLocalizedText(
+              entityType: TranslationEntityType.techCard,
+              entityId: tc.id,
+              fieldName: 'technology',
+              sourceText: techText,
+              sourceLanguage: curLang,
+              targetLanguage: otherLang,
+            );
+            if (translatedTech != techText) newTechMap[otherLang] = translatedTech;
           }
+          try {
+            await svc.saveTechCard(updated.copyWith(
+              dishNameLocalized: nameMap,
+              technologyLocalized: newTechMap,
+            ));
+          } catch (_) {}
         });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.read<LocalizationService>().t('save') + ' ✓')));
