@@ -991,14 +991,13 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
 
   List<SelectableItem> _filterItems(String query) {
     if (query.isEmpty) {
-      return widget.items.take(80).toList();
+      return widget.items.toList();
     }
     final q = query.trim().toLowerCase();
     return widget.items
         .where((item) =>
             item.displayName.toLowerCase().contains(q) ||
             item.searchName.contains(q))
-        .take(50)
         .toList();
   }
 
