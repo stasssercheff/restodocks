@@ -65,6 +65,10 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
       return;
     }
     try {
+      // Загружаем продукты для отображения локализованных имён в таблице
+      final store = context.read<ProductStoreSupabase>();
+      if (store.allProducts.isEmpty) await store.loadProducts();
+
       final lists = await loadOrderLists(estId);
       if (mounted) {
         setState(() {
@@ -95,6 +99,17 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
           : e.value.quantity;
       return e.value.copyWith(quantity: q);
     }).toList();
+  }
+
+  /// Локализованное имя продукта для отображения в UI.
+  String _getItemDisplayName(OrderListItem item, String lang) {
+    final productId = item.productId;
+    if (productId != null && productId.isNotEmpty) {
+      final store = context.read<ProductStoreSupabase>();
+      final product = store.allProducts.where((p) => p.id == productId).firstOrNull;
+      if (product != null) return product.getLocalizedName(lang);
+    }
+    return item.productName;
   }
 
   bool get _canSave =>
@@ -452,7 +467,7 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                               Padding(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 8, vertical: 4),
-                                child: Text(item.productName,
+                                child: Text(_getItemDisplayName(item, lang),
                                     overflow: TextOverflow.ellipsis),
                               ),
                               Padding(

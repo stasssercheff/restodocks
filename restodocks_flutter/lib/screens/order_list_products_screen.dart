@@ -89,13 +89,16 @@ class _OrderListProductsScreenState extends State<OrderListProductsScreen> {
     );
     unit = unitResult ?? unit;
     if (!mounted) return;
+    // Сохраняем русское имя как каноническое — переводы при экспорте
+    // берутся из product.getLocalizedName(docLang) по productId.
+    final canonicalName = product.getLocalizedName('ru');
     setState(() {
       _list = _list.copyWith(
         items: [
           ..._list.items,
           OrderListItem(
             productId: product.id,
-            productName: product.getLocalizedName(loc.currentLanguageCode),
+            productName: canonicalName,
             unit: unit,
           ),
         ],

@@ -79,86 +79,76 @@ class _OrderExportSheetState extends State<OrderExportSheet> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _preTranslate());
   }
 
-  /// Переводим названия продуктов и комментарий через DeepL
+  /// Переводим названия продуктов и комментарий.
+  /// Продукты: всегда ищем по productId в store и берём getLocalizedName(_docLang),
+  /// независимо от языка в котором сохранялось productName — это надёжнее, чем
+  /// сравнивать itemsSourceLang с _docLang.
+  /// Комментарий: переводим если commentSourceLang != _docLang.
   Future<void> _preTranslate() async {
     final uiLang = widget.loc.currentLanguageCode;
-    // Язык, на котором записаны productName (может совпадать с языком создателя заказа)
-    final productsSrcLang = widget.itemsSourceLang ?? uiLang;
     final commentSrcLang = widget.commentSourceLang ?? uiLang;
     if (!mounted) return;
 
-    final needProductTranslation = productsSrcLang != _docLang;
-    final needCommentTranslation = commentSrcLang != _docLang;
-    if (!needProductTranslation && !needCommentTranslation) return;
+    // Продукты переводим всегда когда docLang задан — независимо от языка исходных названий
+    final hasProducts = widget.itemsWithQuantities.any((i) => i.productName.trim().isNotEmpty);
+    final needCommentTranslation = commentSrcLang != _docLang && widget.list.comment.trim().isNotEmpty;
+
+    if (!hasProducts && !needCommentTranslation) return;
 
     setState(() => _translating = true);
     try {
       final translationSvc = context.read<TranslationService>();
       final productStore = context.read<ProductStoreSupabase>();
 
-      // Переводим названия продуктов (если язык источника отличается от языка документа)
-      if (needProductTranslation) {
-        // Загружаем продукты если ещё не загружены
-        if (productStore.allProducts.isEmpty) await productStore.loadProducts();
+      // Загружаем продукты если ещё не загружены
+      if (productStore.allProducts.isEmpty) await productStore.loadProducts();
 
-        for (final item in widget.itemsWithQuantities) {
-          final name = item.productName.trim();
-          if (name.isEmpty) continue;
+      // Переводим каждый продукт по productId → getLocalizedName(_docLang)
+      for (final item in widget.itemsWithQuantities) {
+        if (!mounted) break;
+        final name = item.productName.trim();
+        if (name.isEmpty) continue;
 
-          // Продукты в номенклатуре уже содержат names[] со всеми языками —
-          // getLocalizedName вернёт нужный перевод без DeepL
-          final productId = item.productId;
-          final product = (productId != null && productId.isNotEmpty)
-              ? productStore.allProducts.where((p) => p.id == productId).firstOrNull
-              : null;
+        final productId = item.productId;
+        final product = (productId != null && productId.isNotEmpty)
+            ? productStore.allProducts.where((p) => p.id == productId).firstOrNull
+            : null;
 
-          if (product != null) {
-            final locName = product.getLocalizedName(_docLang);
-            if (locName != name && mounted) {
-              setState(() => _translatedNames[name] = locName);
-            } else if (locName == name && productId != null) {
-              // names[docLang] отсутствует — ждём перевода синхронно чтобы сразу показать корректно
-              final updatedNames = await productStore.translateProductAwait(productId);
-              final translated = updatedNames?[_docLang];
-              if (translated != null && translated != name && mounted) {
-                setState(() => _translatedNames[name] = translated);
-              }
-            }
-          } else {
-            // Продукт не найден в store (ручной ввод без id) — переводим через DeepL
-            final translated = await translationSvc.translate(
-              entityType: TranslationEntityType.product,
-              entityId: name,
-              fieldName: 'name',
-              text: name,
-              from: productsSrcLang,
-              to: _docLang,
-            );
+        if (product != null) {
+          // Продукт из номенклатуры — берём перевод из names[]
+          final locName = product.getLocalizedName(_docLang);
+          if (locName != name && mounted) {
+            setState(() => _translatedNames[name] = locName);
+          } else if (locName == name) {
+            // Перевод на _docLang отсутствует в names[] — запрашиваем через pipeline
+            final updatedNames = await productStore.translateProductAwait(productId!);
+            final translated = updatedNames?[_docLang];
             if (translated != null && translated != name && mounted) {
               setState(() => _translatedNames[name] = translated);
             }
           }
         }
+        // Продукты без productId в заказах из номенклатуры не встречаются
       }
 
       // Переводим комментарий (язык написания → язык документа)
-      if (needCommentTranslation) {
+      if (needCommentTranslation && mounted) {
         final comment = widget.list.comment.trim();
-        if (comment.isNotEmpty && mounted) {
-          final translatedComment = await translationSvc.translate(
-            entityType: TranslationEntityType.ui,
-            entityId: 'order_comment_${widget.list.id}',
-            fieldName: 'comment',
-            text: comment,
-            from: commentSrcLang,
-            to: _docLang,
-          );
-          if (translatedComment != null && translatedComment != comment && mounted) {
-            setState(() => _translatedComment = translatedComment);
-          }
+        final translatedComment = await translationSvc.translate(
+          entityType: TranslationEntityType.ui,
+          entityId: 'order_comment_${widget.list.id}',
+          fieldName: 'comment',
+          text: comment,
+          from: commentSrcLang,
+          to: _docLang,
+        );
+        if (translatedComment != null && translatedComment != comment && mounted) {
+          setState(() => _translatedComment = translatedComment);
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('OrderExportSheet _preTranslate error: $e');
+    }
     if (mounted) setState(() => _translating = false);
   }
 
