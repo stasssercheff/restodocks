@@ -218,7 +218,7 @@ class ProductStoreSupabase {
     }
   }
 
-  /// Публичный метод для запуска перевода извне (например при добавлении в номенклатуру)
+  /// Публичный метод для запуска перевода извне (fire-and-forget)
   void triggerTranslation(String productId) => _translateProductInBackground(productId);
 
   /// Запустить перевод продукта фоново через Edge Function auto-translate-product
@@ -243,6 +243,30 @@ class ProductStoreSupabase {
     }).catchError((e) {
       print('DEBUG ProductStore: Background translation failed for $productId: $e');
     });
+  }
+
+  /// Перевести продукт и дождаться результата. Обновляет names в store.
+  /// Возвращает обновлённый Map<lang, name> или null при ошибке.
+  Future<Map<String, String>?> translateProductAwait(String productId) async {
+    try {
+      final res = await Supabase.instance.client.functions
+          .invoke('auto-translate-product', body: {'product_id': productId});
+      if (res.status == 200 && res.data != null) {
+        final data = res.data as Map<String, dynamic>?;
+        final names = data?['names'];
+        if (names is Map) {
+          final namesMap = Map<String, String>.from(names);
+          final idx = _allProducts.indexWhere((p) => p.id == productId);
+          if (idx != -1) {
+            _allProducts[idx] = _allProducts[idx].copyWith(names: namesMap);
+          }
+          return namesMap;
+        }
+      }
+    } catch (e) {
+      print('DEBUG ProductStore: translateProductAwait failed for $productId: $e');
+    }
+    return null;
   }
 
   /// Обновить продукт

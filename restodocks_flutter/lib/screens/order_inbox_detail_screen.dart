@@ -123,8 +123,20 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
       if (productId != null && productId.isNotEmpty) {
         final product = store.allProducts.where((p) => p.id == productId).firstOrNull;
         if (product != null) {
-          // Продукт найден — всегда берём из names, DeepL не нужен
-          updated[productId] = product.getLocalizedName(lang);
+          final locName = product.getLocalizedName(lang);
+          if (locName != productName) {
+            // Перевод уже есть в names[]
+            updated[productId] = locName;
+          } else {
+            // Перевод отсутствует — ждём синхронно чтобы сразу показать корректно
+            final updatedNames = await store.translateProductAwait(productId);
+            final translated = updatedNames?[lang];
+            if (translated != null && translated != productName) {
+              updated[productId] = translated;
+            } else {
+              updated[productId] = locName;
+            }
+          }
           continue;
         }
       }

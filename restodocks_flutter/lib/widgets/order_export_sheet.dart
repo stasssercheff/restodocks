@@ -116,10 +116,13 @@ class _OrderExportSheetState extends State<OrderExportSheet> {
             final locName = product.getLocalizedName(_docLang);
             if (locName != name && mounted) {
               setState(() => _translatedNames[name] = locName);
-            } else if (locName == name) {
-              // names[docLang] отсутствует — запускаем auto-translate-product фоново
-              // чтобы в следующий раз перевод уже был в names[]
-              productStore.triggerTranslation(productId!);
+            } else if (locName == name && productId != null) {
+              // names[docLang] отсутствует — ждём перевода синхронно чтобы сразу показать корректно
+              final updatedNames = await productStore.translateProductAwait(productId);
+              final translated = updatedNames?[_docLang];
+              if (translated != null && translated != name && mounted) {
+                setState(() => _translatedNames[name] = translated);
+              }
             }
           } else {
             // Продукт не найден в store (ручной ввод без id) — переводим через DeepL

@@ -2996,28 +2996,36 @@ class _ProductSelectDialog extends StatefulWidget {
 
 class _ProductSelectDialogState extends State<_ProductSelectDialog> {
   String _query = '';
+  bool _translating = false;
   final _searchFocus = FocusNode();
   final _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _searchFocus.requestFocus();
-      _triggerMissingTranslations();
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _ensureTranslations());
   }
 
-  /// Запускаем auto-translate-product фоново для продуктов без names[lang].
-  void _triggerMissingTranslations() {
+  Future<void> _ensureTranslations() async {
     if (!mounted) return;
     final lang = widget.lang;
-    if (lang == 'ru') return;
-    final store = context.read<ProductStoreSupabase>();
-    for (final p in widget.products) {
-      if (p.names != null && (p.names![lang]?.trim().isNotEmpty ?? false)) continue;
-      store.triggerTranslation(p.id);
+    if (lang == 'ru') {
+      _searchFocus.requestFocus();
+      return;
     }
+    final store = context.read<ProductStoreSupabase>();
+    final missing = widget.products.where(
+      (p) => !(p.names?.containsKey(lang) == true && (p.names![lang]?.trim().isNotEmpty ?? false)),
+    ).toList();
+
+    if (missing.isNotEmpty) {
+      setState(() => _translating = true);
+      await Future.wait(missing.map((p) => store.translateProductAwait(p.id)));
+      if (!mounted) return;
+      setState(() => _translating = false);
+    }
+
+    _searchFocus.requestFocus();
   }
 
   String _getDisplayName(Product p) => p.getLocalizedName(widget.lang);
@@ -3032,6 +3040,18 @@ class _ProductSelectDialogState extends State<_ProductSelectDialog> {
   @override
   Widget build(BuildContext context) {
     final loc = context.read<LocalizationService>();
+
+    if (_translating) {
+      return AlertDialog(
+        title: Text(loc.t('ttk_choose_product')),
+        content: const SizedBox(
+          width: 420,
+          height: 120,
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
+
     final q = _query.trim().toLowerCase();
     final filtered = q.isEmpty
         ? widget.products
@@ -3138,24 +3158,31 @@ class _ProductPicker extends StatefulWidget {
 
 class _ProductPickerState extends State<_ProductPicker> {
   String _query = '';
+  bool _translating = false;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _triggerMissingTranslations());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _ensureTranslations());
   }
 
-  /// Для продуктов без names[lang] запускаем auto-translate-product фоново —
-  /// при следующем открытии пикера перевод уже будет в product.names.
-  void _triggerMissingTranslations() {
+  /// Для продуктов без names[lang] — ждём перевода через auto-translate-product,
+  /// обновляем store. Показываем лоадер пока не готово.
+  Future<void> _ensureTranslations() async {
     if (!mounted) return;
     final lang = context.read<LocalizationService>().currentLanguageCode;
     if (lang == 'ru') return;
+
     final store = context.read<ProductStoreSupabase>();
-    for (final p in widget.products) {
-      if (p.names != null && (p.names![lang]?.trim().isNotEmpty ?? false)) continue;
-      store.triggerTranslation(p.id);
-    }
+    final missing = widget.products.where(
+      (p) => !(p.names?.containsKey(lang) == true && (p.names![lang]?.trim().isNotEmpty ?? false)),
+    ).toList();
+
+    if (missing.isEmpty) return;
+
+    setState(() => _translating = true);
+    await Future.wait(missing.map((p) => store.translateProductAwait(p.id)));
+    if (mounted) setState(() => _translating = false);
   }
 
   String _getDisplayName(Product p, String lang) => p.getLocalizedName(lang);
@@ -3164,6 +3191,11 @@ class _ProductPickerState extends State<_ProductPicker> {
   Widget build(BuildContext context) {
     final loc = context.read<LocalizationService>();
     final lang = loc.currentLanguageCode;
+
+    if (_translating) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     var list = widget.products;
     if (_query.isNotEmpty) {
       final q = _query.toLowerCase();
