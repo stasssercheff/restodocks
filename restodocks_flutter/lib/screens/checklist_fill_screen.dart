@@ -186,6 +186,8 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
         'done': i < _done.length ? _done[i] : false,
         'numericValue': i < _numericValues.length ? _numericValues[i] : null,
         'dropdownValue': i < _dropdownValues.length ? _dropdownValues[i] : null,
+        if (c.items[i].targetQuantity != null) 'targetQuantity': c.items[i].targetQuantity,
+        if (c.items[i].targetUnit != null) 'targetUnit': c.items[i].targetUnit,
       });
     }
 
@@ -385,8 +387,12 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
           children: [
             SizedBox(width: 40, child: Text('${i + 1}', style: Theme.of(context).textTheme.bodyMedium)),
             Expanded(
-              child: it.techCardId != null
-                  ? InkWell(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (it.techCardId != null)
+                    InkWell(
                       onTap: () => context.push('/tech-cards/${it.techCardId}'),
                       child: Row(
                         children: [
@@ -396,7 +402,27 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
                         ],
                       ),
                     )
-                  : Text(it.title, style: Theme.of(context).textTheme.bodyMedium),
+                  else
+                    Text(it.title, style: Theme.of(context).textTheme.bodyMedium),
+                  if (it.quantityLabel != null) ...[
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        it.quantityLabel!,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: Theme.of(context).colorScheme.onPrimaryContainer,
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
             if (cfg.hasNumeric)
               SizedBox(

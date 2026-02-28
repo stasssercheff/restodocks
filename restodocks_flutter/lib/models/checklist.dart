@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 
+const _sentinel = Object();
+
 /// Тип чеклиста: Заготовки (ТТК ПФ + своё) или Задачи (своё).
 enum ChecklistType {
   prep('prep', 'Заготовки'),
@@ -157,6 +159,10 @@ class ChecklistItem extends Equatable {
   final int sortOrder;
   /// ID ТТК ПФ (если пункт — ссылка на полуфабрикат).
   final String? techCardId;
+  /// Необходимое количество (для ПФ: сколько нужно приготовить).
+  final double? targetQuantity;
+  /// Единица измерения количества (г, кг, порции, шт и т.д.).
+  final String? targetUnit;
 
   const ChecklistItem({
     required this.id,
@@ -164,6 +170,8 @@ class ChecklistItem extends Equatable {
     required this.title,
     this.sortOrder = 0,
     this.techCardId,
+    this.targetQuantity,
+    this.targetUnit,
   });
 
   factory ChecklistItem.fromJson(Map<String, dynamic> json) {
@@ -173,6 +181,8 @@ class ChecklistItem extends Equatable {
       title: (json['title'] as String?) ?? '',
       sortOrder: (json['sort_order'] as num?)?.toInt() ?? 0,
       techCardId: json['tech_card_id'] as String?,
+      targetQuantity: (json['target_quantity'] as num?)?.toDouble(),
+      targetUnit: json['target_unit'] as String?,
     );
   }
 
@@ -183,6 +193,8 @@ class ChecklistItem extends Equatable {
       'title': title,
       'sort_order': sortOrder,
       if (techCardId != null) 'tech_card_id': techCardId,
+      if (targetQuantity != null) 'target_quantity': targetQuantity,
+      if (targetUnit != null) 'target_unit': targetUnit,
     };
   }
 
@@ -191,6 +203,8 @@ class ChecklistItem extends Equatable {
     required String title,
     int sortOrder = 0,
     String? techCardId,
+    double? targetQuantity,
+    String? targetUnit,
   }) {
     return ChecklistItem(
       id: '',
@@ -198,6 +212,8 @@ class ChecklistItem extends Equatable {
       title: title,
       sortOrder: sortOrder,
       techCardId: techCardId,
+      targetQuantity: targetQuantity,
+      targetUnit: targetUnit,
     );
   }
 
@@ -207,6 +223,8 @@ class ChecklistItem extends Equatable {
     String? title,
     int? sortOrder,
     String? techCardId,
+    Object? targetQuantity = _sentinel,
+    Object? targetUnit = _sentinel,
   }) {
     return ChecklistItem(
       id: id ?? this.id,
@@ -214,9 +232,21 @@ class ChecklistItem extends Equatable {
       title: title ?? this.title,
       sortOrder: sortOrder ?? this.sortOrder,
       techCardId: techCardId ?? this.techCardId,
+      targetQuantity: targetQuantity == _sentinel ? this.targetQuantity : targetQuantity as double?,
+      targetUnit: targetUnit == _sentinel ? this.targetUnit : targetUnit as String?,
     );
   }
 
+  /// Отображаемая строка количества: «5 кг», «10 порций» и т.д.
+  String? get quantityLabel {
+    if (targetQuantity == null) return null;
+    final qty = targetQuantity! == targetQuantity!.truncateToDouble()
+        ? targetQuantity!.toInt().toString()
+        : targetQuantity!.toStringAsFixed(1);
+    final unit = targetUnit?.isNotEmpty == true ? ' ${targetUnit!}' : '';
+    return '$qty$unit';
+  }
+
   @override
-  List<Object?> get props => [id, checklistId, title, sortOrder, techCardId];
+  List<Object?> get props => [id, checklistId, title, sortOrder, techCardId, targetQuantity, targetUnit];
 }

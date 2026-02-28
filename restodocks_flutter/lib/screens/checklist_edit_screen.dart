@@ -29,11 +29,14 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
   late final TextEditingController _additionalNameController;
   late final TextEditingController _newItemController;
   late final TextEditingController _dropdownOptionsController;
+  late final TextEditingController _newItemQtyController;
   final List<ChecklistItem> _items = [];
   ChecklistType _type = ChecklistType.tasks;
   bool _actionHasNumeric = false;
   bool _actionHasToggle = true;
   List<String> _actionDropdownOptions = [];
+  /// Единица для нового пункта
+  String _newItemUnit = 'кг';
 
   Future<void> _load() async {
     setState(() {
@@ -84,6 +87,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
     _additionalNameController = createTrackedController();
     _newItemController = createTrackedController();
     _dropdownOptionsController = TextEditingController();
+    _newItemQtyController = TextEditingController();
 
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
 
@@ -109,6 +113,8 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
         'title': item.title,
         'sortOrder': item.sortOrder,
         'techCardId': item.techCardId,
+        'targetQuantity': item.targetQuantity,
+        'targetUnit': item.targetUnit,
       }).toList(),
     };
   }
@@ -134,6 +140,8 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
           title: itemMap['title'] ?? '',
           sortOrder: (itemMap['sortOrder'] as num?)?.toInt() ?? 0,
           techCardId: itemMap['techCardId'] as String?,
+          targetQuantity: (itemMap['targetQuantity'] as num?)?.toDouble(),
+          targetUnit: itemMap['targetUnit'] as String?,
         ));
       }
     });
@@ -145,6 +153,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
     _additionalNameController.dispose();
     _newItemController.dispose();
     _dropdownOptionsController.dispose();
+    _newItemQtyController.dispose();
     super.dispose();
   }
 
@@ -181,6 +190,8 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                 title: e.title,
                 sortOrder: e.sortOrder,
                 techCardId: e.techCardId,
+                targetQuantity: e.targetQuantity,
+                targetUnit: e.targetUnit,
               ))
           .toList(),
     );
@@ -280,16 +291,21 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
     }
   }
 
-  void _addItem({String? title, String? techCardId}) {
+  void _addItem({String? title, String? techCardId, double? targetQuantity, String? targetUnit}) {
     final t = title ?? _newItemController.text.trim();
     if (t.isEmpty) return;
+    final qty = targetQuantity ?? double.tryParse(_newItemQtyController.text.trim().replaceAll(',', '.'));
+    final unit = targetUnit ?? (_newItemQtyController.text.trim().isNotEmpty ? _newItemUnit : null);
     setState(() {
       _items.add(ChecklistItem.template(
         title: t,
         sortOrder: _items.length,
         techCardId: techCardId,
+        targetQuantity: qty,
+        targetUnit: unit,
       ));
       _newItemController.clear();
+      _newItemQtyController.clear();
     });
     scheduleSave();
   }
@@ -324,7 +340,10 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                           title: Text(tc.getDisplayNameInLists(lang)),
                           onTap: () {
                             Navigator.of(ctx).pop();
-                            _addItem(title: tc.getDisplayNameInLists(lang), techCardId: tc.id);
+                            _showQuantityDialog(
+                              title: tc.getDisplayNameInLists(lang),
+                              techCardId: tc.id,
+                            );
                           },
                         );
                       },
@@ -339,9 +358,166 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
     );
   }
 
+  /// Диалог ввода количества после выбора ПФ или при добавлении любого пункта.
+  void _showQuantityDialog({required String title, String? techCardId}) {
+    final loc = context.read<LocalizationService>();
+    final qtyCtrl = TextEditingController();
+    String selectedUnit = 'кг';
+    const units = ['г', 'кг', 'мл', 'л', 'шт', 'порц.', 'упак.', 'пачка'];
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setInner) => AlertDialog(
+          title: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(loc.t('checklist_item_quantity_hint') ?? 'Укажите количество (необязательно)', style: Theme.of(ctx).textTheme.bodySmall?.copyWith(color: Theme.of(ctx).colorScheme.onSurfaceVariant)),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: TextField(
+                      controller: qtyCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: InputDecoration(
+                        labelText: loc.t('checklist_quantity') ?? 'Количество',
+                        isDense: true,
+                        border: const OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 2,
+                    child: DropdownButtonFormField<String>(
+                      value: selectedUnit,
+                      decoration: InputDecoration(
+                        labelText: loc.t('unit') ?? 'Ед.',
+                        isDense: true,
+                        border: const OutlineInputBorder(),
+                      ),
+                      items: units.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
+                      onChanged: (v) {
+                        if (v != null) setInner(() => selectedUnit = v);
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                _addItem(title: title, techCardId: techCardId);
+              },
+              child: Text(loc.t('skip') ?? 'Пропустить'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final qty = double.tryParse(qtyCtrl.text.trim().replaceAll(',', '.'));
+                Navigator.of(ctx).pop();
+                _addItem(title: title, techCardId: techCardId, targetQuantity: qty, targetUnit: qty != null ? selectedUnit : null);
+              },
+              child: Text(loc.t('add_item') ?? 'Добавить'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _removeItem(int i) {
     setState(() => _items.removeAt(i));
-    scheduleSave(); // Автосохранение при удалении элемента
+    scheduleSave();
+  }
+
+  /// Редактирование количества/единицы у существующего пункта.
+  void _editItemQuantity(int index) {
+    final loc = context.read<LocalizationService>();
+    final item = _items[index];
+    final qtyCtrl = TextEditingController(text: item.targetQuantity?.toString() ?? '');
+    String selectedUnit = item.targetUnit ?? 'кг';
+    const units = ['г', 'кг', 'мл', 'л', 'шт', 'порц.', 'упак.', 'пачка'];
+    if (!units.contains(selectedUnit)) selectedUnit = 'кг';
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setInner) => AlertDialog(
+          title: Text(item.title, maxLines: 2, overflow: TextOverflow.ellipsis),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: TextField(
+                      controller: qtyCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: InputDecoration(
+                        labelText: loc.t('checklist_quantity') ?? 'Количество',
+                        isDense: true,
+                        border: const OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 2,
+                    child: DropdownButtonFormField<String>(
+                      value: selectedUnit,
+                      decoration: InputDecoration(
+                        labelText: loc.t('unit') ?? 'Ед.',
+                        isDense: true,
+                        border: const OutlineInputBorder(),
+                      ),
+                      items: units.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
+                      onChanged: (v) {
+                        if (v != null) setInner(() => selectedUnit = v);
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            if (item.targetQuantity != null)
+              TextButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  setState(() => _items[index] = item.copyWith(targetQuantity: null, targetUnit: null));
+                  scheduleSave();
+                },
+                child: Text(loc.t('delete') ?? 'Удалить'),
+              ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text(loc.t('back') ?? 'Отмена'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final qty = double.tryParse(qtyCtrl.text.trim().replaceAll(',', '.'));
+                Navigator.of(ctx).pop();
+                setState(() => _items[index] = item.copyWith(
+                  targetQuantity: qty,
+                  targetUnit: qty != null ? selectedUnit : null,
+                ));
+                scheduleSave();
+              },
+              child: Text(loc.t('save') ?? 'Сохранить'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -559,12 +735,24 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                             ? (loc.t('checklist_item_hint') ?? 'Введите наименование')
                             : (loc.t('checklist_item_prep_hint') ?? 'Введите своё или выберите ПФ'),
                       ),
-                      onSubmitted: (_) => _addItem(),
+                      onSubmitted: (_) {
+                        if (_type == ChecklistType.prep && _newItemController.text.trim().isNotEmpty) {
+                          _showQuantityDialog(title: _newItemController.text.trim());
+                        } else {
+                          _addItem();
+                        }
+                      },
                     ),
                   ),
                   const SizedBox(width: 8),
                   IconButton.filled(
-                    onPressed: () => _addItem(),
+                    onPressed: () {
+                      if (_type == ChecklistType.prep && _newItemController.text.trim().isNotEmpty) {
+                        _showQuantityDialog(title: _newItemController.text.trim());
+                      } else {
+                        _addItem();
+                      }
+                    },
                     icon: const Icon(Icons.add),
                     tooltip: loc.t('add_item'),
                   ),
@@ -581,7 +769,51 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                       ? Icon(Icons.link, size: 20, color: Theme.of(context).colorScheme.primary)
                       : null,
                   title: Text(it.title),
-                  subtitle: it.techCardId != null ? Text(loc.t('ttk_pf') ?? 'ТТК ПФ', style: Theme.of(context).textTheme.labelSmall) : null,
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (it.techCardId != null)
+                        Text(loc.t('ttk_pf') ?? 'ТТК ПФ', style: Theme.of(context).textTheme.labelSmall),
+                      if (it.quantityLabel != null)
+                        GestureDetector(
+                          onTap: canEdit ? () => _editItemQuantity(i) : null,
+                          child: Container(
+                            margin: const EdgeInsets.only(top: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.secondaryContainer,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              it.quantityLabel!,
+                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                    color: Theme.of(context).colorScheme.onSecondaryContainer,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                            ),
+                          ),
+                        )
+                      else if (canEdit && (it.techCardId != null || _type == ChecklistType.prep))
+                        GestureDetector(
+                          onTap: () => _editItemQuantity(i),
+                          child: Container(
+                            margin: const EdgeInsets.only(top: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Theme.of(context).colorScheme.outline),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              loc.t('checklist_add_quantity') ?? '+ кол-во',
+                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                   trailing: canEdit
                       ? IconButton(
                           icon: const Icon(Icons.remove_circle_outline),

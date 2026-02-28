@@ -92,6 +92,8 @@ class ChecklistServiceSupabase {
         'sort_order': i,
       };
       if (item.techCardId != null) itemData['tech_card_id'] = item.techCardId;
+      if (item.targetQuantity != null) itemData['target_quantity'] = item.targetQuantity;
+      if (item.targetUnit != null) itemData['target_unit'] = item.targetUnit;
       await _supabase.insertData('checklist_items', itemData);
     }
     return (await getChecklistById(c.id)) ?? c;
@@ -120,6 +122,8 @@ class ChecklistServiceSupabase {
         'sort_order': i,
       };
       if (item.techCardId != null) itemData['tech_card_id'] = item.techCardId;
+      if (item.targetQuantity != null) itemData['target_quantity'] = item.targetQuantity;
+      if (item.targetUnit != null) itemData['target_unit'] = item.targetUnit;
       await _supabase.insertData('checklist_items', itemData);
     }
   }
@@ -142,6 +146,8 @@ class ChecklistServiceSupabase {
                 title: e.title,
                 sortOrder: e.sortOrder,
                 techCardId: e.techCardId,
+                targetQuantity: e.targetQuantity,
+                targetUnit: e.targetUnit,
               ))
           .toList(),
     );
