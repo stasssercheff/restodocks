@@ -2998,13 +2998,53 @@ class _ProductSelectDialogState extends State<_ProductSelectDialog> {
   String _query = '';
   final _searchFocus = FocusNode();
   final _searchController = TextEditingController();
+  final Map<String, String> _extraNames = {};
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _searchFocus.requestFocus();
+      _translateMissingNames();
     });
+  }
+
+  Future<void> _translateMissingNames() async {
+    if (!mounted) return;
+    final lang = widget.lang;
+    if (lang == 'ru') return;
+    final translationSvc = context.read<TranslationService>();
+    final productStore = context.read<ProductStoreSupabase>();
+    for (final p in widget.products) {
+      if (!mounted) break;
+      if (p.names != null && (p.names![lang]?.trim().isNotEmpty ?? false)) continue;
+      final sourceName = p.names?['ru']?.trim().isNotEmpty == true ? p.names!['ru']! : p.name;
+      if (sourceName.trim().isEmpty) continue;
+      try {
+        final translated = await translationSvc.translate(
+          entityType: TranslationEntityType.product,
+          entityId: p.id,
+          fieldName: 'name',
+          text: sourceName,
+          from: 'ru',
+          to: lang,
+        );
+        if (translated != null && translated != sourceName && mounted) {
+          setState(() => _extraNames[p.id] = translated);
+          if (p.names?.containsKey(lang) != true) {
+            final updatedNames = Map<String, String>.from(p.names ?? {'ru': p.name});
+            updatedNames[lang] = translated;
+            productStore.updateProduct(p.copyWith(names: updatedNames)).catchError((_) {});
+          }
+        }
+      } catch (_) {}
+    }
+  }
+
+  String _getDisplayName(Product p) {
+    final extra = _extraNames[p.id];
+    if (extra != null && extra.isNotEmpty) return extra;
+    return p.getLocalizedName(widget.lang);
   }
 
   @override
@@ -3023,7 +3063,7 @@ class _ProductSelectDialogState extends State<_ProductSelectDialog> {
         : widget.products
             .where((p) =>
                 p.name.toLowerCase().contains(q) ||
-                p.getLocalizedName(widget.lang).toLowerCase().contains(q))
+                _getDisplayName(p).toLowerCase().contains(q))
             .toList();
     return AlertDialog(
       title: Text(loc.t('ttk_choose_product')),
@@ -3060,7 +3100,7 @@ class _ProductSelectDialogState extends State<_ProductSelectDialog> {
                   final p = filtered[i];
                   return ListTile(
                     title: Text(
-                      p.getLocalizedName(widget.lang),
+                      _getDisplayName(p),
                       overflow: TextOverflow.ellipsis,
                       maxLines: 1,
                     ),
@@ -3123,6 +3163,60 @@ class _ProductPicker extends StatefulWidget {
 
 class _ProductPickerState extends State<_ProductPicker> {
   String _query = '';
+  // Дополнительные переводы для продуктов без names[lang]: productId -> localizedName
+  final Map<String, String> _extraNames = {};
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _translateMissingNames());
+  }
+
+  Future<void> _translateMissingNames() async {
+    if (!mounted) return;
+    final loc = context.read<LocalizationService>();
+    final lang = loc.currentLanguageCode;
+    if (lang == 'ru') return; // русский — исходный язык, перевод не нужен
+
+    final translationSvc = context.read<TranslationService>();
+    final productStore = context.read<ProductStoreSupabase>();
+
+    for (final p in widget.products) {
+      if (!mounted) break;
+      // Если в names уже есть нужный язык — пропускаем
+      if (p.names != null && (p.names![lang]?.trim().isNotEmpty ?? false)) continue;
+      // Запрашиваем перевод через TranslationService (кеш в БД, DeepL только при первом запросе)
+      final sourceName = p.names?['ru']?.trim().isNotEmpty == true ? p.names!['ru']! : p.name;
+      if (sourceName.trim().isEmpty) continue;
+      try {
+        final translated = await translationSvc.translate(
+          entityType: TranslationEntityType.product,
+          entityId: p.id,
+          fieldName: 'name',
+          text: sourceName,
+          from: 'ru',
+          to: lang,
+        );
+        if (translated != null && translated != sourceName && mounted) {
+          setState(() => _extraNames[p.id] = translated);
+          // Обновляем product в store фоново чтобы в следующий раз не дёргать DeepL
+          if (p.names?.containsKey(lang) != true) {
+            final updatedNames = Map<String, String>.from(p.names ?? {'ru': p.name});
+            updatedNames[lang] = translated;
+            productStore.updateProduct(p.copyWith(names: updatedNames)).catchError((_) {});
+          }
+        }
+      } catch (_) {}
+    }
+  }
+
+  String _getDisplayName(Product p, String lang) {
+    // 1. Уже переведено в этой сессии
+    final extra = _extraNames[p.id];
+    if (extra != null && extra.isNotEmpty) return extra;
+    // 2. Из сохранённых names
+    return p.getLocalizedName(lang);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -3131,7 +3225,7 @@ class _ProductPickerState extends State<_ProductPicker> {
     var list = widget.products;
     if (_query.isNotEmpty) {
       final q = _query.toLowerCase();
-      list = list.where((p) => p.name.toLowerCase().contains(q) || p.getLocalizedName(lang).toLowerCase().contains(q)).toList();
+      list = list.where((p) => p.name.toLowerCase().contains(q) || _getDisplayName(p, lang).toLowerCase().contains(q)).toList();
     }
     return Column(
       children: [
@@ -3151,7 +3245,7 @@ class _ProductPickerState extends State<_ProductPicker> {
                 behavior: HitTestBehavior.opaque,
                 onTap: () => _askWeight(p, loc),
                 child: ListTile(
-                  title: Text(p.getLocalizedName(lang)),
+                  title: Text(_getDisplayName(p, lang)),
                   subtitle: Text('${p.calories?.round() ?? 0} ${loc.t('kcal')} · ${CulinaryUnits.displayName((p.unit ?? 'g').trim().toLowerCase(), loc.currentLanguageCode)}'),
                 ),
               );
@@ -3177,7 +3271,7 @@ class _ProductPickerState extends State<_ProductPicker> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx2, setStateDlg) {
           return AlertDialog(
-            title: Text(p.getLocalizedName(lang)),
+            title: Text(_getDisplayName(p, lang)),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
