@@ -46,6 +46,8 @@ class ChecklistSubmissionService {
           'establishment_id': establishmentId,
           'checklist_id': checklistId,
           'submitted_by_employee_id': submittedByEmployeeId,
+          // filled_by_employee_id — старое название колонки в БД (NOT NULL)
+          'filled_by_employee_id': submittedByEmployeeId,
           'recipient_chef_id': rid,
           'checklist_name': checklistName,
           'section': section,
@@ -57,6 +59,8 @@ class ChecklistSubmissionService {
         'establishment_id': establishmentId,
         'checklist_id': checklistId,
         'submitted_by_employee_id': submittedByEmployeeId,
+        // filled_by_employee_id — старое название колонки в БД (NOT NULL)
+        'filled_by_employee_id': submittedByEmployeeId,
         'checklist_name': checklistName,
         'section': section,
         'payload': payload,
