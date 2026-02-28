@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/roles_config.dart';
 import '../services/services.dart';
@@ -141,6 +142,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
         print('DEBUG: Supabase Auth signUp: userId=$authUserId, hasSession=$hasSession');
       } catch (e) {
         print('DEBUG: Supabase Auth signUp failed: $e');
+      }
+
+      // Проверяем лимит сотрудников по промокоду заведения
+      try {
+        final limitResult = await Supabase.instance.client.rpc(
+          'check_employee_limit',
+          params: {'p_establishment_id': establishment.id},
+        );
+        if (limitResult == 'limit_reached') {
+          if (!mounted) return;
+          final loc = context.read<LocalizationService>();
+          setState(() => _errorMessage = loc.t('employee_limit_reached'));
+          return;
+        }
+      } catch (_) {
+        // При ошибке сети — не блокируем регистрацию
       }
 
       final employee = await accountManager.createEmployeeForCompany(

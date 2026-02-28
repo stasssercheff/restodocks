@@ -17,6 +17,7 @@ class _AdminScreenState extends State<AdminScreen> {
   final _supabase = Supabase.instance.client;
   final _codeController = TextEditingController();
   final _noteController = TextEditingController();
+  final _maxEmployeesController = TextEditingController();
   DateTime? _expiresAt;
 
   List<Map<String, dynamic>> _codes = [];
@@ -34,6 +35,7 @@ class _AdminScreenState extends State<AdminScreen> {
   void dispose() {
     _codeController.dispose();
     _noteController.dispose();
+    _maxEmployeesController.dispose();
     super.dispose();
   }
 
@@ -58,13 +60,16 @@ class _AdminScreenState extends State<AdminScreen> {
 
     setState(() => _isSaving = true);
     try {
+      final maxEmp = int.tryParse(_maxEmployeesController.text.trim());
       await _supabase.from('promo_codes').insert({
         'code': code,
         'note': _noteController.text.trim().isEmpty ? null : _noteController.text.trim(),
         'expires_at': _expiresAt?.toIso8601String(),
+        'max_employees': maxEmp,
       });
       _codeController.clear();
       _noteController.clear();
+      _maxEmployeesController.clear();
       setState(() => _expiresAt = null);
       await _loadCodes();
     } catch (e) {
@@ -126,6 +131,43 @@ class _AdminScreenState extends State<AdminScreen> {
 
   Future<void> _clearExpires(int id) async {
     await _supabase.from('promo_codes').update({'expires_at': null}).eq('id', id);
+    await _loadCodes();
+  }
+
+  Future<void> _setMaxEmployees(int id, int? current) async {
+    final controller = TextEditingController(text: current?.toString() ?? '');
+    final result = await showDialog<int?>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Лимит сотрудников'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Макс. количество сотрудников',
+            hintText: 'Например: 10',
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Отмена')),
+          FilledButton(
+            onPressed: () {
+              final v = int.tryParse(controller.text.trim());
+              Navigator.pop(ctx, v);
+            },
+            child: const Text('Сохранить'),
+          ),
+        ],
+      ),
+    );
+    if (result == null) return;
+    await _supabase.from('promo_codes').update({'max_employees': result}).eq('id', id);
+    await _loadCodes();
+  }
+
+  Future<void> _clearMaxEmployees(int id) async {
+    await _supabase.from('promo_codes').update({'max_employees': null}).eq('id', id);
     await _loadCodes();
   }
 
@@ -204,6 +246,20 @@ class _AdminScreenState extends State<AdminScreen> {
                           labelText: 'Заметка',
                           hintText: 'Для кого',
                           prefixIcon: Icon(Icons.notes),
+                          isDense: true,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 90,
+                      child: TextField(
+                        controller: _maxEmployeesController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Макс. сотр.',
+                          hintText: '∞',
+                          prefixIcon: Icon(Icons.people_outline, size: 18),
                           isDense: true,
                         ),
                       ),
@@ -320,6 +376,7 @@ class _AdminScreenState extends State<AdminScreen> {
     final expiresAt = row['expires_at'] as String?;
     final usedAt = row['used_at'] as String?;
     final establishmentName = (row['establishments'] as Map?)?['name'] as String?;
+    final maxEmployees = row['max_employees'] as int?;
     final expired = _isExpired(expiresAt);
 
     Color statusColor = isUsed
@@ -383,6 +440,10 @@ class _AdminScreenState extends State<AdminScreen> {
               'Срок до: ${_formatDate(expiresAt)}',
               style: TextStyle(fontSize: 11, color: expired ? Colors.red : Colors.grey),
             ),
+          Text(
+            'Сотрудники: ${maxEmployees != null ? '≤ $maxEmployees' : '∞ без ограничений'}',
+            style: TextStyle(fontSize: 11, color: maxEmployees != null ? Colors.blueGrey : Colors.grey),
+          ),
         ],
       ),
       trailing: PopupMenuButton<String>(
@@ -396,6 +457,12 @@ class _AdminScreenState extends State<AdminScreen> {
               break;
             case 'clear_expires':
               await _clearExpires(id);
+              break;
+            case 'set_max_employees':
+              await _setMaxEmployees(id, maxEmployees);
+              break;
+            case 'clear_max_employees':
+              await _clearMaxEmployees(id);
               break;
             case 'delete':
               await _deleteCode(id);
@@ -426,6 +493,23 @@ class _AdminScreenState extends State<AdminScreen> {
                 Icon(Icons.timer_off, size: 18),
                 SizedBox(width: 8),
                 Text('Убрать срок'),
+              ]),
+            ),
+          PopupMenuItem(
+            value: 'set_max_employees',
+            child: Row(children: [
+              const Icon(Icons.people_outline, size: 18),
+              const SizedBox(width: 8),
+              Text(maxEmployees != null ? 'Изменить лимит сотрудников' : 'Задать лимит сотрудников'),
+            ]),
+          ),
+          if (maxEmployees != null)
+            const PopupMenuItem(
+              value: 'clear_max_employees',
+              child: Row(children: [
+                Icon(Icons.people_alt, size: 18),
+                SizedBox(width: 8),
+                Text('Убрать лимит сотрудников'),
               ]),
             ),
           const PopupMenuDivider(),
