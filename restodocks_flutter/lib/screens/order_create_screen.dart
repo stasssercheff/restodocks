@@ -294,6 +294,7 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
         loc: loc,
         exportLang: exportLang,
         commentSourceLang: loc.currentLanguageCode,
+        itemsSourceLang: loc.currentLanguageCode,
         onSaved: (msg) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));

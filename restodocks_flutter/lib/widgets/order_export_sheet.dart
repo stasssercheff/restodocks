@@ -20,6 +20,7 @@ class OrderExportSheet extends StatefulWidget {
     required this.onSaved,
     this.exportLang,
     this.commentSourceLang,
+    this.itemsSourceLang,
     this.onExportToInbox,
   });
 
@@ -32,6 +33,8 @@ class OrderExportSheet extends StatefulWidget {
   final String? exportLang;
   /// Язык, на котором написан комментарий. Если null — используется текущий язык UI.
   final String? commentSourceLang;
+  /// Язык, на котором записаны productName в itemsWithQuantities. Если null — текущий язык UI.
+  final String? itemsSourceLang;
   /// Вызывается после успешного экспорта — сохраняет заказ во входящие.
   final Future<void> Function()? onExportToInbox;
 
@@ -78,12 +81,13 @@ class _OrderExportSheetState extends State<OrderExportSheet> {
 
   /// Переводим названия продуктов и комментарий через DeepL
   Future<void> _preTranslate() async {
-    // Язык UI = язык названий продуктов; язык комментария может отличаться
     final uiLang = widget.loc.currentLanguageCode;
+    // Язык, на котором записаны productName (может совпадать с языком создателя заказа)
+    final productsSrcLang = widget.itemsSourceLang ?? uiLang;
     final commentSrcLang = widget.commentSourceLang ?? uiLang;
     if (!mounted) return;
 
-    final needProductTranslation = uiLang != _docLang;
+    final needProductTranslation = productsSrcLang != _docLang;
     final needCommentTranslation = commentSrcLang != _docLang;
     if (!needProductTranslation && !needCommentTranslation) return;
 
@@ -91,7 +95,7 @@ class _OrderExportSheetState extends State<OrderExportSheet> {
     try {
       final translationSvc = context.read<TranslationService>();
 
-      // Переводим названия продуктов (если язык UI отличается от языка документа)
+      // Переводим названия продуктов (если язык источника отличается от языка документа)
       if (needProductTranslation) {
         final seen = <String>{};
         for (final item in widget.itemsWithQuantities) {
@@ -104,7 +108,7 @@ class _OrderExportSheetState extends State<OrderExportSheet> {
             entityId: entityId,
             fieldName: 'name',
             text: name,
-            from: uiLang,
+            from: productsSrcLang,
             to: _docLang,
           );
           if (translated != null && translated != name && mounted) {

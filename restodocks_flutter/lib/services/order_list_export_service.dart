@@ -250,13 +250,17 @@ class OrderListExportService {
   static Future<Uint8List> buildOrderPdfBytesFromPayload({
     required Map<String, dynamic> payload,
     required String Function(String) t,
+    /// productId или productName → переведённое название
+    Map<String, String>? translatedNames,
+    String? translatedComment,
   }) async {
     final theme = await _getPdfTheme();
     final doc = pw.Document(theme: theme);
     final header = payload['header'] as Map<String, dynamic>? ?? {};
     final items = payload['items'] as List<dynamic>? ?? [];
     final grandTotal = (payload['grandTotal'] as num?)?.toDouble() ?? 0;
-    final comment = (payload['comment'] as String?)?.trim() ?? '';
+    final rawComment = (payload['comment'] as String?)?.trim() ?? '';
+    final comment = (translatedComment?.isNotEmpty == true) ? translatedComment! : rawComment;
 
     final companyName = header['establishmentName'] ?? '—';
     final supplierName = header['supplierName'] ?? '—';
@@ -314,7 +318,11 @@ class OrderListExportService {
               ...items.asMap().entries.map((e) {
                 final i = e.key + 1;
                 final item = e.value as Map<String, dynamic>;
-                final name = item['productName']?.toString() ?? '';
+                final rawName = item['productName']?.toString() ?? '';
+                final productId = item['productId']?.toString() ?? '';
+                final name = (productId.isNotEmpty && translatedNames?[productId] != null)
+                    ? translatedNames![productId]!
+                    : (translatedNames?[rawName] ?? rawName);
                 final unit = item['unit']?.toString() ?? '';
                 final qty = (item['quantity'] as num?)?.toDouble() ?? 0;
                 final pricePerUnit = (item['pricePerUnit'] as num?)?.toDouble() ?? 0;
@@ -362,6 +370,8 @@ class OrderListExportService {
   static Future<Uint8List> buildOrderExcelBytesFromPayload({
     required Map<String, dynamic> payload,
     required String Function(String) t,
+    Map<String, String>? translatedNames,
+    String? translatedComment,
   }) async {
     final excel = Excel.createExcel();
     final sheet = excel[excel.getDefaultSheet()!];
@@ -392,9 +402,14 @@ class OrderListExportService {
     ]);
     for (var i = 0; i < items.length; i++) {
       final item = items[i] as Map<String, dynamic>;
+      final rawName = (item['productName'] ?? '').toString();
+      final productId = (item['productId'] ?? '').toString();
+      final displayName = (productId.isNotEmpty && translatedNames?[productId] != null)
+          ? translatedNames![productId]!
+          : (translatedNames?[rawName] ?? rawName);
       sheet.appendRow([
         IntCellValue(i + 1),
-        TextCellValue((item['productName'] ?? '').toString()),
+        TextCellValue(displayName),
         TextCellValue((item['unit'] ?? '').toString()),
         DoubleCellValue((item['quantity'] as num?)?.toDouble() ?? 0),
         DoubleCellValue((item['pricePerUnit'] as num?)?.toDouble() ?? 0),
@@ -411,10 +426,11 @@ class OrderListExportService {
       DoubleCellValue(grandTotal),
     ]);
 
-    final comment = (payload['comment'] as String?)?.trim();
-    if ((comment ?? '').isNotEmpty) {
+    final rawComment = (payload['comment'] as String?)?.trim();
+    final commentToShow = (translatedComment?.isNotEmpty == true) ? translatedComment! : (rawComment ?? '');
+    if (commentToShow.isNotEmpty) {
       sheet.appendRow([]);
-      sheet.appendRow([TextCellValue('${t('order_list_comment')}: $comment')]);
+      sheet.appendRow([TextCellValue('${t('order_list_comment')}: $commentToShow')]);
     }
 
     final out = excel.encode();

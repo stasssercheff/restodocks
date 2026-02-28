@@ -93,36 +93,124 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
 
     final acc = context.read<AccountManagerSupabase>();
     final estId = acc.establishment?.id;
-    if (estId == null) return;
-
-    final store = context.read<ProductStoreSupabase>();
-    if (store.allProducts.isEmpty) await store.loadProducts();
-    await store.loadNomenclature(estId);
 
     final payload = doc['payload'] as Map<String, dynamic>? ?? {};
     final items = payload['items'] as List<dynamic>? ?? [];
+
+    // sourceLang — язык, на котором записаны productName в payload
+    final sourceLangRaw = (payload['sourceLang'] as String?)?.trim() ?? '';
+    final sourceLang = sourceLangRaw.isNotEmpty ? sourceLangRaw : (lang == 'ru' ? 'en' : 'ru');
+
+    if (items.isEmpty) return;
+
+    // 1. Пробуем через productStore (быстро, без сети)
+    final store = context.read<ProductStoreSupabase>();
+    if (store.allProducts.isEmpty) await store.loadProducts();
+    if (estId != null) await store.loadNomenclature(estId);
+
     final updated = <String, String>{};
+    final needDeepL = <Map<String, dynamic>>[];
+
     for (final raw in items) {
       final item = raw as Map<String, dynamic>;
       final productId = item['productId'] as String?;
-      if (productId == null || productId.isEmpty) continue;
-      final product = store.allProducts.where((p) => p.id == productId).firstOrNull;
-      if (product == null) continue;
-      // Всегда берём локализованное имя для текущего языка интерфейса
-      final localizedName = product.getLocalizedName(lang);
-      updated[productId] = localizedName;
+      final productName = (item['productName'] as String?)?.trim() ?? '';
+      if (productName.isEmpty) continue;
+
+      // Если язык совпадает — перевод не нужен
+      if (sourceLang == lang) continue;
+
+      // Ищем в store по productId
+      if (productId != null && productId.isNotEmpty) {
+        final product = store.allProducts.where((p) => p.id == productId).firstOrNull
+            ?? (estId != null ? store.getNomenclatureProducts(estId).where((p) => p.id == productId).firstOrNull : null);
+        if (product != null) {
+          final localizedName = product.getLocalizedName(lang);
+          // getLocalizedName возвращает оригинал если перевода нет — тогда нужен DeepL
+          if (localizedName != product.name || (product.names?.containsKey(lang) ?? false)) {
+            updated[productId] = localizedName;
+            continue;
+          }
+        }
+      }
+      // Продукт не найден в store или нет перевода — запросим DeepL
+      needDeepL.add(item);
     }
+
     if (mounted && updated.isNotEmpty) {
       setState(() => _localizedNames.addAll(updated));
     }
+
+    // 2. Переводим через DeepL имена которых нет в store
+    if (needDeepL.isEmpty || sourceLang == lang) return;
+    if (!mounted) return;
+
+    try {
+      final translationSvc = context.read<TranslationService>();
+      final seen = <String>{};
+      for (final item in needDeepL) {
+        final productName = (item['productName'] as String?)?.trim() ?? '';
+        final productId = (item['productId'] as String?)?.trim() ?? '';
+        if (productName.isEmpty || seen.contains(productName)) continue;
+        seen.add(productName);
+        final entityId = productId.isNotEmpty ? productId : productName;
+        final translated = await translationSvc.translate(
+          entityType: TranslationEntityType.product,
+          entityId: entityId,
+          fieldName: 'name',
+          text: productName,
+          from: sourceLang,
+          to: lang,
+        );
+        if (translated != null && translated != productName && mounted) {
+          // Используем productId как ключ если есть, иначе — имя
+          final key = productId.isNotEmpty ? productId : productName;
+          setState(() => _localizedNames[key] = translated);
+        }
+      }
+    } catch (_) {}
   }
 
   String _getItemName(Map<String, dynamic> item) {
-    final productId = item['productId'] as String?;
-    if (productId != null && _localizedNames.containsKey(productId)) {
+    final productId = (item['productId'] as String?)?.trim() ?? '';
+    final productName = (item['productName'] as String?)?.trim() ?? '';
+    // Сначала ищем по productId, затем по имени (для продуктов без id)
+    if (productId.isNotEmpty && _localizedNames.containsKey(productId)) {
       return _localizedNames[productId]!;
     }
-    return (item['productName'] ?? '').toString();
+    if (productName.isNotEmpty && _localizedNames.containsKey(productName)) {
+      return _localizedNames[productName]!;
+    }
+    return productName;
+  }
+
+  Future<String?> _getTranslatedCommentForExport(Map<String, dynamic> doc, String targetLang) async {
+    if (!mounted) return null;
+    final payload = doc['payload'] as Map<String, dynamic>? ?? {};
+    final comment = (payload['comment'] as String?)?.trim() ?? '';
+    if (comment.isEmpty) return null;
+    final sourceLangRaw = (payload['sourceLang'] as String?)?.trim() ?? '';
+    final loc = context.read<LocalizationService>();
+    final sourceLang = sourceLangRaw.isNotEmpty ? sourceLangRaw : loc.currentLanguageCode;
+    if (sourceLang == targetLang) return null;
+    // Если уже переведено на нужный язык — используем
+    if (targetLang == loc.currentLanguageCode && _translatedComment != null) {
+      return _translatedComment;
+    }
+    try {
+      final translationSvc = context.read<TranslationService>();
+      final translated = await translationSvc.translate(
+        entityType: TranslationEntityType.ui,
+        entityId: 'order_comment_${doc['id'] ?? comment.hashCode}',
+        fieldName: 'comment',
+        text: comment,
+        from: sourceLang,
+        to: targetLang,
+      );
+      return (translated != null && translated != comment) ? translated : null;
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> _showSaveFormatDialog() async {
@@ -212,17 +300,61 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
 
     final tLang = (String key) => loc.tForLanguage(exportLang, key);
 
+    // Собираем переведённые имена для выбранного языка экспорта
+    // Если exportLang совпадает с текущим языком UI — используем уже загруженные _localizedNames
+    // Если отличается — переводим через DeepL
+    final exportTranslatedNames = <String, String>{};
+    final exportTranslatedComment = await _getTranslatedCommentForExport(doc, exportLang);
+    if (exportLang == loc.currentLanguageCode) {
+      exportTranslatedNames.addAll(_localizedNames);
+    } else {
+      // Нужен перевод на другой язык — запрашиваем
+      final sourceLangRaw = (payload['sourceLang'] as String?)?.trim() ?? '';
+      final sourceLang = sourceLangRaw.isNotEmpty ? sourceLangRaw : loc.currentLanguageCode;
+      if (sourceLang != exportLang) {
+        final items2 = payload['items'] as List<dynamic>? ?? [];
+        try {
+          final translationSvc = context.read<TranslationService>();
+          final seen = <String>{};
+          for (final raw in items2) {
+            final item = raw as Map<String, dynamic>;
+            final productName = (item['productName'] as String?)?.trim() ?? '';
+            final productId = (item['productId'] as String?)?.trim() ?? '';
+            if (productName.isEmpty || seen.contains(productName)) continue;
+            seen.add(productName);
+            final entityId = productId.isNotEmpty ? productId : productName;
+            final translated = await translationSvc.translate(
+              entityType: TranslationEntityType.product,
+              entityId: entityId,
+              fieldName: 'name',
+              text: productName,
+              from: sourceLang,
+              to: exportLang,
+            );
+            if (translated != null && translated != productName) {
+              final key = productId.isNotEmpty ? productId : productName;
+              exportTranslatedNames[key] = translated;
+            }
+          }
+        } catch (_) {}
+      }
+    }
+
     try {
       if (format == 'pdf') {
         final bytes = await OrderListExportService.buildOrderPdfBytesFromPayload(
           payload: payload,
           t: tLang,
+          translatedNames: exportTranslatedNames.isNotEmpty ? exportTranslatedNames : null,
+          translatedComment: exportTranslatedComment,
         );
         await saveFileBytes('order_${supplier}_$dateStr.pdf', bytes);
       } else {
         final bytes = await OrderListExportService.buildOrderExcelBytesFromPayload(
           payload: payload,
           t: tLang,
+          translatedNames: exportTranslatedNames.isNotEmpty ? exportTranslatedNames : null,
+          translatedComment: exportTranslatedComment,
         );
         await saveFileBytes('order_${supplier}_$dateStr.xlsx', bytes);
       }
