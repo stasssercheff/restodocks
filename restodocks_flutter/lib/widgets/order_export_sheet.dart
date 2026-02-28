@@ -19,6 +19,7 @@ class OrderExportSheet extends StatefulWidget {
     required this.loc,
     required this.onSaved,
     this.exportLang,
+    this.commentSourceLang,
     this.onExportToInbox,
   });
 
@@ -29,6 +30,8 @@ class OrderExportSheet extends StatefulWidget {
   final void Function(String message) onSaved;
   /// Язык документа (может отличаться от языка UI). Если null — используется текущий язык UI.
   final String? exportLang;
+  /// Язык, на котором написан комментарий. Если null — используется текущий язык UI.
+  final String? commentSourceLang;
   /// Вызывается после успешного экспорта — сохраняет заказ во входящие.
   final Future<void> Function()? onExportToInbox;
 
@@ -75,47 +78,56 @@ class _OrderExportSheetState extends State<OrderExportSheet> {
 
   /// Переводим названия продуктов и комментарий через DeepL
   Future<void> _preTranslate() async {
-    final sourceLang = widget.loc.currentLanguageCode;
-    if (sourceLang == _docLang) return;
+    // Язык UI = язык названий продуктов; язык комментария может отличаться
+    final uiLang = widget.loc.currentLanguageCode;
+    final commentSrcLang = widget.commentSourceLang ?? uiLang;
     if (!mounted) return;
+
+    final needProductTranslation = uiLang != _docLang;
+    final needCommentTranslation = commentSrcLang != _docLang;
+    if (!needProductTranslation && !needCommentTranslation) return;
 
     setState(() => _translating = true);
     try {
       final translationSvc = context.read<TranslationService>();
 
-      // Переводим названия продуктов
-      final seen = <String>{};
-      for (final item in widget.itemsWithQuantities) {
-        final name = item.productName.trim();
-        if (name.isEmpty || seen.contains(name)) continue;
-        seen.add(name);
-        final entityId = item.productId ?? name;
-        final translated = await translationSvc.translate(
-          entityType: TranslationEntityType.product,
-          entityId: entityId,
-          fieldName: 'name',
-          text: name,
-          from: sourceLang,
-          to: _docLang,
-        );
-        if (translated != null && translated != name && mounted) {
-          setState(() => _translatedNames[name] = translated);
+      // Переводим названия продуктов (если язык UI отличается от языка документа)
+      if (needProductTranslation) {
+        final seen = <String>{};
+        for (final item in widget.itemsWithQuantities) {
+          final name = item.productName.trim();
+          if (name.isEmpty || seen.contains(name)) continue;
+          seen.add(name);
+          final entityId = item.productId ?? name;
+          final translated = await translationSvc.translate(
+            entityType: TranslationEntityType.product,
+            entityId: entityId,
+            fieldName: 'name',
+            text: name,
+            from: uiLang,
+            to: _docLang,
+          );
+          if (translated != null && translated != name && mounted) {
+            setState(() => _translatedNames[name] = translated);
+          }
         }
       }
 
-      // Переводим комментарий
-      final comment = widget.list.comment.trim();
-      if (comment.isNotEmpty && mounted) {
-        final translatedComment = await translationSvc.translate(
-          entityType: TranslationEntityType.ui,
-          entityId: 'order_comment_${widget.list.id}',
-          fieldName: 'comment',
-          text: comment,
-          from: sourceLang,
-          to: _docLang,
-        );
-        if (translatedComment != null && translatedComment != comment && mounted) {
-          setState(() => _translatedComment = translatedComment);
+      // Переводим комментарий (язык написания → язык документа)
+      if (needCommentTranslation) {
+        final comment = widget.list.comment.trim();
+        if (comment.isNotEmpty && mounted) {
+          final translatedComment = await translationSvc.translate(
+            entityType: TranslationEntityType.ui,
+            entityId: 'order_comment_${widget.list.id}',
+            fieldName: 'comment',
+            text: comment,
+            from: commentSrcLang,
+            to: _docLang,
+          );
+          if (translatedComment != null && translatedComment != comment && mounted) {
+            setState(() => _translatedComment = translatedComment);
+          }
         }
       }
     } catch (_) {}

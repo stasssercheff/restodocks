@@ -266,6 +266,7 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
         companyName: companyName,
         loc: loc,
         exportLang: exportLang,
+        commentSourceLang: loc.currentLanguageCode,
         onSaved: (msg) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg))),
         onExportToInbox: () async {
           final ok = await _saveOrderToInbox();

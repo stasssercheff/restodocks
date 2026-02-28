@@ -57,11 +57,18 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
     final loc = context.read<LocalizationService>();
     final targetLang = loc.currentLanguageCode;
     final payload = doc['payload'] as Map<String, dynamic>? ?? {};
-    final sourceLang = (payload['sourceLang'] as String?)?.isNotEmpty == true
-        ? payload['sourceLang'] as String
-        : (targetLang == 'ru' ? 'en' : 'ru');
     final comment = (payload['comment'] as String?)?.trim() ?? '';
-    if (comment.isEmpty || sourceLang == targetLang) return;
+    if (comment.isEmpty) return;
+
+    // sourceLang — язык написания комментария, сохранённый при отправке заказа.
+    // Если старый документ без sourceLang — пробуем перевести с противоположного языка.
+    final sourceLangRaw = (payload['sourceLang'] as String?)?.trim() ?? '';
+    final sourceLang = sourceLangRaw.isNotEmpty
+        ? sourceLangRaw
+        : (targetLang == 'ru' ? 'en' : 'ru');
+
+    if (sourceLang == targetLang) return;
+
     try {
       final translationSvc = context.read<TranslationService>();
       final translated = await translationSvc.translate(
@@ -72,7 +79,8 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
         from: sourceLang,
         to: targetLang,
       );
-      if (translated != null && translated != comment && mounted) {
+      // Показываем перевод только если он содержательно отличается от оригинала
+      if (translated != null && translated.trim().isNotEmpty && translated != comment && mounted) {
         setState(() => _translatedComment = translated);
       }
     } catch (_) {}
