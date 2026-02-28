@@ -95,6 +95,18 @@ struct OwnerDashboardView: View {
                 }
             }
         }
+            // === УПРАВЛЕНИЕ СМЕНАМИ ===
+            Section(header: Text("✅ Смены")) {
+                NavigationLink {
+                    ShiftConfirmationView()
+                } label: {
+                    HStack {
+                        Image(systemName: "checkmark.circle")
+                        Text("Подтверждение смен")
+                    }
+                }
+            }
+        }
         .navigationTitle("Панель собственника")
     }
 }

@@ -14,6 +14,7 @@ struct Shift: Codable, Identifiable {
     var fullDay: Bool
     let employeeId: UUID
     var createdAt: Date?
+    var confirmedAt: Date?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -24,6 +25,7 @@ struct Shift: Codable, Identifiable {
         case fullDay = "full_day"
         case employeeId = "employee_id"
         case createdAt = "created_at"
+        case confirmedAt = "confirmed_at"
     }
 
     init(from decoder: Decoder) throws {
@@ -39,9 +41,10 @@ struct Shift: Codable, Identifiable {
         fullDay = try c.decodeIfPresent(Bool.self, forKey: .fullDay) ?? false
         employeeId = try c.decode(UUID.self, forKey: .employeeId)
         createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt)
+        confirmedAt = try c.decodeIfPresent(Date.self, forKey: .confirmedAt)
     }
 
-    init(id: UUID, date: Date, department: String?, startHour: Int16, endHour: Int16, fullDay: Bool, employeeId: UUID, createdAt: Date?) {
+    init(id: UUID, date: Date, department: String?, startHour: Int16, endHour: Int16, fullDay: Bool, employeeId: UUID, createdAt: Date?, confirmedAt: Date? = nil) {
         self.id = id
         self.date = date
         self.department = department
@@ -50,5 +53,16 @@ struct Shift: Codable, Identifiable {
         self.fullDay = fullDay
         self.employeeId = employeeId
         self.createdAt = createdAt
+        self.confirmedAt = confirmedAt
+    }
+
+    /// Смена считается "эффективной" (не выходным) если:
+    /// - она подтверждена, ИЛИ
+    /// - с момента смены прошло менее 72 часов (окно для подтверждения ещё открыто)
+    var isEffective: Bool {
+        if confirmedAt != nil { return true }
+        let shiftEndOfDay = Calendar.current.date(bySettingHour: 23, minute: 59, second: 59, of: date) ?? date
+        let deadline = shiftEndOfDay.addingTimeInterval(72 * 3600)
+        return Date() < deadline
     }
 }

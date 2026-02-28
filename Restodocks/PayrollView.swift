@@ -21,7 +21,7 @@ struct PayrollView: View {
     private var monthEnd: Date { calendar.date(byAdding: DateComponents(month: 1, day: -1), to: monthStart) ?? selectedMonth }
 
     private var shiftsInMonth: [Shift] {
-        accounts.shifts.filter { $0.date >= monthStart && $0.date <= monthEnd }
+        accounts.shifts.filter { $0.date >= monthStart && $0.date <= monthEnd && $0.isEffective }
     }
 
     private var shiftsByEmployee: [UUID: [Shift]] {

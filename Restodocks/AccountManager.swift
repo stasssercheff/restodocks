@@ -223,6 +223,22 @@ final class AccountManager: ObservableObject {
     }
 
     @MainActor
+    func confirmShift(_ shift: Shift) async {
+        do {
+            let now = ISO8601DateFormatter().string(from: Date())
+            try await client.from("shifts")
+                .update(["confirmed_at": now])
+                .eq("id", value: shift.id.uuidString)
+                .execute()
+            if let idx = shifts.firstIndex(where: { $0.id == shift.id }) {
+                shifts[idx].confirmedAt = Date()
+            }
+        } catch {
+            print("❌ Confirm shift error:", error)
+        }
+    }
+
+    @MainActor
     func deleteShift(_ shift: Shift) async {
         do {
             try await client.from("shifts").delete().eq("id", value: shift.id.uuidString).execute()

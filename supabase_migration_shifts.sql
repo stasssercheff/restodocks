@@ -15,8 +15,12 @@ CREATE TABLE IF NOT EXISTS shifts (
   end_hour SMALLINT DEFAULT 0,
   full_day BOOLEAN DEFAULT false,
   employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  confirmed_at TIMESTAMP WITH TIME ZONE DEFAULT NULL
 );
+
+-- Добавляем поле подтверждения смены (если таблица уже существует)
+ALTER TABLE shifts ADD COLUMN IF NOT EXISTS confirmed_at TIMESTAMP WITH TIME ZONE DEFAULT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_shifts_employee_id ON shifts(employee_id);
 CREATE INDEX IF NOT EXISTS idx_shifts_date ON shifts(date);
