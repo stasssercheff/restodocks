@@ -5,6 +5,7 @@ enum TranslationEntityType {
   product,
   techCard,
   checklist,
+  inventory,
   ui,
 }
 

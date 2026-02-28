@@ -206,6 +206,7 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
         workshop: emp.section,
         items: items,
         comments: _commentsController.text.trim(),
+        sourceLang: loc.currentLanguageCode,
       );
       if (mounted) {
         setState(() => _completed = true);

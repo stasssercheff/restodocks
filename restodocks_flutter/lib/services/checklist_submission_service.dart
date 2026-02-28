@@ -27,6 +27,8 @@ class ChecklistSubmissionService {
     required List<Map<String, dynamic>> items,
     String? comments,
     List<String>? recipientChefIds,
+    /// Язык, на котором заполнен чеклист (для последующего перевода)
+    String sourceLang = 'ru',
   }) async {
     final payload = <String, dynamic>{
       'submittedByName': submittedByName,
@@ -39,6 +41,7 @@ class ChecklistSubmissionService {
       'workshop': workshop,
       'comments': comments,
       'items': items,
+      'sourceLang': sourceLang,
     };
     if (recipientChefIds != null && recipientChefIds.isNotEmpty) {
       for (final rid in recipientChefIds) {

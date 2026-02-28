@@ -1805,6 +1805,7 @@ class _InventoryScreenState extends State<InventoryScreen>
       'header': header,
       'rows': rows,
       'aggregatedProducts': aggregatedProducts ?? [],
+      'sourceLang': lang,
     };
   }
 }

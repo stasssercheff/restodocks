@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../models/models.dart';
 import '../services/inventory_download.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
@@ -21,6 +22,8 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
   Map<String, dynamic>? _doc;
   bool _loading = true;
   String? _error;
+  /// Переводы названий продуктов: оригинальное имя -> переведённое
+  final Map<String, String> _translatedNames = {};
 
   @override
   void initState() {
@@ -32,6 +35,7 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
     setState(() {
       _loading = true;
       _error = null;
+      _translatedNames.clear();
     });
     final doc = await InventoryDocumentService().getById(widget.documentId);
     if (!mounted) return;
@@ -40,6 +44,57 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
       _loading = false;
       if (doc == null) _error = 'Документ не найден';
     });
+    if (doc != null) {
+      _loadTranslations(doc);
+    }
+  }
+
+  Future<void> _loadTranslations(Map<String, dynamic> doc) async {
+    if (!mounted) return;
+    final loc = context.read<LocalizationService>();
+    final targetLang = loc.currentLanguageCode;
+    final payload = doc['payload'] as Map<String, dynamic>? ?? {};
+    final sourceLang = (payload['sourceLang'] as String?)?.trim().isNotEmpty == true
+        ? payload['sourceLang'] as String
+        : 'ru';
+    if (targetLang == sourceLang) return;
+
+    final rows = payload['rows'] as List<dynamic>? ?? [];
+    final docId = doc['id']?.toString() ?? widget.documentId;
+
+    try {
+      final translationSvc = context.read<TranslationService>();
+      // Собираем уникальные имена, чтобы не переводить одно и то же дважды
+      final seen = <String>{};
+      for (var i = 0; i < rows.length; i++) {
+        final r = rows[i] as Map<String, dynamic>;
+        final name = (r['productName'] as String? ?? '').trim();
+        if (name.isEmpty || seen.contains(name)) continue;
+        seen.add(name);
+        final translated = await translationSvc.translate(
+          entityType: TranslationEntityType.inventory,
+          entityId: docId,
+          fieldName: 'product_${name.toLowerCase().replaceAll(' ', '_')}',
+          text: name,
+          from: sourceLang,
+          to: targetLang,
+        );
+        if (translated != null && translated != name && mounted) {
+          setState(() => _translatedNames[name] = translated);
+        }
+      }
+    } catch (_) {}
+  }
+
+  /// Возвращает строки, отсортированные по (переведённому) названию А-Я
+  List<Map<String, dynamic>> _sortedRows(List<dynamic> rows) {
+    final list = rows.map((e) => e as Map<String, dynamic>).toList();
+    list.sort((a, b) {
+      final nameA = (_translatedNames[(a['productName'] as String? ?? '')] ?? (a['productName'] as String? ?? '')).toLowerCase();
+      final nameB = (_translatedNames[(b['productName'] as String? ?? '')] ?? (b['productName'] as String? ?? '')).toLowerCase();
+      return nameA.compareTo(nameB);
+    });
+    return list;
   }
 
   Future<void> _saveToFile() async {
@@ -82,12 +137,13 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
       final sheet1 = excel['Продукты + ПФ'];
       sheet1.appendRow(headerCells);
 
-      final rowsSorted = List<Map<String, dynamic>>.from(rows.map((e) => e as Map<String, dynamic>))
-        ..sort((a, b) => ((a['productName'] as String?) ?? '').toLowerCase().compareTo(((b['productName'] as String?) ?? '').toLowerCase()));
+      // Сортируем и переводим названия для Excel так же, как в UI
+      final rowsSorted = _sortedRows(rows);
       var rowNum = 1;
       for (var i = 0; i < rowsSorted.length; i++) {
         final r = rowsSorted[i];
-        final name = r['productName'] as String? ?? '';
+        final originalName = r['productName'] as String? ?? '';
+        final name = _translatedNames[originalName] ?? originalName;
         final unit = r['unit'] as String? ?? '';
         final total = (r['total'] as num?)?.toDouble() ?? 0.0;
         final quantities = r['quantities'] as List<dynamic>? ?? [];
@@ -126,12 +182,18 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
           }
         }
         final groupedList = groupedProducts.values.toList()
-          ..sort((a, b) => ((a['productName'] as String?) ?? '').toLowerCase().compareTo(((b['productName'] as String?) ?? '').toLowerCase()));
+          ..sort((a, b) {
+            final nameA = (_translatedNames[a['productName'] as String? ?? ''] ?? (a['productName'] as String? ?? '')).toLowerCase();
+            final nameB = (_translatedNames[b['productName'] as String? ?? ''] ?? (b['productName'] as String? ?? '')).toLowerCase();
+            return nameA.compareTo(nameB);
+          });
         for (var i = 0; i < groupedList.length; i++) {
           final p = groupedList[i];
+          final originalName = (p['productName'] as String? ?? '');
+          final displayName = _translatedNames[originalName] ?? originalName;
           sheet1.appendRow([
             IntCellValue(i + 1),
-            TextCellValue((p['productName'] as String? ?? '').toString()),
+            TextCellValue(displayName),
             IntCellValue((p['grossGrams'] as double).round()),
             IntCellValue((p['netGrams'] as double).round()),
           ]);
@@ -188,10 +250,15 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
       }
 
       final sortedProducts = allProducts.values.toList()
-        ..sort((a, b) => ((a['productName'] as String?) ?? '').toLowerCase().compareTo(((b['productName'] as String?) ?? '').toLowerCase()));
+        ..sort((a, b) {
+          final nameA = (_translatedNames[a['productName'] as String? ?? ''] ?? (a['productName'] as String? ?? '')).toLowerCase();
+          final nameB = (_translatedNames[b['productName'] as String? ?? ''] ?? (b['productName'] as String? ?? '')).toLowerCase();
+          return nameA.compareTo(nameB);
+        });
       for (var i = 0; i < sortedProducts.length; i++) {
         final p = sortedProducts[i];
-        final name = p['productName'] as String;
+        final originalName = p['productName'] as String;
+        final name = _translatedNames[originalName] ?? originalName;
         final unit = p['unit'] as String;
         final total = p['total'] as double;
         final quantities = p['quantities'] as List<double>;
@@ -257,6 +324,7 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
     final payload = _doc!['payload'] as Map<String, dynamic>? ?? {};
     final header = payload['header'] as Map<String, dynamic>? ?? {};
     final rows = payload['rows'] as List<dynamic>? ?? [];
+    final sortedRows = _sortedRows(rows);
 
     return Scaffold(
       appBar: AppBar(
@@ -282,7 +350,7 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
               style: theme.textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
-            _buildTable(theme, loc, rows),
+            _buildTable(theme, loc, sortedRows),
           ],
         ),
       ),
@@ -321,7 +389,7 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
     );
   }
 
-  Widget _buildTable(ThemeData theme, LocalizationService loc, List<dynamic> rows) {
+  Widget _buildTable(ThemeData theme, LocalizationService loc, List<Map<String, dynamic>> rows) {
     return Table(
       border: TableBorder.all(color: theme.dividerColor),
       columnWidths: const {
@@ -341,11 +409,13 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
           ],
         ),
         ...rows.asMap().entries.map((e) {
-          final r = e.value as Map<String, dynamic>;
+          final r = e.value;
+          final originalName = (r['productName'] ?? '').toString();
+          final displayName = _translatedNames[originalName] ?? originalName;
           return TableRow(
             children: [
               _cell(theme, '${e.key + 1}'),
-              _cell(theme, (r['productName'] ?? '').toString()),
+              _cell(theme, displayName),
               _cell(theme, (r['unit'] ?? '').toString()),
               _cell(theme, _fmt(r['total'])),
             ],

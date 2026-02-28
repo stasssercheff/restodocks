@@ -23,12 +23,15 @@ class _ChecklistInboxDetailScreenState extends State<ChecklistInboxDetailScreen>
   String? _error;
   /// Переводы пунктов: index -> переведённый текст
   final Map<int, String> _translatedTitles = {};
+  /// Перевод названия чеклиста
+  String? _translatedChecklistName;
 
   Future<void> _load() async {
     setState(() {
       _loading = true;
       _error = null;
       _translatedTitles.clear();
+      _translatedChecklistName = null;
     });
     final sub = await ChecklistSubmissionService().getById(widget.documentId);
     if (!mounted) return;
@@ -46,12 +49,31 @@ class _ChecklistInboxDetailScreenState extends State<ChecklistInboxDetailScreen>
     if (!mounted) return;
     final loc = context.read<LocalizationService>();
     final targetLang = loc.currentLanguageCode;
-    // Translations are stored with source lang = 'ru' (default), target = viewer lang.
-    // If viewer is already in Russian, no need to translate.
-    if (targetLang == 'ru') return;
+    // Язык оригинала: берём из payload, иначе 'ru' по умолчанию
+    final sourceLang = (sub.payload['sourceLang'] as String?)?.trim().isNotEmpty == true
+        ? sub.payload['sourceLang'] as String
+        : 'ru';
+    if (targetLang == sourceLang) return;
 
     try {
       final translationSvc = context.read<TranslationService>();
+
+      // Перевод названия чеклиста
+      if (sub.checklistName.trim().isNotEmpty) {
+        final translatedName = await translationSvc.translate(
+          entityType: TranslationEntityType.checklist,
+          entityId: sub.checklistId,
+          fieldName: 'checklist_name',
+          text: sub.checklistName,
+          from: sourceLang,
+          to: targetLang,
+        );
+        if (translatedName != null && translatedName != sub.checklistName && mounted) {
+          setState(() => _translatedChecklistName = translatedName);
+        }
+      }
+
+      // Перевод пунктов чеклиста
       final items = sub.items;
       for (var i = 0; i < items.length; i++) {
         final title = items[i].title;
@@ -61,7 +83,7 @@ class _ChecklistInboxDetailScreenState extends State<ChecklistInboxDetailScreen>
           entityId: sub.checklistId,
           fieldName: 'item_$i',
           text: title,
-          from: 'ru',
+          from: sourceLang,
           to: targetLang,
         );
         if (translated != null && translated != title && mounted) {
@@ -127,11 +149,12 @@ class _ChecklistInboxDetailScreenState extends State<ChecklistInboxDetailScreen>
         : null;
     final comments = sub.payload['comments'] as String?;
     final position = sub.payload['position'] as String?;
+    final displayName = _translatedChecklistName ?? sub.checklistName;
 
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text(sub.checklistName),
+        title: Text(displayName),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
