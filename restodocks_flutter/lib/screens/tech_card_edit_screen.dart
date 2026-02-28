@@ -606,7 +606,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           _loading = false;
           if (tc != null) {
             _portionWeight = tc.portionWeight;
-            _nameController.text = tc.dishName;
+            _nameController.text = tc.getLocalizedDishName(context.read<LocalizationService>().currentLanguageCode);
             _selectedCategory = _categoryOptions.contains(tc.category) ? tc.category : 'misc';
             _selectedSection = tc.section;
             _isSemiFinished = tc.isSemiFinished;
@@ -1692,6 +1692,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                               technology: _technologyController.text,
                               weightPerPortion: _portionWeight,
                               hideTechnologyInTable: true,
+                              productStore: context.read<ProductStoreSupabase>(),
                               onTapPfIngredient: (id) => context.push('/tech-cards/$id?view=1'),
                               onIngredientsChanged: (list) {
                                 WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -2056,7 +2057,7 @@ class _TtkTableState extends State<_TtkTable> {
                               alignment: Alignment.centerLeft,
                               child: Row(
                                 children: [
-                                  Expanded(child: Text(ing.productName, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
+                                  Expanded(child: Text(product?.getLocalizedName(lang) ?? ing.productName, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
                                   if (widget.getProductsForDropdown != null && widget.onProductSelectedFromDropdown != null) ...[
                                     const SizedBox(width: 6),
                                     _ProductDropdownInCell(
@@ -2074,7 +2075,7 @@ class _TtkTableState extends State<_TtkTable> {
                             dataCell: true,
                           ),
                         )
-                      : TableCell(child: wrapCell(Container(color: firstColsBg, constraints: const BoxConstraints(minHeight: 44), padding: _cellPad, alignment: Alignment.centerLeft, child: Text(ing.sourceTechCardName ?? ing.productName, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)), fillColor: firstColsBg, dataCell: true)),
+                      : TableCell(child: wrapCell(Container(color: firstColsBg, constraints: const BoxConstraints(minHeight: 44), padding: _cellPad, alignment: Alignment.centerLeft, child: Text(ing.sourceTechCardName ?? product?.getLocalizedName(lang) ?? ing.productName, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)), fillColor: firstColsBg, dataCell: true)),
               widget.effectiveCanEdit
                   ? TableCell(
                       child: wrapCell(ConstrainedBox(
@@ -2533,6 +2534,7 @@ class _TtkCookTable extends StatefulWidget {
     this.hideTechnologyInTable = false,
     this.weightPerPortion = 100,
     this.onTapPfIngredient,
+    this.productStore,
   });
 
   final LocalizationService loc;
@@ -2544,6 +2546,8 @@ class _TtkCookTable extends StatefulWidget {
   final double weightPerPortion;
   /// При нажатии на ингредиент-ПФ открывает карточку ТТК ПФ (просмотр).
   final void Function(String techCardId)? onTapPfIngredient;
+  /// Хранилище продуктов для получения локализованных названий.
+  final ProductStoreSupabase? productStore;
 
   static const _cellPad = EdgeInsets.symmetric(horizontal: 6, vertical: 6);
   // Ширины как в _TtkTable (таблица создания)
@@ -2671,6 +2675,9 @@ class _TtkCookTableState extends State<_TtkCookTable> {
         ..._ingredients.asMap().entries.map((e) {
           final i = e.key;
           final ing = e.value;
+          final cookProduct = widget.productStore?.findProductForIngredient(ing.productId, ing.productName);
+          final cookLang = widget.loc.currentLanguageCode;
+          final cookDisplayName = ing.sourceTechCardName ?? cookProduct?.getLocalizedName(cookLang) ?? ing.productName;
               // Название — placeholder (объединённая ячейка рисуется поверх в Stack)
               return TableRow(
             children: [
@@ -2687,7 +2694,7 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                         child: Padding(
                           padding: _TtkCookTable._cellPad,
                           child: Text(
-                            ing.productName,
+                            cookDisplayName,
                             style: const TextStyle(fontSize: 12),
                             overflow: TextOverflow.ellipsis,
                             maxLines: 2,
@@ -2695,7 +2702,7 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                         ),
                       ),
                     )
-                  : _cell(ing.productName),
+                  : _cell(cookDisplayName),
               TableCell(
                 child: Padding(
                   padding: _TtkCookTable._cellPad,
