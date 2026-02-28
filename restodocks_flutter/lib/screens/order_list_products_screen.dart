@@ -111,8 +111,14 @@ class _OrderListProductsScreenState extends State<OrderListProductsScreen> {
     final lists = await loadOrderLists(estId);
     await saveOrderLists(estId, [...lists, _list]);
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${loc.t('order_list_name')} ✓')));
-      context.go('/product-order');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${loc.t('save')} ✓')),
+      );
+      // pop дважды: сначала из экрана продуктов (/product-order/new/products),
+      // затем из экрана создания поставщика (/product-order/new) — это разрешает
+      // await context.push(...) в OrderListsScreen и триггерит _load() сразу.
+      if (context.canPop()) context.pop();
+      if (context.canPop()) context.pop();
     }
   }
 

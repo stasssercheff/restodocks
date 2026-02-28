@@ -868,7 +868,16 @@
     "checklists_desc": "Ежедневные чеклисты для кухни",
     "inbox_tab_checklist": "Чеклист",
     "inbox_tab_order": "Заказы",
-    "inbox_tab_inventory": "Инвентаризация"
+    "inbox_tab_inventory": "Инвентаризация",
+    "order_tab_orders": "Заказы",
+    "order_tab_suppliers": "Поставщики",
+    "order_create_supplier": "Создать поставщика",
+    "order_no_suppliers_hint": "Сначала создайте поставщика во вкладке «Поставщики»",
+    "order_suppliers_empty": "Нет поставщиков",
+    "order_suppliers_empty_hint": "Создайте поставщика — укажите название, контакты и список продуктов из номенклатуры",
+    "order_products_count": "продуктов",
+    "order_delete_supplier_confirm": "Удалить поставщика",
+    "order_delete_order_confirm": "Удалить список заказа"
   },
   "en": {
     "app_name": "Restodocks",
@@ -1738,7 +1747,16 @@
     "checklists_desc": "Daily kitchen checklists",
     "inbox_tab_checklist": "Checklist",
     "inbox_tab_order": "Orders",
-    "inbox_tab_inventory": "Inventory"
+    "inbox_tab_inventory": "Inventory",
+    "order_tab_orders": "Orders",
+    "order_tab_suppliers": "Suppliers",
+    "order_create_supplier": "Create supplier",
+    "order_no_suppliers_hint": "First create a supplier in the «Suppliers» tab",
+    "order_suppliers_empty": "No suppliers",
+    "order_suppliers_empty_hint": "Create a supplier — enter name, contacts and product list from nomenclature",
+    "order_products_count": "products",
+    "order_delete_supplier_confirm": "Delete supplier",
+    "order_delete_order_confirm": "Delete order list"
   },
   "es": {
     "app_name": "Restodocks",
@@ -1791,7 +1809,13 @@
     "tt_type_dish": "Plato",
     "inbox_tab_checklist": "Lista de verificación",
     "inbox_tab_order": "Pedidos",
-    "inbox_tab_inventory": "Inventario"
+    "inbox_tab_inventory": "Inventario",
+    "order_tab_orders": "Pedidos",
+    "order_tab_suppliers": "Proveedores",
+    "order_create_supplier": "Crear proveedor",
+    "order_products_count": "productos",
+    "order_delete_supplier_confirm": "Eliminar proveedor",
+    "order_delete_order_confirm": "Eliminar lista de pedido"
   },
   "de": {
     "app_name": "Restodocks",
@@ -1847,7 +1871,13 @@
     "product_database": "Produktdatenbank",
     "inbox_tab_checklist": "Checkliste",
     "inbox_tab_order": "Bestellungen",
-    "inbox_tab_inventory": "Inventar"
+    "inbox_tab_inventory": "Inventar",
+    "order_tab_orders": "Bestellungen",
+    "order_tab_suppliers": "Lieferanten",
+    "order_create_supplier": "Lieferant erstellen",
+    "order_products_count": "Produkte",
+    "order_delete_supplier_confirm": "Lieferant löschen",
+    "order_delete_order_confirm": "Bestellliste löschen"
   },
   "fr": {
     "app_name": "Restodocks",
@@ -1903,6 +1933,12 @@
     "product_database": "Base de données produits",
     "inbox_tab_checklist": "Liste de contrôle",
     "inbox_tab_order": "Commandes",
-    "inbox_tab_inventory": "Inventaire"
+    "inbox_tab_inventory": "Inventaire",
+    "order_tab_orders": "Commandes",
+    "order_tab_suppliers": "Fournisseurs",
+    "order_create_supplier": "Créer un fournisseur",
+    "order_products_count": "produits",
+    "order_delete_supplier_confirm": "Supprimer le fournisseur",
+    "order_delete_order_confirm": "Supprimer la liste de commande"
   }
 }

@@ -57,7 +57,7 @@ class StaffHomeContent extends StatelessWidget {
         ),
         if (employee.department == 'kitchen')
           _Tile(icon: Icons.checklist, title: loc.t('checklists'), onTap: () => context.go('/checklists')),
-        _Tile(icon: Icons.assignment, title: loc.t('inventory_blank'), onTap: () => context.go('/inventory')),
+        _Tile(icon: Icons.assignment, title: loc.t('inventory_blank'), onTap: () => context.push('/inventory')),
       ],
     );
   }

@@ -147,7 +147,8 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${loc.t('order_list_save_with_quantities')} ✓')));
-      context.go('/product-order');
+      // pop вместо go, чтобы разрешить await в OrderListsScreen и сразу показать новый заказ
+      if (context.canPop()) context.pop();
     }
   }
 

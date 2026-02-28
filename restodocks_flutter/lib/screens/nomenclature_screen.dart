@@ -1522,15 +1522,7 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
                   PopupMenuItem(value: _CatalogSort.priceDesc, child: Text(widget.loc.t('sort_price_desc'))),
                 ],
               ),
-              FilterChip(
-                label: Text(widget.loc.t('filter_products'), style: const TextStyle(fontSize: 11)),
-                selected: widget.filterType == _NomenclatureFilter.products,
-                onSelected: (_) => widget.onFilterTypeChanged(
-                  widget.filterType == _NomenclatureFilter.products
-                      ? _NomenclatureFilter.all
-                      : _NomenclatureFilter.products,
-                ),
-              ),
+
             ],
           ),
         ),
