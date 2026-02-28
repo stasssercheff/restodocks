@@ -265,12 +265,14 @@ class _OrderExportSheetState extends State<OrderExportSheet> {
         documentDate: DateTime.now(),
         t: s.t,
       );
+      debugPrint('OrderExportSheet: PDF generated, size=${pdfBytes.length} bytes');
     } catch (e) {
       pdfError = e.toString();
       debugPrint('OrderExportSheet: PDF generation failed: $e');
     }
 
     try {
+      debugPrint('OrderExportSheet: sending email to=$to, pdfBytes=${pdfBytes?.length ?? 0} bytes, pdfError=$pdfError');
       final result = await EmailService().sendOrderEmail(
         to: to,
         subject: subject,
@@ -278,6 +280,7 @@ class _OrderExportSheetState extends State<OrderExportSheet> {
         pdfBytes: pdfBytes,
         pdfFileName: pdfFileName,
       );
+      debugPrint('OrderExportSheet: sendOrderEmail result ok=${result.ok} error=${result.error}');
       if (result.ok) {
         await s.onExportToInbox?.call();
         if (pdfError != null) {
@@ -291,6 +294,7 @@ class _OrderExportSheetState extends State<OrderExportSheet> {
         s.onSaved('${s.t('error_short')}: ${result.error}');
       }
     } catch (e) {
+      debugPrint('OrderExportSheet: sendOrderEmail exception: $e');
       s.onSaved('${s.t('error_short')}: $e');
     }
   }

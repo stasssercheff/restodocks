@@ -14,16 +14,6 @@ interface EmailRequest {
   attachments?: Array<{ filename: string; content: string }>
 }
 
-/** Decode base64 string to Uint8Array (works in Deno) */
-function base64ToUint8Array(base64: string): Uint8Array {
-  const binary = atob(base64)
-  const bytes = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i)
-  }
-  return bytes
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -34,11 +24,18 @@ serve(async (req) => {
 
     const { to, subject, html, attachments }: EmailRequest = await req.json()
 
-    // Resend SDK in Deno requires content as Uint8Array for binary attachments
+    console.log(`send-email: to=${to} subject="${subject}" attachments=${attachments?.length ?? 0}`)
+    if (attachments?.length) {
+      attachments.forEach((a, i) => {
+        console.log(`  attachment[${i}]: filename=${a.filename} contentLen=${a.content?.length ?? 0}`)
+      })
+    }
+
+    // Pass base64 content directly — Resend SDK accepts base64 string as attachment content
     const resolvedAttachments = attachments?.length
       ? attachments.map((a) => ({
           filename: a.filename,
-          content: base64ToUint8Array(a.content),
+          content: a.content, // base64 string, accepted by Resend
         }))
       : undefined
 
@@ -50,7 +47,7 @@ serve(async (req) => {
       ...(resolvedAttachments ? { attachments: resolvedAttachments } : {}),
     }
 
-    console.log(`Sending email to=${to} subject="${subject}" attachments=${resolvedAttachments?.length ?? 0}`)
+    console.log(`send-email: sending payload, from=${payload.from}, attachments=${resolvedAttachments?.length ?? 0}`)
 
     const { data, error } = await resend.emails.send(payload)
 

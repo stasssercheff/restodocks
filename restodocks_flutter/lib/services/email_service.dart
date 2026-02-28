@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Сервис отправки писем через Edge Functions (Resend).
@@ -90,20 +91,27 @@ class EmailService {
         'html': html,
       };
       if (pdfBytes != null && pdfBytes.isNotEmpty) {
+        final b64 = base64Encode(pdfBytes);
+        debugPrint('EmailService: attaching PDF "$pdfFileName", pdfBytes=${pdfBytes.length}, b64len=${b64.length}');
         body['attachments'] = [
           {
             'filename': pdfFileName,
-            'content': base64Encode(pdfBytes),
+            'content': b64,
           },
         ];
+      } else {
+        debugPrint('EmailService: no PDF attachment (pdfBytes=${pdfBytes?.length ?? 'null'})');
       }
+      debugPrint('EmailService: invoking send-email, body keys=${body.keys.toList()}');
       final res = await _client.functions.invoke('send-email', body: body);
+      debugPrint('EmailService: send-email response status=${res.status} data=${res.data}');
       if (res.status == 200) {
         return (ok: true, error: null);
       }
       final msg = (res.data as Map?)?['error']?.toString() ?? 'Unknown error';
       return (ok: false, error: msg);
     } catch (e) {
+      debugPrint('EmailService: sendOrderEmail exception: $e');
       return (ok: false, error: e.toString());
     }
   }
