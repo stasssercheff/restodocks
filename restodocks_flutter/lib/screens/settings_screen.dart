@@ -396,8 +396,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           leading: Text(language['flag']!, style: const TextStyle(fontSize: 24)),
                           title: Text(language['name']!),
                           onTap: () async {
-                            await localization.setLocale(Locale(language['code']!));
-                            if (ctx.mounted) Navigator.of(ctx).pop();
+                            final code = language['code']!;
+                            await localization.setLocale(Locale(code));
+                            // Сохраняем язык в профиле сотрудника в Supabase (работает в любом браузере / инкогнито)
+                            if (ctx.mounted) {
+                              await ctx.read<AccountManagerSupabase>().savePreferredLanguage(code);
+                              Navigator.of(ctx).pop();
+                            }
                           },
                         );
                       }).toList(),

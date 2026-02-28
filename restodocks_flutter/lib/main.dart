@@ -38,6 +38,13 @@ void main() async {
   );
   await AccountManagerSupabase().initialize();
   await LocalizationService.initialize();
+
+  // Подключаем callback: при загрузке профиля сотрудника применяем его preferred_language.
+  // Это обеспечивает сохранение языка между браузерами и режимом инкогнито (хранится в Supabase).
+  AccountManagerSupabase().onPreferredLanguageLoaded = (langCode) {
+    LocalizationService().setLocale(Locale(langCode));
+  };
+
   await ThemeService().initialize();
   await HomeButtonConfigService().initialize();
   await OwnerViewPreferenceService().initialize();

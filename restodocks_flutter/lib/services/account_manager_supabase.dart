@@ -21,6 +21,8 @@ class AccountManagerSupabase extends ChangeNotifier {
   final SecureStorageService _secureStorage = SecureStorageService();
   Establishment? _establishment;
   Employee? _currentEmployee;
+  /// Callback вызывается после загрузки профиля — применяет preferred_language к LocalizationService.
+  void Function(String languageCode)? onPreferredLanguageLoaded;
 
   /// Доступ к SupabaseService
   SupabaseService get supabase => _supabase;
@@ -101,6 +103,7 @@ class AccountManagerSupabase extends ChangeNotifier {
       final empData = Map<String, dynamic>.from(employeeDataRaw);
       empData['password'] = empData['password_hash'] ?? '';
       _currentEmployee = Employee.fromJson(empData);
+      onPreferredLanguageLoaded?.call(_currentEmployee!.preferredLanguage);
 
       print('🔐 AccountManager: Loading establishment data for ID: $establishmentId');
       final estData = await _supabase.client
@@ -594,6 +597,7 @@ class AccountManagerSupabase extends ChangeNotifier {
     print('🔐 AccountManager: Setting current user - employee: ${employee.id}, establishment: ${establishment.id}');
     _currentEmployee = employee;
     _establishment = establishment;
+    onPreferredLanguageLoaded?.call(employee.preferredLanguage);
 
     print('🔐 AccountManager: Saving to secure storage...');
     await _secureStorage.set(_keyEmployeeId, employee.id);
@@ -746,6 +750,22 @@ class AccountManagerSupabase extends ChangeNotifier {
     }
   }
 
+  /// Сохранить выбранный язык в профиле сотрудника (preferred_language в Supabase).
+  /// Вызывается при смене языка из UI, чтобы язык сохранялся между сессиями и браузерами.
+  Future<void> savePreferredLanguage(String languageCode) async {
+    final emp = _currentEmployee;
+    if (emp == null) return;
+    try {
+      await _supabase.client
+          .from('employees')
+          .update({'preferred_language': languageCode})
+          .eq('id', emp.id);
+      _currentEmployee = emp.copyWith(preferredLanguage: languageCode);
+    } catch (e) {
+      print('AccountManager: savePreferredLanguage error: $e');
+    }
+  }
+
   /// Загрузка employee и establishment по Supabase Auth (auth_user_id = auth.uid())
   Future<bool> _loadCurrentUserFromAuth() async {
     try {
@@ -764,6 +784,7 @@ class AccountManagerSupabase extends ChangeNotifier {
       final employeeData = Map<String, dynamic>.from((list as List).first);
       employeeData['password'] = employeeData['password_hash'] ?? '';
       _currentEmployee = Employee.fromJson(employeeData);
+      onPreferredLanguageLoaded?.call(_currentEmployee!.preferredLanguage);
 
       final estData = await _supabase.client
           .from('establishments')
