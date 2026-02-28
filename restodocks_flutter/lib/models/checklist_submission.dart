@@ -34,7 +34,7 @@ class ChecklistSubmission extends Equatable {
       checklistName: (json['checklist_name'] as String?) ?? '',
       section: json['section'] as String?,
       payload: json['payload'] as Map<String, dynamic>? ?? {},
-      createdAt: DateTime.parse(json['created_at'] as String),
+      createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
     );
   }
 

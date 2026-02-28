@@ -34,7 +34,7 @@ class InboxService {
         final dateStr = header['date']?.toString() ?? '';
         final employeeName = header['employeeName']?.toString() ?? '—';
         final createdAt = doc['created_at'] != null
-            ? DateTime.tryParse(doc['created_at'].toString()) ?? DateTime.now()
+            ? (DateTime.tryParse(doc['created_at'].toString()) ?? DateTime.now()).toLocal()
             : DateTime.now();
 
         documents.add(InboxDocument(
@@ -83,7 +83,7 @@ class InboxService {
         final supplierName = header['supplierName']?.toString() ?? '—';
         final employeeName = header['employeeName']?.toString() ?? '—';
         final createdAt = doc['created_at'] != null
-            ? DateTime.tryParse(doc['created_at'].toString()) ?? DateTime.now()
+            ? (DateTime.tryParse(doc['created_at'].toString()) ?? DateTime.now()).toLocal()
             : DateTime.now();
 
         documents.add(InboxDocument(
