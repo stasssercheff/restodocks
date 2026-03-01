@@ -2201,6 +2201,8 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     final estId = account.establishment?.id;
     if (estId == null) return;
     final iikoStore = context.read<IikoProductStore>();
+    // Восстанавливаем байты оригинального бланка из localStorage (если был перезапуск)
+    await iikoStore.restoreBlankFromStorage();
     await iikoStore.loadProducts(estId);
     if (!mounted) return;
     setState(() {
@@ -2236,7 +2238,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   Future<void> _saveAndExport() async {
     setState(() => _completed = true);
 
-    final bytes = _buildIikoExcel();
+    final bytes = await _buildIikoExcel();
     final date = _date;
     final fileName =
         'Инвентаризация_iiko_${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}.xlsx';
@@ -2319,8 +2321,10 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     }
   }
 
-  Uint8List _buildIikoExcel() {
+  Future<Uint8List> _buildIikoExcel() async {
     final iikoStore = context.read<IikoProductStore>();
+    // Если байты не в памяти — пробуем восстановить из localStorage
+    await iikoStore.restoreBlankFromStorage();
     final origBytes = iikoStore.originalBlankBytes;
     final qtyCol = iikoStore.originalQuantityColumnIndex ?? 5;
     return origBytes != null

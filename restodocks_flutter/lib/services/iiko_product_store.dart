@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/iiko_product.dart';
@@ -14,7 +16,10 @@ class IikoProductStore extends ChangeNotifier {
   String? _loadedEstablishmentId;
   bool _isLoading = false;
 
-  /// Байты оригинального xlsx-бланка для экспорта.
+  static const _kBlankBytesKey = 'iiko_blank_bytes_b64';
+  static const _kQtyColKey     = 'iiko_blank_qty_col';
+
+  /// Байты оригинального xlsx-бланка для экспорта (персистируются в localStorage).
   Uint8List? originalBlankBytes;
 
   /// Индекс колонки «Остаток фактический» в оригинальном бланке (0-based).
@@ -24,6 +29,47 @@ class IikoProductStore extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get hasProducts => _products.isNotEmpty;
   String? get loadedEstablishmentId => _loadedEstablishmentId;
+
+  /// Загружает байты бланка из localStorage если они ещё не в памяти.
+  Future<void> restoreBlankFromStorage() async {
+    if (originalBlankBytes != null) return; // уже в памяти
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final b64 = prefs.getString(_kBlankBytesKey);
+      if (b64 != null) {
+        originalBlankBytes = base64Decode(b64);
+        originalQuantityColumnIndex = prefs.getInt(_kQtyColKey);
+        debugPrint('IikoProductStore: blank restored from localStorage '
+            '(${originalBlankBytes!.length} bytes, qtyCol=$originalQuantityColumnIndex)');
+      }
+    } catch (e) {
+      debugPrint('IikoProductStore.restoreBlankFromStorage error: $e');
+    }
+  }
+
+  Future<void> _persistBlank(Uint8List bytes, int? qtyCol) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_kBlankBytesKey, base64Encode(bytes));
+      if (qtyCol != null) {
+        await prefs.setInt(_kQtyColKey, qtyCol);
+      } else {
+        await prefs.remove(_kQtyColKey);
+      }
+      debugPrint('IikoProductStore: blank saved to localStorage '
+          '(${bytes.length} bytes, qtyCol=$qtyCol)');
+    } catch (e) {
+      debugPrint('IikoProductStore._persistBlank error: $e');
+    }
+  }
+
+  Future<void> _clearPersistedBlank() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_kBlankBytesKey);
+      await prefs.remove(_kQtyColKey);
+    } catch (_) {}
+  }
 
   Future<void> loadProducts(String establishmentId, {bool force = false}) async {
     if (!force && _loadedEstablishmentId == establishmentId && _products.isNotEmpty) return;
@@ -58,6 +104,8 @@ class IikoProductStore extends ChangeNotifier {
       if (blankBytes != null) {
         originalBlankBytes = blankBytes;
         originalQuantityColumnIndex = quantityColumnIndex;
+        // Сохраняем байты бланка в localStorage — переживают перезагрузку страницы
+        await _persistBlank(blankBytes, quantityColumnIndex);
       }
 
       // Удаляем старые через rpc
@@ -117,6 +165,7 @@ class IikoProductStore extends ChangeNotifier {
       _loadedEstablishmentId = null;
       originalBlankBytes = null;
       originalQuantityColumnIndex = null;
+      await _clearPersistedBlank();
     } catch (e) {
       debugPrint('IikoProductStore.deleteAll error: $e');
       rethrow;
@@ -131,6 +180,7 @@ class IikoProductStore extends ChangeNotifier {
     _loadedEstablishmentId = null;
     originalBlankBytes = null;
     originalQuantityColumnIndex = null;
+    _clearPersistedBlank();
     notifyListeners();
   }
 }
