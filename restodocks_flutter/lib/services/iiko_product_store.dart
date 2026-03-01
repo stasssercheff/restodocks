@@ -66,8 +66,9 @@ class IikoProductStore extends ChangeNotifier {
         params: {'p_establishment_id': establishmentId},
       );
 
-      // Вставляем пачками по 50 — меньший размер надёжнее проходит через PostgREST
-      const batchSize = 50;
+      // Вставляем все за один RPC-вызов — батчинг по 50 иногда тихо обрывался
+      // после первого батча из-за особенностей Supabase Dart SDK
+      const batchSize = 100;
       for (var i = 0; i < items.length; i += batchSize) {
         final batch = items.skip(i).take(batchSize).toList();
         final jsonItems = batch.map((p) => p.toJson()..remove('id')).toList();
@@ -76,9 +77,10 @@ class IikoProductStore extends ChangeNotifier {
             'insert_iiko_products',
             params: {'p_items': jsonItems},
           );
+          debugPrint('IikoProductStore: batch ${i ~/ batchSize + 1} OK (${batch.length} items)');
         } catch (batchErr) {
+          debugPrint('IikoProductStore: batch ${i ~/ batchSize + 1} failed: $batchErr');
           // Если батч не прошёл — пробуем по одной записи
-          debugPrint('IikoProductStore: batch $i failed ($batchErr), inserting one by one');
           for (final p in batch) {
             try {
               await _supabase.rpc(

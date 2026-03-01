@@ -3592,10 +3592,13 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab>
       );
     }
 
+    // Сортируем по sort_order чтобы порядок совпадал с оригинальным файлом
+    final sorted = [...products]..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+
     // Фильтрация
     final filtered = _query.isEmpty
-        ? products
-        : products
+        ? sorted
+        : sorted
             .where((p) => p.name.toLowerCase().contains(_query.toLowerCase()))
             .toList();
 
@@ -3665,21 +3668,32 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab>
           ),
         ),
 
-        // ── Шапка таблицы — точно как в бланке ──
-        _IikoBlankaHeader(),
-
-        // ── Таблица строк ──
+        // ── Шапка + таблица строк со скроллом по горизонтали ──
         Expanded(
-          child: ListView.builder(
-            itemCount: rows.length,
-            itemBuilder: (ctx, i) {
-              final row = rows[i];
-              final groupCount = groupCounts[row.product.groupName ?? ''] ?? 1;
-              return _IikoBlankaRowWidget(
-                row: row,
-                groupCount: groupCount,
-              );
-            },
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: SizedBox(
+              width: _tableWidth,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const _IikoBlankaHeader(),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: rows.length,
+                      itemBuilder: (ctx, i) {
+                        final row = rows[i];
+                        final groupCount = groupCounts[row.product.groupName ?? ''] ?? 1;
+                        return _IikoBlankaRowWidget(
+                          row: row,
+                          groupCount: groupCount,
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ],
@@ -3695,73 +3709,70 @@ class _IikoBlankRow {
 }
 
 /// Шапка таблицы: Группа | Код | Наименование | Ед. изм. | Остаток фактический
+// ── Константы ширин колонок (как в Excel бланке) ──────────────────────────────
+// Группа=110, Код=60, Наименование=300, Ед.изм.=52, Остаток=90
+// Итого минимальная ширина таблицы: 612px → горизонтальный скролл на узких экранах
+const double _colGroup    = 110;
+const double _colCode     = 60;
+const double _colName     = 300;
+const double _colUnit     = 52;
+const double _colQty      = 90;
+const double _tableWidth  = _colGroup + _colCode + _colName + _colUnit + _colQty;
+
 class _IikoBlankaHeader extends StatelessWidget {
   const _IikoBlankaHeader();
 
   static const _border = BorderSide(color: Color(0xFFBBBBBB));
-  static const _headerStyle = TextStyle(
-    fontSize: 11,
-    fontWeight: FontWeight.w700,
-    color: Color(0xFF333333),
+  static const _style = TextStyle(
+    fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF222222),
   );
 
-  Widget _cell(String text, {double? width, TextAlign align = TextAlign.center}) {
-    Widget w = Text(text, style: _headerStyle, textAlign: align);
-    if (width != null) w = SizedBox(width: width, child: w);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-      decoration: const BoxDecoration(
-        color: Color(0xFFF5F5F5),
-        border: Border(right: _border),
-      ),
-      child: w,
-    );
-  }
+  Widget _cell(String text, double width) => Container(
+    width: width,
+    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 7),
+    decoration: const BoxDecoration(
+      color: Color(0xFFEEEEEE),
+      border: Border(right: _border, bottom: _border),
+    ),
+    child: Text(text, style: _style, textAlign: TextAlign.center),
+  );
 
   @override
   Widget build(BuildContext context) {
     return Container(
+      width: _tableWidth,
       decoration: const BoxDecoration(
-        border: Border(
-          top: _border,
-          bottom: _border,
-          left: _border,
-          right: _border,
-        ),
-        color: Color(0xFFF5F5F5),
+        border: Border(top: _border, left: _border),
+        color: Color(0xFFEEEEEE),
       ),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _cell('Группа', width: 90, align: TextAlign.center),
-            _cell('Код', width: 58, align: TextAlign.center),
-            Expanded(child: _cell('Наименование', align: TextAlign.center)),
-            _cell('Ед.\nизм.', width: 42, align: TextAlign.center),
-            _cell('Остаток\nфактический', width: 72, align: TextAlign.center),
-          ],
-        ),
+      child: Row(
+        children: [
+          _cell('Группа',               _colGroup),
+          _cell('Код',                  _colCode),
+          _cell('Наименование',         _colName),
+          _cell('Ед.\nизм.',            _colUnit),
+          _cell('Остаток\nфактический', _colQty),
+        ],
       ),
     );
   }
 }
 
-/// Одна строка бланка — ячейки Группа | Код | Наименование | Ед.изм. | (пусто)
+/// Одна строка бланка — фиксированные ширины как в Excel
 class _IikoBlankaRowWidget extends StatelessWidget {
   const _IikoBlankaRowWidget({required this.row, required this.groupCount});
 
   final _IikoBlankRow row;
   final int groupCount;
 
-  static const _border = BorderSide(color: Color(0xFFDDDDDD));
+  static const _border    = BorderSide(color: Color(0xFFCCCCCC));
   static const _nameStyle = TextStyle(fontSize: 12, color: Color(0xFF111111));
-  static const _codeStyle = TextStyle(
-      fontSize: 11, color: Color(0xFF555555), fontFeatures: [FontFeature.tabularFigures()]);
-  static const _unitStyle = TextStyle(fontSize: 12, color: Color(0xFF333333));
+  static const _codeStyle = TextStyle(fontSize: 11, color: Color(0xFF444444));
+  static const _unitStyle = TextStyle(fontSize: 12, color: Color(0xFF222222));
   static const _groupStyle = TextStyle(
-      fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF333333));
+      fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF222222));
 
-  Widget _cell(Widget child, {double? width, Color? bg}) {
+  Widget _cell(Widget child, double width, {Color? bg, TextAlign? align}) {
     return Container(
       width: width,
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
@@ -3776,6 +3787,7 @@ class _IikoBlankaRowWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      width: _tableWidth,
       decoration: const BoxDecoration(
         border: Border(left: _border),
       ),
@@ -3783,30 +3795,31 @@ class _IikoBlankaRowWidget extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // ── Группа (показываем только у первой строки группы) ──
+            // Группа — только у первой строки группы
             _cell(
               row.isFirstInGroup
                   ? Text(row.product.groupName ?? '', style: _groupStyle)
                   : const SizedBox.shrink(),
-              width: 90,
-              bg: row.isFirstInGroup ? const Color(0xFFFFF8F0) : null,
+              _colGroup,
+              bg: const Color(0xFFFFF8F0),
             ),
-            // ── Код ──
+            // Код
             _cell(
               Text(row.product.code ?? '', style: _codeStyle, textAlign: TextAlign.center),
-              width: 58,
+              _colCode,
             ),
-            // ── Наименование — точно как в файле ──
-            Expanded(
-              child: _cell(Text(row.product.name, style: _nameStyle)),
+            // Наименование — точно как в файле
+            _cell(
+              Text(row.product.name, style: _nameStyle),
+              _colName,
             ),
-            // ── Ед. изм. — точно как в файле ──
+            // Ед. изм. — точно как в файле
             _cell(
               Text(row.product.unit ?? '', style: _unitStyle, textAlign: TextAlign.center),
-              width: 42,
+              _colUnit,
             ),
-            // ── Остаток фактический — пусто (заполняется при инвентаризации) ──
-            _cell(const SizedBox.shrink(), width: 72),
+            // Остаток фактический — пусто
+            _cell(const SizedBox.shrink(), _colQty),
           ],
         ),
       ),
