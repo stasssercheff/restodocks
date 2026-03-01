@@ -314,6 +314,9 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
   }
 }
 
+// Вкладки номенклатуры
+enum _NomTab { nomenclature, iiko }
+
 class _NomenclatureScreenState extends State<NomenclatureScreen> {
   String _query = '';
   String? _category;
@@ -324,6 +327,9 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
   // Список элементов номенклатуры (продукты + ТТК ПФ)
   List<NomenclatureItem> _nomenclatureItems = [];
   bool _isLoading = true;
+
+  // Активная вкладка
+  _NomTab _selectedTab = _NomTab.nomenclature;
 
   @override
   void initState() {
@@ -885,6 +891,18 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     if (context.mounted) _ensureLoaded().then((_) => setState(() {}));
   }
 
+  Widget _tabChip(_NomTab tab, String label) {
+    final isSelected = _selectedTab == tab;
+    return FilterChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (_) => setState(() => _selectedTab = tab),
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      selectedColor: Theme.of(context).colorScheme.primaryContainer,
+      checkmarkColor: Theme.of(context).colorScheme.onPrimaryContainer,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
@@ -916,68 +934,54 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     final iikoStore = context.watch<IikoProductStore>();
     final estId2 = account.establishment?.id ?? '';
 
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
+    return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
         title: Text(loc.t('nomenclature')),
-        bottom: const TabBar(
-          tabs: [
-            Tab(text: 'Номенклатура'),
-            Tab(text: 'iiko'),
-          ],
-        ),
         actions: [
-          // Счетчик элементов
-          Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.8),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                '${nomItems.length}',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurface,
-                      fontWeight: FontWeight.w600,
-                    ),
+          // Счётчик: показываем для активной вкладки
+          if (_selectedTab == _NomTab.nomenclature)
+            Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.8),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${nomItems.length}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
               ),
             ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.warning),
-            onPressed: () => _showDuplicates(),
-            tooltip: loc.t('tooltip_show_duplicates'),
-          ),
-          // Temporarily disabled - method has compilation issues
-          // IconButton(
-          //   icon: const Icon(Icons.clear_all),
-          //   onPressed: () => _confirmClearAllNomenclature(context, loc),
-          //   tooltip: 'Очистить всю номенклатуру',
-          // ),
-          IconButton(
-            icon: const Icon(Icons.upload_file),
-            tooltip: loc.t('tooltip_upload_products'),
-            onPressed: () {
-              print('=== Nomenclature upload button pressed ===');
-              try {
-                context.push('/products/upload');
-                print('=== Navigation to /products/upload successful ===');
-              } catch (e) {
-                print('=== Navigation error: $e ===');
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(loc.t('error_navigation').replaceFirst('%s', '$e'))),
-                );
-              }
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.attach_money),
-            onPressed: account.establishment != null ? () => _showCurrencyDialog(context, loc, account, store) : null,
-            tooltip: loc.t('default_currency'),
-          ),
+          if (_selectedTab == _NomTab.nomenclature) ...[
+            IconButton(
+              icon: const Icon(Icons.warning),
+              onPressed: () => _showDuplicates(),
+              tooltip: loc.t('tooltip_show_duplicates'),
+            ),
+            IconButton(
+              icon: const Icon(Icons.upload_file),
+              tooltip: loc.t('tooltip_upload_products'),
+              onPressed: () {
+                try {
+                  context.push('/products/upload');
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(loc.t('error_navigation').replaceFirst('%s', '$e'))),
+                  );
+                }
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.attach_money),
+              onPressed: account.establishment != null ? () => _showCurrencyDialog(context, loc, account, store) : null,
+              tooltip: loc.t('default_currency'),
+            ),
+          ],
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () async {
@@ -988,63 +992,91 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
           ),
         ],
       ),
-      body: TabBarView(
+      body: Column(
         children: [
-          // Вкладка 1: стандартная номенклатура
-          Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                child: TextField(
-                  decoration: InputDecoration(
-                    hintText: loc.t('search'),
-                    prefixIcon: const Icon(Icons.search),
-                    border: const OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                  onChanged: (v) => setState(() => _query = v),
-                ),
+          // ── Переключатель вкладок (FilterChip, как в Входящих) ──────────────
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              border: Border(
+                bottom: BorderSide(color: Theme.of(context).dividerColor),
               ),
-              Expanded(
-                child: _isLoading
-                    ? _buildNomenclatureSkeletonLoading()
-                    : _NomenclatureTab(
-                  items: nomItems,
-                  store: store,
-                  estId: estId ?? '',
-                  canRemove: true,
-                  loc: loc,
-                  sort: _nomSort,
-                  filterType: _nomFilter,
-                  onSortChanged: (s) => setState(() => _nomSort = s),
-                  onFilterTypeChanged: (f) => setState(() => _nomFilter = f),
-                  onRefresh: () => _ensureLoaded().then((_) => setState(() {})),
-                  onSwitchToCatalog: () => _showCreateProductDialog(loc),
-                  onEditProduct: (ctx, p) => _showEditProductForNomenclature(ctx, p, store, loc, () => _ensureLoaded().then((_) => setState(() {})), estId ?? ''),
-                  onRemoveProduct: (ctx, p) => _confirmRemoveForNomenclature(ctx, p, store, loc, () => _ensureLoaded().then((_) => setState(() {})), estId ?? ''),
-                  onLoadKbju: (ctx, list) => _loadKbjuForAll(ctx, list),
-                  onLoadTranslations: (ctx, list) => _loadTranslationsForAll(ctx, list),
-                  onVerifyWithAi: (ctx, list) => _verifyWithAi(ctx, list),
-                  onNeedsKbju: (item) => _needsKbju(item),
-                  onNeedsTranslation: (item) => _needsTranslation(item),
-                  onCanShowNutrition: (context) => _canShowNutrition(context),
-                  onBuildProductSubtitle: (context, p, store, estId, loc) => _buildProductSubtitle(context, p, store, estId, loc),
-                  onBuildTechCardSubtitle: (tc) => _buildTechCardSubtitle(context, tc),
-                ),
+            ),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _tabChip(_NomTab.nomenclature, 'Номенклатура'),
+                  const SizedBox(width: 8),
+                  _tabChip(_NomTab.iiko, 'iiko'),
+                ],
               ),
-            ],
+            ),
           ),
 
-          // Вкладка 2: iiko-продукты
-          _IikoNomenclatureTab(
-            store: iikoStore,
-            establishmentId: estId2,
-            onUpload: _uploadIikoBlank,
+          // ── Контент активной вкладки ─────────────────────────────────────────
+          Expanded(
+            child: IndexedStack(
+              index: _selectedTab.index,
+              children: [
+                // Вкладка 0: стандартная номенклатура
+                Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                      child: TextField(
+                        decoration: InputDecoration(
+                          hintText: loc.t('search'),
+                          prefixIcon: const Icon(Icons.search),
+                          border: const OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                        onChanged: (v) => setState(() => _query = v),
+                      ),
+                    ),
+                    Expanded(
+                      child: _isLoading
+                          ? _buildNomenclatureSkeletonLoading()
+                          : _NomenclatureTab(
+                              items: nomItems,
+                              store: store,
+                              estId: estId ?? '',
+                              canRemove: true,
+                              loc: loc,
+                              sort: _nomSort,
+                              filterType: _nomFilter,
+                              onSortChanged: (s) => setState(() => _nomSort = s),
+                              onFilterTypeChanged: (f) => setState(() => _nomFilter = f),
+                              onRefresh: () => _ensureLoaded().then((_) => setState(() {})),
+                              onSwitchToCatalog: () => _showCreateProductDialog(loc),
+                              onEditProduct: (ctx, p) => _showEditProductForNomenclature(ctx, p, store, loc, () => _ensureLoaded().then((_) => setState(() {})), estId ?? ''),
+                              onRemoveProduct: (ctx, p) => _confirmRemoveForNomenclature(ctx, p, store, loc, () => _ensureLoaded().then((_) => setState(() {})), estId ?? ''),
+                              onLoadKbju: (ctx, list) => _loadKbjuForAll(ctx, list),
+                              onLoadTranslations: (ctx, list) => _loadTranslationsForAll(ctx, list),
+                              onVerifyWithAi: (ctx, list) => _verifyWithAi(ctx, list),
+                              onNeedsKbju: (item) => _needsKbju(item),
+                              onNeedsTranslation: (item) => _needsTranslation(item),
+                              onCanShowNutrition: (context) => _canShowNutrition(context),
+                              onBuildProductSubtitle: (context, p, store, estId, loc) => _buildProductSubtitle(context, p, store, estId, loc),
+                              onBuildTechCardSubtitle: (tc) => _buildTechCardSubtitle(context, tc),
+                            ),
+                    ),
+                  ],
+                ),
+
+                // Вкладка 1: iiko-продукты
+                _IikoNomenclatureTab(
+                  store: iikoStore,
+                  establishmentId: estId2,
+                  onUpload: _uploadIikoBlank,
+                ),
+              ],
+            ),
           ),
         ],
       ),
-    ), // Scaffold
-    ); // DefaultTabController
+    );
   }
 
   List<Product> _sortProducts(List<Product> list, _CatalogSort sort, {String lang = 'ru'}) {
