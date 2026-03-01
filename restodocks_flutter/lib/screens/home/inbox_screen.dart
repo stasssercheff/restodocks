@@ -348,6 +348,8 @@ class _DocumentTile extends StatelessWidget {
                   context.push('/inbox/order/${document.id}');
                 } else if (document.type == DocumentType.checklistSubmission) {
                   context.push('/inbox/checklist/${document.id}');
+                } else if (document.type == DocumentType.iikoInventory) {
+                  context.push('/inbox/iiko/${document.id}');
                 } else {
                   onDownload(document);
                 }
@@ -399,6 +401,10 @@ class _DocumentTile extends StatelessWidget {
     }
     if (document.type == DocumentType.checklistSubmission) {
       context.push('/inbox/checklist/${document.id}');
+      return;
+    }
+    if (document.type == DocumentType.iikoInventory) {
+      context.push('/inbox/iiko/${document.id}');
       return;
     }
     final loc = context.read<LocalizationService>();
