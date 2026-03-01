@@ -409,7 +409,8 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
     try {
       final bytes = result.files.single.bytes!;
-      final products = _parseIikoBlank(bytes, estId);
+      final parsed = _parseIikoBlank(bytes, estId);
+      final products = parsed.products;
 
       if (products.isEmpty) {
         if (mounted) {
@@ -423,7 +424,12 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
       _setLoadingMessage('Сохранение ${products.length} позиций iiko...');
       final iikoStore = context.read<IikoProductStore>();
-      await iikoStore.replaceAll(estId, products);
+      await iikoStore.replaceAll(
+        estId,
+        products,
+        blankBytes: bytes,                           // оригинальный файл для экспорта
+        quantityColumnIndex: parsed.quantityCol,     // колонка «Остаток фактический»
+      );
 
       if (mounted) {
         setState(() => _isLoading = false);
@@ -445,10 +451,14 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   /// Парсит xlsx-бланк iiko: извлекает код, наименование, ед. изм., группу.
   /// Определяет колонки по заголовкам строки с «Наименование» / «Код» / «Ед. изм.».
   /// Строки-группы (где есть значение в колонке A но нет кода) трактуются как groupName.
-  List<IikoProduct> _parseIikoBlank(Uint8List bytes, String establishmentId) {
+  /// Результат парсинга iiko-бланка.
+  static const _emptyParsed = (products: <IikoProduct>[], quantityCol: null as int?, dataStartRow: 0);
+
+  ({List<IikoProduct> products, int? quantityCol, int dataStartRow}) _parseIikoBlank(
+      Uint8List bytes, String establishmentId) {
     try {
       final excel = Excel.decodeBytes(bytes.toList());
-      if (excel.tables.isEmpty) return [];
+      if (excel.tables.isEmpty) return _emptyParsed;
       final sheet = excel.tables[excel.tables.keys.first]!;
 
       // Найти строку с заголовками колонок
@@ -457,11 +467,15 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       int? colName;
       int? colUnit;
       int? colGroup;
+      int? colQty; // «Остаток фактический»
 
       for (var r = 0; r < sheet.maxRows && r < 20; r++) {
         final cells = <int, String>{};
         for (var c = 0; c < sheet.maxColumns; c++) {
-          final v = _excelCellToStr(sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r)).value).toLowerCase().trim();
+          final v = _excelCellToStr(
+                  sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r)).value)
+              .toLowerCase()
+              .trim();
           if (v.isNotEmpty) cells[c] = v;
         }
         final vals = cells.values.toList();
@@ -472,63 +486,80 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
             if (v.contains('наименование') || v.contains('товар')) colName = c;
             if (v.contains('ед') || v.contains('мера')) colUnit = c;
             if (v.contains('групп')) colGroup = c;
+            if (v.contains('остаток') || v.contains('фактич')) colQty = c;
           });
           break;
         }
       }
 
-      // Если не нашли по заголовкам — пробуем эвристику по данным бланка Каспий:
-      // A=группа, C=код, D=наименование, E=ед.изм.
+      // Если не нашли по заголовкам — эвристика по бланку Каспий:
+      // A(0)=группа, C(2)=код, D(3)=наименование, E(4)=ед.изм., F(5)=остаток
       if (headerRow == null || colName == null) {
         colGroup = 0;
-        colCode = 2;
-        colName = 3;
-        colUnit = 4;
-        headerRow = 8; // строка 9 (0-based: 8) — первая данных в бланке Каспий
+        colCode  = 2;
+        colName  = 3;
+        colUnit  = 4;
+        colQty   = 5;
+        headerRow = 8;
       }
+      // Колонку остатка ищем и справа от ед.изм., если не нашли явно
+      colQty ??= (colUnit != null ? colUnit! + 1 : 5);
 
       final products = <IikoProduct>[];
-      String? currentGroupRaw; // оригинал группы из бланка (с «Т.»)
+      String? currentGroupRaw;
       int sortOrder = 0;
 
       for (var r = (headerRow! + 1); r < sheet.maxRows; r++) {
-        // Читаем ячейки как есть — без trim, без изменений
-        final nameVal = _excelCellToStr(sheet.cell(CellIndex.indexByColumnRow(columnIndex: colName!, rowIndex: r)).value);
-        final codeVal = colCode != null ? _excelCellToStr(sheet.cell(CellIndex.indexByColumnRow(columnIndex: colCode!, rowIndex: r)).value).trim() : '';
-        final unitVal = colUnit != null ? _excelCellToStr(sheet.cell(CellIndex.indexByColumnRow(columnIndex: colUnit!, rowIndex: r)).value).trim() : '';
-        final groupVal = colGroup != null ? _excelCellToStr(sheet.cell(CellIndex.indexByColumnRow(columnIndex: colGroup!, rowIndex: r)).value).trim() : '';
+        final nameVal = _excelCellToStr(
+            sheet.cell(CellIndex.indexByColumnRow(columnIndex: colName!, rowIndex: r)).value);
+        final codeVal = colCode != null
+            ? _excelCellToStr(
+                    sheet.cell(CellIndex.indexByColumnRow(columnIndex: colCode!, rowIndex: r)).value)
+                .trim()
+            : '';
+        final unitVal = colUnit != null
+            ? _excelCellToStr(
+                    sheet.cell(CellIndex.indexByColumnRow(columnIndex: colUnit!, rowIndex: r)).value)
+                .trim()
+            : '';
+        final groupVal = colGroup != null
+            ? _excelCellToStr(
+                    sheet.cell(CellIndex.indexByColumnRow(columnIndex: colGroup!, rowIndex: r)).value)
+                .trim()
+            : '';
 
         if (nameVal.trim().isEmpty) continue;
 
-        // Определяем строку-группу: в колонке A есть значение, нет кода и нет ед.изм.
         if (codeVal.isEmpty && unitVal.isEmpty && groupVal.isNotEmpty) {
           currentGroupRaw = groupVal;
           continue;
         }
-        // Группа появилась в колонке A, но нет кода товара
         if (groupVal.isNotEmpty && codeVal.isEmpty) {
           currentGroupRaw = groupVal;
           if (nameVal.trim() == groupVal.trim()) continue;
         }
 
-        // Пропускаем заголовки таблицы
         if (_isIikoHeaderRow(nameVal.trim())) continue;
 
         products.add(IikoProduct(
           id: const Uuid().v4(),
           establishmentId: establishmentId,
           code: codeVal.isNotEmpty ? codeVal : null,
-          name: nameVal,                             // ТОЧНЫЙ оригинал из ячейки
-          unit: unitVal.isNotEmpty ? unitVal : null, // как в бланке: кг, л, шт
-          groupName: currentGroupRaw,                // оригинал группы с «Т.»
+          name: nameVal,
+          unit: unitVal.isNotEmpty ? unitVal : null,
+          groupName: currentGroupRaw,
           sortOrder: sortOrder++,
         ));
       }
 
-      return products;
+      return (
+        products: products,
+        quantityCol: colQty,
+        dataStartRow: headerRow + 1,
+      );
     } catch (e) {
       _addDebugLog('parseIikoBlank error: $e');
-      return [];
+      return _emptyParsed;
     }
   }
 

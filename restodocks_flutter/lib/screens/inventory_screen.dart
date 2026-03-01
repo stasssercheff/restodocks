@@ -2199,23 +2199,89 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen> {
     }
   }
 
+  /// Генерирует итоговый Excel.
+  ///
+  /// Если в [IikoProductStore] сохранены байты оригинального бланка —
+  /// открывает его и вписывает только количество в колонку «Остаток фактический».
+  /// Все остальные данные (шапка, группы, коды, наименования, ед.изм.)
+  /// остаются ровно такими же, как в загруженном файле.
+  ///
+  /// Если оригинала нет (например сессия была сброшена) — строит файл заново
+  /// из данных в базе как запасной вариант.
   Uint8List _buildIikoExcel() {
+    final iikoStore = context.read<IikoProductStore>();
+    final origBytes = iikoStore.originalBlankBytes;
+    final qtyCol = iikoStore.originalQuantityColumnIndex ?? 5;
+
+    if (origBytes != null) {
+      return _buildFromOriginal(origBytes, qtyCol);
+    } else {
+      return _buildFallback();
+    }
+  }
+
+  /// Берёт оригинальный xlsx побайтово, находит строки по [IikoProduct.name],
+  /// вписывает количество только в колонку [qtyCol].
+  Uint8List _buildFromOriginal(Uint8List origBytes, int qtyCol) {
+    final excel = Excel.decodeBytes(origBytes.toList());
+    final sheetName = excel.tables.keys.first;
+    final sheet = excel.tables[sheetName]!;
+
+    // Строим карту: name -> quantity (из заполненного бланка инвентаризации)
+    final qtyByName = <String, double>{};
+    for (final r in _rows) {
+      if (r.quantity > 0) {
+        qtyByName[r.product.name] = r.quantity;
+      }
+    }
+
+    // Перебираем все строки оригинала и вписываем количество в нужную колонку
+    for (var r = 0; r < sheet.maxRows; r++) {
+      // Ищем ячейку с наименованием — колонка D (3, 0-based) по умолчанию для бланка Каспий
+      // Проверяем несколько колонок на случай других форматов
+      String? rowName;
+      for (final checkCol in [3, 2, 1, 0]) {
+        final v = _cellStr(sheet, r, checkCol);
+        if (v.isNotEmpty) {
+          rowName = v;
+          break;
+        }
+      }
+      if (rowName == null) continue;
+
+      final qty = qtyByName[rowName];
+      if (qty != null) {
+        sheet
+            .cell(CellIndex.indexByColumnRow(columnIndex: qtyCol, rowIndex: r))
+            .value = DoubleCellValue(qty);
+      }
+    }
+
+    final saved = excel.save();
+    return Uint8List.fromList(saved!);
+  }
+
+  String _cellStr(Sheet sheet, int row, int col) {
+    try {
+      final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row));
+      final v = cell.value;
+      if (v == null) return '';
+      if (v is TextCellValue) return v.value;
+      if (v is IntCellValue) return v.value.toString();
+      if (v is DoubleCellValue) return v.value.toString();
+      return v.toString();
+    } catch (_) {
+      return '';
+    }
+  }
+
+  /// Запасной вариант — строит файл заново из данных базы
+  /// (используется только если оригинал не сохранён в памяти).
+  Uint8List _buildFallback() {
     final excel = Excel.createExcel();
-    final sheetName = 'Инвентаризация';
+    const sheetName = 'Инвентаризация';
     final sheet = excel[sheetName];
 
-    // Шапка — точно как в оригинальном бланке
-    final account = context.read<AccountManagerSupabase>();
-    final estName = account.establishment?.name ?? '';
-    final dateStr = '${_date.day.toString().padLeft(2,'0')}.${_date.month.toString().padLeft(2,'0')}.${_date.year}';
-
-    sheet.cell(CellIndex.indexByString('A1')).value = TextCellValue('Организация:');
-    sheet.cell(CellIndex.indexByString('B1')).value = TextCellValue(estName);
-    sheet.cell(CellIndex.indexByString('A2')).value = TextCellValue('Бланк инвентаризации');
-    sheet.cell(CellIndex.indexByString('A4')).value = TextCellValue('На дату:');
-    sheet.cell(CellIndex.indexByString('B4')).value = TextCellValue(dateStr);
-
-    // Заголовки таблицы — строка 8 (индекс 7), как в оригинале
     int row = 7;
     sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = TextCellValue('Товар');
     sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = TextCellValue('Код');
@@ -2224,29 +2290,23 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen> {
     sheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).value = TextCellValue('Остаток фактический');
     row++;
 
-    // Данные: name и groupName хранятся точно как в оригинальном бланке
     String? lastGroup;
     for (final r in _rows) {
       final groupName = r.product.groupName ?? '';
       if (groupName != lastGroup) {
         lastGroup = groupName;
         if (groupName.isNotEmpty) {
-          // Группа — точно как в бланке (с «Т.»)
           sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value =
               TextCellValue(groupName);
           row++;
         }
       }
-      // Код — как в бланке
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value =
           TextCellValue(r.product.code ?? '');
-      // Наименование — точно как в бланке (с «Т.»)
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value =
           TextCellValue(r.product.name);
-      // Ед. изм. — как в бланке (кг, л, шт)
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).value =
           TextCellValue(r.product.unit ?? '');
-      // Остаток — введённое количество
       if (r.quantity > 0) {
         sheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).value =
             DoubleCellValue(r.quantity);
