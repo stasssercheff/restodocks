@@ -17,6 +17,7 @@ import '../services/image_service.dart';
 import '../services/inventory_download.dart';
 import '../services/services.dart';
 import '../services/iiko_product_store.dart';
+import '../services/draft_storage_service.dart';
 import '../mixins/auto_save_mixin.dart';
 import '../mixins/input_change_listener_mixin.dart';
 import '../widgets/app_bar_home_button.dart';
@@ -2148,6 +2149,9 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   String _nameFilter = '';
   final TextEditingController _filterCtrl = TextEditingController();
 
+  // Временное хранилище данных черновика до загрузки продуктов
+  Map<String, dynamic>? _pendingDraftData;
+
   // ── AutoSaveMixin ──────────────────────────────────────────────────────────
   @override
   String get draftKey => 'iiko_inventory';
@@ -2163,8 +2167,17 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     };
   }
 
+  /// AutoSaveMixin вызывает это ДО загрузки продуктов (_rows пуст).
+  /// Сохраняем данные во временную переменную, применяем в _applyDraft.
   @override
   Future<void> restoreState(Map<String, dynamic> data) async {
+    _pendingDraftData = data;
+    // Если продукты уже загружены — применяем сразу
+    if (_rows.isNotEmpty) _applyDraft(data);
+  }
+
+  /// Применяет данные черновика к заполненным _rows.
+  void _applyDraft(Map<String, dynamic> data) {
     if (!mounted) return;
     final dateStr = data['date'] as String?;
     final qtMap = data['quantities'] as Map<String, dynamic>?;
@@ -2173,7 +2186,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
       if (qtMap != null) {
         for (final r in _rows) {
           final saved = qtMap[r.product.id];
-          if (saved is List) {
+          if (saved is List && saved.isNotEmpty) {
             r.quantities = saved.map((e) => (e as num).toDouble()).toList();
             if (r.quantities.length < 2) r.quantities.add(0.0);
           }
@@ -2193,6 +2206,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   @override
   void dispose() {
     _filterCtrl.dispose();
+    _serverSaveTimer?.cancel();
     super.dispose();
   }
 
@@ -2201,7 +2215,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     final estId = account.establishment?.id;
     if (estId == null) return;
     final iikoStore = context.read<IikoProductStore>();
-    // Восстанавливаем байты оригинального бланка из localStorage (если был перезапуск)
+    // Восстанавливаем байты оригинального бланка из localStorage
     await iikoStore.restoreBlankFromStorage();
     await iikoStore.loadProducts(estId);
     if (!mounted) return;
@@ -2212,6 +2226,22 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
       }
       _isLoading = false;
     });
+    // Применяем черновик — теперь _rows заполнен
+    final draft = _pendingDraftData;
+    if (draft != null) {
+      _applyDraft(draft);
+      _pendingDraftData = null;
+    } else {
+      // Черновик ещё не пришёл от AutoSaveMixin — загружаем явно из localStorage
+      final draftStorage = DraftStorageService();
+      final saved = await draftStorage.loadIikoInventoryDraft();
+      if (saved != null && mounted) {
+        _applyDraft(saved);
+      } else if (estId != null) {
+        // Запасной уровень — Supabase (если localStorage был очищен)
+        await _tryRestoreFromServer(estId);
+      }
+    }
   }
 
   List<_IikoInventoryRow> get _filteredRows {
@@ -2224,6 +2254,8 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
         .toList();
   }
 
+  Timer? _serverSaveTimer;
+
   void _setQuantity(_IikoInventoryRow row, int colIndex, double value) {
     setState(() {
       row.quantities[colIndex] = value;
@@ -2232,7 +2264,64 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
         row.quantities.add(0.0);
       }
     });
-    scheduleSave(); // AutoSaveMixin — сохранение через 300мс
+    scheduleSave(); // AutoSaveMixin — localStorage, 300мс
+    _scheduleServerSave(); // Supabase — резервный слой, 3с
+  }
+
+  /// Резервное сохранение в Supabase — выживает при выходе из аккаунта и очистке браузера.
+  void _scheduleServerSave() {
+    _serverSaveTimer?.cancel();
+    _serverSaveTimer = Timer(const Duration(seconds: 3), _saveIikoDraftToServer);
+  }
+
+  Future<void> _saveIikoDraftToServer() async {
+    if (_completed || _rows.isEmpty || !mounted) return;
+    try {
+      final account = context.read<AccountManagerSupabase>();
+      final estId = account.establishment?.id;
+      final empId = account.currentEmployee?.id;
+      if (estId == null) return;
+      final data = getCurrentState()..['_type'] = 'iiko_inventory';
+      await Supabase.instance.client.from('inventory_drafts').upsert(
+        {
+          'establishment_id': estId,
+          'employee_id': empId,
+          'draft_data': data,
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        onConflict: 'establishment_id',
+      );
+    } catch (_) {} // тихая ошибка — localStorage всегда есть
+  }
+
+  void _clearServerDraft() {
+    if (!mounted) return;
+    try {
+      final account = context.read<AccountManagerSupabase>();
+      final estId = account.establishment?.id;
+      if (estId == null) return;
+      Supabase.instance.client
+          .from('inventory_drafts')
+          .delete()
+          .eq('establishment_id', estId);
+    } catch (_) {}
+  }
+
+  /// При загрузке пробует восстановить с сервера если в localStorage ничего нет.
+  Future<void> _tryRestoreFromServer(String estId) async {
+    try {
+      final rows = await Supabase.instance.client
+          .from('inventory_drafts')
+          .select('draft_data')
+          .eq('establishment_id', estId)
+          .maybeSingle();
+      if (rows == null) return;
+      final data = rows['draft_data'] as Map<String, dynamic>?;
+      if (data == null) return;
+      // Только если это iiko черновик
+      if (data['_type'] != 'iiko_inventory') return;
+      if (mounted) _applyDraft(data);
+    } catch (_) {}
   }
 
   Future<void> _saveAndExport() async {
@@ -2249,8 +2338,9 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
       // Отправляем шефу во входящие
       await _sendToChef(bytes, fileName);
 
-      // Очищаем черновик после успешного сохранения
+      // Очищаем черновик после успешного сохранения (localStorage + сервер)
       await clearDraft();
+      _clearServerDraft();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
