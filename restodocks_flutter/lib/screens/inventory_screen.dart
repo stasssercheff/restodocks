@@ -327,29 +327,19 @@ class _InventoryScreenState extends State<InventoryScreen>
   /// Порядок отображения: сначала продукты, потом ПФ (для обратной совместимости с нумерацией в Excel).
   List<int> get _displayOrder => [..._productIndices, ..._pfIndices];
 
-  /// При открытии: если есть черновик — восстанавливаем без диалога.
-  /// Порядок приоритетов: localStorage → Supabase → диалог.
-  /// В инкогнито localStorage пуст — восстанавливаем с сервера.
+  /// При открытии: всегда показываем диалог выбора типа.
+  /// Если есть черновик — предлагаем «Продолжить» как основной вариант.
   Future<void> _initScreen() async {
     final draftStorage = DraftStorageService();
-    final savedDraft = await draftStorage.loadInventoryDraft();
+    Map<String, dynamic>? existingDraft = await draftStorage.loadInventoryDraft();
     if (!mounted) return;
-    if (savedDraft != null && savedDraft.isNotEmpty) {
-      // Черновик найден в localStorage — сразу восстанавливаем
-      _stateRestored = false;
-      await restoreState(savedDraft);
-      return;
-    }
     // localStorage пуст (инкогнито / очищен) — пробуем Supabase
-    final serverDraft = await _loadDraftFromServer();
-    if (!mounted) return;
-    if (serverDraft != null && serverDraft.isNotEmpty) {
-      _stateRestored = false;
-      await restoreState(serverDraft);
-      return;
+    if (existingDraft == null || existingDraft.isEmpty) {
+      existingDraft = await _loadDraftFromServer();
+      if (!mounted) return;
     }
-    // Черновика нет нигде — показываем диалог выбора режима
-    await _showModeDialog();
+    final hasDraft = existingDraft != null && existingDraft.isNotEmpty;
+    await _showModeDialog(existingDraft: hasDraft ? existingDraft : null);
   }
 
   /// Загружает стандартный черновик инвентаризации с Supabase.
@@ -372,72 +362,105 @@ class _InventoryScreenState extends State<InventoryScreen>
     }
   }
 
-  /// Диалог выбора режима инвентаризации при открытии экрана.
-  Future<void> _showModeDialog() async {
+  /// Диалог выбора режима инвентаризации.
+  /// [existingDraft] — если передан, показывается кнопка «Продолжить» вверху.
+  Future<void> _showModeDialog({Map<String, dynamic>? existingDraft}) async {
     if (!mounted) return;
     final iikoStore = context.read<IikoProductStore>();
     final account = context.read<AccountManagerSupabase>();
     final estId = account.establishment?.id;
 
-    // Проверяем есть ли iiko-продукты
     if (estId != null) {
       await iikoStore.loadProducts(estId);
     }
     if (!mounted) return;
 
     final hasIiko = iikoStore.hasProducts;
+    final hasDraft = existingDraft != null;
 
     final choice = await showDialog<String>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Тип инвентаризации'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.list_alt, color: Colors.blue),
-              title: const Text('Стандартный'),
-              subtitle: const Text('Продукты из номенклатуры'),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              tileColor: Colors.blue.withOpacity(0.05),
-              onTap: () => Navigator.of(ctx).pop('standard'),
-            ),
-            const SizedBox(height: 8),
-            ListTile(
-              leading: Icon(Icons.table_chart_outlined,
-                  color: hasIiko ? Theme.of(ctx).colorScheme.primary : Colors.grey),
-              title: const Text('Бланк iiko'),
-              subtitle: Text(
-                hasIiko
-                    ? 'Продукты из iiko-бланка · ${iikoStore.products.length} позиций'
-                    : 'Сначала загрузите бланк iiko в «Загрузка продуктов»',
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        return AlertDialog(
+          title: const Text('Инвентаризация'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Кнопка «Продолжить» — только если есть черновик
+              if (hasDraft) ...[
+                ListTile(
+                  leading: Icon(Icons.play_circle_outline,
+                      color: theme.colorScheme.primary),
+                  title: Text('Продолжить',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: theme.colorScheme.primary)),
+                  subtitle: const Text('Вернуться к заполнению'),
+                  shape:
+                      RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  tileColor: theme.colorScheme.primaryContainer.withOpacity(0.2),
+                  onTap: () => Navigator.of(ctx).pop('resume'),
+                ),
+                const Divider(height: 20),
+                const Text('Начать заново:',
+                    style: TextStyle(fontSize: 12, color: Colors.grey)),
+                const SizedBox(height: 6),
+              ],
+              ListTile(
+                leading: const Icon(Icons.list_alt, color: Colors.blue),
+                title: const Text('Стандартный'),
+                subtitle: const Text('Продукты из номенклатуры'),
+                shape:
+                    RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                tileColor: Colors.blue.withOpacity(0.05),
+                onTap: () => Navigator.of(ctx).pop('standard'),
               ),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              tileColor: hasIiko
-                  ? Theme.of(ctx).colorScheme.primaryContainer.withOpacity(0.3)
-                  : Colors.grey.withOpacity(0.03),
-              onTap: hasIiko ? () => Navigator.of(ctx).pop('iiko') : null,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop('standard'),
-            child: const Text('Отмена'),
+              const SizedBox(height: 8),
+              ListTile(
+                leading: Icon(Icons.table_chart_outlined,
+                    color: hasIiko ? theme.colorScheme.primary : Colors.grey),
+                title: const Text('Бланк iiko'),
+                subtitle: Text(
+                  hasIiko
+                      ? 'Продукты из iiko-бланка · ${iikoStore.products.length} позиций'
+                      : 'Сначала загрузите бланк iiko в «Загрузка продуктов»',
+                ),
+                shape:
+                    RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                tileColor: hasIiko
+                    ? theme.colorScheme.primaryContainer.withOpacity(0.3)
+                    : Colors.grey.withOpacity(0.03),
+                onTap: hasIiko ? () => Navigator.of(ctx).pop('iiko') : null,
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
 
     if (!mounted) return;
 
-    if (choice == 'iiko') {
-      // Переходим на iiko-экран инвентаризации
-      context.pushReplacement('/inventory-iiko');
-    } else {
-      // Стандартный режим — загружаем номенклатуру как обычно
+    if (choice == 'resume') {
+      // Восстановить черновик
+      _stateRestored = false;
+      await restoreState(existingDraft!);
+    } else if (choice == 'iiko') {
+      context.push('/inventory-iiko');
+    } else if (choice == 'standard') {
+      // Сбрасываем старый черновик и начинаем заново
+      await clearDraft();
+      setState(() {
+        _rows.clear();
+        _date = DateTime.now();
+        _completed = false;
+        _stateRestored = false;
+      });
       _loadNomenclature();
+    } else {
+      // Диалог закрыт без выбора — идём на главную
+      if (mounted) context.go('/home', extra: {'back': true});
     }
   }
 
@@ -1107,9 +1130,21 @@ class _InventoryScreenState extends State<InventoryScreen>
     // но оставляем строку с фильтром — это делается без setState через isKeyboardOpen.
     final mobileKeyboardOpen = isNarrow && isKeyboardOpen;
 
+    final backBtn = IconButton(
+      icon: const Icon(Icons.arrow_back),
+      tooltip: 'К выбору типа',
+      onPressed: () async {
+        // Сохраняем черновик и возвращаем к диалогу выбора
+        await saveImmediately();
+        if (!mounted) return;
+        final draft = getCurrentState();
+        await _showModeDialog(existingDraft: draft.isNotEmpty ? draft : null);
+      },
+    );
+
     return Scaffold(
       appBar: (isNarrow && isKeyboardOpen) ? AppBar(
-        leading: appBarBackButton(context),
+        leading: backBtn,
         title: Text(
           loc.t('inventory_blank_title'),
           style: const TextStyle(fontSize: 16),
@@ -1117,7 +1152,7 @@ class _InventoryScreenState extends State<InventoryScreen>
         toolbarHeight: 40,
         elevation: 0,
       ) : _isInputMode ? AppBar(
-        leading: appBarBackButton(context),
+        leading: backBtn,
         title: Text(
           loc.t('inventory_blank_title'),
           style: const TextStyle(fontSize: 16),
@@ -1125,7 +1160,7 @@ class _InventoryScreenState extends State<InventoryScreen>
         toolbarHeight: 48,
         elevation: 0,
       ) : AppBar(
-        leading: appBarBackButton(context),
+        leading: backBtn,
         title: Text(loc.t('inventory_blank_title')),
       ),
       // Кнопка "Завершить" в bottomNavigationBar — Flutter поднимает её над клавиатурой автоматически.
@@ -2586,7 +2621,19 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
 
     return Scaffold(
       appBar: AppBar(
-        leading: appBarBackButton(context),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: 'К выбору типа',
+          onPressed: () {
+            // Возвращаемся на экран выбора типа инвентаризации
+            // Данные сохранены — при повторном открытии предложат «Продолжить»
+            if (GoRouter.of(context).canPop()) {
+              context.pop();
+            } else {
+              context.go('/inventory');
+            }
+          },
+        ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -2725,9 +2772,9 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
 }
 
 // Ширина фиксированных колонок
-const double _iikoColName  = 180; // Наименование
-const double _iikoColUnit  =  48; // Ед. изм.
-const double _iikoColTotal =  56; // Итого
+const double _iikoColName  = 160; // Наименование
+const double _iikoColUnit  =  32; // Ед. изм. (компактно)
+const double _iikoColTotal =  52; // Итого
 const double _iikoColCell  =  58; // Каждая ячейка ввода
 
 // ── Шапка таблицы ────────────────────────────────────────────────────────────
@@ -2975,6 +3022,7 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
           Container(
             width: _iikoColUnit,
             alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: 1),
             decoration: BoxDecoration(
               color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
               border: Border(right: cb),
@@ -2982,9 +3030,11 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
             child: Text(
               unit,
               style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 10,
                   color: theme.colorScheme.onSurface.withOpacity(0.7)),
               textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           // ── Итого ──
