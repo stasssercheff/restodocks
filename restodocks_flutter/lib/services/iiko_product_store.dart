@@ -87,6 +87,28 @@ class IikoProductStore extends ChangeNotifier {
     }
   }
 
+  /// Удаляет все iiko-продукты заведения из базы и сбрасывает локальное состояние.
+  Future<void> deleteAll(String establishmentId) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      await _supabase.rpc(
+        'delete_iiko_products',
+        params: {'p_establishment_id': establishmentId},
+      );
+      _products = [];
+      _loadedEstablishmentId = null;
+      originalBlankBytes = null;
+      originalQuantityColumnIndex = null;
+    } catch (e) {
+      debugPrint('IikoProductStore.deleteAll error: $e');
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   void clear() {
     _products = [];
     _loadedEstablishmentId = null;
