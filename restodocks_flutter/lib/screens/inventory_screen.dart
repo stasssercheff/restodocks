@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:archive/archive.dart';
+
 import 'package:excel/excel.dart' hide Border, TextSpan;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -2501,8 +2503,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   }
 
   Future<void> _saveAndExport() async {
-    setState(() => _completed = true);
-
+    // Не блокируем дальнейшее заполнение — completed остаётся false
     final bytes = await _buildIikoExcel();
     final date = _date;
     final fileName =
@@ -2528,7 +2529,6 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Ошибка сохранения: $e')),
         );
-        setState(() => _completed = false);
       }
     }
   }
@@ -2599,12 +2599,11 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
         : _buildFallback();
   }
 
+  /// Прямой XML-патч ZIP-архива xlsx.
+  /// Меняет только значения ячеек в колонке «Остаток фактический» — всё остальное
+  /// (стили, mergedCells, размеры строк/колонок) остаётся байт в байт как в оригинале.
   Uint8List _buildFromOriginal(Uint8List origBytes, int qtyCol) {
-    final excel = Excel.decodeBytes(origBytes.toList());
-    final sheetName = excel.tables.keys.first;
-    final sheet = excel.tables[sheetName]!;
-
-    // код → итого (сумма всех замеров)
+    // код → итого
     final qtyByCode = <String, double>{};
     for (final r in _rows) {
       if (r.total > 0 && r.product.code != null) {
@@ -2612,26 +2611,139 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
       }
     }
 
-    int codeCol = 2;
-    for (var r = 0; r < sheet.maxRows && r < 20; r++) {
-      for (var c = 0; c < (sheet.maxColumns > 10 ? 10 : sheet.maxColumns); c++) {
-        final v = _cellStr(sheet, r, c).toLowerCase();
-        if (v == 'код' || v == 'code') { codeCol = c; break; }
+    final archive = ZipDecoder().decodeBytes(origBytes);
+
+    // Находим имя листа
+    String sheetFile = 'xl/worksheets/sheet1.xml';
+    final workbookEntry = archive.findFile('xl/workbook.xml');
+    if (workbookEntry != null) {
+      final wb = utf8.decode(workbookEntry.content as List<int>);
+      // Берём первый sheet
+      final m = RegExp(r'r:id="([^"]+)"').firstMatch(wb);
+      if (m != null) {
+        final relsEntry = archive.findFile('xl/_rels/workbook.xml.rels');
+        if (relsEntry != null) {
+          final rels = utf8.decode(relsEntry.content as List<int>);
+          final rm = RegExp('Id="${m.group(1)}"[^>]*Target="([^"]+)"').firstMatch(rels);
+          if (rm != null) sheetFile = 'xl/${rm.group(1)}';
+        }
       }
     }
 
-    for (var r = 0; r < sheet.maxRows; r++) {
-      final code = _cellStr(sheet, r, codeCol).trim();
-      if (code.isEmpty) continue;
-      final qty = qtyByCode[code];
-      if (qty != null) {
-        sheet
-            .cell(CellIndex.indexByColumnRow(columnIndex: qtyCol, rowIndex: r))
-            .value = DoubleCellValue(qty);
+    // Читаем sharedStrings для поиска кода
+    final sharedStrings = <String>[];
+    final ssEntry = archive.findFile('xl/sharedStrings.xml');
+    if (ssEntry != null) {
+      final ssXml = utf8.decode(ssEntry.content as List<int>);
+      final siRe = RegExp(r'<si>(.*?)</si>', dotAll: true);
+      final tRe  = RegExp(r'<t[^>]*>([^<]*)</t>');
+      for (final si in siRe.allMatches(ssXml)) {
+        final text = tRe.allMatches(si.group(1)!).map((m) => m.group(1)!).join();
+        sharedStrings.add(text);
       }
     }
 
-    return Uint8List.fromList(excel.save()!);
+    // Преобразуем буквенный индекс колонки в цифровой (0-based)
+    String _colLetter(int idx) {
+      var result = '';
+      idx++; // 1-based
+      while (idx > 0) {
+        idx--;
+        result = String.fromCharCode(65 + (idx % 26)) + result;
+        idx ~/= 26;
+      }
+      return result;
+    }
+
+    final qtyColLetter = _colLetter(qtyCol); // например "F"
+
+    // Парсим sheet XML: ищем строки с кодом продукта и проставляем qty
+    final sheetEntry = archive.findFile(sheetFile);
+    if (sheetEntry == null) return origBytes;
+
+    var sheetXml = utf8.decode(sheetEntry.content as List<int>);
+
+    // Определяем колонку с кодом (ищем заголовок "Код" или "Код")
+    int codeColIdx = 2; // по умолчанию C (0-based = 2)
+    final headerRe = RegExp(r'<row r="(\d+)"[^>]*>(.*?)</row>', dotAll: true);
+    for (final rowM in headerRe.allMatches(sheetXml)) {
+      final rowXml = rowM.group(2)!;
+      final cellRe = RegExp(r'<c r="([A-Z]+)\d+"[^>]*t="s"[^>]*><v>(\d+)</v></c>');
+      for (final cm in cellRe.allMatches(rowXml)) {
+        final idx = int.tryParse(cm.group(2)!) ?? -1;
+        if (idx >= 0 && idx < sharedStrings.length) {
+          final val = sharedStrings[idx].trim().toLowerCase();
+          if (val == 'код' || val == 'code') {
+            // Колонка буквами → индекс
+            final letters = cm.group(1)!;
+            int ci = 0;
+            for (final ch in letters.runes) { ci = ci * 26 + (ch - 65 + 1); }
+            codeColIdx = ci - 1;
+            break;
+          }
+        }
+      }
+    }
+    final codeColLetter = _colLetter(codeColIdx);
+
+    // Патчим каждую строку: если в колонке кода есть нужный код — ставим qty
+    sheetXml = sheetXml.replaceAllMapped(
+      RegExp(r'(<row r="(\d+)"[^>]*>)(.*?)(</row>)', dotAll: true),
+      (rowM) {
+        final rowOpen  = rowM.group(1)!;
+        final rowIdx   = rowM.group(2)!;
+        var   rowBody  = rowM.group(3)!;
+        final rowClose = rowM.group(4)!;
+
+        // Ищем ячейку с кодом в текущей строке
+        final codeCell = RegExp(
+          '<c r="${RegExp.escape(codeColLetter)}$rowIdx"[^>]*t="s"[^>]*><v>(\\d+)</v></c>',
+        ).firstMatch(rowBody);
+        if (codeCell == null) return rowM.group(0)!;
+
+        final ssIdx = int.tryParse(codeCell.group(1)!) ?? -1;
+        if (ssIdx < 0 || ssIdx >= sharedStrings.length) return rowM.group(0)!;
+        final code = sharedStrings[ssIdx].trim();
+        final qty = qtyByCode[code];
+        if (qty == null) return rowM.group(0)!;
+
+        // Форматируем число: целое без дробной части, иначе с минимумом знаков
+        final qtyStr = qty == qty.roundToDouble()
+            ? qty.toInt().toString()
+            : qty.toStringAsFixed(3).replaceAll(RegExp(r'0+$'), '').replaceAll(RegExp(r'\.$'), '');
+
+        final qtyCellRef = '$qtyColLetter$rowIdx';
+        final existingQtyCell = RegExp(
+          '<c r="${RegExp.escape(qtyCellRef)}"([^>]*)>.*?</c>',
+          dotAll: true,
+        ).firstMatch(rowBody);
+
+        if (existingQtyCell != null) {
+          // Ячейка уже есть — меняем только значение, стиль сохраняем
+          rowBody = rowBody.replaceFirst(
+            existingQtyCell.group(0)!,
+            '<c r="$qtyCellRef"${existingQtyCell.group(1)!}><v>$qtyStr</v></c>',
+          );
+        } else {
+          // Ячейки нет — вставляем новую перед </row>; стиль берём из соседней строки (s="3")
+          rowBody += '<c r="$qtyCellRef" s="3"><v>$qtyStr</v></c>';
+        }
+
+        return '$rowOpen$rowBody$rowClose';
+      },
+    );
+
+    // Собираем новый ZIP с заменённым sheet
+    final newArchive = Archive();
+    for (final file in archive) {
+      if (file.name == sheetFile) {
+        final newBytes = utf8.encode(sheetXml);
+        newArchive.addFile(ArchiveFile(file.name, newBytes.length, newBytes));
+      } else {
+        newArchive.addFile(file);
+      }
+    }
+    return Uint8List.fromList(ZipEncoder().encode(newArchive)!);
   }
 
   String _cellStr(Sheet sheet, int row, int col) {
@@ -3053,31 +3165,14 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
     final borderClr = theme.dividerColor;
     final cb = BorderSide(color: borderClr);
 
-    // Обособленная ячейка ввода — как в стандартной инвентаризации
+    // Обособленная ячейка ввода — всегда редактируемая (заполнение не блокируется после сохранения)
     Widget numCell(int colIdx) {
       final ctrl = _ctrls[colIdx];
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 5),
         child: SizedBox(
           width: _iikoColCell - 6,
-          child: widget.completed
-              ? Container(
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: borderClr),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-                  child: Text(
-                    widget.row.quantities[colIdx] > 0
-                        ? _fmt(widget.row.quantities[colIdx])
-                        : '',
-                    style: const TextStyle(fontSize: 13),
-                    textAlign: TextAlign.center,
-                  ),
-                )
-              : TextField(
+          child: TextField(
                   controller: ctrl,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   textAlign: TextAlign.center,
