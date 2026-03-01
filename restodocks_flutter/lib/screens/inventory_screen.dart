@@ -159,6 +159,7 @@ class _InventoryScreenState extends State<InventoryScreen>
   _InventoryBlockFilter _blockFilter = _InventoryBlockFilter.all;
   final TextEditingController _nameFilterCtrl = TextEditingController();
   String _nameFilter = '';
+  bool _stateRestored = false; // Флаг: предотвращает двойное восстановление
 
 
   /// Сохранить данные немедленно в локальное хранилище (SharedPreferences/localStorage)
@@ -170,7 +171,7 @@ class _InventoryScreenState extends State<InventoryScreen>
   void initState() {
     super.initState();
     _startTime = TimeOfDay.now();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _showModeDialog());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _initScreen());
     _nameFilterCtrl.addListener(() {
       if (_nameFilter != _nameFilterCtrl.text) {
         setState(() => _nameFilter = _nameFilterCtrl.text);
@@ -219,6 +220,8 @@ class _InventoryScreenState extends State<InventoryScreen>
 
   @override
   Future<void> restoreState(Map<String, dynamic> data) async {
+    if (_stateRestored) return; // уже восстановлено из _initScreen
+    _stateRestored = true;
     setState(() {
       _date = DateTime.parse(data['date'] ?? DateTime.now().toIso8601String());
       _startTime = data['startTime'] != null && data['startTime'].isNotEmpty
@@ -323,6 +326,21 @@ class _InventoryScreenState extends State<InventoryScreen>
 
   /// Порядок отображения: сначала продукты, потом ПФ (для обратной совместимости с нумерацией в Excel).
   List<int> get _displayOrder => [..._productIndices, ..._pfIndices];
+
+  /// При открытии: если есть черновик — восстанавливаем без диалога.
+  /// Если черновика нет — показываем диалог выбора режима.
+  Future<void> _initScreen() async {
+    final draftStorage = DraftStorageService();
+    final savedDraft = await draftStorage.loadInventoryDraft();
+    if (!mounted) return;
+    if (savedDraft != null && savedDraft.isNotEmpty) {
+      // Черновик найден — сразу восстанавливаем состояние, без диалога
+      _stateRestored = false; // разрешаем восстановление (может быть уже true от AutoSaveMixin)
+      await restoreState(savedDraft);
+    } else {
+      await _showModeDialog();
+    }
+  }
 
   /// Диалог выбора режима инвентаризации при открытии экрана.
   Future<void> _showModeDialog() async {
