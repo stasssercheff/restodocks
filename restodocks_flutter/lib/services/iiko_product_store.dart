@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -11,6 +13,13 @@ class IikoProductStore extends ChangeNotifier {
   List<IikoProduct> _products = [];
   String? _loadedEstablishmentId;
   bool _isLoading = false;
+
+  /// Байты оригинального xlsx-бланка — хранятся в памяти для экспорта.
+  /// При следующей загрузке нового бланка перезаписываются.
+  Uint8List? originalBlankBytes;
+
+  /// Индекс колонки «Остаток фактический» в оригинальном бланке (0-based).
+  int? originalQuantityColumnIndex;
 
   List<IikoProduct> get products => List.unmodifiable(_products);
   bool get isLoading => _isLoading;
@@ -40,10 +49,23 @@ class IikoProductStore extends ChangeNotifier {
   }
 
   /// Полная замена iiko-продуктов для заведения (при загрузке нового бланка).
-  Future<void> replaceAll(String establishmentId, List<IikoProduct> items) async {
+  /// [blankBytes] — байты оригинального xlsx-файла для последующего экспорта.
+  /// [quantityColumnIndex] — индекс колонки «Остаток фактический» (0-based).
+  Future<void> replaceAll(
+    String establishmentId,
+    List<IikoProduct> items, {
+    Uint8List? blankBytes,
+    int? quantityColumnIndex,
+  }) async {
     _isLoading = true;
     notifyListeners();
     try {
+      // Сохраняем оригинальный файл в памяти
+      if (blankBytes != null) {
+        originalBlankBytes = blankBytes;
+        originalQuantityColumnIndex = quantityColumnIndex;
+      }
+
       // Удаляем старые
       await _supabase.from('iiko_products').delete().eq('establishment_id', establishmentId);
       // Вставляем новые пачками по 200
@@ -68,6 +90,8 @@ class IikoProductStore extends ChangeNotifier {
   void clear() {
     _products = [];
     _loadedEstablishmentId = null;
+    originalBlankBytes = null;
+    originalQuantityColumnIndex = null;
     notifyListeners();
   }
 }
