@@ -766,6 +766,8 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     }
   }
 
+  /// [mode] = 'inventory' — отключает повторную нормализацию названий через ИИ,
+  /// чтобы сохранить названия дословно как в инвентаризационном бланке.
   Future<void> _processWithDeferredModeration({List<String>? rows, String? text, String? source, String? mode}) async {
     final acc = context.read<AccountManagerSupabase>();
     final est = acc.establishment;
@@ -861,7 +863,8 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         }
       }
 
-      if (newNames.isNotEmpty) {
+      // В режиме инвентаризации пропускаем нормализацию — названия сохраняем дословно из бланка
+      if (newNames.isNotEmpty && mode != 'inventory') {
         final ai = context.read<AiService>();
         final normalized = await ai.normalizeProductNames(newNames);
         if (mounted && normalized.length == newNames.length) {
