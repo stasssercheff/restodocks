@@ -184,8 +184,8 @@ class _InventoryScreenState extends State<InventoryScreen>
       saveNow();
     });
 
-    // Тихая отправка на сервер каждые 15 секунд — данные не теряются при обрыве
-    _serverAutoSaveTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
+    // Тихая отправка на сервер каждые 10 секунд — данные не теряются даже в инкогнито
+    _serverAutoSaveTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
       if (mounted && !_completed) {
         _autoSaveToServer();
       }
@@ -328,17 +328,47 @@ class _InventoryScreenState extends State<InventoryScreen>
   List<int> get _displayOrder => [..._productIndices, ..._pfIndices];
 
   /// При открытии: если есть черновик — восстанавливаем без диалога.
-  /// Если черновика нет — показываем диалог выбора режима.
+  /// Порядок приоритетов: localStorage → Supabase → диалог.
+  /// В инкогнито localStorage пуст — восстанавливаем с сервера.
   Future<void> _initScreen() async {
     final draftStorage = DraftStorageService();
     final savedDraft = await draftStorage.loadInventoryDraft();
     if (!mounted) return;
     if (savedDraft != null && savedDraft.isNotEmpty) {
-      // Черновик найден — сразу восстанавливаем состояние, без диалога
-      _stateRestored = false; // разрешаем восстановление (может быть уже true от AutoSaveMixin)
+      // Черновик найден в localStorage — сразу восстанавливаем
+      _stateRestored = false;
       await restoreState(savedDraft);
-    } else {
-      await _showModeDialog();
+      return;
+    }
+    // localStorage пуст (инкогнито / очищен) — пробуем Supabase
+    final serverDraft = await _loadDraftFromServer();
+    if (!mounted) return;
+    if (serverDraft != null && serverDraft.isNotEmpty) {
+      _stateRestored = false;
+      await restoreState(serverDraft);
+      return;
+    }
+    // Черновика нет нигде — показываем диалог выбора режима
+    await _showModeDialog();
+  }
+
+  /// Загружает стандартный черновик инвентаризации с Supabase.
+  /// Работает даже в инкогнито — localStorage там пуст.
+  Future<Map<String, dynamic>?> _loadDraftFromServer() async {
+    try {
+      final account = context.read<AccountManagerSupabase>();
+      final estId = account.establishment?.id;
+      if (estId == null) return null;
+      final row = await Supabase.instance.client
+          .from('inventory_drafts')
+          .select('draft_data')
+          .eq('establishment_id', estId)
+          .eq('draft_type', 'standard')
+          .maybeSingle();
+      if (row == null) return null;
+      return row['draft_data'] as Map<String, dynamic>?;
+    } catch (_) {
+      return null;
     }
   }
 
@@ -540,27 +570,17 @@ class _InventoryScreenState extends State<InventoryScreen>
     try {
       final account = context.read<AccountManagerSupabase>();
       final employeeId = account.currentEmployee?.id;
-
-      final draftData = {
-        'establishment_id': establishmentId,
-        'employee_id': employeeId,
-        'draft_data': data,
-        'updated_at': DateTime.now().toIso8601String(),
-      };
-
-      // Отправить в таблицу inventory_drafts
-      await Supabase.instance.client
-          .from('inventory_drafts')
-          .upsert(
-            draftData,
-            onConflict: 'establishment_id',
-          );
-
-      print('✅ Auto-saved inventory draft to server');
-    } catch (e) {
-      print('⚠️ Failed to save inventory draft to server: $e');
-      // Если сервер недоступен, данные все равно сохранены локально
-    }
+      await Supabase.instance.client.from('inventory_drafts').upsert(
+        {
+          'establishment_id': establishmentId,
+          'employee_id': employeeId,
+          'draft_type': 'standard',
+          'draft_data': data,
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        onConflict: 'establishment_id,draft_type',
+      );
+    } catch (_) {}
   }
 
   /// Минимум 2 пустых ячейки при открытии. При заполнении последней — добавляется ещё одна.
@@ -2225,7 +2245,10 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   void initState() {
     super.initState(); // AutoSaveMixin.initState регистрирует lifecycle-хуки
     _filterCtrl.addListener(() => setState(() => _nameFilter = _filterCtrl.text));
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadProducts());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadProducts();
+      _startPeriodicServerSave(); // Supabase-бэкап каждые 10с (работает в инкогнито)
+    });
   }
 
   @override
@@ -2290,17 +2313,18 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
       }
     });
     scheduleSave(); // AutoSaveMixin — localStorage, 300мс
-    _scheduleServerSave(); // Supabase — резервный слой, 3с
     // Обновляем метку после debounce (300мс)
     Future.delayed(const Duration(milliseconds: 400), () {
       if (mounted) setState(() => _lastSavedAt = DateTime.now());
     });
   }
 
-  /// Резервное сохранение в Supabase — выживает при выходе из аккаунта и очистке браузера.
-  void _scheduleServerSave() {
+  /// Периодическое сохранение в Supabase каждые 10с — работает даже в инкогнито.
+  void _startPeriodicServerSave() {
     _serverSaveTimer?.cancel();
-    _serverSaveTimer = Timer(const Duration(seconds: 3), _saveIikoDraftToServer);
+    _serverSaveTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted && !_completed) _saveIikoDraftToServer();
+    });
   }
 
   Future<void> _saveIikoDraftToServer() async {
@@ -2310,17 +2334,18 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
       final estId = account.establishment?.id;
       final empId = account.currentEmployee?.id;
       if (estId == null) return;
-      final data = getCurrentState()..['_type'] = 'iiko_inventory';
+      final data = getCurrentState();
       await Supabase.instance.client.from('inventory_drafts').upsert(
         {
           'establishment_id': estId,
           'employee_id': empId,
+          'draft_type': 'iiko_inventory',
           'draft_data': data,
           'updated_at': DateTime.now().toIso8601String(),
         },
-        onConflict: 'establishment_id',
+        onConflict: 'establishment_id,draft_type',
       );
-    } catch (_) {} // тихая ошибка — localStorage всегда есть
+    } catch (_) {}
   }
 
   void _clearServerDraft() {
@@ -2332,23 +2357,23 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
       Supabase.instance.client
           .from('inventory_drafts')
           .delete()
-          .eq('establishment_id', estId);
+          .eq('establishment_id', estId)
+          .eq('draft_type', 'iiko_inventory');
     } catch (_) {}
   }
 
-  /// При загрузке пробует восстановить с сервера если в localStorage ничего нет.
+  /// Восстанавливает iiko-черновик с сервера (инкогнито / очищенный localStorage).
   Future<void> _tryRestoreFromServer(String estId) async {
     try {
-      final rows = await Supabase.instance.client
+      final row = await Supabase.instance.client
           .from('inventory_drafts')
           .select('draft_data')
           .eq('establishment_id', estId)
+          .eq('draft_type', 'iiko_inventory')
           .maybeSingle();
-      if (rows == null) return;
-      final data = rows['draft_data'] as Map<String, dynamic>?;
+      if (row == null) return;
+      final data = row['draft_data'] as Map<String, dynamic>?;
       if (data == null) return;
-      // Только если это iiko черновик
-      if (data['_type'] != 'iiko_inventory') return;
       if (mounted) _applyDraft(data);
     } catch (_) {}
   }
