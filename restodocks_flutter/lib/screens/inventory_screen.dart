@@ -2983,43 +2983,52 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
     final borderClr = theme.dividerColor;
     final cb = BorderSide(color: borderClr);
 
+    // Обособленная ячейка ввода — как в стандартной инвентаризации
     Widget numCell(int colIdx) {
       final ctrl = _ctrls[colIdx];
-      return Container(
-        width: _iikoColCell,
-        height: double.infinity,
-        decoration: BoxDecoration(border: Border(right: cb)),
-        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
-        child: widget.completed
-            ? Center(
-                child: Text(
-                  widget.row.quantities[colIdx] > 0
-                      ? _fmt(widget.row.quantities[colIdx])
-                      : '',
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 5),
+        child: SizedBox(
+          width: _iikoColCell - 6,
+          child: widget.completed
+              ? Container(
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: borderClr),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                  child: Text(
+                    widget.row.quantities[colIdx] > 0
+                        ? _fmt(widget.row.quantities[colIdx])
+                        : '',
+                    style: const TextStyle(fontSize: 13),
+                    textAlign: TextAlign.center,
+                  ),
+                )
+              : TextField(
+                  controller: ctrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  textAlign: TextAlign.center,
                   style: const TextStyle(fontSize: 13),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
+                    filled: true,
+                    fillColor: theme.colorScheme.surfaceContainerHighest.withOpacity(0.45),
+                    hintText: '—',
+                    hintStyle: TextStyle(
+                        fontSize: 12,
+                        color: theme.colorScheme.onSurface.withOpacity(0.3)),
+                  ),
+                  onChanged: (v) {
+                    final qty = double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
+                    widget.onChanged(colIdx, qty);
+                  },
                 ),
-              )
-            : TextField(
-                controller: ctrl,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 13),
-                decoration: InputDecoration(
-                  isDense: true,
-                  border: InputBorder.none,
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-                  hintText: '—',
-                  hintStyle: TextStyle(
-                      fontSize: 12,
-                      color: theme.colorScheme.onSurface.withOpacity(0.3)),
-                ),
-                onChanged: (v) {
-                  final qty = double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
-                  widget.onChanged(colIdx, qty);
-                },
-              ),
+        ),
       );
     }
 
@@ -3027,69 +3036,71 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
       decoration: BoxDecoration(
         border: Border(left: cb, bottom: cb),
       ),
-      height: 48,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // ── Наименование ──
-          Container(
-            width: _iikoColName,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(border: Border(right: cb)),
-            alignment: Alignment.centerLeft,
-            child: Text(
-              widget.row.product.displayName,
-              style: const TextStyle(fontSize: 13),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          // ── Ед. изм. ──
-          Container(
-            width: _iikoColUnit,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
-              border: Border(right: cb),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 1),
-            child: Text(
-              unit,
-              style: TextStyle(
-                  fontSize: 10,
-                  color: theme.colorScheme.onSurface.withOpacity(0.7)),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          // ── Итого ──
-          Container(
-            width: _iikoColTotal,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
-              border: Border(right: cb),
-            ),
-            child: Text(
-              total > 0 ? _fmt(total) : '',
-              style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: total > 0 ? theme.colorScheme.primary : null),
-            ),
-          ),
-          // ── Ячейки ввода — скроллируются вправо ──
-          Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              physics: const ClampingScrollPhysics(),
-              child: Row(
-                children: List.generate(qtyCols, numCell),
+      constraints: const BoxConstraints(minHeight: 48),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // ── Наименование ──
+            Container(
+              width: _iikoColName,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              decoration: BoxDecoration(border: Border(right: cb)),
+              alignment: Alignment.centerLeft,
+              child: Text(
+                widget.row.product.displayName,
+                style: const TextStyle(fontSize: 13),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-          ),
-        ],
+            // ── Ед. изм. ──
+            Container(
+              width: _iikoColUnit,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+                border: Border(right: cb),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 1),
+              child: Text(
+                unit,
+                style: TextStyle(
+                    fontSize: 10,
+                    color: theme.colorScheme.onSurface.withOpacity(0.7)),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            // ── Итого ──
+            Container(
+              width: _iikoColTotal,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                border: Border(right: cb),
+              ),
+              child: Text(
+                total > 0 ? _fmt(total) : '',
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: total > 0 ? theme.colorScheme.primary : null),
+              ),
+            ),
+            // ── Ячейки ввода — скроллируются вправо ──
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const ClampingScrollPhysics(),
+                child: Row(
+                  children: List.generate(qtyCols, numCell),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
