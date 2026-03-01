@@ -2508,7 +2508,13 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                   ),
                 ),
                 // Шапка таблицы
-                _IikoInventoryHeader(),
+                _IikoInventoryHeader(
+                  qtyCols: _rows.isEmpty
+                      ? 2
+                      : _rows
+                          .map((r) => r.quantities.length)
+                          .reduce((a, b) => a > b ? a : b),
+                ),
                 // Список строк
                 Expanded(
                   child: _filteredRows.isEmpty
@@ -2540,39 +2546,58 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   }
 }
 
-// ── Шапка таблицы ────────────────────────────────────────────────────────────
-class _IikoInventoryHeader extends StatelessWidget {
-  const _IikoInventoryHeader();
+// Ширина фиксированных колонок
+const double _iikoColName  = 180; // Наименование
+const double _iikoColTotal =  56; // Итого
+const double _iikoColCell  =  58; // Каждая ячейка ввода
 
-  static const _border = BorderSide(color: Color(0xFFCCCCCC));
-  static const _style = TextStyle(
+// ── Шапка таблицы ────────────────────────────────────────────────────────────
+// Левая часть фиксирована (Наименование + Итого), правая скроллируется вместе со строками.
+class _IikoInventoryHeader extends StatelessWidget {
+  const _IikoInventoryHeader({required this.qtyCols});
+
+  /// Сколько колонок ввода показывать в шапке (минимум 2).
+  final int qtyCols;
+
+  static const _b = BorderSide(color: Color(0xFFBBBBBB));
+  static const _s = TextStyle(
       fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF333333));
 
-  Widget _cell(String text, {double? width, bool expand = false}) {
-    Widget w = Container(
-      width: width,
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-      decoration: const BoxDecoration(
-        color: Color(0xFFEEEEEE),
-        border: Border(right: _border, bottom: _border),
-      ),
-      child: Text(text, style: _style, textAlign: TextAlign.center),
-    );
-    return expand ? Expanded(child: w) : w;
-  }
+  Widget _hCell(String t, double w) => Container(
+        width: w,
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 7),
+        decoration: const BoxDecoration(
+          color: Color(0xFFEEEEEE),
+          border: Border(right: _b, bottom: _b),
+        ),
+        child: Text(t, style: _s, textAlign: TextAlign.center),
+      );
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        border: Border(left: _border, top: _border),
+        border: Border(left: _b, top: _b),
+        color: Color(0xFFEEEEEE),
       ),
       child: Row(
         children: [
-          _cell('Наименование / Ед.', expand: true),
-          _cell('Итого', width: 58),
-          _cell('№1', width: 58),
-          _cell('№2', width: 58),
+          // Фиксированная левая часть
+          _hCell('Наименование / Ед.', _iikoColName),
+          _hCell('Итого', _iikoColTotal),
+          // Скроллируемые заголовки ячеек
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const ClampingScrollPhysics(),
+              child: Row(
+                children: List.generate(
+                  qtyCols,
+                  (i) => _hCell('№${i + 1}', _iikoColCell),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -2700,17 +2725,15 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
     final total = widget.row.total;
     final qtyCols = widget.row.quantities.length;
 
-    const cellBorder = BorderSide(color: Color(0xFFDDDDDD));
-    const rowBorder = BoxDecoration(
-      border: Border(left: cellBorder, bottom: cellBorder),
-    );
+    const cb = BorderSide(color: Color(0xFFDDDDDD)); // cell border
 
     Widget _numCell(int colIdx) {
       final ctrl = _ctrls[colIdx];
       return Container(
-        width: 58,
+        width: _iikoColCell,
+        height: double.infinity,
         decoration: const BoxDecoration(
-          border: Border(right: cellBorder, bottom: cellBorder),
+          border: Border(right: cb),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
         child: widget.completed
@@ -2734,10 +2757,12 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
                   contentPadding:
                       EdgeInsets.symmetric(horizontal: 2, vertical: 4),
                   hintText: '—',
-                  hintStyle: TextStyle(fontSize: 12, color: Color(0xFFBBBBBB)),
+                  hintStyle:
+                      TextStyle(fontSize: 12, color: Color(0xFFBBBBBB)),
                 ),
                 onChanged: (v) {
-                  final qty = double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
+                  final qty =
+                      double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
                   widget.onChanged(colIdx, qty);
                 },
               ),
@@ -2745,51 +2770,66 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
     }
 
     return Container(
-      decoration: rowBorder,
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Наименование + единица
-            Expanded(
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: const BoxDecoration(
-                  border: Border(right: cellBorder),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(widget.row.product.displayName,
-                        style: const TextStyle(fontSize: 13)),
-                    if (unit.isNotEmpty)
-                      Text(unit,
-                          style: TextStyle(
-                              fontSize: 11, color: Colors.grey[500])),
-                  ],
-                ),
-              ),
-            ),
-            // Итого
-            Container(
-              width: 58,
-              alignment: Alignment.center,
-              decoration: const BoxDecoration(
-                color: Color(0xFFF5F5F5),
-                border: Border(right: cellBorder, bottom: cellBorder),
-              ),
-              child: Text(
-                total > 0 ? _fmt(total) : '',
-                style: const TextStyle(
-                    fontSize: 13, fontWeight: FontWeight.w600),
-              ),
-            ),
-            // Ячейки ввода
-            ...List.generate(qtyCols, _numCell),
-          ],
+      decoration: BoxDecoration(
+        border: Border(
+          left: cb,
+          bottom: cb,
         ),
+      ),
+      // Высота строки фиксирована — иначе IntrinsicHeight конфликтует со скроллом
+      height: 48,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ── Фиксированная левая часть: Наименование ──
+          Container(
+            width: _iikoColName,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: const BoxDecoration(
+              border: Border(right: cb),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  widget.row.product.displayName,
+                  style: const TextStyle(fontSize: 13),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (unit.isNotEmpty)
+                  Text(unit,
+                      style: TextStyle(
+                          fontSize: 10, color: Colors.grey[500])),
+              ],
+            ),
+          ),
+          // ── Итого ──
+          Container(
+            width: _iikoColTotal,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              color: Color(0xFFF5F5F5),
+              border: Border(right: cb),
+            ),
+            child: Text(
+              total > 0 ? _fmt(total) : '',
+              style: const TextStyle(
+                  fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+          ),
+          // ── Ячейки ввода — скроллируются вправо ──
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const ClampingScrollPhysics(),
+              child: Row(
+                children: List.generate(qtyCols, _numCell),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
