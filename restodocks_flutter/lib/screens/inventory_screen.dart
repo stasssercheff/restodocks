@@ -2599,38 +2599,37 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
         : _buildFallback();
   }
 
-  /// Прямой XML-патч ZIP-архива xlsx.
-  /// Меняет только значения ячеек в колонке «Остаток фактический» — всё остальное
-  /// (стили, mergedCells, размеры строк/колонок) остаётся байт в байт как в оригинале.
+  /// Прямой байтовый патч xlsx (ZIP).
+  /// Читает ZIP, находит sheet1.xml, патчит только ячейки колонки qty.
+  /// Все остальные файлы (styles, sharedStrings, mergedCells и т.д.) копируются
+  /// **без каких-либо изменений** — файл не «едет» при открытии на мобильном.
   Uint8List _buildFromOriginal(Uint8List origBytes, int qtyCol) {
-    // код → итого
+    // ── 1. Код → итого ────────────────────────────────────────────────────────
     final qtyByCode = <String, double>{};
     for (final r in _rows) {
       if (r.total > 0 && r.product.code != null) {
         qtyByCode[r.product.code!.trim()] = r.total;
       }
     }
+    if (qtyByCode.isEmpty) return origBytes; // нечего писать — возвращаем оригинал
 
+    // ── 2. Открываем ZIP ──────────────────────────────────────────────────────
     final archive = ZipDecoder().decodeBytes(origBytes);
 
-    // Находим имя листа
-    String sheetFile = 'xl/worksheets/sheet1.xml';
-    final workbookEntry = archive.findFile('xl/workbook.xml');
-    if (workbookEntry != null) {
-      final wb = utf8.decode(workbookEntry.content as List<int>);
-      // Берём первый sheet
-      final m = RegExp(r'r:id="([^"]+)"').firstMatch(wb);
-      if (m != null) {
-        final relsEntry = archive.findFile('xl/_rels/workbook.xml.rels');
-        if (relsEntry != null) {
-          final rels = utf8.decode(relsEntry.content as List<int>);
-          final rm = RegExp('Id="${m.group(1)}"[^>]*Target="([^"]+)"').firstMatch(rels);
-          if (rm != null) sheetFile = 'xl/${rm.group(1)}';
-        }
+    // ── 3. Находим имя первого листа ──────────────────────────────────────────
+    String sheetPath = 'xl/worksheets/sheet1.xml';
+    final relsEntry = archive.findFile('xl/_rels/workbook.xml.rels');
+    if (relsEntry != null) {
+      final rels = utf8.decode(relsEntry.content as List<int>);
+      // Первый Relationship с типом worksheet
+      final rm = RegExp(r'Type="[^"]*worksheet"[^>]*Target="([^"]+)"').firstMatch(rels);
+      if (rm != null) {
+        final target = rm.group(1)!;
+        sheetPath = target.startsWith('/') ? target.substring(1) : 'xl/$target';
       }
     }
 
-    // Читаем sharedStrings для поиска кода
+    // ── 4. Читаем sharedStrings из ЭТОГО ЖЕ архива ───────────────────────────
     final sharedStrings = <String>[];
     final ssEntry = archive.findFile('xl/sharedStrings.xml');
     if (ssEntry != null) {
@@ -2643,104 +2642,111 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
       }
     }
 
-    // Преобразуем буквенный индекс колонки в цифровой (0-based)
-    String _colLetter(int idx) {
+    // ── 5. Буква колонки (0-based → 'A','B',…,'F') ───────────────────────────
+    String colLetter(int idx) {
       var result = '';
-      idx++; // 1-based
-      while (idx > 0) {
-        idx--;
-        result = String.fromCharCode(65 + (idx % 26)) + result;
-        idx ~/= 26;
+      var n = idx + 1;
+      while (n > 0) {
+        n--;
+        result = String.fromCharCode(65 + n % 26) + result;
+        n ~/= 26;
       }
       return result;
     }
 
-    final qtyColLetter = _colLetter(qtyCol); // например "F"
+    final qtyColLetter  = colLetter(qtyCol);
 
-    // Парсим sheet XML: ищем строки с кодом продукта и проставляем qty
-    final sheetEntry = archive.findFile(sheetFile);
+    // ── 6. Определяем колонку с кодом ────────────────────────────────────────
+    final sheetEntry = archive.findFile(sheetPath);
     if (sheetEntry == null) return origBytes;
-
     var sheetXml = utf8.decode(sheetEntry.content as List<int>);
 
-    // Определяем колонку с кодом (ищем заголовок "Код" или "Код")
-    int codeColIdx = 2; // по умолчанию C (0-based = 2)
-    final headerRe = RegExp(r'<row r="(\d+)"[^>]*>(.*?)</row>', dotAll: true);
-    for (final rowM in headerRe.allMatches(sheetXml)) {
-      final rowXml = rowM.group(2)!;
+    // Ищем заголовок «Код» в первых 20 строках
+    int codeColIdx = 2; // дефолт: C
+    final headerRowRe = RegExp(r'<row r="(\d+)"[^>]*>(.*?)</row>', dotAll: true);
+    outer:
+    for (final rowM in headerRowRe.allMatches(sheetXml)) {
+      if (int.parse(rowM.group(1)!) > 20) break;
       final cellRe = RegExp(r'<c r="([A-Z]+)\d+"[^>]*t="s"[^>]*><v>(\d+)</v></c>');
-      for (final cm in cellRe.allMatches(rowXml)) {
-        final idx = int.tryParse(cm.group(2)!) ?? -1;
-        if (idx >= 0 && idx < sharedStrings.length) {
-          final val = sharedStrings[idx].trim().toLowerCase();
-          if (val == 'код' || val == 'code') {
-            // Колонка буквами → индекс
+      for (final cm in cellRe.allMatches(rowM.group(2)!)) {
+        final ssIdx = int.tryParse(cm.group(2)!) ?? -1;
+        if (ssIdx >= 0 && ssIdx < sharedStrings.length) {
+          final v = sharedStrings[ssIdx].trim().toLowerCase();
+          if (v == 'код' || v == 'code') {
             final letters = cm.group(1)!;
-            int ci = 0;
-            for (final ch in letters.runes) { ci = ci * 26 + (ch - 65 + 1); }
+            var ci = 0;
+            for (final ch in letters.runes) ci = ci * 26 + (ch - 65 + 1);
             codeColIdx = ci - 1;
-            break;
+            break outer;
           }
         }
       }
     }
-    final codeColLetter = _colLetter(codeColIdx);
+    final codeColLetter = colLetter(codeColIdx);
 
-    // Патчим каждую строку: если в колонке кода есть нужный код — ставим qty
+    // ── 7. Патчим строки: меняем только <v> в ячейке qty-колонки ─────────────
     sheetXml = sheetXml.replaceAllMapped(
       RegExp(r'(<row r="(\d+)"[^>]*>)(.*?)(</row>)', dotAll: true),
-      (rowM) {
-        final rowOpen  = rowM.group(1)!;
-        final rowIdx   = rowM.group(2)!;
-        var   rowBody  = rowM.group(3)!;
-        final rowClose = rowM.group(4)!;
+      (m) {
+        final rowOpen  = m.group(1)!;
+        final rowIdx   = m.group(2)!;
+        var   rowBody  = m.group(3)!;
+        final rowClose = m.group(4)!;
 
-        // Ищем ячейку с кодом в текущей строке
-        final codeCell = RegExp(
-          '<c r="${RegExp.escape(codeColLetter)}$rowIdx"[^>]*t="s"[^>]*><v>(\\d+)</v></c>',
+        // Ищем код в этой строке
+        final codeM = RegExp(
+          '<c r="${RegExp.escape(codeColLetter)}$rowIdx"'
+          r'[^>]*t="s"[^>]*><v>(\d+)</v></c>',
         ).firstMatch(rowBody);
-        if (codeCell == null) return rowM.group(0)!;
+        if (codeM == null) return m.group(0)!;
 
-        final ssIdx = int.tryParse(codeCell.group(1)!) ?? -1;
-        if (ssIdx < 0 || ssIdx >= sharedStrings.length) return rowM.group(0)!;
+        final ssIdx = int.tryParse(codeM.group(1)!) ?? -1;
+        if (ssIdx < 0 || ssIdx >= sharedStrings.length) return m.group(0)!;
         final code = sharedStrings[ssIdx].trim();
-        final qty = qtyByCode[code];
-        if (qty == null) return rowM.group(0)!;
+        final qty  = qtyByCode[code];
+        if (qty == null) return m.group(0)!;
 
-        // Форматируем число: целое без дробной части, иначе с минимумом знаков
         final qtyStr = qty == qty.roundToDouble()
             ? qty.toInt().toString()
-            : qty.toStringAsFixed(3).replaceAll(RegExp(r'0+$'), '').replaceAll(RegExp(r'\.$'), '');
+            : qty.toStringAsFixed(3)
+                .replaceAll(RegExp(r'0+$'), '')
+                .replaceAll(RegExp(r'\.$'), '');
 
-        final qtyCellRef = '$qtyColLetter$rowIdx';
-        final existingQtyCell = RegExp(
-          '<c r="${RegExp.escape(qtyCellRef)}"([^>]*)>.*?</c>',
+        final cellRef = '$qtyColLetter$rowIdx';
+
+        // Ячейка уже есть → меняем только <v>…</v>, атрибуты (стиль s=) не трогаем
+        final existM = RegExp(
+          '<c r="${RegExp.escape(cellRef)}"([^>]*)>(.*?)</c>',
           dotAll: true,
         ).firstMatch(rowBody);
 
-        if (existingQtyCell != null) {
-          // Ячейка уже есть — меняем только значение, стиль сохраняем
+        if (existM != null) {
           rowBody = rowBody.replaceFirst(
-            existingQtyCell.group(0)!,
-            '<c r="$qtyCellRef"${existingQtyCell.group(1)!}><v>$qtyStr</v></c>',
+            existM.group(0)!,
+            '<c r="$cellRef"${existM.group(1)!}><v>$qtyStr</v></c>',
           );
         } else {
-          // Ячейки нет — вставляем новую перед </row>; стиль берём из соседней строки (s="3")
-          rowBody += '<c r="$qtyCellRef" s="3"><v>$qtyStr</v></c>';
+          // Ячейки нет (пустая) → добавляем с тем же стилем что у соседних ячеек строки
+          // Ищем стиль s= первой ячейки в строке
+          final sM = RegExp(r'<c r="[A-Z]+$rowIdx" s="(\d+)"').firstMatch(rowBody);
+          final sAttr = sM != null ? ' s="${sM.group(1)}"' : '';
+          rowBody += '<c r="$cellRef"$sAttr><v>$qtyStr</v></c>';
         }
 
         return '$rowOpen$rowBody$rowClose';
       },
     );
 
-    // Собираем новый ZIP с заменённым sheet
+    // ── 8. Собираем новый ZIP: все файлы берём из оригинала, sheet подменяем ──
     final newArchive = Archive();
-    for (final file in archive) {
-      if (file.name == sheetFile) {
-        final newBytes = utf8.encode(sheetXml);
-        newArchive.addFile(ArchiveFile(file.name, newBytes.length, newBytes));
+    for (final file in archive.files) {
+      if (file.name == sheetPath) {
+        final patched = utf8.encode(sheetXml);
+        newArchive.addFile(ArchiveFile(file.name, patched.length, patched));
       } else {
-        newArchive.addFile(file);
+        // Копируем исходные байты без изменений
+        final raw = file.content as List<int>;
+        newArchive.addFile(ArchiveFile(file.name, raw.length, raw));
       }
     }
     return Uint8List.fromList(ZipEncoder().encode(newArchive)!);
