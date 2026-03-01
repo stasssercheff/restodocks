@@ -3361,9 +3361,11 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab> with Automat
     final products = widget.store.products;
     final filtered = _query.isEmpty
         ? products
-        : products.where((p) => p.name.toLowerCase().contains(_query.toLowerCase())).toList();
+        : products.where((p) =>
+            p.displayName.toLowerCase().contains(_query.toLowerCase()) ||
+            p.name.toLowerCase().contains(_query.toLowerCase())).toList();
 
-    // Группируем по group_name
+    // Группируем по оригинальному groupName (ключ), отображаем displayGroupName
     final groups = <String, List<IikoProduct>>{};
     for (final p in filtered) {
       final g = p.groupName ?? '';
@@ -3461,7 +3463,10 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab> with Automat
                       color: Colors.orange.withOpacity(0.08),
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                       child: Text(
-                        groupName,
+                        // Для отображения убираем «Т.»
+                        groupItems.isNotEmpty
+                            ? (groupItems.first.displayGroupName ?? groupName)
+                            : groupName,
                         style: Theme.of(context).textTheme.labelMedium?.copyWith(
                               color: Colors.orange[800],
                               fontWeight: FontWeight.w600,
@@ -3470,7 +3475,7 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab> with Automat
                     ),
                   ...groupItems.map((p) => ListTile(
                         dense: true,
-                        title: Text(p.name),
+                        title: Text(p.displayName),
                         subtitle: p.code != null ? Text('Код: ${p.code}', style: const TextStyle(fontSize: 11)) : null,
                         trailing: p.unit != null
                             ? Container(

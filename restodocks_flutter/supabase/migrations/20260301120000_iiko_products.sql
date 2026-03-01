@@ -5,11 +5,11 @@ CREATE TABLE IF NOT EXISTS iiko_products (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     establishment_id    UUID NOT NULL REFERENCES establishments(id) ON DELETE CASCADE,
     code                TEXT,
-    name                TEXT NOT NULL,        -- отображаемое (без «Т.»)
-    name_original       TEXT,                 -- оригинал из бланка (с «Т.»)
+    name                TEXT NOT NULL,        -- ТОЧНЫЙ оригинал из бланка (с «Т.», пробелами)
+    name_original       TEXT,                 -- резерв (дублирует name)
     unit                TEXT,                 -- ед. изм. как в бланке (кг, л, шт)
-    group_name          TEXT,                 -- группа отображаемая (без «Т.»)
-    group_name_original TEXT,                 -- группа оригинал из бланка
+    group_name          TEXT,                 -- ТОЧНЫЙ оригинал группы из бланка (с «Т.»)
+    group_name_original TEXT,                 -- резерв (дублирует group_name)
     sort_order          INTEGER DEFAULT 0,
     created_at          TIMESTAMPTZ DEFAULT now()
 );

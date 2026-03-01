@@ -2168,7 +2168,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen> {
   List<_IikoInventoryRow> get _filteredRows {
     if (_nameFilter.isEmpty) return _rows;
     final q = _nameFilter.toLowerCase();
-    return _rows.where((r) => r.product.name.toLowerCase().contains(q)).toList();
+    return _rows.where((r) => r.product.displayName.toLowerCase().contains(q) || r.product.name.toLowerCase().contains(q)).toList();
   }
 
   Future<void> _saveAndExport() async {
@@ -2224,30 +2224,29 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen> {
     sheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).value = TextCellValue('Остаток фактический');
     row++;
 
-    // Данные: используем оригинальные значения из бланка (nameOriginal, groupNameOriginal, unit)
+    // Данные: name и groupName хранятся точно как в оригинальном бланке
     String? lastGroup;
     for (final r in _rows) {
       final groupName = r.product.groupName ?? '';
       if (groupName != lastGroup) {
         lastGroup = groupName;
         if (groupName.isNotEmpty) {
-          // Оригинальный заголовок группы как был в файле
-          final origGroup = r.product.groupNameOriginal ?? 'Т. $groupName';
-          sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = TextCellValue(origGroup);
+          // Группа — точно как в бланке (с «Т.»)
+          sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value =
+              TextCellValue(groupName);
           row++;
         }
       }
       // Код — как в бланке
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value =
           TextCellValue(r.product.code ?? '');
-      // Наименование — оригинал из бланка (с «Т.»)
-      final origName = r.product.nameOriginal ?? r.product.name;
+      // Наименование — точно как в бланке (с «Т.»)
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value =
-          TextCellValue(origName);
+          TextCellValue(r.product.name);
       // Ед. изм. — как в бланке (кг, л, шт)
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).value =
           TextCellValue(r.product.unit ?? '');
-      // Остаток — введённое количество (только если > 0)
+      // Остаток — введённое количество
       if (r.quantity > 0) {
         sheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).value =
             DoubleCellValue(r.quantity);
@@ -2398,16 +2397,17 @@ class _IikoInventoryTable extends StatelessWidget {
       itemBuilder: (ctx, i) {
         final row = rows[i];
         final groupName = row.product.groupName ?? '';
+        final groupDisplay = row.product.displayGroupName ?? '';
         Widget? groupHeader;
         if (groupName != lastGroup) {
           lastGroup = groupName;
-          if (groupName.isNotEmpty) {
+          if (groupDisplay.isNotEmpty) {
             groupHeader = Container(
               width: double.infinity,
               color: Colors.purple.withOpacity(0.08),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
               child: Text(
-                groupName,
+                groupDisplay,
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
@@ -2474,7 +2474,7 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
     final unitLabel = widget.row.product.unit ?? '';
     return ListTile(
       dense: true,
-      title: Text(widget.row.product.name, style: const TextStyle(fontSize: 14)),
+      title: Text(widget.row.product.displayName, style: const TextStyle(fontSize: 14)),
       subtitle: widget.row.product.code != null
           ? Text('Код: ${widget.row.product.code}', style: const TextStyle(fontSize: 11))
           : null,
