@@ -53,10 +53,11 @@ export default function AdminClient() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      <header className="border-b border-gray-800 px-6 py-4 flex items-center justify-between">
-        <div>
+      <header className="border-b border-amber-900/40 bg-gray-950 px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
           <span className="font-bold text-lg">Restodocks</span>
-          <span className="text-gray-500 ml-2 text-sm">/ Admin</span>
+          <span className="bg-amber-500 text-black text-xs font-bold px-2 py-0.5 rounded">BETA</span>
+          <span className="text-gray-500 text-sm">/ Admin</span>
         </div>
         <button onClick={logout} className="text-sm text-gray-500 hover:text-white transition">
           Выйти
