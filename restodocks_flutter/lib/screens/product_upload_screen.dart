@@ -327,17 +327,6 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
               color: Colors.blue,
               onTap: _isLoading ? null : () => _uploadFromFileUnified(),
             ),
-            const SizedBox(height: 12),
-
-            // 3. Загрузить бланк iiko (xlsx → отдельная номенклатура)
-            _UploadMethodCard(
-              icon: Icons.table_chart_outlined,
-              title: '3. Загрузить бланк iiko (.xlsx)',
-              description: 'Загрузите Excel-бланк инвентаризации iiko. '
-                  'Все позиции сохранятся в отдельной iiko-номенклатуре для проведения инвентаризации.',
-              color: Colors.purple,
-              onTap: _isLoading ? null : () => _uploadIikoBlank(),
-            ),
 
             const SizedBox(height: 24),
 
