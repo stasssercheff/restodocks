@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
-import { verifySessionToken } from '../auth/route'
+import { verifySessionToken } from '@/lib/session'
 
 function getServiceClient() {
   return createClient(

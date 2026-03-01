@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { verifySessionToken } from './api/auth/route'
+import { verifySessionToken } from '@/lib/session'
 
 export async function requireAuth() {
   const cookieStore = await cookies()
