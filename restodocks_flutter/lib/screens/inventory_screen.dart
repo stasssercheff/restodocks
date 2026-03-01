@@ -2347,8 +2347,8 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     final estId = account.establishment?.id;
     if (estId == null) return;
     final iikoStore = context.read<IikoProductStore>();
-    // Восстанавливаем байты оригинального бланка из localStorage
-    await iikoStore.restoreBlankFromStorage();
+    // Восстанавливаем байты бланка: localStorage → Supabase Storage (инкогнито/другое устройство)
+    await iikoStore.restoreBlankFromStorage(establishmentId: estId);
     await iikoStore.loadProducts(estId);
     if (!mounted) return;
     setState(() {
@@ -2551,8 +2551,9 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
 
   Future<Uint8List> _buildIikoExcel() async {
     final iikoStore = context.read<IikoProductStore>();
-    // Если байты не в памяти — пробуем восстановить из localStorage
-    await iikoStore.restoreBlankFromStorage();
+    final estId = context.read<AccountManagerSupabase>().establishment?.id;
+    // Если байты не в памяти — пробуем localStorage → Supabase Storage
+    await iikoStore.restoreBlankFromStorage(establishmentId: estId);
     final origBytes = iikoStore.originalBlankBytes;
     final qtyCol = iikoStore.originalQuantityColumnIndex ?? 5;
     return origBytes != null
@@ -2667,6 +2668,10 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   Widget build(BuildContext context) {
     final account = context.watch<AccountManagerSupabase>();
     final theme = Theme.of(context);
+    final isKeyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final isNarrow = MediaQuery.sizeOf(context).width < 600;
+    // На мобильном при открытой клавиатуре скрываем статус-строку — экономим место
+    final hideStatusRow = isNarrow && isKeyboardOpen;
 
     return Scaffold(
       appBar: AppBar(
@@ -2676,10 +2681,11 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text('Инвентаризация iiko', style: TextStyle(fontSize: 16)),
-            Text(
-              account.establishment?.name ?? '',
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
-            ),
+            if (!hideStatusRow)
+              Text(
+                account.establishment?.name ?? '',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
+              ),
           ],
         ),
         actions: [
@@ -2710,8 +2716,8 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                         ),
                       ),
                     ),
-                    // Статус-строка
-                    Container(
+                    // Статус-строка — скрывается на мобильном при открытой клавиатуре
+                    if (!hideStatusRow) Container(
                       color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                       child: Row(

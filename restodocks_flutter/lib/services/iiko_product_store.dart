@@ -18,8 +18,9 @@ class IikoProductStore extends ChangeNotifier {
 
   static const _kBlankBytesKey = 'iiko_blank_bytes_b64';
   static const _kQtyColKey     = 'iiko_blank_qty_col';
+  static const _kStorageBucket = 'iiko-blanks';
 
-  /// Байты оригинального xlsx-бланка для экспорта (персистируются в localStorage).
+  /// Байты оригинального xlsx-бланка для экспорта (персистируются в localStorage + Supabase Storage).
   Uint8List? originalBlankBytes;
 
   /// Индекс колонки «Остаток фактический» в оригинальном бланке (0-based).
@@ -30,9 +31,12 @@ class IikoProductStore extends ChangeNotifier {
   bool get hasProducts => _products.isNotEmpty;
   String? get loadedEstablishmentId => _loadedEstablishmentId;
 
-  /// Загружает байты бланка из localStorage если они ещё не в памяти.
-  Future<void> restoreBlankFromStorage() async {
+  /// Загружает байты бланка: сначала localStorage, потом Supabase Storage.
+  /// Вызывается перед экспортом и при загрузке iiko-экрана.
+  Future<void> restoreBlankFromStorage({String? establishmentId}) async {
     if (originalBlankBytes != null) return; // уже в памяти
+
+    // 1) localStorage (быстро, работает без сети)
     try {
       final prefs = await SharedPreferences.getInstance();
       final b64 = prefs.getString(_kBlankBytesKey);
@@ -41,9 +45,43 @@ class IikoProductStore extends ChangeNotifier {
         originalQuantityColumnIndex = prefs.getInt(_kQtyColKey);
         debugPrint('IikoProductStore: blank restored from localStorage '
             '(${originalBlankBytes!.length} bytes, qtyCol=$originalQuantityColumnIndex)');
+        return;
       }
     } catch (e) {
-      debugPrint('IikoProductStore.restoreBlankFromStorage error: $e');
+      debugPrint('IikoProductStore.restoreBlankFromStorage(local) error: $e');
+    }
+
+    // 2) Supabase Storage (инкогнито / другое устройство)
+    final estId = establishmentId ?? _loadedEstablishmentId;
+    if (estId == null) return;
+    await _restoreBlankFromServer(estId);
+  }
+
+  /// Скачивает бланк с Supabase Storage и сохраняет в память + localStorage.
+  Future<void> _restoreBlankFromServer(String establishmentId) async {
+    try {
+      // Читаем метаданные (индекс колонки)
+      final meta = await _supabase
+          .from('iiko_blank_meta')
+          .select('qty_col_index')
+          .eq('establishment_id', establishmentId)
+          .maybeSingle();
+      if (meta == null) return;
+
+      final storagePath = '$establishmentId/blank.xlsx';
+      final bytes = await _supabase.storage
+          .from(_kStorageBucket)
+          .download(storagePath);
+
+      originalBlankBytes = Uint8List.fromList(bytes);
+      originalQuantityColumnIndex = meta['qty_col_index'] as int?;
+
+      // Кэшируем в localStorage
+      await _persistBlank(originalBlankBytes!, originalQuantityColumnIndex);
+      debugPrint('IikoProductStore: blank restored from Supabase Storage '
+          '(${originalBlankBytes!.length} bytes, qtyCol=$originalQuantityColumnIndex)');
+    } catch (e) {
+      debugPrint('IikoProductStore._restoreBlankFromServer error: $e');
     }
   }
 
@@ -60,6 +98,37 @@ class IikoProductStore extends ChangeNotifier {
           '(${bytes.length} bytes, qtyCol=$qtyCol)');
     } catch (e) {
       debugPrint('IikoProductStore._persistBlank error: $e');
+    }
+  }
+
+  /// Загружает байты бланка в Supabase Storage и сохраняет метаданные.
+  Future<void> _uploadBlankToServer(
+      String establishmentId, Uint8List bytes, int? qtyCol) async {
+    try {
+      final storagePath = '$establishmentId/blank.xlsx';
+      await _supabase.storage
+          .from(_kStorageBucket)
+          .uploadBinary(
+            storagePath,
+            bytes,
+            fileOptions: const FileOptions(
+              contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+              upsert: true,
+            ),
+          );
+      // Сохраняем / обновляем метаданные
+      await _supabase.from('iiko_blank_meta').upsert(
+        {
+          'establishment_id': establishmentId,
+          'storage_path': storagePath,
+          'qty_col_index': qtyCol ?? 5,
+          'uploaded_at': DateTime.now().toIso8601String(),
+        },
+        onConflict: 'establishment_id',
+      );
+      debugPrint('IikoProductStore: blank uploaded to Supabase Storage ($storagePath)');
+    } catch (e) {
+      debugPrint('IikoProductStore._uploadBlankToServer error: $e');
     }
   }
 
@@ -104,8 +173,10 @@ class IikoProductStore extends ChangeNotifier {
       if (blankBytes != null) {
         originalBlankBytes = blankBytes;
         originalQuantityColumnIndex = quantityColumnIndex;
-        // Сохраняем байты бланка в localStorage — переживают перезагрузку страницы
+        // Сохраняем в localStorage (быстро)
         await _persistBlank(blankBytes, quantityColumnIndex);
+        // Сохраняем в Supabase Storage (работает в инкогнито и на других устройствах)
+        await _uploadBlankToServer(establishmentId, blankBytes, quantityColumnIndex);
       }
 
       // Удаляем старые через rpc
