@@ -375,7 +375,8 @@ class _InventoryScreenState extends State<InventoryScreen>
             ),
             const SizedBox(height: 8),
             ListTile(
-              leading: Icon(Icons.table_chart_outlined, color: hasIiko ? Colors.purple : Colors.grey),
+              leading: Icon(Icons.table_chart_outlined,
+                  color: hasIiko ? Theme.of(ctx).colorScheme.primary : Colors.grey),
               title: const Text('Бланк iiko'),
               subtitle: Text(
                 hasIiko
@@ -383,7 +384,9 @@ class _InventoryScreenState extends State<InventoryScreen>
                     : 'Сначала загрузите бланк iiko в «Загрузка продуктов»',
               ),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              tileColor: hasIiko ? Colors.purple.withOpacity(0.05) : Colors.grey.withOpacity(0.03),
+              tileColor: hasIiko
+                  ? Theme.of(ctx).colorScheme.primaryContainer.withOpacity(0.3)
+                  : Colors.grey.withOpacity(0.03),
               onTap: hasIiko ? () => Navigator.of(ctx).pop('iiko') : null,
             ),
           ],
@@ -2554,6 +2557,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   @override
   Widget build(BuildContext context) {
     final account = context.watch<AccountManagerSupabase>();
+    final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -2569,7 +2573,6 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
             ),
           ],
         ),
-        backgroundColor: Colors.purple[50],
         actions: [
           if (!_isLoading && !_completed)
             TextButton.icon(
@@ -2600,18 +2603,20 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                     ),
                     // Статус-строка
                     Container(
-                      color: Colors.purple.withOpacity(0.06),
+                      color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                       child: Row(
                         children: [
-                          Icon(Icons.table_chart_outlined, size: 16, color: Colors.purple[700]),
+                          Icon(Icons.table_chart_outlined, size: 16,
+                              color: theme.colorScheme.primary),
                           const SizedBox(width: 6),
                           Text(
                             'iiko · ${_rows.length} поз. · '
                             '${_date.day.toString().padLeft(2, '0')}.'
                             '${_date.month.toString().padLeft(2, '0')}.'
                             '${_date.year}',
-                            style: TextStyle(fontSize: 12, color: Colors.purple[700]),
+                            style: TextStyle(fontSize: 12,
+                                color: theme.colorScheme.onSurfaceVariant),
                           ),
                           const Spacer(),
                           // Индикатор защиты данных
@@ -2679,13 +2684,11 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                         padding: const EdgeInsets.all(12),
                         child: SizedBox(
                           width: double.infinity,
-                          child: FilledButton.icon(
-                            icon: const Icon(Icons.save_alt),
-                            label: const Text('Сохранить и скачать xlsx'),
-                            style: FilledButton.styleFrom(
-                                backgroundColor: Colors.purple[700]),
-                            onPressed: _saveAndExport,
-                          ),
+                        child: FilledButton.icon(
+                        icon: const Icon(Icons.save_alt),
+                        label: const Text('Сохранить и скачать xlsx'),
+                        onPressed: _saveAndExport,
+                      ),
                         ),
                       ),
                   ],
@@ -2706,36 +2709,37 @@ const double _iikoColCell  =  58; // Каждая ячейка ввода
 class _IikoInventoryHeader extends StatelessWidget {
   const _IikoInventoryHeader({required this.qtyCols});
 
-  /// Сколько колонок ввода показывать в шапке (минимум 2).
   final int qtyCols;
-
-  static const _b = BorderSide(color: Color(0xFFBBBBBB));
-  static const _s = TextStyle(
-      fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF333333));
-
-  Widget _hCell(String t, double w) => Container(
-        width: w,
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 7),
-        decoration: const BoxDecoration(
-          color: Color(0xFFEEEEEE),
-          border: Border(right: _b, bottom: _b),
-        ),
-        child: Text(t, style: _s, textAlign: TextAlign.center),
-      );
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final headerBg   = theme.colorScheme.surfaceContainerHighest;
+    final borderClr  = theme.dividerColor;
+    final textStyle  = TextStyle(
+        fontSize: 11, fontWeight: FontWeight.w700,
+        color: theme.colorScheme.onSurface);
+    final border = BorderSide(color: borderClr);
+
+    Widget hCell(String t, double w) => Container(
+          width: w,
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 7),
+          decoration: BoxDecoration(
+            color: headerBg,
+            border: Border(right: border, bottom: border),
+          ),
+          child: Text(t, style: textStyle, textAlign: TextAlign.center),
+        );
+
     return Container(
-      decoration: const BoxDecoration(
-        border: Border(left: _b, top: _b),
-        color: Color(0xFFEEEEEE),
+      decoration: BoxDecoration(
+        border: Border(left: border, top: border),
+        color: headerBg,
       ),
       child: Row(
         children: [
-          // Фиксированная левая часть
-          _hCell('Наименование / Ед.', _iikoColName),
-          _hCell('Итого', _iikoColTotal),
-          // Скроллируемые заголовки ячеек
+          hCell('Наименование / Ед.', _iikoColName),
+          hCell('Итого', _iikoColTotal),
           Expanded(
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -2743,7 +2747,7 @@ class _IikoInventoryHeader extends StatelessWidget {
               child: Row(
                 children: List.generate(
                   qtyCols,
-                  (i) => _hCell('№${i + 1}', _iikoColCell),
+                  (i) => hCell('№${i + 1}', _iikoColCell),
                 ),
               ),
             ),
@@ -2780,17 +2784,17 @@ class _IikoInventoryTable extends StatelessWidget {
         if (groupName != lastGroup) {
           lastGroup = groupName;
           if (groupDisplay.isNotEmpty) {
+            final theme = Theme.of(ctx);
             groupHeader = Container(
               width: double.infinity,
-              color: Colors.purple.withOpacity(0.08),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              color: theme.colorScheme.primaryContainer.withOpacity(0.25),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               child: Text(
                 groupDisplay,
                 style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: Colors.purple[800]),
+                    color: theme.colorScheme.primary),
               ),
             );
           }
@@ -2875,16 +2879,16 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
     final total = widget.row.total;
     final qtyCols = widget.row.quantities.length;
 
-    const cb = BorderSide(color: Color(0xFFDDDDDD)); // cell border
+    final theme = Theme.of(context);
+    final borderClr = theme.dividerColor;
+    final cb = BorderSide(color: borderClr);
 
-    Widget _numCell(int colIdx) {
+    Widget numCell(int colIdx) {
       final ctrl = _ctrls[colIdx];
       return Container(
         width: _iikoColCell,
         height: double.infinity,
-        decoration: const BoxDecoration(
-          border: Border(right: cb),
-        ),
+        decoration: BoxDecoration(border: Border(right: cb)),
         padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
         child: widget.completed
             ? Center(
@@ -2901,18 +2905,18 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
                     const TextInputType.numberWithOptions(decimal: true),
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 13),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   isDense: true,
                   border: InputBorder.none,
                   contentPadding:
-                      EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+                      const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
                   hintText: '—',
-                  hintStyle:
-                      TextStyle(fontSize: 12, color: Color(0xFFBBBBBB)),
+                  hintStyle: TextStyle(
+                      fontSize: 12,
+                      color: theme.colorScheme.onSurface.withOpacity(0.3)),
                 ),
                 onChanged: (v) {
-                  final qty =
-                      double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
+                  final qty = double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
                   widget.onChanged(colIdx, qty);
                 },
               ),
@@ -2921,23 +2925,17 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
 
     return Container(
       decoration: BoxDecoration(
-        border: Border(
-          left: cb,
-          bottom: cb,
-        ),
+        border: Border(left: cb, bottom: cb),
       ),
-      // Высота строки фиксирована — иначе IntrinsicHeight конфликтует со скроллом
       height: 48,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // ── Фиксированная левая часть: Наименование ──
+          // ── Наименование ──
           Container(
             width: _iikoColName,
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: const BoxDecoration(
-              border: Border(right: cb),
-            ),
+            decoration: BoxDecoration(border: Border(right: cb)),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
@@ -2951,7 +2949,8 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
                 if (unit.isNotEmpty)
                   Text(unit,
                       style: TextStyle(
-                          fontSize: 10, color: Colors.grey[500])),
+                          fontSize: 10,
+                          color: theme.colorScheme.onSurface.withOpacity(0.5))),
               ],
             ),
           ),
@@ -2959,14 +2958,16 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
           Container(
             width: _iikoColTotal,
             alignment: Alignment.center,
-            decoration: const BoxDecoration(
-              color: Color(0xFFF5F5F5),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
               border: Border(right: cb),
             ),
             child: Text(
               total > 0 ? _fmt(total) : '',
-              style: const TextStyle(
-                  fontSize: 13, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: total > 0 ? theme.colorScheme.primary : null),
             ),
           ),
           // ── Ячейки ввода — скроллируются вправо ──
@@ -2975,7 +2976,7 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
               scrollDirection: Axis.horizontal,
               physics: const ClampingScrollPhysics(),
               child: Row(
-                children: List.generate(qtyCols, _numCell),
+                children: List.generate(qtyCols, numCell),
               ),
             ),
           ),

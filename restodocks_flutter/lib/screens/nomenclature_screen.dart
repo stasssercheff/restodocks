@@ -3756,36 +3756,38 @@ const double _tableWidth  = _colGroup + _colCode + _colName + _colUnit + _colQty
 class _IikoBlankaHeader extends StatelessWidget {
   const _IikoBlankaHeader();
 
-  static const _border = BorderSide(color: Color(0xFFBBBBBB));
-  static const _style = TextStyle(
-    fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF222222),
-  );
-
-  Widget _cell(String text, double width) => Container(
-    width: width,
-    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 7),
-    decoration: const BoxDecoration(
-      color: Color(0xFFEEEEEE),
-      border: Border(right: _border, bottom: _border),
-    ),
-    child: Text(text, style: _style, textAlign: TextAlign.center),
-  );
-
   @override
   Widget build(BuildContext context) {
+    final theme  = Theme.of(context);
+    final bg     = theme.colorScheme.surfaceContainerHighest;
+    final border = BorderSide(color: theme.dividerColor);
+    final style  = TextStyle(
+        fontSize: 11, fontWeight: FontWeight.w700,
+        color: theme.colorScheme.onSurface);
+
+    Widget cell(String text, double width) => Container(
+          width: width,
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 7),
+          decoration: BoxDecoration(
+            color: bg,
+            border: Border(right: border, bottom: border),
+          ),
+          child: Text(text, style: style, textAlign: TextAlign.center),
+        );
+
     return Container(
       width: _tableWidth,
-      decoration: const BoxDecoration(
-        border: Border(top: _border, left: _border),
-        color: Color(0xFFEEEEEE),
+      decoration: BoxDecoration(
+        border: Border(top: border, left: border),
+        color: bg,
       ),
       child: Row(
         children: [
-          _cell('Группа',               _colGroup),
-          _cell('Код',                  _colCode),
-          _cell('Наименование',         _colName),
-          _cell('Ед.\nизм.',            _colUnit),
-          _cell('Остаток\nфактический', _colQty),
+          cell('Группа',               _colGroup),
+          cell('Код',                  _colCode),
+          cell('Наименование',         _colName),
+          cell('Ед.\nизм.',            _colUnit),
+          cell('Остаток\nфактический', _colQty),
         ],
       ),
     );
@@ -3799,61 +3801,59 @@ class _IikoBlankaRowWidget extends StatelessWidget {
   final _IikoBlankRow row;
   final int groupCount;
 
-  static const _border    = BorderSide(color: Color(0xFFCCCCCC));
-  static const _nameStyle = TextStyle(fontSize: 12, color: Color(0xFF111111));
-  static const _codeStyle = TextStyle(fontSize: 11, color: Color(0xFF444444));
-  static const _unitStyle = TextStyle(fontSize: 12, color: Color(0xFF222222));
-  static const _groupStyle = TextStyle(
-      fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF222222));
-
-  Widget _cell(Widget child, double width, {Color? bg, TextAlign? align}) {
-    return Container(
-      width: width,
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
-      decoration: BoxDecoration(
-        color: bg,
-        border: const Border(right: _border, bottom: _border),
-      ),
-      child: child,
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    final theme  = Theme.of(context);
+    final border = BorderSide(color: theme.dividerColor);
+
+    Widget cell(Widget child, double width, {Color? bg}) => Container(
+          width: width,
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+          decoration: BoxDecoration(
+            color: bg,
+            border: Border(right: border, bottom: border),
+          ),
+          child: child,
+        );
+
+    final textColor    = theme.colorScheme.onSurface;
+    final subtleColor  = theme.colorScheme.onSurface.withOpacity(0.55);
+    final groupBg      = theme.colorScheme.primaryContainer.withOpacity(0.18);
+
     return Container(
       width: _tableWidth,
-      decoration: const BoxDecoration(
-        border: Border(left: _border),
-      ),
+      decoration: BoxDecoration(border: Border(left: border)),
       child: IntrinsicHeight(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Группа — только у первой строки группы
-            _cell(
+            cell(
               row.isFirstInGroup
-                  ? Text(row.product.groupName ?? '', style: _groupStyle)
+                  ? Text(row.product.groupName ?? '',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+                          color: theme.colorScheme.primary))
                   : const SizedBox.shrink(),
               _colGroup,
-              bg: const Color(0xFFFFF8F0),
+              bg: groupBg,
             ),
-            // Код
-            _cell(
-              Text(row.product.code ?? '', style: _codeStyle, textAlign: TextAlign.center),
+            cell(
+              Text(row.product.code ?? '',
+                  style: TextStyle(fontSize: 11, color: subtleColor),
+                  textAlign: TextAlign.center),
               _colCode,
             ),
-            // Наименование — точно как в файле
-            _cell(
-              Text(row.product.name, style: _nameStyle),
+            cell(
+              Text(row.product.name,
+                  style: TextStyle(fontSize: 12, color: textColor)),
               _colName,
             ),
-            // Ед. изм. — точно как в файле
-            _cell(
-              Text(row.product.unit ?? '', style: _unitStyle, textAlign: TextAlign.center),
+            cell(
+              Text(row.product.unit ?? '',
+                  style: TextStyle(fontSize: 12, color: textColor),
+                  textAlign: TextAlign.center),
               _colUnit,
             ),
-            // Остаток фактический — пусто
-            _cell(const SizedBox.shrink(), _colQty),
+            cell(const SizedBox.shrink(), _colQty),
           ],
         ),
       ),

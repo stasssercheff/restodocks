@@ -227,7 +227,6 @@ class _IikoInventoryInboxDetailScreenState
       appBar: AppBar(
         leading: appBarBackButton(context),
         title: const Text('Инвентаризация iiko'),
-        backgroundColor: Colors.purple[50],
         actions: [
           IconButton(
             icon: const Icon(Icons.download),
@@ -282,23 +281,25 @@ class _HeaderPanel extends StatelessWidget {
         ? '${dt.day.toString().padLeft(2, '0')}.${dt.month.toString().padLeft(2, '0')}.${dt.year}'
         : dateRaw;
 
+    final theme = Theme.of(context);
     return Container(
       width: double.infinity,
-      color: Colors.purple.withOpacity(0.06),
+      color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(header['establishmentName'] as String? ?? '—',
-              style: const TextStyle(
-                  fontSize: 14, fontWeight: FontWeight.w600)),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
           const SizedBox(height: 2),
-          Text('Дата: $dateStr  •  '
-              'Сотрудник: ${header['employeeName'] ?? '—'}',
-              style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+          Text('Дата: $dateStr  •  Сотрудник: ${header['employeeName'] ?? '—'}',
+              style: TextStyle(fontSize: 12,
+                  color: theme.colorScheme.onSurface.withOpacity(0.6))),
           const SizedBox(height: 2),
           Text('Заполнено: $filledRows из $totalRows позиций',
-              style: TextStyle(fontSize: 12, color: Colors.purple[700])),
+              style: TextStyle(fontSize: 12,
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.w500)),
         ],
       ),
     );
@@ -309,33 +310,35 @@ class _HeaderPanel extends StatelessWidget {
 class _TableHeader extends StatelessWidget {
   const _TableHeader();
 
-  static const _b = BorderSide(color: Color(0xFFBBBBBB));
-  static const _s = TextStyle(
-      fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF222222));
-
-  Widget _hCell(String t, double w) => Container(
-        width: w,
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 7),
-        decoration: const BoxDecoration(
-          color: Color(0xFFEEEEEE),
-          border: Border(right: _b, bottom: _b),
-        ),
-        child: Text(t, style: _s, textAlign: TextAlign.center),
-      );
-
   @override
   Widget build(BuildContext context) {
+    final theme  = Theme.of(context);
+    final bg     = theme.colorScheme.surfaceContainerHighest;
+    final border = BorderSide(color: theme.dividerColor);
+    final style  = TextStyle(
+        fontSize: 11, fontWeight: FontWeight.w700,
+        color: theme.colorScheme.onSurface);
+
+    Widget hCell(String t, double w) => Container(
+          width: w,
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 7),
+          decoration: BoxDecoration(
+            color: bg,
+            border: Border(right: border, bottom: border),
+          ),
+          child: Text(t, style: style, textAlign: TextAlign.center),
+        );
+
     return Container(
-      decoration: const BoxDecoration(
-          border: Border(left: _b, top: _b),
-          color: Color(0xFFEEEEEE)),
+      decoration: BoxDecoration(
+          border: Border(left: border, top: border), color: bg),
       child: Row(
         children: [
-          _hCell('Группа', 100),
-          _hCell('Код',    58),
-          Expanded(child: _hCell('Наименование', double.infinity)),
-          _hCell('Ед.', 44),
-          _hCell('Итого', 72),
+          hCell('Группа', 100),
+          hCell('Код',    58),
+          Expanded(child: hCell('Наименование', double.infinity)),
+          hCell('Ед.',    44),
+          hCell('Итого',  72),
         ],
       ),
     );
@@ -349,74 +352,68 @@ class _TableRow extends StatelessWidget {
   final Map<String, dynamic> row;
   final int index;
 
-  static const _b = BorderSide(color: Color(0xFFDDDDDD));
-
   String _fmt(double v) => v == v.roundToDouble()
       ? v.toInt().toString()
       : v.toStringAsFixed(3)
           .replaceAll(RegExp(r'0+$'), '')
           .replaceAll(RegExp(r'\.$'), '');
 
-  Widget _cell(Widget child, {double? width, Color? bg}) => Container(
-        width: width,
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-        decoration: BoxDecoration(
-          color: bg,
-          border: const Border(right: _b, bottom: _b),
-        ),
-        child: child,
-      );
-
   @override
   Widget build(BuildContext context) {
+    final theme  = Theme.of(context);
+    final border = BorderSide(color: theme.dividerColor);
+
+    Widget cell(Widget child, {double? width, Color? bg}) => Container(
+          width: width,
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+          decoration: BoxDecoration(
+            color: bg,
+            border: Border(right: border, bottom: border),
+          ),
+          child: child,
+        );
+
     final name  = row['name']  as String? ?? '';
     final code  = row['code']  as String? ?? '';
     final unit  = row['unit']  as String? ?? '';
     final total = (row['total'] as num?)?.toDouble() ?? 0.0;
 
     return Container(
-      decoration: const BoxDecoration(
-          border: Border(left: _b)),
+      decoration: BoxDecoration(border: Border(left: border)),
       child: IntrinsicHeight(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Группа — iiko payload не хранит группу, оставляем пустой
-            _cell(const SizedBox.shrink(), width: 100,
+            cell(const SizedBox.shrink(), width: 100,
                 bg: index.isEven
-                    ? const Color(0xFFFAFAFA)
+                    ? theme.colorScheme.surfaceContainerHighest.withOpacity(0.3)
                     : null),
-            // Код
-            _cell(
+            cell(
               Text(code,
-                  style: const TextStyle(fontSize: 11, color: Color(0xFF444444)),
+                  style: TextStyle(fontSize: 11,
+                      color: theme.colorScheme.onSurface.withOpacity(0.6)),
                   textAlign: TextAlign.center),
               width: 58,
             ),
-            // Наименование — точно как в оригинале
             Expanded(
-              child: _cell(
-                Text(name,
-                    style: const TextStyle(fontSize: 12)),
-              ),
+              child: cell(Text(name, style: const TextStyle(fontSize: 12))),
             ),
-            // Ед.изм.
-            _cell(
+            cell(
               Text(unit,
                   style: const TextStyle(fontSize: 12),
                   textAlign: TextAlign.center),
               width: 44,
             ),
-            // Итого — выделено жирным и фиолетовым
-            _cell(
+            // Итого — акцент цветом primary темы
+            cell(
               Text(_fmt(total),
                   style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: Colors.purple[700]),
+                      color: theme.colorScheme.primary),
                   textAlign: TextAlign.center),
               width: 72,
-              bg: Colors.purple.withOpacity(0.06),
+              bg: theme.colorScheme.primaryContainer.withOpacity(0.2),
             ),
           ],
         ),
