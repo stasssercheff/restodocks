@@ -333,39 +333,48 @@ class _InventoryScreenState extends State<InventoryScreen>
   Future<void> _initScreen() async {
     final draftStorage = DraftStorageService();
 
-    // Проверяем оба типа черновиков параллельно
-    final results = await Future.wait([
+    // Загружаем iiko-продукты и оба типа черновиков одновременно
+    final iikoStore = context.read<IikoProductStore>();
+    final account  = context.read<AccountManagerSupabase>();
+    final estId    = account.establishment?.id;
+
+    final futures = await Future.wait([
       draftStorage.loadInventoryDraft(),
       draftStorage.loadIikoInventoryDraft(),
+      if (estId != null) iikoStore.loadProducts(estId) else Future.value(null),
     ]);
     if (!mounted) return;
 
-    final stdDraft  = results[0];
-    final iikoDraft = results[1];
+    final stdDraft  = futures[0] as Map<String, dynamic>?;
+    final iikoDraft = futures[1] as Map<String, dynamic>?;
 
-    // Если есть iiko-черновик — всегда показываем диалог (пользователь должен выбрать, к чему вернуться)
-    if (iikoDraft != null && iikoDraft.isNotEmpty) {
-      await _showModeDialog(hasIikoDraft: true);
+    final hasIikoProducts = iikoStore.hasProducts;
+    final hasIikoDraft    = iikoDraft != null && iikoDraft.isNotEmpty;
+    final hasStdDraft     = stdDraft  != null && stdDraft.isNotEmpty;
+
+    // Если есть iiko-продукты или iiko-черновик — показываем диалог выбора ВСЕГДА
+    // (пользователь должен сам выбрать куда вернуться)
+    if (hasIikoProducts || hasIikoDraft) {
+      await _showModeDialog(hasIikoDraft: hasIikoDraft, hasStdDraft: hasStdDraft);
       return;
     }
 
-    // Только стандартный черновик — восстанавливаем без диалога
-    if (stdDraft != null && stdDraft.isNotEmpty) {
-      _stateRestored = false;
-      await restoreState(stdDraft);
-      return;
-    }
-
-    // localStorage пуст (инкогнито / очищен) — пробуем Supabase
-    // Проверяем iiko-черновик на сервере
+    // iiko-продуктов нет — проверяем сервер (инкогнито / очищенный localStorage)
     final serverIikoDraft = await _loadIikoDraftFromServer();
     if (!mounted) return;
     if (serverIikoDraft != null) {
-      await _showModeDialog(hasIikoDraft: true);
+      await _showModeDialog(hasIikoDraft: true, hasStdDraft: hasStdDraft);
       return;
     }
 
-    // Стандартный черновик на сервере
+    // iiko нет нигде — тихо восстанавливаем стандартный черновик (если есть)
+    if (hasStdDraft) {
+      _stateRestored = false;
+      await restoreState(stdDraft!);
+      return;
+    }
+
+    // Стандартный черновик на сервере (инкогнито)
     final serverStdDraft = await _loadDraftFromServer();
     if (!mounted) return;
     if (serverStdDraft != null && serverStdDraft.isNotEmpty) {
@@ -374,7 +383,7 @@ class _InventoryScreenState extends State<InventoryScreen>
       return;
     }
 
-    // Черновика нет нигде — показываем диалог выбора режима
+    // Черновиков нет — диалог (iiko-продуктов тоже нет, но показываем для консистентности)
     await _showModeDialog();
   }
 
@@ -418,20 +427,32 @@ class _InventoryScreenState extends State<InventoryScreen>
   }
 
   /// Диалог выбора режима инвентаризации при открытии экрана.
-  /// [hasIikoDraft] — если true, у iiko-варианта показывается метка «Продолжить».
-  Future<void> _showModeDialog({bool hasIikoDraft = false}) async {
+  /// [hasIikoDraft] — незавершённая iiko-инвентаризация сохранена.
+  /// [hasStdDraft]  — незавершённая стандартная инвентаризация сохранена.
+  Future<void> _showModeDialog({bool hasIikoDraft = false, bool hasStdDraft = false}) async {
     if (!mounted) return;
     final iikoStore = context.read<IikoProductStore>();
-    final account = context.read<AccountManagerSupabase>();
-    final estId = account.establishment?.id;
-
-    // Проверяем есть ли iiko-продукты
-    if (estId != null) {
-      await iikoStore.loadProducts(estId);
-    }
-    if (!mounted) return;
-
     final hasIiko = iikoStore.hasProducts || hasIikoDraft;
+
+    Widget _continueBadge(BuildContext ctx) {
+      final theme = Theme.of(ctx);
+      return Container(
+        margin: const EdgeInsets.only(left: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.primaryContainer,
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          'Продолжить',
+          style: TextStyle(
+            fontSize: 11,
+            color: theme.colorScheme.onPrimaryContainer,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+    }
 
     final choice = await showDialog<String>(
       context: context,
@@ -445,8 +466,13 @@ class _InventoryScreenState extends State<InventoryScreen>
             children: [
               ListTile(
                 leading: const Icon(Icons.list_alt, color: Colors.blue),
-                title: const Text('Стандартный'),
-                subtitle: const Text('Продукты из номенклатуры'),
+                title: Row(children: [
+                  const Text('Стандартный'),
+                  if (hasStdDraft) _continueBadge(ctx),
+                ]),
+                subtitle: Text(hasStdDraft
+                    ? 'Незавершённая инвентаризация сохранена'
+                    : 'Продукты из номенклатуры'),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 tileColor: Colors.blue.withOpacity(0.05),
                 onTap: () => Navigator.of(ctx).pop('standard'),
@@ -455,29 +481,10 @@ class _InventoryScreenState extends State<InventoryScreen>
               ListTile(
                 leading: Icon(Icons.table_chart_outlined,
                     color: hasIiko ? theme.colorScheme.primary : Colors.grey),
-                title: Row(
-                  children: [
-                    const Text('Бланк iiko'),
-                    if (hasIikoDraft) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primaryContainer,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          'Продолжить',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: theme.colorScheme.onPrimaryContainer,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+                title: Row(children: [
+                  const Text('Бланк iiko'),
+                  if (hasIikoDraft) _continueBadge(ctx),
+                ]),
                 subtitle: Text(
                   hasIikoDraft
                       ? 'Незавершённая инвентаризация сохранена'
@@ -493,12 +500,6 @@ class _InventoryScreenState extends State<InventoryScreen>
               ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop('standard'),
-              child: const Text('Отмена'),
-            ),
-          ],
         );
       },
     );
@@ -506,12 +507,22 @@ class _InventoryScreenState extends State<InventoryScreen>
     if (!mounted) return;
 
     if (choice == 'iiko') {
-      // Переходим на iiko-экран инвентаризации (данные там уже сохранены и восстановятся)
       context.pushReplacement('/inventory-iiko');
-    } else {
-      // Стандартный режим — загружаем номенклатуру как обычно
+    } else if (choice == 'standard') {
+      // Если есть стандартный черновик — восстанавливаем его
+      if (hasStdDraft) {
+        final draftStorage = DraftStorageService();
+        final savedDraft = await draftStorage.loadInventoryDraft();
+        if (!mounted) return;
+        if (savedDraft != null && savedDraft.isNotEmpty) {
+          _stateRestored = false;
+          await restoreState(savedDraft);
+          return;
+        }
+      }
       _loadNomenclature();
     }
+    // choice == null → пользователь не выбрал (нажал вне диалога) — ничего не делаем
   }
 
   /// Автоматическая подстановка: номенклатура заведения + полуфабрикаты (ТТК с типом ПФ).
