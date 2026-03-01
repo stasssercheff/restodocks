@@ -142,6 +142,48 @@ class DraftStorageService {
     } catch (_) {}
   }
 
+  // ── iiko-инвентаризация ──────────────────────────────────────────────────────
+
+  static const String _iikoInventoryKey = 'draft_iiko_inventory';
+
+  Future<void> saveIikoInventoryDraft(Map<String, dynamic> data) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_iikoInventoryKey, jsonEncode(data));
+    } catch (e) {
+      debugPrint('Failed to save iiko draft: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>?> loadIikoInventoryDraft() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final s = prefs.getString(_iikoInventoryKey);
+      return s != null ? jsonDecode(s) as Map<String, dynamic> : null;
+    } catch (e) {
+      debugPrint('Failed to load iiko draft: $e');
+      return null;
+    }
+  }
+
+  Future<void> clearIikoInventoryDraft() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_iikoInventoryKey);
+    } catch (_) {}
+  }
+
+  Future<bool> hasIikoInventoryDraft() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.containsKey(_iikoInventoryKey);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
+
   /// Удалить черновик чек-листа (общий)
   Future<void> clearChecklistDraft() async {
     try {

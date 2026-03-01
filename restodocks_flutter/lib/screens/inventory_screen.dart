@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:archive/archive.dart';
+
 import 'package:excel/excel.dart' hide Border, TextSpan;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -17,6 +19,7 @@ import '../services/image_service.dart';
 import '../services/inventory_download.dart';
 import '../services/services.dart';
 import '../services/iiko_product_store.dart';
+import '../services/draft_storage_service.dart';
 import '../mixins/auto_save_mixin.dart';
 import '../mixins/input_change_listener_mixin.dart';
 import '../widgets/app_bar_home_button.dart';
@@ -158,6 +161,7 @@ class _InventoryScreenState extends State<InventoryScreen>
   _InventoryBlockFilter _blockFilter = _InventoryBlockFilter.all;
   final TextEditingController _nameFilterCtrl = TextEditingController();
   String _nameFilter = '';
+  bool _stateRestored = false; // Флаг: предотвращает двойное восстановление
 
 
   /// Сохранить данные немедленно в локальное хранилище (SharedPreferences/localStorage)
@@ -169,7 +173,7 @@ class _InventoryScreenState extends State<InventoryScreen>
   void initState() {
     super.initState();
     _startTime = TimeOfDay.now();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _showModeDialog());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _initScreen());
     _nameFilterCtrl.addListener(() {
       if (_nameFilter != _nameFilterCtrl.text) {
         setState(() => _nameFilter = _nameFilterCtrl.text);
@@ -182,8 +186,8 @@ class _InventoryScreenState extends State<InventoryScreen>
       saveNow();
     });
 
-    // Тихая отправка на сервер каждые 15 секунд — данные не теряются при обрыве
-    _serverAutoSaveTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
+    // Тихая отправка на сервер каждые 10 секунд — данные не теряются даже в инкогнито
+    _serverAutoSaveTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
       if (mounted && !_completed) {
         _autoSaveToServer();
       }
@@ -218,6 +222,8 @@ class _InventoryScreenState extends State<InventoryScreen>
 
   @override
   Future<void> restoreState(Map<String, dynamic> data) async {
+    if (_stateRestored) return; // уже восстановлено из _initScreen
+    _stateRestored = true;
     setState(() {
       _date = DateTime.parse(data['date'] ?? DateTime.now().toIso8601String());
       _startTime = data['startTime'] != null && data['startTime'].isNotEmpty
@@ -323,70 +329,202 @@ class _InventoryScreenState extends State<InventoryScreen>
   /// Порядок отображения: сначала продукты, потом ПФ (для обратной совместимости с нумерацией в Excel).
   List<int> get _displayOrder => [..._productIndices, ..._pfIndices];
 
+  /// При открытии: если есть черновик — восстанавливаем без диалога.
+  /// Порядок приоритетов: localStorage → Supabase → диалог.
+  /// В инкогнито localStorage пуст — восстанавливаем с сервера.
+  Future<void> _initScreen() async {
+    final draftStorage = DraftStorageService();
+
+    // Загружаем iiko-продукты и оба типа черновиков одновременно
+    final iikoStore = context.read<IikoProductStore>();
+    final account  = context.read<AccountManagerSupabase>();
+    final estId    = account.establishment?.id;
+
+    final futures = await Future.wait([
+      draftStorage.loadInventoryDraft(),
+      draftStorage.loadIikoInventoryDraft(),
+      if (estId != null) iikoStore.loadProducts(estId) else Future.value(null),
+    ]);
+    if (!mounted) return;
+
+    final stdDraft  = futures[0] as Map<String, dynamic>?;
+    final iikoDraft = futures[1] as Map<String, dynamic>?;
+
+    final hasIikoProducts = iikoStore.hasProducts;
+    final hasIikoDraft    = iikoDraft != null && iikoDraft.isNotEmpty;
+    final hasStdDraft     = stdDraft  != null && stdDraft.isNotEmpty;
+
+    // Если есть iiko-продукты или iiko-черновик — показываем диалог выбора ВСЕГДА
+    // (пользователь должен сам выбрать куда вернуться)
+    if (hasIikoProducts || hasIikoDraft) {
+      await _showModeDialog(hasIikoDraft: hasIikoDraft, hasStdDraft: hasStdDraft);
+      return;
+    }
+
+    // iiko-продуктов нет — проверяем сервер (инкогнито / очищенный localStorage)
+    final serverIikoDraft = await _loadIikoDraftFromServer();
+    if (!mounted) return;
+    if (serverIikoDraft != null) {
+      await _showModeDialog(hasIikoDraft: true, hasStdDraft: hasStdDraft);
+      return;
+    }
+
+    // iiko нет нигде — тихо восстанавливаем стандартный черновик (если есть)
+    if (hasStdDraft) {
+      _stateRestored = false;
+      await restoreState(stdDraft!);
+      return;
+    }
+
+    // Стандартный черновик на сервере (инкогнито)
+    final serverStdDraft = await _loadDraftFromServer();
+    if (!mounted) return;
+    if (serverStdDraft != null && serverStdDraft.isNotEmpty) {
+      _stateRestored = false;
+      await restoreState(serverStdDraft);
+      return;
+    }
+
+    // Черновиков нет — диалог (iiko-продуктов тоже нет, но показываем для консистентности)
+    await _showModeDialog();
+  }
+
+  /// Проверяет наличие iiko-черновика на сервере (для инкогнито / очищенного localStorage).
+  Future<Map<String, dynamic>?> _loadIikoDraftFromServer() async {
+    try {
+      final account = context.read<AccountManagerSupabase>();
+      final estId = account.establishment?.id;
+      if (estId == null) return null;
+      final row = await Supabase.instance.client
+          .from('inventory_drafts')
+          .select('draft_data')
+          .eq('establishment_id', estId)
+          .eq('draft_type', 'iiko_inventory')
+          .maybeSingle();
+      if (row == null) return null;
+      return row['draft_data'] as Map<String, dynamic>?;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Загружает стандартный черновик инвентаризации с Supabase.
+  /// Работает даже в инкогнито — localStorage там пуст.
+  Future<Map<String, dynamic>?> _loadDraftFromServer() async {
+    try {
+      final account = context.read<AccountManagerSupabase>();
+      final estId = account.establishment?.id;
+      if (estId == null) return null;
+      final row = await Supabase.instance.client
+          .from('inventory_drafts')
+          .select('draft_data')
+          .eq('establishment_id', estId)
+          .eq('draft_type', 'standard')
+          .maybeSingle();
+      if (row == null) return null;
+      return row['draft_data'] as Map<String, dynamic>?;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Диалог выбора режима инвентаризации при открытии экрана.
-  Future<void> _showModeDialog() async {
+  /// [hasIikoDraft] — незавершённая iiko-инвентаризация сохранена.
+  /// [hasStdDraft]  — незавершённая стандартная инвентаризация сохранена.
+  Future<void> _showModeDialog({bool hasIikoDraft = false, bool hasStdDraft = false}) async {
     if (!mounted) return;
     final iikoStore = context.read<IikoProductStore>();
-    final account = context.read<AccountManagerSupabase>();
-    final estId = account.establishment?.id;
+    final hasIiko = iikoStore.hasProducts || hasIikoDraft;
 
-    // Проверяем есть ли iiko-продукты
-    if (estId != null) {
-      await iikoStore.loadProducts(estId);
+    Widget _continueBadge(BuildContext ctx) {
+      final theme = Theme.of(ctx);
+      return Container(
+        margin: const EdgeInsets.only(left: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.primaryContainer,
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          'Продолжить',
+          style: TextStyle(
+            fontSize: 11,
+            color: theme.colorScheme.onPrimaryContainer,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
     }
-    if (!mounted) return;
-
-    final hasIiko = iikoStore.hasProducts;
 
     final choice = await showDialog<String>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Тип инвентаризации'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.list_alt, color: Colors.blue),
-              title: const Text('Стандартный'),
-              subtitle: const Text('Продукты из номенклатуры'),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              tileColor: Colors.blue.withOpacity(0.05),
-              onTap: () => Navigator.of(ctx).pop('standard'),
-            ),
-            const SizedBox(height: 8),
-            ListTile(
-              leading: Icon(Icons.table_chart_outlined, color: hasIiko ? Colors.purple : Colors.grey),
-              title: const Text('Бланк iiko'),
-              subtitle: Text(
-                hasIiko
-                    ? 'Продукты из iiko-бланка · ${iikoStore.products.length} позиций'
-                    : 'Сначала загрузите бланк iiko в «Загрузка продуктов»',
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        return AlertDialog(
+          title: const Text('Тип инвентаризации'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.list_alt, color: Colors.blue),
+                title: Row(children: [
+                  const Text('Стандартный'),
+                  if (hasStdDraft) _continueBadge(ctx),
+                ]),
+                subtitle: Text(hasStdDraft
+                    ? 'Незавершённая инвентаризация сохранена'
+                    : 'Продукты из номенклатуры'),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                tileColor: Colors.blue.withOpacity(0.05),
+                onTap: () => Navigator.of(ctx).pop('standard'),
               ),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              tileColor: hasIiko ? Colors.purple.withOpacity(0.05) : Colors.grey.withOpacity(0.03),
-              onTap: hasIiko ? () => Navigator.of(ctx).pop('iiko') : null,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop('standard'),
-            child: const Text('Отмена'),
+              const SizedBox(height: 8),
+              ListTile(
+                leading: Icon(Icons.table_chart_outlined,
+                    color: hasIiko ? theme.colorScheme.primary : Colors.grey),
+                title: Row(children: [
+                  const Text('Бланк iiko'),
+                  if (hasIikoDraft) _continueBadge(ctx),
+                ]),
+                subtitle: Text(
+                  hasIikoDraft
+                      ? 'Незавершённая инвентаризация сохранена'
+                      : hasIiko
+                          ? 'Продукты из iiko-бланка · ${iikoStore.products.length} позиций'
+                          : 'Сначала загрузите бланк iiko в «Загрузка продуктов»',
+                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                tileColor: hasIiko
+                    ? theme.colorScheme.primaryContainer.withOpacity(0.3)
+                    : Colors.grey.withOpacity(0.03),
+                onTap: hasIiko ? () => Navigator.of(ctx).pop('iiko') : null,
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
 
     if (!mounted) return;
 
     if (choice == 'iiko') {
-      // Переходим на iiko-экран инвентаризации
       context.pushReplacement('/inventory-iiko');
-    } else {
-      // Стандартный режим — загружаем номенклатуру как обычно
+    } else if (choice == 'standard') {
+      // Если есть стандартный черновик — восстанавливаем его
+      if (hasStdDraft) {
+        final draftStorage = DraftStorageService();
+        final savedDraft = await draftStorage.loadInventoryDraft();
+        if (!mounted) return;
+        if (savedDraft != null && savedDraft.isNotEmpty) {
+          _stateRestored = false;
+          await restoreState(savedDraft);
+          return;
+        }
+      }
       _loadNomenclature();
     }
+    // choice == null → пользователь не выбрал (нажал вне диалога) — ничего не делаем
   }
 
   /// Автоматическая подстановка: номенклатура заведения + полуфабрикаты (ТТК с типом ПФ).
@@ -518,27 +656,17 @@ class _InventoryScreenState extends State<InventoryScreen>
     try {
       final account = context.read<AccountManagerSupabase>();
       final employeeId = account.currentEmployee?.id;
-
-      final draftData = {
-        'establishment_id': establishmentId,
-        'employee_id': employeeId,
-        'draft_data': data,
-        'updated_at': DateTime.now().toIso8601String(),
-      };
-
-      // Отправить в таблицу inventory_drafts
-      await Supabase.instance.client
-          .from('inventory_drafts')
-          .upsert(
-            draftData,
-            onConflict: 'establishment_id',
-          );
-
-      print('✅ Auto-saved inventory draft to server');
-    } catch (e) {
-      print('⚠️ Failed to save inventory draft to server: $e');
-      // Если сервер недоступен, данные все равно сохранены локально
-    }
+      await Supabase.instance.client.from('inventory_drafts').upsert(
+        {
+          'establishment_id': establishmentId,
+          'employee_id': employeeId,
+          'draft_type': 'standard',
+          'draft_data': data,
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        onConflict: 'establishment_id,draft_type',
+      );
+    } catch (_) {}
   }
 
   /// Минимум 2 пустых ячейки при открытии. При заполнении последней — добавляется ещё одна.
@@ -2112,15 +2240,26 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Строка iiko-инвентаризации: продукт из iiko_products + количество (одна ячейка).
+// ══════════════════════════════════════════════════════════════════════════════
+// iiko-инвентаризация
+// ══════════════════════════════════════════════════════════════════════════════
+
+/// Одна строка iiko-инвентаризации: продукт + список замеров (как в стандартной).
 class _IikoInventoryRow {
   final IikoProduct product;
-  double quantity;
-  _IikoInventoryRow({required this.product, this.quantity = 0.0});
+  List<double> quantities; // список замеров, минимум 2
+
+  _IikoInventoryRow({required this.product, List<double>? quantities})
+      : quantities = quantities ?? [0.0, 0.0];
+
+  /// Итого = сумма всех замеров
+  double get total => quantities.fold(0.0, (a, b) => a + b);
 }
 
 /// Экран инвентаризации в режиме iiko.
-/// Продукты берутся из iiko_products, интерфейс — таблица с одной колонкой «Количество».
-/// При сохранении — генерирует Excel той же структуры что входной бланк.
+/// - Автосохранение в localStorage при каждом изменении (AutoSaveMixin)
+/// - 2 ячейки ввода + итого (как в стандартной инвентаризации)
+/// - При сохранении — Excel той же структуры что входной бланк + отправка шефу
 class InventoryIikoScreen extends StatefulWidget {
   const InventoryIikoScreen({super.key});
 
@@ -2128,7 +2267,8 @@ class InventoryIikoScreen extends StatefulWidget {
   State<InventoryIikoScreen> createState() => _InventoryIikoScreenState();
 }
 
-class _InventoryIikoScreenState extends State<InventoryIikoScreen> {
+class _InventoryIikoScreenState extends State<InventoryIikoScreen>
+    with AutoSaveMixin<InventoryIikoScreen> {
   final List<_IikoInventoryRow> _rows = [];
   bool _isLoading = true;
   bool _completed = false;
@@ -2136,16 +2276,71 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen> {
   String _nameFilter = '';
   final TextEditingController _filterCtrl = TextEditingController();
 
+  // Временное хранилище данных черновика до загрузки продуктов
+  Map<String, dynamic>? _pendingDraftData;
+
+  // Метка времени последнего сохранения (для индикатора "Данные защищены")
+  DateTime? _lastSavedAt;
+
+  // ── AutoSaveMixin ──────────────────────────────────────────────────────────
+  @override
+  String get draftKey => 'iiko_inventory';
+
+  @override
+  Map<String, dynamic> getCurrentState() {
+    return {
+      'date': _date.toIso8601String(),
+      'quantities': {
+        for (final r in _rows)
+          if (r.total > 0) r.product.id: r.quantities,
+      },
+    };
+  }
+
+  /// AutoSaveMixin вызывает это ДО загрузки продуктов (_rows пуст).
+  /// Сохраняем данные во временную переменную, применяем в _applyDraft.
+  @override
+  Future<void> restoreState(Map<String, dynamic> data) async {
+    _pendingDraftData = data;
+    // Если продукты уже загружены — применяем сразу
+    if (_rows.isNotEmpty) _applyDraft(data);
+  }
+
+  /// Применяет данные черновика к заполненным _rows.
+  void _applyDraft(Map<String, dynamic> data) {
+    if (!mounted) return;
+    final dateStr = data['date'] as String?;
+    final qtMap = data['quantities'] as Map<String, dynamic>?;
+    setState(() {
+      if (dateStr != null) _date = DateTime.tryParse(dateStr) ?? _date;
+      if (qtMap != null) {
+        for (final r in _rows) {
+          final saved = qtMap[r.product.id];
+          if (saved is List && saved.isNotEmpty) {
+            r.quantities = saved.map((e) => (e as num).toDouble()).toList();
+            if (r.quantities.length < 2) r.quantities.add(0.0);
+          }
+        }
+      }
+      _lastSavedAt = DateTime.now(); // черновик загружен — данные под защитой
+    });
+  }
+  // ──────────────────────────────────────────────────────────────────────────
+
   @override
   void initState() {
-    super.initState();
+    super.initState(); // AutoSaveMixin.initState регистрирует lifecycle-хуки
     _filterCtrl.addListener(() => setState(() => _nameFilter = _filterCtrl.text));
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadProducts());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadProducts();
+      _startPeriodicServerSave(); // Supabase-бэкап каждые 10с (работает в инкогнито)
+    });
   }
 
   @override
   void dispose() {
     _filterCtrl.dispose();
+    _serverSaveTimer?.cancel();
     super.dispose();
   }
 
@@ -2154,6 +2349,8 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen> {
     final estId = account.establishment?.id;
     if (estId == null) return;
     final iikoStore = context.read<IikoProductStore>();
+    // Восстанавливаем байты бланка: localStorage → Supabase Storage (инкогнито/другое устройство)
+    await iikoStore.restoreBlankFromStorage(establishmentId: estId);
     await iikoStore.loadProducts(estId);
     if (!mounted) return;
     setState(() {
@@ -2163,30 +2360,168 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen> {
       }
       _isLoading = false;
     });
+    // Применяем черновик — теперь _rows заполнен
+    final draft = _pendingDraftData;
+    if (draft != null) {
+      _applyDraft(draft);
+      _pendingDraftData = null;
+    } else {
+      // Черновик ещё не пришёл от AutoSaveMixin — загружаем явно из localStorage
+      final draftStorage = DraftStorageService();
+      final saved = await draftStorage.loadIikoInventoryDraft();
+      if (saved != null && mounted) {
+        _applyDraft(saved);
+      } else if (estId != null) {
+        // Запасной уровень — Supabase (если localStorage был очищен)
+        await _tryRestoreFromServer(estId);
+      }
+    }
   }
 
   List<_IikoInventoryRow> get _filteredRows {
     if (_nameFilter.isEmpty) return _rows;
     final q = _nameFilter.toLowerCase();
-    return _rows.where((r) => r.product.displayName.toLowerCase().contains(q) || r.product.name.toLowerCase().contains(q)).toList();
+    return _rows
+        .where((r) =>
+            r.product.displayName.toLowerCase().contains(q) ||
+            r.product.name.toLowerCase().contains(q))
+        .toList();
+  }
+
+  Timer? _serverSaveTimer;
+
+  void _setQuantity(_IikoInventoryRow row, int colIndex, double value) {
+    setState(() {
+      row.quantities[colIndex] = value;
+      // Добавляем ячейку если заполнили последнюю
+      if (colIndex == row.quantities.length - 1 && value > 0) {
+        row.quantities.add(0.0);
+      }
+    });
+    scheduleSave(); // AutoSaveMixin — localStorage, 300мс
+    // Обновляем метку после debounce (300мс)
+    Future.delayed(const Duration(milliseconds: 400), () {
+      if (mounted) setState(() => _lastSavedAt = DateTime.now());
+    });
+  }
+
+  /// Периодическое сохранение в Supabase каждые 10с — работает даже в инкогнито.
+  void _startPeriodicServerSave() {
+    _serverSaveTimer?.cancel();
+    _serverSaveTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted && !_completed) _saveIikoDraftToServer();
+    });
+  }
+
+  Future<void> _saveIikoDraftToServer() async {
+    if (_completed || _rows.isEmpty || !mounted) return;
+    try {
+      final account = context.read<AccountManagerSupabase>();
+      final estId = account.establishment?.id;
+      final empId = account.currentEmployee?.id;
+      if (estId == null) return;
+      final data = getCurrentState();
+      await Supabase.instance.client.from('inventory_drafts').upsert(
+        {
+          'establishment_id': estId,
+          'employee_id': empId,
+          'draft_type': 'iiko_inventory',
+          'draft_data': data,
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        onConflict: 'establishment_id,draft_type',
+      );
+    } catch (_) {}
+  }
+
+  void _clearServerDraft() {
+    if (!mounted) return;
+    try {
+      final account = context.read<AccountManagerSupabase>();
+      final estId = account.establishment?.id;
+      if (estId == null) return;
+      Supabase.instance.client
+          .from('inventory_drafts')
+          .delete()
+          .eq('establishment_id', estId)
+          .eq('draft_type', 'iiko_inventory');
+    } catch (_) {}
+  }
+
+  /// Восстанавливает iiko-черновик с сервера (инкогнито / очищенный localStorage).
+  Future<void> _tryRestoreFromServer(String estId) async {
+    try {
+      final row = await Supabase.instance.client
+          .from('inventory_drafts')
+          .select('draft_data')
+          .eq('establishment_id', estId)
+          .eq('draft_type', 'iiko_inventory')
+          .maybeSingle();
+      if (row == null) return;
+      final data = row['draft_data'] as Map<String, dynamic>?;
+      if (data == null) return;
+      if (mounted) _applyDraft(data);
+    } catch (_) {}
+  }
+
+  /// Диалог подтверждения обнуления всех количеств.
+  Future<void> _confirmReset() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Обнулить данные?'),
+        content: const Text(
+          'Все введённые количества будут сброшены. Продукты останутся.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            child: const Text('Обнулить'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() {
+      for (final r in _rows) {
+        r.quantities = [0.0, 0.0];
+      }
+      _completed = false;
+      _lastSavedAt = null;
+    });
+    // Сбрасываем черновики
+    await clearDraft();
+    _clearServerDraft();
+    if (mounted) scheduleSave();
   }
 
   Future<void> _saveAndExport() async {
-    setState(() => _completed = true);
+    final bytes = await _buildIikoExcel();
 
-    // Генерируем Excel в структуре iiko-бланка
-    final bytes = _buildIikoExcel();
-
-    // Скачиваем файл
     final date = _date;
-    final fileName = 'Инвентаризация_iiko_${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}.xlsx';
+    final fileName =
+        'Инвентаризация_iiko_${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}.xlsx';
 
-    // Используем FilePicker или download trigger
     try {
       await _downloadBytes(bytes, fileName);
+
+      // Отправляем шефу во входящие
+      await _sendToChef(bytes, fileName);
+
+      // Очищаем черновик после успешного сохранения (localStorage + сервер)
+      await clearDraft();
+      _clearServerDraft();
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Сохранено: $fileName')),
+          SnackBar(content: Text('Сохранено и отправлено шефу: $fileName')),
         );
       }
     } catch (e) {
@@ -2194,77 +2529,467 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Ошибка сохранения: $e')),
         );
-        setState(() => _completed = false);
       }
     }
   }
 
-  /// Генерирует итоговый Excel.
-  ///
-  /// Если в [IikoProductStore] сохранены байты оригинального бланка —
-  /// открывает его и вписывает только количество в колонку «Остаток фактический».
-  /// Все остальные данные (шапка, группы, коды, наименования, ед.изм.)
-  /// остаются ровно такими же, как в загруженном файле.
-  ///
-  /// Если оригинала нет (например сессия была сброшена) — строит файл заново
-  /// из данных в базе как запасной вариант.
-  Uint8List _buildIikoExcel() {
+  /// Отправляет инвентаризацию во входящие шеф-повару.
+  Future<void> _sendToChef(Uint8List bytes, String fileName) async {
+    try {
+      final account = context.read<AccountManagerSupabase>();
+      final establishment = account.establishment;
+      final employee = account.currentEmployee;
+      if (establishment == null || employee == null) return;
+
+      // Ищем шеф-повара в заведении
+      final allEmployees = await Supabase.instance.client
+          .from('employees')
+          .select()
+          .eq('establishment_id', establishment.id)
+          .or('roles.cs.{executive_chef},roles.cs.{owner}');
+      final chefList = allEmployees as List;
+      if (chefList.isEmpty) return;
+      final chef = chefList.first as Map<String, dynamic>;
+
+      final payload = {
+        'type': 'iiko_inventory',
+        'header': {
+          'date': _date.toIso8601String(),
+          'establishmentName': establishment.name,
+          'employeeName': employee.fullName,
+          'fileName': fileName,
+          'totalPositions': _rows.length,
+          'filledPositions': _rows.where((r) => r.total > 0).length,
+        },
+        'rows': _rows
+            .where((r) => r.total > 0)
+            .map((r) => {
+                  'code': r.product.code,
+                  'name': r.product.name,
+                  'unit': r.product.unit,
+                  'quantities': r.quantities,
+                  'total': r.total,
+                })
+            .toList(),
+      };
+
+      final docService = InventoryDocumentService();
+      await docService.save(
+        establishmentId: establishment.id,
+        createdByEmployeeId: employee.id,
+        recipientChefId: chef['id'] as String,
+        recipientEmail: (chef['email'] as String?) ?? '',
+        payload: payload,
+      );
+    } catch (e) {
+      debugPrint('InventoryIiko._sendToChef error: $e');
+      // Не прерываем — скачивание файла важнее
+    }
+  }
+
+  Future<Uint8List> _buildIikoExcel() async {
     final iikoStore = context.read<IikoProductStore>();
+    final estId = context.read<AccountManagerSupabase>().establishment?.id;
+    // Если байты не в памяти — пробуем localStorage → Supabase Storage
+    await iikoStore.restoreBlankFromStorage(establishmentId: estId);
     final origBytes = iikoStore.originalBlankBytes;
     final qtyCol = iikoStore.originalQuantityColumnIndex ?? 5;
-
-    if (origBytes != null) {
-      return _buildFromOriginal(origBytes, qtyCol);
-    } else {
-      return _buildFallback();
-    }
+    return origBytes != null
+        ? _buildFromOriginal(origBytes, qtyCol)
+        : _buildFallback();
   }
 
-  /// Берёт оригинальный xlsx побайтово, находит строки по [IikoProduct.name],
-  /// вписывает количество только в колонку [qtyCol].
+  /// Прямой байтовый патч xlsx без перепаковки ZIP.
+  ///
+  /// Алгоритм:
+  ///  1. Находим sheet1.xml в ZIP через central directory
+  ///  2. Декодируем (inflate) только этот файл
+  ///  3. Патчим XML — ставим значения в колонку qty
+  ///  4. Снова сжимаем (deflate) и вставляем в ZIP побайтово
+  ///  5. Все остальные файлы остаются **ровно теми же битами** — ни один байт
+  ///     не меняется → sheetFormatPr, sheetViews, mergedCells, styles
+  ///     сохраняются 100% идентично оригиналу
   Uint8List _buildFromOriginal(Uint8List origBytes, int qtyCol) {
-    final excel = Excel.decodeBytes(origBytes.toList());
-    final sheetName = excel.tables.keys.first;
-    final sheet = excel.tables[sheetName]!;
-
-    // Строим карту: name -> quantity (из заполненного бланка инвентаризации)
-    final qtyByName = <String, double>{};
+    // ── 1. Код → итого ────────────────────────────────────────────────────────
+    final qtyByCode = <String, double>{};
     for (final r in _rows) {
-      if (r.quantity > 0) {
-        qtyByName[r.product.name] = r.quantity;
+      if (r.total > 0 && r.product.code != null) {
+        qtyByCode[r.product.code!.trim()] = r.total;
       }
     }
+    debugPrint('_buildFromOriginal: rows=${_rows.length}, '
+        'withTotal=${_rows.where((r) => r.total > 0).length}, '
+        'withCode=${_rows.where((r) => r.product.code != null).length}, '
+        'qtyByCode=${qtyByCode.length}, '
+        'qtyCol=$qtyCol, '
+        'sample=${qtyByCode.entries.take(3).map((e) => "${e.key}=${e.value}").join(",")}');
+    if (qtyByCode.isEmpty) {
+      debugPrint('_buildFromOriginal: qtyByCode EMPTY → returning origBytes unchanged');
+      return origBytes;
+    }
 
-    // Перебираем все строки оригинала и вписываем количество в нужную колонку
-    for (var r = 0; r < sheet.maxRows; r++) {
-      // Ищем ячейку с наименованием — колонка D (3, 0-based) по умолчанию для бланка Каспий
-      // Проверяем несколько колонок на случай других форматов
-      String? rowName;
-      for (final checkCol in [3, 2, 1, 0]) {
-        final v = _cellStr(sheet, r, checkCol);
-        if (v.isNotEmpty) {
-          rowName = v;
-          break;
+    // ── 2. Читаем ZIP через archive только для получения XML-содержимого ──────
+    final arc = ZipDecoder().decodeBytes(origBytes);
+
+    // Имя первого листа книги.
+    // Берём r:id первого <sheet> из workbook.xml (sheetId="1"),
+    // затем резолвим Target по этому Id в workbook.xml.rels.
+    // Нельзя просто брать первый worksheet в rels — порядок там произвольный.
+    String sheetPath = 'xl/worksheets/sheet1.xml';
+    final wbEntry   = arc.findFile('xl/workbook.xml');
+    final relsEntry = arc.findFile('xl/_rels/workbook.xml.rels');
+    if (wbEntry != null && relsEntry != null) {
+      final wb   = utf8.decode(wbEntry.content   as List<int>);
+      final rels = utf8.decode(relsEntry.content as List<int>);
+      // Первый <sheet ...> в workbook.xml → его r:id
+      final sheetM = RegExp(r'<sheet\b[^>]*\br:id="([^"]+)"').firstMatch(wb);
+      if (sheetM != null) {
+        final rId = sheetM.group(1)!;
+        // Ищем Target для этого Id в rels
+        final tM = RegExp('Id="$rId"[^>]*Target="([^"]+)"').firstMatch(rels);
+        if (tM != null) {
+          final t = tM.group(1)!;
+          sheetPath = t.startsWith('/') ? t.substring(1) : 'xl/$t';
         }
       }
-      if (rowName == null) continue;
+    }
 
-      final qty = qtyByName[rowName];
-      if (qty != null) {
-        sheet
-            .cell(CellIndex.indexByColumnRow(columnIndex: qtyCol, rowIndex: r))
-            .value = DoubleCellValue(qty);
+    // sharedStrings
+    final sharedStrings = <String>[];
+    final ssEntry = arc.findFile('xl/sharedStrings.xml');
+    if (ssEntry != null) {
+      final ssXml = utf8.decode(ssEntry.content as List<int>);
+      final siRe = RegExp(r'<si>(.*?)</si>', dotAll: true);
+      final tRe  = RegExp(r'<t[^>]*>([^<]*)</t>');
+      for (final si in siRe.allMatches(ssXml)) {
+        sharedStrings.add(tRe.allMatches(si.group(1)!).map((m) => m.group(1)!).join());
       }
     }
 
-    final saved = excel.save();
-    return Uint8List.fromList(saved!);
+    // ── 3. Буква колонки ──────────────────────────────────────────────────────
+    String colLetter(int idx) {
+      var result = '';
+      var n = idx + 1;
+      while (n > 0) { n--; result = String.fromCharCode(65 + n % 26) + result; n ~/= 26; }
+      return result;
+    }
+    final qtyColLetter = colLetter(qtyCol);
+
+    // ── 4. Читаем и патчим sheet XML ──────────────────────────────────────────
+    final sheetEntry = arc.findFile(sheetPath);
+    if (sheetEntry == null) return origBytes;
+    var sheetXml = utf8.decode(sheetEntry.content as List<int>);
+
+    // Определяем колонку кода
+    int codeColIdx = 2;
+    outer:
+    for (final rowM in RegExp(r'<row r="(\d+)"[^>]*>(.*?)</row>', dotAll: true)
+        .allMatches(sheetXml)) {
+      if (int.parse(rowM.group(1)!) > 20) break;
+      for (final cm in RegExp(r'<c r="([A-Z]+)\d+"[^>]*t="s"[^>]*><v>(\d+)</v></c>')
+          .allMatches(rowM.group(2)!)) {
+        final idx = int.tryParse(cm.group(2)!) ?? -1;
+        if (idx >= 0 && idx < sharedStrings.length) {
+          final v = sharedStrings[idx].trim().toLowerCase();
+          if (v == 'код' || v == 'code') {
+            var ci = 0;
+            for (final ch in cm.group(1)!.runes) ci = ci * 26 + (ch - 65 + 1);
+            codeColIdx = ci - 1;
+            break outer;
+          }
+        }
+      }
+    }
+    final codeColLetter = colLetter(codeColIdx);
+    debugPrint('_buildFromOriginal: sheetPath=$sheetPath, codeCol=$codeColLetter, qtyCol=$qtyColLetter');
+
+    var patchedCount = 0;
+    sheetXml = sheetXml.replaceAllMapped(
+      RegExp(r'(<row r="(\d+)"[^>]*>)(.*?)(</row>)', dotAll: true),
+      (m) {
+        final rowOpen = m.group(1)!;
+        final rowIdx  = m.group(2)!;
+        var rowBody   = m.group(3)!;
+        final rowClose = m.group(4)!;
+
+        final codeM = RegExp(
+          '<c r="${RegExp.escape(codeColLetter)}$rowIdx"'
+          r'[^>]*t="s"[^>]*><v>(\d+)</v></c>',
+        ).firstMatch(rowBody);
+        if (codeM == null) return m.group(0)!;
+        final ssIdx = int.tryParse(codeM.group(1)!) ?? -1;
+        if (ssIdx < 0 || ssIdx >= sharedStrings.length) return m.group(0)!;
+        final qty = qtyByCode[sharedStrings[ssIdx].trim()];
+        if (qty == null) return m.group(0)!;
+
+        final qtyStr = qty == qty.roundToDouble()
+            ? qty.toInt().toString()
+            : qty.toStringAsFixed(3)
+                .replaceAll(RegExp(r'0+$'), '')
+                .replaceAll(RegExp(r'\.$'), '');
+        final cellRef = '$qtyColLetter$rowIdx';
+
+        // Самозакрывающаяся ячейка: <c r="F9" s="5"/> — пустая, но со стилем
+        final selfM = RegExp(
+          '<c r="${RegExp.escape(cellRef)}"([^>]*)/>', 
+        ).firstMatch(rowBody);
+        // Ячейка с содержимым: <c r="F9" s="5">...</c>
+        final existM = RegExp(
+          '<c r="${RegExp.escape(cellRef)}"([^>]*)>(.*?)</c>', dotAll: true,
+        ).firstMatch(rowBody);
+
+        if (selfM != null) {
+          // Заменяем самозакрывающийся тег — сохраняем атрибуты (стиль)
+          rowBody = rowBody.replaceFirst(
+            selfM.group(0)!,
+            '<c r="$cellRef"${selfM.group(1)!}><v>$qtyStr</v></c>',
+          );
+        } else if (existM != null) {
+          // Заменяем существующее значение — стиль сохраняем
+          rowBody = rowBody.replaceFirst(
+            existM.group(0)!,
+            '<c r="$cellRef"${existM.group(1)!}><v>$qtyStr</v></c>',
+          );
+        } else {
+          // Ячейки нет совсем — берём стиль из соседней ячейки строки
+          final sM = RegExp('<c r="[A-Z]+$rowIdx" s="(\\d+)"').firstMatch(rowBody);
+          final sAttr = sM != null ? ' s="${sM.group(1)}"' : '';
+          rowBody += '<c r="$cellRef"$sAttr><v>$qtyStr</v></c>';
+        }
+        patchedCount++;
+        return '$rowOpen$rowBody$rowClose';
+      },
+    );
+    debugPrint('_buildFromOriginal: patched $patchedCount rows');
+
+    // ── 5. Заменяем sheet в ZIP без перепаковки остальных файлов ─────────────
+    //
+    // Формат ZIP local file header (little-endian):
+    //   4  signature  = 0x04034b50
+    //   2  version needed
+    //   2  flags
+    //   2  compression method
+    //   2  mod time
+    //   2  mod date
+    //   4  crc-32
+    //   4  compressed size
+    //   4  uncompressed size
+    //   2  file name length
+    //   2  extra field length
+    //   n  file name
+    //   m  extra field
+    //   ...compressed data...
+    //
+    // Central directory entry:
+    //   4  signature  = 0x02014b50
+    //   2  version made
+    //   2  version needed
+    //   2  flags
+    //   2  compression method
+    //   ...
+    //   4  local header offset
+    //
+    // Стратегия: находим local header нашего файла, считаем offset данных,
+    // сжимаем новый XML, вставляем вместо старых данных, пересчитываем
+    // crc/sizes в local header и central directory.
+
+    return _zipReplaceFile(origBytes, sheetPath, utf8.encode(sheetXml));
+  }
+
+  /// Заменяет один файл в ZIP-архиве без изменения остальных entries.
+  /// Возвращает новые байты ZIP.
+  Uint8List _zipReplaceFile(Uint8List zipBytes, String targetName, List<int> newContent) {
+    // Сжимаем новые данные — raw DEFLATE (без zlib-заголовка и Adler32)
+    // ZIP format требует именно raw deflate (метод 8), не zlib-обёртку
+    final newCompressed = Deflate(newContent, level: 6).getBytes();
+    final newCrc        = _crc32(newContent);
+    final newUncompSize = newContent.length;
+    final newCompSize   = newCompressed.length;
+    final targetNameBytes = utf8.encode(targetName);
+
+    // Собираем новый ZIP поэнтрийно
+    final out = BytesBuilder();
+
+    // Таблица: localHeaderOffset для central directory
+    final cdEntries = <_ZipCdEntry>[];
+
+    int pos = 0;
+    final bd = ByteData.sublistView(zipBytes);
+
+    int _readU16(int offset) => bd.getUint16(offset, Endian.little);
+    int _readU32(int offset) => bd.getUint32(offset, Endian.little);
+    void _writeU32(ByteData buf, int offset, int v) =>
+        buf.setUint32(offset, v, Endian.little);
+
+    while (pos < zipBytes.length - 4) {
+      final sig = _readU32(pos);
+
+      if (sig == 0x04034b50) {
+        // Local file header
+        final compMethod  = _readU16(pos + 8);
+        final crc32orig   = _readU32(pos + 14);
+        final compSizeOrig   = _readU32(pos + 18);
+        final uncompSizeOrig = _readU32(pos + 22);
+        final nameLen     = _readU16(pos + 26);
+        final extraLen    = _readU16(pos + 28);
+        final name        = utf8.decode(zipBytes.sublist(pos + 30, pos + 30 + nameLen));
+        final dataOffset  = pos + 30 + nameLen + extraLen;
+
+        final isTarget = (name == targetName);
+        final effectiveCompSize   = isTarget ? newCompSize   : compSizeOrig;
+        final effectiveUncompSize = isTarget ? newUncompSize : uncompSizeOrig;
+        final effectiveCrc        = isTarget ? newCrc        : crc32orig;
+        final effectiveMethod     = isTarget ? 8             : compMethod; // 8=deflate
+
+        final localHeaderOffset = out.length;
+
+        // Пишем local header с обновлёнными полями
+        final lh = Uint8List(30 + nameLen + extraLen);
+        final lhBd = ByteData.sublistView(lh);
+        lhBd.setUint32(0,  0x04034b50, Endian.little); // sig
+        lhBd.setUint16(4,  _readU16(pos + 4),  Endian.little); // version needed
+        lhBd.setUint16(6,  _readU16(pos + 6),  Endian.little); // flags
+        lhBd.setUint16(8,  effectiveMethod,     Endian.little); // compression
+        lhBd.setUint16(10, _readU16(pos + 10), Endian.little); // mod time
+        lhBd.setUint16(12, _readU16(pos + 12), Endian.little); // mod date
+        lhBd.setUint32(14, effectiveCrc,        Endian.little); // crc
+        lhBd.setUint32(18, effectiveCompSize,   Endian.little); // comp size
+        lhBd.setUint32(22, effectiveUncompSize, Endian.little); // uncomp size
+        lhBd.setUint16(26, nameLen,             Endian.little);
+        lhBd.setUint16(28, extraLen,            Endian.little);
+        lh.setRange(30, 30 + nameLen, zipBytes, pos + 30);
+        if (extraLen > 0) {
+          lh.setRange(30 + nameLen, 30 + nameLen + extraLen,
+              zipBytes, pos + 30 + nameLen);
+        }
+        out.add(lh);
+
+        if (isTarget) {
+          // Вставляем новые сжатые данные
+          out.add(newCompressed);
+        } else {
+          // Копируем оригинальные сжатые данные
+          out.add(zipBytes.sublist(dataOffset, dataOffset + compSizeOrig));
+        }
+
+        // Запоминаем для central directory
+        cdEntries.add(_ZipCdEntry(
+          origOffset: pos,
+          newOffset: localHeaderOffset,
+          name: name,
+          isTarget: isTarget,
+          effectiveCrc: effectiveCrc,
+          effectiveCompSize: effectiveCompSize,
+          effectiveUncompSize: effectiveUncompSize,
+          effectiveMethod: effectiveMethod,
+        ));
+
+        pos = dataOffset + compSizeOrig;
+      } else if (sig == 0x02014b50) {
+        // Central directory — перестраиваем
+        break;
+      } else if (sig == 0x06054b50) {
+        // End of central directory
+        break;
+      } else {
+        // Неизвестная сигнатура — прерываемся
+        break;
+      }
+    }
+
+    // Пишем central directory
+    final cdStart = out.length;
+    for (final entry in cdEntries) {
+      final origCdPos = _findCdEntry(zipBytes, entry.name);
+      if (origCdPos < 0) continue;
+      final nameLen  = _readU16(origCdPos + 28);
+      final extraLen = _readU16(origCdPos + 30);
+      final cmtLen   = _readU16(origCdPos + 32);
+      final cdEntrySize = 46 + nameLen + extraLen + cmtLen;
+
+      final ce = Uint8List(cdEntrySize);
+      ce.setRange(0, cdEntrySize, zipBytes, origCdPos);
+      final ceBd = ByteData.sublistView(ce);
+      // Обновляем поля
+      ceBd.setUint16(10, entry.effectiveMethod,     Endian.little);
+      ceBd.setUint32(16, entry.effectiveCrc,        Endian.little);
+      ceBd.setUint32(20, entry.effectiveCompSize,   Endian.little);
+      ceBd.setUint32(24, entry.effectiveUncompSize, Endian.little);
+      ceBd.setUint32(42, entry.newOffset,           Endian.little); // local header offset
+      out.add(ce);
+    }
+    final cdEnd = out.length;
+    final cdSize = cdEnd - cdStart;
+
+    // End of central directory record
+    final eocd = Uint8List(22);
+    final eocdBd = ByteData.sublistView(eocd);
+    eocdBd.setUint32(0,  0x06054b50,      Endian.little); // sig
+    eocdBd.setUint16(4,  0,               Endian.little); // disk num
+    eocdBd.setUint16(6,  0,               Endian.little); // disk cd start
+    eocdBd.setUint16(8,  cdEntries.length, Endian.little);
+    eocdBd.setUint16(10, cdEntries.length, Endian.little);
+    eocdBd.setUint32(12, cdSize,           Endian.little);
+    eocdBd.setUint32(16, cdStart,          Endian.little);
+    eocdBd.setUint16(20, 0,               Endian.little); // comment length
+    out.add(eocd);
+
+    return out.toBytes();
+  }
+
+  /// Находит offset central directory entry для файла с именем [name].
+  int _findCdEntry(Uint8List zipBytes, String name) {
+    final bd = ByteData.sublistView(zipBytes);
+    final nameBytes = utf8.encode(name);
+    int pos = 0;
+    while (pos < zipBytes.length - 4) {
+      final sig = bd.getUint32(pos, Endian.little);
+      if (sig == 0x02014b50) {
+        final nameLen = bd.getUint16(pos + 28, Endian.little);
+        if (nameLen == nameBytes.length) {
+          bool match = true;
+          for (int i = 0; i < nameLen; i++) {
+            if (zipBytes[pos + 46 + i] != nameBytes[i]) { match = false; break; }
+          }
+          if (match) return pos;
+        }
+        final extraLen = bd.getUint16(pos + 30, Endian.little);
+        final cmtLen   = bd.getUint16(pos + 32, Endian.little);
+        pos += 46 + nameLen + extraLen + cmtLen;
+      } else if (sig == 0x04034b50) {
+        final nameLen  = bd.getUint16(pos + 26, Endian.little);
+        final extraLen = bd.getUint16(pos + 28, Endian.little);
+        final compSize = bd.getUint32(pos + 18, Endian.little);
+        pos += 30 + nameLen + extraLen + compSize;
+      } else {
+        pos++;
+      }
+    }
+    return -1;
+  }
+
+  /// CRC-32 (стандартный полином 0xEDB88320).
+  int _crc32(List<int> data) {
+    const poly = 0xEDB88320;
+    var crc = 0xFFFFFFFF;
+    for (final b in data) {
+      crc ^= b;
+      for (int i = 0; i < 8; i++) {
+        if (crc & 1 != 0) {
+          crc = (crc >> 1) ^ poly;
+        } else {
+          crc >>= 1;
+        }
+      }
+    }
+    return crc ^ 0xFFFFFFFF;
   }
 
   String _cellStr(Sheet sheet, int row, int col) {
     try {
-      final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row));
-      final v = cell.value;
+      final v = sheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row))
+          .value;
       if (v == null) return '';
       if (v is TextCellValue) return v.value.text ?? '';
       if (v is IntCellValue) return v.value.toString();
@@ -2275,8 +3000,6 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen> {
     }
   }
 
-  /// Запасной вариант — строит файл заново из данных базы
-  /// (используется только если оригинал не сохранён в памяти).
   Uint8List _buildFallback() {
     final excel = Excel.createExcel();
     const sheetName = 'Инвентаризация';
@@ -2307,16 +3030,15 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen> {
           TextCellValue(r.product.name);
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).value =
           TextCellValue(r.product.unit ?? '');
-      if (r.quantity > 0) {
+      if (r.total > 0) {
         sheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).value =
-            DoubleCellValue(r.quantity);
+            DoubleCellValue(r.total);
       }
       row++;
     }
 
     excel.setDefaultSheet(sheetName);
-    final fileBytes = excel.save();
-    return Uint8List.fromList(fileBytes!);
+    return Uint8List.fromList(excel.save()!);
   }
 
   Future<void> _downloadBytes(Uint8List bytes, String fileName) async {
@@ -2334,6 +3056,11 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen> {
   @override
   Widget build(BuildContext context) {
     final account = context.watch<AccountManagerSupabase>();
+    final theme = Theme.of(context);
+    final isKeyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final isNarrow = MediaQuery.sizeOf(context).width < 600;
+    // На мобильном при открытой клавиатуре скрываем статус-строку — экономим место
+    final hideStatusRow = isNarrow && isKeyboardOpen;
 
     return Scaffold(
       appBar: AppBar(
@@ -2343,15 +3070,15 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text('Инвентаризация iiko', style: TextStyle(fontSize: 16)),
-            Text(
-              account.establishment?.name ?? '',
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
-            ),
+            if (!hideStatusRow)
+              Text(
+                account.establishment?.name ?? '',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
+              ),
           ],
         ),
-        backgroundColor: Colors.purple[50],
         actions: [
-          if (!_isLoading && !_completed)
+          if (!_isLoading)
             TextButton.icon(
               icon: const Icon(Icons.save_alt),
               label: const Text('Сохранить'),
@@ -2361,82 +3088,195 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Column(
+          : Stack(
               children: [
-                // Фильтр поиска
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-                  child: TextField(
-                    controller: _filterCtrl,
-                    decoration: const InputDecoration(
-                      hintText: 'Поиск по наименованию...',
-                      prefixIcon: Icon(Icons.search),
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                  ),
-                ),
-                // Статус
-                Container(
-                  color: Colors.purple.withOpacity(0.06),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                  child: Row(
-                    children: [
-                      Icon(Icons.table_chart_outlined, size: 16, color: Colors.purple[700]),
-                      const SizedBox(width: 6),
-                      Text(
-                        'iiko · ${_rows.length} позиций · ${_date.day.toString().padLeft(2,'0')}.${_date.month.toString().padLeft(2,'0')}.${_date.year}',
-                        style: TextStyle(fontSize: 12, color: Colors.purple[700]),
-                      ),
-                      const Spacer(),
-                      TextButton(
-                        onPressed: () async {
-                          final picked = await showDatePicker(
-                            context: context,
-                            initialDate: _date,
-                            firstDate: DateTime(2020),
-                            lastDate: DateTime(2030),
-                          );
-                          if (picked != null) setState(() => _date = picked);
-                        },
-                        child: const Text('Дата', style: TextStyle(fontSize: 12)),
-                      ),
-                    ],
-                  ),
-                ),
-                // Таблица
-                Expanded(
-                  child: _filteredRows.isEmpty
-                      ? const Center(child: Text('Нет позиций'))
-                      : _IikoInventoryTable(
-                          rows: _filteredRows,
-                          completed: _completed,
-                          onQuantityChanged: (row, qty) {
-                            setState(() => row.quantity = qty);
-                          },
+                Column(
+                  children: [
+                    // Поиск
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                      child: TextField(
+                        controller: _filterCtrl,
+                        decoration: const InputDecoration(
+                          hintText: 'Поиск по наименованию...',
+                          prefixIcon: Icon(Icons.search),
+                          border: OutlineInputBorder(),
+                          isDense: true,
                         ),
-                ),
-                // Нижняя панель
-                if (!_completed)
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        icon: const Icon(Icons.save_alt),
-                        label: const Text('Сохранить и скачать xlsx'),
-                        style: FilledButton.styleFrom(backgroundColor: Colors.purple[700]),
-                        onPressed: _saveAndExport,
                       ),
                     ),
-                  ),
+                    // Статус-строка — скрывается на мобильном при открытой клавиатуре
+                    if (!hideStatusRow) Container(
+                      color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      child: Row(
+                        children: [
+                          Icon(Icons.table_chart_outlined, size: 16,
+                              color: theme.colorScheme.primary),
+                          const SizedBox(width: 6),
+                          Text(
+                            'iiko · ${_rows.length} поз. · '
+                            '${_date.day.toString().padLeft(2, '0')}.'
+                            '${_date.month.toString().padLeft(2, '0')}.'
+                            '${_date.year}',
+                            style: TextStyle(fontSize: 12,
+                                color: theme.colorScheme.onSurfaceVariant),
+                          ),
+                          const Spacer(),
+                          // Индикатор защиты данных
+                          if (_lastSavedAt != null)
+                            Container(
+                              margin: const EdgeInsets.only(right: 4),
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.green.withOpacity(0.4)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.security, size: 12, color: Colors.green),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Данные защищены',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.green[700],
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          TextButton(
+                            onPressed: () async {
+                              final picked = await showDatePicker(
+                                context: context,
+                                initialDate: _date,
+                                firstDate: DateTime(2020),
+                                lastDate: DateTime(2030),
+                              );
+                              if (picked != null) setState(() => _date = picked);
+                            },
+                            child: const Text('Дата', style: TextStyle(fontSize: 12)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Шапка таблицы
+                    _IikoInventoryHeader(
+                      qtyCols: _rows.isEmpty
+                          ? 2
+                          : _rows
+                              .map((r) => r.quantities.length)
+                              .reduce((a, b) => a > b ? a : b),
+                    ),
+                    // Список строк
+                    Expanded(
+                      child: _filteredRows.isEmpty
+                          ? const Center(child: Text('Нет позиций'))
+                          : _IikoInventoryTable(
+                              rows: _filteredRows,
+                              completed: _completed,
+                              onQuantityChanged: _setQuantity,
+                            ),
+                    ),
+                    // Кнопки внизу — всегда видны
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: FilledButton.icon(
+                              icon: const Icon(Icons.save_alt),
+                              label: const Text('Сохранить и скачать xlsx'),
+                              onPressed: _saveAndExport,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          OutlinedButton(
+                            onPressed: _confirmReset,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: theme.colorScheme.error,
+                              side: BorderSide(color: theme.colorScheme.error.withOpacity(0.5)),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            ),
+                            child: const Text('Обнулить', style: TextStyle(fontSize: 13)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
     );
   }
 }
 
-/// Таблица iiko-инвентаризации с фиксированными колонками и вводом количества.
+// Ширина фиксированных колонок
+const double _iikoColName  = 180; // Наименование
+const double _iikoColUnit  =  32; // Ед. изм. (узкая, только аббревиатура)
+const double _iikoColTotal =  56; // Итого
+const double _iikoColCell  =  58; // Каждая ячейка ввода
+
+// ── Шапка таблицы ────────────────────────────────────────────────────────────
+// Левая часть фиксирована (Наименование + Итого), правая скроллируется вместе со строками.
+class _IikoInventoryHeader extends StatelessWidget {
+  const _IikoInventoryHeader({required this.qtyCols});
+
+  final int qtyCols;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final headerBg   = theme.colorScheme.surfaceContainerHighest;
+    final borderClr  = theme.dividerColor;
+    final textStyle  = TextStyle(
+        fontSize: 11, fontWeight: FontWeight.w700,
+        color: theme.colorScheme.onSurface);
+    final border = BorderSide(color: borderClr);
+
+    Widget hCell(String t, double w) => Container(
+          width: w,
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 7),
+          decoration: BoxDecoration(
+            color: headerBg,
+            border: Border(right: border, bottom: border),
+          ),
+          child: Text(t, style: textStyle, textAlign: TextAlign.center),
+        );
+
+    return Container(
+      decoration: BoxDecoration(
+        border: Border(left: border, top: border),
+        color: headerBg,
+      ),
+      child: Row(
+        children: [
+          hCell('Наименование', _iikoColName),
+          hCell('Ед.', _iikoColUnit),
+          hCell('Итого', _iikoColTotal),
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const ClampingScrollPhysics(),
+              child: Row(
+                children: List.generate(
+                  qtyCols,
+                  (i) => hCell('№${i + 1}', _iikoColCell),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Таблица ──────────────────────────────────────────────────────────────────
 class _IikoInventoryTable extends StatelessWidget {
   const _IikoInventoryTable({
     required this.rows,
@@ -2446,12 +3286,12 @@ class _IikoInventoryTable extends StatelessWidget {
 
   final List<_IikoInventoryRow> rows;
   final bool completed;
-  final void Function(_IikoInventoryRow row, double qty) onQuantityChanged;
+  final void Function(_IikoInventoryRow row, int colIndex, double qty)
+      onQuantityChanged;
 
   @override
   Widget build(BuildContext context) {
     String? lastGroup;
-
     return ListView.builder(
       itemCount: rows.length,
       itemBuilder: (ctx, i) {
@@ -2462,22 +3302,21 @@ class _IikoInventoryTable extends StatelessWidget {
         if (groupName != lastGroup) {
           lastGroup = groupName;
           if (groupDisplay.isNotEmpty) {
+            final theme = Theme.of(ctx);
             groupHeader = Container(
               width: double.infinity,
-              color: Colors.purple.withOpacity(0.08),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+              color: theme.colorScheme.primaryContainer.withOpacity(0.25),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               child: Text(
                 groupDisplay,
                 style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.purple[800],
-                ),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.primary),
               ),
             );
           }
         }
-
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -2485,7 +3324,7 @@ class _IikoInventoryTable extends StatelessWidget {
             _IikoInventoryRowTile(
               row: row,
               completed: completed,
-              onChanged: (qty) => onQuantityChanged(row, qty),
+              onChanged: (colIdx, qty) => onQuantityChanged(row, colIdx, qty),
             ),
           ],
         );
@@ -2494,6 +3333,7 @@ class _IikoInventoryTable extends StatelessWidget {
   }
 }
 
+// ── Строка с 2 ячейками и итого ──────────────────────────────────────────────
 class _IikoInventoryRowTile extends StatefulWidget {
   const _IikoInventoryRowTile({
     required this.row,
@@ -2503,65 +3343,161 @@ class _IikoInventoryRowTile extends StatefulWidget {
 
   final _IikoInventoryRow row;
   final bool completed;
-  final void Function(double) onChanged;
+  final void Function(int colIndex, double qty) onChanged;
 
   @override
   State<_IikoInventoryRowTile> createState() => _IikoInventoryRowTileState();
 }
 
 class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
-  late final TextEditingController _ctrl;
+  final List<TextEditingController> _ctrls = [];
 
   @override
   void initState() {
     super.initState();
-    _ctrl = TextEditingController(
-      text: widget.row.quantity > 0 ? _fmt(widget.row.quantity) : '',
-    );
+    _syncControllers();
+  }
+
+  void _syncControllers() {
+    // Создаём/обновляем контроллеры по числу ячеек
+    while (_ctrls.length < widget.row.quantities.length) {
+      final idx = _ctrls.length;
+      final val = widget.row.quantities[idx];
+      _ctrls.add(TextEditingController(
+          text: val > 0 ? _fmt(val) : ''));
+    }
+  }
+
+  @override
+  void didUpdateWidget(_IikoInventoryRowTile old) {
+    super.didUpdateWidget(old);
+    // Если добавилась новая ячейка — создаём контроллер
+    while (_ctrls.length < widget.row.quantities.length) {
+      _ctrls.add(TextEditingController());
+    }
   }
 
   @override
   void dispose() {
-    _ctrl.dispose();
+    for (final c in _ctrls) {
+      c.dispose();
+    }
     super.dispose();
   }
 
-  String _fmt(double v) => v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(3).replaceAll(RegExp(r'0+$'), '').replaceAll(RegExp(r'\.$'), '');
+  String _fmt(double v) => v == v.roundToDouble()
+      ? v.toInt().toString()
+      : v.toStringAsFixed(3)
+          .replaceAll(RegExp(r'0+$'), '')
+          .replaceAll(RegExp(r'\.$'), '');
 
   @override
   Widget build(BuildContext context) {
-    // Единица хранится как в бланке: кг, л, шт — используем напрямую
-    final unitLabel = widget.row.product.unit ?? '';
-    return ListTile(
-      dense: true,
-      title: Text(widget.row.product.displayName, style: const TextStyle(fontSize: 14)),
-      subtitle: widget.row.product.code != null
-          ? Text('Код: ${widget.row.product.code}', style: const TextStyle(fontSize: 11))
-          : null,
-      trailing: SizedBox(
-        width: 120,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            SizedBox(
-              width: 80,
-              child: TextField(
-                controller: _ctrl,
-                enabled: !widget.completed,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                textAlign: TextAlign.center,
-                decoration: InputDecoration(
-                  isDense: true,
-                  border: const OutlineInputBorder(),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-                  hintText: '0',
-                  suffixText: unitLabel,
-                  suffixStyle: const TextStyle(fontSize: 11),
+    final unit = widget.row.product.unit ?? '';
+    final total = widget.row.total;
+    final qtyCols = widget.row.quantities.length;
+
+    final theme = Theme.of(context);
+    final borderClr = theme.dividerColor;
+    final cb = BorderSide(color: borderClr);
+
+    // Обособленная ячейка ввода — всегда редактируемая (заполнение не блокируется после сохранения)
+    Widget numCell(int colIdx) {
+      final ctrl = _ctrls[colIdx];
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 5),
+        child: SizedBox(
+          width: _iikoColCell - 6,
+          child: TextField(
+                  controller: ctrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 13),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
+                    filled: true,
+                    fillColor: theme.colorScheme.surfaceContainerHighest.withOpacity(0.45),
+                    hintText: '—',
+                    hintStyle: TextStyle(
+                        fontSize: 12,
+                        color: theme.colorScheme.onSurface.withOpacity(0.3)),
+                  ),
+                  onChanged: (v) {
+                    final qty = double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
+                    widget.onChanged(colIdx, qty);
+                  },
                 ),
-                onChanged: (v) {
-                  final qty = double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
-                  widget.onChanged(qty);
-                },
+        ),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        border: Border(left: cb, bottom: cb),
+      ),
+      constraints: const BoxConstraints(minHeight: 48),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // ── Наименование ──
+            Container(
+              width: _iikoColName,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              decoration: BoxDecoration(border: Border(right: cb)),
+              alignment: Alignment.centerLeft,
+              child: Text(
+                widget.row.product.displayName,
+                style: const TextStyle(fontSize: 13),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            // ── Ед. изм. ──
+            Container(
+              width: _iikoColUnit,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+                border: Border(right: cb),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 1),
+              child: Text(
+                unit,
+                style: TextStyle(
+                    fontSize: 10,
+                    color: theme.colorScheme.onSurface.withOpacity(0.7)),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            // ── Итого ──
+            Container(
+              width: _iikoColTotal,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                border: Border(right: cb),
+              ),
+              child: Text(
+                total > 0 ? _fmt(total) : '',
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: total > 0 ? theme.colorScheme.primary : null),
+              ),
+            ),
+            // ── Ячейки ввода — скроллируются вправо ──
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const ClampingScrollPhysics(),
+                child: Row(
+                  children: List.generate(qtyCols, numCell),
+                ),
               ),
             ),
           ],
@@ -2569,4 +3505,27 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
       ),
     );
   }
+}
+
+/// Запись для перестройки central directory при ZIP-патче.
+class _ZipCdEntry {
+  final int origOffset;
+  final int newOffset;
+  final String name;
+  final bool isTarget;
+  final int effectiveCrc;
+  final int effectiveCompSize;
+  final int effectiveUncompSize;
+  final int effectiveMethod;
+
+  _ZipCdEntry({
+    required this.origOffset,
+    required this.newOffset,
+    required this.name,
+    required this.isTarget,
+    required this.effectiveCrc,
+    required this.effectiveCompSize,
+    required this.effectiveUncompSize,
+    required this.effectiveMethod,
+  });
 }

@@ -1,4 +1,4 @@
-name: Build and Deploy to Vercel (Staging) v2
+name: Build and Deploy to Vercel (Demo/Beta)
 
 on:
   push:
@@ -8,9 +8,6 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: restodocks_flutter
 
     steps:
       - name: Checkout
@@ -24,6 +21,7 @@ jobs:
           cache: true
 
       - name: Create config.json
+        working-directory: restodocks_flutter
         run: |
           python3 -c "
           import os, json
@@ -40,28 +38,15 @@ jobs:
           SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
 
-      - name: Flutter clean
-        run: flutter clean || true
-
       - name: Flutter pub get
+        working-directory: restodocks_flutter
         run: flutter pub get
 
       - name: Flutter build web
+        working-directory: restodocks_flutter
         run: flutter build web --release
 
-      - name: Prepare .vercel/output (Build Output API)
-        run: |
-          mkdir -p .vercel/output/static
-          cp -r build/web/* .vercel/output/static/
-          echo '{"version":3,"routes":[{"handle":"filesystem"},{"src":"/(.*)","dest":"/index.html"}]}' > .vercel/output/config.json
-
-      - name: Write Vercel project config for staging
-        run: |
-          mkdir -p .vercel
-          printf '{"projectId":"%s","orgId":"%s"}' "${{ secrets.VERCEL_STAGING_PROJECT_ID }}" "${{ secrets.VERCEL_ORG_ID }}" > .vercel/project.json
-          cat .vercel/project.json
-
-      - name: Setup Node and Vercel CLI
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -69,9 +54,14 @@ jobs:
       - name: Install Vercel CLI
         run: npm i -g vercel@latest
 
-      - name: Deploy to Vercel (prebuilt)
+      - name: Deploy to Vercel Demo
+        working-directory: ${{ github.workspace }}
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_STAGING_PROJECT_ID }}
-        run: vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN" --archive=tgz
+        run: |
+          mkdir -p .vercel/output/static
+          cp -r restodocks_flutter/build/web/. .vercel/output/static/
+          printf '{"version":3,"routes":[{"handle":"filesystem"},{"src":"/(.*)","dest":"/index.html"}]}' > .vercel/output/config.json
+          mkdir -p .vercel
+          printf '{"projectId":"prj_rSIA3SgwSDWTL0pfYVJTCiGVFAke","orgId":"team_l4N4pAZyq8RCmMOLAqatxkUn"}' > .vercel/project.json
+          vercel deploy --prebuilt --prod --yes --token="$VERCEL_TOKEN"

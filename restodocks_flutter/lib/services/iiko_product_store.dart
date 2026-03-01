@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/iiko_product.dart';
@@ -14,7 +16,11 @@ class IikoProductStore extends ChangeNotifier {
   String? _loadedEstablishmentId;
   bool _isLoading = false;
 
-  /// Байты оригинального xlsx-бланка для экспорта.
+  static const _kBlankBytesKey = 'iiko_blank_bytes_b64';
+  static const _kQtyColKey     = 'iiko_blank_qty_col';
+  static const _kStorageBucket = 'iiko-blanks';
+
+  /// Байты оригинального xlsx-бланка для экспорта (персистируются в localStorage + Supabase Storage).
   Uint8List? originalBlankBytes;
 
   /// Индекс колонки «Остаток фактический» в оригинальном бланке (0-based).
@@ -24,6 +30,115 @@ class IikoProductStore extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get hasProducts => _products.isNotEmpty;
   String? get loadedEstablishmentId => _loadedEstablishmentId;
+
+  /// Загружает байты бланка: сначала localStorage, потом Supabase Storage.
+  /// Вызывается перед экспортом и при загрузке iiko-экрана.
+  Future<void> restoreBlankFromStorage({String? establishmentId}) async {
+    if (originalBlankBytes != null) return; // уже в памяти
+
+    // 1) localStorage (быстро, работает без сети)
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final b64 = prefs.getString(_kBlankBytesKey);
+      if (b64 != null) {
+        originalBlankBytes = base64Decode(b64);
+        originalQuantityColumnIndex = prefs.getInt(_kQtyColKey);
+        debugPrint('IikoProductStore: blank restored from localStorage '
+            '(${originalBlankBytes!.length} bytes, qtyCol=$originalQuantityColumnIndex)');
+        return;
+      }
+    } catch (e) {
+      debugPrint('IikoProductStore.restoreBlankFromStorage(local) error: $e');
+    }
+
+    // 2) Supabase Storage (инкогнито / другое устройство)
+    final estId = establishmentId ?? _loadedEstablishmentId;
+    if (estId == null) return;
+    await _restoreBlankFromServer(estId);
+  }
+
+  /// Скачивает бланк с Supabase Storage и сохраняет в память + localStorage.
+  Future<void> _restoreBlankFromServer(String establishmentId) async {
+    try {
+      // Читаем метаданные (индекс колонки)
+      final meta = await _supabase
+          .from('iiko_blank_meta')
+          .select('qty_col_index')
+          .eq('establishment_id', establishmentId)
+          .maybeSingle();
+      if (meta == null) return;
+
+      final storagePath = '$establishmentId/blank.xlsx';
+      final bytes = await _supabase.storage
+          .from(_kStorageBucket)
+          .download(storagePath);
+
+      originalBlankBytes = Uint8List.fromList(bytes);
+      originalQuantityColumnIndex = meta['qty_col_index'] as int?;
+
+      // Кэшируем в localStorage
+      await _persistBlank(originalBlankBytes!, originalQuantityColumnIndex);
+      debugPrint('IikoProductStore: blank restored from Supabase Storage '
+          '(${originalBlankBytes!.length} bytes, qtyCol=$originalQuantityColumnIndex)');
+    } catch (e) {
+      debugPrint('IikoProductStore._restoreBlankFromServer error: $e');
+    }
+  }
+
+  Future<void> _persistBlank(Uint8List bytes, int? qtyCol) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_kBlankBytesKey, base64Encode(bytes));
+      if (qtyCol != null) {
+        await prefs.setInt(_kQtyColKey, qtyCol);
+      } else {
+        await prefs.remove(_kQtyColKey);
+      }
+      debugPrint('IikoProductStore: blank saved to localStorage '
+          '(${bytes.length} bytes, qtyCol=$qtyCol)');
+    } catch (e) {
+      debugPrint('IikoProductStore._persistBlank error: $e');
+    }
+  }
+
+  /// Загружает байты бланка в Supabase Storage и сохраняет метаданные.
+  Future<void> _uploadBlankToServer(
+      String establishmentId, Uint8List bytes, int? qtyCol) async {
+    try {
+      final storagePath = '$establishmentId/blank.xlsx';
+      await _supabase.storage
+          .from(_kStorageBucket)
+          .uploadBinary(
+            storagePath,
+            bytes,
+            fileOptions: const FileOptions(
+              contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+              upsert: true,
+            ),
+          );
+      // Сохраняем / обновляем метаданные
+      await _supabase.from('iiko_blank_meta').upsert(
+        {
+          'establishment_id': establishmentId,
+          'storage_path': storagePath,
+          'qty_col_index': qtyCol ?? 5,
+          'uploaded_at': DateTime.now().toIso8601String(),
+        },
+        onConflict: 'establishment_id',
+      );
+      debugPrint('IikoProductStore: blank uploaded to Supabase Storage ($storagePath)');
+    } catch (e) {
+      debugPrint('IikoProductStore._uploadBlankToServer error: $e');
+    }
+  }
+
+  Future<void> _clearPersistedBlank() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_kBlankBytesKey);
+      await prefs.remove(_kQtyColKey);
+    } catch (_) {}
+  }
 
   Future<void> loadProducts(String establishmentId, {bool force = false}) async {
     if (!force && _loadedEstablishmentId == establishmentId && _products.isNotEmpty) return;
@@ -58,6 +173,10 @@ class IikoProductStore extends ChangeNotifier {
       if (blankBytes != null) {
         originalBlankBytes = blankBytes;
         originalQuantityColumnIndex = quantityColumnIndex;
+        // Сохраняем в localStorage (быстро)
+        await _persistBlank(blankBytes, quantityColumnIndex);
+        // Сохраняем в Supabase Storage (работает в инкогнито и на других устройствах)
+        await _uploadBlankToServer(establishmentId, blankBytes, quantityColumnIndex);
       }
 
       // Удаляем старые через rpc
@@ -66,20 +185,60 @@ class IikoProductStore extends ChangeNotifier {
         params: {'p_establishment_id': establishmentId},
       );
 
-      // Вставляем новые пачками по 200 через rpc
-      const batchSize = 200;
+      // Вставляем все за один RPC-вызов — батчинг по 50 иногда тихо обрывался
+      // после первого батча из-за особенностей Supabase Dart SDK
+      const batchSize = 100;
       for (var i = 0; i < items.length; i += batchSize) {
         final batch = items.skip(i).take(batchSize).toList();
         final jsonItems = batch.map((p) => p.toJson()..remove('id')).toList();
-        await _supabase.rpc(
-          'insert_iiko_products',
-          params: {'p_items': jsonItems},
-        );
+        try {
+          await _supabase.rpc(
+            'insert_iiko_products',
+            params: {'p_items': jsonItems},
+          );
+          debugPrint('IikoProductStore: batch ${i ~/ batchSize + 1} OK (${batch.length} items)');
+        } catch (batchErr) {
+          debugPrint('IikoProductStore: batch ${i ~/ batchSize + 1} failed: $batchErr');
+          // Если батч не прошёл — пробуем по одной записи
+          for (final p in batch) {
+            try {
+              await _supabase.rpc(
+                'insert_iiko_products',
+                params: {'p_items': [p.toJson()..remove('id')]},
+              );
+            } catch (singleErr) {
+              debugPrint('IikoProductStore: single insert failed: ${p.code} — $singleErr');
+            }
+          }
+        }
       }
 
       await loadProducts(establishmentId, force: true);
     } catch (e) {
       debugPrint('IikoProductStore.replaceAll error: $e');
+      // Не rethrow — даже при частичной ошибке загружаем что вставили
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Удаляет все iiko-продукты заведения из базы и сбрасывает локальное состояние.
+  Future<void> deleteAll(String establishmentId) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      await _supabase.rpc(
+        'delete_iiko_products',
+        params: {'p_establishment_id': establishmentId},
+      );
+      _products = [];
+      _loadedEstablishmentId = null;
+      originalBlankBytes = null;
+      originalQuantityColumnIndex = null;
+      await _clearPersistedBlank();
+    } catch (e) {
+      debugPrint('IikoProductStore.deleteAll error: $e');
       rethrow;
     } finally {
       _isLoading = false;
@@ -92,6 +251,7 @@ class IikoProductStore extends ChangeNotifier {
     _loadedEstablishmentId = null;
     originalBlankBytes = null;
     originalQuantityColumnIndex = null;
+    _clearPersistedBlank();
     notifyListeners();
   }
 }

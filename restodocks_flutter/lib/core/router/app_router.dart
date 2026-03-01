@@ -15,6 +15,7 @@ import '../../screens/inventory_inbox_detail_screen.dart';
 import '../../screens/inventory_screen.dart';
 import '../../screens/order_inbox_detail_screen.dart';
 import '../../screens/checklist_inbox_detail_screen.dart';
+import '../../screens/iiko_inventory_inbox_detail_screen.dart';
 import '../../screens/home/expenses_placeholder_screen.dart';
 import '../../screens/home/department_placeholder_screen.dart';
 import '../../screens/supabase_test_screen.dart';
@@ -318,6 +319,14 @@ class AppRouter {
                 pageBuilder: (context, state) {
                   final id = state.pathParameters['id'] ?? '';
                   return _slideTransitionPage(state, ChecklistInboxDetailScreen(documentId: id));
+                },
+              ),
+              GoRoute(
+                path: 'iiko/:id',
+                pageBuilder: (context, state) {
+                  final id = state.pathParameters['id'] ?? '';
+                  return _slideTransitionPage(
+                      state, IikoInventoryInboxDetailScreen(documentId: id));
                 },
               ),
             ],

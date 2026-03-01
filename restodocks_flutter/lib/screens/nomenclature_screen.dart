@@ -314,6 +314,9 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
   }
 }
 
+// Вкладки номенклатуры
+enum _NomTab { nomenclature, iiko }
+
 class _NomenclatureScreenState extends State<NomenclatureScreen> {
   String _query = '';
   String? _category;
@@ -324,6 +327,9 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
   // Список элементов номенклатуры (продукты + ТТК ПФ)
   List<NomenclatureItem> _nomenclatureItems = [];
   bool _isLoading = true;
+
+  // Активная вкладка
+  _NomTab _selectedTab = _NomTab.nomenclature;
 
   @override
   void initState() {
@@ -425,97 +431,82 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       if (excel.tables.isEmpty) return _emptyParsed;
       final sheet = excel.tables[excel.tables.keys.first]!;
 
-      int? headerRow;
-      int? colCode;
-      int? colName;
-      int? colUnit;
-      int? colGroup;
-      int? colQty;
+      String _cell(int col, int row) {
+        final v = sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row)).value;
+        return _iikoExcelCellToStr(v).trim();
+      }
 
+      // Defaults: формат Каспий A=группа, C=код, D=наименование, E=ед.изм., F=остаток
+      int colGroup = 0;
+      int colCode  = 2;
+      int colName  = 3;
+      int colUnit  = 4;
+      int colQty   = 5;
+      int dataStart = 8;
+
+      // Ищем строку с «Наименование» — только не в столбце группы (не A). Продукт = 3-й столбец (D).
       for (var r = 0; r < sheet.maxRows && r < 20; r++) {
-        final cells = <int, String>{};
-        for (var c = 0; c < sheet.maxColumns; c++) {
-          final v = _iikoExcelCellToStr(
-                  sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r)).value)
-              .toLowerCase()
-              .trim();
-          if (v.isNotEmpty) cells[c] = v;
+        final rowCells = <int, String>{};
+        for (var c = 0; c < (sheet.maxColumns > 15 ? 15 : sheet.maxColumns); c++) {
+          final v = _cell(c, r).toLowerCase();
+          if (v.isNotEmpty) rowCells[c] = v;
         }
-        final vals = cells.values.toList();
-        if (vals.any((v) => v.contains('наименование') || v.contains('товар'))) {
-          headerRow = r;
-          cells.forEach((c, v) {
-            if (v.contains('код')) colCode = c;
-            if (v.contains('наименование') || v.contains('товар')) colName = c;
-            if (v.contains('ед') || v.contains('мера')) colUnit = c;
-            if (v.contains('групп')) colGroup = c;
-            if (v.contains('остаток') || v.contains('фактич')) colQty = c;
-          });
+        final nameEntry = rowCells.entries
+            .where((e) => (e.value.contains('наименование') || e.value.contains('товар')) && e.key != colGroup)
+            .firstOrNull;
+        if (nameEntry != null) {
+          colName = nameEntry.key;
+          for (final scanRow in [r, r - 1]) {
+            if (scanRow < 0) continue;
+            for (var c = 0; c < (sheet.maxColumns > 15 ? 15 : sheet.maxColumns); c++) {
+              final v = _cell(c, scanRow).toLowerCase();
+              if (v.contains('код') && !v.contains('штрих')) colCode = c;
+              if ((v.contains('ед') && v.length < 10) || v.contains('мера')) colUnit = c;
+              if (v.contains('остаток') || v.contains('фактич')) colQty = c;
+              if (v.contains('групп')) colGroup = c;
+            }
+          }
+          dataStart = r + 1;
           break;
         }
       }
 
-      if (headerRow == null || colName == null) {
-        colGroup = 0;
-        colCode = 2;
-        colName = 3;
-        colUnit = 4;
-        colQty = 5;
-        headerRow = 8;
-      }
-      colQty ??= (colUnit != null ? colUnit! + 1 : 5);
+      if (colName == colGroup) colName = 3;
 
       final products = <IikoProduct>[];
       String? currentGroupRaw;
       int sortOrder = 0;
 
-      for (var r = (headerRow! + 1); r < sheet.maxRows; r++) {
-        final nameVal = _iikoExcelCellToStr(
-            sheet.cell(CellIndex.indexByColumnRow(columnIndex: colName!, rowIndex: r)).value);
-        final codeVal = colCode != null
-            ? _iikoExcelCellToStr(
-                    sheet.cell(CellIndex.indexByColumnRow(columnIndex: colCode!, rowIndex: r)).value)
-                .trim()
-            : '';
-        final unitVal = colUnit != null
-            ? _iikoExcelCellToStr(
-                    sheet.cell(CellIndex.indexByColumnRow(columnIndex: colUnit!, rowIndex: r)).value)
-                .trim()
-            : '';
-        final groupVal = colGroup != null
-            ? _iikoExcelCellToStr(
-                    sheet.cell(CellIndex.indexByColumnRow(columnIndex: colGroup!, rowIndex: r)).value)
-                .trim()
-            : '';
+      for (var r = dataStart; r < sheet.maxRows; r++) {
+        final codeVal  = _cell(colCode, r);
+        final nameVal  = _cell(colName, r);
+        final unitVal  = _cell(colUnit, r);
+        final groupVal = _cell(colGroup, r);
 
-        if (nameVal.trim().isEmpty) continue;
-
-        if (codeVal.isEmpty && unitVal.isEmpty && groupVal.isNotEmpty) {
-          currentGroupRaw = groupVal;
+        // Строка с кодом = товар
+        if (codeVal.isNotEmpty) {
+          if (groupVal.isNotEmpty) currentGroupRaw = groupVal;
+          if (nameVal.isEmpty) continue;
+          products.add(IikoProduct(
+            id: const Uuid().v4(),
+            establishmentId: establishmentId,
+            code: codeVal,
+            name: nameVal,
+            unit: unitVal.isNotEmpty ? unitVal : null,
+            groupName: currentGroupRaw,
+            sortOrder: sortOrder++,
+          ));
           continue;
         }
-        if (groupVal.isNotEmpty && codeVal.isEmpty) {
-          currentGroupRaw = groupVal;
-          if (nameVal.trim() == groupVal.trim()) continue;
-        }
 
-        if (_isIikoHeaderRow(nameVal.trim())) continue;
-
-        products.add(IikoProduct(
-          id: const Uuid().v4(),
-          establishmentId: establishmentId,
-          code: codeVal.isNotEmpty ? codeVal : null,
-          name: nameVal,
-          unit: unitVal.isNotEmpty ? unitVal : null,
-          groupName: currentGroupRaw,
-          sortOrder: sortOrder++,
-        ));
+        // Строка без кода: смена группы
+        if (groupVal.isNotEmpty) currentGroupRaw = groupVal;
       }
 
       return (
         products: products,
         quantityCol: colQty,
-        dataStartRow: headerRow + 1,
+        dataStartRow: dataStart,
       );
     } catch (e) {
       return _emptyParsed;
@@ -900,6 +891,18 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     if (context.mounted) _ensureLoaded().then((_) => setState(() {}));
   }
 
+  Widget _tabChip(_NomTab tab, String label) {
+    final isSelected = _selectedTab == tab;
+    return FilterChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (_) => setState(() => _selectedTab = tab),
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      selectedColor: Theme.of(context).colorScheme.primaryContainer,
+      checkmarkColor: Theme.of(context).colorScheme.onPrimaryContainer,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
@@ -931,68 +934,54 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     final iikoStore = context.watch<IikoProductStore>();
     final estId2 = account.establishment?.id ?? '';
 
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
+    return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
         title: Text(loc.t('nomenclature')),
-        bottom: const TabBar(
-          tabs: [
-            Tab(text: 'Номенклатура'),
-            Tab(text: 'iiko'),
-          ],
-        ),
         actions: [
-          // Счетчик элементов
-          Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.8),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                '${nomItems.length}',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurface,
-                      fontWeight: FontWeight.w600,
-                    ),
+          // Счётчик: показываем для активной вкладки
+          if (_selectedTab == _NomTab.nomenclature)
+            Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.8),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${nomItems.length}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
               ),
             ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.warning),
-            onPressed: () => _showDuplicates(),
-            tooltip: loc.t('tooltip_show_duplicates'),
-          ),
-          // Temporarily disabled - method has compilation issues
-          // IconButton(
-          //   icon: const Icon(Icons.clear_all),
-          //   onPressed: () => _confirmClearAllNomenclature(context, loc),
-          //   tooltip: 'Очистить всю номенклатуру',
-          // ),
-          IconButton(
-            icon: const Icon(Icons.upload_file),
-            tooltip: loc.t('tooltip_upload_products'),
-            onPressed: () {
-              print('=== Nomenclature upload button pressed ===');
-              try {
-                context.push('/products/upload');
-                print('=== Navigation to /products/upload successful ===');
-              } catch (e) {
-                print('=== Navigation error: $e ===');
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(loc.t('error_navigation').replaceFirst('%s', '$e'))),
-                );
-              }
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.attach_money),
-            onPressed: account.establishment != null ? () => _showCurrencyDialog(context, loc, account, store) : null,
-            tooltip: loc.t('default_currency'),
-          ),
+          if (_selectedTab == _NomTab.nomenclature) ...[
+            IconButton(
+              icon: const Icon(Icons.warning),
+              onPressed: () => _showDuplicates(),
+              tooltip: loc.t('tooltip_show_duplicates'),
+            ),
+            IconButton(
+              icon: const Icon(Icons.upload_file),
+              tooltip: loc.t('tooltip_upload_products'),
+              onPressed: () {
+                try {
+                  context.push('/products/upload');
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(loc.t('error_navigation').replaceFirst('%s', '$e'))),
+                  );
+                }
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.attach_money),
+              onPressed: account.establishment != null ? () => _showCurrencyDialog(context, loc, account, store) : null,
+              tooltip: loc.t('default_currency'),
+            ),
+          ],
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () async {
@@ -1003,63 +992,91 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
           ),
         ],
       ),
-      body: TabBarView(
+      body: Column(
         children: [
-          // Вкладка 1: стандартная номенклатура
-          Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                child: TextField(
-                  decoration: InputDecoration(
-                    hintText: loc.t('search'),
-                    prefixIcon: const Icon(Icons.search),
-                    border: const OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                  onChanged: (v) => setState(() => _query = v),
-                ),
+          // ── Переключатель вкладок (FilterChip, как в Входящих) ──────────────
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              border: Border(
+                bottom: BorderSide(color: Theme.of(context).dividerColor),
               ),
-              Expanded(
-                child: _isLoading
-                    ? _buildNomenclatureSkeletonLoading()
-                    : _NomenclatureTab(
-                  items: nomItems,
-                  store: store,
-                  estId: estId ?? '',
-                  canRemove: true,
-                  loc: loc,
-                  sort: _nomSort,
-                  filterType: _nomFilter,
-                  onSortChanged: (s) => setState(() => _nomSort = s),
-                  onFilterTypeChanged: (f) => setState(() => _nomFilter = f),
-                  onRefresh: () => _ensureLoaded().then((_) => setState(() {})),
-                  onSwitchToCatalog: () => _showCreateProductDialog(loc),
-                  onEditProduct: (ctx, p) => _showEditProductForNomenclature(ctx, p, store, loc, () => _ensureLoaded().then((_) => setState(() {})), estId ?? ''),
-                  onRemoveProduct: (ctx, p) => _confirmRemoveForNomenclature(ctx, p, store, loc, () => _ensureLoaded().then((_) => setState(() {})), estId ?? ''),
-                  onLoadKbju: (ctx, list) => _loadKbjuForAll(ctx, list),
-                  onLoadTranslations: (ctx, list) => _loadTranslationsForAll(ctx, list),
-                  onVerifyWithAi: (ctx, list) => _verifyWithAi(ctx, list),
-                  onNeedsKbju: (item) => _needsKbju(item),
-                  onNeedsTranslation: (item) => _needsTranslation(item),
-                  onCanShowNutrition: (context) => _canShowNutrition(context),
-                  onBuildProductSubtitle: (context, p, store, estId, loc) => _buildProductSubtitle(context, p, store, estId, loc),
-                  onBuildTechCardSubtitle: (tc) => _buildTechCardSubtitle(context, tc),
-                ),
+            ),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _tabChip(_NomTab.nomenclature, 'Номенклатура'),
+                  const SizedBox(width: 8),
+                  _tabChip(_NomTab.iiko, 'iiko'),
+                ],
               ),
-            ],
+            ),
           ),
 
-          // Вкладка 2: iiko-продукты
-          _IikoNomenclatureTab(
-            store: iikoStore,
-            establishmentId: estId2,
-            onUpload: _uploadIikoBlank,
+          // ── Контент активной вкладки ─────────────────────────────────────────
+          Expanded(
+            child: IndexedStack(
+              index: _selectedTab.index,
+              children: [
+                // Вкладка 0: стандартная номенклатура
+                Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                      child: TextField(
+                        decoration: InputDecoration(
+                          hintText: loc.t('search'),
+                          prefixIcon: const Icon(Icons.search),
+                          border: const OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                        onChanged: (v) => setState(() => _query = v),
+                      ),
+                    ),
+                    Expanded(
+                      child: _isLoading
+                          ? _buildNomenclatureSkeletonLoading()
+                          : _NomenclatureTab(
+                              items: nomItems,
+                              store: store,
+                              estId: estId ?? '',
+                              canRemove: true,
+                              loc: loc,
+                              sort: _nomSort,
+                              filterType: _nomFilter,
+                              onSortChanged: (s) => setState(() => _nomSort = s),
+                              onFilterTypeChanged: (f) => setState(() => _nomFilter = f),
+                              onRefresh: () => _ensureLoaded().then((_) => setState(() {})),
+                              onSwitchToCatalog: () => _showCreateProductDialog(loc),
+                              onEditProduct: (ctx, p) => _showEditProductForNomenclature(ctx, p, store, loc, () => _ensureLoaded().then((_) => setState(() {})), estId ?? ''),
+                              onRemoveProduct: (ctx, p) => _confirmRemoveForNomenclature(ctx, p, store, loc, () => _ensureLoaded().then((_) => setState(() {})), estId ?? ''),
+                              onLoadKbju: (ctx, list) => _loadKbjuForAll(ctx, list),
+                              onLoadTranslations: (ctx, list) => _loadTranslationsForAll(ctx, list),
+                              onVerifyWithAi: (ctx, list) => _verifyWithAi(ctx, list),
+                              onNeedsKbju: (item) => _needsKbju(item),
+                              onNeedsTranslation: (item) => _needsTranslation(item),
+                              onCanShowNutrition: (context) => _canShowNutrition(context),
+                              onBuildProductSubtitle: (context, p, store, estId, loc) => _buildProductSubtitle(context, p, store, estId, loc),
+                              onBuildTechCardSubtitle: (tc) => _buildTechCardSubtitle(context, tc),
+                            ),
+                    ),
+                  ],
+                ),
+
+                // Вкладка 1: iiko-продукты
+                _IikoNomenclatureTab(
+                  store: iikoStore,
+                  establishmentId: estId2,
+                  onUpload: _uploadIikoBlank,
+                ),
+              ],
+            ),
           ),
         ],
       ),
-    ), // Scaffold
-    ); // DefaultTabController
+    );
   }
 
   List<Product> _sortProducts(List<Product> list, _CatalogSort sort, {String lang = 'ru'}) {
@@ -3518,7 +3535,8 @@ class _IikoNomenclatureTab extends StatefulWidget {
   State<_IikoNomenclatureTab> createState() => _IikoNomenclatureTabState();
 }
 
-class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab> with AutomaticKeepAliveClientMixin {
+class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab>
+    with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
 
@@ -3534,22 +3552,45 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab> with Automat
     });
   }
 
+  Future<void> _confirmDeleteAll(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Удалить все iiko-продукты?'),
+        content: const Text(
+          'Все загруженные iiko-продукты будут удалены из базы.\nЭто действие нельзя отменить.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Отмена')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await widget.store.deleteAll(widget.establishmentId);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('iiko-продукты удалены')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
     final products = widget.store.products;
-    final filtered = _query.isEmpty
-        ? products
-        : products.where((p) =>
-            p.displayName.toLowerCase().contains(_query.toLowerCase()) ||
-            p.name.toLowerCase().contains(_query.toLowerCase())).toList();
-
-    // Группируем по оригинальному groupName (ключ), отображаем displayGroupName
-    final groups = <String, List<IikoProduct>>{};
-    for (final p in filtered) {
-      final g = p.groupName ?? '';
-      groups.putIfAbsent(g, () => []).add(p);
-    }
 
     if (widget.store.isLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -3562,16 +3603,18 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab> with Automat
           children: [
             Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey[400]),
             const SizedBox(height: 16),
-            Text(
-              'iiko-продукты не загружены',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.grey[600]),
-            ),
+            Text('iiko-продукты не загружены',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(color: Colors.grey[600])),
             const SizedBox(height: 8),
-            Text(
-              'Загрузите инвентаризационный бланк iiko\nчерез раздел «Загрузка продуктов»',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[500]),
-            ),
+            Text('Загрузите инвентаризационный бланк iiko',
+                textAlign: TextAlign.center,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: Colors.grey[500])),
             const SizedBox(height: 24),
             FilledButton.icon(
               icon: const Icon(Icons.upload_file),
@@ -3583,96 +3626,237 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab> with Automat
       );
     }
 
+    // Сортируем по sort_order чтобы порядок совпадал с оригинальным файлом
+    final sorted = [...products]..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+
+    // Фильтрация
+    final filtered = _query.isEmpty
+        ? sorted
+        : sorted
+            .where((p) => p.name.toLowerCase().contains(_query.toLowerCase()))
+            .toList();
+
+    // Строим плоский список строк для ListView — чередуем группы и товары
+    // Структура: _IikoBlankRow (строка бланка) с данными о том, первая ли строка группы
+    final rows = <_IikoBlankRow>[];
+    String? lastGroup;
+    for (final p in filtered) {
+      final g = p.groupName ?? '';
+      final isFirstInGroup = g != lastGroup;
+      lastGroup = g;
+      rows.add(_IikoBlankRow(product: p, isFirstInGroup: isFirstInGroup));
+    }
+
+    // Считаем сколько товаров в каждой группе (для rowspan-эффекта)
+    final groupCounts = <String, int>{};
+    for (final p in filtered) {
+      groupCounts[p.groupName ?? ''] = (groupCounts[p.groupName ?? ''] ?? 0) + 1;
+    }
+
     return Column(
       children: [
+        // ── Тулбар ──
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+          padding: const EdgeInsets.fromLTRB(8, 6, 8, 2),
           child: Row(
             children: [
               Expanded(
                 child: TextField(
                   decoration: const InputDecoration(
-                    hintText: 'Поиск по iiko...',
-                    prefixIcon: Icon(Icons.search),
+                    hintText: 'Поиск по наименованию...',
+                    prefixIcon: Icon(Icons.search, size: 18),
                     border: OutlineInputBorder(),
                     isDense: true,
+                    contentPadding: EdgeInsets.symmetric(vertical: 7),
                   ),
                   onChanged: (v) => setState(() => _query = v),
                 ),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                icon: const Icon(Icons.refresh),
-                tooltip: 'Обновить',
-                onPressed: () => widget.store.loadProducts(widget.establishmentId, force: true),
               ),
               IconButton(
                 icon: const Icon(Icons.upload_file),
                 tooltip: 'Загрузить новый бланк',
                 onPressed: widget.onUpload,
               ),
-            ],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-          child: Row(
-            children: [
-              Icon(Icons.info_outline, size: 14, color: Colors.orange[700]),
-              const SizedBox(width: 4),
-              Text(
-                'Продукты iiko · ${products.length} позиций',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.orange[700]),
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                tooltip: 'Обновить',
+                onPressed: () =>
+                    widget.store.loadProducts(widget.establishmentId, force: true),
+              ),
+              IconButton(
+                icon: Icon(Icons.delete_sweep_outlined, color: Colors.red[400]),
+                tooltip: 'Удалить все',
+                onPressed: () => _confirmDeleteAll(context),
               ),
             ],
           ),
         ),
+
+        // ── Заголовок «N позиций» ──
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text('${products.length} позиций',
+                style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+          ),
+        ),
+
+        // ── Шапка + таблица строк со скроллом по горизонтали ──
         Expanded(
-          child: ListView.builder(
-            itemCount: groups.length,
-            itemBuilder: (ctx, gi) {
-              final groupName = groups.keys.elementAt(gi);
-              final groupItems = groups.values.elementAt(gi);
-              return Column(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: SizedBox(
+              width: _tableWidth,
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (groupName.isNotEmpty)
-                    Container(
-                      width: double.infinity,
-                      color: Colors.orange.withOpacity(0.08),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                      child: Text(
-                        // Для отображения убираем «Т.»
-                        groupItems.isNotEmpty
-                            ? (groupItems.first.displayGroupName ?? groupName)
-                            : groupName,
-                        style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                              color: Colors.orange[800],
-                              fontWeight: FontWeight.w600,
-                            ),
-                      ),
+                  const _IikoBlankaHeader(),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: rows.length,
+                      itemBuilder: (ctx, i) {
+                        final row = rows[i];
+                        final groupCount = groupCounts[row.product.groupName ?? ''] ?? 1;
+                        return _IikoBlankaRowWidget(
+                          row: row,
+                          groupCount: groupCount,
+                        );
+                      },
                     ),
-                  ...groupItems.map((p) => ListTile(
-                        dense: true,
-                        title: Text(p.displayName),
-                        subtitle: p.code != null ? Text('Код: ${p.code}', style: const TextStyle(fontSize: 11)) : null,
-                        trailing: p.unit != null
-                            ? Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[100],
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(p.unit!, style: const TextStyle(fontSize: 12)),
-                              )
-                            : null,
-                      )),
+                  ),
                 ],
-              );
-            },
+              ),
+            ),
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Данные одной строки бланка
+class _IikoBlankRow {
+  final IikoProduct product;
+  final bool isFirstInGroup; // нужно ли показывать ячейку группы
+  const _IikoBlankRow({required this.product, required this.isFirstInGroup});
+}
+
+/// Шапка таблицы: Группа | Код | Наименование | Ед. изм. | Остаток фактический
+// ── Константы ширин колонок (как в Excel бланке) ──────────────────────────────
+// Группа=110, Код=60, Наименование=300, Ед.изм.=52, Остаток=90
+// Итого минимальная ширина таблицы: 612px → горизонтальный скролл на узких экранах
+const double _colGroup    = 110;
+const double _colCode     = 60;
+const double _colName     = 300;
+const double _colUnit     = 52;
+const double _colQty      = 90;
+const double _tableWidth  = _colGroup + _colCode + _colName + _colUnit + _colQty;
+
+class _IikoBlankaHeader extends StatelessWidget {
+  const _IikoBlankaHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme  = Theme.of(context);
+    final bg     = theme.colorScheme.surfaceContainerHighest;
+    final border = BorderSide(color: theme.dividerColor);
+    final style  = TextStyle(
+        fontSize: 11, fontWeight: FontWeight.w700,
+        color: theme.colorScheme.onSurface);
+
+    Widget cell(String text, double width) => Container(
+          width: width,
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 7),
+          decoration: BoxDecoration(
+            color: bg,
+            border: Border(right: border, bottom: border),
+          ),
+          child: Text(text, style: style, textAlign: TextAlign.center),
+        );
+
+    return Container(
+      width: _tableWidth,
+      decoration: BoxDecoration(
+        border: Border(top: border, left: border),
+        color: bg,
+      ),
+      child: Row(
+        children: [
+          cell('Группа',               _colGroup),
+          cell('Код',                  _colCode),
+          cell('Наименование',         _colName),
+          cell('Ед.\nизм.',            _colUnit),
+          cell('Остаток\nфактический', _colQty),
+        ],
+      ),
+    );
+  }
+}
+
+/// Одна строка бланка — фиксированные ширины как в Excel
+class _IikoBlankaRowWidget extends StatelessWidget {
+  const _IikoBlankaRowWidget({required this.row, required this.groupCount});
+
+  final _IikoBlankRow row;
+  final int groupCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme  = Theme.of(context);
+    final border = BorderSide(color: theme.dividerColor);
+
+    Widget cell(Widget child, double width, {Color? bg}) => Container(
+          width: width,
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+          decoration: BoxDecoration(
+            color: bg,
+            border: Border(right: border, bottom: border),
+          ),
+          child: child,
+        );
+
+    final textColor    = theme.colorScheme.onSurface;
+    final subtleColor  = theme.colorScheme.onSurface.withOpacity(0.55);
+    final groupBg      = theme.colorScheme.primaryContainer.withOpacity(0.18);
+
+    return Container(
+      width: _tableWidth,
+      decoration: BoxDecoration(border: Border(left: border)),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            cell(
+              row.isFirstInGroup
+                  ? Text(row.product.groupName ?? '',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+                          color: theme.colorScheme.primary))
+                  : const SizedBox.shrink(),
+              _colGroup,
+              bg: groupBg,
+            ),
+            cell(
+              Text(row.product.code ?? '',
+                  style: TextStyle(fontSize: 11, color: subtleColor),
+                  textAlign: TextAlign.center),
+              _colCode,
+            ),
+            cell(
+              Text(row.product.name,
+                  style: TextStyle(fontSize: 12, color: textColor)),
+              _colName,
+            ),
+            cell(
+              Text(row.product.unit ?? '',
+                  style: TextStyle(fontSize: 12, color: textColor),
+                  textAlign: TextAlign.center),
+              _colUnit,
+            ),
+            cell(const SizedBox.shrink(), _colQty),
+          ],
+        ),
+      ),
     );
   }
 }
