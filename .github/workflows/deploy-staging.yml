@@ -58,7 +58,7 @@ jobs:
       - name: Write Vercel project config for staging
         run: |
           mkdir -p .vercel
-          printf '{"projectId":"%s","orgId":"%s"}' "${{ secrets.VERCEL_STAGING_PROJECT_ID }}" "${{ secrets.VERCEL_ORG_ID }}" > .vercel/project.json
+          printf '{"projectId":"prj_4FMDqFFqx73cJSoap5uMyO6QSuG2","orgId":"team_l4N4pAZyq8RCmMOLAqatxkUn"}' > .vercel/project.json
           cat .vercel/project.json
 
       - name: Setup Node and Vercel CLI
@@ -72,6 +72,4 @@ jobs:
       - name: Deploy to Vercel (prebuilt)
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_STAGING_PROJECT_ID }}
         run: vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN" --archive=tgz
