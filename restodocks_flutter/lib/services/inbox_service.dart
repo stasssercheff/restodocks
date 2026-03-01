@@ -37,10 +37,13 @@ class InboxService {
             ? (DateTime.tryParse(doc['created_at'].toString()) ?? DateTime.now()).toLocal()
             : DateTime.now();
 
+        // Различаем обычную инвентаризацию и iiko по полю payload['type']
+        final isIiko = payload['type'] == 'iiko_inventory';
+
         documents.add(InboxDocument(
           id: doc['id']?.toString() ?? '',
-          type: DocumentType.inventory,
-          title: 'Инвентаризация $dateStr',
+          type: isIiko ? DocumentType.iikoInventory : DocumentType.inventory,
+          title: isIiko ? 'Инвентаризация iiko $dateStr' : 'Инвентаризация $dateStr',
           description: employeeName,
           createdAt: createdAt,
           employeeId: doc['created_by_employee_id']?.toString() ?? '',

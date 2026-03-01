@@ -20,7 +20,7 @@ class InboxScreen extends StatefulWidget {
 }
 
 /// Типы вкладок во входящих
-enum _InboxTab { checklist, order, inventory }
+enum _InboxTab { checklist, order, inventory, iikoInventory }
 
 class _InboxScreenState extends State<InboxScreen> {
   late InboxService _inboxService;
@@ -55,12 +55,14 @@ class _InboxScreenState extends State<InboxScreen> {
     final isOwner = employee.roles.contains('owner');
 
     final tabs = <_InboxTab>[];
-    // Чеклист — шеф и су-шеф
     if (isChef || isSousChef) tabs.add(_InboxTab.checklist);
-    // Заказы — шеф и су-шеф
     if (isChef || isSousChef) tabs.add(_InboxTab.order);
-    // Инвентаризация — шеф и собственник
     if (isChef || isOwner) tabs.add(_InboxTab.inventory);
+    // Вкладка iiko — только если есть хотя бы один документ такого типа
+    if ((isChef || isOwner) &&
+        _documents.any((d) => d.type == DocumentType.iikoInventory)) {
+      tabs.add(_InboxTab.iikoInventory);
+    }
     return tabs;
   }
 
@@ -98,6 +100,8 @@ class _InboxScreenState extends State<InboxScreen> {
         return _documents.where((d) => d.type == DocumentType.productOrder).toList();
       case _InboxTab.inventory:
         return _documents.where((d) => d.type == DocumentType.inventory).toList();
+      case _InboxTab.iikoInventory:
+        return _documents.where((d) => d.type == DocumentType.iikoInventory).toList();
       case null:
         return [];
     }
@@ -150,6 +154,8 @@ class _InboxScreenState extends State<InboxScreen> {
         return loc.t('inbox_tab_order');
       case _InboxTab.inventory:
         return loc.t('inbox_tab_inventory');
+      case _InboxTab.iikoInventory:
+        return 'Инвентаризация iiko';
     }
   }
 

@@ -9,6 +9,7 @@ part 'inbox_document.g.dart';
 /// Типы документов во входящих
 enum DocumentType {
   inventory,
+  iikoInventory,
   productOrder,
   shiftConfirmation,
   checklistSubmission,
@@ -61,6 +62,8 @@ class InboxDocument extends Equatable {
     switch (type) {
       case DocumentType.inventory:
         return Icons.assignment;
+      case DocumentType.iikoInventory:
+        return Icons.table_chart_outlined;
       case DocumentType.productOrder:
         return Icons.shopping_cart;
       case DocumentType.shiftConfirmation:
@@ -76,11 +79,13 @@ class InboxDocument extends Equatable {
       case DocumentType.inventory:
         final date = metadata?['header']?['date']?.toString() ?? '';
         return loc.t('inbox_title_inventory').replaceFirst('%s', date);
+      case DocumentType.iikoInventory:
+        final date = metadata?['header']?['date']?.toString() ?? '';
+        return 'Инвентаризация iiko $date';
       case DocumentType.productOrder:
         final supplier = metadata?['header']?['supplierName']?.toString() ?? '—';
         return loc.t('inbox_title_order').replaceFirst('%s', supplier);
       case DocumentType.checklistSubmission:
-        // title хранится как "Чеклист: <name>" — извлекаем имя
         final colonIdx = title.indexOf(': ');
         final name = colonIdx >= 0 ? title.substring(colonIdx + 2) : title;
         return loc.t('inbox_title_checklist').replaceFirst('%s', name);
@@ -94,6 +99,8 @@ class InboxDocument extends Equatable {
     switch (type) {
       case DocumentType.inventory:
         return loc.t('doc_type_inventory');
+      case DocumentType.iikoInventory:
+        return 'Инвентаризация iiko';
       case DocumentType.productOrder:
         return loc.t('doc_type_product_order');
       case DocumentType.shiftConfirmation:

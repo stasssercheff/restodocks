@@ -2112,15 +2112,26 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Строка iiko-инвентаризации: продукт из iiko_products + количество (одна ячейка).
+// ══════════════════════════════════════════════════════════════════════════════
+// iiko-инвентаризация
+// ══════════════════════════════════════════════════════════════════════════════
+
+/// Одна строка iiko-инвентаризации: продукт + список замеров (как в стандартной).
 class _IikoInventoryRow {
   final IikoProduct product;
-  double quantity;
-  _IikoInventoryRow({required this.product, this.quantity = 0.0});
+  List<double> quantities; // список замеров, минимум 2
+
+  _IikoInventoryRow({required this.product, List<double>? quantities})
+      : quantities = quantities ?? [0.0, 0.0];
+
+  /// Итого = сумма всех замеров
+  double get total => quantities.fold(0.0, (a, b) => a + b);
 }
 
 /// Экран инвентаризации в режиме iiko.
-/// Продукты берутся из iiko_products, интерфейс — таблица с одной колонкой «Количество».
-/// При сохранении — генерирует Excel той же структуры что входной бланк.
+/// - Автосохранение в localStorage при каждом изменении (AutoSaveMixin)
+/// - 2 ячейки ввода + итого (как в стандартной инвентаризации)
+/// - При сохранении — Excel той же структуры что входной бланк + отправка шефу
 class InventoryIikoScreen extends StatefulWidget {
   const InventoryIikoScreen({super.key});
 
@@ -2128,7 +2139,8 @@ class InventoryIikoScreen extends StatefulWidget {
   State<InventoryIikoScreen> createState() => _InventoryIikoScreenState();
 }
 
-class _InventoryIikoScreenState extends State<InventoryIikoScreen> {
+class _InventoryIikoScreenState extends State<InventoryIikoScreen>
+    with AutoSaveMixin<InventoryIikoScreen> {
   final List<_IikoInventoryRow> _rows = [];
   bool _isLoading = true;
   bool _completed = false;
@@ -2136,9 +2148,44 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen> {
   String _nameFilter = '';
   final TextEditingController _filterCtrl = TextEditingController();
 
+  // ── AutoSaveMixin ──────────────────────────────────────────────────────────
+  @override
+  String get draftKey => 'iiko_inventory';
+
+  @override
+  Map<String, dynamic> getCurrentState() {
+    return {
+      'date': _date.toIso8601String(),
+      'quantities': {
+        for (final r in _rows)
+          if (r.total > 0) r.product.id: r.quantities,
+      },
+    };
+  }
+
+  @override
+  Future<void> restoreState(Map<String, dynamic> data) async {
+    if (!mounted) return;
+    final dateStr = data['date'] as String?;
+    final qtMap = data['quantities'] as Map<String, dynamic>?;
+    setState(() {
+      if (dateStr != null) _date = DateTime.tryParse(dateStr) ?? _date;
+      if (qtMap != null) {
+        for (final r in _rows) {
+          final saved = qtMap[r.product.id];
+          if (saved is List) {
+            r.quantities = saved.map((e) => (e as num).toDouble()).toList();
+            if (r.quantities.length < 2) r.quantities.add(0.0);
+          }
+        }
+      }
+    });
+  }
+  // ──────────────────────────────────────────────────────────────────────────
+
   @override
   void initState() {
-    super.initState();
+    super.initState(); // AutoSaveMixin.initState регистрирует lifecycle-хуки
     _filterCtrl.addListener(() => setState(() => _nameFilter = _filterCtrl.text));
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadProducts());
   }
@@ -2168,25 +2215,44 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen> {
   List<_IikoInventoryRow> get _filteredRows {
     if (_nameFilter.isEmpty) return _rows;
     final q = _nameFilter.toLowerCase();
-    return _rows.where((r) => r.product.displayName.toLowerCase().contains(q) || r.product.name.toLowerCase().contains(q)).toList();
+    return _rows
+        .where((r) =>
+            r.product.displayName.toLowerCase().contains(q) ||
+            r.product.name.toLowerCase().contains(q))
+        .toList();
+  }
+
+  void _setQuantity(_IikoInventoryRow row, int colIndex, double value) {
+    setState(() {
+      row.quantities[colIndex] = value;
+      // Добавляем ячейку если заполнили последнюю
+      if (colIndex == row.quantities.length - 1 && value > 0) {
+        row.quantities.add(0.0);
+      }
+    });
+    scheduleSave(); // AutoSaveMixin — сохранение через 300мс
   }
 
   Future<void> _saveAndExport() async {
     setState(() => _completed = true);
 
-    // Генерируем Excel в структуре iiko-бланка
     final bytes = _buildIikoExcel();
-
-    // Скачиваем файл
     final date = _date;
-    final fileName = 'Инвентаризация_iiko_${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}.xlsx';
+    final fileName =
+        'Инвентаризация_iiko_${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}.xlsx';
 
-    // Используем FilePicker или download trigger
     try {
       await _downloadBytes(bytes, fileName);
+
+      // Отправляем шефу во входящие
+      await _sendToChef(bytes, fileName);
+
+      // Очищаем черновик после успешного сохранения
+      await clearDraft();
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Сохранено: $fileName')),
+          SnackBar(content: Text('Сохранено и отправлено шефу: $fileName')),
         );
       }
     } catch (e) {
@@ -2199,56 +2265,90 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen> {
     }
   }
 
-  /// Генерирует итоговый Excel.
-  ///
-  /// Если в [IikoProductStore] сохранены байты оригинального бланка —
-  /// открывает его и вписывает только количество в колонку «Остаток фактический».
-  /// Все остальные данные (шапка, группы, коды, наименования, ед.изм.)
-  /// остаются ровно такими же, как в загруженном файле.
-  ///
-  /// Если оригинала нет (например сессия была сброшена) — строит файл заново
-  /// из данных в базе как запасной вариант.
+  /// Отправляет инвентаризацию во входящие шеф-повару.
+  Future<void> _sendToChef(Uint8List bytes, String fileName) async {
+    try {
+      final account = context.read<AccountManagerSupabase>();
+      final establishment = account.establishment;
+      final employee = account.currentEmployee;
+      if (establishment == null || employee == null) return;
+
+      // Ищем шеф-повара в заведении
+      final allEmployees = await Supabase.instance.client
+          .from('employees')
+          .select()
+          .eq('establishment_id', establishment.id)
+          .or('roles.cs.{executive_chef},roles.cs.{owner}');
+      final chefList = allEmployees as List;
+      if (chefList.isEmpty) return;
+      final chef = chefList.first as Map<String, dynamic>;
+
+      final payload = {
+        'type': 'iiko_inventory',
+        'header': {
+          'date': _date.toIso8601String(),
+          'establishmentName': establishment.name,
+          'employeeName': employee.fullName,
+          'fileName': fileName,
+          'totalPositions': _rows.length,
+          'filledPositions': _rows.where((r) => r.total > 0).length,
+        },
+        'rows': _rows
+            .where((r) => r.total > 0)
+            .map((r) => {
+                  'code': r.product.code,
+                  'name': r.product.name,
+                  'unit': r.product.unit,
+                  'quantities': r.quantities,
+                  'total': r.total,
+                })
+            .toList(),
+      };
+
+      final docService = InventoryDocumentService();
+      await docService.save(
+        establishmentId: establishment.id,
+        createdByEmployeeId: employee.id,
+        recipientChefId: chef['id'] as String,
+        recipientEmail: (chef['email'] as String?) ?? '',
+        payload: payload,
+      );
+    } catch (e) {
+      debugPrint('InventoryIiko._sendToChef error: $e');
+      // Не прерываем — скачивание файла важнее
+    }
+  }
+
   Uint8List _buildIikoExcel() {
     final iikoStore = context.read<IikoProductStore>();
     final origBytes = iikoStore.originalBlankBytes;
     final qtyCol = iikoStore.originalQuantityColumnIndex ?? 5;
-
-    if (origBytes != null) {
-      return _buildFromOriginal(origBytes, qtyCol);
-    } else {
-      return _buildFallback();
-    }
+    return origBytes != null
+        ? _buildFromOriginal(origBytes, qtyCol)
+        : _buildFallback();
   }
 
-  /// Берёт оригинальный xlsx побайтово, находит строки по коду товара (col C),
-  /// вписывает введённое количество только в колонку [qtyCol] («Остаток фактический»).
-  /// Все остальные данные (шапка, форматирование, наименования, ед.изм.) остаются нетронутыми.
   Uint8List _buildFromOriginal(Uint8List origBytes, int qtyCol) {
     final excel = Excel.decodeBytes(origBytes.toList());
     final sheetName = excel.tables.keys.first;
     final sheet = excel.tables[sheetName]!;
 
-    // Строим карту: код -> quantity (ненулевые введённые значения)
+    // код → итого (сумма всех замеров)
     final qtyByCode = <String, double>{};
     for (final r in _rows) {
-      if (r.quantity > 0 && r.product.code != null) {
-        qtyByCode[r.product.code!.trim()] = r.quantity;
+      if (r.total > 0 && r.product.code != null) {
+        qtyByCode[r.product.code!.trim()] = r.total;
       }
     }
 
-    // Определяем колонку с кодом — ищем строку-заголовок «Код» в первых 20 строках
-    int codeCol = 2; // по умолчанию col C (0-based=2) для бланка Каспий
+    int codeCol = 2;
     for (var r = 0; r < sheet.maxRows && r < 20; r++) {
       for (var c = 0; c < (sheet.maxColumns > 10 ? 10 : sheet.maxColumns); c++) {
         final v = _cellStr(sheet, r, c).toLowerCase();
-        if (v == 'код' || v == 'code') {
-          codeCol = c;
-          break;
-        }
+        if (v == 'код' || v == 'code') { codeCol = c; break; }
       }
     }
 
-    // Вписываем количество в строки с совпадающим кодом
     for (var r = 0; r < sheet.maxRows; r++) {
       final code = _cellStr(sheet, r, codeCol).trim();
       if (code.isEmpty) continue;
@@ -2260,14 +2360,14 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen> {
       }
     }
 
-    final saved = excel.save();
-    return Uint8List.fromList(saved!);
+    return Uint8List.fromList(excel.save()!);
   }
 
   String _cellStr(Sheet sheet, int row, int col) {
     try {
-      final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row));
-      final v = cell.value;
+      final v = sheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row))
+          .value;
       if (v == null) return '';
       if (v is TextCellValue) return v.value.text ?? '';
       if (v is IntCellValue) return v.value.toString();
@@ -2278,8 +2378,6 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen> {
     }
   }
 
-  /// Запасной вариант — строит файл заново из данных базы
-  /// (используется только если оригинал не сохранён в памяти).
   Uint8List _buildFallback() {
     final excel = Excel.createExcel();
     const sheetName = 'Инвентаризация';
@@ -2310,16 +2408,15 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen> {
           TextCellValue(r.product.name);
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).value =
           TextCellValue(r.product.unit ?? '');
-      if (r.quantity > 0) {
+      if (r.total > 0) {
         sheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).value =
-            DoubleCellValue(r.quantity);
+            DoubleCellValue(r.total);
       }
       row++;
     }
 
     excel.setDefaultSheet(sheetName);
-    final fileBytes = excel.save();
-    return Uint8List.fromList(fileBytes!);
+    return Uint8List.fromList(excel.save()!);
   }
 
   Future<void> _downloadBytes(Uint8List bytes, String fileName) async {
@@ -2366,7 +2463,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen> {
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
-                // Фильтр поиска
+                // Поиск
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
                   child: TextField(
@@ -2379,7 +2476,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen> {
                     ),
                   ),
                 ),
-                // Статус
+                // Статус-строка
                 Container(
                   color: Colors.purple.withOpacity(0.06),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -2388,7 +2485,10 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen> {
                       Icon(Icons.table_chart_outlined, size: 16, color: Colors.purple[700]),
                       const SizedBox(width: 6),
                       Text(
-                        'iiko · ${_rows.length} позиций · ${_date.day.toString().padLeft(2,'0')}.${_date.month.toString().padLeft(2,'0')}.${_date.year}',
+                        'iiko · ${_rows.length} поз. · '
+                        '${_date.day.toString().padLeft(2, '0')}.'
+                        '${_date.month.toString().padLeft(2, '0')}.'
+                        '${_date.year}',
                         style: TextStyle(fontSize: 12, color: Colors.purple[700]),
                       ),
                       const Spacer(),
@@ -2407,19 +2507,19 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen> {
                     ],
                   ),
                 ),
-                // Таблица
+                // Шапка таблицы
+                _IikoInventoryHeader(),
+                // Список строк
                 Expanded(
                   child: _filteredRows.isEmpty
                       ? const Center(child: Text('Нет позиций'))
                       : _IikoInventoryTable(
                           rows: _filteredRows,
                           completed: _completed,
-                          onQuantityChanged: (row, qty) {
-                            setState(() => row.quantity = qty);
-                          },
+                          onQuantityChanged: _setQuantity,
                         ),
                 ),
-                // Нижняя панель
+                // Кнопка внизу
                 if (!_completed)
                   Padding(
                     padding: const EdgeInsets.all(12),
@@ -2428,7 +2528,8 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen> {
                       child: FilledButton.icon(
                         icon: const Icon(Icons.save_alt),
                         label: const Text('Сохранить и скачать xlsx'),
-                        style: FilledButton.styleFrom(backgroundColor: Colors.purple[700]),
+                        style: FilledButton.styleFrom(
+                            backgroundColor: Colors.purple[700]),
                         onPressed: _saveAndExport,
                       ),
                     ),
@@ -2439,7 +2540,46 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen> {
   }
 }
 
-/// Таблица iiko-инвентаризации с фиксированными колонками и вводом количества.
+// ── Шапка таблицы ────────────────────────────────────────────────────────────
+class _IikoInventoryHeader extends StatelessWidget {
+  const _IikoInventoryHeader();
+
+  static const _border = BorderSide(color: Color(0xFFCCCCCC));
+  static const _style = TextStyle(
+      fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF333333));
+
+  Widget _cell(String text, {double? width, bool expand = false}) {
+    Widget w = Container(
+      width: width,
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      decoration: const BoxDecoration(
+        color: Color(0xFFEEEEEE),
+        border: Border(right: _border, bottom: _border),
+      ),
+      child: Text(text, style: _style, textAlign: TextAlign.center),
+    );
+    return expand ? Expanded(child: w) : w;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        border: Border(left: _border, top: _border),
+      ),
+      child: Row(
+        children: [
+          _cell('Наименование / Ед.', expand: true),
+          _cell('Итого', width: 58),
+          _cell('№1', width: 58),
+          _cell('№2', width: 58),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Таблица ──────────────────────────────────────────────────────────────────
 class _IikoInventoryTable extends StatelessWidget {
   const _IikoInventoryTable({
     required this.rows,
@@ -2449,12 +2589,12 @@ class _IikoInventoryTable extends StatelessWidget {
 
   final List<_IikoInventoryRow> rows;
   final bool completed;
-  final void Function(_IikoInventoryRow row, double qty) onQuantityChanged;
+  final void Function(_IikoInventoryRow row, int colIndex, double qty)
+      onQuantityChanged;
 
   @override
   Widget build(BuildContext context) {
     String? lastGroup;
-
     return ListView.builder(
       itemCount: rows.length,
       itemBuilder: (ctx, i) {
@@ -2468,19 +2608,18 @@ class _IikoInventoryTable extends StatelessWidget {
             groupHeader = Container(
               width: double.infinity,
               color: Colors.purple.withOpacity(0.08),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               child: Text(
                 groupDisplay,
                 style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.purple[800],
-                ),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.purple[800]),
               ),
             );
           }
         }
-
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -2488,7 +2627,7 @@ class _IikoInventoryTable extends StatelessWidget {
             _IikoInventoryRowTile(
               row: row,
               completed: completed,
-              onChanged: (qty) => onQuantityChanged(row, qty),
+              onChanged: (colIdx, qty) => onQuantityChanged(row, colIdx, qty),
             ),
           ],
         );
@@ -2497,6 +2636,7 @@ class _IikoInventoryTable extends StatelessWidget {
   }
 }
 
+// ── Строка с 2 ячейками и итого ──────────────────────────────────────────────
 class _IikoInventoryRowTile extends StatefulWidget {
   const _IikoInventoryRowTile({
     required this.row,
@@ -2506,67 +2646,148 @@ class _IikoInventoryRowTile extends StatefulWidget {
 
   final _IikoInventoryRow row;
   final bool completed;
-  final void Function(double) onChanged;
+  final void Function(int colIndex, double qty) onChanged;
 
   @override
   State<_IikoInventoryRowTile> createState() => _IikoInventoryRowTileState();
 }
 
 class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
-  late final TextEditingController _ctrl;
+  final List<TextEditingController> _ctrls = [];
 
   @override
   void initState() {
     super.initState();
-    _ctrl = TextEditingController(
-      text: widget.row.quantity > 0 ? _fmt(widget.row.quantity) : '',
-    );
+    _syncControllers();
+  }
+
+  void _syncControllers() {
+    // Создаём/обновляем контроллеры по числу ячеек
+    while (_ctrls.length < widget.row.quantities.length) {
+      final idx = _ctrls.length;
+      final val = widget.row.quantities[idx];
+      _ctrls.add(TextEditingController(
+          text: val > 0 ? _fmt(val) : ''));
+    }
+  }
+
+  @override
+  void didUpdateWidget(_IikoInventoryRowTile old) {
+    super.didUpdateWidget(old);
+    // Если добавилась новая ячейка — создаём контроллер
+    while (_ctrls.length < widget.row.quantities.length) {
+      _ctrls.add(TextEditingController());
+    }
   }
 
   @override
   void dispose() {
-    _ctrl.dispose();
+    for (final c in _ctrls) {
+      c.dispose();
+    }
     super.dispose();
   }
 
-  String _fmt(double v) => v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(3).replaceAll(RegExp(r'0+$'), '').replaceAll(RegExp(r'\.$'), '');
+  String _fmt(double v) => v == v.roundToDouble()
+      ? v.toInt().toString()
+      : v.toStringAsFixed(3)
+          .replaceAll(RegExp(r'0+$'), '')
+          .replaceAll(RegExp(r'\.$'), '');
 
   @override
   Widget build(BuildContext context) {
-    // Единица хранится как в бланке: кг, л, шт — используем напрямую
-    final unitLabel = widget.row.product.unit ?? '';
-    return ListTile(
-      dense: true,
-      title: Text(widget.row.product.displayName, style: const TextStyle(fontSize: 14)),
-      subtitle: widget.row.product.code != null
-          ? Text('Код: ${widget.row.product.code}', style: const TextStyle(fontSize: 11))
-          : null,
-      trailing: SizedBox(
-        width: 120,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            SizedBox(
-              width: 80,
-              child: TextField(
-                controller: _ctrl,
-                enabled: !widget.completed,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+    final unit = widget.row.product.unit ?? '';
+    final total = widget.row.total;
+    final qtyCols = widget.row.quantities.length;
+
+    const cellBorder = BorderSide(color: Color(0xFFDDDDDD));
+    const rowBorder = BoxDecoration(
+      border: Border(left: cellBorder, bottom: cellBorder),
+    );
+
+    Widget _numCell(int colIdx) {
+      final ctrl = _ctrls[colIdx];
+      return Container(
+        width: 58,
+        decoration: const BoxDecoration(
+          border: Border(right: cellBorder, bottom: cellBorder),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
+        child: widget.completed
+            ? Center(
+                child: Text(
+                  widget.row.quantities[colIdx] > 0
+                      ? _fmt(widget.row.quantities[colIdx])
+                      : '',
+                  style: const TextStyle(fontSize: 13),
+                ),
+              )
+            : TextField(
+                controller: ctrl,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
                 textAlign: TextAlign.center,
-                decoration: InputDecoration(
+                style: const TextStyle(fontSize: 13),
+                decoration: const InputDecoration(
                   isDense: true,
-                  border: const OutlineInputBorder(),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-                  hintText: '0',
-                  suffixText: unitLabel,
-                  suffixStyle: const TextStyle(fontSize: 11),
+                  border: InputBorder.none,
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+                  hintText: '—',
+                  hintStyle: TextStyle(fontSize: 12, color: Color(0xFFBBBBBB)),
                 ),
                 onChanged: (v) {
                   final qty = double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
-                  widget.onChanged(qty);
+                  widget.onChanged(colIdx, qty);
                 },
               ),
+      );
+    }
+
+    return Container(
+      decoration: rowBorder,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Наименование + единица
+            Expanded(
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: const BoxDecoration(
+                  border: Border(right: cellBorder),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(widget.row.product.displayName,
+                        style: const TextStyle(fontSize: 13)),
+                    if (unit.isNotEmpty)
+                      Text(unit,
+                          style: TextStyle(
+                              fontSize: 11, color: Colors.grey[500])),
+                  ],
+                ),
+              ),
             ),
+            // Итого
+            Container(
+              width: 58,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(
+                color: Color(0xFFF5F5F5),
+                border: Border(right: cellBorder, bottom: cellBorder),
+              ),
+              child: Text(
+                total > 0 ? _fmt(total) : '',
+                style: const TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+            ),
+            // Ячейки ввода
+            ...List.generate(qtyCols, _numCell),
           ],
         ),
       ),
