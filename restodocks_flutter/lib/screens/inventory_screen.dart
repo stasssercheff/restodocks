@@ -2845,7 +2845,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
           ],
         ),
         actions: [
-          if (!_isLoading && !_completed)
+          if (!_isLoading)
             TextButton.icon(
               icon: const Icon(Icons.save_alt),
               label: const Text('Сохранить'),
@@ -2949,22 +2949,19 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                               onQuantityChanged: _setQuantity,
                             ),
                     ),
-                    // Кнопки внизу
+                    // Кнопки внизу — всегда видны
                     Padding(
                       padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
                       child: Row(
                         children: [
-                          // Основная кнопка — скрывается после сохранения
-                          if (!_completed)
-                            Expanded(
-                              child: FilledButton.icon(
-                                icon: const Icon(Icons.save_alt),
-                                label: const Text('Сохранить и скачать xlsx'),
-                                onPressed: _saveAndExport,
-                              ),
+                          Expanded(
+                            child: FilledButton.icon(
+                              icon: const Icon(Icons.save_alt),
+                              label: const Text('Сохранить и скачать xlsx'),
+                              onPressed: _saveAndExport,
                             ),
-                          if (!_completed) const SizedBox(width: 8),
-                          // Кнопка «Обнулить» — всегда доступна
+                          ),
+                          const SizedBox(width: 8),
                           OutlinedButton(
                             onPressed: _confirmReset,
                             style: OutlinedButton.styleFrom(
