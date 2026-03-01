@@ -3,9 +3,6 @@ name: Build and Deploy to Vercel (Staging)
 on:
   push:
     branches: [staging]
-    paths:
-      - 'restodocks_flutter/**'
-      - '.github/workflows/deploy-staging.yml'
   workflow_dispatch:
 
 jobs:
