@@ -2701,6 +2701,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
 
 // Ширина фиксированных колонок
 const double _iikoColName  = 180; // Наименование
+const double _iikoColUnit  =  48; // Ед. изм.
 const double _iikoColTotal =  56; // Итого
 const double _iikoColCell  =  58; // Каждая ячейка ввода
 
@@ -2738,7 +2739,8 @@ class _IikoInventoryHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          hCell('Наименование / Ед.', _iikoColName),
+          hCell('Наименование', _iikoColName),
+          hCell('Ед.', _iikoColUnit),
           hCell('Итого', _iikoColTotal),
           Expanded(
             child: SingleChildScrollView(
@@ -2936,22 +2938,28 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
             width: _iikoColName,
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(border: Border(right: cb)),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  widget.row.product.displayName,
-                  style: const TextStyle(fontSize: 13),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (unit.isNotEmpty)
-                  Text(unit,
-                      style: TextStyle(
-                          fontSize: 10,
-                          color: theme.colorScheme.onSurface.withOpacity(0.5))),
-              ],
+            alignment: Alignment.centerLeft,
+            child: Text(
+              widget.row.product.displayName,
+              style: const TextStyle(fontSize: 13),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          // ── Ед. изм. ──
+          Container(
+            width: _iikoColUnit,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+              border: Border(right: cb),
+            ),
+            child: Text(
+              unit,
+              style: TextStyle(
+                  fontSize: 11,
+                  color: theme.colorScheme.onSurface.withOpacity(0.7)),
+              textAlign: TextAlign.center,
             ),
           ),
           // ── Итого ──
