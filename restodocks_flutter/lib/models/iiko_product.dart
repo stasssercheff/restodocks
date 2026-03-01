@@ -1,18 +1,21 @@
 /// Продукт из iiko-бланка инвентаризации.
 /// Хранится в таблице iiko_products, не связан с основным каталогом products.
+/// Все поля хранятся ТОЧНО как в оригинальном бланке — ни один символ не изменяется.
 class IikoProduct {
   final String id;
   final String establishmentId;
   final String? code;
-  /// Отображаемое название (без префикса «Т.»)
+
+  /// Название ТОЧНО как в бланке (например «Т.  Пенообразователь Bubble drops»).
+  /// Используется при экспорте — копируется 1-в-1 в выходной файл.
   final String name;
-  /// Оригинальное название из бланка (с «Т.», как в файле) — для экспорта
-  final String? nameOriginal;
-  /// Единица измерения как в бланке (кг, л, шт — оригинал)
+
+  /// Единица измерения как в бланке (кг, л, шт — не нормализованная).
   final String? unit;
-  /// Оригинальное значение группы из бланка (с «Т.») — для экспорта
-  final String? groupNameOriginal;
+
+  /// Группа как в бланке (например «Т. Аперитивы/Биттеры»).
   final String? groupName;
+
   final int sortOrder;
 
   const IikoProduct({
@@ -20,22 +23,38 @@ class IikoProduct {
     required this.establishmentId,
     this.code,
     required this.name,
-    this.nameOriginal,
     this.unit,
     this.groupName,
-    this.groupNameOriginal,
     this.sortOrder = 0,
   });
+
+  /// Отображаемое название — убирает префикс «Т.» только для показа на экране.
+  /// В базе и в Excel всегда хранится оригинал [name].
+  String get displayName {
+    var v = name.trim();
+    if (v.startsWith('Т.')) {
+      v = v.replaceFirst(RegExp(r'^Т\.\s*'), '').trim();
+    }
+    return v.isEmpty ? name : v;
+  }
+
+  /// Отображаемое название группы (без «Т.»).
+  String? get displayGroupName {
+    if (groupName == null) return null;
+    var v = groupName!.trim();
+    if (v.startsWith('Т.')) {
+      v = v.replaceFirst(RegExp(r'^Т\.\s*'), '').trim();
+    }
+    return v.isEmpty ? groupName : v;
+  }
 
   factory IikoProduct.fromJson(Map<String, dynamic> json) => IikoProduct(
         id: json['id'] as String,
         establishmentId: json['establishment_id'] as String,
         code: json['code'] as String?,
         name: json['name'] as String,
-        nameOriginal: json['name_original'] as String?,
         unit: json['unit'] as String?,
         groupName: json['group_name'] as String?,
-        groupNameOriginal: json['group_name_original'] as String?,
         sortOrder: (json['sort_order'] as int?) ?? 0,
       );
 
@@ -44,20 +63,16 @@ class IikoProduct {
         'establishment_id': establishmentId,
         'code': code,
         'name': name,
-        'name_original': nameOriginal ?? name,
         'unit': unit,
         'group_name': groupName,
-        'group_name_original': groupNameOriginal ?? groupName,
         'sort_order': sortOrder,
       };
 
   IikoProduct copyWith({
     String? code,
     String? name,
-    String? nameOriginal,
     String? unit,
     String? groupName,
-    String? groupNameOriginal,
     int? sortOrder,
   }) =>
       IikoProduct(
@@ -65,10 +80,8 @@ class IikoProduct {
         establishmentId: establishmentId,
         code: code ?? this.code,
         name: name ?? this.name,
-        nameOriginal: nameOriginal ?? this.nameOriginal,
         unit: unit ?? this.unit,
         groupName: groupName ?? this.groupName,
-        groupNameOriginal: groupNameOriginal ?? this.groupNameOriginal,
         sortOrder: sortOrder ?? this.sortOrder,
       );
 }
