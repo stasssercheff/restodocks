@@ -2204,7 +2204,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen> {
     final sheetName = 'Инвентаризация';
     final sheet = excel[sheetName];
 
-    // Метаданные шапки
+    // Шапка — точно как в оригинальном бланке
     final account = context.read<AccountManagerSupabase>();
     final estName = account.establishment?.name ?? '';
     final dateStr = '${_date.day.toString().padLeft(2,'0')}.${_date.month.toString().padLeft(2,'0')}.${_date.year}';
@@ -2215,31 +2215,42 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen> {
     sheet.cell(CellIndex.indexByString('A4')).value = TextCellValue('На дату:');
     sheet.cell(CellIndex.indexByString('B4')).value = TextCellValue(dateStr);
 
-    // Заголовки таблицы
+    // Заголовки таблицы — строка 8 (индекс 7), как в оригинале
     int row = 7;
-    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = TextCellValue('Группа');
+    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = TextCellValue('Товар');
     sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = TextCellValue('Код');
     sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = TextCellValue('Наименование');
     sheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).value = TextCellValue('Ед. изм.');
     sheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).value = TextCellValue('Остаток фактический');
     row++;
 
-    // Группируем строки по group_name
+    // Данные: используем оригинальные значения из бланка (nameOriginal, groupNameOriginal, unit)
     String? lastGroup;
     for (final r in _rows) {
       final groupName = r.product.groupName ?? '';
       if (groupName != lastGroup) {
         lastGroup = groupName;
         if (groupName.isNotEmpty) {
-          sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = TextCellValue('Т. $groupName');
+          // Оригинальный заголовок группы как был в файле
+          final origGroup = r.product.groupNameOriginal ?? 'Т. $groupName';
+          sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = TextCellValue(origGroup);
           row++;
         }
       }
-      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = TextCellValue(r.product.code ?? '');
-      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = TextCellValue('Т. ${r.product.name}');
-      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).value = TextCellValue(_unitToRu(r.product.unit));
+      // Код — как в бланке
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value =
+          TextCellValue(r.product.code ?? '');
+      // Наименование — оригинал из бланка (с «Т.»)
+      final origName = r.product.nameOriginal ?? r.product.name;
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value =
+          TextCellValue(origName);
+      // Ед. изм. — как в бланке (кг, л, шт)
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).value =
+          TextCellValue(r.product.unit ?? '');
+      // Остаток — введённое количество (только если > 0)
       if (r.quantity > 0) {
-        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).value = DoubleCellValue(r.quantity);
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).value =
+            DoubleCellValue(r.quantity);
       }
       row++;
     }
@@ -2247,11 +2258,6 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen> {
     excel.setDefaultSheet(sheetName);
     final fileBytes = excel.save();
     return Uint8List.fromList(fileBytes!);
-  }
-
-  static String _unitToRu(String? unit) {
-    const map = {'kg': 'кг', 'g': 'г', 'l': 'л', 'ml': 'мл', 'pcs': 'шт', 'pkg': 'уп'};
-    return map[unit] ?? (unit ?? '');
   }
 
   Future<void> _downloadBytes(Uint8List bytes, String fileName) async {
@@ -2464,7 +2470,8 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
 
   @override
   Widget build(BuildContext context) {
-    final unitRu = _unitToRuDisplay(widget.row.product.unit);
+    // Единица хранится как в бланке: кг, л, шт — используем напрямую
+    final unitLabel = widget.row.product.unit ?? '';
     return ListTile(
       dense: true,
       title: Text(widget.row.product.name, style: const TextStyle(fontSize: 14)),
@@ -2488,7 +2495,7 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
                   border: const OutlineInputBorder(),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
                   hintText: '0',
-                  suffixText: unitRu,
+                  suffixText: unitLabel,
                   suffixStyle: const TextStyle(fontSize: 11),
                 ),
                 onChanged: (v) {
@@ -2501,10 +2508,5 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
         ),
       ),
     );
-  }
-
-  static String _unitToRuDisplay(String? unit) {
-    const map = {'kg': 'кг', 'g': 'г', 'l': 'л', 'ml': 'мл', 'pcs': 'шт', 'pkg': 'уп'};
-    return map[unit] ?? (unit ?? '');
   }
 }

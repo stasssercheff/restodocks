@@ -488,12 +488,14 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       }
 
       final products = <IikoProduct>[];
-      String? currentGroup;
+      String? currentGroup;        // отображаемая (без «Т.»)
+      String? currentGroupOrig;   // оригинал из бланка
       int sortOrder = 0;
 
       for (var r = (headerRow! + 1); r < sheet.maxRows; r++) {
         final nameVal = _excelCellToStr(sheet.cell(CellIndex.indexByColumnRow(columnIndex: colName!, rowIndex: r)).value).trim();
         final codeVal = colCode != null ? _excelCellToStr(sheet.cell(CellIndex.indexByColumnRow(columnIndex: colCode!, rowIndex: r)).value).trim() : '';
+        // Единицу храним как есть из бланка (кг, л, шт — не нормализуем)
         final unitVal = colUnit != null ? _excelCellToStr(sheet.cell(CellIndex.indexByColumnRow(columnIndex: colUnit!, rowIndex: r)).value).trim() : '';
         final groupVal = colGroup != null ? _excelCellToStr(sheet.cell(CellIndex.indexByColumnRow(columnIndex: colGroup!, rowIndex: r)).value).trim() : '';
 
@@ -501,17 +503,19 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
         // Строка-группа: есть значение в колонке группы, нет кода, нет ед.изм.
         if (codeVal.isEmpty && unitVal.isEmpty && groupVal.isNotEmpty && nameVal == groupVal) {
+          currentGroupOrig = nameVal;
           currentGroup = _cleanIikoName(nameVal);
           continue;
         }
         if (codeVal.isEmpty && groupVal.isNotEmpty && nameVal == groupVal) {
+          currentGroupOrig = nameVal;
           currentGroup = _cleanIikoName(nameVal);
           continue;
         }
         // Если в colGroup появилась новая группа (ячейка заполнена и это не товарная строка)
         if (groupVal.isNotEmpty && codeVal.isEmpty) {
+          currentGroupOrig = groupVal;
           currentGroup = _cleanIikoName(groupVal);
-          // Если nameVal тоже выглядит как группа — пропускаем
           if (nameVal == groupVal || nameVal.isEmpty) continue;
         }
 
@@ -525,9 +529,11 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
           id: const Uuid().v4(),
           establishmentId: establishmentId,
           code: codeVal.isNotEmpty ? codeVal : null,
-          name: cleanName,
-          unit: unitVal.isNotEmpty ? _normalizeIikoUnit(unitVal) : null,
+          name: cleanName,                            // для отображения (без «Т.»)
+          nameOriginal: nameVal,                      // оригинал для экспорта
+          unit: unitVal.isNotEmpty ? unitVal : null,  // как в бланке: кг, л, шт
           groupName: currentGroup,
+          groupNameOriginal: currentGroupOrig,
           sortOrder: sortOrder++,
         ));
       }
