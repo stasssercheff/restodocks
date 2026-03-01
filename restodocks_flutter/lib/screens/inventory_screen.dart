@@ -2217,11 +2217,11 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen> {
 
     // Заголовки таблицы
     int row = 7;
-    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = const TextCellValue('Группа');
-    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = const TextCellValue('Код');
-    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = const TextCellValue('Наименование');
-    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).value = const TextCellValue('Ед. изм.');
-    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).value = const TextCellValue('Остаток фактический');
+    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = TextCellValue('Группа');
+    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = TextCellValue('Код');
+    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = TextCellValue('Наименование');
+    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).value = TextCellValue('Ед. изм.');
+    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).value = TextCellValue('Остаток фактический');
     row++;
 
     // Группируем строки по group_name
@@ -2255,16 +2255,12 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen> {
   }
 
   Future<void> _downloadBytes(Uint8List bytes, String fileName) async {
-    // На веб — через anchor download, на мобиле — share sheet
-    final blob = bytes;
-    // Используем inventory_download если доступен, иначе fallback
     try {
-      InventoryDownload.download(blob, fileName);
-    } catch (_) {
-      // fallback: показываем snackbar с размером
+      await saveFileBytes(fileName, bytes);
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Файл готов: $fileName (${blob.length} байт)')),
+          SnackBar(content: Text('Ошибка скачивания: $e')),
         );
       }
     }
