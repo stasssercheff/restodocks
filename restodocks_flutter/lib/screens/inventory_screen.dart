@@ -2272,6 +2272,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   final List<_IikoInventoryRow> _rows = [];
   bool _isLoading = true;
   bool _completed = false;
+  String _lastExportInfo = '';
   DateTime _date = DateTime.now();
   String _nameFilter = '';
   final TextEditingController _filterCtrl = TextEditingController();
@@ -2507,15 +2508,20 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     final withTotal = _rows.where((r) => r.total > 0).length;
     final withCode  = _rows.where((r) => r.product.code != null).length;
     final ready     = _rows.where((r) => r.total > 0 && r.product.code != null).length;
+
+    final bytes = await _buildIikoExcel();
+
+    // Диагностика — показываем после сборки файла
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Экспорт: всего=${_rows.length} total>0=$withTotal code≠null=$withCode готово=$ready'),
-        duration: const Duration(seconds: 6),
+        content: Text(
+          'Экспорт: всего=${_rows.length} total>0=$withTotal code≠null=$withCode готово=$ready | $_lastExportInfo',
+        ),
+        duration: const Duration(seconds: 8),
       ));
     }
     await Future.delayed(const Duration(milliseconds: 100));
 
-    final bytes = await _buildIikoExcel();
     final date = _date;
     final fileName =
         'Инвентаризация_iiko_${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}.xlsx';
@@ -2772,6 +2778,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
       },
     );
     debugPrint('_buildFromOriginal: patched $patchedCount rows');
+    _lastExportInfo = 'sheet=$sheetPath patched=$patchedCount/${qtyByCode.length} codeCol=$codeColLetter qtyCol=$qtyColLetter ss=${sharedStrings.length}';
 
     // ── 5. Заменяем sheet в ZIP без перепаковки остальных файлов ─────────────
     //
