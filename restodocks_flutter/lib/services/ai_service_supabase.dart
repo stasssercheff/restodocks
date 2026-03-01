@@ -53,13 +53,14 @@ class AiServiceSupabase implements AiService {
   }
 
   @override
-  Future<List<ParsedProductItem>> parseProductList({List<String>? rows, String? text, String? source, String? userLocale}) async {
+  Future<List<ParsedProductItem>> parseProductList({List<String>? rows, String? text, String? source, String? userLocale, String? mode}) async {
     lastParseProductListError = null;
     final body = <String, dynamic>{};
     if (rows != null && rows.isNotEmpty) body['rows'] = rows;
     if (text != null && text.trim().isNotEmpty) body['text'] = text;
     if (source != null && source.isNotEmpty) body['source'] = source;
     if (userLocale != null && userLocale.isNotEmpty) body['userLocale'] = userLocale;
+    if (mode != null && mode.isNotEmpty) body['mode'] = mode;
     try {
       final res = await _client.functions.invoke('ai-parse-product-list', body: body);
       final data = res.data;

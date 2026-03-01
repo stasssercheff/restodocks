@@ -145,7 +145,8 @@ abstract class AiService {
   /// Всеядный парсинг списка продуктов из сырых строк (Excel/CSV/Numbers/RTF/текст).
   /// [source] — подсказка для ИИ: "numbers", "rtf", "text", "csv" и т.п.
   /// [userLocale] — локаль для подсказки валюты (ru_RU, en_US и т.д.)
-  Future<List<ParsedProductItem>> parseProductList({List<String>? rows, String? text, String? source, String? userLocale});
+  /// [mode] — режим парсинга: null/обычный или "inventory" для инвентаризационных бланков.
+  Future<List<ParsedProductItem>> parseProductList({List<String>? rows, String? text, String? source, String? userLocale, String? mode});
 
   /// Батч-исправление названий продуктов (опечатки, сленг).
   Future<List<String>> normalizeProductNames(List<String> names);
@@ -187,7 +188,7 @@ class AiServiceStub implements AiService {
       null;
 
   @override
-  Future<List<ParsedProductItem>> parseProductList({List<String>? rows, String? text, String? source, String? userLocale}) async => [];
+  Future<List<ParsedProductItem>> parseProductList({List<String>? rows, String? text, String? source, String? userLocale, String? mode}) async => [];
 
   @override
   Future<List<String>> normalizeProductNames(List<String> names) async => names;

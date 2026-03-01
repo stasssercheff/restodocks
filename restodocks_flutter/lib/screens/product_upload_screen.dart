@@ -325,6 +325,17 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
               color: Colors.blue,
               onTap: _isLoading ? null : () => _uploadFromFileUnified(),
             ),
+            const SizedBox(height: 12),
+
+            // 3. Из инвентаризационного бланка
+            _UploadMethodCard(
+              icon: Icons.inventory_2_outlined,
+              title: '3. Из инвентаризационного бланка',
+              description: 'Вставьте строки из бланка инвентаризации. '
+                  'ИИ сам определит название товара и отделит цифры (количество/цена).',
+              color: Colors.orange,
+              onTap: _isLoading ? null : () => _showInventoryUploadDialog(),
+            ),
 
             const SizedBox(height: 24),
 
@@ -345,6 +356,21 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     );
     if (result == null || result.trim().isEmpty || !mounted) return;
     await _processWithDeferredModeration(text: result, source: 'вставленный текст');
+  }
+
+  /// 3. Загрузить из инвентаризационного бланка — вставить строки с названием + числами
+  Future<void> _showInventoryUploadDialog() async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => _InventoryPasteDialog(controller: controller),
+    );
+    if (result == null || result.trim().isEmpty || !mounted) return;
+    await _processWithDeferredModeration(
+      text: result,
+      source: 'инвентаризационный бланк',
+      mode: 'inventory',
+    );
   }
 
   /// 2. Загрузить из файла — выбор файла → SheetJS Edge Function → _processWithDeferredModeration
@@ -740,7 +766,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     }
   }
 
-  Future<void> _processWithDeferredModeration({List<String>? rows, String? text, String? source}) async {
+  Future<void> _processWithDeferredModeration({List<String>? rows, String? text, String? source, String? mode}) async {
     final acc = context.read<AccountManagerSupabase>();
     final est = acc.establishment;
     if (est == null) {
@@ -763,9 +789,9 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       // ИИ обрабатывает входящие данные (текст или файл) — корректно определяет названия, цены, валюту, исправляет опечатки
       final userLocale = WidgetsBinding.instance.platformDispatcher.locale.toString();
       if (rows != null && rows.isNotEmpty) {
-        parsed = await ai.parseProductList(rows: rows, source: source ?? 'строки', userLocale: userLocale);
+        parsed = await ai.parseProductList(rows: rows, source: source ?? 'строки', userLocale: userLocale, mode: mode);
       } else if (text != null && text.trim().isNotEmpty) {
-        parsed = await ai.parseProductList(text: text, source: source ?? 'вставленный текст', userLocale: userLocale);
+        parsed = await ai.parseProductList(text: text, source: source ?? 'вставленный текст', userLocale: userLocale, mode: mode);
       }
 
       // Fallback: локальный парсинг, если ИИ недоступен или вернул пустой результат
@@ -3449,6 +3475,115 @@ class _PasteTextDialogState extends State<_PasteTextDialog> {
                     FilledButton(
                       onPressed: () => Navigator.of(context).pop(widget.controller.text),
                       child: const Text('Анализ'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Диалог вставки строк из инвентаризационного бланка.
+/// Пользователь копирует столбец «Наименование» (или несколько столбцов),
+/// ИИ сам выделяет название товара и отбрасывает/сохраняет числа.
+class _InventoryPasteDialog extends StatefulWidget {
+  const _InventoryPasteDialog({required this.controller});
+  final TextEditingController controller;
+
+  @override
+  State<_InventoryPasteDialog> createState() => _InventoryPasteDialogState();
+}
+
+class _InventoryPasteDialogState extends State<_InventoryPasteDialog> {
+  @override
+  Widget build(BuildContext context) {
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 24, 16, keyboardInset + 16),
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: Material(
+          borderRadius: BorderRadius.circular(16),
+          color: theme.dialogBackgroundColor,
+          elevation: 6,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.inventory_2_outlined, color: Colors.orange[700], size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Инвентаризационный бланк',
+                      style: theme.textTheme.titleMedium,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Скопируйте столбец «Наименование» из Excel (или несколько столбцов). '
+                        'ИИ сам определит название товара и отделит цифры (количество, цену, код).',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Пример строки: "Т. Абсент Грин Зомби/Фея (хаус)"',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontFamily: 'monospace',
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: widget.controller,
+                  maxLines: 8,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    hintText: 'Т.  Пенообразователь Bubble drops\n'
+                        'Т. Апельсин чипсы\n'
+                        'Т. Абсент Грин Зомби/Фея (хаус)\n'
+                        'Т. Мартини Бьянко вермут',
+                    hintStyle: theme.textTheme.bodySmall?.copyWith(color: Colors.grey[400]),
+                    border: const OutlineInputBorder(),
+                    contentPadding: const EdgeInsets.all(12),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Отмена'),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton.icon(
+                      icon: const Icon(Icons.auto_awesome, size: 16),
+                      label: const Text('Распознать'),
+                      style: FilledButton.styleFrom(backgroundColor: Colors.orange[700]),
+                      onPressed: () => Navigator.of(context).pop(widget.controller.text),
                     ),
                   ],
                 ),

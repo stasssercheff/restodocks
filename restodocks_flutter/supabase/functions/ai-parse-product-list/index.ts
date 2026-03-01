@@ -11,6 +11,34 @@ function corsHeaders(origin: string | null) {
   };
 }
 
+// Промпт для режима инвентаризационного бланка
+const INVENTORY_SYSTEM_PROMPT = `Ты — парсер инвентаризационного бланка для ресторана. ОБЯЗАТЕЛЬНО выполняй ВСЕ пункты.
+
+ЗАДАЧА: из каждой строки извлечь название товара. Строки взяты из столбца «Наименование» инвентаризационного бланка.
+
+ФОРМАТ СТРОК:
+- Строка может начинаться с префикса типа «Т.», «Т. », «ТМЦ» и т.п. — это технический маркер, НЕ часть названия. Убирай его.
+- После названия может стоять ед. изм.: «кг», «л», «шт», «мл» — извлеки unit.
+- В строке могут быть числа (код товара, количество, цена) — НЕ включай их в name.
+- Некоторые строки — это заголовки ГРУПП (например: «Т. Аперитивы/Биттеры», «Т. Вино белое», «Т. БАР») — пропускай их, если у них нет конкретного кода-цифр рядом. Но если сомневаешься — лучше включи.
+- Строки-заголовки таблицы («Наименование», «Код», «Ед. изм.», «Остаток») — пропускай.
+- Строки с организацией, датой, складом («Организация:», «На дату:», «Склад») — пропускай.
+
+ИСПРАВЛЕНИЕ НАЗВАНИЙ:
+- Исправляй ВСЕ опечатки, приводи к стандартной кулинарной терминологии.
+- НЕ добавляй слова которых нет в строке, НЕ переводи, сохраняй бренды как есть.
+- Примеры очистки: «Т.  Пенообразователь Bubble drops» → name «Пенообразователь Bubble drops», unit «l»
+  «Т. Абсент Грин Зомби/Фея (хаус)» → name «Абсент Грин Зомби/Фея (хаус)»
+  «Т. Мартини Бьянко вермут» → name «Мартини Бьянко вермут», unit «l»
+
+OUTPUT: JSON array of objects:
+- name (string, required): название товара без префиксов и цифр
+- price (number|null): цена если есть в строке, иначе null
+- unit (string|null): «g», «kg», «ml», «l», «pcs», «portion» или аналог
+- currency (string|null): валюта если есть, иначе null
+
+Return ONLY valid JSON array, no markdown, no extra text. Max 500 items.`;
+
 const SYSTEM_PROMPT = `Ты — парсер списка продуктов для ресторана. ОБЯЗАТЕЛЬНО выполняй ВСЕ пункты.
 
 ИСТОЧНИКИ (принимай любые): RTF, XLS, XLSX, DOC, DOCX, TXT, CSV — у разных пользователей разная структура.
@@ -91,9 +119,11 @@ Deno.serve(async (req: Request) => {
       source?: string;
       hintCurrency?: string;
       userLocale?: string;
+      mode?: string;
     };
     let rows: string[] = [];
     const source = typeof body.source === "string" ? body.source : "";
+    const isInventoryMode = typeof body.mode === "string" && body.mode.trim().toLowerCase() === "inventory";
     let defaultCurrency = typeof body.hintCurrency === "string" && body.hintCurrency.trim()
       ? body.hintCurrency.trim().toUpperCase()
       : null;
@@ -148,11 +178,15 @@ Deno.serve(async (req: Request) => {
     const sourceHint = source ? `\n\nИсточник: ${source}. Обработай соответственно.` : "";
     const currencyHint = `\n\ndefaultCurrency (если в строке нет валюты): ${defaultCurrency}`;
     const toSend = rows.slice(0, 500);
-    const userContent = `Распарси в список продуктов. Обязательно исправь ВСЕ опечатки в названиях. Определи валюту по тексту или используй defaultCurrency.${sourceHint}${currencyHint}\n\nСтрок: ${toSend.length}\n\n${toSend.map((r, i) => `${i + 1}. ${r}`).join("\n")}`;
+
+    const activeSystemPrompt = isInventoryMode ? INVENTORY_SYSTEM_PROMPT : SYSTEM_PROMPT;
+    const userContent = isInventoryMode
+      ? `Извлеки названия товаров из строк инвентаризационного бланка. Убери префиксы «Т.», коды, числа. Исправь опечатки.${currencyHint}\n\nСтрок: ${toSend.length}\n\n${toSend.map((r, i) => `${i + 1}. ${r}`).join("\n")}`
+      : `Распарси в список продуктов. Обязательно исправь ВСЕ опечатки в названиях. Определи валюту по тексту или используй defaultCurrency.${sourceHint}${currencyHint}\n\nСтрок: ${toSend.length}\n\n${toSend.map((r, i) => `${i + 1}. ${r}`).join("\n")}`;
 
     const content = await chatText({
       messages: [
-        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: activeSystemPrompt },
         { role: "user", content: userContent },
       ],
       temperature: 0.2,
