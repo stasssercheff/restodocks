@@ -8,6 +8,7 @@ import '../../services/order_history_service.dart';
 import '../../services/inventory_history_service.dart';
 import '../../services/translation_service.dart';
 import '../../services/translation_manager.dart';
+import '../../services/iiko_product_store.dart';
 
 /// Настройка всех провайдеров приложения
 class AppProviders {
@@ -73,6 +74,9 @@ class AppProviders {
         ),
         Provider<EmailService>(
           create: (_) => EmailService(),
+        ),
+        ChangeNotifierProvider<IikoProductStore>(
+          create: (_) => IikoProductStore(),
         ),
 
         // Инициализация сервисов при запуске + загрузка продуктов после входа

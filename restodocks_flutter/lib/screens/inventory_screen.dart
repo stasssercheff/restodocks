@@ -11,10 +11,12 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/models.dart';
+import '../models/iiko_product.dart';
 import '../services/ai_service.dart';
 import '../services/image_service.dart';
 import '../services/inventory_download.dart';
 import '../services/services.dart';
+import '../services/iiko_product_store.dart';
 import '../mixins/auto_save_mixin.dart';
 import '../mixins/input_change_listener_mixin.dart';
 import '../widgets/app_bar_home_button.dart';
@@ -167,7 +169,7 @@ class _InventoryScreenState extends State<InventoryScreen>
   void initState() {
     super.initState();
     _startTime = TimeOfDay.now();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadNomenclature());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _showModeDialog());
     _nameFilterCtrl.addListener(() {
       if (_nameFilter != _nameFilterCtrl.text) {
         setState(() => _nameFilter = _nameFilterCtrl.text);
@@ -320,6 +322,72 @@ class _InventoryScreenState extends State<InventoryScreen>
 
   /// Порядок отображения: сначала продукты, потом ПФ (для обратной совместимости с нумерацией в Excel).
   List<int> get _displayOrder => [..._productIndices, ..._pfIndices];
+
+  /// Диалог выбора режима инвентаризации при открытии экрана.
+  Future<void> _showModeDialog() async {
+    if (!mounted) return;
+    final iikoStore = context.read<IikoProductStore>();
+    final account = context.read<AccountManagerSupabase>();
+    final estId = account.establishment?.id;
+
+    // Проверяем есть ли iiko-продукты
+    if (estId != null) {
+      await iikoStore.loadProducts(estId);
+    }
+    if (!mounted) return;
+
+    final hasIiko = iikoStore.hasProducts;
+
+    final choice = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Тип инвентаризации'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.list_alt, color: Colors.blue),
+              title: const Text('Стандартный'),
+              subtitle: const Text('Продукты из номенклатуры'),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              tileColor: Colors.blue.withOpacity(0.05),
+              onTap: () => Navigator.of(ctx).pop('standard'),
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: Icon(Icons.table_chart_outlined, color: hasIiko ? Colors.purple : Colors.grey),
+              title: const Text('Бланк iiko'),
+              subtitle: Text(
+                hasIiko
+                    ? 'Продукты из iiko-бланка · ${iikoStore.products.length} позиций'
+                    : 'Сначала загрузите бланк iiko в «Загрузка продуктов»',
+              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              tileColor: hasIiko ? Colors.purple.withOpacity(0.05) : Colors.grey.withOpacity(0.03),
+              onTap: hasIiko ? () => Navigator.of(ctx).pop('iiko') : null,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop('standard'),
+            child: const Text('Отмена'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted) return;
+
+    if (choice == 'iiko') {
+      // Переходим на iiko-экран инвентаризации
+      context.pushReplacement('/inventory-iiko');
+    } else {
+      // Стандартный режим — загружаем номенклатуру как обычно
+      _loadNomenclature();
+    }
+  }
 
   /// Автоматическая подстановка: номенклатура заведения + полуфабрикаты (ТТК с типом ПФ).
   Future<void> _loadNomenclature() async {
@@ -2036,5 +2104,411 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
         ],
       ),
     );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ЭКРАН ИНВЕНТАРИЗАЦИИ iiko
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Строка iiko-инвентаризации: продукт из iiko_products + количество (одна ячейка).
+class _IikoInventoryRow {
+  final IikoProduct product;
+  double quantity;
+  _IikoInventoryRow({required this.product, this.quantity = 0.0});
+}
+
+/// Экран инвентаризации в режиме iiko.
+/// Продукты берутся из iiko_products, интерфейс — таблица с одной колонкой «Количество».
+/// При сохранении — генерирует Excel той же структуры что входной бланк.
+class InventoryIikoScreen extends StatefulWidget {
+  const InventoryIikoScreen({super.key});
+
+  @override
+  State<InventoryIikoScreen> createState() => _InventoryIikoScreenState();
+}
+
+class _InventoryIikoScreenState extends State<InventoryIikoScreen> {
+  final List<_IikoInventoryRow> _rows = [];
+  bool _isLoading = true;
+  bool _completed = false;
+  DateTime _date = DateTime.now();
+  String _nameFilter = '';
+  final TextEditingController _filterCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _filterCtrl.addListener(() => setState(() => _nameFilter = _filterCtrl.text));
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadProducts());
+  }
+
+  @override
+  void dispose() {
+    _filterCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadProducts() async {
+    final account = context.read<AccountManagerSupabase>();
+    final estId = account.establishment?.id;
+    if (estId == null) return;
+    final iikoStore = context.read<IikoProductStore>();
+    await iikoStore.loadProducts(estId);
+    if (!mounted) return;
+    setState(() {
+      _rows.clear();
+      for (final p in iikoStore.products) {
+        _rows.add(_IikoInventoryRow(product: p));
+      }
+      _isLoading = false;
+    });
+  }
+
+  List<_IikoInventoryRow> get _filteredRows {
+    if (_nameFilter.isEmpty) return _rows;
+    final q = _nameFilter.toLowerCase();
+    return _rows.where((r) => r.product.name.toLowerCase().contains(q)).toList();
+  }
+
+  Future<void> _saveAndExport() async {
+    setState(() => _completed = true);
+
+    // Генерируем Excel в структуре iiko-бланка
+    final bytes = _buildIikoExcel();
+
+    // Скачиваем файл
+    final date = _date;
+    final fileName = 'Инвентаризация_iiko_${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}.xlsx';
+
+    // Используем FilePicker или download trigger
+    try {
+      await _downloadBytes(bytes, fileName);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Сохранено: $fileName')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка сохранения: $e')),
+        );
+        setState(() => _completed = false);
+      }
+    }
+  }
+
+  Uint8List _buildIikoExcel() {
+    final excel = Excel.createExcel();
+    final sheetName = 'Инвентаризация';
+    final sheet = excel[sheetName];
+
+    // Метаданные шапки
+    final account = context.read<AccountManagerSupabase>();
+    final estName = account.establishment?.name ?? '';
+    final dateStr = '${_date.day.toString().padLeft(2,'0')}.${_date.month.toString().padLeft(2,'0')}.${_date.year}';
+
+    sheet.cell(CellIndex.indexByString('A1')).value = TextCellValue('Организация:');
+    sheet.cell(CellIndex.indexByString('B1')).value = TextCellValue(estName);
+    sheet.cell(CellIndex.indexByString('A2')).value = TextCellValue('Бланк инвентаризации');
+    sheet.cell(CellIndex.indexByString('A4')).value = TextCellValue('На дату:');
+    sheet.cell(CellIndex.indexByString('B4')).value = TextCellValue(dateStr);
+
+    // Заголовки таблицы
+    int row = 7;
+    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = const TextCellValue('Группа');
+    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = const TextCellValue('Код');
+    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = const TextCellValue('Наименование');
+    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).value = const TextCellValue('Ед. изм.');
+    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).value = const TextCellValue('Остаток фактический');
+    row++;
+
+    // Группируем строки по group_name
+    String? lastGroup;
+    for (final r in _rows) {
+      final groupName = r.product.groupName ?? '';
+      if (groupName != lastGroup) {
+        lastGroup = groupName;
+        if (groupName.isNotEmpty) {
+          sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = TextCellValue('Т. $groupName');
+          row++;
+        }
+      }
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = TextCellValue(r.product.code ?? '');
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = TextCellValue('Т. ${r.product.name}');
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).value = TextCellValue(_unitToRu(r.product.unit));
+      if (r.quantity > 0) {
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).value = DoubleCellValue(r.quantity);
+      }
+      row++;
+    }
+
+    excel.setDefaultSheet(sheetName);
+    final fileBytes = excel.save();
+    return Uint8List.fromList(fileBytes!);
+  }
+
+  static String _unitToRu(String? unit) {
+    const map = {'kg': 'кг', 'g': 'г', 'l': 'л', 'ml': 'мл', 'pcs': 'шт', 'pkg': 'уп'};
+    return map[unit] ?? (unit ?? '');
+  }
+
+  Future<void> _downloadBytes(Uint8List bytes, String fileName) async {
+    // На веб — через anchor download, на мобиле — share sheet
+    final blob = bytes;
+    // Используем inventory_download если доступен, иначе fallback
+    try {
+      InventoryDownload.download(blob, fileName);
+    } catch (_) {
+      // fallback: показываем snackbar с размером
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Файл готов: $fileName (${blob.length} байт)')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final account = context.watch<AccountManagerSupabase>();
+
+    return Scaffold(
+      appBar: AppBar(
+        leading: appBarBackButton(context),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Инвентаризация iiko', style: TextStyle(fontSize: 16)),
+            Text(
+              account.establishment?.name ?? '',
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
+            ),
+          ],
+        ),
+        backgroundColor: Colors.purple[50],
+        actions: [
+          if (!_isLoading && !_completed)
+            TextButton.icon(
+              icon: const Icon(Icons.save_alt),
+              label: const Text('Сохранить'),
+              onPressed: _saveAndExport,
+            ),
+        ],
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+              children: [
+                // Фильтр поиска
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                  child: TextField(
+                    controller: _filterCtrl,
+                    decoration: const InputDecoration(
+                      hintText: 'Поиск по наименованию...',
+                      prefixIcon: Icon(Icons.search),
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                ),
+                // Статус
+                Container(
+                  color: Colors.purple.withOpacity(0.06),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  child: Row(
+                    children: [
+                      Icon(Icons.table_chart_outlined, size: 16, color: Colors.purple[700]),
+                      const SizedBox(width: 6),
+                      Text(
+                        'iiko · ${_rows.length} позиций · ${_date.day.toString().padLeft(2,'0')}.${_date.month.toString().padLeft(2,'0')}.${_date.year}',
+                        style: TextStyle(fontSize: 12, color: Colors.purple[700]),
+                      ),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: _date,
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime(2030),
+                          );
+                          if (picked != null) setState(() => _date = picked);
+                        },
+                        child: const Text('Дата', style: TextStyle(fontSize: 12)),
+                      ),
+                    ],
+                  ),
+                ),
+                // Таблица
+                Expanded(
+                  child: _filteredRows.isEmpty
+                      ? const Center(child: Text('Нет позиций'))
+                      : _IikoInventoryTable(
+                          rows: _filteredRows,
+                          completed: _completed,
+                          onQuantityChanged: (row, qty) {
+                            setState(() => row.quantity = qty);
+                          },
+                        ),
+                ),
+                // Нижняя панель
+                if (!_completed)
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        icon: const Icon(Icons.save_alt),
+                        label: const Text('Сохранить и скачать xlsx'),
+                        style: FilledButton.styleFrom(backgroundColor: Colors.purple[700]),
+                        onPressed: _saveAndExport,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+    );
+  }
+}
+
+/// Таблица iiko-инвентаризации с фиксированными колонками и вводом количества.
+class _IikoInventoryTable extends StatelessWidget {
+  const _IikoInventoryTable({
+    required this.rows,
+    required this.completed,
+    required this.onQuantityChanged,
+  });
+
+  final List<_IikoInventoryRow> rows;
+  final bool completed;
+  final void Function(_IikoInventoryRow row, double qty) onQuantityChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    String? lastGroup;
+
+    return ListView.builder(
+      itemCount: rows.length,
+      itemBuilder: (ctx, i) {
+        final row = rows[i];
+        final groupName = row.product.groupName ?? '';
+        Widget? groupHeader;
+        if (groupName != lastGroup) {
+          lastGroup = groupName;
+          if (groupName.isNotEmpty) {
+            groupHeader = Container(
+              width: double.infinity,
+              color: Colors.purple.withOpacity(0.08),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+              child: Text(
+                groupName,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.purple[800],
+                ),
+              ),
+            );
+          }
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (groupHeader != null) groupHeader,
+            _IikoInventoryRowTile(
+              row: row,
+              completed: completed,
+              onChanged: (qty) => onQuantityChanged(row, qty),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _IikoInventoryRowTile extends StatefulWidget {
+  const _IikoInventoryRowTile({
+    required this.row,
+    required this.completed,
+    required this.onChanged,
+  });
+
+  final _IikoInventoryRow row;
+  final bool completed;
+  final void Function(double) onChanged;
+
+  @override
+  State<_IikoInventoryRowTile> createState() => _IikoInventoryRowTileState();
+}
+
+class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
+  late final TextEditingController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(
+      text: widget.row.quantity > 0 ? _fmt(widget.row.quantity) : '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  String _fmt(double v) => v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(3).replaceAll(RegExp(r'0+$'), '').replaceAll(RegExp(r'\.$'), '');
+
+  @override
+  Widget build(BuildContext context) {
+    final unitRu = _unitToRuDisplay(widget.row.product.unit);
+    return ListTile(
+      dense: true,
+      title: Text(widget.row.product.name, style: const TextStyle(fontSize: 14)),
+      subtitle: widget.row.product.code != null
+          ? Text('Код: ${widget.row.product.code}', style: const TextStyle(fontSize: 11))
+          : null,
+      trailing: SizedBox(
+        width: 120,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            SizedBox(
+              width: 80,
+              child: TextField(
+                controller: _ctrl,
+                enabled: !widget.completed,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                textAlign: TextAlign.center,
+                decoration: InputDecoration(
+                  isDense: true,
+                  border: const OutlineInputBorder(),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                  hintText: '0',
+                  suffixText: unitRu,
+                  suffixStyle: const TextStyle(fontSize: 11),
+                ),
+                onChanged: (v) {
+                  final qty = double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
+                  widget.onChanged(qty);
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static String _unitToRuDisplay(String? unit) {
+    const map = {'kg': 'кг', 'g': 'г', 'l': 'л', 'ml': 'мл', 'pcs': 'шт', 'pkg': 'уп'};
+    return map[unit] ?? (unit ?? '');
   }
 }

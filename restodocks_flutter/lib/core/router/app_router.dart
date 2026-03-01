@@ -12,6 +12,7 @@ import '../../screens/owner_registration_screen.dart';
 import '../../screens/home/schedule_screen.dart';
 import '../../screens/home/inbox_screen.dart';
 import '../../screens/inventory_inbox_detail_screen.dart';
+import '../../screens/inventory_screen.dart';
 import '../../screens/order_inbox_detail_screen.dart';
 import '../../screens/checklist_inbox_detail_screen.dart';
 import '../../screens/home/expenses_placeholder_screen.dart';
@@ -216,6 +217,10 @@ class AppRouter {
       GoRoute(
         path: '/inventory-received',
         pageBuilder: (context, state) => _slideTransitionPage(state, const InventoryReceivedScreen()),
+      ),
+      GoRoute(
+        path: '/inventory-iiko',
+        pageBuilder: (context, state) => _slideTransitionPage(state, const InventoryIikoScreen()),
       ),
 
       // Регистрация соучредителя после принятия приглашения

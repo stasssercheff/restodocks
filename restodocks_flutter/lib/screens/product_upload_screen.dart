@@ -20,10 +20,12 @@ import 'package:uuid/uuid.dart';
 import '../models/culinary_units.dart';
 import '../models/models.dart';
 import '../models/product_import_result.dart';
+import '../models/iiko_product.dart';
 import '../services/services.dart';
 import '../services/intelligent_product_import_service.dart';
 import '../services/translation_service.dart';
 import '../services/translation_manager.dart';
+import '../services/iiko_product_store.dart';
 import '../widgets/app_bar_home_button.dart';
 
 // Глобальная переменная для хранения debug логов
@@ -327,7 +329,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
             ),
             const SizedBox(height: 12),
 
-            // 3. Из инвентаризационного бланка
+            // 3. Из инвентаризационного бланка (текст)
             _UploadMethodCard(
               icon: Icons.inventory_2_outlined,
               title: '3. Из инвентаризационного бланка',
@@ -335,6 +337,17 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
                   'ИИ сам определит название товара и отделит цифры (количество/цена).',
               color: Colors.orange,
               onTap: _isLoading ? null : () => _showInventoryUploadDialog(),
+            ),
+            const SizedBox(height: 12),
+
+            // 4. Загрузить бланк iiko (xlsx → отдельная номенклатура)
+            _UploadMethodCard(
+              icon: Icons.table_chart_outlined,
+              title: '4. Загрузить бланк iiko (.xlsx)',
+              description: 'Загрузите Excel-бланк инвентаризации iiko. '
+                  'Все позиции сохранятся в отдельной iiko-номенклатуре для проведения инвентаризации.',
+              color: Colors.purple,
+              onTap: _isLoading ? null : () => _uploadIikoBlank(),
             ),
 
             const SizedBox(height: 24),
@@ -371,6 +384,187 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       source: 'инвентаризационный бланк',
       mode: 'inventory',
     );
+  }
+
+  /// 4. Загрузить бланк iiko: парсит xlsx 1-в-1 (без ИИ), сохраняет в iiko_products
+  Future<void> _uploadIikoBlank() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['xlsx', 'xls'],
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty || result.files.single.bytes == null) return;
+
+    final acc = context.read<AccountManagerSupabase>();
+    final estId = acc.establishment?.id;
+    if (estId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Не найдено заведение')));
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _loadingMessage = 'Чтение бланка iiko...';
+    });
+
+    try {
+      final bytes = result.files.single.bytes!;
+      final products = _parseIikoBlank(bytes, estId);
+
+      if (products.isEmpty) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Не удалось распознать структуру бланка iiko')),
+          );
+        }
+        return;
+      }
+
+      _setLoadingMessage('Сохранение ${products.length} позиций iiko...');
+      final iikoStore = context.read<IikoProductStore>();
+      await iikoStore.replaceAll(estId, products);
+
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Загружено ${products.length} позиций iiko. Доступны в номенклатуре → вкладка iiko'),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+      }
+    }
+  }
+
+  /// Парсит xlsx-бланк iiko: извлекает код, наименование, ед. изм., группу.
+  /// Определяет колонки по заголовкам строки с «Наименование» / «Код» / «Ед. изм.».
+  /// Строки-группы (где есть значение в колонке A но нет кода) трактуются как groupName.
+  List<IikoProduct> _parseIikoBlank(Uint8List bytes, String establishmentId) {
+    try {
+      final excel = Excel.decodeBytes(bytes.toList());
+      if (excel.tables.isEmpty) return [];
+      final sheet = excel.tables[excel.tables.keys.first]!;
+
+      // Найти строку с заголовками колонок
+      int? headerRow;
+      int? colCode;
+      int? colName;
+      int? colUnit;
+      int? colGroup;
+
+      for (var r = 0; r < sheet.maxRows && r < 20; r++) {
+        final cells = <int, String>{};
+        for (var c = 0; c < sheet.maxColumns; c++) {
+          final v = _excelCellToStr(sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r)).value).toLowerCase().trim();
+          if (v.isNotEmpty) cells[c] = v;
+        }
+        final vals = cells.values.toList();
+        if (vals.any((v) => v.contains('наименование') || v.contains('товар'))) {
+          headerRow = r;
+          cells.forEach((c, v) {
+            if (v.contains('код')) colCode = c;
+            if (v.contains('наименование') || v.contains('товар')) colName = c;
+            if (v.contains('ед') || v.contains('мера')) colUnit = c;
+            if (v.contains('групп')) colGroup = c;
+          });
+          break;
+        }
+      }
+
+      // Если не нашли по заголовкам — пробуем эвристику по данным бланка Каспий:
+      // A=группа, C=код, D=наименование, E=ед.изм.
+      if (headerRow == null || colName == null) {
+        colGroup = 0;
+        colCode = 2;
+        colName = 3;
+        colUnit = 4;
+        headerRow = 8; // строка 9 (0-based: 8) — первая данных в бланке Каспий
+      }
+
+      final products = <IikoProduct>[];
+      String? currentGroup;
+      int sortOrder = 0;
+
+      for (var r = (headerRow! + 1); r < sheet.maxRows; r++) {
+        final nameVal = _excelCellToStr(sheet.cell(CellIndex.indexByColumnRow(columnIndex: colName!, rowIndex: r)).value).trim();
+        final codeVal = colCode != null ? _excelCellToStr(sheet.cell(CellIndex.indexByColumnRow(columnIndex: colCode!, rowIndex: r)).value).trim() : '';
+        final unitVal = colUnit != null ? _excelCellToStr(sheet.cell(CellIndex.indexByColumnRow(columnIndex: colUnit!, rowIndex: r)).value).trim() : '';
+        final groupVal = colGroup != null ? _excelCellToStr(sheet.cell(CellIndex.indexByColumnRow(columnIndex: colGroup!, rowIndex: r)).value).trim() : '';
+
+        if (nameVal.isEmpty) continue;
+
+        // Строка-группа: есть значение в колонке группы, нет кода, нет ед.изм.
+        if (codeVal.isEmpty && unitVal.isEmpty && groupVal.isNotEmpty && nameVal == groupVal) {
+          currentGroup = _cleanIikoName(nameVal);
+          continue;
+        }
+        if (codeVal.isEmpty && groupVal.isNotEmpty && nameVal == groupVal) {
+          currentGroup = _cleanIikoName(nameVal);
+          continue;
+        }
+        // Если в colGroup появилась новая группа (ячейка заполнена и это не товарная строка)
+        if (groupVal.isNotEmpty && codeVal.isEmpty) {
+          currentGroup = _cleanIikoName(groupVal);
+          // Если nameVal тоже выглядит как группа — пропускаем
+          if (nameVal == groupVal || nameVal.isEmpty) continue;
+        }
+
+        final cleanName = _cleanIikoName(nameVal);
+        if (cleanName.isEmpty) continue;
+
+        // Фильтруем технические строки
+        if (_isIikoHeaderRow(cleanName)) continue;
+
+        products.add(IikoProduct(
+          id: const Uuid().v4(),
+          establishmentId: establishmentId,
+          code: codeVal.isNotEmpty ? codeVal : null,
+          name: cleanName,
+          unit: unitVal.isNotEmpty ? _normalizeIikoUnit(unitVal) : null,
+          groupName: currentGroup,
+          sortOrder: sortOrder++,
+        ));
+      }
+
+      return products;
+    } catch (e) {
+      _addDebugLog('parseIikoBlank error: $e');
+      return [];
+    }
+  }
+
+  /// Убирает префикс «Т.», «Т. », лишние пробелы.
+  static String _cleanIikoName(String s) {
+    var v = s.trim();
+    if (v.startsWith('Т. ') || v.startsWith('Т.  ')) {
+      v = v.replaceFirst(RegExp(r'^Т\.\s+'), '').trim();
+    } else if (v.startsWith('Т.')) {
+      v = v.substring(2).trim();
+    }
+    return v.trim();
+  }
+
+  /// Нормализует единицу измерения из iiko-бланка.
+  static String _normalizeIikoUnit(String raw) {
+    final v = raw.trim().toLowerCase();
+    const map = {
+      'кг': 'kg', 'г': 'g', 'гр': 'g', 'л': 'l', 'мл': 'ml',
+      'шт': 'pcs', 'шт.': 'pcs', 'уп': 'pkg', 'уп.': 'pkg',
+    };
+    return map[v] ?? v;
+  }
+
+  /// Строка-заголовок таблицы — пропустить.
+  static bool _isIikoHeaderRow(String name) {
+    final lower = name.toLowerCase();
+    const headers = ['наименование', 'код', 'ед. изм', 'остаток', 'бланк', 'организация', 'на дату', 'склад', 'группа', 'товар'];
+    return headers.any((h) => lower.contains(h));
   }
 
   /// 2. Загрузить из файла — выбор файла → SheetJS Edge Function → _processWithDeferredModeration
