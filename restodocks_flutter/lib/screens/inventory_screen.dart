@@ -2462,6 +2462,44 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     } catch (_) {}
   }
 
+  /// Диалог подтверждения обнуления всех количеств.
+  Future<void> _confirmReset() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Обнулить данные?'),
+        content: const Text(
+          'Все введённые количества будут сброшены. Продукты останутся.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            child: const Text('Обнулить'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() {
+      for (final r in _rows) {
+        r.quantities = [0.0, 0.0];
+      }
+      _completed = false;
+      _lastSavedAt = null;
+    });
+    // Сбрасываем черновики
+    await clearDraft();
+    _clearServerDraft();
+    if (mounted) scheduleSave();
+  }
+
   Future<void> _saveAndExport() async {
     setState(() => _completed = true);
 
@@ -2793,19 +2831,34 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                               onQuantityChanged: _setQuantity,
                             ),
                     ),
-                    // Кнопка внизу
-                    if (!_completed)
-                      Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: SizedBox(
-                          width: double.infinity,
-                        child: FilledButton.icon(
-                        icon: const Icon(Icons.save_alt),
-                        label: const Text('Сохранить и скачать xlsx'),
-                        onPressed: _saveAndExport,
+                    // Кнопки внизу
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                      child: Row(
+                        children: [
+                          // Основная кнопка — скрывается после сохранения
+                          if (!_completed)
+                            Expanded(
+                              child: FilledButton.icon(
+                                icon: const Icon(Icons.save_alt),
+                                label: const Text('Сохранить и скачать xlsx'),
+                                onPressed: _saveAndExport,
+                              ),
+                            ),
+                          if (!_completed) const SizedBox(width: 8),
+                          // Кнопка «Обнулить» — всегда доступна
+                          OutlinedButton(
+                            onPressed: _confirmReset,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: theme.colorScheme.error,
+                              side: BorderSide(color: theme.colorScheme.error.withOpacity(0.5)),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            ),
+                            child: const Text('Обнулить', style: TextStyle(fontSize: 13)),
+                          ),
+                        ],
                       ),
-                        ),
-                      ),
+                    ),
                   ],
                 ),
               ],
