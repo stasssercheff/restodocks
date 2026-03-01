@@ -66,21 +66,36 @@ class IikoProductStore extends ChangeNotifier {
         params: {'p_establishment_id': establishmentId},
       );
 
-      // Вставляем новые пачками по 200 через rpc
-      const batchSize = 200;
+      // Вставляем пачками по 50 — меньший размер надёжнее проходит через PostgREST
+      const batchSize = 50;
       for (var i = 0; i < items.length; i += batchSize) {
         final batch = items.skip(i).take(batchSize).toList();
         final jsonItems = batch.map((p) => p.toJson()..remove('id')).toList();
-        await _supabase.rpc(
-          'insert_iiko_products',
-          params: {'p_items': jsonItems},
-        );
+        try {
+          await _supabase.rpc(
+            'insert_iiko_products',
+            params: {'p_items': jsonItems},
+          );
+        } catch (batchErr) {
+          // Если батч не прошёл — пробуем по одной записи
+          debugPrint('IikoProductStore: batch $i failed ($batchErr), inserting one by one');
+          for (final p in batch) {
+            try {
+              await _supabase.rpc(
+                'insert_iiko_products',
+                params: {'p_items': [p.toJson()..remove('id')]},
+              );
+            } catch (singleErr) {
+              debugPrint('IikoProductStore: single insert failed: ${p.code} — $singleErr');
+            }
+          }
+        }
       }
 
       await loadProducts(establishmentId, force: true);
     } catch (e) {
       debugPrint('IikoProductStore.replaceAll error: $e');
-      rethrow;
+      // Не rethrow — даже при частичной ошибке загружаем что вставили
     } finally {
       _isLoading = false;
       notifyListeners();

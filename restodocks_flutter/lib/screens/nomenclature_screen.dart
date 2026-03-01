@@ -3501,7 +3501,8 @@ class _IikoNomenclatureTab extends StatefulWidget {
   State<_IikoNomenclatureTab> createState() => _IikoNomenclatureTabState();
 }
 
-class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab> with AutomaticKeepAliveClientMixin {
+class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab>
+    with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
 
@@ -3523,14 +3524,10 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab> with Automat
       builder: (ctx) => AlertDialog(
         title: const Text('Удалить все iiko-продукты?'),
         content: const Text(
-          'Все загруженные iiko-продукты будут удалены из базы. '
-          'Это действие нельзя отменить.',
+          'Все загруженные iiko-продукты будут удалены из базы.\nЭто действие нельзя отменить.',
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Отмена'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Отмена')),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(ctx, true),
@@ -3539,7 +3536,7 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab> with Automat
         ],
       ),
     );
-    if (confirmed != true) return;
+    if (confirmed != true || !context.mounted) return;
     try {
       await widget.store.deleteAll(widget.establishmentId);
       if (context.mounted) {
@@ -3550,7 +3547,7 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab> with Automat
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка удаления: $e')),
+          SnackBar(content: Text('Ошибка: $e')),
         );
       }
     }
@@ -3560,17 +3557,6 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab> with Automat
   Widget build(BuildContext context) {
     super.build(context);
     final products = widget.store.products;
-    final filtered = _query.isEmpty
-        ? products
-        : products.where((p) =>
-            p.name.toLowerCase().contains(_query.toLowerCase())).toList();
-
-    // Группируем по оригинальному groupName — точно как в бланке
-    final groups = <String, List<IikoProduct>>{};
-    for (final p in filtered) {
-      final g = p.groupName ?? '';
-      groups.putIfAbsent(g, () => []).add(p);
-    }
 
     if (widget.store.isLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -3583,16 +3569,18 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab> with Automat
           children: [
             Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey[400]),
             const SizedBox(height: 16),
-            Text(
-              'iiko-продукты не загружены',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.grey[600]),
-            ),
+            Text('iiko-продукты не загружены',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(color: Colors.grey[600])),
             const SizedBox(height: 8),
-            Text(
-              'Загрузите инвентаризационный бланк iiko',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[500]),
-            ),
+            Text('Загрузите инвентаризационный бланк iiko',
+                textAlign: TextAlign.center,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: Colors.grey[500])),
             const SizedBox(height: 24),
             FilledButton.icon(
               icon: const Icon(Icons.upload_file),
@@ -3604,26 +3592,49 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab> with Automat
       );
     }
 
+    // Фильтрация
+    final filtered = _query.isEmpty
+        ? products
+        : products
+            .where((p) => p.name.toLowerCase().contains(_query.toLowerCase()))
+            .toList();
+
+    // Строим плоский список строк для ListView — чередуем группы и товары
+    // Структура: _IikoBlankRow (строка бланка) с данными о том, первая ли строка группы
+    final rows = <_IikoBlankRow>[];
+    String? lastGroup;
+    for (final p in filtered) {
+      final g = p.groupName ?? '';
+      final isFirstInGroup = g != lastGroup;
+      lastGroup = g;
+      rows.add(_IikoBlankRow(product: p, isFirstInGroup: isFirstInGroup));
+    }
+
+    // Считаем сколько товаров в каждой группе (для rowspan-эффекта)
+    final groupCounts = <String, int>{};
+    for (final p in filtered) {
+      groupCounts[p.groupName ?? ''] = (groupCounts[p.groupName ?? ''] ?? 0) + 1;
+    }
+
     return Column(
       children: [
-        // ── Панель инструментов ──────────────────────────────────────────
+        // ── Тулбар ──
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+          padding: const EdgeInsets.fromLTRB(8, 6, 8, 2),
           child: Row(
             children: [
               Expanded(
                 child: TextField(
                   decoration: const InputDecoration(
-                    hintText: 'Поиск...',
+                    hintText: 'Поиск по наименованию...',
                     prefixIcon: Icon(Icons.search, size: 18),
                     border: OutlineInputBorder(),
                     isDense: true,
-                    contentPadding: EdgeInsets.symmetric(vertical: 8),
+                    contentPadding: EdgeInsets.symmetric(vertical: 7),
                   ),
                   onChanged: (v) => setState(() => _query = v),
                 ),
               ),
-              const SizedBox(width: 6),
               IconButton(
                 icon: const Icon(Icons.upload_file),
                 tooltip: 'Загрузить новый бланк',
@@ -3644,83 +3655,29 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab> with Automat
           ),
         ),
 
-        // ── Шапка таблицы (как в бланке) ────────────────────────────────
-        Container(
-          color: Colors.orange.withOpacity(0.12),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 60,
-                child: Text('Код',
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.orange[900])),
-              ),
-              Expanded(
-                child: Text('Наименование',
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.orange[900])),
-              ),
-              SizedBox(
-                width: 44,
-                child: Text('Ед.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.orange[900])),
-              ),
-            ],
-          ),
-        ),
-
-        // ── Строка «N позиций» ───────────────────────────────────────────
+        // ── Заголовок «N позиций» ──
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
-          child: Row(
-            children: [
-              Icon(Icons.table_rows_outlined, size: 13, color: Colors.grey[500]),
-              const SizedBox(width: 4),
-              Text(
-                '${products.length} позиций',
-                style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-              ),
-            ],
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text('${products.length} позиций',
+                style: TextStyle(fontSize: 11, color: Colors.grey[500])),
           ),
         ),
 
-        // ── Таблица продуктов точно как в бланке ────────────────────────
+        // ── Шапка таблицы — точно как в бланке ──
+        _IikoBlankaHeader(),
+
+        // ── Таблица строк ──
         Expanded(
           child: ListView.builder(
-            itemCount: groups.length,
-            itemBuilder: (ctx, gi) {
-              final groupName = groups.keys.elementAt(gi);
-              final groupItems = groups.values.elementAt(gi);
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Строка группы — оригинальный текст из бланка (с «Т.»)
-                  if (groupName.isNotEmpty)
-                    Container(
-                      width: double.infinity,
-                      color: Colors.orange.withOpacity(0.07),
-                      padding: const EdgeInsets.fromLTRB(12, 5, 12, 5),
-                      child: Text(
-                        groupName, // точно как в бланке
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.orange[800],
-                        ),
-                      ),
-                    ),
-                  // Строки товаров — оригинальный текст из бланка
-                  ...groupItems.map((p) => _IikoProductRow(product: p)),
-                ],
+            itemCount: rows.length,
+            itemBuilder: (ctx, i) {
+              final row = rows[i];
+              final groupCount = groupCounts[row.product.groupName ?? ''] ?? 1;
+              return _IikoBlankaRowWidget(
+                row: row,
+                groupCount: groupCount,
               );
             },
           ),
@@ -3730,50 +3687,128 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab> with Automat
   }
 }
 
-/// Строка товара в стиле бланка: код | наименование | ед.изм.
-class _IikoProductRow extends StatelessWidget {
-  const _IikoProductRow({required this.product});
+/// Данные одной строки бланка
+class _IikoBlankRow {
   final IikoProduct product;
+  final bool isFirstInGroup; // нужно ли показывать ячейку группы
+  const _IikoBlankRow({required this.product, required this.isFirstInGroup});
+}
+
+/// Шапка таблицы: Группа | Код | Наименование | Ед. изм. | Остаток фактический
+class _IikoBlankaHeader extends StatelessWidget {
+  const _IikoBlankaHeader();
+
+  static const _border = BorderSide(color: Color(0xFFBBBBBB));
+  static const _headerStyle = TextStyle(
+    fontSize: 11,
+    fontWeight: FontWeight.w700,
+    color: Color(0xFF333333),
+  );
+
+  Widget _cell(String text, {double? width, TextAlign align = TextAlign.center}) {
+    Widget w = Text(text, style: _headerStyle, textAlign: align);
+    if (width != null) w = SizedBox(width: width, child: w);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      decoration: const BoxDecoration(
+        color: Color(0xFFF5F5F5),
+        border: Border(right: _border),
+      ),
+      child: w,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: Colors.grey.shade100)),
+      decoration: const BoxDecoration(
+        border: Border(
+          top: _border,
+          bottom: _border,
+          left: _border,
+          right: _border,
+        ),
+        color: Color(0xFFF5F5F5),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Код
-          SizedBox(
-            width: 60,
-            child: Text(
-              product.code ?? '',
-              style: TextStyle(fontSize: 12, color: Colors.grey[600], fontFamily: 'monospace'),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _cell('Группа', width: 90, align: TextAlign.center),
+            _cell('Код', width: 58, align: TextAlign.center),
+            Expanded(child: _cell('Наименование', align: TextAlign.center)),
+            _cell('Ед.\nизм.', width: 42, align: TextAlign.center),
+            _cell('Остаток\nфактический', width: 72, align: TextAlign.center),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Одна строка бланка — ячейки Группа | Код | Наименование | Ед.изм. | (пусто)
+class _IikoBlankaRowWidget extends StatelessWidget {
+  const _IikoBlankaRowWidget({required this.row, required this.groupCount});
+
+  final _IikoBlankRow row;
+  final int groupCount;
+
+  static const _border = BorderSide(color: Color(0xFFDDDDDD));
+  static const _nameStyle = TextStyle(fontSize: 12, color: Color(0xFF111111));
+  static const _codeStyle = TextStyle(
+      fontSize: 11, color: Color(0xFF555555), fontFeatures: [FontFeature.tabularFigures()]);
+  static const _unitStyle = TextStyle(fontSize: 12, color: Color(0xFF333333));
+  static const _groupStyle = TextStyle(
+      fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF333333));
+
+  Widget _cell(Widget child, {double? width, Color? bg}) {
+    return Container(
+      width: width,
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+      decoration: BoxDecoration(
+        color: bg,
+        border: const Border(right: _border, bottom: _border),
+      ),
+      child: child,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        border: Border(left: _border),
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // ── Группа (показываем только у первой строки группы) ──
+            _cell(
+              row.isFirstInGroup
+                  ? Text(row.product.groupName ?? '', style: _groupStyle)
+                  : const SizedBox.shrink(),
+              width: 90,
+              bg: row.isFirstInGroup ? const Color(0xFFFFF8F0) : null,
             ),
-          ),
-          // Наименование — точно как в бланке (с «Т.»)
-          Expanded(
-            child: Text(
-              product.name,
-              style: const TextStyle(fontSize: 13),
+            // ── Код ──
+            _cell(
+              Text(row.product.code ?? '', style: _codeStyle, textAlign: TextAlign.center),
+              width: 58,
             ),
-          ),
-          // Ед. изм. — точно как в бланке
-          SizedBox(
-            width: 44,
-            child: Text(
-              product.unit ?? '',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[700],
-                fontWeight: FontWeight.w500,
-              ),
+            // ── Наименование — точно как в файле ──
+            Expanded(
+              child: _cell(Text(row.product.name, style: _nameStyle)),
             ),
-          ),
-        ],
+            // ── Ед. изм. — точно как в файле ──
+            _cell(
+              Text(row.product.unit ?? '', style: _unitStyle, textAlign: TextAlign.center),
+              width: 42,
+            ),
+            // ── Остаток фактический — пусто (заполняется при инвентаризации) ──
+            _cell(const SizedBox.shrink(), width: 72),
+          ],
+        ),
       ),
     );
   }
