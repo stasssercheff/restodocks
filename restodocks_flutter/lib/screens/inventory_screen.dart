@@ -2503,7 +2503,18 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   }
 
   Future<void> _saveAndExport() async {
-    // Не блокируем дальнейшее заполнение — completed остаётся false
+    // Диагностика: покажем что видит экспорт
+    final withTotal = _rows.where((r) => r.total > 0).length;
+    final withCode  = _rows.where((r) => r.product.code != null).length;
+    final ready     = _rows.where((r) => r.total > 0 && r.product.code != null).length;
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Экспорт: всего=${_rows.length} total>0=$withTotal code≠null=$withCode готово=$ready'),
+        duration: const Duration(seconds: 6),
+      ));
+    }
+    await Future.delayed(const Duration(milliseconds: 100));
+
     final bytes = await _buildIikoExcel();
     final date = _date;
     final fileName =
@@ -2617,20 +2628,40 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
         qtyByCode[r.product.code!.trim()] = r.total;
       }
     }
-    if (qtyByCode.isEmpty) return origBytes;
+    debugPrint('_buildFromOriginal: rows=${_rows.length}, '
+        'withTotal=${_rows.where((r) => r.total > 0).length}, '
+        'withCode=${_rows.where((r) => r.product.code != null).length}, '
+        'qtyByCode=${qtyByCode.length}, '
+        'qtyCol=$qtyCol, '
+        'sample=${qtyByCode.entries.take(3).map((e) => "${e.key}=${e.value}").join(",")}');
+    if (qtyByCode.isEmpty) {
+      debugPrint('_buildFromOriginal: qtyByCode EMPTY → returning origBytes unchanged');
+      return origBytes;
+    }
 
     // ── 2. Читаем ZIP через archive только для получения XML-содержимого ──────
     final arc = ZipDecoder().decodeBytes(origBytes);
 
-    // Имя первого листа
+    // Имя первого листа книги.
+    // Берём r:id первого <sheet> из workbook.xml (sheetId="1"),
+    // затем резолвим Target по этому Id в workbook.xml.rels.
+    // Нельзя просто брать первый worksheet в rels — порядок там произвольный.
     String sheetPath = 'xl/worksheets/sheet1.xml';
+    final wbEntry   = arc.findFile('xl/workbook.xml');
     final relsEntry = arc.findFile('xl/_rels/workbook.xml.rels');
-    if (relsEntry != null) {
+    if (wbEntry != null && relsEntry != null) {
+      final wb   = utf8.decode(wbEntry.content   as List<int>);
       final rels = utf8.decode(relsEntry.content as List<int>);
-      final rm = RegExp(r'Type="[^"]*worksheet"[^>]*Target="([^"]+)"').firstMatch(rels);
-      if (rm != null) {
-        final t = rm.group(1)!;
-        sheetPath = t.startsWith('/') ? t.substring(1) : 'xl/$t';
+      // Первый <sheet ...> в workbook.xml → его r:id
+      final sheetM = RegExp(r'<sheet\b[^>]*\br:id="([^"]+)"').firstMatch(wb);
+      if (sheetM != null) {
+        final rId = sheetM.group(1)!;
+        // Ищем Target для этого Id в rels
+        final tM = RegExp('Id="$rId"[^>]*Target="([^"]+)"').firstMatch(rels);
+        if (tM != null) {
+          final t = tM.group(1)!;
+          sheetPath = t.startsWith('/') ? t.substring(1) : 'xl/$t';
+        }
       }
     }
 
@@ -2681,7 +2712,9 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
       }
     }
     final codeColLetter = colLetter(codeColIdx);
+    debugPrint('_buildFromOriginal: sheetPath=$sheetPath, codeCol=$codeColLetter, qtyCol=$qtyColLetter');
 
+    var patchedCount = 0;
     sheetXml = sheetXml.replaceAllMapped(
       RegExp(r'(<row r="(\d+)"[^>]*>)(.*?)(</row>)', dotAll: true),
       (m) {
@@ -2734,9 +2767,11 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
           final sAttr = sM != null ? ' s="${sM.group(1)}"' : '';
           rowBody += '<c r="$cellRef"$sAttr><v>$qtyStr</v></c>';
         }
+        patchedCount++;
         return '$rowOpen$rowBody$rowClose';
       },
     );
+    debugPrint('_buildFromOriginal: patched $patchedCount rows');
 
     // ── 5. Заменяем sheet в ZIP без перепаковки остальных файлов ─────────────
     //
