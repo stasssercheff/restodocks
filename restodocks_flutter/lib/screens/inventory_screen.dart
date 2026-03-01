@@ -2707,15 +2707,29 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                 .replaceAll(RegExp(r'\.$'), '');
         final cellRef = '$qtyColLetter$rowIdx';
 
+        // Самозакрывающаяся ячейка: <c r="F9" s="5"/> — пустая, но со стилем
+        final selfM = RegExp(
+          '<c r="${RegExp.escape(cellRef)}"([^>]*)/>', 
+        ).firstMatch(rowBody);
+        // Ячейка с содержимым: <c r="F9" s="5">...</c>
         final existM = RegExp(
           '<c r="${RegExp.escape(cellRef)}"([^>]*)>(.*?)</c>', dotAll: true,
         ).firstMatch(rowBody);
-        if (existM != null) {
+
+        if (selfM != null) {
+          // Заменяем самозакрывающийся тег — сохраняем атрибуты (стиль)
+          rowBody = rowBody.replaceFirst(
+            selfM.group(0)!,
+            '<c r="$cellRef"${selfM.group(1)!}><v>$qtyStr</v></c>',
+          );
+        } else if (existM != null) {
+          // Заменяем существующее значение — стиль сохраняем
           rowBody = rowBody.replaceFirst(
             existM.group(0)!,
             '<c r="$cellRef"${existM.group(1)!}><v>$qtyStr</v></c>',
           );
         } else {
+          // Ячейки нет совсем — берём стиль из соседней ячейки строки
           final sM = RegExp('<c r="[A-Z]+$rowIdx" s="(\\d+)"').firstMatch(rowBody);
           final sAttr = sM != null ? ' s="${sM.group(1)}"' : '';
           rowBody += '<c r="$cellRef"$sAttr><v>$qtyStr</v></c>';
