@@ -447,13 +447,13 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         return _excelCellToStr(v).trim();
       }
 
-      // ── Шаг 1: ищем строку с «Наименование» в любой ячейке (до строки 20) ──
-      int colGroup = 0; // A — группа
+      // ── Шаг 1: определяем колонки. Продукт = 3-й столбец (D, «Наименование»), не 1-й (A, группа). ──
+      int colGroup = 0; // A — группа (только категория)
       int colCode  = 2; // C — код
-      int colName  = 3; // D — наименование
+      int colName  = 3; // D — наименование ТОВАРА (обязательно не A!)
       int colUnit  = 4; // E — ед.изм.
       int colQty   = 5; // F — остаток фактический
-      int dataStart = 8; // строка 9 (0-based = 8)
+      int dataStart = 8;
 
       for (var r = 0; r < sheet.maxRows && r < 20; r++) {
         final rowCells = <int, String>{};
@@ -461,13 +461,11 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
           final v = _cell(c, r).toLowerCase();
           if (v.isNotEmpty) rowCells[c] = v;
         }
-        // Ищем строку где есть «наименование» (строка 8 в бланке Каспий)
         final nameEntry = rowCells.entries
-            .where((e) => e.value.contains('наименование') || e.value.contains('товар'))
+            .where((e) => (e.value.contains('наименование') || e.value.contains('товар')) && e.key != colGroup)
             .firstOrNull;
         if (nameEntry != null) {
           colName = nameEntry.key;
-          // Ищем «код» в этой же строке или строкой выше
           for (final scanRow in [r, r - 1]) {
             if (scanRow < 0) continue;
             for (var c = 0; c < (sheet.maxColumns > 15 ? 15 : sheet.maxColumns); c++) {
@@ -482,6 +480,9 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
           break;
         }
       }
+
+      // Наименование товара никогда не из столбца группы: если случайно совпали — принудительно D (3)
+      if (colName == colGroup) colName = 3;
 
       // ── Шаг 2: обходим строки данных ──
       final products = <IikoProduct>[];

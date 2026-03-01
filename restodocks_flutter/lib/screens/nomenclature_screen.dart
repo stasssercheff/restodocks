@@ -438,7 +438,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       int colQty   = 5;
       int dataStart = 8;
 
-      // Ищем строку с «Наименование» (до строки 20) для автоопределения колонок
+      // Ищем строку с «Наименование» — только не в столбце группы (не A). Продукт = 3-й столбец (D).
       for (var r = 0; r < sheet.maxRows && r < 20; r++) {
         final rowCells = <int, String>{};
         for (var c = 0; c < (sheet.maxColumns > 15 ? 15 : sheet.maxColumns); c++) {
@@ -446,7 +446,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
           if (v.isNotEmpty) rowCells[c] = v;
         }
         final nameEntry = rowCells.entries
-            .where((e) => e.value.contains('наименование') || e.value.contains('товар'))
+            .where((e) => (e.value.contains('наименование') || e.value.contains('товар')) && e.key != colGroup)
             .firstOrNull;
         if (nameEntry != null) {
           colName = nameEntry.key;
@@ -464,6 +464,8 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
           break;
         }
       }
+
+      if (colName == colGroup) colName = 3;
 
       final products = <IikoProduct>[];
       String? currentGroupRaw;
