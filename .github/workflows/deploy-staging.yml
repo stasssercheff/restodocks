@@ -53,7 +53,7 @@ jobs:
         run: |
           mkdir -p .vercel/output/static
           cp -r build/web/* .vercel/output/static/
-          echo '{"version":3,"routes":[{"handle":"filesystem"},{"handle":"miss"},{"src":"/(.*)","dest":"/index.html"}]}' > .vercel/output/config.json
+          echo '{"version":3,"routes":[{"handle":"filesystem"},{"src":"/(.*)","dest":"/index.html"}]}' > .vercel/output/config.json
 
       - name: Write Vercel project config for staging
         run: |
