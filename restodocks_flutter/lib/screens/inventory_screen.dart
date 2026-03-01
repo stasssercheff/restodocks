@@ -2266,7 +2266,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen> {
       final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row));
       final v = cell.value;
       if (v == null) return '';
-      if (v is TextCellValue) return v.value;
+      if (v is TextCellValue) return v.value.text ?? '';
       if (v is IntCellValue) return v.value.toString();
       if (v is DoubleCellValue) return v.value.toString();
       return v.toString();
