@@ -2599,10 +2599,16 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
         : _buildFallback();
   }
 
-  /// Прямой байтовый патч xlsx (ZIP).
-  /// Читает ZIP, находит sheet1.xml, патчит только ячейки колонки qty.
-  /// Все остальные файлы (styles, sharedStrings, mergedCells и т.д.) копируются
-  /// **без каких-либо изменений** — файл не «едет» при открытии на мобильном.
+  /// Прямой байтовый патч xlsx без перепаковки ZIP.
+  ///
+  /// Алгоритм:
+  ///  1. Находим sheet1.xml в ZIP через central directory
+  ///  2. Декодируем (inflate) только этот файл
+  ///  3. Патчим XML — ставим значения в колонку qty
+  ///  4. Снова сжимаем (deflate) и вставляем в ZIP побайтово
+  ///  5. Все остальные файлы остаются **ровно теми же битами** — ни один байт
+  ///     не меняется → sheetFormatPr, sheetViews, mergedCells, styles
+  ///     сохраняются 100% идентично оригиналу
   Uint8List _buildFromOriginal(Uint8List origBytes, int qtyCol) {
     // ── 1. Код → итого ────────────────────────────────────────────────────────
     final qtyByCode = <String, double>{};
@@ -2611,71 +2617,63 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
         qtyByCode[r.product.code!.trim()] = r.total;
       }
     }
-    if (qtyByCode.isEmpty) return origBytes; // нечего писать — возвращаем оригинал
+    if (qtyByCode.isEmpty) return origBytes;
 
-    // ── 2. Открываем ZIP ──────────────────────────────────────────────────────
-    final archive = ZipDecoder().decodeBytes(origBytes);
+    // ── 2. Читаем ZIP через archive только для получения XML-содержимого ──────
+    final arc = ZipDecoder().decodeBytes(origBytes);
 
-    // ── 3. Находим имя первого листа ──────────────────────────────────────────
+    // Имя первого листа
     String sheetPath = 'xl/worksheets/sheet1.xml';
-    final relsEntry = archive.findFile('xl/_rels/workbook.xml.rels');
+    final relsEntry = arc.findFile('xl/_rels/workbook.xml.rels');
     if (relsEntry != null) {
       final rels = utf8.decode(relsEntry.content as List<int>);
-      // Первый Relationship с типом worksheet
       final rm = RegExp(r'Type="[^"]*worksheet"[^>]*Target="([^"]+)"').firstMatch(rels);
       if (rm != null) {
-        final target = rm.group(1)!;
-        sheetPath = target.startsWith('/') ? target.substring(1) : 'xl/$target';
+        final t = rm.group(1)!;
+        sheetPath = t.startsWith('/') ? t.substring(1) : 'xl/$t';
       }
     }
 
-    // ── 4. Читаем sharedStrings из ЭТОГО ЖЕ архива ───────────────────────────
+    // sharedStrings
     final sharedStrings = <String>[];
-    final ssEntry = archive.findFile('xl/sharedStrings.xml');
+    final ssEntry = arc.findFile('xl/sharedStrings.xml');
     if (ssEntry != null) {
       final ssXml = utf8.decode(ssEntry.content as List<int>);
       final siRe = RegExp(r'<si>(.*?)</si>', dotAll: true);
       final tRe  = RegExp(r'<t[^>]*>([^<]*)</t>');
       for (final si in siRe.allMatches(ssXml)) {
-        final text = tRe.allMatches(si.group(1)!).map((m) => m.group(1)!).join();
-        sharedStrings.add(text);
+        sharedStrings.add(tRe.allMatches(si.group(1)!).map((m) => m.group(1)!).join());
       }
     }
 
-    // ── 5. Буква колонки (0-based → 'A','B',…,'F') ───────────────────────────
+    // ── 3. Буква колонки ──────────────────────────────────────────────────────
     String colLetter(int idx) {
       var result = '';
       var n = idx + 1;
-      while (n > 0) {
-        n--;
-        result = String.fromCharCode(65 + n % 26) + result;
-        n ~/= 26;
-      }
+      while (n > 0) { n--; result = String.fromCharCode(65 + n % 26) + result; n ~/= 26; }
       return result;
     }
+    final qtyColLetter = colLetter(qtyCol);
 
-    final qtyColLetter  = colLetter(qtyCol);
-
-    // ── 6. Определяем колонку с кодом ────────────────────────────────────────
-    final sheetEntry = archive.findFile(sheetPath);
+    // ── 4. Читаем и патчим sheet XML ──────────────────────────────────────────
+    final sheetEntry = arc.findFile(sheetPath);
     if (sheetEntry == null) return origBytes;
     var sheetXml = utf8.decode(sheetEntry.content as List<int>);
 
-    // Ищем заголовок «Код» в первых 20 строках
-    int codeColIdx = 2; // дефолт: C
-    final headerRowRe = RegExp(r'<row r="(\d+)"[^>]*>(.*?)</row>', dotAll: true);
+    // Определяем колонку кода
+    int codeColIdx = 2;
     outer:
-    for (final rowM in headerRowRe.allMatches(sheetXml)) {
+    for (final rowM in RegExp(r'<row r="(\d+)"[^>]*>(.*?)</row>', dotAll: true)
+        .allMatches(sheetXml)) {
       if (int.parse(rowM.group(1)!) > 20) break;
-      final cellRe = RegExp(r'<c r="([A-Z]+)\d+"[^>]*t="s"[^>]*><v>(\d+)</v></c>');
-      for (final cm in cellRe.allMatches(rowM.group(2)!)) {
-        final ssIdx = int.tryParse(cm.group(2)!) ?? -1;
-        if (ssIdx >= 0 && ssIdx < sharedStrings.length) {
-          final v = sharedStrings[ssIdx].trim().toLowerCase();
+      for (final cm in RegExp(r'<c r="([A-Z]+)\d+"[^>]*t="s"[^>]*><v>(\d+)</v></c>')
+          .allMatches(rowM.group(2)!)) {
+        final idx = int.tryParse(cm.group(2)!) ?? -1;
+        if (idx >= 0 && idx < sharedStrings.length) {
+          final v = sharedStrings[idx].trim().toLowerCase();
           if (v == 'код' || v == 'code') {
-            final letters = cm.group(1)!;
             var ci = 0;
-            for (final ch in letters.runes) ci = ci * 26 + (ch - 65 + 1);
+            for (final ch in cm.group(1)!.runes) ci = ci * 26 + (ch - 65 + 1);
             codeColIdx = ci - 1;
             break outer;
           }
@@ -2684,26 +2682,22 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     }
     final codeColLetter = colLetter(codeColIdx);
 
-    // ── 7. Патчим строки: меняем только <v> в ячейке qty-колонки ─────────────
     sheetXml = sheetXml.replaceAllMapped(
       RegExp(r'(<row r="(\d+)"[^>]*>)(.*?)(</row>)', dotAll: true),
       (m) {
-        final rowOpen  = m.group(1)!;
-        final rowIdx   = m.group(2)!;
-        var   rowBody  = m.group(3)!;
+        final rowOpen = m.group(1)!;
+        final rowIdx  = m.group(2)!;
+        var rowBody   = m.group(3)!;
         final rowClose = m.group(4)!;
 
-        // Ищем код в этой строке
         final codeM = RegExp(
           '<c r="${RegExp.escape(codeColLetter)}$rowIdx"'
           r'[^>]*t="s"[^>]*><v>(\d+)</v></c>',
         ).firstMatch(rowBody);
         if (codeM == null) return m.group(0)!;
-
         final ssIdx = int.tryParse(codeM.group(1)!) ?? -1;
         if (ssIdx < 0 || ssIdx >= sharedStrings.length) return m.group(0)!;
-        final code = sharedStrings[ssIdx].trim();
-        final qty  = qtyByCode[code];
+        final qty = qtyByCode[sharedStrings[ssIdx].trim()];
         if (qty == null) return m.group(0)!;
 
         final qtyStr = qty == qty.roundToDouble()
@@ -2711,45 +2705,246 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
             : qty.toStringAsFixed(3)
                 .replaceAll(RegExp(r'0+$'), '')
                 .replaceAll(RegExp(r'\.$'), '');
-
         final cellRef = '$qtyColLetter$rowIdx';
 
-        // Ячейка уже есть → меняем только <v>…</v>, атрибуты (стиль s=) не трогаем
         final existM = RegExp(
-          '<c r="${RegExp.escape(cellRef)}"([^>]*)>(.*?)</c>',
-          dotAll: true,
+          '<c r="${RegExp.escape(cellRef)}"([^>]*)>(.*?)</c>', dotAll: true,
         ).firstMatch(rowBody);
-
         if (existM != null) {
           rowBody = rowBody.replaceFirst(
             existM.group(0)!,
             '<c r="$cellRef"${existM.group(1)!}><v>$qtyStr</v></c>',
           );
         } else {
-          // Ячейки нет (пустая) → добавляем с тем же стилем что у соседних ячеек строки
-          // Ищем стиль s= первой ячейки в строке
-          final sM = RegExp(r'<c r="[A-Z]+$rowIdx" s="(\d+)"').firstMatch(rowBody);
+          final sM = RegExp('<c r="[A-Z]+$rowIdx" s="(\\d+)"').firstMatch(rowBody);
           final sAttr = sM != null ? ' s="${sM.group(1)}"' : '';
           rowBody += '<c r="$cellRef"$sAttr><v>$qtyStr</v></c>';
         }
-
         return '$rowOpen$rowBody$rowClose';
       },
     );
 
-    // ── 8. Собираем новый ZIP: все файлы берём из оригинала, sheet подменяем ──
-    final newArchive = Archive();
-    for (final file in archive.files) {
-      if (file.name == sheetPath) {
-        final patched = utf8.encode(sheetXml);
-        newArchive.addFile(ArchiveFile(file.name, patched.length, patched));
+    // ── 5. Заменяем sheet в ZIP без перепаковки остальных файлов ─────────────
+    //
+    // Формат ZIP local file header (little-endian):
+    //   4  signature  = 0x04034b50
+    //   2  version needed
+    //   2  flags
+    //   2  compression method
+    //   2  mod time
+    //   2  mod date
+    //   4  crc-32
+    //   4  compressed size
+    //   4  uncompressed size
+    //   2  file name length
+    //   2  extra field length
+    //   n  file name
+    //   m  extra field
+    //   ...compressed data...
+    //
+    // Central directory entry:
+    //   4  signature  = 0x02014b50
+    //   2  version made
+    //   2  version needed
+    //   2  flags
+    //   2  compression method
+    //   ...
+    //   4  local header offset
+    //
+    // Стратегия: находим local header нашего файла, считаем offset данных,
+    // сжимаем новый XML, вставляем вместо старых данных, пересчитываем
+    // crc/sizes в local header и central directory.
+
+    return _zipReplaceFile(origBytes, sheetPath, utf8.encode(sheetXml));
+  }
+
+  /// Заменяет один файл в ZIP-архиве без изменения остальных entries.
+  /// Возвращает новые байты ZIP.
+  Uint8List _zipReplaceFile(Uint8List zipBytes, String targetName, List<int> newContent) {
+    // Сжимаем новые данные — raw DEFLATE (без zlib-заголовка и Adler32)
+    // ZIP format требует именно raw deflate (метод 8), не zlib-обёртку
+    final newCompressed = Deflate(newContent, level: 6).getBytes();
+    final newCrc        = _crc32(newContent);
+    final newUncompSize = newContent.length;
+    final newCompSize   = newCompressed.length;
+    final targetNameBytes = utf8.encode(targetName);
+
+    // Собираем новый ZIP поэнтрийно
+    final out = BytesBuilder();
+
+    // Таблица: localHeaderOffset для central directory
+    final cdEntries = <_ZipCdEntry>[];
+
+    int pos = 0;
+    final bd = ByteData.sublistView(zipBytes);
+
+    int _readU16(int offset) => bd.getUint16(offset, Endian.little);
+    int _readU32(int offset) => bd.getUint32(offset, Endian.little);
+    void _writeU32(ByteData buf, int offset, int v) =>
+        buf.setUint32(offset, v, Endian.little);
+
+    while (pos < zipBytes.length - 4) {
+      final sig = _readU32(pos);
+
+      if (sig == 0x04034b50) {
+        // Local file header
+        final compMethod  = _readU16(pos + 8);
+        final crc32orig   = _readU32(pos + 14);
+        final compSizeOrig   = _readU32(pos + 18);
+        final uncompSizeOrig = _readU32(pos + 22);
+        final nameLen     = _readU16(pos + 26);
+        final extraLen    = _readU16(pos + 28);
+        final name        = utf8.decode(zipBytes.sublist(pos + 30, pos + 30 + nameLen));
+        final dataOffset  = pos + 30 + nameLen + extraLen;
+
+        final isTarget = (name == targetName);
+        final effectiveCompSize   = isTarget ? newCompSize   : compSizeOrig;
+        final effectiveUncompSize = isTarget ? newUncompSize : uncompSizeOrig;
+        final effectiveCrc        = isTarget ? newCrc        : crc32orig;
+        final effectiveMethod     = isTarget ? 8             : compMethod; // 8=deflate
+
+        final localHeaderOffset = out.length;
+
+        // Пишем local header с обновлёнными полями
+        final lh = Uint8List(30 + nameLen + extraLen);
+        final lhBd = ByteData.sublistView(lh);
+        lhBd.setUint32(0,  0x04034b50, Endian.little); // sig
+        lhBd.setUint16(4,  _readU16(pos + 4),  Endian.little); // version needed
+        lhBd.setUint16(6,  _readU16(pos + 6),  Endian.little); // flags
+        lhBd.setUint16(8,  effectiveMethod,     Endian.little); // compression
+        lhBd.setUint16(10, _readU16(pos + 10), Endian.little); // mod time
+        lhBd.setUint16(12, _readU16(pos + 12), Endian.little); // mod date
+        lhBd.setUint32(14, effectiveCrc,        Endian.little); // crc
+        lhBd.setUint32(18, effectiveCompSize,   Endian.little); // comp size
+        lhBd.setUint32(22, effectiveUncompSize, Endian.little); // uncomp size
+        lhBd.setUint16(26, nameLen,             Endian.little);
+        lhBd.setUint16(28, extraLen,            Endian.little);
+        lh.setRange(30, 30 + nameLen, zipBytes, pos + 30);
+        if (extraLen > 0) {
+          lh.setRange(30 + nameLen, 30 + nameLen + extraLen,
+              zipBytes, pos + 30 + nameLen);
+        }
+        out.add(lh);
+
+        if (isTarget) {
+          // Вставляем новые сжатые данные
+          out.add(newCompressed);
+        } else {
+          // Копируем оригинальные сжатые данные
+          out.add(zipBytes.sublist(dataOffset, dataOffset + compSizeOrig));
+        }
+
+        // Запоминаем для central directory
+        cdEntries.add(_ZipCdEntry(
+          origOffset: pos,
+          newOffset: localHeaderOffset,
+          name: name,
+          isTarget: isTarget,
+          effectiveCrc: effectiveCrc,
+          effectiveCompSize: effectiveCompSize,
+          effectiveUncompSize: effectiveUncompSize,
+          effectiveMethod: effectiveMethod,
+        ));
+
+        pos = dataOffset + compSizeOrig;
+      } else if (sig == 0x02014b50) {
+        // Central directory — перестраиваем
+        break;
+      } else if (sig == 0x06054b50) {
+        // End of central directory
+        break;
       } else {
-        // Копируем исходные байты без изменений
-        final raw = file.content as List<int>;
-        newArchive.addFile(ArchiveFile(file.name, raw.length, raw));
+        // Неизвестная сигнатура — прерываемся
+        break;
       }
     }
-    return Uint8List.fromList(ZipEncoder().encode(newArchive)!);
+
+    // Пишем central directory
+    final cdStart = out.length;
+    for (final entry in cdEntries) {
+      final origCdPos = _findCdEntry(zipBytes, entry.name);
+      if (origCdPos < 0) continue;
+      final nameLen  = _readU16(origCdPos + 28);
+      final extraLen = _readU16(origCdPos + 30);
+      final cmtLen   = _readU16(origCdPos + 32);
+      final cdEntrySize = 46 + nameLen + extraLen + cmtLen;
+
+      final ce = Uint8List(cdEntrySize);
+      ce.setRange(0, cdEntrySize, zipBytes, origCdPos);
+      final ceBd = ByteData.sublistView(ce);
+      // Обновляем поля
+      ceBd.setUint16(10, entry.effectiveMethod,     Endian.little);
+      ceBd.setUint32(16, entry.effectiveCrc,        Endian.little);
+      ceBd.setUint32(20, entry.effectiveCompSize,   Endian.little);
+      ceBd.setUint32(24, entry.effectiveUncompSize, Endian.little);
+      ceBd.setUint32(42, entry.newOffset,           Endian.little); // local header offset
+      out.add(ce);
+    }
+    final cdEnd = out.length;
+    final cdSize = cdEnd - cdStart;
+
+    // End of central directory record
+    final eocd = Uint8List(22);
+    final eocdBd = ByteData.sublistView(eocd);
+    eocdBd.setUint32(0,  0x06054b50,      Endian.little); // sig
+    eocdBd.setUint16(4,  0,               Endian.little); // disk num
+    eocdBd.setUint16(6,  0,               Endian.little); // disk cd start
+    eocdBd.setUint16(8,  cdEntries.length, Endian.little);
+    eocdBd.setUint16(10, cdEntries.length, Endian.little);
+    eocdBd.setUint32(12, cdSize,           Endian.little);
+    eocdBd.setUint32(16, cdStart,          Endian.little);
+    eocdBd.setUint16(20, 0,               Endian.little); // comment length
+    out.add(eocd);
+
+    return out.toBytes();
+  }
+
+  /// Находит offset central directory entry для файла с именем [name].
+  int _findCdEntry(Uint8List zipBytes, String name) {
+    final bd = ByteData.sublistView(zipBytes);
+    final nameBytes = utf8.encode(name);
+    int pos = 0;
+    while (pos < zipBytes.length - 4) {
+      final sig = bd.getUint32(pos, Endian.little);
+      if (sig == 0x02014b50) {
+        final nameLen = bd.getUint16(pos + 28, Endian.little);
+        if (nameLen == nameBytes.length) {
+          bool match = true;
+          for (int i = 0; i < nameLen; i++) {
+            if (zipBytes[pos + 46 + i] != nameBytes[i]) { match = false; break; }
+          }
+          if (match) return pos;
+        }
+        final extraLen = bd.getUint16(pos + 30, Endian.little);
+        final cmtLen   = bd.getUint16(pos + 32, Endian.little);
+        pos += 46 + nameLen + extraLen + cmtLen;
+      } else if (sig == 0x04034b50) {
+        final nameLen  = bd.getUint16(pos + 26, Endian.little);
+        final extraLen = bd.getUint16(pos + 28, Endian.little);
+        final compSize = bd.getUint32(pos + 18, Endian.little);
+        pos += 30 + nameLen + extraLen + compSize;
+      } else {
+        pos++;
+      }
+    }
+    return -1;
+  }
+
+  /// CRC-32 (стандартный полином 0xEDB88320).
+  int _crc32(List<int> data) {
+    const poly = 0xEDB88320;
+    var crc = 0xFFFFFFFF;
+    for (final b in data) {
+      crc ^= b;
+      for (int i = 0; i < 8; i++) {
+        if (crc & 1 != 0) {
+          crc = (crc >> 1) ^ poly;
+        } else {
+          crc >>= 1;
+        }
+      }
+    }
+    return crc ^ 0xFFFFFFFF;
   }
 
   String _cellStr(Sheet sheet, int row, int col) {
@@ -3272,4 +3467,27 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
       ),
     );
   }
+}
+
+/// Запись для перестройки central directory при ZIP-патче.
+class _ZipCdEntry {
+  final int origOffset;
+  final int newOffset;
+  final String name;
+  final bool isTarget;
+  final int effectiveCrc;
+  final int effectiveCompSize;
+  final int effectiveUncompSize;
+  final int effectiveMethod;
+
+  _ZipCdEntry({
+    required this.origOffset,
+    required this.newOffset,
+    required this.name,
+    required this.isTarget,
+    required this.effectiveCrc,
+    required this.effectiveCompSize,
+    required this.effectiveUncompSize,
+    required this.effectiveMethod,
+  });
 }
