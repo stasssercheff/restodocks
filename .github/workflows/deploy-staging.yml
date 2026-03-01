@@ -1,4 +1,4 @@
-name: Build and Deploy to Vercel (Staging) v3
+name: Build and Deploy to Vercel (Demo/Beta)
 
 on:
   push:
@@ -54,30 +54,15 @@ jobs:
       - name: Install Vercel CLI
         run: npm i -g vercel@latest
 
-      - name: Prepare Vercel output
-        working-directory: restodocks_flutter
-        run: |
-          mkdir -p .vercel/output/static
-          cp -r build/web/. .vercel/output/static/
-          cat > .vercel/output/config.json << 'EOF'
-          {"version":3,"routes":[{"handle":"filesystem"},{"src":"/(.*)","dest":"/index.html"}]}
-          EOF
-          printf '{"projectId":"prj_4FMDqFFqx73cJSoap5uMyO6QSuG2","orgId":"team_l4N4pAZyq8RCmMOLAqatxkUn"}' > .vercel/project.json
-          echo "=== .vercel/project.json ==="
-          cat .vercel/project.json
-          echo "=== output/config.json ==="
-          cat .vercel/output/config.json
-          echo "=== static files count ==="
-          ls .vercel/output/static | wc -l
-
-      - name: Deploy to Vercel
+      - name: Deploy to Vercel Demo
         working-directory: ${{ github.workspace }}
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
-          mkdir -p .vercel
-          printf '{"projectId":"prj_4FMDqFFqx73cJSoap5uMyO6QSuG2","orgId":"team_l4N4pAZyq8RCmMOLAqatxkUn"}' > .vercel/project.json
           mkdir -p .vercel/output/static
-          cp -r restodocks_flutter/.vercel/output/static/. .vercel/output/static/
-          cp restodocks_flutter/.vercel/output/config.json .vercel/output/config.json
+          cp -r restodocks_flutter/build/web/. .vercel/output/static/
+          printf '{"version":3,"routes":[{"handle":"filesystem"},{"src":"/(.*)","dest":"/index.html"}]}' > .vercel/output/config.json
+          mkdir -p .vercel
+          printf '{"projectId":"prj_rSIA3SgwSDWTL0pfYVJTCiGVFAke","orgId":"team_l4N4pAZyq8RCmMOLAqatxkUn"}' > .vercel/project.json
+          echo "=== project.json ===" && cat .vercel/project.json
           vercel deploy --prebuilt --prod --yes --token="$VERCEL_TOKEN"
