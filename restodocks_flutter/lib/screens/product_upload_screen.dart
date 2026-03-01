@@ -329,21 +329,10 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
             ),
             const SizedBox(height: 12),
 
-            // 3. Из инвентаризационного бланка (текст)
-            _UploadMethodCard(
-              icon: Icons.inventory_2_outlined,
-              title: '3. Из инвентаризационного бланка',
-              description: 'Вставьте строки из бланка инвентаризации. '
-                  'ИИ сам определит название товара и отделит цифры (количество/цена).',
-              color: Colors.orange,
-              onTap: _isLoading ? null : () => _showInventoryUploadDialog(),
-            ),
-            const SizedBox(height: 12),
-
-            // 4. Загрузить бланк iiko (xlsx → отдельная номенклатура)
+            // 3. Загрузить бланк iiko (xlsx → отдельная номенклатура)
             _UploadMethodCard(
               icon: Icons.table_chart_outlined,
-              title: '4. Загрузить бланк iiko (.xlsx)',
+              title: '3. Загрузить бланк iiko (.xlsx)',
               description: 'Загрузите Excel-бланк инвентаризации iiko. '
                   'Все позиции сохранятся в отдельной iiko-номенклатуре для проведения инвентаризации.',
               color: Colors.purple,
