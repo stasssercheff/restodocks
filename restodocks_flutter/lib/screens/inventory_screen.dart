@@ -2170,6 +2170,9 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   // Временное хранилище данных черновика до загрузки продуктов
   Map<String, dynamic>? _pendingDraftData;
 
+  // Метка времени последнего сохранения (для индикатора "Данные защищены")
+  DateTime? _lastSavedAt;
+
   // ── AutoSaveMixin ──────────────────────────────────────────────────────────
   @override
   String get draftKey => 'iiko_inventory';
@@ -2210,6 +2213,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
           }
         }
       }
+      _lastSavedAt = DateTime.now(); // черновик загружен — данные под защитой
     });
   }
   // ──────────────────────────────────────────────────────────────────────────
@@ -2284,6 +2288,10 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     });
     scheduleSave(); // AutoSaveMixin — localStorage, 300мс
     _scheduleServerSave(); // Supabase — резервный слой, 3с
+    // Обновляем метку после debounce (300мс)
+    Future.delayed(const Duration(milliseconds: 400), () {
+      if (mounted) setState(() => _lastSavedAt = DateTime.now());
+    });
   }
 
   /// Резервное сохранение в Supabase — выживает при выходе из аккаунта и очистке браузера.
@@ -2573,85 +2581,115 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Column(
+          : Stack(
               children: [
-                // Поиск
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-                  child: TextField(
-                    controller: _filterCtrl,
-                    decoration: const InputDecoration(
-                      hintText: 'Поиск по наименованию...',
-                      prefixIcon: Icon(Icons.search),
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                  ),
-                ),
-                // Статус-строка
-                Container(
-                  color: Colors.purple.withOpacity(0.06),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                  child: Row(
-                    children: [
-                      Icon(Icons.table_chart_outlined, size: 16, color: Colors.purple[700]),
-                      const SizedBox(width: 6),
-                      Text(
-                        'iiko · ${_rows.length} поз. · '
-                        '${_date.day.toString().padLeft(2, '0')}.'
-                        '${_date.month.toString().padLeft(2, '0')}.'
-                        '${_date.year}',
-                        style: TextStyle(fontSize: 12, color: Colors.purple[700]),
-                      ),
-                      const Spacer(),
-                      TextButton(
-                        onPressed: () async {
-                          final picked = await showDatePicker(
-                            context: context,
-                            initialDate: _date,
-                            firstDate: DateTime(2020),
-                            lastDate: DateTime(2030),
-                          );
-                          if (picked != null) setState(() => _date = picked);
-                        },
-                        child: const Text('Дата', style: TextStyle(fontSize: 12)),
-                      ),
-                    ],
-                  ),
-                ),
-                // Шапка таблицы
-                _IikoInventoryHeader(
-                  qtyCols: _rows.isEmpty
-                      ? 2
-                      : _rows
-                          .map((r) => r.quantities.length)
-                          .reduce((a, b) => a > b ? a : b),
-                ),
-                // Список строк
-                Expanded(
-                  child: _filteredRows.isEmpty
-                      ? const Center(child: Text('Нет позиций'))
-                      : _IikoInventoryTable(
-                          rows: _filteredRows,
-                          completed: _completed,
-                          onQuantityChanged: _setQuantity,
+                Column(
+                  children: [
+                    // Поиск
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                      child: TextField(
+                        controller: _filterCtrl,
+                        decoration: const InputDecoration(
+                          hintText: 'Поиск по наименованию...',
+                          prefixIcon: Icon(Icons.search),
+                          border: OutlineInputBorder(),
+                          isDense: true,
                         ),
-                ),
-                // Кнопка внизу
-                if (!_completed)
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        icon: const Icon(Icons.save_alt),
-                        label: const Text('Сохранить и скачать xlsx'),
-                        style: FilledButton.styleFrom(
-                            backgroundColor: Colors.purple[700]),
-                        onPressed: _saveAndExport,
                       ),
                     ),
-                  ),
+                    // Статус-строка
+                    Container(
+                      color: Colors.purple.withOpacity(0.06),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      child: Row(
+                        children: [
+                          Icon(Icons.table_chart_outlined, size: 16, color: Colors.purple[700]),
+                          const SizedBox(width: 6),
+                          Text(
+                            'iiko · ${_rows.length} поз. · '
+                            '${_date.day.toString().padLeft(2, '0')}.'
+                            '${_date.month.toString().padLeft(2, '0')}.'
+                            '${_date.year}',
+                            style: TextStyle(fontSize: 12, color: Colors.purple[700]),
+                          ),
+                          const Spacer(),
+                          // Индикатор защиты данных
+                          if (_lastSavedAt != null)
+                            Container(
+                              margin: const EdgeInsets.only(right: 4),
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.green.withOpacity(0.4)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.security, size: 12, color: Colors.green),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Данные защищены',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.green[700],
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          TextButton(
+                            onPressed: () async {
+                              final picked = await showDatePicker(
+                                context: context,
+                                initialDate: _date,
+                                firstDate: DateTime(2020),
+                                lastDate: DateTime(2030),
+                              );
+                              if (picked != null) setState(() => _date = picked);
+                            },
+                            child: const Text('Дата', style: TextStyle(fontSize: 12)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Шапка таблицы
+                    _IikoInventoryHeader(
+                      qtyCols: _rows.isEmpty
+                          ? 2
+                          : _rows
+                              .map((r) => r.quantities.length)
+                              .reduce((a, b) => a > b ? a : b),
+                    ),
+                    // Список строк
+                    Expanded(
+                      child: _filteredRows.isEmpty
+                          ? const Center(child: Text('Нет позиций'))
+                          : _IikoInventoryTable(
+                              rows: _filteredRows,
+                              completed: _completed,
+                              onQuantityChanged: _setQuantity,
+                            ),
+                    ),
+                    // Кнопка внизу
+                    if (!_completed)
+                      Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.icon(
+                            icon: const Icon(Icons.save_alt),
+                            label: const Text('Сохранить и скачать xlsx'),
+                            style: FilledButton.styleFrom(
+                                backgroundColor: Colors.purple[700]),
+                            onPressed: _saveAndExport,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ],
             ),
     );
