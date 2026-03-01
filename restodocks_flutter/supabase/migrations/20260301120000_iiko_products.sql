@@ -21,26 +21,26 @@ ALTER TABLE iiko_products ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "iiko_products_select" ON iiko_products
     FOR SELECT USING (
         establishment_id IN (
-            SELECT establishment_id FROM employees WHERE auth_user_id = auth.uid()
+            SELECT establishment_id FROM employees WHERE id = auth.uid()
             UNION
-            SELECT id FROM establishments WHERE owner_auth_user_id = auth.uid()
+            SELECT id FROM establishments WHERE owner_id = auth.uid()
         )
     );
 
 CREATE POLICY "iiko_products_insert" ON iiko_products
     FOR INSERT WITH CHECK (
         establishment_id IN (
-            SELECT establishment_id FROM employees WHERE auth_user_id = auth.uid()
+            SELECT establishment_id FROM employees WHERE id = auth.uid()
             UNION
-            SELECT id FROM establishments WHERE owner_auth_user_id = auth.uid()
+            SELECT id FROM establishments WHERE owner_id = auth.uid()
         )
     );
 
 CREATE POLICY "iiko_products_delete" ON iiko_products
     FOR DELETE USING (
         establishment_id IN (
-            SELECT establishment_id FROM employees WHERE auth_user_id = auth.uid()
+            SELECT establishment_id FROM employees WHERE id = auth.uid()
             UNION
-            SELECT id FROM establishments WHERE owner_auth_user_id = auth.uid()
+            SELECT id FROM establishments WHERE owner_id = auth.uid()
         )
     );
