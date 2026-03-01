@@ -425,97 +425,80 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       if (excel.tables.isEmpty) return _emptyParsed;
       final sheet = excel.tables[excel.tables.keys.first]!;
 
-      int? headerRow;
-      int? colCode;
-      int? colName;
-      int? colUnit;
-      int? colGroup;
-      int? colQty;
+      String _cell(int col, int row) {
+        final v = sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row)).value;
+        return _iikoExcelCellToStr(v).trim();
+      }
 
+      // Defaults: формат Каспий A=группа, C=код, D=наименование, E=ед.изм., F=остаток
+      int colGroup = 0;
+      int colCode  = 2;
+      int colName  = 3;
+      int colUnit  = 4;
+      int colQty   = 5;
+      int dataStart = 8;
+
+      // Ищем строку с «Наименование» (до строки 20) для автоопределения колонок
       for (var r = 0; r < sheet.maxRows && r < 20; r++) {
-        final cells = <int, String>{};
-        for (var c = 0; c < sheet.maxColumns; c++) {
-          final v = _iikoExcelCellToStr(
-                  sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r)).value)
-              .toLowerCase()
-              .trim();
-          if (v.isNotEmpty) cells[c] = v;
+        final rowCells = <int, String>{};
+        for (var c = 0; c < (sheet.maxColumns > 15 ? 15 : sheet.maxColumns); c++) {
+          final v = _cell(c, r).toLowerCase();
+          if (v.isNotEmpty) rowCells[c] = v;
         }
-        final vals = cells.values.toList();
-        if (vals.any((v) => v.contains('наименование') || v.contains('товар'))) {
-          headerRow = r;
-          cells.forEach((c, v) {
-            if (v.contains('код')) colCode = c;
-            if (v.contains('наименование') || v.contains('товар')) colName = c;
-            if (v.contains('ед') || v.contains('мера')) colUnit = c;
-            if (v.contains('групп')) colGroup = c;
-            if (v.contains('остаток') || v.contains('фактич')) colQty = c;
-          });
+        final nameEntry = rowCells.entries
+            .where((e) => e.value.contains('наименование') || e.value.contains('товар'))
+            .firstOrNull;
+        if (nameEntry != null) {
+          colName = nameEntry.key;
+          for (final scanRow in [r, r - 1]) {
+            if (scanRow < 0) continue;
+            for (var c = 0; c < (sheet.maxColumns > 15 ? 15 : sheet.maxColumns); c++) {
+              final v = _cell(c, scanRow).toLowerCase();
+              if (v.contains('код') && !v.contains('штрих')) colCode = c;
+              if ((v.contains('ед') && v.length < 10) || v.contains('мера')) colUnit = c;
+              if (v.contains('остаток') || v.contains('фактич')) colQty = c;
+              if (v.contains('групп')) colGroup = c;
+            }
+          }
+          dataStart = r + 1;
           break;
         }
       }
-
-      if (headerRow == null || colName == null) {
-        colGroup = 0;
-        colCode = 2;
-        colName = 3;
-        colUnit = 4;
-        colQty = 5;
-        headerRow = 8;
-      }
-      colQty ??= (colUnit != null ? colUnit! + 1 : 5);
 
       final products = <IikoProduct>[];
       String? currentGroupRaw;
       int sortOrder = 0;
 
-      for (var r = (headerRow! + 1); r < sheet.maxRows; r++) {
-        final nameVal = _iikoExcelCellToStr(
-            sheet.cell(CellIndex.indexByColumnRow(columnIndex: colName!, rowIndex: r)).value);
-        final codeVal = colCode != null
-            ? _iikoExcelCellToStr(
-                    sheet.cell(CellIndex.indexByColumnRow(columnIndex: colCode!, rowIndex: r)).value)
-                .trim()
-            : '';
-        final unitVal = colUnit != null
-            ? _iikoExcelCellToStr(
-                    sheet.cell(CellIndex.indexByColumnRow(columnIndex: colUnit!, rowIndex: r)).value)
-                .trim()
-            : '';
-        final groupVal = colGroup != null
-            ? _iikoExcelCellToStr(
-                    sheet.cell(CellIndex.indexByColumnRow(columnIndex: colGroup!, rowIndex: r)).value)
-                .trim()
-            : '';
+      for (var r = dataStart; r < sheet.maxRows; r++) {
+        final codeVal  = _cell(colCode, r);
+        final nameVal  = _cell(colName, r);
+        final unitVal  = _cell(colUnit, r);
+        final groupVal = _cell(colGroup, r);
 
-        if (nameVal.trim().isEmpty) continue;
-
-        if (codeVal.isEmpty && unitVal.isEmpty && groupVal.isNotEmpty) {
-          currentGroupRaw = groupVal;
+        // Строка с кодом = товар
+        if (codeVal.isNotEmpty) {
+          if (groupVal.isNotEmpty) currentGroupRaw = groupVal;
+          if (nameVal.isEmpty) continue;
+          products.add(IikoProduct(
+            id: const Uuid().v4(),
+            establishmentId: establishmentId,
+            code: codeVal,
+            name: nameVal,
+            unit: unitVal.isNotEmpty ? unitVal : null,
+            groupName: currentGroupRaw,
+            sortOrder: sortOrder++,
+          ));
           continue;
         }
-        if (groupVal.isNotEmpty && codeVal.isEmpty) {
-          currentGroupRaw = groupVal;
-          if (nameVal.trim() == groupVal.trim()) continue;
-        }
 
-        if (_isIikoHeaderRow(nameVal.trim())) continue;
-
-        products.add(IikoProduct(
-          id: const Uuid().v4(),
-          establishmentId: establishmentId,
-          code: codeVal.isNotEmpty ? codeVal : null,
-          name: nameVal,
-          unit: unitVal.isNotEmpty ? unitVal : null,
-          groupName: currentGroupRaw,
-          sortOrder: sortOrder++,
-        ));
+        // Строка без кода: смена группы
+        if (groupVal.isNotEmpty) currentGroupRaw = groupVal;
       }
 
       return (
         products: products,
         quantityCol: colQty,
-        dataStartRow: headerRow + 1,
+        dataStartRow: dataStart,
       );
     } catch (e) {
       return _emptyParsed;

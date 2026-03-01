@@ -2220,36 +2220,39 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen> {
     }
   }
 
-  /// Берёт оригинальный xlsx побайтово, находит строки по [IikoProduct.name],
-  /// вписывает количество только в колонку [qtyCol].
+  /// Берёт оригинальный xlsx побайтово, находит строки по коду товара (col C),
+  /// вписывает введённое количество только в колонку [qtyCol] («Остаток фактический»).
+  /// Все остальные данные (шапка, форматирование, наименования, ед.изм.) остаются нетронутыми.
   Uint8List _buildFromOriginal(Uint8List origBytes, int qtyCol) {
     final excel = Excel.decodeBytes(origBytes.toList());
     final sheetName = excel.tables.keys.first;
     final sheet = excel.tables[sheetName]!;
 
-    // Строим карту: name -> quantity (из заполненного бланка инвентаризации)
-    final qtyByName = <String, double>{};
+    // Строим карту: код -> quantity (ненулевые введённые значения)
+    final qtyByCode = <String, double>{};
     for (final r in _rows) {
-      if (r.quantity > 0) {
-        qtyByName[r.product.name] = r.quantity;
+      if (r.quantity > 0 && r.product.code != null) {
+        qtyByCode[r.product.code!.trim()] = r.quantity;
       }
     }
 
-    // Перебираем все строки оригинала и вписываем количество в нужную колонку
-    for (var r = 0; r < sheet.maxRows; r++) {
-      // Ищем ячейку с наименованием — колонка D (3, 0-based) по умолчанию для бланка Каспий
-      // Проверяем несколько колонок на случай других форматов
-      String? rowName;
-      for (final checkCol in [3, 2, 1, 0]) {
-        final v = _cellStr(sheet, r, checkCol);
-        if (v.isNotEmpty) {
-          rowName = v;
+    // Определяем колонку с кодом — ищем строку-заголовок «Код» в первых 20 строках
+    int codeCol = 2; // по умолчанию col C (0-based=2) для бланка Каспий
+    for (var r = 0; r < sheet.maxRows && r < 20; r++) {
+      for (var c = 0; c < (sheet.maxColumns > 10 ? 10 : sheet.maxColumns); c++) {
+        final v = _cellStr(sheet, r, c).toLowerCase();
+        if (v == 'код' || v == 'code') {
+          codeCol = c;
           break;
         }
       }
-      if (rowName == null) continue;
+    }
 
-      final qty = qtyByName[rowName];
+    // Вписываем количество в строки с совпадающим кодом
+    for (var r = 0; r < sheet.maxRows; r++) {
+      final code = _cellStr(sheet, r, codeCol).trim();
+      if (code.isEmpty) continue;
+      final qty = qtyByCode[code];
       if (qty != null) {
         sheet
             .cell(CellIndex.indexByColumnRow(columnIndex: qtyCol, rowIndex: r))

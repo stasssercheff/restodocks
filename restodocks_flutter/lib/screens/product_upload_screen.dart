@@ -426,10 +426,13 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     }
   }
 
-  /// Парсит xlsx-бланк iiko: извлекает код, наименование, ед. изм., группу.
-  /// Определяет колонки по заголовкам строки с «Наименование» / «Код» / «Ед. изм.».
-  /// Строки-группы (где есть значение в колонке A но нет кода) трактуются как groupName.
-  /// Результат парсинга iiko-бланка.
+  /// Парсит xlsx-бланк iiko 1-в-1, без каких-либо изменений данных.
+  ///
+  /// Поддерживает формат Каспий (двухстрочный заголовок, строки 7+8):
+  ///   A=Группа, C=Код, D=Наименование, E=Ед.изм., F=Остаток фактический
+  ///
+  /// Строка считается ТОВАРОМ если в ней есть код (col C).
+  /// Значение A в строке товара = текущая группа (меняется при заполненном A).
   static const _emptyParsed = (products: <IikoProduct>[], quantityCol: null as int?, dataStartRow: 0);
 
   ({List<IikoProduct> products, int? quantityCol, int dataStartRow}) _parseIikoBlank(
@@ -439,101 +442,87 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       if (excel.tables.isEmpty) return _emptyParsed;
       final sheet = excel.tables[excel.tables.keys.first]!;
 
-      // Найти строку с заголовками колонок
-      int? headerRow;
-      int? colCode;
-      int? colName;
-      int? colUnit;
-      int? colGroup;
-      int? colQty; // «Остаток фактический»
+      String _cell(int col, int row) {
+        final v = sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row)).value;
+        return _excelCellToStr(v).trim();
+      }
+
+      // ── Шаг 1: ищем строку с «Наименование» в любой ячейке (до строки 20) ──
+      int colGroup = 0; // A — группа
+      int colCode  = 2; // C — код
+      int colName  = 3; // D — наименование
+      int colUnit  = 4; // E — ед.изм.
+      int colQty   = 5; // F — остаток фактический
+      int dataStart = 8; // строка 9 (0-based = 8)
 
       for (var r = 0; r < sheet.maxRows && r < 20; r++) {
-        final cells = <int, String>{};
-        for (var c = 0; c < sheet.maxColumns; c++) {
-          final v = _excelCellToStr(
-                  sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r)).value)
-              .toLowerCase()
-              .trim();
-          if (v.isNotEmpty) cells[c] = v;
+        final rowCells = <int, String>{};
+        for (var c = 0; c < (sheet.maxColumns > 15 ? 15 : sheet.maxColumns); c++) {
+          final v = _cell(c, r).toLowerCase();
+          if (v.isNotEmpty) rowCells[c] = v;
         }
-        final vals = cells.values.toList();
-        if (vals.any((v) => v.contains('наименование') || v.contains('товар'))) {
-          headerRow = r;
-          cells.forEach((c, v) {
-            if (v.contains('код')) colCode = c;
-            if (v.contains('наименование') || v.contains('товар')) colName = c;
-            if (v.contains('ед') || v.contains('мера')) colUnit = c;
-            if (v.contains('групп')) colGroup = c;
-            if (v.contains('остаток') || v.contains('фактич')) colQty = c;
-          });
+        // Ищем строку где есть «наименование» (строка 8 в бланке Каспий)
+        final nameEntry = rowCells.entries
+            .where((e) => e.value.contains('наименование') || e.value.contains('товар'))
+            .firstOrNull;
+        if (nameEntry != null) {
+          colName = nameEntry.key;
+          // Ищем «код» в этой же строке или строкой выше
+          for (final scanRow in [r, r - 1]) {
+            if (scanRow < 0) continue;
+            for (var c = 0; c < (sheet.maxColumns > 15 ? 15 : sheet.maxColumns); c++) {
+              final v = _cell(c, scanRow).toLowerCase();
+              if (v.contains('код') && !v.contains('штрих')) colCode = c;
+              if ((v.contains('ед') && v.length < 10) || v.contains('мера')) colUnit = c;
+              if (v.contains('остаток') || v.contains('фактич')) colQty = c;
+              if (v.contains('групп')) colGroup = c;
+            }
+          }
+          dataStart = r + 1;
           break;
         }
       }
 
-      // Если не нашли по заголовкам — эвристика по бланку Каспий:
-      // A(0)=группа, C(2)=код, D(3)=наименование, E(4)=ед.изм., F(5)=остаток
-      if (headerRow == null || colName == null) {
-        colGroup = 0;
-        colCode  = 2;
-        colName  = 3;
-        colUnit  = 4;
-        colQty   = 5;
-        headerRow = 8;
-      }
-      // Колонку остатка ищем и справа от ед.изм., если не нашли явно
-      colQty ??= (colUnit != null ? colUnit! + 1 : 5);
-
+      // ── Шаг 2: обходим строки данных ──
       final products = <IikoProduct>[];
       String? currentGroupRaw;
       int sortOrder = 0;
 
-      for (var r = (headerRow! + 1); r < sheet.maxRows; r++) {
-        final nameVal = _excelCellToStr(
-            sheet.cell(CellIndex.indexByColumnRow(columnIndex: colName!, rowIndex: r)).value);
-        final codeVal = colCode != null
-            ? _excelCellToStr(
-                    sheet.cell(CellIndex.indexByColumnRow(columnIndex: colCode!, rowIndex: r)).value)
-                .trim()
-            : '';
-        final unitVal = colUnit != null
-            ? _excelCellToStr(
-                    sheet.cell(CellIndex.indexByColumnRow(columnIndex: colUnit!, rowIndex: r)).value)
-                .trim()
-            : '';
-        final groupVal = colGroup != null
-            ? _excelCellToStr(
-                    sheet.cell(CellIndex.indexByColumnRow(columnIndex: colGroup!, rowIndex: r)).value)
-                .trim()
-            : '';
+      for (var r = dataStart; r < sheet.maxRows; r++) {
+        final codeVal  = _cell(colCode, r);
+        final nameVal  = _cell(colName, r);
+        final unitVal  = _cell(colUnit, r);
+        final groupVal = _cell(colGroup, r);
 
-        if (nameVal.trim().isEmpty) continue;
+        // Строка с кодом = товар (основной критерий)
+        if (codeVal.isNotEmpty) {
+          // Если в этой же строке заполнена колонка группы — обновляем текущую группу
+          if (groupVal.isNotEmpty) currentGroupRaw = groupVal;
 
-        if (codeVal.isEmpty && unitVal.isEmpty && groupVal.isNotEmpty) {
-          currentGroupRaw = groupVal;
+          if (nameVal.isEmpty) continue; // нет наименования — пропуск
+
+          products.add(IikoProduct(
+            id: const Uuid().v4(),
+            establishmentId: establishmentId,
+            code: codeVal,
+            name: nameVal,     // точно как в файле, каждый символ
+            unit: unitVal.isNotEmpty ? unitVal : null,
+            groupName: currentGroupRaw,
+            sortOrder: sortOrder++,
+          ));
           continue;
         }
-        if (groupVal.isNotEmpty && codeVal.isEmpty) {
+
+        // Строка без кода: если есть текст в колонке группы — это смена группы
+        if (groupVal.isNotEmpty) {
           currentGroupRaw = groupVal;
-          if (nameVal.trim() == groupVal.trim()) continue;
         }
-
-        if (_isIikoHeaderRow(nameVal.trim())) continue;
-
-        products.add(IikoProduct(
-          id: const Uuid().v4(),
-          establishmentId: establishmentId,
-          code: codeVal.isNotEmpty ? codeVal : null,
-          name: nameVal,
-          unit: unitVal.isNotEmpty ? unitVal : null,
-          groupName: currentGroupRaw,
-          sortOrder: sortOrder++,
-        ));
       }
 
       return (
         products: products,
         quantityCol: colQty,
-        dataStartRow: headerRow + 1,
+        dataStartRow: dataStart,
       );
     } catch (e) {
       _addDebugLog('parseIikoBlank error: $e');
