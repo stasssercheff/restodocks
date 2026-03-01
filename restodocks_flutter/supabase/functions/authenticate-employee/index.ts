@@ -12,6 +12,26 @@ function corsHeaders(origin: string | null) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Simple in-memory rate limiter: max 10 attempts per IP per 15 minutes
+// (Deno isolate is short-lived, but this stops rapid bursts within one isolate)
+// ---------------------------------------------------------------------------
+const RATE_LIMIT_MAX = 10;
+const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+const rateLimitMap = new Map<string, { count: number; windowStart: number }>();
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (!entry || now - entry.windowStart > RATE_LIMIT_WINDOW_MS) {
+    rateLimitMap.set(ip, { count: 1, windowStart: now });
+    return true;
+  }
+  entry.count++;
+  if (entry.count > RATE_LIMIT_MAX) return false;
+  return true;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders(req.headers.get("Origin")) });
@@ -21,6 +41,15 @@ Deno.serve(async (req: Request) => {
       status: 405,
       headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
     });
+  }
+
+  // Rate limiting by IP
+  const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "unknown";
+  if (!checkRateLimit(clientIp)) {
+    return new Response(
+      JSON.stringify({ error: "Too many requests. Please try again later." }),
+      { status: 429, headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json", "Retry-After": "900" } }
+    );
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -96,15 +125,16 @@ Deno.serve(async (req: Request) => {
         // BCrypt
         passwordMatch = await bcrypt.compare(password, hash);
       } else {
-        // plain text (legacy) — сравниваем и сразу мигрируем на BCrypt
-        passwordMatch = (hash === password);
-        if (passwordMatch) {
-          const newHash = await bcrypt.hash(password, 10);
-          await supabase
-            .from("employees")
-            .update({ password_hash: newHash })
-            .eq("id", emp.id);
-        }
+        // Legacy plaintext password — hash it immediately and deny login
+        // (forces the user to reset their password via the reset flow)
+        console.warn(`[authenticate-employee] Employee ${emp.id} still has plaintext password_hash — forcing reset`);
+        const newHash = await bcrypt.hash(hash, 10);
+        await supabase
+          .from("employees")
+          .update({ password_hash: newHash })
+          .eq("id", emp.id);
+        // Do NOT match: user must reset password
+        passwordMatch = false;
       }
 
       if (!passwordMatch) continue;

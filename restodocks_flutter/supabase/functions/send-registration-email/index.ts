@@ -20,6 +20,17 @@ Deno.serve(async (req: Request) => {
     });
   }
 
+  // Require the Supabase anon key (or service role) — blocks unauthenticated external callers
+  const expectedAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  const expectedServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const providedKey = req.headers.get("apikey") || req.headers.get("Authorization")?.replace("Bearer ", "");
+  if (providedKey !== expectedAnonKey && providedKey !== expectedServiceKey) {
+    return new Response(JSON.stringify({ error: "Forbidden" }), {
+      status: 403,
+      headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+    });
+  }
+
   const apiKey = Deno.env.get("RESEND_API_KEY")?.trim();
   if (!apiKey) {
     return new Response(JSON.stringify({ error: "RESEND_API_KEY not configured" }), {
@@ -36,11 +47,10 @@ Deno.serve(async (req: Request) => {
       to: string;
       companyName?: string;
       email?: string;
-      password?: string;
       pinCode?: string;
     };
 
-    const { type, to, companyName, email, password, pinCode } = body;
+    const { type, to, companyName, email, pinCode } = body;
 
     // Письмо о завершении регистрации (после подтверждения email)
     if (type === "registration_confirmed") {
@@ -80,8 +90,8 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    if (!type || !to || !companyName || !email || !password) {
-      return new Response(JSON.stringify({ error: "type, to, companyName, email, password required" }), {
+    if (!type || !to || !companyName || !email) {
+      return new Response(JSON.stringify({ error: "type, to, companyName, email required" }), {
         status: 400,
         headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
       });
@@ -97,8 +107,9 @@ Deno.serve(async (req: Request) => {
 <p>Регистрация вашего заведения <strong>${escapeHtml(companyName)}</strong> успешно завершена.</p>
 <p>Для доступа сотрудников к системе используйте уникальный идентификатор:</p>
 <p><strong>PIN-код компании: ${escapeHtml(pinCode || "")}</strong></p>
-<p>Ваш логин — ${escapeHtml(email)}<br>Ваш пароль — ${escapeHtml(password)}</p>
-<p><strong>Инструкция:</strong><br>Передайте данный код персоналу. Им потребуется ввести его один раз при регистрации в приложении для синхронизации с базой данных вашего заведения.</p>
+<p>Ваш логин: <strong>${escapeHtml(email)}</strong></p>
+<p>Для входа используйте пароль, который вы указали при регистрации. Если вы забыли пароль — воспользуйтесь функцией восстановления в приложении.</p>
+<p><strong>Инструкция:</strong><br>Передайте PIN-код персоналу. Им потребуется ввести его один раз при регистрации в приложении для синхронизации с базой данных вашего заведения.</p>
 <p>С уважением,<br>Команда Restodocks</p>
       `.trim();
     } else {
@@ -106,7 +117,8 @@ Deno.serve(async (req: Request) => {
       html = `
 <p>Здравствуйте!</p>
 <p>Ваша учетная запись успешно привязана к системе управления заведением <strong>${escapeHtml(companyName)}</strong>.</p>
-<p>Ваш логин — ${escapeHtml(email)}<br>Ваш пароль — ${escapeHtml(password)}</p>
+<p>Ваш логин: <strong>${escapeHtml(email)}</strong></p>
+<p>Для входа используйте пароль, который вы указали при регистрации. Если вы забыли пароль — воспользуйтесь функцией восстановления в приложении.</p>
 <p>С уважением,<br>Команда Restodocks</p>
       `.trim();
     }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
+import { verifySessionToken } from '../auth/route'
 
 function getServiceClient() {
   return createClient(
@@ -9,9 +10,12 @@ function getServiceClient() {
   )
 }
 
-async function checkAuth() {
+async function checkAuth(): Promise<boolean> {
   const cookieStore = await cookies()
-  return cookieStore.get('admin_session')?.value === 'authenticated'
+  const session = cookieStore.get('admin_session')?.value
+  const adminPassword = process.env.ADMIN_PASSWORD
+  if (!session || !adminPassword) return false
+  return verifySessionToken(session, adminPassword)
 }
 
 export async function GET() {
@@ -31,11 +35,32 @@ export async function POST(req: NextRequest) {
   if (!await checkAuth()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
+
+  // Server-side validation
+  if (!body.code || typeof body.code !== 'string' || body.code.trim().length === 0 || body.code.length > 64) {
+    return NextResponse.json({ error: 'Invalid promo code: must be a non-empty string up to 64 characters' }, { status: 400 })
+  }
+  if (body.note !== undefined && body.note !== null && (typeof body.note !== 'string' || body.note.length > 500)) {
+    return NextResponse.json({ error: 'Invalid note: must be a string up to 500 characters' }, { status: 400 })
+  }
+  if (body.max_employees !== undefined && body.max_employees !== null) {
+    const n = Number(body.max_employees)
+    if (!Number.isInteger(n) || n < 1 || n > 10000) {
+      return NextResponse.json({ error: 'Invalid max_employees: must be an integer between 1 and 10000' }, { status: 400 })
+    }
+  }
+  if (body.starts_at && isNaN(Date.parse(body.starts_at))) {
+    return NextResponse.json({ error: 'Invalid starts_at: must be a valid ISO date string' }, { status: 400 })
+  }
+  if (body.expires_at && isNaN(Date.parse(body.expires_at))) {
+    return NextResponse.json({ error: 'Invalid expires_at: must be a valid ISO date string' }, { status: 400 })
+  }
+
   const supabase = getServiceClient()
   const { data, error } = await supabase
     .from('promo_codes')
     .insert({
-      code: body.code,
+      code: body.code.trim(),
       note: body.note || null,
       starts_at: body.starts_at || null,
       expires_at: body.expires_at || null,

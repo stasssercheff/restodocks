@@ -13,12 +13,12 @@ class EmailService {
 
   /// Отправить письмо при регистрации (владелец или сотрудник).
   /// Не бросает исключения — ошибки логируются.
+  /// Пароль намеренно не передаётся — пользователь использует тот, что указал при регистрации.
   Future<void> sendRegistrationEmail({
     required bool isOwner,
     required String to,
     required String companyName,
     required String email,
-    required String password,
     String? pinCode,
   }) async {
     try {
@@ -29,7 +29,6 @@ class EmailService {
           'to': to,
           'companyName': companyName,
           'email': email,
-          'password': password,
           if (pinCode != null) 'pinCode': pinCode,
         },
       );

@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
+import { verifySessionToken } from '../auth/route'
 
 export async function GET() {
   const cookieStore = await cookies()
   const session = cookieStore.get('admin_session')?.value
-  if (session !== 'authenticated') {
+  const adminPassword = process.env.ADMIN_PASSWORD
+  if (!session || !adminPassword || !(await verifySessionToken(session, adminPassword))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

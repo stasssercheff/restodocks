@@ -87,7 +87,6 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
         to: email,
         companyName: estab.name,
         email: email,
-        password: password,
         pinCode: estab.pinCode,
       );
 

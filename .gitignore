@@ -1,4 +1,6 @@
 .vercel
+.env
+.env.*
 .env*.local
 backup_*.tar.gz
 backup_*/

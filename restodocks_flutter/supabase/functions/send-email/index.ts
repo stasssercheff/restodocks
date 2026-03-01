@@ -18,6 +18,19 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  // Require the Supabase anon key (or service role) — blocks unauthenticated external callers
+  const expectedKey = Deno.env.get('SUPABASE_ANON_KEY')
+  const providedKey = req.headers.get('apikey') || req.headers.get('Authorization')?.replace('Bearer ', '')
+  if (!expectedKey || providedKey !== expectedKey) {
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    if (!serviceKey || providedKey !== serviceKey) {
+      return new Response(
+        JSON.stringify({ error: 'Forbidden' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
+  }
+
   try {
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
     const RESEND_FROM = Deno.env.get('RESEND_FROM_EMAIL')?.trim() || 'Restodocks <noreply@restodocks.com>'

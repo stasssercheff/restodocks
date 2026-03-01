@@ -178,7 +178,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
         to: email,
         companyName: establishment.name,
         email: email,
-        password: password,
       );
 
       if (!mounted) return;
