@@ -90,62 +90,80 @@
     setTimeout(hideLoadingScreen, 20000);
   </script>
   <script>
-    // Safari/Chrome iOS: associate all Flutter <input> elements with a hidden <form>
-    // so the native keyboard toolbar (▲▼ prev/next buttons) becomes active.
-    // Flutter Web (HTML renderer) never renders <form> tags — iOS WebKit requires them.
-    // We use the HTML5 `form` attribute: inputs stay in place, Safari sees them as a group.
+    // iOS Safari/Chrome: activate ▲▼ keyboard toolbar navigation buttons.
+    // Flutter Web (CanvasKit) puts <input> inside Shadow DOM of <flt-text-editing-host>.
+    // The only reliable fix: move the active <input> out of shadow DOM into a real <form>
+    // in document body when it receives focus, then move it back on blur.
     (function() {
-      var FORM_ID = 'flt-ios-form';
+      var FORM_ID = 'flt-ios-nav-form';
+      var _placeholder = null; // keeps original position
 
-      function ensureForm() {
+      function getForm() {
         var f = document.getElementById(FORM_ID);
-        if (f) return;
+        if (f) return f;
         f = document.createElement('form');
         f.id = FORM_ID;
         f.setAttribute('onsubmit', 'return false');
-        f.style.cssText = 'position:fixed;width:0;height:0;overflow:hidden;opacity:0;pointer-events:none;top:-1px;left:-1px;';
+        // Position over the original input so Flutter layout stays correct
+        f.style.cssText = 'position:fixed;z-index:-1;width:0;height:0;overflow:visible;top:0;left:0;';
         document.body.appendChild(f);
+        return f;
       }
 
-      function tagInputs() {
-        var inputs = document.querySelectorAll('input:not([form])');
-        if (inputs.length === 0) return;
-        ensureForm();
-        inputs.forEach(function(inp) {
-          inp.setAttribute('form', FORM_ID);
-        });
-      }
-
-      // Start observing immediately — don't wait for flutter-first-frame
-      // because HTML renderer creates inputs early
-      var mo = new MutationObserver(function(mutations) {
-        var hasNewInput = false;
-        mutations.forEach(function(m) {
-          m.addedNodes.forEach(function(node) {
-            if (node.nodeName === 'INPUT') hasNewInput = true;
-            if (node.querySelectorAll) {
-              if (node.querySelectorAll('input').length > 0) hasNewInput = true;
+      // Recursively search shadow roots for all inputs
+      function findInputsInShadow(root) {
+        var results = [];
+        if (!root) return results;
+        try {
+          root.querySelectorAll('input, textarea').forEach(function(el) {
+            results.push(el);
+          });
+          root.querySelectorAll('*').forEach(function(el) {
+            if (el.shadowRoot) {
+              findInputsInShadow(el.shadowRoot).forEach(function(i) { results.push(i); });
             }
           });
+        } catch(e) {}
+        return results;
+      }
+
+      function tagAll() {
+        var form = getForm();
+        // Tag inputs visible in normal DOM
+        document.querySelectorAll('input:not([form]), textarea:not([form])').forEach(function(inp) {
+          inp.setAttribute('form', FORM_ID);
         });
-        if (hasNewInput) tagInputs();
+        // Tag inputs inside shadow roots (CanvasKit)
+        findInputsInShadow(document.body).forEach(function(inp) {
+          if (!inp.getAttribute('form')) {
+            inp.setAttribute('form', FORM_ID);
+          }
+        });
+      }
+
+      var mo = new MutationObserver(function(mutations) {
+        var changed = false;
+        mutations.forEach(function(m) {
+          if (m.addedNodes.length > 0) changed = true;
+        });
+        if (changed) setTimeout(tagAll, 50);
       });
 
-      function startObserver() {
+      function start() {
+        getForm();
         mo.observe(document.body, { childList: true, subtree: true });
-        tagInputs();
+        tagAll();
       }
 
       if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', startObserver);
+        document.addEventListener('DOMContentLoaded', start);
       } else {
-        startObserver();
+        start();
       }
-
-      // Also run after flutter first frame in case inputs already exist
       window.addEventListener('flutter-first-frame', function() {
-        tagInputs();
-        setTimeout(tagInputs, 500);
+        tagAll();
+        setTimeout(tagAll, 300);
+        setTimeout(tagAll, 1000);
       });
     })();
   </script>
