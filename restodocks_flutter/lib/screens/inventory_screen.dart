@@ -162,6 +162,7 @@ class _InventoryScreenState extends State<InventoryScreen>
   final TextEditingController _nameFilterCtrl = TextEditingController();
   String _nameFilter = '';
   bool _stateRestored = false; // Флаг: предотвращает двойное восстановление
+  bool _isLoadingProducts = true; // Показывать "Загрузка продуктов..." пока не завершился initScreen
 
 
   /// Сохранить данные немедленно в локальное хранилище (SharedPreferences/localStorage)
@@ -346,6 +347,7 @@ class _InventoryScreenState extends State<InventoryScreen>
       if (estId != null) iikoStore.loadProducts(estId) else Future.value(null),
     ]);
     if (!mounted) return;
+    if (_isLoadingProducts) setState(() => _isLoadingProducts = false);
 
     final stdDraft  = futures[0] as Map<String, dynamic>?;
     final iikoDraft = futures[1] as Map<String, dynamic>?;
@@ -1397,6 +1399,18 @@ class _InventoryScreenState extends State<InventoryScreen>
   }
 
   Widget _buildTable(LocalizationService loc) {
+    if (_isLoadingProducts) {
+      return const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Загрузка продуктов...'),
+          ],
+        ),
+      );
+    }
     if (_rows.isEmpty) {
       return Center(
         child: Padding(
@@ -3097,17 +3111,19 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
               ),
           ],
         ),
-        actions: [
-          if (!_isLoading)
-            TextButton.icon(
-              icon: const Icon(Icons.save_alt),
-              label: const Text('Сохранить'),
-              onPressed: _saveAndExport,
-            ),
-        ],
+        actions: const [],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Загрузка продуктов...'),
+                ],
+              ),
+            )
           : Stack(
               children: [
                 Column(
