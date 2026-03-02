@@ -90,39 +90,62 @@
     setTimeout(hideLoadingScreen, 20000);
   </script>
   <script>
-    // Safari iOS: associate all Flutter <input> elements with a hidden <form>
+    // Safari/Chrome iOS: associate all Flutter <input> elements with a hidden <form>
     // so the native keyboard toolbar (▲▼ prev/next buttons) becomes active.
-    // Flutter Web never renders <form> tags — Safari requires them to enable navigation.
-    // We use the HTML `form` attribute on each <input> pointing to a hidden <form id>,
-    // so inputs stay in their original DOM position (no reparenting = Flutter stays happy).
+    // Flutter Web (HTML renderer) never renders <form> tags — iOS WebKit requires them.
+    // We use the HTML5 `form` attribute: inputs stay in place, Safari sees them as a group.
     (function() {
-      var FORM_ID = 'flt-safari-form';
+      var FORM_ID = 'flt-ios-form';
 
       function ensureForm() {
         var f = document.getElementById(FORM_ID);
-        if (f) return f;
+        if (f) return;
         f = document.createElement('form');
         f.id = FORM_ID;
         f.setAttribute('onsubmit', 'return false');
-        f.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;opacity:0;pointer-events:none;';
+        f.style.cssText = 'position:fixed;width:0;height:0;overflow:hidden;opacity:0;pointer-events:none;top:-1px;left:-1px;';
         document.body.appendChild(f);
-        return f;
       }
 
       function tagInputs() {
+        var inputs = document.querySelectorAll('input:not([form])');
+        if (inputs.length === 0) return;
         ensureForm();
-        var inputs = document.querySelectorAll('input:not([form="' + FORM_ID + '"])');
         inputs.forEach(function(inp) {
           inp.setAttribute('form', FORM_ID);
         });
       }
 
-      // Run after Flutter renders its first frame
-      window.addEventListener('flutter-first-frame', function() {
-        setTimeout(tagInputs, 200);
-        // Re-tag whenever DOM changes (new inputs appear when scrolling / tab switch)
-        var mo = new MutationObserver(tagInputs);
+      // Start observing immediately — don't wait for flutter-first-frame
+      // because HTML renderer creates inputs early
+      var mo = new MutationObserver(function(mutations) {
+        var hasNewInput = false;
+        mutations.forEach(function(m) {
+          m.addedNodes.forEach(function(node) {
+            if (node.nodeName === 'INPUT') hasNewInput = true;
+            if (node.querySelectorAll) {
+              if (node.querySelectorAll('input').length > 0) hasNewInput = true;
+            }
+          });
+        });
+        if (hasNewInput) tagInputs();
+      });
+
+      function startObserver() {
         mo.observe(document.body, { childList: true, subtree: true });
+        tagInputs();
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', startObserver);
+      } else {
+        startObserver();
+      }
+
+      // Also run after flutter first frame in case inputs already exist
+      window.addEventListener('flutter-first-frame', function() {
+        tagInputs();
+        setTimeout(tagInputs, 500);
       });
     })();
   </script>

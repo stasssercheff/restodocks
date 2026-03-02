@@ -44,7 +44,7 @@ jobs:
 
       - name: Flutter build web
         working-directory: restodocks_flutter
-        run: flutter build web --release
+        run: flutter build web --release --web-renderer html
 
       - name: Setup Node
         uses: actions/setup-node@v4
