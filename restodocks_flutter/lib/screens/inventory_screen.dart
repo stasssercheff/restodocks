@@ -2517,6 +2517,10 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   }
 
   Future<void> _saveAndExport() async {
+    // Снимаем фокус чтобы зафиксировать последнее значение в активном поле
+    FocusScope.of(context).unfocus();
+    // Даём фреймворку обработать onEditingComplete / onChanged
+    await Future.delayed(const Duration(milliseconds: 50));
     final bytes = await _buildIikoExcel();
 
     final date = _date;
@@ -3432,9 +3436,25 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
   @override
   void didUpdateWidget(_IikoInventoryRowTile old) {
     super.didUpdateWidget(old);
+    final qtys = widget.row.quantities;
+
     // Если добавилась новая ячейка — создаём контроллер
-    while (_ctrls.length < widget.row.quantities.length) {
-      _ctrls.add(TextEditingController());
+    while (_ctrls.length < qtys.length) {
+      final idx = _ctrls.length;
+      final val = qtys[idx];
+      _ctrls.add(TextEditingController(text: val > 0 ? _fmt(val) : ''));
+    }
+
+    // Если количества были сброшены (обнуление) — обновляем текст контроллеров.
+    // Сравниваем только если число ячеек не изменилось (иначе это добавление новой).
+    if (old.row.quantities.length == qtys.length) {
+      for (var i = 0; i < _ctrls.length && i < qtys.length; i++) {
+        final expected = qtys[i] > 0 ? _fmt(qtys[i]) : '';
+        // Обновляем только если значение реально изменилось и поле не в фокусе
+        if (_ctrls[i].text != expected && !_ctrls[i].selection.isValid) {
+          _ctrls[i].text = expected;
+        }
+      }
     }
   }
 
@@ -3488,6 +3508,15 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
                   onChanged: (v) {
                     final qty = double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
                     widget.onChanged(colIdx, qty);
+                  },
+                  onSubmitted: (v) {
+                    final qty = double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
+                    widget.onChanged(colIdx, qty);
+                  },
+                  onEditingComplete: () {
+                    final qty = double.tryParse(ctrl.text.replaceAll(',', '.')) ?? 0.0;
+                    widget.onChanged(colIdx, qty);
+                    FocusScope.of(context).nextFocus();
                   },
                 ),
         ),
