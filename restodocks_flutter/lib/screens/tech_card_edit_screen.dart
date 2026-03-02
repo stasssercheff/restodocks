@@ -464,10 +464,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     'cold_kitchen':  ('section_cold_kitchen', false),
     'preparation':   ('section_prep', false),
     'confectionery': ('section_pastry', false),
-    'grill':         ('section_grill', true),
-    'pizza':         ('section_pizza', true),
-    'sushi':         ('section_sushi', true),
-    'bakery':        ('section_bakery', true),
+    'grill':         ('section_grill', false),
+    'pizza':         ('section_pizza', false),
+    'sushi':         ('section_sushi', false),
+    'bakery':        ('section_bakery', false),
   };
 
   // Русские названия цехов (fallback если нет локализации)
@@ -485,7 +485,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   Map<String, String> _getAvailableSections(bool hasPro, LocalizationService loc) {
     return Map.fromEntries(
       _sectionKeys.entries
-          .where((e) => hasPro || !e.value.$2)
           .map((e) => MapEntry(e.key, loc.t(e.value.$1))),
     );
   }
