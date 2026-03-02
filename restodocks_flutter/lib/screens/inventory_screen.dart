@@ -2334,22 +2334,29 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   }
 
   /// Кнопки ▲▼: переходим к следующей / предыдущей ячейке.
-  /// Стратегия:
-  /// 1. Определяем текущую ячейку по _highlightedCell или по JS activeElement.
-  /// 2. Вычисляем целевой индекс.
-  /// 3. Скроллируем строку в экран.
-  /// 4. Фокусируем: FocusNode.requestFocus() (работает Chrome/Firefox) +
-  ///    JS focus() через dart:html (дополнительно для Safari iOS).
+  /// onTapDown вызывается ДО того как Safari снимает фокус с поля ввода,
+  /// поэтому _cellFocusNodes.hasFocus ещё актуален в этот момент.
   void _navigateCell({required bool forward}) {
     final rows = _filteredRows;
     if (rows.isEmpty || _cellFocusNodes.isEmpty) return;
 
-    // Определяем текущий индекс
+    // Приоритет: FocusNode (надёжно в момент onTapDown) → _highlightedCell
     int curIdx = _cellFocusNodes.indexWhere((n) => n.hasFocus);
+    if (curIdx < 0) {
+      // JS activeElement как запасной вариант
+      try {
+        final active = html.document.activeElement;
+        if (active is html.InputElement) {
+          final attr = active.getAttribute('data-iiko-cell-idx');
+          curIdx = int.tryParse(attr ?? '') ?? -1;
+        }
+      } catch (_) {}
+    }
     if (curIdx < 0) curIdx = _highlightedCell;
 
     int nextIdx;
     if (curIdx < 0) {
+      // Нет текущей — начинаем с первой или последней
       nextIdx = forward ? 0 : _cellFocusNodes.length - 1;
     } else {
       nextIdx = forward ? curIdx + 1 : curIdx - 1;
@@ -2360,22 +2367,19 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     _scrollToFlatIndex(rows, nextIdx);
     _hideBrowserAddressBar();
 
-    // requestFocus — работает в Chrome, Firefox, Edge
+    // requestFocus для Chrome/Firefox/Edge
     _cellFocusNodes[nextIdx].requestFocus();
 
-    // JS focus() — дополнительно для Safari iOS (срабатывает из onPointerDown)
+    // Для Safari: JS focus() после рендера на числовой input по порядку
     WidgetsBinding.instance.addPostFrameCallback((_) {
       try {
         final inputs = html.document
-            .querySelectorAll('input[data-iiko-idx]')
+            .querySelectorAll('input[inputmode="decimal"], input[inputmode="numeric"]')
             .cast<html.InputElement>()
             .toList();
-        final target = inputs.where(
-          (el) => el.getAttribute('data-iiko-idx') == '$nextIdx',
-        ).firstOrNull;
-        if (target != null) {
-          target.focus();
-          target.select();
+        if (nextIdx < inputs.length) {
+          inputs[nextIdx].focus();
+          inputs[nextIdx].select();
         }
       } catch (_) {}
     });
@@ -3390,13 +3394,13 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                             _NavButton(
                               icon: Icons.keyboard_arrow_up,
                               tooltip: 'Предыдущая ячейка',
-                              onPointerDown: () => _navigateCell(forward: false),
+                              onPress: () => _navigateCell(forward: false),
                             ),
                             const SizedBox(width: 4),
                             _NavButton(
                               icon: Icons.keyboard_arrow_down,
                               tooltip: 'Следующая ячейка',
-                              onPointerDown: () => _navigateCell(forward: true),
+                              onPress: () => _navigateCell(forward: true),
                             ),
                             const SizedBox(width: 8),
                           ],
@@ -3627,35 +3631,73 @@ class _SheetTabBar extends StatelessWidget {
 }
 
 // ── Кнопка навигации ▲▼ ─────────────────────────────────────────────────────
-// Использует Listener.onPointerDown — синхронный обработчик нажатия.
-// В Safari iOS GestureDetector.onTap приходит асинхронно и браузер
-// блокирует программный focus() вызванный не из прямого user action.
-// onPointerDown вызывается синхронно → JS focus() работает корректно.
-class _NavButton extends StatelessWidget {
+// Критично для Safari iOS: кнопка не должна снимать фокус с TextField.
+// Решение: mousedown.preventDefault() — стандартный браузерный способ сказать
+// «не передавай фокус этому элементу». В Flutter Web это делается через
+// dart:html addEventListener на платформенный элемент кнопки.
+// Дополнительно GestureDetector.onTapDown (синхронный) запускает навигацию.
+class _NavButton extends StatefulWidget {
   const _NavButton({
     required this.icon,
-    required this.onPointerDown,
+    required this.onPress,
     this.tooltip = '',
   });
 
   final IconData icon;
-  final VoidCallback onPointerDown;
+  final VoidCallback onPress;
   final String tooltip;
+
+  @override
+  State<_NavButton> createState() => _NavButtonState();
+}
+
+class _NavButtonState extends State<_NavButton> {
+  final _key = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    // После рендера вешаем mousedown.preventDefault() на DOM-элемент кнопки —
+    // это не даёт Safari снять фокус с активного TextField при нажатии кнопки.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _attachPreventDefault());
+  }
+
+  void _attachPreventDefault() {
+    try {
+      // Ищем <flt-semantics> или любой элемент под нашим RenderBox
+      // Самый надёжный способ: вешаем на document mousedown с проверкой target
+      // Делаем это один раз глобально через статический флаг
+      if (!_NavButton._preventDefaultAttached) {
+        _NavButton._preventDefaultAttached = true;
+        html.document.addEventListener('mousedown', (event) {
+          final el = (event as html.MouseEvent).target;
+          if (el is html.Element &&
+              el.getAttribute('data-nav-btn') == 'true') {
+            event.preventDefault();
+          }
+        }, true); // capture phase — до того как элемент получит фокус
+      }
+    } catch (_) {}
+  }
+
+  static bool _preventDefaultAttached = false;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Tooltip(
-      message: tooltip,
-      child: Listener(
-        onPointerDown: (_) => onPointerDown(),
-        child: Material(
-          color: theme.colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(8),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-            child: Icon(icon, size: 22, color: theme.colorScheme.onSurface),
+      key: _key,
+      message: widget.tooltip,
+      child: GestureDetector(
+        // onTapDown — срабатывает раньше onTap, ближе к моменту касания
+        onTapDown: (_) => widget.onPress(),
+        child: Container(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(8),
           ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Icon(widget.icon, size: 22, color: theme.colorScheme.onSurface),
         ),
       ),
     );
@@ -3829,6 +3871,20 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
             ),
             onTap: () {
               widget.onCellFocused?.call(flatIdx);
+              // Помечаем активный input атрибутом чтобы _navigateCell мог
+              // найти текущий индекс через JS при следующем нажатии ▲▼
+              try {
+                final active = html.document.activeElement;
+                if (active is html.InputElement) {
+                  // Снимаем старые метки
+                  for (final el in html.document
+                      .querySelectorAll('[data-iiko-cell-idx]')
+                      .cast<html.InputElement>()) {
+                    el.attributes.remove('data-iiko-cell-idx');
+                  }
+                  active.setAttribute('data-iiko-cell-idx', '$flatIdx');
+                }
+              } catch (_) {}
             },
             onChanged: (v) {
               final qty = double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
