@@ -55,9 +55,14 @@ class _MenuScreenState extends State<MenuScreen> {
       final techCardService = context.read<TechCardServiceSupabase>();
       await productStore.loadProducts();
       await productStore.loadNomenclature(est.id);
-      final tcs = await techCardService.getTechCardsForEstablishment(est.id);
+      final emp = acc.currentEmployee;
+      final allTcs = await techCardService.getTechCardsForEstablishment(est.id);
+      // Фильтр по цеху для кухни
+      final tcs = emp == null
+          ? allTcs
+          : allTcs.where((tc) => emp.canSeeTechCard(tc.sections)).toList();
       if (!mounted) return;
-      final currency = acc.currentEmployee?.currency ?? acc.establishment?.defaultCurrency ?? 'RUB';
+      final currency = emp?.currency ?? acc.establishment?.defaultCurrency ?? 'RUB';
       // Пересчитываем стоимость ингредиентов по актуальным ценам номенклатуры
       final enriched = <TechCard>[];
       for (final tc in tcs) {

@@ -8,7 +8,8 @@ class TechCard extends Equatable {
   final String dishName;
   final Map<String, String>? dishNameLocalized;
   final String category;
-  final String? section; // цех: 'hot_kitchen', 'cold_kitchen', 'grill', 'pizza', 'sushi', 'preparation', 'bakery', 'confectionery'
+  // Цеха: [] = Скрыто (только шеф/су-шеф), ['all'] = все, ['hot_kitchen', ...] = конкретные
+  final List<String> sections;
   final bool isSemiFinished; // true = ПФ (полуфабрикат), false = блюдо
   final double portionWeight; // вес порции в граммах
   final double yield; // выход готового блюда в граммах
@@ -26,7 +27,7 @@ class TechCard extends Equatable {
     required this.dishName,
     this.dishNameLocalized,
     required this.category,
-    this.section,
+    this.sections = const [],
     this.isSemiFinished = true,
     required this.portionWeight,
     required this.yield,
@@ -48,7 +49,10 @@ class TechCard extends Equatable {
         (key, value) => MapEntry(key, value as String),
       ),
       category: json['category'] as String,
-      section: json['section'] as String?,
+      sections: (json['sections'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [],
       isSemiFinished: json['is_semi_finished'] as bool? ?? true,
       portionWeight: (json['portion_weight'] as num).toDouble(),
       yield: (json['yield'] as num).toDouble(),
@@ -71,7 +75,7 @@ class TechCard extends Equatable {
       'dish_name': dishName,
       'dish_name_localized': dishNameLocalized,
       'category': category,
-      'section': section,
+      'sections': sections,
       'is_semi_finished': isSemiFinished,
       'portion_weight': portionWeight,
       'yield': yield,
@@ -93,7 +97,7 @@ class TechCard extends Equatable {
     String? dishName,
     Map<String, String>? dishNameLocalized,
     String? category,
-    String? section,
+    List<String>? sections,
     bool? isSemiFinished,
     double? portionWeight,
     double? yield,
@@ -110,7 +114,7 @@ class TechCard extends Equatable {
       dishName: dishName ?? this.dishName,
       dishNameLocalized: dishNameLocalized ?? this.dishNameLocalized,
       category: category ?? this.category,
-      section: section ?? this.section,
+      sections: sections ?? this.sections,
       isSemiFinished: isSemiFinished ?? this.isSemiFinished,
       portionWeight: portionWeight ?? this.portionWeight,
       yield: yield ?? this.yield,
@@ -273,11 +277,25 @@ class TechCard extends Equatable {
   ];
 
   /// Создание новой ТТК
+  /// Является ли ТТК скрытой (пустой список цехов = скрыто, только шеф/су-шеф)
+  bool get isHidden => sections.isEmpty;
+
+  /// Доступна ли ТТК для всех цехов
+  bool get isForAllSections => sections.contains('all');
+
+  /// Доступна ли ТТК для конкретного цеха
+  bool isVisibleForSection(String? employeeSection) {
+    if (sections.isEmpty) return false;          // скрыто
+    if (sections.contains('all')) return true;   // все цеха
+    if (employeeSection == null) return false;
+    return sections.contains(employeeSection);
+  }
+
   factory TechCard.create({
     required String dishName,
     Map<String, String>? dishNameLocalized,
     required String category,
-    String? section,
+    List<String> sections = const [],
     bool isSemiFinished = true,
     required String establishmentId,
     required String createdBy,
@@ -288,7 +306,7 @@ class TechCard extends Equatable {
       dishName: dishName,
       dishNameLocalized: dishNameLocalized,
       category: category,
-      section: section,
+      sections: sections,
       isSemiFinished: isSemiFinished,
       portionWeight: 100, // вес порции по умолчанию
       yield: 0,

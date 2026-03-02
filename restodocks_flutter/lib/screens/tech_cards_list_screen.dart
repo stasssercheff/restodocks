@@ -77,6 +77,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   Future<void> _load() async {
     final acc = context.read<AccountManagerSupabase>();
     final est = acc.establishment;
+    final emp = acc.currentEmployee;
     if (est == null) {
       setState(() { _loading = false; _error = 'Нет заведения'; });
       return;
@@ -84,7 +85,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     setState(() { _loading = true; _error = null; });
     try {
       final svc = context.read<TechCardServiceSupabase>();
-      final list = await svc.getTechCardsForEstablishment(est.id);
+      final all = await svc.getTechCardsForEstablishment(est.id);
+      // Фильтрация по цеху для кухни
+      final list = emp == null
+          ? all
+          : all.where((tc) => emp.canSeeTechCard(tc.sections)).toList();
       if (mounted) {
         setState(() { _list = list; _loading = false; });
         _ensureTechCardTranslations(svc, list);

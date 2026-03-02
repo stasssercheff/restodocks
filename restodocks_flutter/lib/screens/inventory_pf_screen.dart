@@ -61,9 +61,13 @@ class _InventoryPfScreenState extends State<InventoryPfScreen> {
     final svc = context.read<TechCardServiceSupabase>();
     final estId = account.establishment?.id;
     if (estId == null) return;
-    final list = await svc.getTechCardsForEstablishment(estId);
+    final emp = account.currentEmployee;
+    final all = await svc.getTechCardsForEstablishment(estId);
+    final visible = emp == null
+        ? all
+        : all.where((tc) => emp.canSeeTechCard(tc.sections)).toList();
     if (!mounted) return;
-    final pfOnly = list.where((tc) => tc.isSemiFinished).toList();
+    final pfOnly = visible.where((tc) => tc.isSemiFinished).toList();
     setState(() {
       _loading = false;
       for (final tc in pfOnly) {

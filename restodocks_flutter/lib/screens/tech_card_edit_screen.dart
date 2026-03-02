@@ -414,7 +414,7 @@ TechCard _applyEdits(
   TechCard t, {
   String? dishName,
   String? category,
-  String? section,
+  List<String>? sections,
   bool? isSemiFinished,
   double? portionWeight,
   double? yieldGrams,
@@ -425,7 +425,7 @@ TechCard _applyEdits(
   return t.copyWith(
     dishName: dishName,
     category: category,
-    section: section,
+    sections: sections,
     isSemiFinished: isSemiFinished,
     portionWeight: portionWeight,
     yield: yieldGrams,
@@ -458,6 +458,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   final _nameController = TextEditingController();
   static const _categoryOptions = ['sauce', 'vegetables', 'salad', 'meat', 'seafood', 'side', 'subside', 'bakery', 'dessert', 'decor', 'soup', 'misc', 'beverages'];
   // Ключи секций: id → (localization_key, requiresPro)
+  // Цеха кухни: код → (ключ локализации, requiresPro)
   static const _sectionKeys = <String, (String, bool)>{
     'hot_kitchen':   ('section_hot_kitchen', false),
     'cold_kitchen':  ('section_cold_kitchen', false),
@@ -469,6 +470,18 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     'bakery':        ('section_bakery', true),
   };
 
+  // Русские названия цехов (fallback если нет локализации)
+  static const _sectionLabelsRu = <String, String>{
+    'hot_kitchen':   'Горячий цех',
+    'cold_kitchen':  'Холодный цех',
+    'preparation':   'Заготовки',
+    'confectionery': 'Кондитерский',
+    'grill':         'Гриль',
+    'pizza':         'Пицца',
+    'sushi':         'Суши',
+    'bakery':        'Пекарня',
+  };
+
   Map<String, String> _getAvailableSections(bool hasPro, LocalizationService loc) {
     return Map.fromEntries(
       _sectionKeys.entries
@@ -476,8 +489,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           .map((e) => MapEntry(e.key, loc.t(e.value.$1))),
     );
   }
+
+  String _sectionLabel(String code, LocalizationService loc) {
+    final sections = _getAvailableSections(true, loc);
+    return sections[code] ?? _sectionLabelsRu[code] ?? code;
+  }
+
   String _selectedCategory = 'misc';
-  String? _selectedSection; // цех
+  List<String> _selectedSections = []; // [] = Скрыто, ['all'] = Все цеха
   bool _isSemiFinished = true; // ПФ или блюдо (порция — в карточках блюд, отдельно)
   final _technologyController = TextEditingController();
   final List<TTIngredient> _ingredients = [];
@@ -611,7 +630,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
             _portionWeight = tc.portionWeight;
             _nameController.text = tc.getLocalizedDishName(context.read<LocalizationService>().currentLanguageCode);
             _selectedCategory = _categoryOptions.contains(tc.category) ? tc.category : 'misc';
-            _selectedSection = tc.section;
+            _selectedSections = List<String>.from(tc.sections);
             _isSemiFinished = tc.isSemiFinished;
             _photoUrls = tc.photoUrls ?? [];
             _pendingPhotoBytes = [];
@@ -745,7 +764,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
         final created = await svc.createTechCard(
           dishName: name,
           category: category,
-          section: _selectedSection,
+          sections: _selectedSections,
           isSemiFinished: _isSemiFinished,
           establishmentId: est.id,
           createdBy: emp.id,
@@ -826,7 +845,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
             if (url != null) photoUrls.add(url);
           }
         }
-        final updated = _applyEdits(tc, dishName: name, category: category, section: _selectedSection, isSemiFinished: _isSemiFinished, portionWeight: _portionWeight, yieldGrams: yieldVal, technologyLocalized: techMap, photoUrls: photoUrls, ingredients: toSaveIngredients);
+        final updated = _applyEdits(tc, dishName: name, category: category, sections: _selectedSections, isSemiFinished: _isSemiFinished, portionWeight: _portionWeight, yieldGrams: yieldVal, technologyLocalized: techMap, photoUrls: photoUrls, ingredients: toSaveIngredients);
         await svc.saveTechCard(updated);
         // Переводим название и технологию фоново
         final techText = _technologyController.text.trim();
@@ -1692,18 +1711,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                           child: Text(_categoryLabel(_selectedCategory, loc.currentLanguageCode), overflow: TextOverflow.ellipsis),
                         ),
                   const SizedBox(height: 12),
-                  effectiveCanEdit
-                      ? DropdownButtonFormField<String>(
-                          value: _selectedSection,
-                          decoration: InputDecoration(labelText: loc.t('kitchen_section'), isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
-                          items: _getAvailableSections(context.read<AccountManagerSupabase>().hasProSubscription, loc).entries.map((entry) =>
-                            DropdownMenuItem(value: entry.key, child: Text(entry.value))).toList(),
-                          onChanged: (v) => setState(() => _selectedSection = v),
-                        )
-                      : _selectedSection != null ? InputDecorator(
-                          decoration: InputDecoration(labelText: loc.t('kitchen_section'), isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
-                          child: Text(_getAvailableSections(context.read<AccountManagerSupabase>().hasProSubscription, loc)[_selectedSection!] ?? _selectedSection!, overflow: TextOverflow.ellipsis),
-                        ) : const SizedBox.shrink(),
+                  _SectionPicker(
+                    selected: _selectedSections,
+                    availableSections: _getAvailableSections(
+                        context.read<AccountManagerSupabase>().hasProSubscription, loc),
+                    canEdit: effectiveCanEdit,
+                    onChanged: (v) => setState(() => _selectedSections = v),
+                    loc: loc,
+                  ),
                   const SizedBox(height: 12),
                   effectiveCanEdit
                       ? DropdownButtonFormField<bool>(
@@ -1769,20 +1784,16 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                         ),
                         const SizedBox(width: 8),
                         SizedBox(
-                          width: 140,
-                          height: 56,
-                          child: effectiveCanEdit
-                              ? DropdownButtonFormField<String>(
-                                  value: _selectedSection,
-                                  decoration: InputDecoration(labelText: loc.t('kitchen_section'), isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)), contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
-                                  items: _getAvailableSections(context.read<AccountManagerSupabase>().hasProSubscription, loc).entries.map((entry) =>
-                                    DropdownMenuItem(value: entry.key, child: Text(entry.value))).toList(),
-                                  onChanged: (v) => setState(() => _selectedSection = v),
-                                )
-                              : _selectedSection != null ? InputDecorator(
-                                  decoration: InputDecoration(labelText: loc.t('kitchen_section'), isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
-                                  child: Text(_getAvailableSections(context.read<AccountManagerSupabase>().hasProSubscription, loc)[_selectedSection!] ?? _selectedSection!, overflow: TextOverflow.ellipsis),
-                                ) : const SizedBox.shrink(),
+                          width: 180,
+                          child: _SectionPicker(
+                            selected: _selectedSections,
+                            availableSections: _getAvailableSections(
+                                context.read<AccountManagerSupabase>().hasProSubscription, loc),
+                            canEdit: effectiveCanEdit,
+                            onChanged: (v) => setState(() => _selectedSections = v),
+                            loc: loc,
+                            compact: true,
+                          ),
                         ),
                         const SizedBox(width: 8),
                         ConstrainedBox(
@@ -3762,6 +3773,356 @@ class _PhotoViewerDialogState extends State<_PhotoViewerDialog> {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Выбор цехов для ТТК:
+//   [] = Скрыто (только шеф/су-шеф)
+//   ['all'] = Все цеха
+//   ['hot_kitchen', ...] = конкретные цеха
+//
+// Логика взаимоисключения:
+//   - Выбрать "Все цеха" → снимает все конкретные
+//   - Выбрать конкретный → снимает "Все цеха"
+//   - Снять все конкретные → возвращается "Скрыто"
+//   - "Скрыто" нельзя выбрать вручную — только если ничего не выбрано
+// ══════════════════════════════════════════════════════════════════════════════
+class _SectionPicker extends StatelessWidget {
+  final List<String> selected;
+  final Map<String, String> availableSections;
+  final bool canEdit;
+  final ValueChanged<List<String>> onChanged;
+  final LocalizationService loc;
+  final bool compact; // компактный режим для горизонтального layout
+
+  const _SectionPicker({
+    required this.selected,
+    required this.availableSections,
+    required this.canEdit,
+    required this.onChanged,
+    required this.loc,
+    this.compact = false,
+  });
+
+  String get _displayLabel {
+    if (selected.isEmpty) return 'Скрыто';
+    if (selected.contains('all')) return 'Все цеха';
+    if (selected.length == 1) {
+      return availableSections[selected.first] ?? selected.first;
+    }
+    return '${selected.length} цеха';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    if (!canEdit) {
+      return InputDecorator(
+        decoration: InputDecoration(
+          labelText: 'Цех',
+          isDense: true,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              selected.isEmpty ? Icons.visibility_off : Icons.store,
+              size: 16,
+              color: selected.isEmpty
+                  ? theme.colorScheme.error.withValues(alpha: 0.7)
+                  : theme.colorScheme.primary,
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                _displayLabel,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: selected.isEmpty
+                      ? theme.colorScheme.error.withValues(alpha: 0.8)
+                      : null,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return GestureDetector(
+      onTap: () => _showPicker(context),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: 'Цех',
+          isDense: true,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          suffixIcon: const Icon(Icons.arrow_drop_down),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              selected.isEmpty ? Icons.visibility_off : Icons.store,
+              size: 16,
+              color: selected.isEmpty
+                  ? theme.colorScheme.error.withValues(alpha: 0.7)
+                  : theme.colorScheme.primary,
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                _displayLabel,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: selected.isEmpty
+                      ? theme.colorScheme.error.withValues(alpha: 0.8)
+                      : null,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showPicker(BuildContext context) {
+    showDialog<List<String>>(
+      context: context,
+      builder: (_) => _SectionPickerDialog(
+        selected: List<String>.from(selected),
+        availableSections: availableSections,
+        loc: loc,
+      ),
+    ).then((result) {
+      if (result != null) onChanged(result);
+    });
+  }
+}
+
+class _SectionPickerDialog extends StatefulWidget {
+  final List<String> selected;
+  final Map<String, String> availableSections;
+  final LocalizationService loc;
+
+  const _SectionPickerDialog({
+    required this.selected,
+    required this.availableSections,
+    required this.loc,
+  });
+
+  @override
+  State<_SectionPickerDialog> createState() => _SectionPickerDialogState();
+}
+
+class _SectionPickerDialogState extends State<_SectionPickerDialog> {
+  late List<String> _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = List<String>.from(widget.selected);
+  }
+
+  void _toggle(String code) {
+    setState(() {
+      if (code == 'all') {
+        // Выбрать "Все цеха" — снимаем все конкретные
+        if (_selected.contains('all')) {
+          _selected = []; // снятие "Все" → Скрыто
+        } else {
+          _selected = ['all'];
+        }
+      } else {
+        // Конкретный цех — снимаем 'all' если был
+        _selected.remove('all');
+        if (_selected.contains(code)) {
+          _selected.remove(code);
+          // Сняли последний конкретный → Скрыто (пустой список)
+        } else {
+          _selected.add(code);
+        }
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isHidden = _selected.isEmpty;
+    final isAll = _selected.contains('all');
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                Icon(Icons.store, color: theme.colorScheme.primary, size: 22),
+                const SizedBox(width: 10),
+                Text('Выбор цеха',
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w700)),
+              ]),
+              const SizedBox(height: 4),
+              Text(
+                'ТТК будет видна только поварам выбранных цехов. '
+                'Если ничего не выбрано — видят только шеф-повар и су-шеф.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+              ),
+              const SizedBox(height: 16),
+
+              // Статус "Скрыто"
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isHidden
+                      ? theme.colorScheme.errorContainer.withValues(alpha: 0.3)
+                      : theme.colorScheme.surfaceContainerLowest,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: isHidden
+                        ? theme.colorScheme.error.withValues(alpha: 0.4)
+                        : theme.colorScheme.outline.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(children: [
+                  Icon(Icons.visibility_off,
+                      size: 18,
+                      color: isHidden
+                          ? theme.colorScheme.error
+                          : theme.colorScheme.onSurface.withValues(alpha: 0.4)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      isHidden
+                          ? 'Скрыто — виден только шеф-повару и су-шефу'
+                          : 'Снимите все цеха чтобы скрыть ТТК',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isHidden
+                            ? theme.colorScheme.error
+                            : theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                      ),
+                    ),
+                  ),
+                ]),
+              ),
+              const SizedBox(height: 12),
+
+              // Список цехов
+              ...widget.availableSections.entries.map((e) => _CheckItem(
+                    label: e.value,
+                    checked: _selected.contains(e.key),
+                    onTap: () => _toggle(e.key),
+                    theme: theme,
+                  )),
+
+              const Divider(height: 20),
+
+              // Все цеха
+              _CheckItem(
+                label: 'Все цеха',
+                checked: isAll,
+                onTap: () => _toggle('all'),
+                theme: theme,
+                icon: Icons.done_all,
+                bold: true,
+              ),
+
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(null),
+                    child: const Text('Отмена'),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton(
+                    onPressed: () => Navigator.of(context).pop(_selected),
+                    child: const Text('Сохранить'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CheckItem extends StatelessWidget {
+  final String label;
+  final bool checked;
+  final VoidCallback onTap;
+  final ThemeData theme;
+  final IconData icon;
+  final bool bold;
+
+  const _CheckItem({
+    required this.label,
+    required this.checked,
+    required this.onTap,
+    required this.theme,
+    this.icon = Icons.kitchen,
+    this.bold = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+        child: Row(
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                shape: BoxShape.rectangle,
+                borderRadius: BorderRadius.circular(4),
+                color: checked ? theme.colorScheme.primary : Colors.transparent,
+                border: Border.all(
+                  color: checked
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.outline,
+                  width: 2,
+                ),
+              ),
+              child: checked
+                  ? const Icon(Icons.check, size: 14, color: Colors.white)
+                  : null,
+            ),
+            const SizedBox(width: 10),
+            Icon(icon, size: 16,
+                color: checked
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurface.withValues(alpha: 0.55)),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: bold ? FontWeight.w600 : FontWeight.normal,
+                color: checked ? theme.colorScheme.primary : null,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

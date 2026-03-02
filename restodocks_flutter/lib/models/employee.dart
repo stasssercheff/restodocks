@@ -265,6 +265,20 @@ class Employee extends Equatable {
     return hasRole('executive_chef') || hasRole('sous_chef');
   }
 
+  /// Видит ли сотрудник конкретную ТТК кухни по цехам.
+  /// sections == [] → скрыто, видят только шеф/су-шеф/владелец.
+  /// sections == ['all'] → видят все (кухни и управление).
+  /// sections == [...] → только сотрудники чей section входит в список.
+  bool canSeeTechCard(List<String> sections) {
+    // Владелец, шеф-повар, су-шеф — видят всё
+    if (hasRole('owner') || hasRole('executive_chef') || hasRole('sous_chef')) return true;
+    if (sections.isEmpty) return false;          // скрыто
+    if (sections.contains('all')) return true;   // все цеха
+    final mySection = section;                   // KitchenSection.code или null
+    if (mySection == null) return false;
+    return sections.contains(mySection);
+  }
+
   /// Может ли просматривать отдел (в зависимости от роли и отдела)
   bool canViewDepartment(String departmentCode) {
     // Владелец может видеть все
