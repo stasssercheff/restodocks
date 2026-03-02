@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'dart:html' as html show document, InputElement, NodeList;
+import 'dart:html' as html show document, window, InputElement, NodeList;
 
 import 'package:archive/archive.dart';
 
@@ -2358,6 +2358,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
 
     setState(() => _highlightedCell = nextIdx);
     _scrollToFlatIndex(rows, nextIdx);
+    _hideBrowserAddressBar();
 
     // requestFocus — работает в Chrome, Firefox, Edge
     _cellFocusNodes[nextIdx].requestFocus();
@@ -2378,6 +2379,18 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
         }
       } catch (_) {}
     });
+  }
+
+  /// Скрывает адресную строку Safari iOS / Chrome Android.
+  /// Браузер убирает UI-chrome при window.scrollY > 0.
+  /// Flutter Web занимает весь viewport через position:fixed — скролл идёт
+  /// через window.scrollTo(0, 1) который достаточен для триггера скрытия.
+  void _hideBrowserAddressBar() {
+    try {
+      if (html.window.scrollY == 0) {
+        html.window.scrollTo(0, 1);
+      }
+    } catch (_) {}
   }
 
   /// Прокручивает ListView к строке, содержащей ячейку с плоским индексом [flatIdx].
@@ -3361,6 +3374,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                                 if (_highlightedCell != flatIdx) {
                                   setState(() => _highlightedCell = flatIdx);
                                 }
+                                _hideBrowserAddressBar();
                               },
                               scrollController: _listScrollCtrl,
                             ),
