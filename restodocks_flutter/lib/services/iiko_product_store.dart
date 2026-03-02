@@ -79,10 +79,10 @@ class IikoProductStore extends ChangeNotifier {
   /// Скачивает бланк с Supabase Storage и сохраняет в память + localStorage.
   Future<void> _restoreBlankFromServer(String establishmentId) async {
     try {
-      // Читаем метаданные (индекс колонки)
+      // Читаем метаданные (индекс колонки, имена листов, qty-колонки)
       final meta = await _supabase
           .from('iiko_blank_meta')
-          .select('qty_col_index')
+          .select('qty_col_index, sheet_names, sheet_qty_cols')
           .eq('establishment_id', establishmentId)
           .maybeSingle();
       if (meta == null) return;
