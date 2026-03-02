@@ -13,11 +13,21 @@
         if (p && p !== '/' && p !== '/splash') {
           if (p.endsWith('/') && p.length > 1) p = p.slice(0, -1);
           if (location.search && p.indexOf('?') === -1) p += location.search;
+          // Пишем в ОБА хранилища: sessionStorage сбрасывается при reload на iOS Safari
           sessionStorage.setItem('restodocks_last_path', p);
+          localStorage.setItem('restodocks_last_path_persist', p);
           document.documentElement.dataset.initialPath = p;
+        } else {
+          // pathname == '/' — это reload на iOS. Берём путь из localStorage
+          var saved = localStorage.getItem('restodocks_last_path_persist');
+          if (saved && saved !== '/' && saved !== '/splash') {
+            document.documentElement.dataset.initialPath = saved;
+            sessionStorage.setItem('restodocks_last_path', saved);
+          }
         }
         // При обновлении (F5) не показывать экран с лого — пользователь уже в приложении
-        if (sessionStorage.getItem('restodocks_loaded_before')) {
+        if (sessionStorage.getItem('restodocks_loaded_before') ||
+            localStorage.getItem('restodocks_last_path_persist')) {
           var s = document.createElement('style');
           s.textContent = '#loading-screen { display: none !important; }';
           document.head.appendChild(s);
@@ -215,24 +225,51 @@
         }, 300);
       }
 
-      // Listen for focus on any input (including inside shadow DOM)
+      function attachToShadowHosts() {
+        // Flutter CanvasKit puts inputs inside shadow DOM of flt-text-editing-host
+        document.querySelectorAll('flt-text-editing-host, flt-glass-pane').forEach(function(host) {
+          if (host._navListened) return;
+          host._navListened = true;
+          var root = host.shadowRoot || host;
+          root.addEventListener('focusin', function(e) {
+            var t = e.target;
+            if (t && t.tagName === 'INPUT') {
+              activeInput = t;
+              allInputs = getAllInputs();
+              showBar();
+            }
+          }, true);
+          root.addEventListener('focusout', function(e) {
+            scheduleHide();
+          }, true);
+        });
+      }
+
+      // Also listen on document for HTML renderer inputs (not in shadow DOM)
       document.addEventListener('focusin', function(e) {
         var t = e.target;
         if (t && t.tagName === 'INPUT') {
           activeInput = t;
           allInputs = getAllInputs();
           showBar();
-        } else {
-          scheduleHide();
         }
       }, true);
-
       document.addEventListener('focusout', function(e) {
         scheduleHide();
       }, true);
 
-      window.addEventListener('flutter-first-frame', createBar);
+      // Watch for Flutter shadow hosts appearing in DOM
+      var hostObserver = new MutationObserver(function() {
+        attachToShadowHosts();
+      });
+
+      window.addEventListener('flutter-first-frame', function() {
+        createBar();
+        attachToShadowHosts();
+        hostObserver.observe(document.body, { childList: true, subtree: true });
+      });
     })();
   </script>
 </body>
 </html>
+
