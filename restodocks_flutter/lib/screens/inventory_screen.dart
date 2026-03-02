@@ -2302,6 +2302,9 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   // в текущем _filteredRows. Пересоздаётся при перестройке списка.
   final List<FocusNode> _cellFocusNodes = [];
 
+  // ScrollController для ListView строк — нужен для programmatic scroll к ячейке
+  final ScrollController _listScrollCtrl = ScrollController();
+
   /// Пересоздаёт _cellFocusNodes под текущий _filteredRows.
   /// Вызывается после любого изменения _rows / фильтра / листа.
   void _rebuildFocusNodes(List<_IikoInventoryRow> rows) {
@@ -2333,34 +2336,52 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   void _navigateCell({required bool forward}) {
     final idx = _cellFocusNodes.indexWhere((n) => n.hasFocus);
     if (idx < 0) {
-      // Нет активной ячейки — фокусируем первую/последнюю
       if (_cellFocusNodes.isNotEmpty) {
         final target = _cellFocusNodes[forward ? 0 : _cellFocusNodes.length - 1];
         target.requestFocus();
-        _ensureNodeVisible(target);
+        _scrollToNodeIndex(forward ? 0 : _cellFocusNodes.length - 1);
       }
       return;
     }
     final next = forward ? idx + 1 : idx - 1;
     if (next >= 0 && next < _cellFocusNodes.length) {
-      final target = _cellFocusNodes[next];
-      target.requestFocus();
-      _ensureNodeVisible(target);
+      _cellFocusNodes[next].requestFocus();
+      _scrollToNodeIndex(next);
     }
   }
 
-  /// Прокручивает виджет, связанный с [node], в видимую область.
-  void _ensureNodeVisible(FocusNode node) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (node.context != null) {
-        Scrollable.ensureVisible(
-          node.context!,
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOut,
-          alignment: 0.5,
-        );
-      }
-    });
+  /// Прокручивает ListView к строке, содержащей ячейку с глобальным индексом [nodeIdx].
+  /// Высота строки ≈ 58px (minHeight 48 + padding), группового заголовка ≈ 28px.
+  void _scrollToNodeIndex(int nodeIdx) {
+    if (!_listScrollCtrl.hasClients) return;
+    // Определяем к какой строке относится нода
+    final rows = _filteredRows;
+    var offset = 0;
+    var rowIndex = 0;
+    for (var i = 0; i < rows.length; i++) {
+      final count = rows[i].quantities.length;
+      if (nodeIdx < offset + count) { rowIndex = i; break; }
+      offset += count;
+    }
+    // Примерный offset строки в ListView (учитываем группы)
+    const rowH = 58.0;
+    const groupH = 28.0;
+    String? lastGroup;
+    var scrollOffset = 0.0;
+    for (var i = 0; i < rowIndex; i++) {
+      final g = rows[i].product.groupName ?? '';
+      if (g != lastGroup) { scrollOffset += groupH; lastGroup = g; }
+      scrollOffset += rowH;
+    }
+    // Центрируем: сдвигаем так чтобы строка была в середине viewport
+    final viewH = _listScrollCtrl.position.viewportDimension;
+    final target = (scrollOffset - viewH / 2 + rowH / 2).clamp(
+        0.0, _listScrollCtrl.position.maxScrollExtent);
+    _listScrollCtrl.animateTo(
+      target,
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOut,
+    );
   }
 
   // ── AutoSaveMixin ──────────────────────────────────────────────────────────
@@ -2422,6 +2443,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   void dispose() {
     _filterCtrl.dispose();
     _serverSaveTimer?.cancel();
+    _listScrollCtrl.dispose();
     for (final n in _cellFocusNodes) {
       n.dispose();
     }
@@ -3161,10 +3183,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   Widget build(BuildContext context) {
     final account = context.watch<AccountManagerSupabase>();
     final theme = Theme.of(context);
-    final isKeyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
     final isNarrow = MediaQuery.sizeOf(context).width < 600;
-    // На мобильном при открытой клавиатуре скрываем статус-строку — экономим место
-    final hideStatusRow = isNarrow && isKeyboardOpen;
 
     // Пересоздаём фокус-ноды под текущий набор строк
     final visibleRows = _filteredRows;
@@ -3178,8 +3197,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text('Инвентаризация iiko', style: TextStyle(fontSize: 16)),
-            if (!hideStatusRow)
-              Text(
+            Text(
                 account.establishment?.name ?? '',
                 style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
               ),
@@ -3230,8 +3248,8 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                         ),
                       ),
                     ),
-                    // Статус-строка — скрывается на мобильном при открытой клавиатуре
-                    if (!hideStatusRow) Container(
+                    // Статус-строка
+                    Container(
                       color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                       child: Row(
@@ -3308,6 +3326,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                               focusNodes: _cellFocusNodes,
                               focusNodesForRow: (rowIndex) =>
                                   _focusNodesForRow(visibleRows, rowIndex),
+                              scrollController: _listScrollCtrl,
                             ),
                     ),
                     // Кнопки внизу — всегда видны
@@ -3315,8 +3334,9 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                       padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
                       child: Row(
                         children: [
-                          // Кнопки ▲▼ — видны только на мобильном при открытой клавиатуре
-                          if (isNarrow && isKeyboardOpen) ...[
+                          // Кнопки ▲▼ — всегда видны на мобильном (isKeyboardOpen
+                          // не работает в веб-браузере, поэтому не проверяем)
+                          if (isNarrow) ...[
                             _NavButton(
                               icon: Icons.keyboard_arrow_up,
                               tooltip: 'Предыдущая ячейка',
@@ -3427,6 +3447,7 @@ class _IikoInventoryTable extends StatelessWidget {
     required this.onQuantityChanged,
     required this.focusNodes,
     required this.focusNodesForRow,
+    this.scrollController,
   });
 
   final List<_IikoInventoryRow> rows;
@@ -3435,11 +3456,13 @@ class _IikoInventoryTable extends StatelessWidget {
       onQuantityChanged;
   final List<FocusNode> focusNodes;
   final List<FocusNode> Function(int rowIndex) focusNodesForRow;
+  final ScrollController? scrollController;
 
   @override
   Widget build(BuildContext context) {
     String? lastGroup;
     return ListView.builder(
+      controller: scrollController,
       itemCount: rows.length,
       itemBuilder: (ctx, i) {
         final row = rows[i];
