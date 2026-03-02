@@ -43,10 +43,15 @@ class IikoProductStore extends ChangeNotifier {
   /// Загружает байты бланка: сначала localStorage, потом Supabase Storage.
   /// Вызывается перед экспортом и при загрузке iiko-экрана.
   Future<void> restoreBlankFromStorage({String? establishmentId}) async {
-    // Если байты уже есть, но sheetNames пусты — пробуем восстановить только метаданные
+    // Если байты уже есть, но sheetNames пусты — восстанавливаем метаданные
     if (originalBlankBytes != null) {
       if (sheetNames.isEmpty) {
         await _restoreSheetNamesOnly();
+      }
+      // Если продукты загружены без sheetName — проставляем из бланка
+      if (_products.isNotEmpty && _products.every((p) => p.sheetName == null)) {
+        await _assignSheetNamesInMemory();
+        notifyListeners();
       }
       return;
     }
@@ -70,6 +75,10 @@ class IikoProductStore extends ChangeNotifier {
         }
         debugPrint('IikoProductStore: blank restored from localStorage '
             '(${originalBlankBytes!.length} bytes, qtyCol=$originalQuantityColumnIndex, sheets=${sheetNames.length})');
+        // Если продукты уже загружены но без sheetName — проставляем из бланка
+        if (_products.isNotEmpty && _products.every((p) => p.sheetName == null)) {
+          await _assignSheetNamesInMemory();
+        }
         notifyListeners(); // обновляем вкладки листов в UI
         return;
       }
@@ -81,6 +90,10 @@ class IikoProductStore extends ChangeNotifier {
     final estId = establishmentId ?? _loadedEstablishmentId;
     if (estId == null) return;
     await _restoreBlankFromServer(estId);
+    // Если продукты уже загружены но без sheetName — проставляем из бланка
+    if (_products.isNotEmpty && _products.every((p) => p.sheetName == null)) {
+      await _assignSheetNamesInMemory();
+    }
     notifyListeners(); // обновляем вкладки листов после загрузки с сервера
   }
 
