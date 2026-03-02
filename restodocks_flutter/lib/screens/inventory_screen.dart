@@ -3342,45 +3342,40 @@ class _IikoInventoryTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     String? lastGroup;
-    return ListView.builder(
-      itemCount: rows.length,
-      itemBuilder: (ctx, i) {
-        final row = rows[i];
-        final groupName = row.product.groupName ?? '';
-        final groupDisplay = row.product.displayGroupName ?? '';
-        Widget? groupHeader;
-        if (groupName != lastGroup) {
-          lastGroup = groupName;
-          if (groupDisplay.isNotEmpty) {
-            final theme = Theme.of(ctx);
-            groupHeader = Container(
-              width: double.infinity,
-              color: theme.colorScheme.primaryContainer.withOpacity(0.25),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              child: Text(
-                groupDisplay,
-                style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: theme.colorScheme.primary),
-              ),
-            );
-          }
-        }
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (groupHeader != null) groupHeader,
-            _IikoInventoryRowTile(
-              row: row,
-              completed: completed,
-              onChanged: (colIdx, qty) => onQuantityChanged(row, colIdx, qty),
+    final items = <Widget>[];
+    for (var i = 0; i < rows.length; i++) {
+      final row = rows[i];
+      final groupName = row.product.groupName ?? '';
+      final groupDisplay = row.product.displayGroupName ?? '';
+      if (groupName != lastGroup) {
+        lastGroup = groupName;
+        if (groupDisplay.isNotEmpty) {
+          items.add(Container(
+            width: double.infinity,
+            color: theme.colorScheme.primaryContainer.withOpacity(0.25),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            child: Text(
+              groupDisplay,
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.primary),
             ),
-          ],
-        );
-      },
-    );
+          ));
+        }
+      }
+      items.add(_IikoInventoryRowTile(
+        key: ValueKey(row.product.id),
+        row: row,
+        completed: completed,
+        onChanged: (colIdx, qty) => onQuantityChanged(row, colIdx, qty),
+      ));
+    }
+    // ListView (не builder) — все строки сразу в DOM,
+    // Safari видит полную цепочку <input> и активирует кнопки ▲▼ в панели.
+    return ListView(children: items);
   }
 }
 
@@ -3449,6 +3444,7 @@ class _SheetTabBar extends StatelessWidget {
 
 class _IikoInventoryRowTile extends StatefulWidget {
   const _IikoInventoryRowTile({
+    super.key,
     required this.row,
     required this.completed,
     required this.onChanged,
