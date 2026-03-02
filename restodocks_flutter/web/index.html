@@ -89,5 +89,42 @@
     // Last resort: remove after 20s
     setTimeout(hideLoadingScreen, 20000);
   </script>
+  <script>
+    // Safari iOS: associate all Flutter <input> elements with a hidden <form>
+    // so the native keyboard toolbar (▲▼ prev/next buttons) becomes active.
+    // Flutter Web never renders <form> tags — Safari requires them to enable navigation.
+    // We use the HTML `form` attribute on each <input> pointing to a hidden <form id>,
+    // so inputs stay in their original DOM position (no reparenting = Flutter stays happy).
+    (function() {
+      var FORM_ID = 'flt-safari-form';
+
+      function ensureForm() {
+        var f = document.getElementById(FORM_ID);
+        if (f) return f;
+        f = document.createElement('form');
+        f.id = FORM_ID;
+        f.setAttribute('onsubmit', 'return false');
+        f.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;opacity:0;pointer-events:none;';
+        document.body.appendChild(f);
+        return f;
+      }
+
+      function tagInputs() {
+        ensureForm();
+        var inputs = document.querySelectorAll('input:not([form="' + FORM_ID + '"])');
+        inputs.forEach(function(inp) {
+          inp.setAttribute('form', FORM_ID);
+        });
+      }
+
+      // Run after Flutter renders its first frame
+      window.addEventListener('flutter-first-frame', function() {
+        setTimeout(tagInputs, 200);
+        // Re-tag whenever DOM changes (new inputs appear when scrolling / tab switch)
+        var mo = new MutationObserver(tagInputs);
+        mo.observe(document.body, { childList: true, subtree: true });
+      });
+    })();
+  </script>
 </body>
 </html>
