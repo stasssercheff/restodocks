@@ -2261,7 +2261,7 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
 
 /// Одна строка iiko-инвентаризации: продукт + список замеров (как в стандартной).
 class _IikoInventoryRow {
-  final IikoProduct product;
+  IikoProduct product;
   List<double> quantities; // список замеров, минимум 2
 
   _IikoInventoryRow({required this.product, List<double>? quantities})
@@ -2351,15 +2351,40 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     super.initState(); // AutoSaveMixin.initState регистрирует lifecycle-хуки
     _filterCtrl.addListener(() => setState(() => _nameFilter = _filterCtrl.text));
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Подписываемся на store: когда restoreBlankFromStorage завершится и
+      // обновит sheetName у продуктов — синхронизируем _rows
+      final store = context.read<IikoProductStore>();
+      store.addListener(_onStoreUpdated);
       _loadProducts();
-      _startPeriodicServerSave(); // Supabase-бэкап каждые 10с (работает в инкогнито)
+      _startPeriodicServerSave();
     });
+  }
+
+  /// Вызывается когда IikoProductStore нотифицирует (после restoreBlankFromStorage).
+  /// Синхронизирует sheetName в _rows из актуального store.products.
+  void _onStoreUpdated() {
+    if (!mounted || _rows.isEmpty) return;
+    final store = context.read<IikoProductStore>();
+    final storeProducts = {for (final p in store.products) p.id: p};
+    var changed = false;
+    for (final row in _rows) {
+      final fresh = storeProducts[row.product.id];
+      if (fresh != null && fresh.sheetName != row.product.sheetName) {
+        row.product = fresh;
+        changed = true;
+      }
+    }
+    if (changed) setState(() {});
   }
 
   @override
   void dispose() {
     _filterCtrl.dispose();
     _serverSaveTimer?.cancel();
+    // Отписываемся от store чтобы не вызывать setState после unmount
+    try {
+      context.read<IikoProductStore>().removeListener(_onStoreUpdated);
+    } catch (_) {}
     super.dispose();
   }
 
@@ -3139,7 +3164,23 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                         return _SheetTabBar(
                           sheetNames: sheetNames,
                           selected: activeSheet,
-                          onSelect: (s) => setState(() => _selectedSheet = s),
+                          onSelect: (s) {
+                            setState(() {
+                              _selectedSheet = s;
+                              // Синхронизируем sheetName в _rows из актуального store
+                              // (store мог обновить sheetName после первоначальной загрузки _rows)
+                              final storeProducts = {
+                                for (final p in store.products) p.id: p
+                              };
+                              for (final row in _rows) {
+                                final fresh = storeProducts[row.product.id];
+                                if (fresh != null &&
+                                    fresh.sheetName != row.product.sheetName) {
+                                  row.product = fresh;
+                                }
+                              }
+                            });
+                          },
                         );
                       },
                     ),
