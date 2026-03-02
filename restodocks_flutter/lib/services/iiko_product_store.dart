@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:excel/excel.dart' hide Border;
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -193,12 +194,75 @@ class IikoProductStore extends ChangeNotifier {
           .map((e) => IikoProduct.fromJson(e as Map<String, dynamic>))
           .toList();
       _loadedEstablishmentId = establishmentId;
+
+      // Если у продуктов нет sheetName, но sheetNames известны —
+      // восстанавливаем sheetName из бланка (in-memory, без записи в БД)
+      if (sheetNames.length > 1 && _products.isNotEmpty &&
+          _products.every((p) => p.sheetName == null)) {
+        await _assignSheetNamesInMemory();
+      }
     } catch (e) {
       debugPrint('IikoProductStore.loadProducts error: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  /// Читает бланк и проставляет sheetName для каждого продукта in-memory.
+  /// Вызывается когда sheetNames известны, но в БД sheet_name = NULL (старые данные).
+  Future<void> _assignSheetNamesInMemory() async {
+    if (originalBlankBytes == null) {
+      // Пробуем восстановить бланк из localStorage молча
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final b64 = prefs.getString(_kBlankBytesKey);
+        if (b64 != null) originalBlankBytes = base64Decode(b64);
+      } catch (_) {}
+    }
+    if (originalBlankBytes == null) return;
+
+    try {
+      final excel = Excel.decodeBytes(originalBlankBytes!.toList());
+      // Строим карту: код → sheetName
+      final codeToSheet = <String, String>{};
+      for (final sheetName in excel.tables.keys) {
+        final sheet = excel.tables[sheetName];
+        if (sheet == null) continue;
+        // Ищем колонку кода (первые 20 строк)
+        int codeCol = 2;
+        for (var r = 0; r < sheet.maxRows && r < 20; r++) {
+          for (var c = 0; c < (sheet.maxColumns > 15 ? 15 : sheet.maxColumns); c++) {
+            final v = _excelCellStr(sheet, r, c).toLowerCase();
+            if (v == 'код' || v == 'code') { codeCol = c; break; }
+          }
+        }
+        for (var r = 0; r < sheet.maxRows; r++) {
+          final code = _excelCellStr(sheet, r, codeCol).trim();
+          if (code.isNotEmpty) codeToSheet[code] = sheetName;
+        }
+      }
+      if (codeToSheet.isEmpty) return;
+
+      _products = _products.map((p) {
+        final s = p.code != null ? codeToSheet[p.code!.trim()] : null;
+        return s != null ? p.copyWith(sheetName: s) : p;
+      }).toList();
+      debugPrint('IikoProductStore: assigned sheetName in-memory for ${_products.where((p) => p.sheetName != null).length} products');
+    } catch (e) {
+      debugPrint('IikoProductStore._assignSheetNamesInMemory error: $e');
+    }
+  }
+
+  static String _excelCellStr(Sheet sheet, int row, int col) {
+    try {
+      final v = sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row)).value;
+      if (v == null) return '';
+      if (v is TextCellValue) return v.value.toString().trim();
+      if (v is IntCellValue) return v.value.toString();
+      if (v is DoubleCellValue) return v.value.toString();
+      return v.toString().trim();
+    } catch (_) { return ''; }
   }
 
   Future<void> replaceAll(

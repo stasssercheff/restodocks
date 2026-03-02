@@ -227,8 +227,9 @@ class _IikoInventoryInboxDetailScreenState
         ? _selectedSheet!
         : (hasSheets ? sheetNames.first : null);
 
-    // Фильтруем по активному листу
-    final rows = (hasSheets && activeSheet != null)
+    // Если ни у одной строки нет sheetName — показываем все (старый payload)
+    final anyHasSheetName = hasSheets && allRows.any((r) => (r['sheetName'] as String?)?.isNotEmpty == true);
+    final rows = (hasSheets && activeSheet != null && anyHasSheetName)
         ? allRows.where((r) => r['sheetName'] == activeSheet).toList()
         : allRows;
 

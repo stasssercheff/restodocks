@@ -3668,7 +3668,10 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab>
         : (hasSheets ? sheetNames.first : null);
 
     // Фильтрация по листу и запросу
-    var bySheet = (hasSheets && activeSheet != null)
+    // Если ни у одного продукта нет sheetName (старые данные без переразгрузки)
+    // — показываем всех, иначе фильтруем по активному листу
+    final anyHasSheetName = hasSheets && sorted.any((p) => p.sheetName != null);
+    var bySheet = (hasSheets && activeSheet != null && anyHasSheetName)
         ? sorted.where((p) => p.sheetName == activeSheet).toList()
         : sorted;
     final filtered = _query.isEmpty
