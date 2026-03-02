@@ -502,11 +502,13 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         if (v.isEmpty) continue;
         if (v.contains('наименование') || v.contains('товар') || v == 'name') score += 3;
         if ((v.contains('код') && !v.contains('штрих') && !v.contains('баркод')) ||
-            v == 'code' || v == 'артикул') score += 2;
-        if (v.contains('остаток') || v.contains('фактич') ||
-            v.contains('количеств') || v == 'qty' || v == 'fact') score += 2;
+            v == 'code' || v == 'артикул' || v.contains('external id') ||
+            v == 'ext id' || v == 'external_id') score += 2;
+        if (v.contains('остаток') || v.contains('фактич') || v.contains('факт') ||
+            v.contains('количеств') || v.contains('кол-во') || v.contains('кол.') ||
+            v == 'qty' || v == 'fact') score += 2;
         if ((v.contains('ед') && v.length < 12) || v.contains('мера') ||
-            v.contains('unit')) score += 1;
+            v.contains('unit') || v.startsWith('mea')) score += 1;
         if (v.contains('групп') || v == 'group') score += 1;
       }
       if (score > bestScore) {
@@ -525,11 +527,13 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
           if ((v.contains('наименование') || v.contains('товар') || v == 'name') &&
               c != colGroup) colName = c;
           if ((v.contains('код') && !v.contains('штрих') && !v.contains('баркод')) ||
-              v == 'code' || v == 'артикул') colCode = c;
+              v == 'code' || v == 'артикул' || v.contains('external id') ||
+              v == 'ext id' || v == 'external_id') colCode = c;
           if ((v.contains('ед') && v.length < 12) || v.contains('мера') ||
-              v.contains('unit')) colUnit = c;
-          if (v.contains('остаток') || v.contains('фактич') ||
-              v.contains('количеств') || v == 'qty' || v == 'fact') colQty = c;
+              v.contains('unit') || v.startsWith('mea')) colUnit = c;
+          if (v.contains('остаток') || v.contains('фактич') || v.contains('факт') ||
+              v.contains('количеств') || v.contains('кол-во') || v.contains('кол.') ||
+              v == 'qty' || v == 'fact') colQty = c;
           if (v.contains('групп') || v == 'group') colGroup = c;
         }
       }
