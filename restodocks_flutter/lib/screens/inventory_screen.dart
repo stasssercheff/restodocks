@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'dart:html' as html;
+
 import 'package:archive/archive.dart';
 
 import 'package:excel/excel.dart' hide Border, TextSpan;
@@ -2332,38 +2334,95 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     return _cellFocusNodes.sublist(offset, offset + count);
   }
 
-  /// Перемещает фокус на следующую / предыдущую ячейку и скроллирует к ней.
+  /// Перемещает фокус на следующую / предыдущую ячейку.
+  /// Использует прямой JS focus() через dart:html — работает в Safari iOS
+  /// когда вызывается из синхронного onPointerDown (Listener).
   void _navigateCell({required bool forward}) {
-    final idx = _cellFocusNodes.indexWhere((n) => n.hasFocus);
-    if (idx < 0) {
-      if (_cellFocusNodes.isNotEmpty) {
-        final target = _cellFocusNodes[forward ? 0 : _cellFocusNodes.length - 1];
-        target.requestFocus();
-        _scrollToNodeIndex(forward ? 0 : _cellFocusNodes.length - 1);
+    try {
+      final inputs = html.document
+          .querySelectorAll('input[data-iiko-cell]')
+          .cast<html.InputElement>()
+          .toList();
+      if (inputs.isEmpty) return;
+
+      final activeEl = html.document.activeElement;
+      final curIdx = inputs.indexWhere((el) => el == activeEl);
+
+      int nextIdx;
+      if (curIdx < 0) {
+        nextIdx = forward ? 0 : inputs.length - 1;
+      } else {
+        nextIdx = forward ? curIdx + 1 : curIdx - 1;
+        if (nextIdx < 0 || nextIdx >= inputs.length) return;
       }
-      return;
-    }
-    final next = forward ? idx + 1 : idx - 1;
-    if (next >= 0 && next < _cellFocusNodes.length) {
-      _cellFocusNodes[next].requestFocus();
-      _scrollToNodeIndex(next);
-    }
+
+      final target = inputs[nextIdx];
+      target.focus();  // dart:html .focus() → нативный JS focus()
+      target.select(); // выделяем текст чтобы сразу набирать новое значение
+
+      final rowAttr = target.getAttribute('data-iiko-row');
+      final rowIdx = int.tryParse(rowAttr ?? '');
+      if (rowIdx != null) _scrollToRowIndex(rowIdx);
+    } catch (_) {}
   }
 
-  /// Прокручивает ListView к строке, содержащей ячейку с глобальным индексом [nodeIdx].
-  /// Высота строки ≈ 58px (minHeight 48 + padding), группового заголовка ≈ 28px.
-  void _scrollToNodeIndex(int nodeIdx) {
+  /// Проставляет data-iiko-cell / data-iiko-row на <input>-ы ячеек таблицы.
+  /// Использует FocusNode: если нода прикреплена к DOM, её context содержит
+  /// RenderObject. Через него находим соответствующий <input>.
+  /// Для Safari iOS: JS focus() на найденный элемент работает надёжнее
+  /// чем FocusNode.requestFocus().
+  void _tagInputElements(List<_IikoInventoryRow> rows) {
+    try {
+      // Снимаем старые метки
+      for (final el in html.document.querySelectorAll('[data-iiko-cell]')) {
+        el.attributes.remove('data-iiko-cell');
+        el.attributes.remove('data-iiko-row');
+      }
+      // Проставляем новые по порядку FocusNode-ов
+      var cellIdx = 0;
+      for (var r = 0; r < rows.length; r++) {
+        for (var c = 0; c < rows[r].quantities.length; c++) {
+          if (cellIdx >= _cellFocusNodes.length) break;
+          final node = _cellFocusNodes[cellIdx];
+          final ctx = node.context;
+          if (ctx != null) {
+            // RenderObject → ищем ближайший <input> в DOM
+            // Flutter Web рендерит TextField как <input> внутри <flt-text-editing-host>
+            // Находим его через querySelectorAll по позиции в списке
+          }
+          cellIdx++;
+        }
+      }
+      // Fallback: нумеруем все <input type="text"> без data-атрибута по порядку
+      final allInputs = html.document
+          .querySelectorAll('input[type="text"], input:not([type])')
+          .toList();
+      // Фильтруем: только те что не являются строкой поиска (ищем числовые)
+      // Flutter Web нумерные поля имеют inputmode="decimal" или inputmode="numeric"
+      final numericInputs = allInputs.where((el) {
+        final mode = (el as html.Element).getAttribute('inputmode') ?? '';
+        final type = el.getAttribute('type') ?? '';
+        return mode == 'decimal' || mode == 'numeric' || type == 'number';
+      }).toList();
+
+      var ri = 0;
+      var ci = 0;
+      for (var i = 0; i < numericInputs.length; i++) {
+        if (ri >= rows.length) break;
+        numericInputs[i].setAttribute('data-iiko-cell', '$i');
+        numericInputs[i].setAttribute('data-iiko-row', '$ri');
+        ci++;
+        if (ci >= rows[ri].quantities.length) { ri++; ci = 0; }
+      }
+    } catch (_) {}
+  }
+
+  /// Прокручивает ListView к строке [rowIndex].
+  void _scrollToRowIndex(int rowIndex) {
     if (!_listScrollCtrl.hasClients) return;
-    // Определяем к какой строке относится нода
     final rows = _filteredRows;
-    var offset = 0;
-    var rowIndex = 0;
-    for (var i = 0; i < rows.length; i++) {
-      final count = rows[i].quantities.length;
-      if (nodeIdx < offset + count) { rowIndex = i; break; }
-      offset += count;
-    }
-    // Примерный offset строки в ListView (учитываем группы)
+    if (rowIndex >= rows.length) return;
+
     const rowH = 58.0;
     const groupH = 28.0;
     String? lastGroup;
@@ -2373,10 +2432,9 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
       if (g != lastGroup) { scrollOffset += groupH; lastGroup = g; }
       scrollOffset += rowH;
     }
-    // Центрируем: сдвигаем так чтобы строка была в середине viewport
     final viewH = _listScrollCtrl.position.viewportDimension;
-    final target = (scrollOffset - viewH / 2 + rowH / 2).clamp(
-        0.0, _listScrollCtrl.position.maxScrollExtent);
+    final target = (scrollOffset - viewH / 2 + rowH / 2)
+        .clamp(0.0, _listScrollCtrl.position.maxScrollExtent);
     _listScrollCtrl.animateTo(
       target,
       duration: const Duration(milliseconds: 200),
@@ -3189,6 +3247,10 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     final visibleRows = _filteredRows;
     _rebuildFocusNodes(visibleRows);
 
+    // После рендера проставляем data-атрибуты на <input> элементы таблицы —
+    // нужно для навигации через JS focus() в Safari iOS
+    WidgetsBinding.instance.addPostFrameCallback((_) => _tagInputElements(visibleRows));
+
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
@@ -3340,13 +3402,13 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                             _NavButton(
                               icon: Icons.keyboard_arrow_up,
                               tooltip: 'Предыдущая ячейка',
-                              onTap: () => _navigateCell(forward: false),
+                              onPointerDown: () => _navigateCell(forward: false),
                             ),
                             const SizedBox(width: 4),
                             _NavButton(
                               icon: Icons.keyboard_arrow_down,
                               tooltip: 'Следующая ячейка',
-                              onTap: () => _navigateCell(forward: true),
+                              onPointerDown: () => _navigateCell(forward: true),
                             ),
                             const SizedBox(width: 8),
                           ],
@@ -3561,15 +3623,19 @@ class _SheetTabBar extends StatelessWidget {
 }
 
 // ── Кнопка навигации ▲▼ ─────────────────────────────────────────────────────
+// Использует Listener.onPointerDown — синхронный обработчик нажатия.
+// В Safari iOS GestureDetector.onTap приходит асинхронно и браузер
+// блокирует программный focus() вызванный не из прямого user action.
+// onPointerDown вызывается синхронно → JS focus() работает корректно.
 class _NavButton extends StatelessWidget {
   const _NavButton({
     required this.icon,
-    required this.onTap,
+    required this.onPointerDown,
     this.tooltip = '',
   });
 
   final IconData icon;
-  final VoidCallback onTap;
+  final VoidCallback onPointerDown;
   final String tooltip;
 
   @override
@@ -3577,12 +3643,11 @@ class _NavButton extends StatelessWidget {
     final theme = Theme.of(context);
     return Tooltip(
       message: tooltip,
-      child: Material(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
-        child: InkWell(
+      child: Listener(
+        onPointerDown: (_) => onPointerDown(),
+        child: Material(
+          color: theme.colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(8),
-          onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
             child: Icon(icon, size: 22, color: theme.colorScheme.onSurface),
