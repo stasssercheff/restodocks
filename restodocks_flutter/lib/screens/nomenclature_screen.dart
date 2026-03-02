@@ -540,8 +540,17 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       dataStart = bestRow + 1;
     }
 
-    // Защита: colName не должен совпадать с colGroup
-    if (colName == colGroup) colName = colCode + 1 == colGroup ? colCode + 2 : colCode + 1;
+    // Защита от коллизий столбцов
+    // colName не должен совпадать с colGroup
+    if (colName == colGroup) {
+      colName = colCode + 1 == colGroup ? colCode + 2 : colCode + 1;
+    }
+    // colCode не должен совпадать с colName или colGroup
+    if (colCode == colName) colCode = colName > 0 ? colName - 1 : colName + 1;
+    // colUnit не должен совпадать с ключевыми столбцами
+    if (colUnit == colCode || colUnit == colName || colUnit == colGroup) {
+      colUnit = [colCode, colName, colGroup].reduce((a, b) => a > b ? a : b) + 1;
+    }
 
     return (
       colGroup: colGroup,
@@ -595,15 +604,27 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         final sheetProducts = <IikoProduct>[];
         String? currentGroupRaw;
 
+        // Проверяем совпадает ли colGroup с colName (бывает при нестандартных бланках)
+        // В этом случае группу определяем по строкам без кода (iiko-стиль)
+        final groupIsInNameCol = colGroup == colName;
+
         for (var r = dataStart; r < sheet.maxRows; r++) {
           final codeVal  = cellStr(colCode, r);
           final nameVal  = cellStr(colName, r);
           final unitVal  = cellStr(colUnit, r);
-          final groupVal = cellStr(colGroup, r);
+          // Группу читаем из отдельного столбца только если он не совпадает с именем
+          final groupVal = groupIsInNameCol ? '' : cellStr(colGroup, r);
 
+          // Строка является товаром если есть код
           if (codeVal.isNotEmpty) {
-            if (groupVal.isNotEmpty) currentGroupRaw = groupVal;
+            // Иногда группа пишется в том же столбце что код — пропускаем такие строки
+            // (признак: нет имени и нет единицы)
+            if (nameVal.isEmpty && unitVal.isEmpty) {
+              if (groupVal.isNotEmpty) currentGroupRaw = groupVal;
+              continue;
+            }
             if (nameVal.isEmpty) continue;
+            if (groupVal.isNotEmpty) currentGroupRaw = groupVal;
             sheetProducts.add(IikoProduct(
               id: const Uuid().v4(),
               establishmentId: establishmentId,
@@ -616,7 +637,14 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
             ));
             continue;
           }
-          if (groupVal.isNotEmpty) currentGroupRaw = groupVal;
+
+          // Строка без кода — потенциальная строка группы
+          if (nameVal.isNotEmpty && unitVal.isEmpty) {
+            // В iiko-бланках строка группы: есть название, нет кода, нет единицы
+            currentGroupRaw = nameVal;
+          } else if (groupVal.isNotEmpty) {
+            currentGroupRaw = groupVal;
+          }
         }
 
         if (sheetProducts.isNotEmpty) {
@@ -710,9 +738,23 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
   static String _iikoExcelCellToStr(CellValue? v) {
     if (v == null) return '';
     if (v is TextCellValue) return v.value.toString().trim();
-    if (v is IntCellValue) return v.value.toString();
-    if (v is DoubleCellValue) return v.value.toString();
-    return v.toString().trim();
+    if (v is IntCellValue) return v.value.toString().trim();
+    if (v is DoubleCellValue) {
+      // Целые числа (коды товаров) храним без .0
+      final d = v.value;
+      if (d == d.truncateToDouble()) return d.toInt().toString();
+      return d.toString();
+    }
+    if (v is FormulaCellValue) {
+      // Формула — берём вычисленное значение если есть
+      return v.toString().replaceAll(RegExp(r'^Formula:\s*'), '').trim();
+    }
+    // Любой другой тип — в строку, убираем лишнее
+    final s = v.toString().trim();
+    // Убираем префикс типа который добавляет пакет excel ("TextCellValue: X")
+    final colonIdx = s.indexOf(': ');
+    if (colonIdx > 0 && colonIdx < 25) return s.substring(colonIdx + 2).trim();
+    return s;
   }
 
   static bool _isIikoHeaderRow(String name) {
