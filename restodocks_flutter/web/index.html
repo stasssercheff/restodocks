@@ -90,81 +90,148 @@
     setTimeout(hideLoadingScreen, 20000);
   </script>
   <script>
-    // iOS Safari/Chrome: activate ▲▼ keyboard toolbar navigation buttons.
-    // Flutter Web (CanvasKit) puts <input> inside Shadow DOM of <flt-text-editing-host>.
-    // The only reliable fix: move the active <input> out of shadow DOM into a real <form>
-    // in document body when it receives focus, then move it back on blur.
+    // iOS Safari/Chrome: inject ▲▼ navigation buttons above the keyboard.
+    // These buttons appear only when a numeric input is focused and allow
+    // moving to the prev/next input. Uses touchstart (synchronous) so that
+    // iOS WebKit allows the programmatic focus() call.
     (function() {
-      var FORM_ID = 'flt-ios-nav-form';
-      var _placeholder = null; // keeps original position
+      // Only inject on iOS / touch devices
+      var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+                  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      if (!isIOS) return;
 
-      function getForm() {
-        var f = document.getElementById(FORM_ID);
-        if (f) return f;
-        f = document.createElement('form');
-        f.id = FORM_ID;
-        f.setAttribute('onsubmit', 'return false');
-        // Position over the original input so Flutter layout stays correct
-        f.style.cssText = 'position:fixed;z-index:-1;width:0;height:0;overflow:visible;top:0;left:0;';
-        document.body.appendChild(f);
-        return f;
+      var bar = null;
+      var activeInput = null;
+      var allInputs = [];
+      var hideTimer = null;
+
+      function getAllInputs() {
+        // Collect from normal DOM and shadow roots
+        var result = [];
+        function collect(root) {
+          try {
+            root.querySelectorAll('input[type="number"], input[inputmode="numeric"], input[inputmode="decimal"], input[type="text"]')
+              .forEach(function(el) { result.push(el); });
+            root.querySelectorAll('*').forEach(function(el) {
+              if (el.shadowRoot) collect(el.shadowRoot);
+            });
+          } catch(e) {}
+        }
+        collect(document);
+        return result;
       }
 
-      // Recursively search shadow roots for all inputs
-      function findInputsInShadow(root) {
-        var results = [];
-        if (!root) return results;
-        try {
-          root.querySelectorAll('input, textarea').forEach(function(el) {
-            results.push(el);
-          });
-          root.querySelectorAll('*').forEach(function(el) {
-            if (el.shadowRoot) {
-              findInputsInShadow(el.shadowRoot).forEach(function(i) { results.push(i); });
-            }
-          });
-        } catch(e) {}
-        return results;
+      function createBar() {
+        if (bar) return;
+        bar = document.createElement('div');
+        bar.id = 'flt-nav-bar';
+        bar.style.cssText = [
+          'position:fixed',
+          'bottom:0',
+          'left:0',
+          'right:0',
+          'height:44px',
+          'background:#d1d5db',
+          'display:none',
+          'align-items:center',
+          'padding:0 12px',
+          'gap:8px',
+          'z-index:999999',
+          'box-sizing:border-box',
+          '-webkit-user-select:none',
+          'user-select:none',
+        ].join(';');
+
+        var btnStyle = [
+          'width:40px',
+          'height:32px',
+          'border:none',
+          'border-radius:6px',
+          'background:#fff',
+          'font-size:18px',
+          'line-height:1',
+          'cursor:pointer',
+          'display:flex',
+          'align-items:center',
+          'justify-content:center',
+          '-webkit-tap-highlight-color:transparent',
+        ].join(';');
+
+        var btnPrev = document.createElement('button');
+        btnPrev.type = 'button';
+        btnPrev.innerHTML = '&#8679;';
+        btnPrev.style.cssText = btnStyle;
+
+        var btnNext = document.createElement('button');
+        btnNext.type = 'button';
+        btnNext.innerHTML = '&#8681;';
+        btnNext.style.cssText = btnStyle;
+
+        // touchstart is synchronous — iOS allows focus() here
+        btnPrev.addEventListener('touchstart', function(e) {
+          e.preventDefault();
+          navigate(-1);
+        }, {passive: false});
+
+        btnNext.addEventListener('touchstart', function(e) {
+          e.preventDefault();
+          navigate(1);
+        }, {passive: false});
+
+        // mousedown fallback for desktop testing
+        btnPrev.addEventListener('mousedown', function(e) { e.preventDefault(); navigate(-1); });
+        btnNext.addEventListener('mousedown', function(e) { e.preventDefault(); navigate(1); });
+
+        bar.appendChild(btnPrev);
+        bar.appendChild(btnNext);
+        document.body.appendChild(bar);
       }
 
-      function tagAll() {
-        var form = getForm();
-        // Tag inputs visible in normal DOM
-        document.querySelectorAll('input:not([form]), textarea:not([form])').forEach(function(inp) {
-          inp.setAttribute('form', FORM_ID);
-        });
-        // Tag inputs inside shadow roots (CanvasKit)
-        findInputsInShadow(document.body).forEach(function(inp) {
-          if (!inp.getAttribute('form')) {
-            inp.setAttribute('form', FORM_ID);
-          }
-        });
+      function navigate(dir) {
+        allInputs = getAllInputs();
+        var idx = allInputs.indexOf(activeInput);
+        if (idx < 0 && activeInput) {
+          // Try matching by value/position
+          idx = 0;
+        }
+        var next = allInputs[idx + dir];
+        if (next) {
+          next.focus();
+          try { next.select(); } catch(e) {}
+          activeInput = next;
+        }
       }
 
-      var mo = new MutationObserver(function(mutations) {
-        var changed = false;
-        mutations.forEach(function(m) {
-          if (m.addedNodes.length > 0) changed = true;
-        });
-        if (changed) setTimeout(tagAll, 50);
-      });
-
-      function start() {
-        getForm();
-        mo.observe(document.body, { childList: true, subtree: true });
-        tagAll();
+      function showBar() {
+        if (!bar) createBar();
+        clearTimeout(hideTimer);
+        bar.style.display = 'flex';
       }
 
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', start);
-      } else {
-        start();
+      function scheduleHide() {
+        clearTimeout(hideTimer);
+        hideTimer = setTimeout(function() {
+          if (bar) bar.style.display = 'none';
+        }, 300);
       }
-      window.addEventListener('flutter-first-frame', function() {
-        tagAll();
-        setTimeout(tagAll, 300);
-        setTimeout(tagAll, 1000);
-      });
+
+      // Listen for focus on any input (including inside shadow DOM)
+      document.addEventListener('focusin', function(e) {
+        var t = e.target;
+        if (t && t.tagName === 'INPUT') {
+          activeInput = t;
+          allInputs = getAllInputs();
+          showBar();
+        } else {
+          scheduleHide();
+        }
+      }, true);
+
+      document.addEventListener('focusout', function(e) {
+        scheduleHide();
+      }, true);
+
+      window.addEventListener('flutter-first-frame', createBar);
     })();
   </script>
 </body>
