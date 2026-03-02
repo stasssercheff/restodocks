@@ -2359,6 +2359,10 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     setState(() {
       _rows.clear();
       for (final p in iikoStore.products) {
+        // Пропускаем строки-заголовки и строки с пустым именем
+        // (могут попасть в БД из шапки 2-го и последующих листов Excel)
+        if (p.name.trim().isEmpty) continue;
+        if (_isIikoHeaderRow(p.name)) continue;
         _rows.add(_IikoInventoryRow(product: p));
       }
       _isLoading = false;
@@ -2978,6 +2982,16 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
       }
     }
     return crc ^ 0xFFFFFFFF;
+  }
+
+  /// Проверяет, является ли строка заголовком таблицы (шапкой), а не товаром.
+  /// Используется для фильтрации строк-заголовков которые могут попасть
+  /// в БД при парсинге 2-го и последующих листов Excel.
+  static bool _isIikoHeaderRow(String name) {
+    final lower = name.trim().toLowerCase();
+    const headers = ['наименование', 'код', 'ед. изм', 'остаток', 'бланк',
+        'организация', 'на дату', 'склад', 'группа', 'товар'];
+    return headers.any((h) => lower == h || lower.startsWith(h));
   }
 
   String _cellStr(Sheet sheet, int row, int col) {

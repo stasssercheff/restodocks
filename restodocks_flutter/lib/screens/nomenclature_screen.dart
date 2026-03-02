@@ -624,6 +624,9 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
               continue;
             }
             if (nameVal.isEmpty) continue;
+            // Пропускаем строки-заголовки (шапку), которые могут встречаться
+            // на 2-м и последующих листах (напр. «Наименование», «Код» и т.д.)
+            if (_isIikoHeaderRow(nameVal)) continue;
             if (groupVal.isNotEmpty) currentGroupRaw = groupVal;
             sheetProducts.add(IikoProduct(
               id: const Uuid().v4(),
@@ -3779,6 +3782,14 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab>
   String _query = '';
   String? _selectedSheet; // null = первая вкладка / нет разделения
 
+  /// Проверяет, является ли строка заголовком таблицы (шапкой), а не товаром.
+  static bool _isIikoHeaderRow(String name) {
+    final lower = name.trim().toLowerCase();
+    const headers = ['наименование', 'код', 'ед. изм', 'остаток', 'бланк',
+        'организация', 'на дату', 'склад', 'группа', 'товар'];
+    return headers.any((h) => lower == h || lower.startsWith(h));
+  }
+
   @override
   void initState() {
     super.initState();
@@ -3875,7 +3886,10 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab>
     }
 
     // Сортируем по sort_order чтобы порядок совпадал с оригинальным файлом
-    final sorted = [...products]..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    // Исключаем строки-заголовки и пустые имена (могут попасть из шапки Excel)
+    final sorted = [...products]
+      ..removeWhere((p) => p.name.trim().isEmpty || _IikoNomenclatureTabState._isIikoHeaderRow(p.name))
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
 
     // Листы бланка
     final sheetNames = widget.store.sheetNames;
