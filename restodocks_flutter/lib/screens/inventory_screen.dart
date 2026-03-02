@@ -2401,7 +2401,12 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
 
     var rows = _rows;
     if (hasSheets && activeSheet != null) {
-      rows = rows.where((r) => r.product.sheetName == activeSheet).toList();
+      rows = rows.where((r) {
+        final sn = r.product.sheetName;
+        // Продукты без sheetName показываем на первом листе
+        if (sn == null || sn.isEmpty) return activeSheet == sheetNames.first;
+        return sn == activeSheet;
+      }).toList();
     }
     if (_nameFilter.isEmpty) return rows;
     final q = _nameFilter.toLowerCase();

@@ -3797,6 +3797,9 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (widget.establishmentId.isNotEmpty) {
         widget.store.loadProducts(widget.establishmentId);
+        // Восстанавливаем sheetNames из localStorage/сервера чтобы вкладки появились
+        widget.store.restoreBlankFromStorage(
+            establishmentId: widget.establishmentId);
       }
     });
   }
@@ -3901,8 +3904,13 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab>
         : (hasSheets ? sheetNames.first : null);
 
     // Фильтрация по листу и запросу
+    // Продукты без sheetName (старые данные) показываем на первом листе
     var bySheet = (hasSheets && activeSheet != null)
-        ? sorted.where((p) => p.sheetName == activeSheet).toList()
+        ? sorted.where((p) {
+            final sn = p.sheetName;
+            if (sn == null || sn.isEmpty) return activeSheet == sheetNames.first;
+            return sn == activeSheet;
+          }).toList()
         : sorted;
     final filtered = _query.isEmpty
         ? bySheet
