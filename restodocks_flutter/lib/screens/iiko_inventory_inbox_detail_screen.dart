@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../services/inventory_document_service.dart';
 import '../services/inventory_download.dart';
 import '../services/iiko_product_store.dart';
+import '../services/iiko_xlsx_patcher.dart';
 import '../widgets/app_bar_home_button.dart';
 
 /// Просмотр iiko-инвентаризации из входящих.
@@ -53,12 +54,12 @@ class _IikoInventoryInboxDetailScreenState
     final doc = _doc;
     if (doc == null) return;
 
-    final payload   = doc['payload'] as Map<String, dynamic>? ?? {};
-    final header    = payload['header'] as Map<String, dynamic>? ?? {};
-    final rows      = (payload['rows'] as List<dynamic>? ?? [])
+    final payload = doc['payload'] as Map<String, dynamic>? ?? {};
+    final header  = payload['header'] as Map<String, dynamic>? ?? {};
+    final rows    = (payload['rows'] as List<dynamic>? ?? [])
         .cast<Map<String, dynamic>>();
 
-    // Строим карту код → total
+    // Строим карту код → total (все строки с total > 0)
     final qtyByCode = <String, double>{};
     for (final r in rows) {
       final code  = (r['code'] as String?)?.trim() ?? '';
@@ -66,21 +67,27 @@ class _IikoInventoryInboxDetailScreenState
       if (code.isNotEmpty && total > 0) qtyByCode[code] = total;
     }
 
-    // Пробуем восстановить оригинальный бланк из localStorage
     final iikoStore = context.read<IikoProductStore>();
     await iikoStore.restoreBlankFromStorage();
     final origBytes = iikoStore.originalBlankBytes;
     final qtyCol    = iikoStore.originalQuantityColumnIndex ?? 5;
 
-    Uint8List outBytes;
-    String fileName;
     final dateStr = header['date']?.toString() ?? '';
     final dateLabel = dateStr.isNotEmpty
         ? dateStr.replaceAll(RegExp(r'[T:]'), '-').substring(0, 10)
         : DateTime.now().toIso8601String().substring(0, 10);
 
+    Uint8List outBytes;
+    String fileName;
+
     if (origBytes != null) {
-      outBytes = _fillOriginal(origBytes, qtyCol, qtyByCode);
+      // Байтовый патч — сохраняет форматирование всех листов
+      outBytes = IikoXlsxPatcher.patch(
+        origBytes:     origBytes,
+        defaultQtyCol: qtyCol,
+        sheetQtyCols:  iikoStore.sheetQtyColumns,
+        qtyByCode:     qtyByCode,
+      );
       fileName = header['fileName'] as String? ??
           'Инвентаризация_iiko_$dateLabel.xlsx';
     } else {
@@ -101,51 +108,6 @@ class _IikoInventoryInboxDetailScreenState
           SnackBar(content: Text('Ошибка скачивания: $e')),
         );
       }
-    }
-  }
-
-  /// Берёт оригинальный xlsx, заполняет колонку [qtyCol] по коду строки.
-  Uint8List _fillOriginal(
-      Uint8List orig, int qtyCol, Map<String, double> qtyByCode) {
-    final excel     = Excel.decodeBytes(orig.toList());
-    final sheetName = excel.tables.keys.first;
-    final sheet     = excel.tables[sheetName]!;
-
-    int codeCol = 2;
-    for (var r = 0; r < sheet.maxRows && r < 20; r++) {
-      for (var c = 0; c < (sheet.maxColumns > 10 ? 10 : sheet.maxColumns); c++) {
-        final v = _cellStr(sheet, r, c).toLowerCase();
-        if (v == 'код' || v == 'code') { codeCol = c; break; }
-      }
-    }
-
-    for (var r = 0; r < sheet.maxRows; r++) {
-      final code = _cellStr(sheet, r, codeCol).trim();
-      if (code.isEmpty) continue;
-      final qty = qtyByCode[code];
-      if (qty != null) {
-        sheet
-            .cell(CellIndex.indexByColumnRow(
-                columnIndex: qtyCol, rowIndex: r))
-            .value = DoubleCellValue(qty);
-      }
-    }
-
-    return Uint8List.fromList(excel.save()!);
-  }
-
-  String _cellStr(Sheet sheet, int row, int col) {
-    try {
-      final v = sheet
-          .cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row))
-          .value;
-      if (v == null) return '';
-      if (v is TextCellValue) return v.value.text ?? '';
-      if (v is IntCellValue) return v.value.toString();
-      if (v is DoubleCellValue) return v.value.toString();
-      return v.toString();
-    } catch (_) {
-      return '';
     }
   }
 
