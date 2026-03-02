@@ -1335,105 +1335,188 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   }
 
   /// Блок фото: ПФ — сетка до 10, блюдо — 1 фото. Под технологией.
+  /// Ширина как у блока "Технология" (max 1000px).
+  /// На мобиле — 2 фото в ряд, на десктопе — горизонтальный wrap.
+  /// Тап по фото — полноэкранный просмотр.
   Widget _buildPhotoSection(LocalizationService loc, bool effectiveCanEdit) {
     final maxPhotos = _maxPhotos;
     final existing = _photoUrls.length + _pendingPhotoBytes.length;
     if (existing == 0 && !effectiveCanEdit) return const SizedBox.shrink();
 
-    return Container(
-      margin: const EdgeInsets.only(top: 16),
-      decoration: BoxDecoration(
-        border: Border.all(color: Theme.of(context).colorScheme.outline),
-        color: Theme.of(context).colorScheme.surfaceContainerLowest,
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+
+    // Все фото в одном списке для единой нумерации индексов при тапе
+    final allPhotos = <({String? url, Uint8List? bytes, bool isUrl, int index})>[
+      ..._photoUrls.asMap().entries.map((e) => (url: e.value, bytes: null as Uint8List?, isUrl: true,  index: e.key)),
+      ..._pendingPhotoBytes.asMap().entries.map((e) => (url: null as String?,  bytes: e.value,        isUrl: false, index: e.key)),
+    ];
+
+    Widget photoGrid() {
+      if (isMobile) {
+        // 2 фото в ряд, квадратные
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 8,
+            mainAxisSpacing: 8,
+            childAspectRatio: 1,
+          ),
+          itemCount: allPhotos.length,
+          itemBuilder: (_, i) {
+            final p = allPhotos[i];
+            return _photoThumb(
+              url: p.url,
+              bytes: p.bytes,
+              onRemove: effectiveCanEdit
+                  ? () => _removePhotoByIndex(p.index, isUrl: p.isUrl)
+                  : null,
+              onTap: p.url != null || p.bytes != null
+                  ? () => _showPhotoFullscreen(allPhotos.map((x) => (url: x.url, bytes: x.bytes)).toList(), i)
+                  : null,
+            );
+          },
+        );
+      } else {
+        // Десктоп — wrap с фиксированным размером миниатюр
+        return Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: allPhotos.asMap().entries.map((entry) {
+            final i = entry.key;
+            final p = entry.value;
+            return _photoThumb(
+              url: p.url,
+              bytes: p.bytes,
+              onRemove: effectiveCanEdit
+                  ? () => _removePhotoByIndex(p.index, isUrl: p.isUrl)
+                  : null,
+              onTap: p.url != null || p.bytes != null
+                  ? () => _showPhotoFullscreen(allPhotos.map((x) => (url: x.url, bytes: x.bytes)).toList(), i)
+                  : null,
+            );
+          }).toList(),
+        );
+      }
+    }
+
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: SizedBox(
+        width: screenWidth > 1000 ? 1000 : screenWidth,
+        child: Container(
+          margin: const EdgeInsets.only(top: 12),
+          decoration: BoxDecoration(
+            border: Border.all(color: Theme.of(context).colorScheme.outline),
+            color: Theme.of(context).colorScheme.surfaceContainerLowest,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  border: const Border(bottom: BorderSide(color: Colors.grey, width: 1)),
+                ),
+                child: Row(
+                  children: [
+                    Text(loc.t('photo'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    if (effectiveCanEdit) ...[
+                      const Spacer(),
+                      TextButton.icon(
+                        icon: const Icon(Icons.add_photo_alternate, size: 20),
+                        label: Text(loc.t('add')),
+                        onPressed: existing >= maxPhotos ? null : () => _pickPhotoForTechCard(loc),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: photoGrid(),
+              ),
+            ],
+          ),
+        ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    );
+  }
+
+  /// Миниатюра фото — квадратная, с кнопкой удаления и тапом для просмотра.
+  Widget _photoThumb({
+    String? url,
+    Uint8List? bytes,
+    VoidCallback? onRemove,
+    VoidCallback? onTap,
+  }) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    final size = isMobile ? double.infinity : 100.0;
+
+    Widget image() {
+      if (url != null) {
+        return kIsWeb
+            ? Image.network(url, fit: BoxFit.cover, width: double.infinity, height: double.infinity,
+                errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported),
+                loadingBuilder: (_, child, p) => p == null ? child : const Center(child: CircularProgressIndicator(strokeWidth: 2)))
+            : CachedNetworkImage(imageUrl: url, fit: BoxFit.cover,
+                placeholder: (_, __) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                errorWidget: (_, __, ___) => const Icon(Icons.image_not_supported));
+      }
+      if (bytes != null) return Image.memory(bytes, fit: BoxFit.cover, width: double.infinity, height: double.infinity);
+      return const SizedBox.shrink();
+    }
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Stack(
         children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              border: const Border(bottom: BorderSide(color: Colors.grey, width: 1)),
-            ),
-            child: Row(
-              children: [
-                Text(loc.t('photo'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                if (effectiveCanEdit) ...[
-                  const Spacer(),
-                  TextButton.icon(
-                    icon: const Icon(Icons.add_photo_alternate, size: 20),
-                    label: Text(loc.t('add')),
-                    onPressed: existing >= maxPhotos
-                        ? null
-                        : () => _pickPhotoForTechCard(loc),
-                  ),
-                ],
-              ],
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: SizedBox(
+              width: isMobile ? double.infinity : size,
+              height: isMobile ? double.infinity : size,
+              child: image(),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                ..._photoUrls.asMap().entries.map((e) => _photoThumb(url: e.value, onRemove: effectiveCanEdit ? () => _removePhotoByIndex(e.key, isUrl: true) : null)),
-                ..._pendingPhotoBytes.asMap().entries.map((e) => _photoThumb(bytes: e.value, onRemove: effectiveCanEdit ? () => _removePhotoByIndex(e.key, isUrl: false) : null)),
-              ],
+          if (onRemove != null)
+            Positioned(
+              top: 4,
+              right: 4,
+              child: GestureDetector(
+                onTap: onRemove,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                  child: const Icon(Icons.close, color: Colors.white, size: 16),
+                ),
+              ),
             ),
-          ),
+          if (onTap != null)
+            Positioned(
+              bottom: 4,
+              right: onRemove != null ? 32 : 4,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(color: Colors.black38, shape: BoxShape.circle),
+                child: const Icon(Icons.zoom_in, color: Colors.white, size: 16),
+              ),
+            ),
         ],
       ),
     );
   }
 
-  Widget _photoThumb({String? url, Uint8List? bytes, VoidCallback? onRemove}) {
-    return Stack(
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: SizedBox(
-            width: 80,
-            height: 80,
-            child: url != null
-                ? (kIsWeb
-                    ? Image.network(
-                        url,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) =>
-                            const Icon(Icons.image_not_supported),
-                        loadingBuilder: (_, child, progress) => progress == null
-                            ? child
-                            : const Center(child: CircularProgressIndicator()),
-                      )
-                    : CachedNetworkImage(
-                        imageUrl: url,
-                        fit: BoxFit.cover,
-                        placeholder: (_, __) =>
-                            const Center(child: CircularProgressIndicator()),
-                        errorWidget: (_, __, e) =>
-                            const Icon(Icons.image_not_supported),
-                      ))
-                : bytes != null
-                    ? Image.memory(bytes, fit: BoxFit.cover)
-                    : const SizedBox(),
-          ),
-        ),
-        if (onRemove != null)
-          Positioned(
-            top: 0,
-            right: 0,
-            child: GestureDetector(
-              onTap: onRemove,
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-                child: const Icon(Icons.close, color: Colors.white, size: 16),
-              ),
-            ),
-          ),
-      ],
+  /// Полноэкранный просмотр фото с возможностью листать между фото и зумить.
+  void _showPhotoFullscreen(List<({String? url, Uint8List? bytes})> photos, int initialIndex) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (ctx) => _PhotoViewerDialog(photos: photos, initialIndex: initialIndex),
     );
   }
 
@@ -3555,6 +3638,130 @@ class _TechCardPicker extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Полноэкранный просмотр фото с листанием и зумом
+// ══════════════════════════════════════════════════════════════════════════════
+class _PhotoViewerDialog extends StatefulWidget {
+  final List<({String? url, Uint8List? bytes})> photos;
+  final int initialIndex;
+
+  const _PhotoViewerDialog({required this.photos, required this.initialIndex});
+
+  @override
+  State<_PhotoViewerDialog> createState() => _PhotoViewerDialogState();
+}
+
+class _PhotoViewerDialogState extends State<_PhotoViewerDialog> {
+  late final PageController _pageController;
+  late int _current;
+
+  @override
+  void initState() {
+    super.initState();
+    _current = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final total = widget.photos.length;
+
+    return Dialog.fullscreen(
+      backgroundColor: Colors.black87,
+      child: Stack(
+        children: [
+          // Листалка фото
+          PageView.builder(
+            controller: _pageController,
+            itemCount: total,
+            onPageChanged: (i) => setState(() => _current = i),
+            itemBuilder: (_, i) {
+              final p = widget.photos[i];
+              return InteractiveViewer(
+                minScale: 0.5,
+                maxScale: 4.0,
+                child: Center(
+                  child: p.url != null
+                      ? (kIsWeb
+                          ? Image.network(p.url!, fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) =>
+                                  const Icon(Icons.image_not_supported, color: Colors.white, size: 64))
+                          : CachedNetworkImage(imageUrl: p.url!, fit: BoxFit.contain,
+                              errorWidget: (_, __, ___) =>
+                                  const Icon(Icons.image_not_supported, color: Colors.white, size: 64)))
+                      : p.bytes != null
+                          ? Image.memory(p.bytes!, fit: BoxFit.contain)
+                          : const SizedBox.shrink(),
+                ),
+              );
+            },
+          ),
+
+          // Кнопка закрыть
+          Positioned(
+            top: 16,
+            right: 16,
+            child: SafeArea(
+              child: GestureDetector(
+                onTap: () => Navigator.of(context).pop(),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                  child: const Icon(Icons.close, color: Colors.white, size: 24),
+                ),
+              ),
+            ),
+          ),
+
+          // Счётчик фото (если больше 1)
+          if (total > 1)
+            Positioned(
+              bottom: 24,
+              left: 0,
+              right: 0,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Стрелка влево
+                  if (_current > 0)
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left, color: Colors.white, size: 36),
+                      onPressed: () => _pageController.previousPage(
+                          duration: const Duration(milliseconds: 250), curve: Curves.easeInOut),
+                    ),
+                  // Индикаторы
+                  ...List.generate(total, (i) => AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    width: _current == i ? 12 : 8,
+                    height: _current == i ? 12 : 8,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _current == i ? Colors.white : Colors.white38,
+                    ),
+                  )),
+                  // Стрелка вправо
+                  if (_current < total - 1)
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right, color: Colors.white, size: 36),
+                      onPressed: () => _pageController.nextPage(
+                          duration: const Duration(milliseconds: 250), curve: Curves.easeInOut),
+                    ),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }
