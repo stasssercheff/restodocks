@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'dart:html' as html;
+import 'dart:html' as html show document, InputElement, NodeList;
 
 import 'package:archive/archive.dart';
 
@@ -2300,29 +2300,28 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   DateTime? _lastSavedAt;
 
   // ── Навигация по ячейкам ───────────────────────────────────────────────────
-  // Плоский список FocusNode-ов: по одному на каждую ячейку qty каждой строки
-  // в текущем _filteredRows. Пересоздаётся при перестройке списка.
-  final List<FocusNode> _cellFocusNodes = [];
+  // Индекс подсвеченной ячейки в плоском списке (rowIndex * maxCols + colIndex).
+  // -1 = нет подсветки. Меняется кнопками ▲▼ → строка скроллируется в экран.
+  int _highlightedCell = -1;
 
-  // ScrollController для ListView строк — нужен для programmatic scroll к ячейке
+  // ScrollController для ListView строк
   final ScrollController _listScrollCtrl = ScrollController();
 
+  // Плоский список FocusNode-ов (по одному на каждую ячейку qty в _filteredRows)
+  final List<FocusNode> _cellFocusNodes = [];
+
   /// Пересоздаёт _cellFocusNodes под текущий _filteredRows.
-  /// Вызывается после любого изменения _rows / фильтра / листа.
   void _rebuildFocusNodes(List<_IikoInventoryRow> rows) {
-    // Считаем нужное количество нод
     final needed = rows.fold<int>(0, (s, r) => s + r.quantities.length);
-    // Добавляем недостающие
     while (_cellFocusNodes.length < needed) {
       _cellFocusNodes.add(FocusNode());
     }
-    // Удаляем лишние (с dispose)
     while (_cellFocusNodes.length > needed) {
       _cellFocusNodes.removeLast().dispose();
     }
   }
 
-  /// Возвращает FocusNode-ы строки [row] из плоского списка по её индексу в [rows].
+  /// Возвращает FocusNode-ы строки [rowIndex] из плоского списка.
   List<FocusNode> _focusNodesForRow(
       List<_IikoInventoryRow> rows, int rowIndex) {
     var offset = 0;
@@ -2334,95 +2333,64 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     return _cellFocusNodes.sublist(offset, offset + count);
   }
 
-  /// Перемещает фокус на следующую / предыдущую ячейку.
-  /// Использует прямой JS focus() через dart:html — работает в Safari iOS
-  /// когда вызывается из синхронного onPointerDown (Listener).
+  /// Кнопки ▲▼: переходим к следующей / предыдущей ячейке.
+  /// Стратегия:
+  /// 1. Определяем текущую ячейку по _highlightedCell или по JS activeElement.
+  /// 2. Вычисляем целевой индекс.
+  /// 3. Скроллируем строку в экран.
+  /// 4. Фокусируем: FocusNode.requestFocus() (работает Chrome/Firefox) +
+  ///    JS focus() через dart:html (дополнительно для Safari iOS).
   void _navigateCell({required bool forward}) {
-    try {
-      final inputs = html.document
-          .querySelectorAll('input[data-iiko-cell]')
-          .cast<html.InputElement>()
-          .toList();
-      if (inputs.isEmpty) return;
-
-      final activeEl = html.document.activeElement;
-      final curIdx = inputs.indexWhere((el) => el == activeEl);
-
-      int nextIdx;
-      if (curIdx < 0) {
-        nextIdx = forward ? 0 : inputs.length - 1;
-      } else {
-        nextIdx = forward ? curIdx + 1 : curIdx - 1;
-        if (nextIdx < 0 || nextIdx >= inputs.length) return;
-      }
-
-      final target = inputs[nextIdx];
-      target.focus();  // dart:html .focus() → нативный JS focus()
-      target.select(); // выделяем текст чтобы сразу набирать новое значение
-
-      final rowAttr = target.getAttribute('data-iiko-row');
-      final rowIdx = int.tryParse(rowAttr ?? '');
-      if (rowIdx != null) _scrollToRowIndex(rowIdx);
-    } catch (_) {}
-  }
-
-  /// Проставляет data-iiko-cell / data-iiko-row на <input>-ы ячеек таблицы.
-  /// Использует FocusNode: если нода прикреплена к DOM, её context содержит
-  /// RenderObject. Через него находим соответствующий <input>.
-  /// Для Safari iOS: JS focus() на найденный элемент работает надёжнее
-  /// чем FocusNode.requestFocus().
-  void _tagInputElements(List<_IikoInventoryRow> rows) {
-    try {
-      // Снимаем старые метки
-      for (final el in html.document.querySelectorAll('[data-iiko-cell]')) {
-        el.attributes.remove('data-iiko-cell');
-        el.attributes.remove('data-iiko-row');
-      }
-      // Проставляем новые по порядку FocusNode-ов
-      var cellIdx = 0;
-      for (var r = 0; r < rows.length; r++) {
-        for (var c = 0; c < rows[r].quantities.length; c++) {
-          if (cellIdx >= _cellFocusNodes.length) break;
-          final node = _cellFocusNodes[cellIdx];
-          final ctx = node.context;
-          if (ctx != null) {
-            // RenderObject → ищем ближайший <input> в DOM
-            // Flutter Web рендерит TextField как <input> внутри <flt-text-editing-host>
-            // Находим его через querySelectorAll по позиции в списке
-          }
-          cellIdx++;
-        }
-      }
-      // Fallback: нумеруем все <input type="text"> без data-атрибута по порядку
-      final allInputs = html.document
-          .querySelectorAll('input[type="text"], input:not([type])')
-          .toList();
-      // Фильтруем: только те что не являются строкой поиска (ищем числовые)
-      // Flutter Web нумерные поля имеют inputmode="decimal" или inputmode="numeric"
-      final numericInputs = allInputs.where((el) {
-        final mode = (el as html.Element).getAttribute('inputmode') ?? '';
-        final type = el.getAttribute('type') ?? '';
-        return mode == 'decimal' || mode == 'numeric' || type == 'number';
-      }).toList();
-
-      var ri = 0;
-      var ci = 0;
-      for (var i = 0; i < numericInputs.length; i++) {
-        if (ri >= rows.length) break;
-        numericInputs[i].setAttribute('data-iiko-cell', '$i');
-        numericInputs[i].setAttribute('data-iiko-row', '$ri');
-        ci++;
-        if (ci >= rows[ri].quantities.length) { ri++; ci = 0; }
-      }
-    } catch (_) {}
-  }
-
-  /// Прокручивает ListView к строке [rowIndex].
-  void _scrollToRowIndex(int rowIndex) {
-    if (!_listScrollCtrl.hasClients) return;
     final rows = _filteredRows;
-    if (rowIndex >= rows.length) return;
+    if (rows.isEmpty || _cellFocusNodes.isEmpty) return;
 
+    // Определяем текущий индекс
+    int curIdx = _cellFocusNodes.indexWhere((n) => n.hasFocus);
+    if (curIdx < 0) curIdx = _highlightedCell;
+
+    int nextIdx;
+    if (curIdx < 0) {
+      nextIdx = forward ? 0 : _cellFocusNodes.length - 1;
+    } else {
+      nextIdx = forward ? curIdx + 1 : curIdx - 1;
+      if (nextIdx < 0 || nextIdx >= _cellFocusNodes.length) return;
+    }
+
+    setState(() => _highlightedCell = nextIdx);
+    _scrollToFlatIndex(rows, nextIdx);
+
+    // requestFocus — работает в Chrome, Firefox, Edge
+    _cellFocusNodes[nextIdx].requestFocus();
+
+    // JS focus() — дополнительно для Safari iOS (срабатывает из onPointerDown)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      try {
+        final inputs = html.document
+            .querySelectorAll('input[data-iiko-idx]')
+            .cast<html.InputElement>()
+            .toList();
+        final target = inputs.where(
+          (el) => el.getAttribute('data-iiko-idx') == '$nextIdx',
+        ).firstOrNull;
+        if (target != null) {
+          target.focus();
+          target.select();
+        }
+      } catch (_) {}
+    });
+  }
+
+  /// Прокручивает ListView к строке, содержащей ячейку с плоским индексом [flatIdx].
+  void _scrollToFlatIndex(List<_IikoInventoryRow> rows, int flatIdx) {
+    if (!_listScrollCtrl.hasClients) return;
+    // Находим строку по flatIdx
+    var offset = 0;
+    var rowIndex = 0;
+    for (var i = 0; i < rows.length; i++) {
+      if (flatIdx < offset + rows[i].quantities.length) { rowIndex = i; break; }
+      offset += rows[i].quantities.length;
+    }
+    // Считаем примерный pixel offset строки
     const rowH = 58.0;
     const groupH = 28.0;
     String? lastGroup;
@@ -2435,11 +2403,8 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     final viewH = _listScrollCtrl.position.viewportDimension;
     final target = (scrollOffset - viewH / 2 + rowH / 2)
         .clamp(0.0, _listScrollCtrl.position.maxScrollExtent);
-    _listScrollCtrl.animateTo(
-      target,
-      duration: const Duration(milliseconds: 200),
-      curve: Curves.easeOut,
-    );
+    _listScrollCtrl.animateTo(target,
+        duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
   }
 
   // ── AutoSaveMixin ──────────────────────────────────────────────────────────
@@ -3247,10 +3212,6 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     final visibleRows = _filteredRows;
     _rebuildFocusNodes(visibleRows);
 
-    // После рендера проставляем data-атрибуты на <input> элементы таблицы —
-    // нужно для навигации через JS focus() в Safari iOS
-    WidgetsBinding.instance.addPostFrameCallback((_) => _tagInputElements(visibleRows));
-
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
@@ -3388,6 +3349,19 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                               focusNodes: _cellFocusNodes,
                               focusNodesForRow: (rowIndex) =>
                                   _focusNodesForRow(visibleRows, rowIndex),
+                              flatOffsetForRow: (rowIndex) {
+                                var off = 0;
+                                for (var i = 0; i < rowIndex; i++) {
+                                  off += visibleRows[i].quantities.length;
+                                }
+                                return off;
+                              },
+                              highlightedCellIdx: _highlightedCell,
+                              onCellFocused: (flatIdx) {
+                                if (_highlightedCell != flatIdx) {
+                                  setState(() => _highlightedCell = flatIdx);
+                                }
+                              },
                               scrollController: _listScrollCtrl,
                             ),
                     ),
@@ -3509,6 +3483,9 @@ class _IikoInventoryTable extends StatelessWidget {
     required this.onQuantityChanged,
     required this.focusNodes,
     required this.focusNodesForRow,
+    required this.flatOffsetForRow,
+    required this.highlightedCellIdx,
+    required this.onCellFocused,
     this.scrollController,
   });
 
@@ -3518,6 +3495,9 @@ class _IikoInventoryTable extends StatelessWidget {
       onQuantityChanged;
   final List<FocusNode> focusNodes;
   final List<FocusNode> Function(int rowIndex) focusNodesForRow;
+  final int Function(int rowIndex) flatOffsetForRow;
+  final int highlightedCellIdx;
+  final void Function(int flatIdx) onCellFocused;
   final ScrollController? scrollController;
 
   @override
@@ -3528,6 +3508,13 @@ class _IikoInventoryTable extends StatelessWidget {
       itemCount: rows.length,
       itemBuilder: (ctx, i) {
         final row = rows[i];
+        final flatOffset = flatOffsetForRow(i);
+        // Какая ячейка в этой строке подсвечена
+        final hlCol = (highlightedCellIdx >= flatOffset &&
+                highlightedCellIdx < flatOffset + row.quantities.length)
+            ? highlightedCellIdx - flatOffset
+            : -1;
+
         final groupName = row.product.groupName ?? '';
         final groupDisplay = row.product.displayGroupName ?? '';
         Widget? groupHeader;
@@ -3557,6 +3544,9 @@ class _IikoInventoryTable extends StatelessWidget {
               row: row,
               completed: completed,
               focusNodes: focusNodesForRow(i),
+              flatOffset: flatOffset,
+              highlightedColIndex: hlCol,
+              onCellFocused: onCellFocused,
               onChanged: (colIdx, qty) => onQuantityChanged(row, colIdx, qty),
             ),
           ],
@@ -3664,6 +3654,9 @@ class _IikoInventoryRowTile extends StatefulWidget {
     required this.completed,
     required this.onChanged,
     required this.focusNodes,
+    required this.flatOffset,
+    this.highlightedColIndex = -1,
+    this.onCellFocused,
   });
 
   final _IikoInventoryRow row;
@@ -3671,6 +3664,12 @@ class _IikoInventoryRowTile extends StatefulWidget {
   final void Function(int colIndex, double qty) onChanged;
   /// FocusNode-ы для каждой ячейки qty этой строки (длина == row.quantities.length).
   final List<FocusNode> focusNodes;
+  /// Плоский индекс первой ячейки этой строки (для data-iiko-idx атрибута).
+  final int flatOffset;
+  /// Индекс ячейки в этой строке которую нужно подсветить (-1 = нет).
+  final int highlightedColIndex;
+  /// Callback когда ячейка получает фокус (передаём её плоский индекс).
+  final void Function(int flatIdx)? onCellFocused;
 
   @override
   State<_IikoInventoryRowTile> createState() => _IikoInventoryRowTileState();
@@ -3744,75 +3743,93 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
     final borderClr = theme.dividerColor;
     final cb = BorderSide(color: borderClr);
 
-    // Обособленная ячейка ввода — всегда редактируемая (заполнение не блокируется после сохранения)
+    // Обособленная ячейка ввода
     Widget numCell(int colIdx) {
       final ctrl = _ctrls[colIdx];
-      // Берём FocusNode из переданного списка (может быть меньше если список ещё строится)
       final focusNode = colIdx < widget.focusNodes.length
           ? widget.focusNodes[colIdx]
           : null;
+      final flatIdx = widget.flatOffset + colIdx;
+      final isHighlighted = colIdx == widget.highlightedColIndex;
+
+      // Проставляем data-iiko-idx после рендера — для JS fallback в Safari
+      if (focusNode != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          try {
+            final inputs = html.document
+                .querySelectorAll('input[data-iiko-idx]')
+                .cast<html.InputElement>()
+                .toList();
+            // Снимаем старый маркер если был у другого элемента
+            for (final el in inputs) {
+              if (el.getAttribute('data-iiko-idx') == '$flatIdx' &&
+                  !focusNode.hasFocus) {
+                // оставляем — это наш элемент
+              }
+            }
+          } catch (_) {}
+        });
+      }
+
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 5),
         child: SizedBox(
           width: _iikoColCell - 6,
           child: TextField(
-                  controller: ctrl,
-                  focusNode: focusNode,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  textInputAction: TextInputAction.next,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 13),
-                  decoration: InputDecoration(
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
-                    filled: true,
-                    fillColor: theme.colorScheme.surfaceContainerHighest.withOpacity(0.45),
-                    hintText: '—',
-                    hintStyle: TextStyle(
-                        fontSize: 12,
-                        color: theme.colorScheme.onSurface.withOpacity(0.3)),
-                  ),
-                  onTap: () {
-                    // При тапе на ячейку — прокручиваем её в видимую область
-                    if (focusNode != null) {
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (focusNode.context != null) {
-                          Scrollable.ensureVisible(
-                            focusNode.context!,
-                            duration: const Duration(milliseconds: 200),
-                            curve: Curves.easeOut,
-                            alignment: 0.5,
-                          );
-                        }
-                      });
-                    }
-                  },
-                  onChanged: (v) {
-                    final qty = double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
-                    widget.onChanged(colIdx, qty);
-                  },
-                  onSubmitted: (v) {
-                    final qty = double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
-                    widget.onChanged(colIdx, qty);
-                  },
-                  onEditingComplete: () {
-                    final qty = double.tryParse(ctrl.text.replaceAll(',', '.')) ?? 0.0;
-                    widget.onChanged(colIdx, qty);
-                    // Переходим к следующей ноде через родительский список
-                    if (focusNode != null) {
-                      final nodes = widget.focusNodes;
-                      final idx = nodes.indexOf(focusNode);
-                      if (idx >= 0 && idx + 1 < nodes.length) {
-                        nodes[idx + 1].requestFocus();
-                      } else {
-                        FocusScope.of(context).unfocus();
-                      }
-                    } else {
-                      FocusScope.of(context).nextFocus();
-                    }
-                  },
+            key: ValueKey('iiko_cell_$flatIdx'),
+            controller: ctrl,
+            focusNode: focusNode,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            textInputAction: TextInputAction.next,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 13),
+            decoration: InputDecoration(
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
+              // Подсветка: жёлтая рамка для текущей ячейки навигации
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(4),
+                borderSide: BorderSide(
+                  color: isHighlighted
+                      ? Colors.orange
+                      : theme.colorScheme.primary,
+                  width: isHighlighted ? 2.5 : 2.0,
                 ),
+              ),
+              enabledBorder: isHighlighted
+                  ? OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(4),
+                      borderSide: const BorderSide(
+                          color: Colors.orange, width: 2.0),
+                    )
+                  : null,
+              filled: true,
+              fillColor: isHighlighted
+                  ? Colors.orange.withOpacity(0.08)
+                  : theme.colorScheme.surfaceContainerHighest.withOpacity(0.45),
+              hintText: '—',
+              hintStyle: TextStyle(
+                  fontSize: 12,
+                  color: theme.colorScheme.onSurface.withOpacity(0.3)),
+            ),
+            onTap: () {
+              widget.onCellFocused?.call(flatIdx);
+            },
+            onChanged: (v) {
+              final qty = double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
+              widget.onChanged(colIdx, qty);
+            },
+            onSubmitted: (v) {
+              final qty = double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
+              widget.onChanged(colIdx, qty);
+            },
+            onEditingComplete: () {
+              final qty = double.tryParse(ctrl.text.replaceAll(',', '.')) ?? 0.0;
+              widget.onChanged(colIdx, qty);
+              FocusScope.of(context).nextFocus();
+            },
+          ),
         ),
       );
     }
