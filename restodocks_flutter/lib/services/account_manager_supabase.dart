@@ -21,6 +21,7 @@ class AccountManagerSupabase extends ChangeNotifier {
   final SecureStorageService _secureStorage = SecureStorageService();
   Establishment? _establishment;
   Employee? _currentEmployee;
+  bool _initialized = false;
   /// Callback вызывается после загрузки профиля — применяет preferred_language к LocalizationService.
   void Function(String languageCode)? onPreferredLanguageLoaded;
 
@@ -51,15 +52,19 @@ class AccountManagerSupabase extends ChangeNotifier {
   /// Supabase восстанавливает сессию из localStorage при Supabase.initialize() в main().
   /// При F5/hard refresh Auth может восстанавливаться асинхронно — делаем retry.
   Future<void> initialize() async {
+    // Если уже инициализирован и авторизован — не повторяем дорогую инициализацию.
+    // Это предотвращает лишние задержки при повторных вызовах из GoRouter redirect.
+    if (_initialized && isLoggedInSync) return;
     print('🔐 AccountManager: Starting initialization...');
     await _secureStorage.initialize();
 
     await _tryRestoreSession();
-    if (isLoggedInSync) return;
+    if (isLoggedInSync) { _initialized = true; return; }
 
     // Retry: при hard refresh Supabase Auth может ещё не успеть прочитать localStorage.
     await Future.delayed(const Duration(milliseconds: 400));
     await _tryRestoreSession();
+    _initialized = true;
     if (isLoggedInSync) return;
 
     print('🔐 AccountManager: No stored session and not authenticated');

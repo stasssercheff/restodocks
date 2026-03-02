@@ -64,6 +64,7 @@ class IikoProductStore extends ChangeNotifier {
         }
         debugPrint('IikoProductStore: blank restored from localStorage '
             '(${originalBlankBytes!.length} bytes, qtyCol=$originalQuantityColumnIndex, sheets=${sheetNames.length})');
+        notifyListeners(); // обновляем вкладки листов в UI
         return;
       }
     } catch (e) {
@@ -74,6 +75,7 @@ class IikoProductStore extends ChangeNotifier {
     final estId = establishmentId ?? _loadedEstablishmentId;
     if (estId == null) return;
     await _restoreBlankFromServer(estId);
+    notifyListeners(); // обновляем вкладки листов после загрузки с сервера
   }
 
   /// Скачивает бланк с Supabase Storage и сохраняет в память + localStorage.
