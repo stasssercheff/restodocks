@@ -3501,6 +3501,7 @@ class _IikoInventoryRowTile extends StatefulWidget {
 
 class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
   final List<TextEditingController> _ctrls = [];
+  final ScrollController _hScroll = ScrollController();
 
   @override
   void initState() {
@@ -3523,12 +3524,14 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
     super.didUpdateWidget(old);
     final qtys = widget.row.quantities;
 
-    // Если добавилась новая ячейка — создаём контроллер
+    // Если добавилась новая ячейка — создаём контроллер и прокручиваем вправо
+    final hadNewCell = _ctrls.length < qtys.length;
     while (_ctrls.length < qtys.length) {
       final idx = _ctrls.length;
       final val = qtys[idx];
       _ctrls.add(TextEditingController(text: val > 0 ? _fmt(val) : ''));
     }
+    if (hadNewCell) _scrollToEnd();
 
     // Если количества были сброшены (обнуление) — обновляем текст контроллеров.
     // Сравниваем только если число ячеек не изменилось (иначе это добавление новой).
@@ -3548,6 +3551,7 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
     for (final c in _ctrls) {
       c.dispose();
     }
+    _hScroll.dispose();
     super.dispose();
   }
 
@@ -3556,6 +3560,18 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
       : v.toStringAsFixed(3)
           .replaceAll(RegExp(r'0+$'), '')
           .replaceAll(RegExp(r'\.$'), '');
+
+  void _scrollToEnd() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_hScroll.hasClients) {
+        _hScroll.animateTo(
+          _hScroll.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -3664,6 +3680,7 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
             // ── Ячейки ввода — скроллируются вправо ──
             Expanded(
               child: SingleChildScrollView(
+                controller: _hScroll,
                 scrollDirection: Axis.horizontal,
                 physics: const ClampingScrollPhysics(),
                 child: Row(
