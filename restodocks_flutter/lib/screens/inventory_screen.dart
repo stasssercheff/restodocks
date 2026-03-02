@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
 
 
 import 'package:archive/archive.dart';
@@ -2282,6 +2284,11 @@ class InventoryIikoScreen extends StatefulWidget {
   State<InventoryIikoScreen> createState() => _InventoryIikoScreenState();
 }
 
+/// Глобальный реестр FocusNode для iiko-ячеек.
+/// Каждый _IikoInventoryRowTileState регистрирует свои узлы при init и снимает при dispose.
+/// _InventoryIikoScreenState.navigate() использует список для перехода между ячейками.
+final List<FocusNode> _iikoCellFocusNodes = [];
+
 class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     with AutoSaveMixin<InventoryIikoScreen> {
   final List<_IikoInventoryRow> _rows = [];
@@ -2297,9 +2304,6 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
 
   // Метка времени последнего сохранения (для индикатора "Данные защищены")
   DateTime? _lastSavedAt;
-
-  // Нет кастомной навигации — используется родная панель браузера (Safari/Chrome).
-  // textInputAction.next в TextField обеспечивает переход между ячейками.
 
   // ── AutoSaveMixin ──────────────────────────────────────────────────────────
   @override
@@ -2350,6 +2354,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   void initState() {
     super.initState(); // AutoSaveMixin.initState регистрирует lifecycle-хуки
     _filterCtrl.addListener(() => setState(() => _nameFilter = _filterCtrl.text));
+    _registerJsNavChannel();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Подписываемся на store: когда restoreBlankFromStorage завершится и
       // обновит sheetName у продуктов — синхронизируем _rows
@@ -2358,6 +2363,28 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
       _loadProducts();
       _startPeriodicServerSave();
     });
+  }
+
+  /// Регистрирует window._flutterNav(dir) — вызывается JS кнопками ▲▼.
+  /// dir = 1 → следующая ячейка, dir = -1 → предыдущая.
+  void _registerJsNavChannel() {
+    try {
+      html.context['_flutterNav'] = (int dir) {
+        _navigateCell(dir);
+      };
+    } catch (_) {}
+  }
+
+  void _navigateCell(int dir) {
+    if (_iikoCellFocusNodes.isEmpty) return;
+    // Найти текущий сфокусированный узел
+    final currentIdx = _iikoCellFocusNodes.indexWhere((n) => n.hasFocus);
+    final nextIdx = currentIdx < 0
+        ? (dir > 0 ? 0 : _iikoCellFocusNodes.length - 1)
+        : currentIdx + dir;
+    if (nextIdx >= 0 && nextIdx < _iikoCellFocusNodes.length) {
+      _iikoCellFocusNodes[nextIdx].requestFocus();
+    }
   }
 
   /// Вызывается когда IikoProductStore нотифицирует (после restoreBlankFromStorage).
@@ -2381,6 +2408,8 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   void dispose() {
     _filterCtrl.dispose();
     _serverSaveTimer?.cancel();
+    _iikoCellFocusNodes.clear();
+    try { html.context.deleteProperty('_flutterNav'); } catch (_) {}
     // Отписываемся от store чтобы не вызывать setState после unmount
     try {
       context.read<IikoProductStore>().removeListener(_onStoreUpdated);
@@ -3501,12 +3530,14 @@ class _IikoInventoryRowTile extends StatefulWidget {
 
 class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
   final List<TextEditingController> _ctrls = [];
+  final List<FocusNode> _focusNodes = [];
   final ScrollController _hScroll = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _syncControllers();
+    _registerFocusNodes();
   }
 
   void _syncControllers() {
@@ -3514,8 +3545,24 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
     while (_ctrls.length < widget.row.quantities.length) {
       final idx = _ctrls.length;
       final val = widget.row.quantities[idx];
-      _ctrls.add(TextEditingController(
-          text: val > 0 ? _fmt(val) : ''));
+      _ctrls.add(TextEditingController(text: val > 0 ? _fmt(val) : ''));
+    }
+  }
+
+  void _syncFocusNodes() {
+    while (_focusNodes.length < widget.row.quantities.length) {
+      _focusNodes.add(FocusNode());
+    }
+  }
+
+  void _registerFocusNodes() {
+    _syncFocusNodes();
+    _iikoCellFocusNodes.addAll(_focusNodes);
+  }
+
+  void _unregisterFocusNodes() {
+    for (final fn in _focusNodes) {
+      _iikoCellFocusNodes.remove(fn);
     }
   }
 
@@ -3524,12 +3571,17 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
     super.didUpdateWidget(old);
     final qtys = widget.row.quantities;
 
-    // Если добавилась новая ячейка — создаём контроллер и прокручиваем вправо
+    // Если добавилась новая ячейка — создаём контроллер, FocusNode и прокручиваем вправо
     final hadNewCell = _ctrls.length < qtys.length;
     while (_ctrls.length < qtys.length) {
       final idx = _ctrls.length;
       final val = qtys[idx];
       _ctrls.add(TextEditingController(text: val > 0 ? _fmt(val) : ''));
+    }
+    while (_focusNodes.length < qtys.length) {
+      final fn = FocusNode();
+      _focusNodes.add(fn);
+      _iikoCellFocusNodes.add(fn);
     }
     if (hadNewCell) _scrollToEnd();
 
@@ -3548,8 +3600,12 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
 
   @override
   void dispose() {
+    _unregisterFocusNodes();
     for (final c in _ctrls) {
       c.dispose();
+    }
+    for (final fn in _focusNodes) {
+      fn.dispose();
     }
     _hScroll.dispose();
     super.dispose();
@@ -3586,12 +3642,14 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
     // Ячейка ввода количества
     Widget numCell(int colIdx) {
       final ctrl = _ctrls[colIdx];
+      final fn = colIdx < _focusNodes.length ? _focusNodes[colIdx] : null;
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 5),
         child: SizedBox(
           width: _iikoColCell - 6,
           child: TextField(
             controller: ctrl,
+            focusNode: fn,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             textInputAction: TextInputAction.next,
             textAlign: TextAlign.center,
