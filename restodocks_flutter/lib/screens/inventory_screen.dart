@@ -2274,6 +2274,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   bool _completed = false;
   DateTime _date = DateTime.now();
   String _nameFilter = '';
+  String? _selectedSheet; // активный лист (null = первый/все)
   final TextEditingController _filterCtrl = TextEditingController();
 
   // Временное хранилище данных черновика до загрузки продуктов
@@ -2352,6 +2353,8 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     // Восстанавливаем байты бланка: localStorage → Supabase Storage (инкогнито/другое устройство)
     await iikoStore.restoreBlankFromStorage(establishmentId: estId);
     await iikoStore.loadProducts(estId);
+    // Примечание: loadProducts внутри может вызвать _assignSheetNamesInMemory,
+    // который обновит sheetName у продуктов. Берём products ПОСЛЕ завершения.
     if (!mounted) return;
     setState(() {
       _rows.clear();
@@ -2379,9 +2382,20 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   }
 
   List<_IikoInventoryRow> get _filteredRows {
-    if (_nameFilter.isEmpty) return _rows;
+    final iikoStore = context.read<IikoProductStore>();
+    final sheetNames = iikoStore.sheetNames;
+    final hasSheets = sheetNames.length > 1;
+    final activeSheet = (hasSheets && sheetNames.contains(_selectedSheet))
+        ? _selectedSheet
+        : (hasSheets ? sheetNames.first : null);
+
+    var rows = _rows;
+    if (hasSheets && activeSheet != null) {
+      rows = rows.where((r) => r.product.sheetName == activeSheet).toList();
+    }
+    if (_nameFilter.isEmpty) return rows;
     final q = _nameFilter.toLowerCase();
-    return _rows
+    return rows
         .where((r) =>
             r.product.displayName.toLowerCase().contains(q) ||
             r.product.name.toLowerCase().contains(q))
@@ -2503,6 +2517,10 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   }
 
   Future<void> _saveAndExport() async {
+    // Снимаем фокус чтобы зафиксировать последнее значение в активном поле
+    FocusScope.of(context).unfocus();
+    // Даём фреймворку обработать onEditingComplete / onChanged
+    await Future.delayed(const Duration(milliseconds: 50));
     final bytes = await _buildIikoExcel();
 
     final date = _date;
@@ -2561,12 +2579,14 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
           'totalPositions': _rows.length,
           'filledPositions': _rows.where((r) => r.total > 0).length,
         },
+        // Сохраняем ВСЕ строки — чтобы во входящих отображались в т.ч. незаполненные
         'rows': _rows
-            .where((r) => r.total > 0)
             .map((r) => {
                   'code': r.product.code,
                   'name': r.product.name,
                   'unit': r.product.unit,
+                  'groupName': r.product.groupName,
+                  'sheetName': r.product.sheetName,
                   'quantities': r.quantities,
                   'total': r.total,
                 })
@@ -2594,8 +2614,9 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     await iikoStore.restoreBlankFromStorage(establishmentId: estId);
     final origBytes = iikoStore.originalBlankBytes;
     final qtyCol = iikoStore.originalQuantityColumnIndex ?? 5;
+    final sheetQtyCols = iikoStore.sheetQtyColumns;
     return origBytes != null
-        ? _buildFromOriginal(origBytes, qtyCol)
+        ? _buildFromOriginal(origBytes, qtyCol, sheetQtyCols: sheetQtyCols)
         : _buildFallback();
   }
 
@@ -2609,49 +2630,33 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   ///  5. Все остальные файлы остаются **ровно теми же битами** — ни один байт
   ///     не меняется → sheetFormatPr, sheetViews, mergedCells, styles
   ///     сохраняются 100% идентично оригиналу
-  Uint8List _buildFromOriginal(Uint8List origBytes, int qtyCol) {
-    // ── 1. Код → итого ────────────────────────────────────────────────────────
-    final qtyByCode = <String, double>{};
+  Uint8List _buildFromOriginal(
+    Uint8List origBytes,
+    int qtyCol, {
+    Map<String, int> sheetQtyCols = const {},
+  }) {
+    // ── 1. Код → итого (по листам) ────────────────────────────────────────────
+    final qtyBySheetCode = <String?, Map<String, double>>{};
     for (final r in _rows) {
       if (r.total > 0 && r.product.code != null) {
-        qtyByCode[r.product.code!.trim()] = r.total;
+        final sheet = r.product.sheetName;
+        qtyBySheetCode.putIfAbsent(sheet, () => {})[r.product.code!.trim()] = r.total;
       }
     }
-    debugPrint('_buildFromOriginal: rows=${_rows.length}, '
-        'withTotal=${_rows.where((r) => r.total > 0).length}, '
-        'withCode=${_rows.where((r) => r.product.code != null).length}, '
-        'qtyByCode=${qtyByCode.length}, '
-        'qtyCol=$qtyCol, '
-        'sample=${qtyByCode.entries.take(3).map((e) => "${e.key}=${e.value}").join(",")}');
-    if (qtyByCode.isEmpty) {
-      debugPrint('_buildFromOriginal: qtyByCode EMPTY → returning origBytes unchanged');
-      return origBytes;
-    }
+    final qtyByCodeFlat = <String, double>{
+      for (final m in qtyBySheetCode.values)
+        for (final e in m.entries) e.key: e.value,
+    };
+    if (qtyByCodeFlat.isEmpty) return origBytes;
 
-    // ── 2. Читаем ZIP через archive только для получения XML-содержимого ──────
+    // ── 2. Читаем ZIP ─────────────────────────────────────────────────────────
     final arc = ZipDecoder().decodeBytes(origBytes);
 
-    // Имя первого листа книги.
-    // Берём r:id первого <sheet> из workbook.xml (sheetId="1"),
-    // затем резолвим Target по этому Id в workbook.xml.rels.
-    // Нельзя просто брать первый worksheet в rels — порядок там произвольный.
-    String sheetPath = 'xl/worksheets/sheet1.xml';
-    final wbEntry   = arc.findFile('xl/workbook.xml');
-    final relsEntry = arc.findFile('xl/_rels/workbook.xml.rels');
-    if (wbEntry != null && relsEntry != null) {
-      final wb   = utf8.decode(wbEntry.content   as List<int>);
-      final rels = utf8.decode(relsEntry.content as List<int>);
-      // Первый <sheet ...> в workbook.xml → его r:id
-      final sheetM = RegExp(r'<sheet\b[^>]*\br:id="([^"]+)"').firstMatch(wb);
-      if (sheetM != null) {
-        final rId = sheetM.group(1)!;
-        // Ищем Target для этого Id в rels
-        final tM = RegExp('Id="$rId"[^>]*Target="([^"]+)"').firstMatch(rels);
-        if (tM != null) {
-          final t = tM.group(1)!;
-          sheetPath = t.startsWith('/') ? t.substring(1) : 'xl/$t';
-        }
-      }
+    String colLetter(int idx) {
+      var result = '';
+      var n = idx + 1;
+      while (n > 0) { n--; result = String.fromCharCode(65 + n % 26) + result; n ~/= 26; }
+      return result;
     }
 
     // sharedStrings
@@ -2666,134 +2671,124 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
       }
     }
 
-    // ── 3. Буква колонки ──────────────────────────────────────────────────────
-    String colLetter(int idx) {
-      var result = '';
-      var n = idx + 1;
-      while (n > 0) { n--; result = String.fromCharCode(65 + n % 26) + result; n ~/= 26; }
-      return result;
+    // ── 3. Строим карту листов: displayName → { path, col } ───────────────────
+    final wbEntry   = arc.findFile('xl/workbook.xml');
+    final relsEntry = arc.findFile('xl/_rels/workbook.xml.rels');
+    final sheetInfos = <String, ({String path, int col})>{};
+
+    if (wbEntry != null && relsEntry != null) {
+      final wb   = utf8.decode(wbEntry.content   as List<int>);
+      final rels = utf8.decode(relsEntry.content as List<int>);
+      for (final sm in RegExp(r'<sheet\b([^>]*)/>').allMatches(wb)) {
+        final attrs = sm.group(1)!;
+        final nameM = RegExp(r'name="([^"]*)"').firstMatch(attrs);
+        final rIdM  = RegExp(r'r:id="([^"]*)"').firstMatch(attrs);
+        if (nameM == null || rIdM == null) continue;
+        final displayName = nameM.group(1)!;
+        final rId = rIdM.group(1)!;
+        final tM = RegExp('Id="$rId"[^>]*Target="([^"]+)"').firstMatch(rels);
+        if (tM == null) continue;
+        final t = tM.group(1)!;
+        final path = t.startsWith('/') ? t.substring(1) : 'xl/$t';
+        final col = sheetQtyCols[displayName] ?? qtyCol;
+        sheetInfos[displayName] = (path: path, col: col);
+      }
     }
-    final qtyColLetter = colLetter(qtyCol);
+    if (sheetInfos.isEmpty) {
+      sheetInfos[''] = (path: 'xl/worksheets/sheet1.xml', col: qtyCol);
+    }
 
-    // ── 4. Читаем и патчим sheet XML ──────────────────────────────────────────
-    final sheetEntry = arc.findFile(sheetPath);
-    if (sheetEntry == null) return origBytes;
-    var sheetXml = utf8.decode(sheetEntry.content as List<int>);
+    // ── 4. Патчим каждый лист ─────────────────────────────────────────────────
+    String patchSheetXml(String xml, String sheetName, int sheetQtyCol) {
+      final qtyByCode = qtyBySheetCode[sheetName]
+          ?? qtyBySheetCode[null]
+          ?? qtyByCodeFlat;
+      if (qtyByCode.isEmpty) return xml;
 
-    // Определяем колонку кода
-    int codeColIdx = 2;
-    outer:
-    for (final rowM in RegExp(r'<row r="(\d+)"[^>]*>(.*?)</row>', dotAll: true)
-        .allMatches(sheetXml)) {
-      if (int.parse(rowM.group(1)!) > 20) break;
-      for (final cm in RegExp(r'<c r="([A-Z]+)\d+"[^>]*t="s"[^>]*><v>(\d+)</v></c>')
-          .allMatches(rowM.group(2)!)) {
-        final idx = int.tryParse(cm.group(2)!) ?? -1;
-        if (idx >= 0 && idx < sharedStrings.length) {
-          final v = sharedStrings[idx].trim().toLowerCase();
-          if (v == 'код' || v == 'code') {
-            var ci = 0;
-            for (final ch in cm.group(1)!.runes) ci = ci * 26 + (ch - 65 + 1);
-            codeColIdx = ci - 1;
-            break outer;
+      final qtyColLetter = colLetter(sheetQtyCol);
+      int codeColIdx = 2;
+      outer:
+      for (final rowM in RegExp(r'<row r="(\d+)"[^>]*>(.*?)</row>', dotAll: true).allMatches(xml)) {
+        if (int.parse(rowM.group(1)!) > 20) break;
+        for (final cm in RegExp(r'<c r="([A-Z]+)\d+"[^>]*t="s"[^>]*><v>(\d+)</v></c>').allMatches(rowM.group(2)!)) {
+          final idx = int.tryParse(cm.group(2)!) ?? -1;
+          if (idx >= 0 && idx < sharedStrings.length) {
+            final v = sharedStrings[idx].trim().toLowerCase();
+            if (v == 'код' || v == 'code') {
+              var ci = 0;
+              for (final ch in cm.group(1)!.runes) ci = ci * 26 + (ch - 65 + 1);
+              codeColIdx = ci - 1;
+              break outer;
+            }
           }
         }
       }
+      final codeColLetter = colLetter(codeColIdx);
+      debugPrint('_buildFromOriginal[$sheetName]: codeCol=$codeColLetter qtyCol=$qtyColLetter');
+
+      var patchedCount = 0;
+      final result = xml.replaceAllMapped(
+        RegExp(r'(<row r="(\d+)"[^>]*>)(.*?)(</row>)', dotAll: true),
+        (m) {
+          final rowOpen  = m.group(1)!;
+          final rowIdx   = m.group(2)!;
+          var   rowBody  = m.group(3)!;
+          final rowClose = m.group(4)!;
+
+          final codeM = RegExp(
+            '<c r="${RegExp.escape(codeColLetter)}$rowIdx"'
+            r'[^>]*t="s"[^>]*><v>(\d+)</v></c>',
+          ).firstMatch(rowBody);
+          if (codeM == null) return m.group(0)!;
+          final ssIdx = int.tryParse(codeM.group(1)!) ?? -1;
+          if (ssIdx < 0 || ssIdx >= sharedStrings.length) return m.group(0)!;
+          final qty = qtyByCode[sharedStrings[ssIdx].trim()];
+          if (qty == null) return m.group(0)!;
+
+          final qtyStr = qty == qty.roundToDouble()
+              ? qty.toInt().toString()
+              : qty.toStringAsFixed(3)
+                  .replaceAll(RegExp(r'0+$'), '')
+                  .replaceAll(RegExp(r'\.$'), '');
+          final cellRef = '$qtyColLetter$rowIdx';
+
+          final selfM  = RegExp('<c r="${RegExp.escape(cellRef)}"([^>]*)/>').firstMatch(rowBody);
+          final existM = RegExp(
+            '<c r="${RegExp.escape(cellRef)}"([^>]*)>(.*?)</c>', dotAll: true,
+          ).firstMatch(rowBody);
+
+          if (selfM != null) {
+            rowBody = rowBody.replaceFirst(selfM.group(0)!, '<c r="$cellRef"${selfM.group(1)!}><v>$qtyStr</v></c>');
+          } else if (existM != null) {
+            rowBody = rowBody.replaceFirst(existM.group(0)!, '<c r="$cellRef"${existM.group(1)!}><v>$qtyStr</v></c>');
+          } else {
+            final sM = RegExp('<c r="[A-Z]+$rowIdx" s="(\\d+)"').firstMatch(rowBody);
+            final sAttr = sM != null ? ' s="${sM.group(1)}"' : '';
+            rowBody += '<c r="$cellRef"$sAttr><v>$qtyStr</v></c>';
+          }
+          patchedCount++;
+          return '$rowOpen$rowBody$rowClose';
+        },
+      );
+      debugPrint('_buildFromOriginal[$sheetName]: patched $patchedCount rows');
+      return result;
     }
-    final codeColLetter = colLetter(codeColIdx);
-    debugPrint('_buildFromOriginal: sheetPath=$sheetPath, codeCol=$codeColLetter, qtyCol=$qtyColLetter');
 
-    var patchedCount = 0;
-    sheetXml = sheetXml.replaceAllMapped(
-      RegExp(r'(<row r="(\d+)"[^>]*>)(.*?)(</row>)', dotAll: true),
-      (m) {
-        final rowOpen = m.group(1)!;
-        final rowIdx  = m.group(2)!;
-        var rowBody   = m.group(3)!;
-        final rowClose = m.group(4)!;
+    // Собираем патченные XML
+    final patchedXmls = <String, String>{};
+    for (final entry in sheetInfos.entries) {
+      final sheetEntry = arc.findFile(entry.value.path);
+      if (sheetEntry == null) continue;
+      final xml = utf8.decode(sheetEntry.content as List<int>);
+      patchedXmls[entry.value.path] = patchSheetXml(xml, entry.key, entry.value.col);
+    }
 
-        final codeM = RegExp(
-          '<c r="${RegExp.escape(codeColLetter)}$rowIdx"'
-          r'[^>]*t="s"[^>]*><v>(\d+)</v></c>',
-        ).firstMatch(rowBody);
-        if (codeM == null) return m.group(0)!;
-        final ssIdx = int.tryParse(codeM.group(1)!) ?? -1;
-        if (ssIdx < 0 || ssIdx >= sharedStrings.length) return m.group(0)!;
-        final qty = qtyByCode[sharedStrings[ssIdx].trim()];
-        if (qty == null) return m.group(0)!;
-
-        final qtyStr = qty == qty.roundToDouble()
-            ? qty.toInt().toString()
-            : qty.toStringAsFixed(3)
-                .replaceAll(RegExp(r'0+$'), '')
-                .replaceAll(RegExp(r'\.$'), '');
-        final cellRef = '$qtyColLetter$rowIdx';
-
-        // Самозакрывающаяся ячейка: <c r="F9" s="5"/> — пустая, но со стилем
-        final selfM = RegExp(
-          '<c r="${RegExp.escape(cellRef)}"([^>]*)/>', 
-        ).firstMatch(rowBody);
-        // Ячейка с содержимым: <c r="F9" s="5">...</c>
-        final existM = RegExp(
-          '<c r="${RegExp.escape(cellRef)}"([^>]*)>(.*?)</c>', dotAll: true,
-        ).firstMatch(rowBody);
-
-        if (selfM != null) {
-          // Заменяем самозакрывающийся тег — сохраняем атрибуты (стиль)
-          rowBody = rowBody.replaceFirst(
-            selfM.group(0)!,
-            '<c r="$cellRef"${selfM.group(1)!}><v>$qtyStr</v></c>',
-          );
-        } else if (existM != null) {
-          // Заменяем существующее значение — стиль сохраняем
-          rowBody = rowBody.replaceFirst(
-            existM.group(0)!,
-            '<c r="$cellRef"${existM.group(1)!}><v>$qtyStr</v></c>',
-          );
-        } else {
-          // Ячейки нет совсем — берём стиль из соседней ячейки строки
-          final sM = RegExp('<c r="[A-Z]+$rowIdx" s="(\\d+)"').firstMatch(rowBody);
-          final sAttr = sM != null ? ' s="${sM.group(1)}"' : '';
-          rowBody += '<c r="$cellRef"$sAttr><v>$qtyStr</v></c>';
-        }
-        patchedCount++;
-        return '$rowOpen$rowBody$rowClose';
-      },
-    );
-    debugPrint('_buildFromOriginal: patched $patchedCount rows');
-
-    // ── 5. Заменяем sheet в ZIP без перепаковки остальных файлов ─────────────
-    //
-    // Формат ZIP local file header (little-endian):
-    //   4  signature  = 0x04034b50
-    //   2  version needed
-    //   2  flags
-    //   2  compression method
-    //   2  mod time
-    //   2  mod date
-    //   4  crc-32
-    //   4  compressed size
-    //   4  uncompressed size
-    //   2  file name length
-    //   2  extra field length
-    //   n  file name
-    //   m  extra field
-    //   ...compressed data...
-    //
-    // Central directory entry:
-    //   4  signature  = 0x02014b50
-    //   2  version made
-    //   2  version needed
-    //   2  flags
-    //   2  compression method
-    //   ...
-    //   4  local header offset
-    //
-    // Стратегия: находим local header нашего файла, считаем offset данных,
-    // сжимаем новый XML, вставляем вместо старых данных, пересчитываем
-    // crc/sizes в local header и central directory.
-
-    return _zipReplaceFile(origBytes, sheetPath, utf8.encode(sheetXml));
+    // ── 5. Заменяем листы в ZIP без перепаковки остальных файлов ─────────────
+    Uint8List result = origBytes;
+    for (final entry in patchedXmls.entries) {
+      result = _zipReplaceFile(result, entry.key, utf8.encode(entry.value));
+    }
+    return result;
   }
 
   /// Заменяет один файл в ZIP-архиве без изменения остальных entries.
@@ -3092,6 +3087,21 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
               children: [
                 Column(
                   children: [
+                    // Вкладки листов (если > 1 листа в бланке)
+                    Consumer<IikoProductStore>(
+                      builder: (ctx, store, _) {
+                        final sheetNames = store.sheetNames;
+                        if (sheetNames.length <= 1) return const SizedBox.shrink();
+                        final activeSheet = sheetNames.contains(_selectedSheet)
+                            ? _selectedSheet!
+                            : sheetNames.first;
+                        return _SheetTabBar(
+                          sheetNames: sheetNames,
+                          selected: activeSheet,
+                          onSelect: (s) => setState(() => _selectedSheet = s),
+                        );
+                      },
+                    ),
                     // Поиск
                     Padding(
                       padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
@@ -3334,6 +3344,61 @@ class _IikoInventoryTable extends StatelessWidget {
 }
 
 // ── Строка с 2 ячейками и итого ──────────────────────────────────────────────
+// ── Переключатель вкладок листов Excel ────────────────────────────────────────
+class _SheetTabBar extends StatelessWidget {
+  const _SheetTabBar({
+    required this.sheetNames,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  final List<String> sheetNames;
+  final String selected;
+  final ValueChanged<String> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      height: 36,
+      color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Row(
+          children: sheetNames.map((name) {
+            final isActive = name == selected;
+            return Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: GestureDetector(
+                onTap: () => onSelect(name),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isActive ? theme.colorScheme.primary : Colors.transparent,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    name,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                      color: isActive
+                          ? theme.colorScheme.onPrimary
+                          : theme.colorScheme.onSurface.withOpacity(0.7),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+}
+
 class _IikoInventoryRowTile extends StatefulWidget {
   const _IikoInventoryRowTile({
     required this.row,
@@ -3371,9 +3436,25 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
   @override
   void didUpdateWidget(_IikoInventoryRowTile old) {
     super.didUpdateWidget(old);
+    final qtys = widget.row.quantities;
+
     // Если добавилась новая ячейка — создаём контроллер
-    while (_ctrls.length < widget.row.quantities.length) {
-      _ctrls.add(TextEditingController());
+    while (_ctrls.length < qtys.length) {
+      final idx = _ctrls.length;
+      final val = qtys[idx];
+      _ctrls.add(TextEditingController(text: val > 0 ? _fmt(val) : ''));
+    }
+
+    // Если количества были сброшены (обнуление) — обновляем текст контроллеров.
+    // Сравниваем только если число ячеек не изменилось (иначе это добавление новой).
+    if (old.row.quantities.length == qtys.length) {
+      for (var i = 0; i < _ctrls.length && i < qtys.length; i++) {
+        final expected = qtys[i] > 0 ? _fmt(qtys[i]) : '';
+        // Обновляем только если значение реально изменилось и поле не в фокусе
+        if (_ctrls[i].text != expected && !_ctrls[i].selection.isValid) {
+          _ctrls[i].text = expected;
+        }
+      }
     }
   }
 
@@ -3427,6 +3508,15 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
                   onChanged: (v) {
                     final qty = double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
                     widget.onChanged(colIdx, qty);
+                  },
+                  onSubmitted: (v) {
+                    final qty = double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
+                    widget.onChanged(colIdx, qty);
+                  },
+                  onEditingComplete: () {
+                    final qty = double.tryParse(ctrl.text.replaceAll(',', '.')) ?? 0.0;
+                    widget.onChanged(colIdx, qty);
+                    FocusScope.of(context).nextFocus();
                   },
                 ),
         ),

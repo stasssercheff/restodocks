@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:excel/excel.dart' hide Border;
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -16,15 +17,23 @@ class IikoProductStore extends ChangeNotifier {
   String? _loadedEstablishmentId;
   bool _isLoading = false;
 
-  static const _kBlankBytesKey = 'iiko_blank_bytes_b64';
-  static const _kQtyColKey     = 'iiko_blank_qty_col';
-  static const _kStorageBucket = 'iiko-blanks';
+  static const _kBlankBytesKey   = 'iiko_blank_bytes_b64';
+  static const _kQtyColKey       = 'iiko_blank_qty_col';
+  static const _kSheetNamesKey   = 'iiko_blank_sheet_names';
+  static const _kSheetQtyColsKey = 'iiko_blank_sheet_qty_cols';
+  static const _kStorageBucket   = 'iiko-blanks';
 
   /// Байты оригинального xlsx-бланка для экспорта (персистируются в localStorage + Supabase Storage).
   Uint8List? originalBlankBytes;
 
-  /// Индекс колонки «Остаток фактический» в оригинальном бланке (0-based).
+  /// Индекс колонки «Остаток фактический» в оригинальном бланке (0-based) — для первого листа.
   int? originalQuantityColumnIndex;
+
+  /// Упорядоченный список имён листов бланка (пуст если бланк не загружен или лист один).
+  List<String> sheetNames = [];
+
+  /// Индекс колонки qty для каждого листа: { sheetName → colIndex }.
+  Map<String, int> sheetQtyColumns = {};
 
   List<IikoProduct> get products => List.unmodifiable(_products);
   bool get isLoading => _isLoading;
@@ -43,8 +52,18 @@ class IikoProductStore extends ChangeNotifier {
       if (b64 != null) {
         originalBlankBytes = base64Decode(b64);
         originalQuantityColumnIndex = prefs.getInt(_kQtyColKey);
+        // Восстанавливаем имена листов и колонки
+        final sheetNamesJson = prefs.getString(_kSheetNamesKey);
+        if (sheetNamesJson != null) {
+          sheetNames = (jsonDecode(sheetNamesJson) as List).cast<String>();
+        }
+        final sheetQtyColsJson = prefs.getString(_kSheetQtyColsKey);
+        if (sheetQtyColsJson != null) {
+          sheetQtyColumns = (jsonDecode(sheetQtyColsJson) as Map)
+              .map((k, v) => MapEntry(k as String, v as int));
+        }
         debugPrint('IikoProductStore: blank restored from localStorage '
-            '(${originalBlankBytes!.length} bytes, qtyCol=$originalQuantityColumnIndex)');
+            '(${originalBlankBytes!.length} bytes, qtyCol=$originalQuantityColumnIndex, sheets=${sheetNames.length})');
         return;
       }
     } catch (e) {
@@ -76,10 +95,20 @@ class IikoProductStore extends ChangeNotifier {
       originalBlankBytes = Uint8List.fromList(bytes);
       originalQuantityColumnIndex = meta['qty_col_index'] as int?;
 
+      // Восстанавливаем имена листов из метаданных
+      final sheetNamesRaw = meta['sheet_names'];
+      if (sheetNamesRaw is List) {
+        sheetNames = sheetNamesRaw.cast<String>();
+      }
+      final sheetQtyColsRaw = meta['sheet_qty_cols'];
+      if (sheetQtyColsRaw is Map) {
+        sheetQtyColumns = sheetQtyColsRaw.map((k, v) => MapEntry(k as String, v as int));
+      }
+
       // Кэшируем в localStorage
       await _persistBlank(originalBlankBytes!, originalQuantityColumnIndex);
       debugPrint('IikoProductStore: blank restored from Supabase Storage '
-          '(${originalBlankBytes!.length} bytes, qtyCol=$originalQuantityColumnIndex)');
+          '(${originalBlankBytes!.length} bytes, qtyCol=$originalQuantityColumnIndex, sheets=${sheetNames.length})');
     } catch (e) {
       debugPrint('IikoProductStore._restoreBlankFromServer error: $e');
     }
@@ -94,8 +123,16 @@ class IikoProductStore extends ChangeNotifier {
       } else {
         await prefs.remove(_kQtyColKey);
       }
+      // Сохраняем имена листов и колонки
+      if (sheetNames.isNotEmpty) {
+        await prefs.setString(_kSheetNamesKey, jsonEncode(sheetNames));
+        await prefs.setString(_kSheetQtyColsKey, jsonEncode(sheetQtyColumns));
+      } else {
+        await prefs.remove(_kSheetNamesKey);
+        await prefs.remove(_kSheetQtyColsKey);
+      }
       debugPrint('IikoProductStore: blank saved to localStorage '
-          '(${bytes.length} bytes, qtyCol=$qtyCol)');
+          '(${bytes.length} bytes, qtyCol=$qtyCol, sheets=${sheetNames.length})');
     } catch (e) {
       debugPrint('IikoProductStore._persistBlank error: $e');
     }
@@ -122,6 +159,8 @@ class IikoProductStore extends ChangeNotifier {
           'establishment_id': establishmentId,
           'storage_path': storagePath,
           'qty_col_index': qtyCol ?? 5,
+          'sheet_names': sheetNames.isEmpty ? null : sheetNames,
+          'sheet_qty_cols': sheetQtyColumns.isEmpty ? null : sheetQtyColumns,
           'uploaded_at': DateTime.now().toIso8601String(),
         },
         onConflict: 'establishment_id',
@@ -137,6 +176,8 @@ class IikoProductStore extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_kBlankBytesKey);
       await prefs.remove(_kQtyColKey);
+      await prefs.remove(_kSheetNamesKey);
+      await prefs.remove(_kSheetQtyColsKey);
     } catch (_) {}
   }
 
@@ -153,6 +194,13 @@ class IikoProductStore extends ChangeNotifier {
           .map((e) => IikoProduct.fromJson(e as Map<String, dynamic>))
           .toList();
       _loadedEstablishmentId = establishmentId;
+
+      // Если у продуктов нет sheetName — восстанавливаем из бланка in-memory.
+      // Это нужно как для старых данных (sheetName=NULL в БД), так и для случая
+      // когда sheetNames ещё не были сохранены в localStorage.
+      if (_products.isNotEmpty && _products.every((p) => p.sheetName == null)) {
+        await _assignSheetNamesInMemory();
+      }
     } catch (e) {
       debugPrint('IikoProductStore.loadProducts error: $e');
     } finally {
@@ -161,11 +209,83 @@ class IikoProductStore extends ChangeNotifier {
     }
   }
 
+  /// Читает бланк и проставляет sheetName для каждого продукта in-memory.
+  /// Также заполняет sheetNames если они ещё не были восстановлены.
+  Future<void> _assignSheetNamesInMemory() async {
+    if (originalBlankBytes == null) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final b64 = prefs.getString(_kBlankBytesKey);
+        if (b64 != null) originalBlankBytes = base64Decode(b64);
+      } catch (_) {}
+    }
+    if (originalBlankBytes == null) return;
+
+    try {
+      final excel = Excel.decodeBytes(originalBlankBytes!.toList());
+      // Строим карту: код → sheetName
+      final codeToSheet = <String, String>{};
+      final foundSheets = <String>[];
+
+      for (final sName in excel.tables.keys) {
+        final sheet = excel.tables[sName];
+        if (sheet == null) continue;
+        // Ищем колонку кода (первые 20 строк)
+        int codeCol = 2;
+        for (var r = 0; r < sheet.maxRows && r < 20; r++) {
+          for (var c = 0; c < (sheet.maxColumns > 15 ? 15 : sheet.maxColumns); c++) {
+            final v = _excelCellStr(sheet, r, c).toLowerCase();
+            if (v == 'код' || v == 'code') { codeCol = c; break; }
+          }
+        }
+        var hasProducts = false;
+        for (var r = 0; r < sheet.maxRows; r++) {
+          final code = _excelCellStr(sheet, r, codeCol).trim();
+          if (code.isNotEmpty) {
+            codeToSheet[code] = sName;
+            hasProducts = true;
+          }
+        }
+        if (hasProducts) foundSheets.add(sName);
+      }
+
+      if (codeToSheet.isEmpty) return;
+
+      // Заполняем sheetNames если пусты
+      if (sheetNames.length <= 1 && foundSheets.length > 1) {
+        sheetNames = foundSheets;
+        debugPrint('IikoProductStore: restored sheetNames from blank: $sheetNames');
+      }
+
+      _products = _products.map((p) {
+        final s = p.code != null ? codeToSheet[p.code!.trim()] : null;
+        return s != null ? p.copyWith(sheetName: s) : p;
+      }).toList();
+      debugPrint('IikoProductStore: assigned sheetName in-memory for '
+          '${_products.where((p) => p.sheetName != null).length}/${_products.length} products');
+    } catch (e) {
+      debugPrint('IikoProductStore._assignSheetNamesInMemory error: $e');
+    }
+  }
+
+  static String _excelCellStr(Sheet sheet, int row, int col) {
+    try {
+      final v = sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row)).value;
+      if (v == null) return '';
+      if (v is TextCellValue) return v.value.toString().trim();
+      if (v is IntCellValue) return v.value.toString();
+      if (v is DoubleCellValue) return v.value.toString();
+      return v.toString().trim();
+    } catch (_) { return ''; }
+  }
+
   Future<void> replaceAll(
     String establishmentId,
     List<IikoProduct> items, {
     Uint8List? blankBytes,
     int? quantityColumnIndex,
+    List<String>? newSheetNames,
+    Map<String, int>? newSheetQtyColumns,
   }) async {
     _isLoading = true;
     notifyListeners();
@@ -173,6 +293,8 @@ class IikoProductStore extends ChangeNotifier {
       if (blankBytes != null) {
         originalBlankBytes = blankBytes;
         originalQuantityColumnIndex = quantityColumnIndex;
+        if (newSheetNames != null) sheetNames = newSheetNames;
+        if (newSheetQtyColumns != null) sheetQtyColumns = newSheetQtyColumns;
         // Сохраняем в localStorage (быстро)
         await _persistBlank(blankBytes, quantityColumnIndex);
         // Сохраняем в Supabase Storage (работает в инкогнито и на других устройствах)
@@ -236,6 +358,8 @@ class IikoProductStore extends ChangeNotifier {
       _loadedEstablishmentId = null;
       originalBlankBytes = null;
       originalQuantityColumnIndex = null;
+      sheetNames = [];
+      sheetQtyColumns = {};
       await _clearPersistedBlank();
     } catch (e) {
       debugPrint('IikoProductStore.deleteAll error: $e');
@@ -251,6 +375,8 @@ class IikoProductStore extends ChangeNotifier {
     _loadedEstablishmentId = null;
     originalBlankBytes = null;
     originalQuantityColumnIndex = null;
+    sheetNames = [];
+    sheetQtyColumns = {};
     _clearPersistedBlank();
     notifyListeners();
   }
