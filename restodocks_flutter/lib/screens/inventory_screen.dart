@@ -2297,6 +2297,72 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   // Метка времени последнего сохранения (для индикатора "Данные защищены")
   DateTime? _lastSavedAt;
 
+  // ── Навигация по ячейкам ───────────────────────────────────────────────────
+  // Плоский список FocusNode-ов: по одному на каждую ячейку qty каждой строки
+  // в текущем _filteredRows. Пересоздаётся при перестройке списка.
+  final List<FocusNode> _cellFocusNodes = [];
+
+  /// Пересоздаёт _cellFocusNodes под текущий _filteredRows.
+  /// Вызывается после любого изменения _rows / фильтра / листа.
+  void _rebuildFocusNodes(List<_IikoInventoryRow> rows) {
+    // Считаем нужное количество нод
+    final needed = rows.fold<int>(0, (s, r) => s + r.quantities.length);
+    // Добавляем недостающие
+    while (_cellFocusNodes.length < needed) {
+      _cellFocusNodes.add(FocusNode());
+    }
+    // Удаляем лишние (с dispose)
+    while (_cellFocusNodes.length > needed) {
+      _cellFocusNodes.removeLast().dispose();
+    }
+  }
+
+  /// Возвращает FocusNode-ы строки [row] из плоского списка по её индексу в [rows].
+  List<FocusNode> _focusNodesForRow(
+      List<_IikoInventoryRow> rows, int rowIndex) {
+    var offset = 0;
+    for (var i = 0; i < rowIndex; i++) {
+      offset += rows[i].quantities.length;
+    }
+    final count = rows[rowIndex].quantities.length;
+    if (offset + count > _cellFocusNodes.length) return [];
+    return _cellFocusNodes.sublist(offset, offset + count);
+  }
+
+  /// Перемещает фокус на следующую / предыдущую ячейку и скроллирует к ней.
+  void _navigateCell({required bool forward}) {
+    final idx = _cellFocusNodes.indexWhere((n) => n.hasFocus);
+    if (idx < 0) {
+      // Нет активной ячейки — фокусируем первую/последнюю
+      if (_cellFocusNodes.isNotEmpty) {
+        final target = _cellFocusNodes[forward ? 0 : _cellFocusNodes.length - 1];
+        target.requestFocus();
+        _ensureNodeVisible(target);
+      }
+      return;
+    }
+    final next = forward ? idx + 1 : idx - 1;
+    if (next >= 0 && next < _cellFocusNodes.length) {
+      final target = _cellFocusNodes[next];
+      target.requestFocus();
+      _ensureNodeVisible(target);
+    }
+  }
+
+  /// Прокручивает виджет, связанный с [node], в видимую область.
+  void _ensureNodeVisible(FocusNode node) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (node.context != null) {
+        Scrollable.ensureVisible(
+          node.context!,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+          alignment: 0.5,
+        );
+      }
+    });
+  }
+
   // ── AutoSaveMixin ──────────────────────────────────────────────────────────
   @override
   String get draftKey => 'iiko_inventory';
@@ -2356,6 +2422,10 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   void dispose() {
     _filterCtrl.dispose();
     _serverSaveTimer?.cancel();
+    for (final n in _cellFocusNodes) {
+      n.dispose();
+    }
+    _cellFocusNodes.clear();
     super.dispose();
   }
 
@@ -3096,6 +3166,10 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     // На мобильном при открытой клавиатуре скрываем статус-строку — экономим место
     final hideStatusRow = isNarrow && isKeyboardOpen;
 
+    // Пересоздаём фокус-ноды под текущий набор строк
+    final visibleRows = _filteredRows;
+    _rebuildFocusNodes(visibleRows);
+
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
@@ -3225,12 +3299,15 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                     ),
                     // Список строк
                     Expanded(
-                      child: _filteredRows.isEmpty
+                      child: visibleRows.isEmpty
                           ? const Center(child: Text('Нет позиций'))
                           : _IikoInventoryTable(
-                              rows: _filteredRows,
+                              rows: visibleRows,
                               completed: _completed,
                               onQuantityChanged: _setQuantity,
+                              focusNodes: _cellFocusNodes,
+                              focusNodesForRow: (rowIndex) =>
+                                  _focusNodesForRow(visibleRows, rowIndex),
                             ),
                     ),
                     // Кнопки внизу — всегда видны
@@ -3238,6 +3315,21 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                       padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
                       child: Row(
                         children: [
+                          // Кнопки ▲▼ — видны только на мобильном при открытой клавиатуре
+                          if (isNarrow && isKeyboardOpen) ...[
+                            _NavButton(
+                              icon: Icons.keyboard_arrow_up,
+                              tooltip: 'Предыдущая ячейка',
+                              onTap: () => _navigateCell(forward: false),
+                            ),
+                            const SizedBox(width: 4),
+                            _NavButton(
+                              icon: Icons.keyboard_arrow_down,
+                              tooltip: 'Следующая ячейка',
+                              onTap: () => _navigateCell(forward: true),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
                           Expanded(
                             child: FilledButton.icon(
                               icon: const Icon(Icons.save_alt),
@@ -3333,12 +3425,16 @@ class _IikoInventoryTable extends StatelessWidget {
     required this.rows,
     required this.completed,
     required this.onQuantityChanged,
+    required this.focusNodes,
+    required this.focusNodesForRow,
   });
 
   final List<_IikoInventoryRow> rows;
   final bool completed;
   final void Function(_IikoInventoryRow row, int colIndex, double qty)
       onQuantityChanged;
+  final List<FocusNode> focusNodes;
+  final List<FocusNode> Function(int rowIndex) focusNodesForRow;
 
   @override
   Widget build(BuildContext context) {
@@ -3375,6 +3471,7 @@ class _IikoInventoryTable extends StatelessWidget {
             _IikoInventoryRowTile(
               row: row,
               completed: completed,
+              focusNodes: focusNodesForRow(i),
               onChanged: (colIdx, qty) => onQuantityChanged(row, colIdx, qty),
             ),
           ],
@@ -3440,16 +3537,52 @@ class _SheetTabBar extends StatelessWidget {
   }
 }
 
+// ── Кнопка навигации ▲▼ ─────────────────────────────────────────────────────
+class _NavButton extends StatelessWidget {
+  const _NavButton({
+    required this.icon,
+    required this.onTap,
+    this.tooltip = '',
+  });
+
+  final IconData icon;
+  final VoidCallback onTap;
+  final String tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(8),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            child: Icon(icon, size: 22, color: theme.colorScheme.onSurface),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _IikoInventoryRowTile extends StatefulWidget {
   const _IikoInventoryRowTile({
     required this.row,
     required this.completed,
     required this.onChanged,
+    required this.focusNodes,
   });
 
   final _IikoInventoryRow row;
   final bool completed;
   final void Function(int colIndex, double qty) onChanged;
+  /// FocusNode-ы для каждой ячейки qty этой строки (длина == row.quantities.length).
+  final List<FocusNode> focusNodes;
 
   @override
   State<_IikoInventoryRowTile> createState() => _IikoInventoryRowTileState();
@@ -3526,13 +3659,19 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
     // Обособленная ячейка ввода — всегда редактируемая (заполнение не блокируется после сохранения)
     Widget numCell(int colIdx) {
       final ctrl = _ctrls[colIdx];
+      // Берём FocusNode из переданного списка (может быть меньше если список ещё строится)
+      final focusNode = colIdx < widget.focusNodes.length
+          ? widget.focusNodes[colIdx]
+          : null;
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 5),
         child: SizedBox(
           width: _iikoColCell - 6,
           child: TextField(
                   controller: ctrl,
+                  focusNode: focusNode,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  textInputAction: TextInputAction.next,
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontSize: 13),
                   decoration: InputDecoration(
@@ -3546,6 +3685,21 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
                         fontSize: 12,
                         color: theme.colorScheme.onSurface.withOpacity(0.3)),
                   ),
+                  onTap: () {
+                    // При тапе на ячейку — прокручиваем её в видимую область
+                    if (focusNode != null) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (focusNode.context != null) {
+                          Scrollable.ensureVisible(
+                            focusNode.context!,
+                            duration: const Duration(milliseconds: 200),
+                            curve: Curves.easeOut,
+                            alignment: 0.5,
+                          );
+                        }
+                      });
+                    }
+                  },
                   onChanged: (v) {
                     final qty = double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
                     widget.onChanged(colIdx, qty);
@@ -3557,7 +3711,18 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
                   onEditingComplete: () {
                     final qty = double.tryParse(ctrl.text.replaceAll(',', '.')) ?? 0.0;
                     widget.onChanged(colIdx, qty);
-                    FocusScope.of(context).nextFocus();
+                    // Переходим к следующей ноде через родительский список
+                    if (focusNode != null) {
+                      final nodes = widget.focusNodes;
+                      final idx = nodes.indexOf(focusNode);
+                      if (idx >= 0 && idx + 1 < nodes.length) {
+                        nodes[idx + 1].requestFocus();
+                      } else {
+                        FocusScope.of(context).unfocus();
+                      }
+                    } else {
+                      FocusScope.of(context).nextFocus();
+                    }
                   },
                 ),
         ),
