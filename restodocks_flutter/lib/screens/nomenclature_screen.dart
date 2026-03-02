@@ -384,23 +384,51 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
 
     try {
       final bytes = result.files.single.bytes!;
-      final parsed = _parseIikoBlank(bytes, estId);
-      final products = parsed.products;
 
-      if (products.isEmpty) {
+      // Первичный парсинг — проверяем нашёл ли авто все столбцы остатка
+      final firstPass = _parseIikoBlank(bytes, estId);
+      if (firstPass.products.isEmpty) {
         if (mounted) {
           setState(() => _iikoUploading = false);
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Не удалось распознать структуру бланка iiko')),
+            const SnackBar(
+              content: Text('Не удалось распознать структуру бланка iiko. '
+                  'Убедитесь что файл содержит столбцы: код, наименование, остаток.'),
+              duration: Duration(seconds: 6),
+            ),
           );
         }
         return;
       }
 
+      // Проверяем: для каких листов столбец остатка не был найден автоматически
+      final excel = Excel.decodeBytes(bytes.toList());
+      final sheetsNeedingManual = <String>[];
+      for (final sheetName in firstPass.sheetNames) {
+        final sheet = excel.tables[sheetName];
+        if (sheet == null) continue;
+        final detected = _detectColumns(sheet);
+        if (detected.colQty == null) sheetsNeedingManual.add(sheetName);
+      }
+
+      // Если есть листы без авто-определения столбца — показываем диалог
+      Map<String, int>? manualCols;
+      if (sheetsNeedingManual.isNotEmpty) {
+        if (mounted) setState(() => _iikoUploading = false);
+        manualCols = await _showQtyColumnDialog(bytes, sheetsNeedingManual);
+        if (manualCols == null) return; // пользователь отменил
+        if (mounted) setState(() => _iikoUploading = true);
+      }
+
+      // Финальный парсинг с ручными столбцами (если были)
+      final parsed = manualCols != null
+          ? _parseIikoBlank(bytes, estId, manualQtyCols: manualCols)
+          : firstPass;
+
       final iikoStore = context.read<IikoProductStore>();
       await iikoStore.replaceAll(
         estId,
-        products,
+        parsed.products,
         blankBytes: bytes,
         quantityColumnIndex: parsed.quantityCol,
         newSheetNames: parsed.sheetNames,
@@ -411,7 +439,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         setState(() => _iikoUploading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Загружено ${products.length} позиций iiko'),
+            content: Text('Загружено ${parsed.products.length} позиций iiko'),
             duration: const Duration(seconds: 5),
           ),
         );
@@ -432,18 +460,108 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     sheetQtyColumns: <String, int>{},
   );
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // Автоопределение столбцов: возвращает индекс по ключевым словам в строках
+  // заголовка. Просматриваем первые [scanRows] строк листа.
+  // ──────────────────────────────────────────────────────────────────────────
+  static ({
+    int colGroup,
+    int colCode,
+    int colName,
+    int colUnit,
+    int? colQty,    // null = не найдено, нужен диалог
+    int dataStart,
+  }) _detectColumns(Sheet sheet, {int scanRows = 25}) {
+    String cellStr(int col, int row) {
+      final v = sheet.cell(CellIndex.indexByColumnRow(
+              columnIndex: col, rowIndex: row))
+          .value;
+      return _iikoExcelCellToStr(v).trim();
+    }
+
+    // Defaults (формат стандартного бланка iiko):
+    // A=группа, C=код, D=наименование, E=ед.изм., F=остаток
+    int colGroup = 0;
+    int colCode  = 2;
+    int colName  = 3;
+    int colUnit  = 4;
+    int? colQty;        // будет null если не найдено по заголовкам
+    int dataStart = 8;
+
+    final maxCols = sheet.maxColumns.clamp(0, 20);
+
+    // Сканируем все строки заголовка — ищем строку с максимальным числом
+    // совпадений ключевых слов (это надёжнее чем искать только "наименование")
+    int bestScore = 0;
+    int bestRow   = -1;
+
+    for (var r = 0; r < sheet.maxRows && r < scanRows; r++) {
+      int score = 0;
+      for (var c = 0; c < maxCols; c++) {
+        final v = cellStr(c, r).toLowerCase();
+        if (v.isEmpty) continue;
+        if (v.contains('наименование') || v.contains('товар') || v == 'name') score += 3;
+        if ((v.contains('код') && !v.contains('штрих') && !v.contains('баркод')) ||
+            v == 'code' || v == 'артикул') score += 2;
+        if (v.contains('остаток') || v.contains('фактич') ||
+            v.contains('количеств') || v == 'qty' || v == 'fact') score += 2;
+        if ((v.contains('ед') && v.length < 12) || v.contains('мера') ||
+            v.contains('unit')) score += 1;
+        if (v.contains('групп') || v == 'group') score += 1;
+      }
+      if (score > bestScore) {
+        bestScore = score;
+        bestRow = r;
+      }
+    }
+
+    if (bestRow >= 0 && bestScore >= 3) {
+      // Нашли строку заголовков — парсим конкретные столбцы
+      // Сканируем bestRow и bestRow-1 (заголовки бывают в 2 строки)
+      for (final scanRow in {bestRow, if (bestRow > 0) bestRow - 1}) {
+        for (var c = 0; c < maxCols; c++) {
+          final v = cellStr(c, scanRow).toLowerCase();
+          if (v.isEmpty) continue;
+          if ((v.contains('наименование') || v.contains('товар') || v == 'name') &&
+              c != colGroup) colName = c;
+          if ((v.contains('код') && !v.contains('штрих') && !v.contains('баркод')) ||
+              v == 'code' || v == 'артикул') colCode = c;
+          if ((v.contains('ед') && v.length < 12) || v.contains('мера') ||
+              v.contains('unit')) colUnit = c;
+          if (v.contains('остаток') || v.contains('фактич') ||
+              v.contains('количеств') || v == 'qty' || v == 'fact') colQty = c;
+          if (v.contains('групп') || v == 'group') colGroup = c;
+        }
+      }
+      dataStart = bestRow + 1;
+    }
+
+    // Защита: colName не должен совпадать с colGroup
+    if (colName == colGroup) colName = colCode + 1 == colGroup ? colCode + 2 : colCode + 1;
+
+    return (
+      colGroup: colGroup,
+      colCode:  colCode,
+      colName:  colName,
+      colUnit:  colUnit,
+      colQty:   colQty,
+      dataStart: dataStart,
+    );
+  }
+
   ({
     List<IikoProduct> products,
     int? quantityCol,
     int dataStartRow,
     List<String> sheetNames,
     Map<String, int> sheetQtyColumns,
-  }) _parseIikoBlank(Uint8List bytes, String establishmentId) {
+  }) _parseIikoBlank(Uint8List bytes, String establishmentId,
+      {Map<String, int>? manualQtyCols}) {
     try {
       final excel = Excel.decodeBytes(bytes.toList());
       if (excel.tables.isEmpty) return _emptyParsed;
 
-      final allProducts = <IikoProduct>[];
+      final allProducts      = <IikoProduct>[];
       final parsedSheetNames = <String>[];
       final parsedSheetQtyCols = <String, int>{};
       int? firstQtyCol;
@@ -454,45 +572,21 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         if (sheet == null) continue;
 
         String cellStr(int col, int row) {
-          final v = sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row)).value;
+          final v = sheet.cell(CellIndex.indexByColumnRow(
+                  columnIndex: col, rowIndex: row))
+              .value;
           return _iikoExcelCellToStr(v).trim();
         }
 
-        // Defaults: формат Каспий A=группа, C=код, D=наименование, E=ед.изм., F=остаток
-        int colGroup = 0;
-        int colCode  = 2;
-        int colName  = 3;
-        int colUnit  = 4;
-        int colQty   = 5;
-        int dataStart = 8;
+        final detected = _detectColumns(sheet);
+        final colGroup = detected.colGroup;
+        final colCode  = detected.colCode;
+        final colName  = detected.colName;
+        final colUnit  = detected.colUnit;
+        final dataStart = detected.dataStart;
 
-        for (var r = 0; r < sheet.maxRows && r < 20; r++) {
-          final rowCells = <int, String>{};
-          for (var c = 0; c < (sheet.maxColumns > 15 ? 15 : sheet.maxColumns); c++) {
-            final v = cellStr(c, r).toLowerCase();
-            if (v.isNotEmpty) rowCells[c] = v;
-          }
-          final nameEntry = rowCells.entries
-              .where((e) => (e.value.contains('наименование') || e.value.contains('товар')) && e.key != colGroup)
-              .firstOrNull;
-          if (nameEntry != null) {
-            colName = nameEntry.key;
-            for (final scanRow in [r, r - 1]) {
-              if (scanRow < 0) continue;
-              for (var c = 0; c < (sheet.maxColumns > 15 ? 15 : sheet.maxColumns); c++) {
-                final v = cellStr(c, scanRow).toLowerCase();
-                if (v.contains('код') && !v.contains('штрих')) colCode = c;
-                if ((v.contains('ед') && v.length < 10) || v.contains('мера')) colUnit = c;
-                if (v.contains('остаток') || v.contains('фактич')) colQty = c;
-                if (v.contains('групп')) colGroup = c;
-              }
-            }
-            dataStart = r + 1;
-            break;
-          }
-        }
-
-        if (colName == colGroup) colName = 3;
+        // Столбец остатка: сначала ручной (из диалога), потом авто, потом default=5
+        final colQty = manualQtyCols?[sheetName] ?? detected.colQty ?? 5;
 
         final sheetProducts = <IikoProduct>[];
         String? currentGroupRaw;
@@ -530,15 +624,83 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       }
 
       return (
-        products: allProducts,
-        quantityCol: firstQtyCol,
-        dataStartRow: 0,
-        sheetNames: parsedSheetNames,
+        products:       allProducts,
+        quantityCol:    firstQtyCol,
+        dataStartRow:   0,
+        sheetNames:     parsedSheetNames,
         sheetQtyColumns: parsedSheetQtyCols,
       );
     } catch (e) {
       return _emptyParsed;
     }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Диалог выбора столбца остатка — показывается когда авто не нашло столбец.
+  // Отображает первые строки каждого листа с кнопками-столбцами.
+  // Возвращает null если пользователь отменил.
+  // ──────────────────────────────────────────────────────────────────────────
+  Future<Map<String, int>?> _showQtyColumnDialog(
+      Uint8List bytes, List<String> sheetNames) async {
+    if (!mounted) return null;
+    final excel = Excel.decodeBytes(bytes.toList());
+
+    String cellStr(Sheet sheet, int col, int row) {
+      final v = sheet.cell(CellIndex.indexByColumnRow(
+              columnIndex: col, rowIndex: row))
+          .value;
+      return _iikoExcelCellToStr(v).trim();
+    }
+
+    // Для каждого листа пользователь выбирает столбец
+    final result = <String, int>{};
+
+    for (final sheetName in sheetNames) {
+      final sheet = excel.tables[sheetName];
+      if (sheet == null) continue;
+
+      final detected = _detectColumns(sheet);
+      if (detected.colQty != null) {
+        // Авто нашло — не спрашиваем
+        result[sheetName] = detected.colQty!;
+        continue;
+      }
+
+      // Собираем превью: строки вокруг заголовка (до 3 строк заголовка + 3 данных)
+      final maxCols = sheet.maxColumns.clamp(0, 12);
+      final previewRows = <List<String>>[];
+      final startPreview = (detected.dataStart - 2).clamp(0, sheet.maxRows - 1);
+      for (var r = startPreview; r < sheet.maxRows && r < startPreview + 6; r++) {
+        final row = <String>[];
+        for (var c = 0; c < maxCols; c++) {
+          row.add(cellStr(sheet, c, r));
+        }
+        previewRows.add(row);
+      }
+
+      // Получаем заголовки столбцов из строки заголовка
+      final headerRow = detected.dataStart > 0
+          ? List.generate(maxCols,
+              (c) => cellStr(sheet, c, detected.dataStart - 1))
+          : List.generate(maxCols,
+              (c) => String.fromCharCode(65 + c));
+
+      final selectedCol = await showDialog<int>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => _QtyColumnPickerDialog(
+          sheetName: sheetName,
+          headerRow: headerRow,
+          previewRows: previewRows,
+          maxCols: maxCols,
+        ),
+      );
+
+      if (selectedCol == null) return null; // пользователь отменил
+      result[sheetName] = selectedCol;
+    }
+
+    return result;
   }
 
   static String _iikoExcelCellToStr(CellValue? v) {
@@ -3972,6 +4134,227 @@ class _IikoBlankaRowWidget extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Диалог ручного выбора столбца «Фактический остаток»
+// Показывается только когда авто-определение не нашло нужный столбец.
+// ════════════════════════════════════════════════════════════════════════════
+class _QtyColumnPickerDialog extends StatefulWidget {
+  final String sheetName;
+  final List<String> headerRow;
+  final List<List<String>> previewRows;
+  final int maxCols;
+
+  const _QtyColumnPickerDialog({
+    required this.sheetName,
+    required this.headerRow,
+    required this.previewRows,
+    required this.maxCols,
+  });
+
+  @override
+  State<_QtyColumnPickerDialog> createState() => _QtyColumnPickerDialogState();
+}
+
+class _QtyColumnPickerDialogState extends State<_QtyColumnPickerDialog> {
+  int? _selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cols = widget.maxCols;
+
+    // Буква столбца (A, B, C…)
+    String colLetter(int i) {
+      var n = i + 1;
+      var s = '';
+      while (n > 0) {
+        n--;
+        s = String.fromCharCode(65 + n % 26) + s;
+        n ~/= 26;
+      }
+      return s;
+    }
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560, maxHeight: 520),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Заголовок
+              Row(children: [
+                Icon(Icons.table_chart_outlined,
+                    color: theme.colorScheme.primary, size: 22),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Укажи столбец остатка',
+                          style: theme.textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w700)),
+                      if (widget.sheetName.isNotEmpty)
+                        Text('Лист: ${widget.sheetName}',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurface
+                                    .withOpacity(0.55))),
+                    ],
+                  ),
+                ),
+              ]),
+              const SizedBox(height: 6),
+              Text(
+                'Система не смогла автоматически определить столбец «Фактический остаток». '
+                'Нажми на нужный столбец в таблице ниже.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withOpacity(0.65)),
+              ),
+              const SizedBox(height: 14),
+
+              // Превью таблицы
+              Flexible(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Кнопки выбора столбца
+                      Row(
+                        children: List.generate(cols, (c) {
+                          final isSelected = _selected == c;
+                          return GestureDetector(
+                            onTap: () => setState(() => _selected = c),
+                            child: Container(
+                              width: 80,
+                              height: 32,
+                              margin: const EdgeInsets.symmetric(horizontal: 1),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? theme.colorScheme.primary
+                                    : theme.colorScheme.surfaceVariant,
+                                borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(6)),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? theme.colorScheme.primary
+                                      : theme.colorScheme.outline
+                                          .withOpacity(0.3),
+                                ),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  colLetter(c),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: isSelected
+                                        ? theme.colorScheme.onPrimary
+                                        : theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }),
+                      ),
+                      // Заголовок бланка
+                      _buildPreviewRow(
+                        context,
+                        widget.headerRow,
+                        cols,
+                        isHeader: true,
+                      ),
+                      // Строки данных
+                      ...widget.previewRows.map((row) =>
+                          _buildPreviewRow(context, row, cols)),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Кнопки действий
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(null),
+                    child: const Text('Отмена'),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton(
+                    onPressed: _selected == null
+                        ? null
+                        : () => Navigator.of(context).pop(_selected),
+                    child: const Text('Подтвердить'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPreviewRow(
+    BuildContext context,
+    List<String> cells,
+    int maxCols, {
+    bool isHeader = false,
+  }) {
+    final theme = Theme.of(context);
+    return Row(
+      children: List.generate(maxCols, (c) {
+        final isSelected = _selected == c;
+        final text = c < cells.length ? cells[c] : '';
+        return GestureDetector(
+          onTap: () => setState(() => _selected = c),
+          child: Container(
+            width: 80,
+            height: isHeader ? 36 : 28,
+            margin: const EdgeInsets.symmetric(horizontal: 1, vertical: 1),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? theme.colorScheme.primary.withOpacity(0.12)
+                  : isHeader
+                      ? theme.colorScheme.surfaceVariant.withOpacity(0.6)
+                      : theme.colorScheme.surface,
+              border: Border.all(
+                color: isSelected
+                    ? theme.colorScheme.primary.withOpacity(0.5)
+                    : theme.colorScheme.outline.withOpacity(0.2),
+              ),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                text,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: isHeader ? 10 : 11,
+                  fontWeight:
+                      isHeader ? FontWeight.w600 : FontWeight.normal,
+                  color: isSelected
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurface,
+                ),
+              ),
+            ),
+          ),
+        );
+      }),
     );
   }
 }
