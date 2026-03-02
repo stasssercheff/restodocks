@@ -10,29 +10,29 @@
         } else {
           p = (location.pathname || '').trim();
         }
+        console.log('[RD] pathname='+p+' href='+location.href+' ls='+localStorage.getItem('restodocks_last_path_persist'));
         if (p && p !== '/' && p !== '/splash') {
           if (p.endsWith('/') && p.length > 1) p = p.slice(0, -1);
           if (location.search && p.indexOf('?') === -1) p += location.search;
-          // Пишем в ОБА хранилища: sessionStorage сбрасывается при reload на iOS Safari
           sessionStorage.setItem('restodocks_last_path', p);
           localStorage.setItem('restodocks_last_path_persist', p);
           document.documentElement.dataset.initialPath = p;
+          console.log('[RD] saved path: '+p);
         } else {
-          // pathname == '/' — это reload на iOS. Берём путь из localStorage
           var saved = localStorage.getItem('restodocks_last_path_persist');
+          console.log('[RD] pathname=/ → localStorage saved='+saved);
           if (saved && saved !== '/' && saved !== '/splash') {
             document.documentElement.dataset.initialPath = saved;
             sessionStorage.setItem('restodocks_last_path', saved);
           }
         }
-        // При обновлении (F5) не показывать экран с лого — пользователь уже в приложении
         if (sessionStorage.getItem('restodocks_loaded_before') ||
             localStorage.getItem('restodocks_last_path_persist')) {
           var s = document.createElement('style');
           s.textContent = '#loading-screen { display: none !important; }';
           document.head.appendChild(s);
         }
-      } catch(e) {}
+      } catch(e) { console.log('[RD] error: '+e); }
     })();
   </script>
   <!--
@@ -112,16 +112,15 @@
 
       var bar = null;
       var activeInput = null;
+      var activeIdx = -1;   // index в последнем снимке allInputs
       var allInputs = [];
       var hideTimer = null;
 
       function getAllInputs() {
-        // Collect from normal DOM and shadow roots
         var result = [];
         function collect(root) {
           try {
-            root.querySelectorAll('input[type="number"], input[inputmode="numeric"], input[inputmode="decimal"], input[type="text"]')
-              .forEach(function(el) { result.push(el); });
+            root.querySelectorAll('input').forEach(function(el) { result.push(el); });
             root.querySelectorAll('*').forEach(function(el) {
               if (el.shadowRoot) collect(el.shadowRoot);
             });
@@ -198,17 +197,17 @@
       }
 
       function navigate(dir) {
-        allInputs = getAllInputs();
-        var idx = allInputs.indexOf(activeInput);
-        if (idx < 0 && activeInput) {
-          // Try matching by value/position
-          idx = 0;
-        }
-        var next = allInputs[idx + dir];
-        if (next) {
+        // CanvasKit destroys the input element on focusout — activeInput ref is stale.
+        // Use saved index instead. On press, take a fresh snapshot of all inputs.
+        var snapshot = getAllInputs();
+        var nextIdx = activeIdx + dir;
+        console.log('[RD] navigate dir='+dir+' activeIdx='+activeIdx+' snapshot.len='+snapshot.length+' nextIdx='+nextIdx);
+        if (nextIdx >= 0 && nextIdx < snapshot.length) {
+          var next = snapshot[nextIdx];
+          activeIdx = nextIdx;
+          activeInput = next;
           next.focus();
           try { next.select(); } catch(e) {}
-          activeInput = next;
         }
       }
 
@@ -225,38 +224,33 @@
         }, 300);
       }
 
+      function onInputFocus(inp) {
+        activeInput = inp;
+        // Save index in a fresh snapshot so navigate() can use it even after inp is removed
+        var snapshot = getAllInputs();
+        var idx = snapshot.indexOf(inp);
+        if (idx >= 0) activeIdx = idx;
+        allInputs = snapshot;
+        console.log('[RD] focusin idx='+activeIdx+' total='+snapshot.length);
+        showBar();
+      }
+
       function attachToShadowHosts() {
-        // Flutter CanvasKit puts inputs inside shadow DOM of flt-text-editing-host
-        document.querySelectorAll('flt-text-editing-host, flt-glass-pane').forEach(function(host) {
+        document.querySelectorAll('flt-text-editing-host, flt-glass-pane, flt-scene').forEach(function(host) {
           if (host._navListened) return;
           host._navListened = true;
           var root = host.shadowRoot || host;
           root.addEventListener('focusin', function(e) {
-            var t = e.target;
-            if (t && t.tagName === 'INPUT') {
-              activeInput = t;
-              allInputs = getAllInputs();
-              showBar();
-            }
+            if (e.target && e.target.tagName === 'INPUT') onInputFocus(e.target);
           }, true);
-          root.addEventListener('focusout', function(e) {
-            scheduleHide();
-          }, true);
+          root.addEventListener('focusout', scheduleHide, true);
         });
       }
 
-      // Also listen on document for HTML renderer inputs (not in shadow DOM)
       document.addEventListener('focusin', function(e) {
-        var t = e.target;
-        if (t && t.tagName === 'INPUT') {
-          activeInput = t;
-          allInputs = getAllInputs();
-          showBar();
-        }
+        if (e.target && e.target.tagName === 'INPUT') onInputFocus(e.target);
       }, true);
-      document.addEventListener('focusout', function(e) {
-        scheduleHide();
-      }, true);
+      document.addEventListener('focusout', scheduleHide, true);
 
       // Watch for Flutter shadow hosts appearing in DOM
       var hostObserver = new MutationObserver(function() {
