@@ -12,8 +12,8 @@ import '../widgets/app_bar_home_button.dart';
 /// Просмотр iiko-инвентаризации из входящих.
 ///
 /// Отображение — как во вкладке «Номенклатура → iiko», но с колонкой «Итого».
-/// Кнопка «Скачать» — генерирует файл в точно той же форме что был загружен
-/// (берёт оригинальный бланк из localStorage через [IikoProductStore]).
+/// Поддерживает многолистовые бланки: вкладки переключают листы.
+/// Показывает все строки включая незаполненные (total == 0).
 class IikoInventoryInboxDetailScreen extends StatefulWidget {
   const IikoInventoryInboxDetailScreen({super.key, required this.documentId});
 
@@ -29,6 +29,7 @@ class _IikoInventoryInboxDetailScreenState
   Map<String, dynamic>? _doc;
   bool _loading = true;
   String? _error;
+  String? _selectedSheet;
 
   @override
   void initState() {
@@ -79,12 +80,10 @@ class _IikoInventoryInboxDetailScreenState
         : DateTime.now().toIso8601String().substring(0, 10);
 
     if (origBytes != null) {
-      // Оригинальный бланк найден — вписываем только итого в нужную колонку
       outBytes = _fillOriginal(origBytes, qtyCol, qtyByCode);
       fileName = header['fileName'] as String? ??
           'Инвентаризация_iiko_$dateLabel.xlsx';
     } else {
-      // Запасной вариант — создаём новый файл
       outBytes = _buildFallback(rows, header);
       fileName = 'Инвентаризация_iiko_$dateLabel.xlsx';
     }
@@ -112,7 +111,6 @@ class _IikoInventoryInboxDetailScreenState
     final sheetName = excel.tables.keys.first;
     final sheet     = excel.tables[sheetName]!;
 
-    // Находим колонку с кодами
     int codeCol = 2;
     for (var r = 0; r < sheet.maxRows && r < 20; r++) {
       for (var c = 0; c < (sheet.maxColumns > 10 ? 10 : sheet.maxColumns); c++) {
@@ -213,16 +211,29 @@ class _IikoInventoryInboxDetailScreenState
 
     final payload = _doc!['payload'] as Map<String, dynamic>? ?? {};
     final header  = payload['header'] as Map<String, dynamic>? ?? {};
-    final rows    = (payload['rows'] as List<dynamic>? ?? [])
+    final allRows = (payload['rows'] as List<dynamic>? ?? [])
         .cast<Map<String, dynamic>>();
 
-    // Только заполненные строки
-    final filledRows = rows
-        .where((r) => ((r['total'] as num?)?.toDouble() ?? 0.0) > 0)
-        .toList();
+    // Определяем листы
+    final sheetNames = allRows
+        .map((r) => r['sheetName'] as String?)
+        .where((s) => s != null && s.isNotEmpty)
+        .toSet()
+        .toList()
+        .cast<String>();
+    final hasSheets = sheetNames.length > 1;
 
-    // Группируем по группе (если есть) — iiko payload не хранит groupName,
-    // поэтому просто отображаем плоский список
+    final activeSheet = (hasSheets && sheetNames.contains(_selectedSheet))
+        ? _selectedSheet!
+        : (hasSheets ? sheetNames.first : null);
+
+    // Фильтруем по активному листу
+    final rows = (hasSheets && activeSheet != null)
+        ? allRows.where((r) => r['sheetName'] == activeSheet).toList()
+        : allRows;
+
+    final filledCount = rows.where((r) => ((r['total'] as num?)?.toDouble() ?? 0.0) > 0).length;
+
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
@@ -238,23 +249,88 @@ class _IikoInventoryInboxDetailScreenState
       body: Column(
         children: [
           // Шапка документа
-          _HeaderPanel(header: header, totalRows: rows.length,
-              filledRows: filledRows.length),
+          _HeaderPanel(
+            header: header,
+            totalRows: rows.length,
+            filledRows: filledCount,
+          ),
+          // Вкладки листов (если > 1)
+          if (hasSheets)
+            _InboxSheetTabBar(
+              sheetNames: sheetNames,
+              selected: activeSheet ?? sheetNames.first,
+              onSelect: (s) => setState(() => _selectedSheet = s),
+            ),
           // Шапка таблицы
-          _TableHeader(),
-          // Строки
+          const _TableHeader(),
+          // Строки — все, включая незаполненные
           Expanded(
-            child: filledRows.isEmpty
+            child: rows.isEmpty
                 ? const Center(
-                    child: Text('Нет заполненных позиций',
+                    child: Text('Нет позиций',
                         style: TextStyle(color: Colors.grey)))
                 : ListView.builder(
-                    itemCount: filledRows.length,
+                    itemCount: rows.length,
                     itemBuilder: (ctx, i) =>
-                        _TableRow(row: filledRows[i], index: i),
+                        _TableRow(row: rows[i], index: i),
                   ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Вкладки листов ────────────────────────────────────────────────────────────
+class _InboxSheetTabBar extends StatelessWidget {
+  const _InboxSheetTabBar({
+    required this.sheetNames,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  final List<String> sheetNames;
+  final String selected;
+  final ValueChanged<String> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      height: 36,
+      color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Row(
+          children: sheetNames.map((name) {
+            final isActive = name == selected;
+            return Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: GestureDetector(
+                onTap: () => onSelect(name),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isActive ? theme.colorScheme.primary : Colors.transparent,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    name,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                      color: isActive
+                          ? theme.colorScheme.onPrimary
+                          : theme.colorScheme.onSurface.withOpacity(0.7),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
       ),
     );
   }
@@ -376,18 +452,33 @@ class _TableRow extends StatelessWidget {
     final name  = row['name']  as String? ?? '';
     final code  = row['code']  as String? ?? '';
     final unit  = row['unit']  as String? ?? '';
+    final group = row['groupName'] as String? ?? '';
     final total = (row['total'] as num?)?.toDouble() ?? 0.0;
+    final isEmpty = total == 0;
 
     return Container(
-      decoration: BoxDecoration(border: Border(left: border)),
+      decoration: BoxDecoration(
+        border: Border(left: border),
+        color: isEmpty
+            ? theme.colorScheme.surfaceContainerHighest.withOpacity(0.15)
+            : null,
+      ),
       child: IntrinsicHeight(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            cell(const SizedBox.shrink(), width: 100,
-                bg: index.isEven
-                    ? theme.colorScheme.surfaceContainerHighest.withOpacity(0.3)
-                    : null),
+            cell(
+              Text(group,
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: theme.colorScheme.onSurface.withOpacity(0.5)),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2),
+              width: 100,
+              bg: index.isEven
+                  ? theme.colorScheme.surfaceContainerHighest.withOpacity(0.3)
+                  : null,
+            ),
             cell(
               Text(code,
                   style: TextStyle(fontSize: 11,
@@ -396,7 +487,12 @@ class _TableRow extends StatelessWidget {
               width: 58,
             ),
             Expanded(
-              child: cell(Text(name, style: const TextStyle(fontSize: 12))),
+              child: cell(Text(name,
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: isEmpty
+                          ? theme.colorScheme.onSurface.withOpacity(0.5)
+                          : null))),
             ),
             cell(
               Text(unit,
@@ -404,16 +500,19 @@ class _TableRow extends StatelessWidget {
                   textAlign: TextAlign.center),
               width: 44,
             ),
-            // Итого — акцент цветом primary темы
             cell(
-              Text(_fmt(total),
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: theme.colorScheme.primary),
-                  textAlign: TextAlign.center),
+              isEmpty
+                  ? const SizedBox.shrink()
+                  : Text(_fmt(total),
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: theme.colorScheme.primary),
+                      textAlign: TextAlign.center),
               width: 72,
-              bg: theme.colorScheme.primaryContainer.withOpacity(0.2),
+              bg: isEmpty
+                  ? null
+                  : theme.colorScheme.primaryContainer.withOpacity(0.2),
             ),
           ],
         ),

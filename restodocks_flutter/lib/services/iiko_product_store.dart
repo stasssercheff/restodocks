@@ -16,15 +16,23 @@ class IikoProductStore extends ChangeNotifier {
   String? _loadedEstablishmentId;
   bool _isLoading = false;
 
-  static const _kBlankBytesKey = 'iiko_blank_bytes_b64';
-  static const _kQtyColKey     = 'iiko_blank_qty_col';
-  static const _kStorageBucket = 'iiko-blanks';
+  static const _kBlankBytesKey   = 'iiko_blank_bytes_b64';
+  static const _kQtyColKey       = 'iiko_blank_qty_col';
+  static const _kSheetNamesKey   = 'iiko_blank_sheet_names';
+  static const _kSheetQtyColsKey = 'iiko_blank_sheet_qty_cols';
+  static const _kStorageBucket   = 'iiko-blanks';
 
   /// Байты оригинального xlsx-бланка для экспорта (персистируются в localStorage + Supabase Storage).
   Uint8List? originalBlankBytes;
 
-  /// Индекс колонки «Остаток фактический» в оригинальном бланке (0-based).
+  /// Индекс колонки «Остаток фактический» в оригинальном бланке (0-based) — для первого листа.
   int? originalQuantityColumnIndex;
+
+  /// Упорядоченный список имён листов бланка (пуст если бланк не загружен или лист один).
+  List<String> sheetNames = [];
+
+  /// Индекс колонки qty для каждого листа: { sheetName → colIndex }.
+  Map<String, int> sheetQtyColumns = {};
 
   List<IikoProduct> get products => List.unmodifiable(_products);
   bool get isLoading => _isLoading;
@@ -43,8 +51,18 @@ class IikoProductStore extends ChangeNotifier {
       if (b64 != null) {
         originalBlankBytes = base64Decode(b64);
         originalQuantityColumnIndex = prefs.getInt(_kQtyColKey);
+        // Восстанавливаем имена листов и колонки
+        final sheetNamesJson = prefs.getString(_kSheetNamesKey);
+        if (sheetNamesJson != null) {
+          sheetNames = (jsonDecode(sheetNamesJson) as List).cast<String>();
+        }
+        final sheetQtyColsJson = prefs.getString(_kSheetQtyColsKey);
+        if (sheetQtyColsJson != null) {
+          sheetQtyColumns = (jsonDecode(sheetQtyColsJson) as Map)
+              .map((k, v) => MapEntry(k as String, v as int));
+        }
         debugPrint('IikoProductStore: blank restored from localStorage '
-            '(${originalBlankBytes!.length} bytes, qtyCol=$originalQuantityColumnIndex)');
+            '(${originalBlankBytes!.length} bytes, qtyCol=$originalQuantityColumnIndex, sheets=${sheetNames.length})');
         return;
       }
     } catch (e) {
@@ -76,10 +94,20 @@ class IikoProductStore extends ChangeNotifier {
       originalBlankBytes = Uint8List.fromList(bytes);
       originalQuantityColumnIndex = meta['qty_col_index'] as int?;
 
+      // Восстанавливаем имена листов из метаданных
+      final sheetNamesRaw = meta['sheet_names'];
+      if (sheetNamesRaw is List) {
+        sheetNames = sheetNamesRaw.cast<String>();
+      }
+      final sheetQtyColsRaw = meta['sheet_qty_cols'];
+      if (sheetQtyColsRaw is Map) {
+        sheetQtyColumns = sheetQtyColsRaw.map((k, v) => MapEntry(k as String, v as int));
+      }
+
       // Кэшируем в localStorage
       await _persistBlank(originalBlankBytes!, originalQuantityColumnIndex);
       debugPrint('IikoProductStore: blank restored from Supabase Storage '
-          '(${originalBlankBytes!.length} bytes, qtyCol=$originalQuantityColumnIndex)');
+          '(${originalBlankBytes!.length} bytes, qtyCol=$originalQuantityColumnIndex, sheets=${sheetNames.length})');
     } catch (e) {
       debugPrint('IikoProductStore._restoreBlankFromServer error: $e');
     }
@@ -94,8 +122,16 @@ class IikoProductStore extends ChangeNotifier {
       } else {
         await prefs.remove(_kQtyColKey);
       }
+      // Сохраняем имена листов и колонки
+      if (sheetNames.isNotEmpty) {
+        await prefs.setString(_kSheetNamesKey, jsonEncode(sheetNames));
+        await prefs.setString(_kSheetQtyColsKey, jsonEncode(sheetQtyColumns));
+      } else {
+        await prefs.remove(_kSheetNamesKey);
+        await prefs.remove(_kSheetQtyColsKey);
+      }
       debugPrint('IikoProductStore: blank saved to localStorage '
-          '(${bytes.length} bytes, qtyCol=$qtyCol)');
+          '(${bytes.length} bytes, qtyCol=$qtyCol, sheets=${sheetNames.length})');
     } catch (e) {
       debugPrint('IikoProductStore._persistBlank error: $e');
     }
@@ -122,6 +158,8 @@ class IikoProductStore extends ChangeNotifier {
           'establishment_id': establishmentId,
           'storage_path': storagePath,
           'qty_col_index': qtyCol ?? 5,
+          'sheet_names': sheetNames.isEmpty ? null : sheetNames,
+          'sheet_qty_cols': sheetQtyColumns.isEmpty ? null : sheetQtyColumns,
           'uploaded_at': DateTime.now().toIso8601String(),
         },
         onConflict: 'establishment_id',
@@ -137,6 +175,8 @@ class IikoProductStore extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_kBlankBytesKey);
       await prefs.remove(_kQtyColKey);
+      await prefs.remove(_kSheetNamesKey);
+      await prefs.remove(_kSheetQtyColsKey);
     } catch (_) {}
   }
 
@@ -166,6 +206,8 @@ class IikoProductStore extends ChangeNotifier {
     List<IikoProduct> items, {
     Uint8List? blankBytes,
     int? quantityColumnIndex,
+    List<String>? newSheetNames,
+    Map<String, int>? newSheetQtyColumns,
   }) async {
     _isLoading = true;
     notifyListeners();
@@ -173,6 +215,8 @@ class IikoProductStore extends ChangeNotifier {
       if (blankBytes != null) {
         originalBlankBytes = blankBytes;
         originalQuantityColumnIndex = quantityColumnIndex;
+        if (newSheetNames != null) sheetNames = newSheetNames;
+        if (newSheetQtyColumns != null) sheetQtyColumns = newSheetQtyColumns;
         // Сохраняем в localStorage (быстро)
         await _persistBlank(blankBytes, quantityColumnIndex);
         // Сохраняем в Supabase Storage (работает в инкогнито и на других устройствах)
@@ -236,6 +280,8 @@ class IikoProductStore extends ChangeNotifier {
       _loadedEstablishmentId = null;
       originalBlankBytes = null;
       originalQuantityColumnIndex = null;
+      sheetNames = [];
+      sheetQtyColumns = {};
       await _clearPersistedBlank();
     } catch (e) {
       debugPrint('IikoProductStore.deleteAll error: $e');
@@ -251,6 +297,8 @@ class IikoProductStore extends ChangeNotifier {
     _loadedEstablishmentId = null;
     originalBlankBytes = null;
     originalQuantityColumnIndex = null;
+    sheetNames = [];
+    sheetQtyColumns = {};
     _clearPersistedBlank();
     notifyListeners();
   }

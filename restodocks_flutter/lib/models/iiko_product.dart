@@ -18,6 +18,10 @@ class IikoProduct {
 
   final int sortOrder;
 
+  /// Название листа Excel из которого взят продукт (например «Товары», «Блюда»).
+  /// Null означает первый лист или старые данные без разделения по листам.
+  final String? sheetName;
+
   const IikoProduct({
     required this.id,
     required this.establishmentId,
@@ -26,6 +30,7 @@ class IikoProduct {
     this.unit,
     this.groupName,
     this.sortOrder = 0,
+    this.sheetName,
   });
 
   /// Отображаемое название — убирает префикс «Т.» только для показа на экране.
@@ -56,6 +61,7 @@ class IikoProduct {
         unit: json['unit'] as String?,
         groupName: json['group_name'] as String?,
         sortOrder: (json['sort_order'] as int?) ?? 0,
+        sheetName: json['sheet_name'] as String?,
       );
 
   Map<String, dynamic> toJson() => {
@@ -66,6 +72,7 @@ class IikoProduct {
         'unit': unit,
         'group_name': groupName,
         'sort_order': sortOrder,
+        'sheet_name': sheetName,
       };
 
   IikoProduct copyWith({
@@ -74,6 +81,7 @@ class IikoProduct {
     String? unit,
     String? groupName,
     int? sortOrder,
+    String? sheetName,
   }) =>
       IikoProduct(
         id: id,
@@ -83,5 +91,6 @@ class IikoProduct {
         unit: unit ?? this.unit,
         groupName: groupName ?? this.groupName,
         sortOrder: sortOrder ?? this.sortOrder,
+        sheetName: sheetName ?? this.sheetName,
       );
 }

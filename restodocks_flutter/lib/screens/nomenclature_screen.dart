@@ -403,6 +403,8 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         products,
         blankBytes: bytes,
         quantityColumnIndex: parsed.quantityCol,
+        newSheetNames: parsed.sheetNames,
+        newSheetQtyColumns: parsed.sheetQtyColumns,
       );
 
       if (mounted) {
@@ -422,91 +424,117 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     }
   }
 
-  static const _emptyParsed = (products: <IikoProduct>[], quantityCol: null as int?, dataStartRow: 0);
+  static const _emptyParsed = (
+    products: <IikoProduct>[],
+    quantityCol: null as int?,
+    dataStartRow: 0,
+    sheetNames: <String>[],
+    sheetQtyColumns: <String, int>{},
+  );
 
-  ({List<IikoProduct> products, int? quantityCol, int dataStartRow}) _parseIikoBlank(
-      Uint8List bytes, String establishmentId) {
+  ({
+    List<IikoProduct> products,
+    int? quantityCol,
+    int dataStartRow,
+    List<String> sheetNames,
+    Map<String, int> sheetQtyColumns,
+  }) _parseIikoBlank(Uint8List bytes, String establishmentId) {
     try {
       final excel = Excel.decodeBytes(bytes.toList());
       if (excel.tables.isEmpty) return _emptyParsed;
-      final sheet = excel.tables[excel.tables.keys.first]!;
 
-      String _cell(int col, int row) {
-        final v = sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row)).value;
-        return _iikoExcelCellToStr(v).trim();
-      }
+      final allProducts = <IikoProduct>[];
+      final parsedSheetNames = <String>[];
+      final parsedSheetQtyCols = <String, int>{};
+      int? firstQtyCol;
+      int globalSortOrder = 0;
 
-      // Defaults: формат Каспий A=группа, C=код, D=наименование, E=ед.изм., F=остаток
-      int colGroup = 0;
-      int colCode  = 2;
-      int colName  = 3;
-      int colUnit  = 4;
-      int colQty   = 5;
-      int dataStart = 8;
+      for (final sheetName in excel.tables.keys) {
+        final sheet = excel.tables[sheetName];
+        if (sheet == null) continue;
 
-      // Ищем строку с «Наименование» — только не в столбце группы (не A). Продукт = 3-й столбец (D).
-      for (var r = 0; r < sheet.maxRows && r < 20; r++) {
-        final rowCells = <int, String>{};
-        for (var c = 0; c < (sheet.maxColumns > 15 ? 15 : sheet.maxColumns); c++) {
-          final v = _cell(c, r).toLowerCase();
-          if (v.isNotEmpty) rowCells[c] = v;
+        String cellStr(int col, int row) {
+          final v = sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row)).value;
+          return _iikoExcelCellToStr(v).trim();
         }
-        final nameEntry = rowCells.entries
-            .where((e) => (e.value.contains('наименование') || e.value.contains('товар')) && e.key != colGroup)
-            .firstOrNull;
-        if (nameEntry != null) {
-          colName = nameEntry.key;
-          for (final scanRow in [r, r - 1]) {
-            if (scanRow < 0) continue;
-            for (var c = 0; c < (sheet.maxColumns > 15 ? 15 : sheet.maxColumns); c++) {
-              final v = _cell(c, scanRow).toLowerCase();
-              if (v.contains('код') && !v.contains('штрих')) colCode = c;
-              if ((v.contains('ед') && v.length < 10) || v.contains('мера')) colUnit = c;
-              if (v.contains('остаток') || v.contains('фактич')) colQty = c;
-              if (v.contains('групп')) colGroup = c;
-            }
+
+        // Defaults: формат Каспий A=группа, C=код, D=наименование, E=ед.изм., F=остаток
+        int colGroup = 0;
+        int colCode  = 2;
+        int colName  = 3;
+        int colUnit  = 4;
+        int colQty   = 5;
+        int dataStart = 8;
+
+        for (var r = 0; r < sheet.maxRows && r < 20; r++) {
+          final rowCells = <int, String>{};
+          for (var c = 0; c < (sheet.maxColumns > 15 ? 15 : sheet.maxColumns); c++) {
+            final v = cellStr(c, r).toLowerCase();
+            if (v.isNotEmpty) rowCells[c] = v;
           }
-          dataStart = r + 1;
-          break;
+          final nameEntry = rowCells.entries
+              .where((e) => (e.value.contains('наименование') || e.value.contains('товар')) && e.key != colGroup)
+              .firstOrNull;
+          if (nameEntry != null) {
+            colName = nameEntry.key;
+            for (final scanRow in [r, r - 1]) {
+              if (scanRow < 0) continue;
+              for (var c = 0; c < (sheet.maxColumns > 15 ? 15 : sheet.maxColumns); c++) {
+                final v = cellStr(c, scanRow).toLowerCase();
+                if (v.contains('код') && !v.contains('штрих')) colCode = c;
+                if ((v.contains('ед') && v.length < 10) || v.contains('мера')) colUnit = c;
+                if (v.contains('остаток') || v.contains('фактич')) colQty = c;
+                if (v.contains('групп')) colGroup = c;
+              }
+            }
+            dataStart = r + 1;
+            break;
+          }
         }
-      }
 
-      if (colName == colGroup) colName = 3;
+        if (colName == colGroup) colName = 3;
 
-      final products = <IikoProduct>[];
-      String? currentGroupRaw;
-      int sortOrder = 0;
+        final sheetProducts = <IikoProduct>[];
+        String? currentGroupRaw;
 
-      for (var r = dataStart; r < sheet.maxRows; r++) {
-        final codeVal  = _cell(colCode, r);
-        final nameVal  = _cell(colName, r);
-        final unitVal  = _cell(colUnit, r);
-        final groupVal = _cell(colGroup, r);
+        for (var r = dataStart; r < sheet.maxRows; r++) {
+          final codeVal  = cellStr(colCode, r);
+          final nameVal  = cellStr(colName, r);
+          final unitVal  = cellStr(colUnit, r);
+          final groupVal = cellStr(colGroup, r);
 
-        // Строка с кодом = товар
-        if (codeVal.isNotEmpty) {
+          if (codeVal.isNotEmpty) {
+            if (groupVal.isNotEmpty) currentGroupRaw = groupVal;
+            if (nameVal.isEmpty) continue;
+            sheetProducts.add(IikoProduct(
+              id: const Uuid().v4(),
+              establishmentId: establishmentId,
+              code: codeVal,
+              name: nameVal,
+              unit: unitVal.isNotEmpty ? unitVal : null,
+              groupName: currentGroupRaw,
+              sortOrder: globalSortOrder++,
+              sheetName: sheetName,
+            ));
+            continue;
+          }
           if (groupVal.isNotEmpty) currentGroupRaw = groupVal;
-          if (nameVal.isEmpty) continue;
-          products.add(IikoProduct(
-            id: const Uuid().v4(),
-            establishmentId: establishmentId,
-            code: codeVal,
-            name: nameVal,
-            unit: unitVal.isNotEmpty ? unitVal : null,
-            groupName: currentGroupRaw,
-            sortOrder: sortOrder++,
-          ));
-          continue;
         }
 
-        // Строка без кода: смена группы
-        if (groupVal.isNotEmpty) currentGroupRaw = groupVal;
+        if (sheetProducts.isNotEmpty) {
+          parsedSheetNames.add(sheetName);
+          parsedSheetQtyCols[sheetName] = colQty;
+          firstQtyCol ??= colQty;
+          allProducts.addAll(sheetProducts);
+        }
       }
 
       return (
-        products: products,
-        quantityCol: colQty,
-        dataStartRow: dataStart,
+        products: allProducts,
+        quantityCol: firstQtyCol,
+        dataStartRow: 0,
+        sheetNames: parsedSheetNames,
+        sheetQtyColumns: parsedSheetQtyCols,
       );
     } catch (e) {
       return _emptyParsed;
@@ -3541,6 +3569,7 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab>
   bool get wantKeepAlive => true;
 
   String _query = '';
+  String? _selectedSheet; // null = все листы / нет разделения
 
   @override
   void initState() {
@@ -3629,10 +3658,22 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab>
     // Сортируем по sort_order чтобы порядок совпадал с оригинальным файлом
     final sorted = [...products]..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
 
-    // Фильтрация
+    // Листы бланка
+    final sheetNames = widget.store.sheetNames;
+    final hasSheets  = sheetNames.length > 1;
+
+    // Если выбранный лист больше не существует — сбросим
+    final activeSheet = (hasSheets && sheetNames.contains(_selectedSheet))
+        ? _selectedSheet
+        : (hasSheets ? sheetNames.first : null);
+
+    // Фильтрация по листу и запросу
+    var bySheet = (hasSheets && activeSheet != null)
+        ? sorted.where((p) => p.sheetName == activeSheet).toList()
+        : sorted;
     final filtered = _query.isEmpty
-        ? sorted
-        : sorted
+        ? bySheet
+        : bySheet
             .where((p) => p.name.toLowerCase().contains(_query.toLowerCase()))
             .toList();
 
@@ -3655,6 +3696,14 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab>
 
     return Column(
       children: [
+        // ── Вкладки листов (если > 1 листа) ──
+        if (hasSheets)
+          _SheetTabBar(
+            sheetNames: sheetNames,
+            selected: activeSheet ?? sheetNames.first,
+            onSelect: (s) => setState(() => _selectedSheet = s),
+          ),
+
         // ── Тулбар ──
         Padding(
           padding: const EdgeInsets.fromLTRB(8, 6, 8, 2),
@@ -3731,6 +3780,61 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab>
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Переключатель вкладок листов Excel (горизонтальный скролл)
+class _SheetTabBar extends StatelessWidget {
+  const _SheetTabBar({
+    required this.sheetNames,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  final List<String> sheetNames;
+  final String selected;
+  final ValueChanged<String> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      height: 36,
+      color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Row(
+          children: sheetNames.map((name) {
+            final isActive = name == selected;
+            return Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: GestureDetector(
+                onTap: () => onSelect(name),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isActive ? theme.colorScheme.primary : Colors.transparent,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    name,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                      color: isActive
+                          ? theme.colorScheme.onPrimary
+                          : theme.colorScheme.onSurface.withOpacity(0.7),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ),
     );
   }
 }
