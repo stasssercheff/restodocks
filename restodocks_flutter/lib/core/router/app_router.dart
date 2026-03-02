@@ -543,22 +543,28 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _checkAuthStatus() async {
-    // Убираем ручное перенаправление - оно должно происходить через redirect функцию GoRouter
     final accountManager = context.read<AccountManagerSupabase>();
     await accountManager.initialize();
     if (!mounted) return;
 
-    // Даем время на инициализацию и позволяем GoRouter redirect обработать маршрутизацию
-    await Future.delayed(const Duration(milliseconds: 100));
-    if (!mounted) return;
-
-    // Принудительно вызываем refresh маршрутизации
     if (accountManager.isLoggedInSync) {
-      // Web: при F5 — исходный путь из URL (getCurrentBrowserPath уже /splash после redirect)
-      final target = kIsWeb
-          ? (initial_loc.getCachedInitialPath() ?? initial_loc.getCurrentBrowserPath())
-          : null;
-      context.go((target != null && target != '/' && target != '/splash' && target.isNotEmpty) ? target : '/home');
+      // Web: при F5 — восстанавливаем исходный путь из кэша или localStorage.
+      // _cachedInitialPath кэшируется в getInitialLocation() который вызывается
+      // в main() до любых redirect, поэтому всегда содержит реальный URL.
+      String? target;
+      if (kIsWeb) {
+        target = initial_loc.getCachedInitialPath();
+        // Дополнительный fallback: читаем из localStorage напрямую
+        if (target == null || target == '/' || target == '/splash') {
+          target = initial_loc.getLastSavedPath();
+        }
+        // Фильтруем служебные пути
+        if (target == '/' || target == '/splash' || target?.isEmpty == true) {
+          target = null;
+        }
+      }
+      debugPrint('[Splash] go → ${target ?? '/home'} (cached=${initial_loc.getCachedInitialPath()})');
+      context.go(target ?? '/home');
     } else {
       context.go('/login');
     }

@@ -2351,43 +2351,28 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     if (estId == null) return;
     final iikoStore = context.read<IikoProductStore>();
 
-    // Шаг 1: если продукты уже в памяти — показываем их немедленно,
-    // не ждём restoreBlankFromStorage (байты бланка нужны только для экспорта).
-    if (iikoStore.products.isNotEmpty) {
-      if (!mounted) return;
-      setState(() {
-        _rows.clear();
-        for (final p in iikoStore.products) {
-          if (p.name.trim().isEmpty) continue;
-          if (_isIikoHeaderRow(p.name)) continue;
-          _rows.add(_IikoInventoryRow(product: p));
-        }
-        _isLoading = false;
-      });
-      // Восстанавливаем бланк для экспорта в фоне, не блокируя UI
-      iikoStore.restoreBlankFromStorage(establishmentId: estId);
-    } else {
-      // Шаг 2: продуктов нет — грузим параллельно бланк и продукты из БД.
-      // restoreBlankFromStorage запускаем параллельно, не await-им первым.
-      final blankFuture = iikoStore.restoreBlankFromStorage(establishmentId: estId);
+    // Всегда ждём и бланк, и продукты вместе — так _rows и sheetNames всегда синхронны.
+    // restoreBlankFromStorage запускаем параллельно с loadProducts чтобы не блокировать.
+    final blankFuture = iikoStore.restoreBlankFromStorage(establishmentId: estId);
+
+    if (iikoStore.products.isEmpty) {
+      // Продуктов нет в памяти — грузим из БД
       await iikoStore.loadProducts(estId);
-      // Ждём бланк только если он нужен для sheetNames (которые уже должны были загрузиться)
-      // Но не блокируем UI — показываем продукты сразу после loadProducts.
-      if (!mounted) return;
-      setState(() {
-        _rows.clear();
-        for (final p in iikoStore.products) {
-          if (p.name.trim().isEmpty) continue;
-          if (_isIikoHeaderRow(p.name)) continue;
-          _rows.add(_IikoInventoryRow(product: p));
-        }
-        _isLoading = false;
-      });
-      // Дожидаемся бланка в фоне — когда придёт, sheetNames обновятся через notifyListeners
-      blankFuture.then((_) {
-        if (mounted) setState(() {});
-      });
     }
+
+    // Ждём завершения бланка (нужен для корректных sheetName у продуктов)
+    await blankFuture;
+
+    if (!mounted) return;
+    setState(() {
+      _rows.clear();
+      for (final p in iikoStore.products) {
+        if (p.name.trim().isEmpty) continue;
+        if (_isIikoHeaderRow(p.name)) continue;
+        _rows.add(_IikoInventoryRow(product: p));
+      }
+      _isLoading = false;
+    });
     // Применяем черновик — теперь _rows заполнен
     final draft = _pendingDraftData;
     if (draft != null) {
