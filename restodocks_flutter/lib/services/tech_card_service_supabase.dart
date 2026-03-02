@@ -55,7 +55,7 @@ class TechCardServiceSupabase {
     required String dishName,
     Map<String, String>? dishNameLocalized,
     required String category,
-    String? section,
+    List<String> sections = const [],
     bool isSemiFinished = true,
     required String establishmentId,
     required String createdBy,
@@ -64,7 +64,7 @@ class TechCardServiceSupabase {
       dishName: dishName,
       dishNameLocalized: dishNameLocalized,
       category: category,
-      section: section,
+      sections: sections,
       isSemiFinished: isSemiFinished,
       establishmentId: establishmentId,
       createdBy: createdBy,
@@ -72,7 +72,7 @@ class TechCardServiceSupabase {
 
     final techCardData = Map<String, dynamic>.from(techCard.toJson())
       ..remove('id')
-      ..remove('section'); // колонка section может отсутствовать в схеме БД
+      ..remove('section'); // старая колонка, заменена на sections
     final response = await _supabase.insertData('tech_cards', techCardData);
     final createdTechCard = TechCard.fromJson(response);
 
@@ -187,7 +187,7 @@ class TechCardServiceSupabase {
   Future<void> saveTechCard(TechCard techCard) async {
     try {
       final payload = Map<String, dynamic>.from(techCard.toJson());
-      payload.remove('section'); // колонка section может отсутствовать в схеме БД
+      payload.remove('section'); // старая колонка, заменена на sections
       await _supabase.updateData(
         'tech_cards',
         payload,

@@ -1,6 +1,8 @@
 import 'dart:typed_data';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -412,7 +414,7 @@ TechCard _applyEdits(
   TechCard t, {
   String? dishName,
   String? category,
-  String? section,
+  List<String>? sections,
   bool? isSemiFinished,
   double? portionWeight,
   double? yieldGrams,
@@ -423,7 +425,7 @@ TechCard _applyEdits(
   return t.copyWith(
     dishName: dishName,
     category: category,
-    section: section,
+    sections: sections,
     isSemiFinished: isSemiFinished,
     portionWeight: portionWeight,
     yield: yieldGrams,
@@ -456,6 +458,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   final _nameController = TextEditingController();
   static const _categoryOptions = ['sauce', 'vegetables', 'salad', 'meat', 'seafood', 'side', 'subside', 'bakery', 'dessert', 'decor', 'soup', 'misc', 'beverages'];
   // Ключи секций: id → (localization_key, requiresPro)
+  // Цеха кухни: код → (ключ локализации, requiresPro)
   static const _sectionKeys = <String, (String, bool)>{
     'hot_kitchen':   ('section_hot_kitchen', false),
     'cold_kitchen':  ('section_cold_kitchen', false),
@@ -467,6 +470,18 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     'bakery':        ('section_bakery', true),
   };
 
+  // Русские названия цехов (fallback если нет локализации)
+  static const _sectionLabelsRu = <String, String>{
+    'hot_kitchen':   'Горячий цех',
+    'cold_kitchen':  'Холодный цех',
+    'preparation':   'Заготовки',
+    'confectionery': 'Кондитерский',
+    'grill':         'Гриль',
+    'pizza':         'Пицца',
+    'sushi':         'Суши',
+    'bakery':        'Пекарня',
+  };
+
   Map<String, String> _getAvailableSections(bool hasPro, LocalizationService loc) {
     return Map.fromEntries(
       _sectionKeys.entries
@@ -474,8 +489,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           .map((e) => MapEntry(e.key, loc.t(e.value.$1))),
     );
   }
+
+  String _sectionLabel(String code, LocalizationService loc) {
+    final sections = _getAvailableSections(true, loc);
+    return sections[code] ?? _sectionLabelsRu[code] ?? code;
+  }
+
   String _selectedCategory = 'misc';
-  String? _selectedSection; // цех
+  List<String> _selectedSections = []; // [] = Скрыто, ['all'] = Все цеха
   bool _isSemiFinished = true; // ПФ или блюдо (порция — в карточках блюд, отдельно)
   final _technologyController = TextEditingController();
   final List<TTIngredient> _ingredients = [];
@@ -609,7 +630,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
             _portionWeight = tc.portionWeight;
             _nameController.text = tc.getLocalizedDishName(context.read<LocalizationService>().currentLanguageCode);
             _selectedCategory = _categoryOptions.contains(tc.category) ? tc.category : 'misc';
-            _selectedSection = tc.section;
+            _selectedSections = List<String>.from(tc.sections);
             _isSemiFinished = tc.isSemiFinished;
             _photoUrls = tc.photoUrls ?? [];
             _pendingPhotoBytes = [];
@@ -743,7 +764,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
         final created = await svc.createTechCard(
           dishName: name,
           category: category,
-          section: _selectedSection,
+          sections: _selectedSections,
           isSemiFinished: _isSemiFinished,
           establishmentId: est.id,
           createdBy: emp.id,
@@ -824,7 +845,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
             if (url != null) photoUrls.add(url);
           }
         }
-        final updated = _applyEdits(tc, dishName: name, category: category, section: _selectedSection, isSemiFinished: _isSemiFinished, portionWeight: _portionWeight, yieldGrams: yieldVal, technologyLocalized: techMap, photoUrls: photoUrls, ingredients: toSaveIngredients);
+        final updated = _applyEdits(tc, dishName: name, category: category, sections: _selectedSections, isSemiFinished: _isSemiFinished, portionWeight: _portionWeight, yieldGrams: yieldVal, technologyLocalized: techMap, photoUrls: photoUrls, ingredients: toSaveIngredients);
         await svc.saveTechCard(updated);
         // Переводим название и технологию фоново
         final techText = _technologyController.text.trim();
@@ -1333,128 +1354,245 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   }
 
   /// Блок фото: ПФ — сетка до 10, блюдо — 1 фото. Под технологией.
+  /// Ширина как у блока "Технология" (max 1000px).
+  /// На мобиле — 2 фото в ряд, на десктопе — горизонтальный wrap.
+  /// Тап по фото — полноэкранный просмотр.
   Widget _buildPhotoSection(LocalizationService loc, bool effectiveCanEdit) {
     final maxPhotos = _maxPhotos;
     final existing = _photoUrls.length + _pendingPhotoBytes.length;
     if (existing == 0 && !effectiveCanEdit) return const SizedBox.shrink();
 
-    return Container(
-      margin: const EdgeInsets.only(top: 16),
-      decoration: BoxDecoration(
-        border: Border.all(color: Theme.of(context).colorScheme.outline),
-        color: Theme.of(context).colorScheme.surfaceContainerLowest,
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+
+    // Все фото в одном списке для единой нумерации индексов при тапе
+    final allPhotos = <({String? url, Uint8List? bytes, bool isUrl, int index})>[
+      ..._photoUrls.asMap().entries.map((e) => (url: e.value, bytes: null as Uint8List?, isUrl: true,  index: e.key)),
+      ..._pendingPhotoBytes.asMap().entries.map((e) => (url: null as String?,  bytes: e.value,        isUrl: false, index: e.key)),
+    ];
+
+    Widget photoGrid() {
+      if (isMobile) {
+        // 2 фото в ряд, квадратные
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 8,
+            mainAxisSpacing: 8,
+            childAspectRatio: 1,
+          ),
+          itemCount: allPhotos.length,
+          itemBuilder: (_, i) {
+            final p = allPhotos[i];
+            return _photoThumb(
+              url: p.url,
+              bytes: p.bytes,
+              onRemove: effectiveCanEdit
+                  ? () => _removePhotoByIndex(p.index, isUrl: p.isUrl)
+                  : null,
+              onTap: p.url != null || p.bytes != null
+                  ? () => _showPhotoFullscreen(allPhotos.map((x) => (url: x.url, bytes: x.bytes)).toList(), i)
+                  : null,
+            );
+          },
+        );
+      } else {
+        // Десктоп — wrap с фиксированным размером миниатюр
+        return Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: allPhotos.asMap().entries.map((entry) {
+            final i = entry.key;
+            final p = entry.value;
+            return _photoThumb(
+              url: p.url,
+              bytes: p.bytes,
+              onRemove: effectiveCanEdit
+                  ? () => _removePhotoByIndex(p.index, isUrl: p.isUrl)
+                  : null,
+              onTap: p.url != null || p.bytes != null
+                  ? () => _showPhotoFullscreen(allPhotos.map((x) => (url: x.url, bytes: x.bytes)).toList(), i)
+                  : null,
+            );
+          }).toList(),
+        );
+      }
+    }
+
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: SizedBox(
+        width: screenWidth > 1000 ? 1000 : screenWidth,
+        child: Container(
+          margin: const EdgeInsets.only(top: 12),
+          decoration: BoxDecoration(
+            border: Border.all(color: Theme.of(context).colorScheme.outline),
+            color: Theme.of(context).colorScheme.surfaceContainerLowest,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  border: const Border(bottom: BorderSide(color: Colors.grey, width: 1)),
+                ),
+                child: Row(
+                  children: [
+                    Text(loc.t('photo'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    if (effectiveCanEdit) ...[
+                      const Spacer(),
+                      TextButton.icon(
+                        icon: const Icon(Icons.add_photo_alternate, size: 20),
+                        label: Text(loc.t('add')),
+                        onPressed: existing >= maxPhotos ? null : () => _pickPhotoForTechCard(loc),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: photoGrid(),
+              ),
+            ],
+          ),
+        ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    );
+  }
+
+  /// Миниатюра фото — квадратная, с кнопкой удаления и тапом для просмотра.
+  Widget _photoThumb({
+    String? url,
+    Uint8List? bytes,
+    VoidCallback? onRemove,
+    VoidCallback? onTap,
+  }) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    final size = isMobile ? double.infinity : 100.0;
+
+    Widget image() {
+      if (url != null) {
+        return kIsWeb
+            ? Image.network(url, fit: BoxFit.cover, width: double.infinity, height: double.infinity,
+                errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported),
+                loadingBuilder: (_, child, p) => p == null ? child : const Center(child: CircularProgressIndicator(strokeWidth: 2)))
+            : CachedNetworkImage(imageUrl: url, fit: BoxFit.cover,
+                placeholder: (_, __) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                errorWidget: (_, __, ___) => const Icon(Icons.image_not_supported));
+      }
+      if (bytes != null) return Image.memory(bytes, fit: BoxFit.cover, width: double.infinity, height: double.infinity);
+      return const SizedBox.shrink();
+    }
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Stack(
         children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              border: const Border(bottom: BorderSide(color: Colors.grey, width: 1)),
-            ),
-            child: Row(
-              children: [
-                Text(loc.t('photo'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                if (effectiveCanEdit) ...[
-                  const Spacer(),
-                  TextButton.icon(
-                    icon: const Icon(Icons.add_photo_alternate, size: 20),
-                    label: Text(loc.t('add')),
-                    onPressed: existing >= maxPhotos
-                        ? null
-                        : () => _pickPhotoForTechCard(loc),
-                  ),
-                ],
-              ],
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: SizedBox(
+              width: isMobile ? double.infinity : size,
+              height: isMobile ? double.infinity : size,
+              child: image(),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                ..._photoUrls.asMap().entries.map((e) => _photoThumb(url: e.value, onRemove: effectiveCanEdit ? () => _removePhotoByIndex(e.key, isUrl: true) : null)),
-                ..._pendingPhotoBytes.asMap().entries.map((e) => _photoThumb(bytes: e.value, onRemove: effectiveCanEdit ? () => _removePhotoByIndex(e.key, isUrl: false) : null)),
-              ],
+          if (onRemove != null)
+            Positioned(
+              top: 4,
+              right: 4,
+              child: GestureDetector(
+                onTap: onRemove,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                  child: const Icon(Icons.close, color: Colors.white, size: 16),
+                ),
+              ),
             ),
-          ),
+          if (onTap != null)
+            Positioned(
+              bottom: 4,
+              right: onRemove != null ? 32 : 4,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(color: Colors.black38, shape: BoxShape.circle),
+                child: const Icon(Icons.zoom_in, color: Colors.white, size: 16),
+              ),
+            ),
         ],
       ),
     );
   }
 
-  Widget _photoThumb({String? url, Uint8List? bytes, VoidCallback? onRemove}) {
-    return Stack(
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: SizedBox(
-            width: 80,
-            height: 80,
-            child: url != null
-                ? CachedNetworkImage(
-                    imageUrl: url,
-                    fit: BoxFit.cover,
-                    placeholder: (_, __) => const Center(child: CircularProgressIndicator()),
-                    errorWidget: (_, __, e) => const Icon(Icons.image_not_supported),
-                  )
-                : bytes != null
-                    ? Image.memory(bytes, fit: BoxFit.cover)
-                    : const SizedBox(),
-          ),
-        ),
-        if (onRemove != null)
-          Positioned(
-            top: 0,
-            right: 0,
-            child: GestureDetector(
-              onTap: onRemove,
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-                child: const Icon(Icons.close, color: Colors.white, size: 16),
-              ),
-            ),
-          ),
-      ],
+  /// Полноэкранный просмотр фото с возможностью листать между фото и зумить.
+  void _showPhotoFullscreen(List<({String? url, Uint8List? bytes})> photos, int initialIndex) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (ctx) => _PhotoViewerDialog(photos: photos, initialIndex: initialIndex),
     );
   }
 
   Future<void> _pickPhotoForTechCard(LocalizationService loc) async {
-    final source = await showModalBottomSheet<bool>(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(leading: const Icon(Icons.photo_library), title: Text(loc.t('photo_from_gallery')), onTap: () => Navigator.pop(ctx, true)),
-            ListTile(leading: const Icon(Icons.camera_alt), title: Text(loc.t('photo_from_camera')), onTap: () => Navigator.pop(ctx, false)),
-          ],
-        ),
-      ),
-    );
-    if (source == null || !mounted) return;
+    Uint8List? bytes;
+
     try {
-      final picker = ImagePicker();
-      final file = await picker.pickImage(
-        source: source ? ImageSource.gallery : ImageSource.camera,
-        maxWidth: 1200,
-        maxHeight: 1200,
-        imageQuality: 85,
-      );
-      if (file == null || !mounted) return;
-      final bytes = await file.readAsBytes();
-      if (!mounted) return;
+      if (kIsWeb) {
+        // На вебе FilePicker надёжнее
+        final result = await FilePicker.platform.pickFiles(
+          type: FileType.image,
+          withData: true,
+        );
+        if (result == null || result.files.isEmpty) return;
+        bytes = result.files.single.bytes;
+      } else {
+        final source = await showModalBottomSheet<bool>(
+          context: context,
+          builder: (ctx) => SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.photo_library),
+                  title: Text(loc.t('photo_from_gallery')),
+                  onTap: () => Navigator.pop(ctx, true),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.camera_alt),
+                  title: Text(loc.t('photo_from_camera')),
+                  onTap: () => Navigator.pop(ctx, false),
+                ),
+              ],
+            ),
+          ),
+        );
+        if (source == null || !mounted) return;
+        final picker = ImagePicker();
+        final file = await picker.pickImage(
+          source: source ? ImageSource.gallery : ImageSource.camera,
+          maxWidth: 1200,
+          maxHeight: 1200,
+          imageQuality: 85,
+        );
+        if (file == null || !mounted) return;
+        bytes = await file.readAsBytes();
+      }
+
+      if (bytes == null || bytes.isEmpty || !mounted) return;
       setState(() {
         if (_pendingPhotoBytes.length + _photoUrls.length < _maxPhotos) {
-          _pendingPhotoBytes.add(bytes);
+          _pendingPhotoBytes.add(bytes!);
         }
       });
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${loc.t('photo_upload_error')}: $e')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${loc.t('photo_upload_error')}: $e')));
     }
   }
 
@@ -1573,18 +1711,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                           child: Text(_categoryLabel(_selectedCategory, loc.currentLanguageCode), overflow: TextOverflow.ellipsis),
                         ),
                   const SizedBox(height: 12),
-                  effectiveCanEdit
-                      ? DropdownButtonFormField<String>(
-                          value: _selectedSection,
-                          decoration: InputDecoration(labelText: loc.t('kitchen_section'), isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
-                          items: _getAvailableSections(context.read<AccountManagerSupabase>().hasProSubscription, loc).entries.map((entry) =>
-                            DropdownMenuItem(value: entry.key, child: Text(entry.value))).toList(),
-                          onChanged: (v) => setState(() => _selectedSection = v),
-                        )
-                      : _selectedSection != null ? InputDecorator(
-                          decoration: InputDecoration(labelText: loc.t('kitchen_section'), isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
-                          child: Text(_getAvailableSections(context.read<AccountManagerSupabase>().hasProSubscription, loc)[_selectedSection!] ?? _selectedSection!, overflow: TextOverflow.ellipsis),
-                        ) : const SizedBox.shrink(),
+                  _SectionPicker(
+                    selected: _selectedSections,
+                    availableSections: _getAvailableSections(
+                        context.read<AccountManagerSupabase>().hasProSubscription, loc),
+                    canEdit: effectiveCanEdit,
+                    onChanged: (v) => setState(() => _selectedSections = v),
+                    loc: loc,
+                  ),
                   const SizedBox(height: 12),
                   effectiveCanEdit
                       ? DropdownButtonFormField<bool>(
@@ -1650,20 +1784,16 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                         ),
                         const SizedBox(width: 8),
                         SizedBox(
-                          width: 140,
-                          height: 56,
-                          child: effectiveCanEdit
-                              ? DropdownButtonFormField<String>(
-                                  value: _selectedSection,
-                                  decoration: InputDecoration(labelText: loc.t('kitchen_section'), isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)), contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
-                                  items: _getAvailableSections(context.read<AccountManagerSupabase>().hasProSubscription, loc).entries.map((entry) =>
-                                    DropdownMenuItem(value: entry.key, child: Text(entry.value))).toList(),
-                                  onChanged: (v) => setState(() => _selectedSection = v),
-                                )
-                              : _selectedSection != null ? InputDecorator(
-                                  decoration: InputDecoration(labelText: loc.t('kitchen_section'), isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
-                                  child: Text(_getAvailableSections(context.read<AccountManagerSupabase>().hasProSubscription, loc)[_selectedSection!] ?? _selectedSection!, overflow: TextOverflow.ellipsis),
-                                ) : const SizedBox.shrink(),
+                          width: 180,
+                          child: _SectionPicker(
+                            selected: _selectedSections,
+                            availableSections: _getAvailableSections(
+                                context.read<AccountManagerSupabase>().hasProSubscription, loc),
+                            canEdit: effectiveCanEdit,
+                            onChanged: (v) => setState(() => _selectedSections = v),
+                            loc: loc,
+                            compact: true,
+                          ),
                         ),
                         const SizedBox(width: 8),
                         ConstrainedBox(
@@ -3516,6 +3646,480 @@ class _TechCardPicker extends StatelessWidget {
                 }
               },
               child: Text(loc.t('save')),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Полноэкранный просмотр фото с листанием и зумом
+// ══════════════════════════════════════════════════════════════════════════════
+class _PhotoViewerDialog extends StatefulWidget {
+  final List<({String? url, Uint8List? bytes})> photos;
+  final int initialIndex;
+
+  const _PhotoViewerDialog({required this.photos, required this.initialIndex});
+
+  @override
+  State<_PhotoViewerDialog> createState() => _PhotoViewerDialogState();
+}
+
+class _PhotoViewerDialogState extends State<_PhotoViewerDialog> {
+  late final PageController _pageController;
+  late int _current;
+
+  @override
+  void initState() {
+    super.initState();
+    _current = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final total = widget.photos.length;
+
+    return Dialog.fullscreen(
+      backgroundColor: Colors.black87,
+      child: Stack(
+        children: [
+          // Листалка фото
+          PageView.builder(
+            controller: _pageController,
+            itemCount: total,
+            onPageChanged: (i) => setState(() => _current = i),
+            itemBuilder: (_, i) {
+              final p = widget.photos[i];
+              return InteractiveViewer(
+                minScale: 0.5,
+                maxScale: 4.0,
+                child: Center(
+                  child: p.url != null
+                      ? (kIsWeb
+                          ? Image.network(p.url!, fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) =>
+                                  const Icon(Icons.image_not_supported, color: Colors.white, size: 64))
+                          : CachedNetworkImage(imageUrl: p.url!, fit: BoxFit.contain,
+                              errorWidget: (_, __, ___) =>
+                                  const Icon(Icons.image_not_supported, color: Colors.white, size: 64)))
+                      : p.bytes != null
+                          ? Image.memory(p.bytes!, fit: BoxFit.contain)
+                          : const SizedBox.shrink(),
+                ),
+              );
+            },
+          ),
+
+          // Кнопка закрыть
+          Positioned(
+            top: 16,
+            right: 16,
+            child: SafeArea(
+              child: GestureDetector(
+                onTap: () => Navigator.of(context).pop(),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                  child: const Icon(Icons.close, color: Colors.white, size: 24),
+                ),
+              ),
+            ),
+          ),
+
+          // Счётчик фото (если больше 1)
+          if (total > 1)
+            Positioned(
+              bottom: 24,
+              left: 0,
+              right: 0,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Стрелка влево
+                  if (_current > 0)
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left, color: Colors.white, size: 36),
+                      onPressed: () => _pageController.previousPage(
+                          duration: const Duration(milliseconds: 250), curve: Curves.easeInOut),
+                    ),
+                  // Индикаторы
+                  ...List.generate(total, (i) => AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    width: _current == i ? 12 : 8,
+                    height: _current == i ? 12 : 8,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _current == i ? Colors.white : Colors.white38,
+                    ),
+                  )),
+                  // Стрелка вправо
+                  if (_current < total - 1)
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right, color: Colors.white, size: 36),
+                      onPressed: () => _pageController.nextPage(
+                          duration: const Duration(milliseconds: 250), curve: Curves.easeInOut),
+                    ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Выбор цехов для ТТК:
+//   [] = Скрыто (только шеф/су-шеф)
+//   ['all'] = Все цеха
+//   ['hot_kitchen', ...] = конкретные цеха
+//
+// Логика взаимоисключения:
+//   - Выбрать "Все цеха" → снимает все конкретные
+//   - Выбрать конкретный → снимает "Все цеха"
+//   - Снять все конкретные → возвращается "Скрыто"
+//   - "Скрыто" нельзя выбрать вручную — только если ничего не выбрано
+// ══════════════════════════════════════════════════════════════════════════════
+class _SectionPicker extends StatelessWidget {
+  final List<String> selected;
+  final Map<String, String> availableSections;
+  final bool canEdit;
+  final ValueChanged<List<String>> onChanged;
+  final LocalizationService loc;
+  final bool compact; // компактный режим для горизонтального layout
+
+  const _SectionPicker({
+    required this.selected,
+    required this.availableSections,
+    required this.canEdit,
+    required this.onChanged,
+    required this.loc,
+    this.compact = false,
+  });
+
+  String get _displayLabel {
+    if (selected.isEmpty) return 'Скрыто';
+    if (selected.contains('all')) return 'Все цеха';
+    if (selected.length == 1) {
+      return availableSections[selected.first] ?? selected.first;
+    }
+    return '${selected.length} цеха';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    if (!canEdit) {
+      return InputDecorator(
+        decoration: InputDecoration(
+          labelText: 'Цех',
+          isDense: true,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              selected.isEmpty ? Icons.visibility_off : Icons.store,
+              size: 16,
+              color: selected.isEmpty
+                  ? theme.colorScheme.error.withValues(alpha: 0.7)
+                  : theme.colorScheme.primary,
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                _displayLabel,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: selected.isEmpty
+                      ? theme.colorScheme.error.withValues(alpha: 0.8)
+                      : null,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return GestureDetector(
+      onTap: () => _showPicker(context),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: 'Цех',
+          isDense: true,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          suffixIcon: const Icon(Icons.arrow_drop_down),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              selected.isEmpty ? Icons.visibility_off : Icons.store,
+              size: 16,
+              color: selected.isEmpty
+                  ? theme.colorScheme.error.withValues(alpha: 0.7)
+                  : theme.colorScheme.primary,
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                _displayLabel,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: selected.isEmpty
+                      ? theme.colorScheme.error.withValues(alpha: 0.8)
+                      : null,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showPicker(BuildContext context) {
+    showDialog<List<String>>(
+      context: context,
+      builder: (_) => _SectionPickerDialog(
+        selected: List<String>.from(selected),
+        availableSections: availableSections,
+        loc: loc,
+      ),
+    ).then((result) {
+      if (result != null) onChanged(result);
+    });
+  }
+}
+
+class _SectionPickerDialog extends StatefulWidget {
+  final List<String> selected;
+  final Map<String, String> availableSections;
+  final LocalizationService loc;
+
+  const _SectionPickerDialog({
+    required this.selected,
+    required this.availableSections,
+    required this.loc,
+  });
+
+  @override
+  State<_SectionPickerDialog> createState() => _SectionPickerDialogState();
+}
+
+class _SectionPickerDialogState extends State<_SectionPickerDialog> {
+  late List<String> _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = List<String>.from(widget.selected);
+  }
+
+  void _toggle(String code) {
+    setState(() {
+      if (code == 'all') {
+        // Выбрать "Все цеха" — снимаем все конкретные
+        if (_selected.contains('all')) {
+          _selected = []; // снятие "Все" → Скрыто
+        } else {
+          _selected = ['all'];
+        }
+      } else {
+        // Конкретный цех — снимаем 'all' если был
+        _selected.remove('all');
+        if (_selected.contains(code)) {
+          _selected.remove(code);
+          // Сняли последний конкретный → Скрыто (пустой список)
+        } else {
+          _selected.add(code);
+        }
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isHidden = _selected.isEmpty;
+    final isAll = _selected.contains('all');
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                Icon(Icons.store, color: theme.colorScheme.primary, size: 22),
+                const SizedBox(width: 10),
+                Text('Выбор цеха',
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w700)),
+              ]),
+              const SizedBox(height: 4),
+              Text(
+                'ТТК будет видна только поварам выбранных цехов. '
+                'Если ничего не выбрано — видят только шеф-повар и су-шеф.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+              ),
+              const SizedBox(height: 16),
+
+              // Статус "Скрыто"
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isHidden
+                      ? theme.colorScheme.errorContainer.withValues(alpha: 0.3)
+                      : theme.colorScheme.surfaceContainerLowest,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: isHidden
+                        ? theme.colorScheme.error.withValues(alpha: 0.4)
+                        : theme.colorScheme.outline.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(children: [
+                  Icon(Icons.visibility_off,
+                      size: 18,
+                      color: isHidden
+                          ? theme.colorScheme.error
+                          : theme.colorScheme.onSurface.withValues(alpha: 0.4)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      isHidden
+                          ? 'Скрыто — виден только шеф-повару и су-шефу'
+                          : 'Снимите все цеха чтобы скрыть ТТК',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isHidden
+                            ? theme.colorScheme.error
+                            : theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                      ),
+                    ),
+                  ),
+                ]),
+              ),
+              const SizedBox(height: 12),
+
+              // Список цехов
+              ...widget.availableSections.entries.map((e) => _CheckItem(
+                    label: e.value,
+                    checked: _selected.contains(e.key),
+                    onTap: () => _toggle(e.key),
+                    theme: theme,
+                  )),
+
+              const Divider(height: 20),
+
+              // Все цеха
+              _CheckItem(
+                label: 'Все цеха',
+                checked: isAll,
+                onTap: () => _toggle('all'),
+                theme: theme,
+                icon: Icons.done_all,
+                bold: true,
+              ),
+
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(null),
+                    child: const Text('Отмена'),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton(
+                    onPressed: () => Navigator.of(context).pop(_selected),
+                    child: const Text('Сохранить'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CheckItem extends StatelessWidget {
+  final String label;
+  final bool checked;
+  final VoidCallback onTap;
+  final ThemeData theme;
+  final IconData icon;
+  final bool bold;
+
+  const _CheckItem({
+    required this.label,
+    required this.checked,
+    required this.onTap,
+    required this.theme,
+    this.icon = Icons.kitchen,
+    this.bold = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+        child: Row(
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                shape: BoxShape.rectangle,
+                borderRadius: BorderRadius.circular(4),
+                color: checked ? theme.colorScheme.primary : Colors.transparent,
+                border: Border.all(
+                  color: checked
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.outline,
+                  width: 2,
+                ),
+              ),
+              child: checked
+                  ? const Icon(Icons.check, size: 14, color: Colors.white)
+                  : null,
+            ),
+            const SizedBox(width: 10),
+            Icon(icon, size: 16,
+                color: checked
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurface.withValues(alpha: 0.55)),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: bold ? FontWeight.w600 : FontWeight.normal,
+                color: checked ? theme.colorScheme.primary : null,
+              ),
             ),
           ],
         ),

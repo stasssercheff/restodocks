@@ -1,4 +1,4 @@
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -55,9 +55,14 @@ class _MenuScreenState extends State<MenuScreen> {
       final techCardService = context.read<TechCardServiceSupabase>();
       await productStore.loadProducts();
       await productStore.loadNomenclature(est.id);
-      final tcs = await techCardService.getTechCardsForEstablishment(est.id);
+      final emp = acc.currentEmployee;
+      final allTcs = await techCardService.getTechCardsForEstablishment(est.id);
+      // Фильтр по цеху для кухни
+      final tcs = emp == null
+          ? allTcs
+          : allTcs.where((tc) => emp.canSeeTechCard(tc.sections)).toList();
       if (!mounted) return;
-      final currency = acc.currentEmployee?.currency ?? acc.establishment?.defaultCurrency ?? 'RUB';
+      final currency = emp?.currency ?? acc.establishment?.defaultCurrency ?? 'RUB';
       // Пересчитываем стоимость ингредиентов по актуальным ценам номенклатуры
       final enriched = <TechCard>[];
       for (final tc in tcs) {
@@ -206,27 +211,29 @@ class _MenuScreenState extends State<MenuScreen> {
           final tc = _dishes[index];
           final totalCost = tc.totalCost;
           final lang = loc.currentLanguageCode;
-          final photoUrl = tc.photoUrls != null && tc.photoUrls!.isNotEmpty ? tc.photoUrls!.first : null;
+          final photoUrls = tc.photoUrls ?? [];
+          final photoUrl = photoUrls.isNotEmpty ? photoUrls.first : null;
+          final fallbackIcon = Icon(
+            tc.isSemiFinished ? Icons.inventory_2 : Icons.restaurant,
+            color: Theme.of(context).colorScheme.primary,
+          );
           return Card(
             margin: const EdgeInsets.only(bottom: 12),
             child: ExpansionTile(
-              leading: SizedBox(
-                width: 48,
-                height: 48,
-                child: photoUrl != null
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: CachedNetworkImage(
-                          imageUrl: photoUrl,
-                          fit: BoxFit.cover,
-                          placeholder: (_, __) => Icon(tc.isSemiFinished ? Icons.inventory_2 : Icons.restaurant, color: Theme.of(context).colorScheme.primary),
-                          errorWidget: (_, __, ___) => Icon(tc.isSemiFinished ? Icons.inventory_2 : Icons.restaurant, color: Theme.of(context).colorScheme.primary),
-                        ),
-                      )
-                    : Icon(
-                        tc.isSemiFinished ? Icons.inventory_2 : Icons.restaurant,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
+              leading: GestureDetector(
+                onTap: photoUrl != null
+                    ? () => _showPhotoFullscreen(context, photoUrls)
+                    : null,
+                child: SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: photoUrl != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: _LazyPhoto(url: photoUrl, fallback: fallbackIcon),
+                        )
+                      : fallbackIcon,
+                ),
               ),
               title: InkWell(
                 onTap: () => context.push('/tech-cards/${tc.id}?view=1'),
@@ -263,6 +270,14 @@ class _MenuScreenState extends State<MenuScreen> {
           );
         },
       ),
+    );
+  }
+
+  void _showPhotoFullscreen(BuildContext ctx, List<String> urls) {
+    showDialog(
+      context: ctx,
+      barrierColor: Colors.black87,
+      builder: (_) => _MenuPhotoViewer(urls: urls),
     );
   }
 }
@@ -387,6 +402,141 @@ class _MenuDishTable extends StatelessWidget {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Lazy-фото: грузится только когда попадает во viewport,
+// пока грузится — показывает placeholder (иконку).
+// ─────────────────────────────────────────────────────────────────────────────
+class _LazyPhoto extends StatelessWidget {
+  final String url;
+  final Widget fallback;
+
+  const _LazyPhoto({required this.url, required this.fallback});
+
+  @override
+  Widget build(BuildContext context) {
+    return Image.network(
+      url,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+      // frameBuilder даёт плавное появление без мигания
+      frameBuilder: (_, child, frame, wasSynchronouslyLoaded) {
+        if (wasSynchronouslyLoaded || frame != null) return child;
+        return fallback;
+      },
+      errorBuilder: (_, __, ___) => fallback,
+      // cacheWidth ограничивает декодирование — не тянет полный размер в память
+      cacheWidth: 96,
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Полноэкранный просмотр фото блюда (из меню)
+// ─────────────────────────────────────────────────────────────────────────────
+class _MenuPhotoViewer extends StatefulWidget {
+  final List<String> urls;
+  const _MenuPhotoViewer({required this.urls});
+
+  @override
+  State<_MenuPhotoViewer> createState() => _MenuPhotoViewerState();
+}
+
+class _MenuPhotoViewerState extends State<_MenuPhotoViewer> {
+  late final PageController _ctrl;
+  int _current = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = PageController();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final total = widget.urls.length;
+    return Dialog.fullscreen(
+      backgroundColor: Colors.black87,
+      child: Stack(
+        children: [
+          PageView.builder(
+            controller: _ctrl,
+            itemCount: total,
+            onPageChanged: (i) => setState(() => _current = i),
+            itemBuilder: (_, i) => InteractiveViewer(
+              minScale: 0.5,
+              maxScale: 4.0,
+              child: Center(
+                child: Image.network(
+                  widget.urls[i],
+                  fit: BoxFit.contain,
+                  loadingBuilder: (_, child, p) => p == null
+                      ? child
+                      : const Center(child: CircularProgressIndicator(color: Colors.white)),
+                  errorBuilder: (_, __, ___) =>
+                      const Icon(Icons.image_not_supported, color: Colors.white, size: 64),
+                ),
+              ),
+            ),
+          ),
+          // Закрыть
+          Positioned(
+            top: 16, right: 16,
+            child: SafeArea(
+              child: GestureDetector(
+                onTap: () => Navigator.of(context).pop(),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                  child: const Icon(Icons.close, color: Colors.white, size: 24),
+                ),
+              ),
+            ),
+          ),
+          // Индикаторы (если фото > 1)
+          if (total > 1)
+            Positioned(
+              bottom: 24, left: 0, right: 0,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (_current > 0)
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left, color: Colors.white, size: 36),
+                      onPressed: () => _ctrl.previousPage(
+                          duration: const Duration(milliseconds: 250), curve: Curves.easeInOut),
+                    ),
+                  ...List.generate(total, (i) => AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    width: _current == i ? 12 : 8,
+                    height: _current == i ? 12 : 8,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _current == i ? Colors.white : Colors.white38,
+                    ),
+                  )),
+                  if (_current < total - 1)
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right, color: Colors.white, size: 36),
+                      onPressed: () => _ctrl.nextPage(
+                          duration: const Duration(milliseconds: 250), curve: Curves.easeInOut),
+                    ),
+                ],
+              ),
+            ),
         ],
       ),
     );
