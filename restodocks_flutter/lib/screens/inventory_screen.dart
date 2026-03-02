@@ -2353,6 +2353,8 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     // Восстанавливаем байты бланка: localStorage → Supabase Storage (инкогнито/другое устройство)
     await iikoStore.restoreBlankFromStorage(establishmentId: estId);
     await iikoStore.loadProducts(estId);
+    // Примечание: loadProducts внутри может вызвать _assignSheetNamesInMemory,
+    // который обновит sheetName у продуктов. Берём products ПОСЛЕ завершения.
     if (!mounted) return;
     setState(() {
       _rows.clear();
@@ -2389,13 +2391,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
 
     var rows = _rows;
     if (hasSheets && activeSheet != null) {
-      // Продукты с sheetName фильтруем точно; у старых данных (sheetName==null)
-      // показываем всё на первой вкладке
-      final anyHasSheetName = rows.any((r) => r.product.sheetName != null);
-      if (anyHasSheetName) {
-        rows = rows.where((r) => r.product.sheetName == activeSheet).toList();
-      }
-      // Если ни у одного продукта нет sheetName — показываем все на любой вкладке
+      rows = rows.where((r) => r.product.sheetName == activeSheet).toList();
     }
     if (_nameFilter.isEmpty) return rows;
     final q = _nameFilter.toLowerCase();

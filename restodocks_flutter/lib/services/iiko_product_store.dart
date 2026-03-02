@@ -195,10 +195,10 @@ class IikoProductStore extends ChangeNotifier {
           .toList();
       _loadedEstablishmentId = establishmentId;
 
-      // Если у продуктов нет sheetName, но sheetNames известны —
-      // восстанавливаем sheetName из бланка (in-memory, без записи в БД)
-      if (sheetNames.length > 1 && _products.isNotEmpty &&
-          _products.every((p) => p.sheetName == null)) {
+      // Если у продуктов нет sheetName — восстанавливаем из бланка in-memory.
+      // Это нужно как для старых данных (sheetName=NULL в БД), так и для случая
+      // когда sheetNames ещё не были сохранены в localStorage.
+      if (_products.isNotEmpty && _products.every((p) => p.sheetName == null)) {
         await _assignSheetNamesInMemory();
       }
     } catch (e) {
@@ -210,10 +210,9 @@ class IikoProductStore extends ChangeNotifier {
   }
 
   /// Читает бланк и проставляет sheetName для каждого продукта in-memory.
-  /// Вызывается когда sheetNames известны, но в БД sheet_name = NULL (старые данные).
+  /// Также заполняет sheetNames если они ещё не были восстановлены.
   Future<void> _assignSheetNamesInMemory() async {
     if (originalBlankBytes == null) {
-      // Пробуем восстановить бланк из localStorage молча
       try {
         final prefs = await SharedPreferences.getInstance();
         final b64 = prefs.getString(_kBlankBytesKey);
@@ -226,8 +225,10 @@ class IikoProductStore extends ChangeNotifier {
       final excel = Excel.decodeBytes(originalBlankBytes!.toList());
       // Строим карту: код → sheetName
       final codeToSheet = <String, String>{};
-      for (final sheetName in excel.tables.keys) {
-        final sheet = excel.tables[sheetName];
+      final foundSheets = <String>[];
+
+      for (final sName in excel.tables.keys) {
+        final sheet = excel.tables[sName];
         if (sheet == null) continue;
         // Ищем колонку кода (первые 20 строк)
         int codeCol = 2;
@@ -237,18 +238,31 @@ class IikoProductStore extends ChangeNotifier {
             if (v == 'код' || v == 'code') { codeCol = c; break; }
           }
         }
+        var hasProducts = false;
         for (var r = 0; r < sheet.maxRows; r++) {
           final code = _excelCellStr(sheet, r, codeCol).trim();
-          if (code.isNotEmpty) codeToSheet[code] = sheetName;
+          if (code.isNotEmpty) {
+            codeToSheet[code] = sName;
+            hasProducts = true;
+          }
         }
+        if (hasProducts) foundSheets.add(sName);
       }
+
       if (codeToSheet.isEmpty) return;
+
+      // Заполняем sheetNames если пусты
+      if (sheetNames.length <= 1 && foundSheets.length > 1) {
+        sheetNames = foundSheets;
+        debugPrint('IikoProductStore: restored sheetNames from blank: $sheetNames');
+      }
 
       _products = _products.map((p) {
         final s = p.code != null ? codeToSheet[p.code!.trim()] : null;
         return s != null ? p.copyWith(sheetName: s) : p;
       }).toList();
-      debugPrint('IikoProductStore: assigned sheetName in-memory for ${_products.where((p) => p.sheetName != null).length} products');
+      debugPrint('IikoProductStore: assigned sheetName in-memory for '
+          '${_products.where((p) => p.sheetName != null).length}/${_products.length} products');
     } catch (e) {
       debugPrint('IikoProductStore._assignSheetNamesInMemory error: $e');
     }

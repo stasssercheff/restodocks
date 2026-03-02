@@ -3569,16 +3569,27 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab>
   bool get wantKeepAlive => true;
 
   String _query = '';
-  String? _selectedSheet; // null = все листы / нет разделения
+  String? _selectedSheet; // null = первая вкладка / нет разделения
 
   @override
   void initState() {
     super.initState();
+    widget.store.addListener(_onStoreChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (widget.establishmentId.isNotEmpty) {
         widget.store.loadProducts(widget.establishmentId);
       }
     });
+  }
+
+  @override
+  void dispose() {
+    widget.store.removeListener(_onStoreChanged);
+    super.dispose();
+  }
+
+  void _onStoreChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _confirmDeleteAll(BuildContext context) async {
@@ -3668,10 +3679,7 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab>
         : (hasSheets ? sheetNames.first : null);
 
     // Фильтрация по листу и запросу
-    // Если ни у одного продукта нет sheetName (старые данные без переразгрузки)
-    // — показываем всех, иначе фильтруем по активному листу
-    final anyHasSheetName = hasSheets && sorted.any((p) => p.sheetName != null);
-    var bySheet = (hasSheets && activeSheet != null && anyHasSheetName)
+    var bySheet = (hasSheets && activeSheet != null)
         ? sorted.where((p) => p.sheetName == activeSheet).toList()
         : sorted;
     final filtered = _query.isEmpty
