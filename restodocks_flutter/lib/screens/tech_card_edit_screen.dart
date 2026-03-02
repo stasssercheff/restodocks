@@ -1,6 +1,8 @@
 import 'dart:typed_data';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -1395,12 +1397,24 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
             width: 80,
             height: 80,
             child: url != null
-                ? CachedNetworkImage(
-                    imageUrl: url,
-                    fit: BoxFit.cover,
-                    placeholder: (_, __) => const Center(child: CircularProgressIndicator()),
-                    errorWidget: (_, __, e) => const Icon(Icons.image_not_supported),
-                  )
+                ? (kIsWeb
+                    ? Image.network(
+                        url,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) =>
+                            const Icon(Icons.image_not_supported),
+                        loadingBuilder: (_, child, progress) => progress == null
+                            ? child
+                            : const Center(child: CircularProgressIndicator()),
+                      )
+                    : CachedNetworkImage(
+                        imageUrl: url,
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) =>
+                            const Center(child: CircularProgressIndicator()),
+                        errorWidget: (_, __, e) =>
+                            const Icon(Icons.image_not_supported),
+                      ))
                 : bytes != null
                     ? Image.memory(bytes, fit: BoxFit.cover)
                     : const SizedBox(),
@@ -1424,37 +1438,59 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   }
 
   Future<void> _pickPhotoForTechCard(LocalizationService loc) async {
-    final source = await showModalBottomSheet<bool>(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(leading: const Icon(Icons.photo_library), title: Text(loc.t('photo_from_gallery')), onTap: () => Navigator.pop(ctx, true)),
-            ListTile(leading: const Icon(Icons.camera_alt), title: Text(loc.t('photo_from_camera')), onTap: () => Navigator.pop(ctx, false)),
-          ],
-        ),
-      ),
-    );
-    if (source == null || !mounted) return;
+    Uint8List? bytes;
+
     try {
-      final picker = ImagePicker();
-      final file = await picker.pickImage(
-        source: source ? ImageSource.gallery : ImageSource.camera,
-        maxWidth: 1200,
-        maxHeight: 1200,
-        imageQuality: 85,
-      );
-      if (file == null || !mounted) return;
-      final bytes = await file.readAsBytes();
-      if (!mounted) return;
+      if (kIsWeb) {
+        // На вебе FilePicker надёжнее
+        final result = await FilePicker.platform.pickFiles(
+          type: FileType.image,
+          withData: true,
+        );
+        if (result == null || result.files.isEmpty) return;
+        bytes = result.files.single.bytes;
+      } else {
+        final source = await showModalBottomSheet<bool>(
+          context: context,
+          builder: (ctx) => SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.photo_library),
+                  title: Text(loc.t('photo_from_gallery')),
+                  onTap: () => Navigator.pop(ctx, true),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.camera_alt),
+                  title: Text(loc.t('photo_from_camera')),
+                  onTap: () => Navigator.pop(ctx, false),
+                ),
+              ],
+            ),
+          ),
+        );
+        if (source == null || !mounted) return;
+        final picker = ImagePicker();
+        final file = await picker.pickImage(
+          source: source ? ImageSource.gallery : ImageSource.camera,
+          maxWidth: 1200,
+          maxHeight: 1200,
+          imageQuality: 85,
+        );
+        if (file == null || !mounted) return;
+        bytes = await file.readAsBytes();
+      }
+
+      if (bytes == null || bytes.isEmpty || !mounted) return;
       setState(() {
         if (_pendingPhotoBytes.length + _photoUrls.length < _maxPhotos) {
-          _pendingPhotoBytes.add(bytes);
+          _pendingPhotoBytes.add(bytes!);
         }
       });
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${loc.t('photo_upload_error')}: $e')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${loc.t('photo_upload_error')}: $e')));
     }
   }
 

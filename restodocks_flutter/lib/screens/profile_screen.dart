@@ -1,4 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -377,16 +379,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildAvatar(Employee emp, double size) {
-    if (emp.avatarUrl != null && emp.avatarUrl!.isNotEmpty) {
+    final url = emp.avatarUrl;
+    if (url != null && url.isNotEmpty) {
+      // Используем Image.network на вебе — CachedNetworkImage иногда кэширует 404
       return ClipOval(
-        child: CachedNetworkImage(
-          imageUrl: emp.avatarUrl!,
-          width: size,
-          height: size,
-          fit: BoxFit.cover,
-          placeholder: (_, __) => Container(color: Colors.grey[300], child: const Icon(Icons.person, size: 40)),
-          errorWidget: (_, __, ___) => _avatarPlaceholder(size),
-        ),
+        child: kIsWeb
+            ? Image.network(
+                url,
+                width: size,
+                height: size,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => _avatarPlaceholder(size),
+                loadingBuilder: (_, child, progress) =>
+                    progress == null ? child : Container(color: Colors.grey[300],
+                        child: const Icon(Icons.person, size: 40)),
+              )
+            : CachedNetworkImage(
+                imageUrl: url,
+                width: size,
+                height: size,
+                fit: BoxFit.cover,
+                placeholder: (_, __) => Container(color: Colors.grey[300],
+                    child: const Icon(Icons.person, size: 40)),
+                errorWidget: (_, __, ___) => _avatarPlaceholder(size),
+              ),
       );
     }
     return _avatarPlaceholder(size);
@@ -444,23 +460,40 @@ class _ProfileEditDialogState extends State<_ProfileEditDialog> {
   }
 
   Future<void> _pickPhoto() async {
-    final loc = context.read<LocalizationService>();
-    final isGallery = await showModalBottomSheet<bool>(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(leading: const Icon(Icons.photo_library), title: Text(loc.t('photo_from_gallery')), onTap: () => Navigator.pop(ctx, true)),
-            ListTile(leading: const Icon(Icons.camera_alt), title: Text(loc.t('photo_from_camera')), onTap: () => Navigator.pop(ctx, false)),
-          ],
-        ),
-      ),
-    );
-    if (isGallery == null || !mounted) return;
+    Uint8List? bytes;
 
-    setState(() => _isLoading = true);
-    try {
+    if (kIsWeb) {
+      // На вебе FilePicker надёжнее чем image_picker
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) return;
+      bytes = result.files.single.bytes;
+    } else {
+      // На мобильных — показываем выбор галерея/камера
+      final loc = context.read<LocalizationService>();
+      final isGallery = await showModalBottomSheet<bool>(
+        context: context,
+        builder: (ctx) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo_library),
+                title: Text(loc.t('photo_from_gallery')),
+                onTap: () => Navigator.pop(ctx, true),
+              ),
+              ListTile(
+                leading: const Icon(Icons.camera_alt),
+                title: Text(loc.t('photo_from_camera')),
+                onTap: () => Navigator.pop(ctx, false),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (isGallery == null || !mounted) return;
       final picker = ImagePicker();
       final file = await picker.pickImage(
         source: isGallery ? ImageSource.gallery : ImageSource.camera,
@@ -469,13 +502,22 @@ class _ProfileEditDialogState extends State<_ProfileEditDialog> {
         imageQuality: 85,
       );
       if (file == null || !mounted) return;
+      bytes = await file.readAsBytes();
+    }
 
-      final bytes = await file.readAsBytes();
+    if (bytes == null || bytes.isEmpty || !mounted) return;
+
+    setState(() => _isLoading = true);
+    try {
       final supabase = SupabaseService();
       const bucket = 'avatars';
       final fileName = '${widget.employee.id}.jpg';
-      await supabase.client.storage.from(bucket).uploadBinary(fileName, bytes, fileOptions: FileOptions(upsert: true));
-      final url = supabase.client.storage.from(bucket).getPublicUrl(fileName);
+      await supabase.client.storage
+          .from(bucket)
+          .uploadBinary(fileName, bytes, fileOptions: FileOptions(upsert: true));
+      // Cache-busting: добавляем timestamp чтобы CachedNetworkImage не брал старый кэш
+      final baseUrl = supabase.client.storage.from(bucket).getPublicUrl(fileName);
+      final url = '$baseUrl?t=${DateTime.now().millisecondsSinceEpoch}';
       if (mounted) setState(() => _avatarUrl = url);
     } catch (e) {
       if (mounted) {
@@ -483,7 +525,7 @@ class _ProfileEditDialogState extends State<_ProfileEditDialog> {
         final isBucketNotFound = errStr.contains('Bucket not found') || errStr.contains('404');
         setState(() {
           _error = isBucketNotFound
-              ? '${context.read<LocalizationService>().t('photo_upload_error')}: bucket "avatars" не найден. Создайте его в Supabase Dashboard: Storage → New bucket → имя "avatars" → Public bucket.'
+              ? '${context.read<LocalizationService>().t('photo_upload_error')}: bucket "avatars" не найден.'
               : '${context.read<LocalizationService>().t('photo_upload_error')}: $e';
           _isLoading = false;
         });
@@ -506,10 +548,12 @@ class _ProfileEditDialogState extends State<_ProfileEditDialog> {
       _error = null;
     });
     try {
+      // Сохраняем чистый URL без cache-busting параметра
+      final cleanAvatarUrl = _avatarUrl?.split('?t=').first;
       final updated = widget.employee.copyWith(
         fullName: fullName,
         surname: surname.isEmpty ? '' : surname,
-        avatarUrl: _avatarUrl ?? widget.employee.avatarUrl,
+        avatarUrl: cleanAvatarUrl ?? widget.employee.avatarUrl,
       );
       await widget.onSaved(updated);
     } catch (e) {
