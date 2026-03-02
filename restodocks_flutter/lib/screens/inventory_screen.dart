@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'dart:html' as html show document, window, InputElement, NodeList;
+import 'dart:html' as html show document, window, InputElement, NodeList, MouseEvent, Element;
 
 import 'package:archive/archive.dart';
 
@@ -3651,42 +3651,38 @@ class _NavButton extends StatefulWidget {
   State<_NavButton> createState() => _NavButtonState();
 }
 
-class _NavButtonState extends State<_NavButton> {
-  final _key = GlobalKey();
+// Флаг: preventDefault на mousedown зарегистрирован один раз глобально
+bool _navBtnPreventDefaultAttached = false;
 
+class _NavButtonState extends State<_NavButton> {
   @override
   void initState() {
     super.initState();
-    // После рендера вешаем mousedown.preventDefault() на DOM-элемент кнопки —
-    // это не даёт Safari снять фокус с активного TextField при нажатии кнопки.
     WidgetsBinding.instance.addPostFrameCallback((_) => _attachPreventDefault());
   }
 
   void _attachPreventDefault() {
+    if (_navBtnPreventDefaultAttached) return;
+    _navBtnPreventDefaultAttached = true;
     try {
-      // Ищем <flt-semantics> или любой элемент под нашим RenderBox
-      // Самый надёжный способ: вешаем на document mousedown с проверкой target
-      // Делаем это один раз глобально через статический флаг
-      if (!_NavButton._preventDefaultAttached) {
-        _NavButton._preventDefaultAttached = true;
-        html.document.addEventListener('mousedown', (event) {
+      // Перехватываем mousedown в capture phase — раньше чем Safari снимает фокус.
+      // Если target помечен data-nav-btn=true → preventDefault() → фокус не снимается.
+      html.document.addEventListener('mousedown', (event) {
+        try {
           final el = (event as html.MouseEvent).target;
           if (el is html.Element &&
               el.getAttribute('data-nav-btn') == 'true') {
             event.preventDefault();
           }
-        }, true); // capture phase — до того как элемент получит фокус
-      }
+        } catch (_) {}
+      }, true);
     } catch (_) {}
   }
-
-  static bool _preventDefaultAttached = false;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Tooltip(
-      key: _key,
       message: widget.tooltip,
       child: GestureDetector(
         // onTapDown — срабатывает раньше onTap, ближе к моменту касания
