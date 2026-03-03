@@ -174,14 +174,21 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
         final total = (r['total'] as num?)?.toDouble() ?? 0.0;
         final quantities = r['quantities'] as List<dynamic>? ?? [];
         double rowSum = 0;
-        if (withPrice && pricePerProduct != null && establishmentId != null) {
-          final pid = r['productId'] as String?;
-          if (pid != null && !pid.startsWith('pf_') && !pid.startsWith('free_')) {
-            final price = pricePerProduct[pid];
-            if (price != null && price > 0) {
-              final totalKg = total / 1000;
-              rowSum = totalKg * price;
-              totalSumAll += rowSum;
+        if (withPrice) {
+          // Приоритет: цена из payload (пересчитана при завершении из карточки продукта)
+          final priceFromPayload = (r['price'] as num?)?.toDouble();
+          if (priceFromPayload != null && priceFromPayload > 0) {
+            rowSum = priceFromPayload;
+            totalSumAll += rowSum;
+          } else if (pricePerProduct != null && establishmentId != null) {
+            final pid = r['productId'] as String?;
+            if (pid != null && !pid.startsWith('pf_') && !pid.startsWith('free_')) {
+              final price = pricePerProduct[pid];
+              if (price != null && price > 0) {
+                final totalKg = total / 1000;
+                rowSum = totalKg * price;
+                totalSumAll += rowSum;
+              }
             }
           }
         }
@@ -452,6 +459,7 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
         1: FlexColumnWidth(2),
         2: FlexColumnWidth(0.5),
         3: FlexColumnWidth(0.6),
+        4: FlexColumnWidth(0.6),
       },
       children: [
         TableRow(
@@ -461,18 +469,21 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
             _cell(theme, loc.t('inventory_item_name'), bold: true),
             _cell(theme, loc.t('inventory_unit'), bold: true),
             _cell(theme, loc.t('inventory_total'), bold: true),
+            _cell(theme, loc.t('inventory_excel_sum') ?? 'Сумма', bold: true),
           ],
         ),
         ...rows.asMap().entries.map((e) {
           final r = e.value;
           final originalName = (r['productName'] ?? '').toString();
           final displayName = _translatedNames[originalName] ?? originalName;
+          final price = (r['price'] as num?)?.toDouble();
           return TableRow(
             children: [
               _cell(theme, '${e.key + 1}'),
               _cell(theme, displayName),
               _cell(theme, (r['unit'] ?? '').toString()),
               _cell(theme, _fmt(r['total'])),
+              _cell(theme, price != null && price > 0 ? _fmt(price) : '—'),
             ],
           );
         }),
