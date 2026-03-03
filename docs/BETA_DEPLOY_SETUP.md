@@ -17,7 +17,7 @@
 |-----|--------------|
 | `STAGING_SUPABASE_URL` | Supabase Dashboard → Project Settings → API → Project URL |
 | `STAGING_SUPABASE_ANON_KEY` | Supabase Dashboard → Project Settings → API → anon public |
-| `VERCEL_TOKEN` | Vercel → Account Settings → Tokens → Create Token (scope: Full Account) |
+| `VERCEL_TOKEN` | Vercel → Account Settings → Tokens → Create Token (scope: Full Account). **Никогда не коммитить в код** — иначе Vercel автоматически отзовёт токен. |
 
 ## 3. Связать Vercel-проект (если нужно)
 
@@ -31,6 +31,10 @@
 2. Должен появиться запуск после push в `staging`
 3. Если workflow **Test Actions** прошёл — Actions включены
 4. Если **Build and Deploy to Vercel (Demo/Beta)** падает — смотрите логи, какой шаг упал
+
+## Если Vercel отозвал токен
+
+Vercel отзывает токены при обнаружении в публичном коде/логах. Создайте новый токен в Vercel → Account Settings → Tokens и обновите `VERCEL_TOKEN` в GitHub Secrets.
 
 ## Ручной запуск
 
