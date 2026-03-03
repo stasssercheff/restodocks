@@ -162,9 +162,11 @@ class _InventoryScreenState extends State<InventoryScreen>
   TimeOfDay? _endTime;
   bool _completed = false;
   bool _isInputMode = false; // Режим ввода количества (клавиатура открыта)
+  bool _hasInputFocus = false; // Фокус в ячейке/фильтре — для скрытия шапки на мобильном
   _InventorySort _sortMode = _InventorySort.alphabetAsc;
   _InventoryBlockFilter _blockFilter = _InventoryBlockFilter.all;
   final TextEditingController _nameFilterCtrl = TextEditingController();
+  final FocusNode _nameFilterFocusNode = FocusNode();
   String _nameFilter = '';
   bool _stateRestored = false; // Флаг: предотвращает двойное восстановление
   bool _isLoadingProducts = true; // Показывать "Загрузка продуктов..." пока не завершился initScreen
@@ -184,6 +186,9 @@ class _InventoryScreenState extends State<InventoryScreen>
       if (_nameFilter != _nameFilterCtrl.text) {
         setState(() => _nameFilter = _nameFilterCtrl.text);
       }
+    });
+    _nameFilterFocusNode.addListener(() {
+      setState(() => _hasInputFocus = _nameFilterFocusNode.hasFocus);
     });
 
     // Настроить автосохранение - сохранять чаще
@@ -633,6 +638,7 @@ class _InventoryScreenState extends State<InventoryScreen>
   void dispose() {
     _hScroll.dispose();
     _nameFilterCtrl.dispose();
+    _nameFilterFocusNode.dispose();
     _serverAutoSaveTimer?.cancel(); // Отменить таймер автосохранения на сервер
     super.dispose();
   }
@@ -811,7 +817,7 @@ class _InventoryScreenState extends State<InventoryScreen>
 
     // Если это последняя ячейка и значение > 0, добавляем новую (как в iiko) и скроллим вправо
     if (colIndex == row.quantities.length - 1 && value > 0) {
-      row.quantities.add(0.0);
+      setState(() => row.quantities.add(0.0));
       _scrollToNewColumn();
     }
 
@@ -1209,8 +1215,9 @@ class _InventoryScreenState extends State<InventoryScreen>
       });
     }
 
-    // collapseLayout: скрывать футер и шапку при клавиатуре (десктоп + мобильный).
-    final collapseLayout = (_isInputMode && !isNarrow) || (isNarrow && isKeyboardOpen);
+    // collapseLayout: скрывать футер и шапку при клавиатуре. На мобильном viewInsets ненадёжен — по фокусу.
+    final collapseLayout = (_isInputMode && !isNarrow) ||
+        (isNarrow && (isKeyboardOpen || _hasInputFocus));
     // На мобильном при открытой клавиатуре скрываем строку с датой/именем (верхняя шапка),
     // но оставляем строку с фильтром — это делается без setState через isKeyboardOpen.
     final mobileKeyboardOpen = isNarrow && isKeyboardOpen;
@@ -1244,12 +1251,13 @@ class _InventoryScreenState extends State<InventoryScreen>
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _buildHeader(
-                loc, establishment, employee,
-                collapseLayout: collapseLayout,
-                hideInfoRow: mobileKeyboardOpen,
-              ),
-              const Divider(height: 1),
+              if (!collapseLayout)
+                _buildHeader(
+                  loc, establishment, employee,
+                  collapseLayout: collapseLayout,
+                  hideInfoRow: mobileKeyboardOpen,
+                ),
+              if (!collapseLayout) const Divider(height: 1),
               Expanded(
                 child: _buildTable(loc),
               ),
@@ -1303,6 +1311,7 @@ class _InventoryScreenState extends State<InventoryScreen>
             width: narrow ? double.infinity : 160,
             child: TextField(
               controller: _nameFilterCtrl,
+              focusNode: _nameFilterFocusNode,
               keyboardType: TextInputType.text,
               textCapitalization: TextCapitalization.sentences,
               decoration: InputDecoration(
@@ -1821,6 +1830,8 @@ class _InventoryScreenState extends State<InventoryScreen>
                           onChanged: (v) => _setQuantity(actualIndex, colIndex, v),
                           textInputAction: isLastCell ? TextInputAction.done : TextInputAction.next,
                           scrollToContext: rowContext,
+                          onFocusGained: () => setState(() => _hasInputFocus = true),
+                          onFocusLost: () => setState(() => _hasInputFocus = false),
                         ),
                 ),
               );
@@ -2102,6 +2113,8 @@ class _QtyCell extends StatefulWidget {
   final TextInputAction textInputAction;
   /// Контекст строки для Scrollable.ensureVisible при фокусе (как в iiko).
   final BuildContext? scrollToContext;
+  final VoidCallback? onFocusGained;
+  final VoidCallback? onFocusLost;
 
   const _QtyCell({
     super.key,
@@ -2110,6 +2123,8 @@ class _QtyCell extends StatefulWidget {
     required this.onChanged,
     this.textInputAction = TextInputAction.next,
     this.scrollToContext,
+    this.onFocusGained,
+    this.onFocusLost,
   });
 
   @override
@@ -2145,12 +2160,15 @@ class _QtyCellState extends State<_QtyCell> {
   }
 
   void _onFocusChanged() {
-    if (_focus.hasFocus && widget.scrollToContext != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) Scrollable.ensureVisible(widget.scrollToContext!);
-      });
-    }
-    if (!_focus.hasFocus) {
+    if (_focus.hasFocus) {
+      widget.onFocusGained?.call();
+      if (widget.scrollToContext != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) Scrollable.ensureVisible(widget.scrollToContext!);
+        });
+      }
+    } else {
+      widget.onFocusLost?.call();
       // При потере фокуса применяем изменения
       final textValue = _controller.text.trim();
       final parsedValue = double.tryParse(textValue.replaceFirst(',', '.')) ?? 0;
