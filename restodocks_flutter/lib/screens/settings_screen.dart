@@ -315,7 +315,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   /// Должности, не скрытые при регистрации (совпадает с owner_registration).
-  static const List<String> _visiblePositionCodes = ['executive_chef', 'sous_chef'];
+  static const List<String> _visiblePositionCodes = [
+    'executive_chef', 'sous_chef', 'bar_manager', 'floor_manager', 'general_manager',
+  ];
 
   void _showPositionPicker(BuildContext context, LocalizationService loc, Employee currentEmployee, AccountManagerSupabase accountManager) {
     final availablePositions = [
