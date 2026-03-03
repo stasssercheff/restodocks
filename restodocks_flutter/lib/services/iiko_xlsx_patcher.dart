@@ -7,7 +7,8 @@ import 'package:flutter/foundation.dart';
 /// Утилита для байтового патча xlsx-бланка iiko.
 ///
 /// Патчит все листы бланка без изменения форматирования:
-/// ищет строки по коду в sharedStrings, записывает qty в колонку остатка.
+/// ищет строки по коду (shared string или число — Numbers хранит коды как числа),
+/// записывает qty в колонку остатка.
 ///
 /// Использование:
 ///   final bytes = IikoXlsxPatcher.patch(
@@ -99,7 +100,7 @@ class IikoXlsxPatcher {
           .allMatches(xml)) {
         if (int.parse(rowM.group(1)!) > 20) break;
         for (final cm in RegExp(
-                r'<c r="([A-Z]+)\d+"[^>]*t="s"[^>]*><v>(\d+)</v></c>')
+                r'<c r="([A-Z]+)\d+"(?:[^>]*)t="s"(?:[^>]*)><v>(\d+)</v></c>')
             .allMatches(rowM.group(2)!)) {
           final idx = int.tryParse(cm.group(2)!) ?? -1;
           if (idx >= 0 && idx < sharedStrings.length) {
@@ -128,14 +129,22 @@ class IikoXlsxPatcher {
           var   rowBody  = m.group(3)!;
           final rowClose = m.group(4)!;
 
-          final codeM = RegExp(
-            '<c r="${RegExp.escape(codeColLetter)}$rowIdx"'
-            r'[^>]*t="s"[^>]*><v>(\d+)</v></c>',
-          ).firstMatch(rowBody);
+          // Код может быть shared string (t="s") или число (t="n"/нет — бланки из Numbers)
+          final codeCellRe = RegExp(
+            '<c r="${RegExp.escape(codeColLetter)}$rowIdx"([^>]*)><v>([^<]+)</v></c>',
+          );
+          final codeM = codeCellRe.firstMatch(rowBody);
           if (codeM == null) return m.group(0)!;
-          final ssIdx = int.tryParse(codeM.group(1)!) ?? -1;
-          if (ssIdx < 0 || ssIdx >= sharedStrings.length) return m.group(0)!;
-          final qty = qtyByCode[sharedStrings[ssIdx].trim()];
+          final attrs = codeM.group(1) ?? '';
+          final val = codeM.group(2) ?? '';
+          final String codeStr = attrs.contains('t="s"')
+              ? ((int.tryParse(val) ?? -1) >= 0 &&
+                        (int.tryParse(val) ?? -1) < sharedStrings.length
+                    ? sharedStrings[int.parse(val)].trim()
+                    : '')
+              : val.trim();
+          if (codeStr.isEmpty) return m.group(0)!;
+          final qty = qtyByCode[codeStr];
           if (qty == null) return m.group(0)!;
 
           final qtyStr = qty == qty.roundToDouble()
