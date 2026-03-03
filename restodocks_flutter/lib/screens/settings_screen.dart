@@ -359,6 +359,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  void _showTtkBranchFilterPicker(
+    BuildContext context,
+    LocalizationService loc,
+    AccountManagerSupabase accountManager,
+    List<Establishment> branches,
+  ) {
+    final branchFilter = context.read<TtkBranchFilterService>();
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('ttk_branch_display') ?? 'Отображение ТТК по филиалам'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.store),
+              title: Text(loc.t('main_establishment') ?? 'Основное'),
+              trailing: branchFilter.selectedBranchId == null
+                  ? const Icon(Icons.check, color: Colors.green)
+                  : null,
+              onTap: () async {
+                await branchFilter.setBranchFilter(null);
+                if (ctx.mounted) Navigator.of(ctx).pop();
+              },
+            ),
+            ...branches.map((b) => ListTile(
+                  leading: const Icon(Icons.account_tree),
+                  title: Text(b.name),
+                  trailing: branchFilter.selectedBranchId == b.id
+                      ? const Icon(Icons.check, color: Colors.green)
+                      : null,
+                  onTap: () async {
+                    await branchFilter.setBranchFilter(b.id);
+                    if (ctx.mounted) Navigator.of(ctx).pop();
+                  },
+                )),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showHomeButtonPicker(BuildContext context, LocalizationService loc, HomeButtonConfigService homeBtn) {
     showDialog<void>(
       context: context,
@@ -781,21 +823,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))),
                 )
               else if (_ownerEstablishments.length > 1) ...[
-                ..._ownerEstablishments.map((est) => ListTile(
-                  leading: Icon(
-                    est.id == establishment?.id ? Icons.check_circle : Icons.store,
-                    color: est.id == establishment?.id ? Theme.of(context).colorScheme.primary : null,
-                  ),
-                  title: Text(est.name),
-                  subtitle: est.id == establishment?.id
-                      ? Text(localization.t('current') ?? 'Текущее')
-                      : null,
-                  trailing: est.id == establishment?.id ? const Icon(Icons.check, color: Colors.green) : null,
-                  onTap: est.id == establishment?.id ? null : () async {
-                    await accountManager.switchEstablishment(est);
-                    if (context.mounted) context.go('/home');
-                  },
-                )),
+                ..._ownerEstablishments.map((est) {
+                  final parentName = est.isBranch && est.parentEstablishmentId != null
+                      ? _ownerEstablishments.where((e) => e.id == est.parentEstablishmentId).firstOrNull?.name
+                      : null;
+                  return ListTile(
+                    leading: Icon(
+                      est.id == establishment?.id ? Icons.check_circle : (est.isBranch ? Icons.account_tree : Icons.store),
+                      color: est.id == establishment?.id ? Theme.of(context).colorScheme.primary : null,
+                    ),
+                    title: Text(est.name),
+                    subtitle: est.id == establishment?.id
+                        ? Text(localization.t('current') ?? 'Текущее')
+                        : (est.isBranch && parentName != null
+                            ? Text('${localization.t('branch_of') ?? 'Филиал'}: $parentName')
+                            : (est.isMain ? Text(localization.t('main_establishment') ?? 'Основное') : null)),
+                    trailing: est.id == establishment?.id ? const Icon(Icons.check, color: Colors.green) : null,
+                    onTap: est.id == establishment?.id ? null : () async {
+                      await accountManager.switchEstablishment(est);
+                      if (context.mounted) context.go('/home');
+                    },
+                  );
+                }),
                 const SizedBox(height: 8),
               ],
               if (!accountManager.isViewOnlyOwner)
@@ -884,6 +933,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   title: Text(localization.t('invite_co_owner')),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => _showInviteCoOwnerDialog(context, localization, accountManager),
+                ),
+              if ((currentEmployee.hasRole('executive_chef') || currentEmployee.hasRole('sous_chef')) &&
+                  accountManager.establishment?.isMain == true)
+                FutureBuilder<List<Establishment>>(
+                  future: accountManager.getBranchesForEstablishment(accountManager.establishment!.id),
+                  builder: (ctx, snap) {
+                    if (!snap.hasData || snap.data!.isEmpty) return const SizedBox.shrink();
+                    final branches = snap.data!;
+                    return Consumer<TtkBranchFilterService>(
+                      builder: (_, branchFilter, __) {
+                        final selId = branchFilter.selectedBranchId;
+                        final name = selId == null
+                            ? (localization.t('main_establishment') ?? 'Основное')
+                            : branches.where((b) => b.id == selId).map((b) => b.name).firstOrNull ?? selId;
+                        return ListTile(
+                          leading: const Icon(Icons.account_tree),
+                          title: Text(localization.t('ttk_branch_display') ?? 'Отображение ТТК по филиалам'),
+                          subtitle: Text(name),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () => _showTtkBranchFilterPicker(context, localization, accountManager, branches),
+                        );
+                      },
+                    );
+                  },
                 ),
               if (accountManager.isViewOnlyOwner)
                 ListTile(

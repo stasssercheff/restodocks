@@ -48,6 +48,7 @@ void main() async {
   await ThemeService().initialize();
   await HomeButtonConfigService().initialize();
   await OwnerViewPreferenceService().initialize();
+  await TtkBranchFilterService().initialize();
   runApp(const RestodocksApp());
 }
 

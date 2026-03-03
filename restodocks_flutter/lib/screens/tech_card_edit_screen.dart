@@ -555,8 +555,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
       await context.read<ProductStoreSupabase>().loadProducts();
       final est = context.read<AccountManagerSupabase>().establishment;
       if (est != null) {
-        await context.read<ProductStoreSupabase>().loadNomenclature(est.id);
-        final tcs = await context.read<TechCardServiceSupabase>().getTechCardsForEstablishment(est.id);
+        await context.read<ProductStoreSupabase>().loadNomenclature(est.dataEstablishmentId);
+        final tcs = await context.read<TechCardServiceSupabase>().getTechCardsForEstablishment(est.dataEstablishmentId);
         if (mounted) {
           _pickerTechCards = _isNew ? tcs : tcs.where((t) => t.id != widget.techCardId).toList();
           _semiFinishedProducts = tcs.where((t) => t.isSemiFinished).toList();
@@ -765,7 +765,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           category: category,
           sections: _selectedSections,
           isSemiFinished: _isSemiFinished,
-          establishmentId: est.id,
+          establishmentId: est.dataEstablishmentId,
           createdBy: emp.id,
         );
         var updated = _applyEdits(created, portionWeight: _portionWeight, yieldGrams: yieldVal, technologyLocalized: techMap, ingredients: toSaveIngredients);
@@ -773,7 +773,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           final urls = <String>[];
           for (var i = 0; i < _pendingPhotoBytes.length; i++) {
             final url = await svc.uploadTechCardPhoto(
-              establishmentId: est.id,
+              establishmentId: est.dataEstablishmentId,
               techCardId: created.id,
               index: i,
               bytes: _pendingPhotoBytes[i],
@@ -836,7 +836,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
         if (_pendingPhotoBytes.isNotEmpty) {
           for (var i = 0; i < _pendingPhotoBytes.length; i++) {
             final url = await svc.uploadTechCardPhoto(
-              establishmentId: est.id,
+              establishmentId: est.dataEstablishmentId,
               techCardId: tc.id,
               index: photoUrls.length + i,
               bytes: _pendingPhotoBytes[i],
@@ -981,9 +981,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     if (est == null) return [];
     final productStore = context.read<ProductStoreSupabase>();
     await productStore.loadProducts();
-    await productStore.loadNomenclature(est.id);
+    await productStore.loadNomenclature(est.dataEstablishmentId);
     if (!mounted) return [];
-    return productStore.getNomenclatureProducts(est.id);
+    return productStore.getNomenclatureProducts(est.dataEstablishmentId);
   }
 
   /// [replaceIndex] — если задан, заменяем строку вместо добавления (тап по ячейке «Продукт»).
@@ -993,10 +993,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     final est = context.read<AccountManagerSupabase>().establishment;
     if (est == null) return;
     await productStore.loadProducts();
-    await productStore.loadNomenclature(est.id);
+    await productStore.loadNomenclature(est.dataEstablishmentId);
 
     if (!mounted) return;
-    final nomenclatureProducts = productStore.getNomenclatureProducts(est.id);
+    final nomenclatureProducts = productStore.getNomenclatureProducts(est.dataEstablishmentId);
     final allProducts = productStore.allProducts;
     showModalBottomSheet<void>(
       context: context,
@@ -1209,7 +1209,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     final accountManager = context.read<AccountManagerSupabase>();
     final currency = accountManager.currentEmployee?.currency ?? accountManager.establishment?.defaultCurrency ?? 'RUB';
     final productStore = context.read<ProductStoreSupabase>();
-    final establishmentId = context.read<AccountManagerSupabase>().establishment?.id;
+    final establishmentId = context.read<AccountManagerSupabase>().dataEstablishmentId;
     final hasProSubscription = context.read<AccountManagerSupabase>().currentEmployee?.hasProSubscription ?? false;
     final ing = TTIngredient.fromProduct(
       product: p,
@@ -1249,7 +1249,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
       final accountManager = context.read<AccountManagerSupabase>();
     final currency = accountManager.currentEmployee?.currency ?? accountManager.establishment?.defaultCurrency ?? 'RUB';
       final productStore = context.read<ProductStoreSupabase>();
-      final establishmentId = context.read<AccountManagerSupabase>().establishment?.id;
+      final establishmentId = context.read<AccountManagerSupabase>().dataEstablishmentId;
       final hasProSubscription = context.read<AccountManagerSupabase>().currentEmployee?.hasProSubscription ?? false;
       final ing = TTIngredient.fromProduct(
         product: p,
@@ -1878,7 +1878,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                             dishNameController: _nameController,
                             technologyController: _technologyController,
                             productStore: context.read<ProductStoreSupabase>(),
-                            establishmentId: context.read<AccountManagerSupabase>().establishment?.id,
+                            establishmentId: context.read<AccountManagerSupabase>().dataEstablishmentId ?? '',
                             semiFinishedProducts: _semiFinishedProducts,
                             isCook: isCook,
                             weightPerPortion: _portionWeight,

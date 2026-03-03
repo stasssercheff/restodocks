@@ -85,7 +85,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     setState(() { _loading = true; _error = null; });
     try {
       final svc = context.read<TechCardServiceSupabase>();
-      final all = await svc.getTechCardsForEstablishment(est.id);
+      final all = await svc.getTechCardsForEstablishment(est.dataEstablishmentId);
       // Фильтрация по цеху для кухни
       final list = emp == null
           ? all
@@ -336,10 +336,53 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     return v.toString();
   }
 
+  void _showTtkBranchFilterPicker(
+    BuildContext context,
+    LocalizationService loc,
+    AccountManagerSupabase accountManager,
+    List<Establishment> branches,
+  ) {
+    final branchFilter = context.read<TtkBranchFilterService>();
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('ttk_branch_display') ?? 'Отображение ТТК по филиалам'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.store),
+              title: Text(loc.t('main_establishment') ?? 'Основное'),
+              trailing: branchFilter.selectedBranchId == null
+                  ? const Icon(Icons.check, color: Colors.green)
+                  : null,
+              onTap: () async {
+                await branchFilter.setBranchFilter(null);
+                if (ctx.mounted) Navigator.of(ctx).pop();
+              },
+            ),
+            ...branches.map((b) => ListTile(
+                  leading: const Icon(Icons.account_tree),
+                  title: Text(b.name),
+                  trailing: branchFilter.selectedBranchId == b.id
+                      ? const Icon(Icons.check, color: Colors.green)
+                      : null,
+                  onTap: () async {
+                    await branchFilter.setBranchFilter(b.id);
+                    if (ctx.mounted) Navigator.of(ctx).pop();
+                  },
+                )),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
-    final canEdit = context.watch<AccountManagerSupabase>().currentEmployee?.canEditChecklistsAndTechCards ?? false;
+    final accountManager = context.watch<AccountManagerSupabase>();
+    final canEdit = accountManager.currentEmployee?.canEditChecklistsAndTechCards ?? false;
 
     return Scaffold(
       appBar: AppBar(
@@ -540,10 +583,44 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     final semiFinishedCards = filterBySearch(_list.where((tc) => tc.isSemiFinished).toList());
     final dishCards = filterBySearch(_list.where((tc) => !tc.isSemiFinished).toList());
 
+    final acc = context.read<AccountManagerSupabase>();
+    final emp = acc.currentEmployee;
+    final showBranchFilter = (emp?.hasRole('executive_chef') == true || emp?.hasRole('sous_chef') == true) &&
+        acc.establishment?.isMain == true;
+
     return DefaultTabController(
       length: 2,
       child: Column(
         children: [
+          if (showBranchFilter)
+            FutureBuilder<List<Establishment>>(
+              future: acc.getBranchesForEstablishment(acc.establishment!.id),
+              builder: (ctx, snap) {
+                if (!snap.hasData || snap.data!.isEmpty) return const SizedBox.shrink();
+                final branches = snap.data!;
+                return Consumer<TtkBranchFilterService>(
+                  builder: (_, branchFilter, __) {
+                    final selId = branchFilter.selectedBranchId;
+                    final label = selId == null
+                        ? (loc.t('main_establishment') ?? 'Основное')
+                        : branches.where((b) => b.id == selId).map((b) => b.name).firstOrNull ?? selId;
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                      child: Row(
+                        children: [
+                          FilterChip(
+                            avatar: const Icon(Icons.account_tree, size: 18),
+                            label: Text(label),
+                            selected: selId != null,
+                            onSelected: (_) => _showTtkBranchFilterPicker(context, loc, acc, branches),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
           TabBar(
             tabs: [
               Tab(text: loc.t('ttk_tab_pf')),

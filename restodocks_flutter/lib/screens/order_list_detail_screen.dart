@@ -41,7 +41,7 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
     _establishmentId = est.id;
     // Загружаем номенклатуру для отображения локализованных имён при экспорте
     final store = context.read<ProductStoreSupabase>();
-    await store.loadNomenclature(est.id);
+    await store.loadNomenclature(est.dataEstablishmentId);
     final lists = await loadOrderLists(est.id);
     final found = lists.where((l) => l.id == widget.listId).firstOrNull;
     for (final c in _qtyControllers) {

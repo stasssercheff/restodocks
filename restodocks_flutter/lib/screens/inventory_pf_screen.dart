@@ -59,10 +59,11 @@ class _InventoryPfScreenState extends State<InventoryPfScreen> {
   Future<void> _loadTechCards() async {
     final account = context.read<AccountManagerSupabase>();
     final svc = context.read<TechCardServiceSupabase>();
-    final estId = account.establishment?.id;
-    if (estId == null) return;
+    final est = account.establishment;
+    final dataEstId = est?.dataEstablishmentId;
+    if (dataEstId == null) return;
     final emp = account.currentEmployee;
-    final all = await svc.getTechCardsForEstablishment(estId);
+    final all = await svc.getTechCardsForEstablishment(dataEstId);
     final visible = emp == null
         ? all
         : all.where((tc) => emp.canSeeTechCard(tc.sections)).toList();

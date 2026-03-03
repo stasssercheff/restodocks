@@ -155,7 +155,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
               bool isUsed = false;
               final establishment = account.establishment;
               if (establishment != null) {
-                final nomenclatureIds = store.getNomenclatureIdsForEstablishment(establishment.id);
+                final nomenclatureIds = store.getNomenclatureIdsForEstablishment(establishment.dataEstablishmentId);
                 if (nomenclatureIds.contains(productId)) {
                   isUsed = true;
                 }
@@ -242,7 +242,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
         // Проверяем в номенклатуре ТОЛЬКО текущего заведения
         final establishment = account.establishment;
         if (establishment != null) {
-          final nomenclatureIds = store.getNomenclatureIdsForEstablishment(establishment.id);
+          final nomenclatureIds = store.getNomenclatureIdsForEstablishment(establishment.dataEstablishmentId);
           if (nomenclatureIds.contains(product.id)) {
             isUsed = true;
             usageMessage = 'Продукт используется в номенклатуре заведения "${establishment.name}"';
@@ -364,7 +364,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
             // Проверяем в номенклатуре текущего заведения
             final establishment = account.establishment;
             if (establishment != null) {
-              final nomenclatureIds = store.getNomenclatureIdsForEstablishment(establishment.id);
+              final nomenclatureIds = store.getNomenclatureIdsForEstablishment(establishment.dataEstablishmentId);
               if (nomenclatureIds.contains(product.id)) {
                 isUsed = true;
                 usageMessage = 'Продукт используется в номенклатуре заведения "${establishment.name}"';
@@ -513,7 +513,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
               final establishment = account.establishment;
               if (establishment != null) {
-                final nomenclatureIds = store.getNomenclatureIdsForEstablishment(establishment.id);
+                final nomenclatureIds = store.getNomenclatureIdsForEstablishment(establishment.dataEstablishmentId);
                 if (nomenclatureIds.contains(productId)) {
                   isUsed = true;
                 }

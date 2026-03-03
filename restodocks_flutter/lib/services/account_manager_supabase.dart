@@ -48,6 +48,9 @@ class AccountManagerSupabase extends ChangeNotifier {
   /// Co-owner с view_only: только просмотр (при >1 заведении у пригласившего)
   bool get isViewOnlyOwner => _currentEmployee?.isViewOnlyOwner ?? false;
 
+  /// ID заведения для данных (номенклатура, ТТК). Для филиала — родитель.
+  String? get dataEstablishmentId => _establishment?.dataEstablishmentId;
+
   /// Авторизован ли пользователь (своя сессия employees или восстановленная из хранилища)
   bool get isLoggedInSync => _currentEmployee != null && _establishment != null;
 
@@ -174,27 +177,50 @@ class AccountManagerSupabase extends ChangeNotifier {
   }
 
   /// Добавить заведение существующим владельцем (без регистрации владельца)
+  /// [parentEstablishmentId] — если задан, создаётся филиал указанного основного заведения
   Future<Establishment> addEstablishmentForOwner({
     required String name,
     String? address,
     String? phone,
     String? email,
     String? pinCode,
+    String? parentEstablishmentId,
   }) async {
+    final params = <String, dynamic>{
+      'p_name': name,
+      'p_address': address,
+      'p_phone': phone,
+      'p_email': email,
+      'p_pin_code': pinCode,
+    };
+    if (parentEstablishmentId != null && parentEstablishmentId.isNotEmpty) {
+      params['p_parent_establishment_id'] = parentEstablishmentId;
+    }
     final raw = await _supabase.client.rpc(
       'add_establishment_for_owner',
-      params: {
-        'p_name': name,
-        'p_address': address,
-        'p_phone': phone,
-        'p_email': email,
-        'p_pin_code': pinCode,
-      },
+      params: params,
     );
     final response = Map<String, dynamic>.from(raw as Map);
     response['owner_id'] = response['owner_id']?.toString() ?? '';
+    response['parent_establishment_id'] = response['parent_establishment_id']?.toString();
     final created = Establishment.fromJson(response);
     return created;
+  }
+
+  /// Филиалы заведения (для шефа — фильтр ТТК по филиалам)
+  Future<List<Establishment>> getBranchesForEstablishment(String establishmentId) async {
+    try {
+      final data = await _supabase.client.rpc(
+        'get_branches_for_establishment',
+        params: {'p_establishment_id': establishmentId},
+      );
+      if (data == null) return [];
+      final list = data as List;
+      return list.map((e) => Establishment.fromJson(Map<String, dynamic>.from(e as Map))).toList();
+    } catch (e) {
+      print('AccountManager: getBranchesForEstablishment error: $e');
+      return [];
+    }
   }
 
   /// Переключение на другое заведение (для владельца с несколькими заведениями)

@@ -108,7 +108,7 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
       aiService: context.read<AiServiceSupabase>(),
       supabase: context.read<SupabaseService>(),
     );
-    final estId = account.establishment?.id;
+    final estId = account.dataEstablishmentId;
 
     if (estId == null) {
       if (mounted) {
@@ -340,7 +340,8 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
   Future<void> _ensureLoaded() async {
     final store = context.read<ProductStoreSupabase>();
     final account = context.read<AccountManagerSupabase>();
-    final estId = account.establishment?.id;
+    final est = account.establishment;
+    final estId = est?.dataEstablishmentId;
     if (estId == null) return;
 
     final techCardService = context.read<TechCardServiceSupabase>();
@@ -821,7 +822,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         loc: loc,
         onRemove: (idsToRemove) async {
           final store = context.read<ProductStoreSupabase>();
-          final estId = context.read<AccountManagerSupabase>().establishment?.id;
+          final estId = context.read<AccountManagerSupabase>().dataEstablishmentId;
           if (estId == null) return;
           for (final id in idsToRemove) {
             final item = idToItem[id];
@@ -861,7 +862,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
 
   void _showCreateProductDialog(LocalizationService loc) {
     final account = context.read<AccountManagerSupabase>();
-    final estId = account.establishment?.id;
+    final estId = account.dataEstablishmentId;
     if (estId == null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('no_establishment'))));
       return;
@@ -1147,7 +1148,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     final loc = context.watch<LocalizationService>();
     final store = context.watch<ProductStoreSupabase>();
     final account = context.watch<AccountManagerSupabase>();
-    final estId = account.establishment?.id;
+    final estId = account.dataEstablishmentId;
     final canEdit = account.currentEmployee?.canEditChecklistsAndTechCards ?? false;
 
     // Фильтруем элементы номенклатуры
@@ -1171,7 +1172,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     nomItems = _sortNomenclatureItems(nomItems, _nomSort, lang: loc.currentLanguageCode);
 
     final iikoStore = context.watch<IikoProductStore>();
-    final estId2 = account.establishment?.id ?? '';
+    final estId2 = account.dataEstablishmentId ?? '';
 
     return Scaffold(
       appBar: AppBar(
@@ -1439,7 +1440,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
 
   Future<void> _showAddProductDialog(LocalizationService loc) async {
     final account = context.read<AccountManagerSupabase>();
-    final estId = account.establishment?.id;
+    final estId = account.dataEstablishmentId;
     if (estId == null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('no_establishment'))));
       return;
@@ -1618,7 +1619,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     // Обновляем список после загрузки
     final store = context.read<ProductStoreSupabase>();
     final account = context.read<AccountManagerSupabase>();
-    final estId = account.establishment?.id;
+    final estId = account.dataEstablishmentId;
     if (estId != null) {
       await store.loadProducts(force: true);
       await store.loadNomenclature(estId);
@@ -3699,7 +3700,7 @@ class _NomenclatureSkeletonItem extends StatelessWidget {
       try {
         final store = context.read<ProductStoreSupabase>();
         final account = context.read<AccountManagerSupabase>();
-        final estId = account.establishment?.id;
+        final estId = account.dataEstablishmentId;
 
         if (estId == null) {
           ScaffoldMessenger.of(context).showSnackBar(

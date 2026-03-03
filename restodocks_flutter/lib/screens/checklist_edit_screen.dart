@@ -51,7 +51,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
       final c = await svc.getChecklistById(widget.checklistId);
       List<TechCard> techs = [];
       if (est != null) {
-        techs = await techSvc.getTechCardsForEstablishment(est.id);
+        techs = await techSvc.getTechCardsForEstablishment(est.dataEstablishmentId);
       }
       if (!mounted) return;
       setState(() {

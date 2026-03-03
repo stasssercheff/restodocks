@@ -36,12 +36,13 @@ class _OrderListProductsScreenState extends State<OrderListProductsScreen> {
     final acc = context.read<AccountManagerSupabase>();
     final store = context.read<ProductStoreSupabase>();
     final loc = context.read<LocalizationService>();
-    final estId = acc.establishment?.id;
-    if (estId == null) return;
+    final est = acc.establishment;
+    final dataEstId = est?.dataEstablishmentId;
+    if (dataEstId == null) return;
     // getNomenclatureProducts использует _allProducts — нужно загрузить и продукты, и номенклатуру
     await store.loadProducts();
-    await store.loadNomenclature(estId);
-    final products = store.getNomenclatureProducts(estId);
+    await store.loadNomenclature(dataEstId);
+    final products = store.getNomenclatureProducts(dataEstId);
     if (products.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${loc.t('nomenclature')}: ${loc.t('no_products')}')),

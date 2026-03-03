@@ -17,12 +17,35 @@ class AddEstablishmentScreen extends StatefulWidget {
   State<AddEstablishmentScreen> createState() => _AddEstablishmentScreenState();
 }
 
+enum _EstablishmentType { newEst, branch }
+
 class _AddEstablishmentScreenState extends State<AddEstablishmentScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   bool _isLoading = false;
   String? _errorMessage;
   CountryItem? _selectedCountry;
+  _EstablishmentType _type = _EstablishmentType.newEst;
+  Establishment? _selectedParent;
+  List<Establishment> _mainEstablishments = [];
+  bool _loadingEstablishments = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMainEstablishments();
+  }
+
+  Future<void> _loadMainEstablishments() async {
+    final acc = context.read<AccountManagerSupabase>();
+    final all = await acc.getEstablishmentsForOwner();
+    if (mounted) {
+      setState(() {
+        _mainEstablishments = all.where((e) => e.isMain).toList();
+        _loadingEstablishments = false;
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -32,6 +55,7 @@ class _AddEstablishmentScreenState extends State<AddEstablishmentScreen> {
 
   Future<void> _addEstablishment() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_type == _EstablishmentType.branch && _selectedParent == null) return;
 
     setState(() {
       _isLoading = true;
@@ -49,6 +73,7 @@ class _AddEstablishmentScreenState extends State<AddEstablishmentScreen> {
       final establishment = await accountManager.addEstablishmentForOwner(
         name: name,
         address: address,
+        parentEstablishmentId: _type == _EstablishmentType.branch ? _selectedParent!.id : null,
       );
 
       if (!mounted) return;
@@ -96,6 +121,67 @@ class _AddEstablishmentScreenState extends State<AddEstablishmentScreen> {
                 ),
                 const SizedBox(height: 24),
                 Text(
+                  loc.t('establishment_type') ?? 'Тип заведения',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 8),
+                SegmentedButton<_EstablishmentType>(
+                  segments: [
+                    ButtonSegment(
+                      value: _EstablishmentType.newEst,
+                      label: Text(loc.t('new_establishment') ?? 'Новое заведение'),
+                      icon: const Icon(Icons.add_business_outlined),
+                    ),
+                    ButtonSegment(
+                      value: _EstablishmentType.branch,
+                      label: Text(loc.t('branch_of') ?? 'Филиал'),
+                      icon: const Icon(Icons.account_tree_outlined),
+                    ),
+                  ],
+                  selected: {_type},
+                  onSelectionChanged: (s) => setState(() {
+                    _type = s.first;
+                    if (_type == _EstablishmentType.newEst) _selectedParent = null;
+                  }),
+                ),
+                if (_type == _EstablishmentType.branch) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    loc.t('branch_of_establishment') ?? 'Филиал какого заведения?',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  if (_loadingEstablishments)
+                    const Center(child: Padding(
+                      padding: EdgeInsets.all(16),
+                      child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)),
+                    ))
+                  else
+                    DropdownButtonFormField<Establishment>(
+                      value: _selectedParent,
+                      decoration: InputDecoration(
+                        labelText: loc.t('main_establishment') ?? 'Основное заведение',
+                        prefixIcon: const Icon(Icons.store),
+                        border: const OutlineInputBorder(),
+                      ),
+                      items: _mainEstablishments
+                          .map((e) => DropdownMenuItem(value: e, child: Text(e.name)))
+                          .toList(),
+                      onChanged: (e) => setState(() => _selectedParent = e),
+                      validator: (v) => _type == _EstablishmentType.branch && v == null
+                          ? (loc.t('select_main_establishment') ?? 'Выберите основное заведение')
+                          : null,
+                    ),
+                  const SizedBox(height: 12),
+                  Text(
+                    loc.t('branch_sync_hint') ?? 'Номенклатура и ТТК будут синхронизироваться с основным заведением.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 24),
+                Text(
                   loc.t('company_info'),
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
@@ -137,7 +223,7 @@ class _AddEstablishmentScreenState extends State<AddEstablishmentScreen> {
                       decoration: InputDecoration(hintText: searchHint),
                     ),
                   ),
-                  validator: (v) => v == null ? loc.t('country_required') : null,
+                  validator: (v) => _type == _EstablishmentType.newEst && v == null ? loc.t('country_required') : null,
                   onChanged: (c) {
                     setState(() => _selectedCountry = c);
                   },

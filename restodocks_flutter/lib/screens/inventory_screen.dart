@@ -539,7 +539,8 @@ class _InventoryScreenState extends State<InventoryScreen>
     final store = context.read<ProductStoreSupabase>();
     final account = context.read<AccountManagerSupabase>();
     final techCardSvc = context.read<TechCardServiceSupabase>();
-    final estId = account.establishment?.id;
+    final est = account.establishment;
+    final estId = est?.dataEstablishmentId;
     if (estId == null) return;
     await store.loadProducts();
     await store.loadNomenclature(estId);
@@ -1906,7 +1907,8 @@ class _InventoryScreenState extends State<InventoryScreen>
   Future<void> _showProductPicker(BuildContext context, LocalizationService loc) async {
     final productStore = context.read<ProductStoreSupabase>();
     final account = context.read<AccountManagerSupabase>();
-    final estId = account.establishment?.id;
+    final est = account.establishment;
+    final estId = est?.dataEstablishmentId;
     if (estId == null) return;
     await productStore.loadProducts();
     await productStore.loadNomenclature(estId);
