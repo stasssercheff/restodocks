@@ -1582,39 +1582,40 @@ class _InventoryScreenState extends State<InventoryScreen>
                 ),
                 Expanded(
           child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            controller: _hScroll,
-            physics: const AlwaysScrollableScrollPhysics(),
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
-                    child: SizedBox(
-                      width: rightW.clamp(screenW - leftW, double.infinity),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (_blockFilter != _InventoryBlockFilter.pfOnly && _productIndices.isNotEmpty) ...[
-                            SizedBox(height: _sectionHeaderHeight),
-                            ..._productIndices.asMap().entries.map((e) {
-                              final lastIdx = _pfIndices.isNotEmpty ? _pfIndices.last : _productIndices.last;
-                              return _buildScrollableDataRow(loc, e.value, isLastRow: e.value == lastIdx);
-                            }),
-                          ],
-                          if (_blockFilter != _InventoryBlockFilter.productsOnly && _pfIndices.isNotEmpty) ...[
-                            SizedBox(height: _sectionHeaderHeight),
-                            ..._pfIndices.asMap().entries.map((e) {
-                              final lastIdx = _pfIndices.last;
-                              return _buildScrollableDataRow(loc, e.value, isLastRow: e.value == lastIdx);
-                            }),
-                          ],
-                          if (_aggregatedFromFile != null && _aggregatedFromFile!.isNotEmpty) ...[
-                            SizedBox(height: _sectionHeaderHeight),
-                            _buildScrollableAggregatedHeaderRow(loc),
-                            ..._aggregatedFromFile!.asMap().entries.map((e) => _buildScrollableAggregatedDataRow(loc, e.value)),
-                          ],
-                        ],
-                      ),
-                    ),
+            physics: const ClampingScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(height: _sectionHeaderHeight),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  controller: _hScroll,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
+                  child: SizedBox(
+                    width: rightW.clamp(screenW - leftW, double.infinity),
+                    child: _buildScrollableHeaderRow(loc),
                   ),
+                ),
+                if (_blockFilter != _InventoryBlockFilter.pfOnly && _productIndices.isNotEmpty)
+                  ..._productIndices.asMap().entries.map((e) {
+                    final lastIdx = _pfIndices.isNotEmpty ? _pfIndices.last : _productIndices.last;
+                    return _buildScrollableDataRow(loc, e.value, isLastRow: e.value == lastIdx);
+                  }),
+                if (_blockFilter != _InventoryBlockFilter.productsOnly && _pfIndices.isNotEmpty)
+                  ..._pfIndices.asMap().entries.map((e) {
+                    final lastIdx = _pfIndices.last;
+                    return _buildScrollableDataRow(loc, e.value, isLastRow: e.value == lastIdx);
+                  }),
+                if (_aggregatedFromFile != null && _aggregatedFromFile!.isNotEmpty) ...[
+                  _buildScrollableAggregatedHeaderRow(loc),
+                  ..._aggregatedFromFile!.asMap().entries
+                      .map((e) => _buildScrollableAggregatedDataRow(loc, e.value)),
+                ],
+              ],
+            ),
+          ),
                 ),
               ],
             ),
@@ -1797,50 +1798,21 @@ class _InventoryScreenState extends State<InventoryScreen>
   }
 
   Widget _buildScrollableDataRow(LocalizationService loc, int actualIndex, {bool isLastRow = false}) {
-    final theme = Theme.of(context);
     final row = _rows[actualIndex];
-    final qtyCols = row.quantities.length;
-
-    return Builder(
-      builder: (rowContext) => SizedBox(
-        height: _dataRowHeight,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
-            border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-            ...List.generate(
-              qtyCols,
-              (colIndex) {
-                final isLastCell = isLastRow && colIndex == qtyCols - 1;
-                return Padding(
-                padding: EdgeInsets.only(right: colIndex < qtyCols - 1 ? _colGap : 0),
-                child: SizedBox(
-                  width: _colQtyWidth,
-                  child: _completed
-                      ? Text(_formatQty(row.quantityDisplayAt(colIndex)), style: theme.textTheme.bodyMedium)
-                      : _QtyCell(
-                          key: ValueKey('qty_${actualIndex}_$colIndex'),
-                          value: row.quantities[colIndex],
-                          useGrams: row.isWeightInKg,
-                          onChanged: (v) => _setQuantity(actualIndex, colIndex, v),
-                          textInputAction: isLastCell ? TextInputAction.done : TextInputAction.next,
-                          scrollToContext: rowContext,
-                          onFocusGained: () => setState(() => _hasInputFocus = true),
-                          onFocusLost: () => setState(() => _hasInputFocus = false),
-                        ),
-                ),
-              );
-              },
-            ),
-          ],
-        ),
-      ),
-    ),
+    return _StdInventoryScrollableRow(
+      key: ValueKey('row_$actualIndex'),
+      loc: loc,
+      actualIndex: actualIndex,
+      row: row,
+      isLastRow: isLastRow,
+      completed: _completed,
+      onSetQuantity: _setQuantity,
+      formatQty: _formatQty,
+      colQtyWidth: _colQtyWidth,
+      colGap: _colGap,
+      dataRowHeight: _dataRowHeight,
+      onFocusGained: () => setState(() => _hasInputFocus = true),
+      onFocusLost: () => setState(() => _hasInputFocus = false),
     );
   }
 
@@ -2053,6 +2025,134 @@ class _InventoryScreenState extends State<InventoryScreen>
       'aggregatedProducts': aggregatedProducts ?? [],
       'sourceLang': lang,
     };
+  }
+}
+
+/// Строка стандартного бланка с прокруткой по строке (как в iiko).
+class _StdInventoryScrollableRow extends StatefulWidget {
+  const _StdInventoryScrollableRow({
+    super.key,
+    required this.loc,
+    required this.actualIndex,
+    required this.row,
+    required this.isLastRow,
+    required this.completed,
+    required this.onSetQuantity,
+    required this.formatQty,
+    required this.colQtyWidth,
+    required this.colGap,
+    required this.dataRowHeight,
+    required this.onFocusGained,
+    required this.onFocusLost,
+  });
+
+  final LocalizationService loc;
+  final int actualIndex;
+  final _InventoryRow row;
+  final bool isLastRow;
+  final bool completed;
+  final void Function(int, int, double) onSetQuantity;
+  final String Function(double) formatQty;
+  final double colQtyWidth;
+  final double colGap;
+  final double dataRowHeight;
+  final VoidCallback onFocusGained;
+  final VoidCallback onFocusLost;
+
+  @override
+  State<_StdInventoryScrollableRow> createState() => _StdInventoryScrollableRowState();
+}
+
+class _StdInventoryScrollableRowState extends State<_StdInventoryScrollableRow> {
+  final ScrollController _rowScroll = ScrollController();
+
+  @override
+  void dispose() {
+    _rowScroll.dispose();
+    super.dispose();
+  }
+
+  void _scrollToEnd() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_rowScroll.hasClients) {
+        _rowScroll.animateTo(
+          _rowScroll.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  @override
+  void didUpdateWidget(_StdInventoryScrollableRow old) {
+    super.didUpdateWidget(old);
+    if (widget.row.quantities.length > old.row.quantities.length) {
+      _scrollToEnd();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final row = widget.row;
+    final qtyCols = row.quantities.length;
+    final rowWidth = qtyCols * (widget.colQtyWidth + widget.colGap) - widget.colGap + 24;
+
+    return SizedBox(
+      height: widget.dataRowHeight,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
+        ),
+        child: SingleChildScrollView(
+          controller: _rowScroll,
+          scrollDirection: Axis.horizontal,
+          physics: const ClampingScrollPhysics(),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
+          child: SizedBox(
+            width: rowWidth,
+            child: Builder(
+              builder: (rowContext) => Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: List.generate(
+                  qtyCols,
+                  (colIndex) {
+                    final isLastCell = widget.isLastRow && colIndex == qtyCols - 1;
+                    return Padding(
+                      padding: EdgeInsets.only(
+                          right: colIndex < qtyCols - 1 ? widget.colGap : 0),
+                      child: SizedBox(
+                        width: widget.colQtyWidth,
+                        child: widget.completed
+                            ? Text(
+                                widget.formatQty(row.quantityDisplayAt(colIndex)),
+                                style: theme.textTheme.bodyMedium,
+                              )
+                            : _QtyCell(
+                                key: ValueKey('qty_${widget.actualIndex}_$colIndex'),
+                                value: row.quantities[colIndex],
+                                useGrams: row.isWeightInKg,
+                                onChanged: (v) =>
+                                    widget.onSetQuantity(widget.actualIndex, colIndex, v),
+                                textInputAction:
+                                    isLastCell ? TextInputAction.done : TextInputAction.next,
+                                scrollToContext: rowContext,
+                                onFocusGained: widget.onFocusGained,
+                                onFocusLost: widget.onFocusLost,
+                              ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
