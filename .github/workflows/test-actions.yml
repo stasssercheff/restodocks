@@ -1,0 +1,15 @@
+# Минимальный тест — проверяет, что GitHub Actions включены.
+# Если этот workflow запускается, Actions работают.
+name: Test Actions
+
+on:
+  push:
+    branches: [staging]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test
+        run: echo "GitHub Actions работают! Repo: ${{ github.repository }}"
