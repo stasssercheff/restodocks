@@ -3734,6 +3734,15 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
       );
     }
 
+    // Тап по левой части строки (название, ед., итого) — фокус на первую ячейку,
+    // клавиатура остаётся/возвращается (на мобильном при прокрутке не закрывается).
+    void focusFirstCell() {
+      if (_focusNodes.isEmpty) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _focusNodes.first.requestFocus();
+      });
+    }
+
     return Container(
       decoration: BoxDecoration(
         border: Border(left: cb, bottom: cb),
@@ -3743,52 +3752,59 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // ── Наименование ──
-            Container(
-              width: _iikoColName,
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              decoration: BoxDecoration(border: Border(right: cb)),
-              alignment: Alignment.centerLeft,
-              child: Text(
-                widget.row.product.displayName,
-                style: const TextStyle(fontSize: 13),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            // ── Ед. изм. ──
-            Container(
-              width: _iikoColUnit,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
-                border: Border(right: cb),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 1),
-              child: Text(
-                unit,
-                style: TextStyle(
-                    fontSize: 10,
-                    color: theme.colorScheme.onSurface.withOpacity(0.7)),
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            // ── Итого ──
-            Container(
-              width: _iikoColTotal,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                border: Border(right: cb),
-              ),
-              child: Text(
-                total > 0 ? _fmt(total) : '',
-                style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: total > 0 ? theme.colorScheme.primary : null),
+            // ── Наименование, ед., итого — тап фокусирует первую ячейку ──
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTapDown: (_) => focusFirstCell(),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
+                    width: _iikoColName,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    decoration: BoxDecoration(border: Border(right: cb)),
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      widget.row.product.displayName,
+                      style: const TextStyle(fontSize: 13),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Container(
+                    width: _iikoColUnit,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+                      border: Border(right: cb),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 1),
+                    child: Text(
+                      unit,
+                      style: TextStyle(
+                          fontSize: 10,
+                          color: theme.colorScheme.onSurface.withOpacity(0.7)),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Container(
+                    width: _iikoColTotal,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                      border: Border(right: cb),
+                    ),
+                    child: Text(
+                      total > 0 ? _fmt(total) : '',
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: total > 0 ? theme.colorScheme.primary : null),
+                    ),
+                  ),
+                ],
               ),
             ),
             // ── Ячейки ввода — скроллируются вправо ──
