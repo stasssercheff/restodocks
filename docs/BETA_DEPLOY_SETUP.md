@@ -28,9 +28,8 @@
 ## 4. Проверка
 
 1. **Actions** → вкладка **Actions**
-2. Должен появиться запуск после push в `staging`
-3. Если workflow **Test Actions** прошёл — Actions включены
-4. Если **Build and Deploy to Vercel (Demo/Beta)** падает — смотрите логи, какой шаг упал
+2. После push в `staging` запускается **Build and Deploy to Vercel (Demo/Beta)**
+3. Если падает — смотрите логи, на каком шаге ошибка
 
 ## Если Vercel отозвал токен
 
