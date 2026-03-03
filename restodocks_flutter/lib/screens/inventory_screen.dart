@@ -3229,7 +3229,8 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                         );
                       },
                     ),
-                    // Поиск
+                    // Поиск + статус — скрываем при фокусе на ячейке, освобождая место для строк
+                    if (!_iikoCellFocusNodes.any((n) => n.hasFocus)) ...[
                     Padding(
                       padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
                       child: TextField(
@@ -3242,7 +3243,6 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                         ),
                       ),
                     ),
-                    // Статус-строка
                     Container(
                       color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -3301,6 +3301,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                         ],
                       ),
                     ),
+                    ],
                     // Шапка таблицы
                     _IikoInventoryHeader(
                       qtyCols: _rows.isEmpty
@@ -3317,9 +3318,11 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                               rows: visibleRows,
                               completed: _completed,
                               onQuantityChanged: _setQuantity,
+                              onFocusChange: () => setState(() {}),
                             ),
                     ),
-                    // Кнопки внизу
+                    // Кнопки внизу — скрываем при фокусе на ячейке
+                    if (!_iikoCellFocusNodes.any((n) => n.hasFocus))
                     Padding(
                       padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
                       child: Row(
@@ -3419,12 +3422,14 @@ class _IikoInventoryTable extends StatelessWidget {
     required this.rows,
     required this.completed,
     required this.onQuantityChanged,
+    this.onFocusChange,
   });
 
   final List<_IikoInventoryRow> rows;
   final bool completed;
   final void Function(_IikoInventoryRow row, int colIndex, double qty)
       onQuantityChanged;
+  final VoidCallback? onFocusChange;
 
   @override
   Widget build(BuildContext context) {
@@ -3457,6 +3462,7 @@ class _IikoInventoryTable extends StatelessWidget {
         row: row,
         completed: completed,
         onChanged: (colIdx, qty) => onQuantityChanged(row, colIdx, qty),
+        onFocusChange: onFocusChange,
       ));
     }
     // ListView (не builder) — все строки сразу в DOM,
@@ -3534,11 +3540,13 @@ class _IikoInventoryRowTile extends StatefulWidget {
     required this.row,
     required this.completed,
     required this.onChanged,
+    this.onFocusChange,
   });
 
   final _IikoInventoryRow row;
   final bool completed;
   final void Function(int colIndex, double qty) onChanged;
+  final VoidCallback? onFocusChange;
 
   @override
   State<_IikoInventoryRowTile> createState() => _IikoInventoryRowTileState();
@@ -3571,12 +3579,22 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
     }
   }
 
+  void _notifyFocusChange() {
+    if (mounted) widget.onFocusChange?.call();
+  }
+
   void _registerFocusNodes() {
     _syncFocusNodes();
     _iikoCellFocusNodes.addAll(_focusNodes);
+    for (final fn in _focusNodes) {
+      fn.addListener(_notifyFocusChange);
+    }
   }
 
   void _unregisterFocusNodes() {
+    for (final fn in _focusNodes) {
+      fn.removeListener(_notifyFocusChange);
+    }
     for (final fn in _focusNodes) {
       _iikoCellFocusNodes.remove(fn);
     }
@@ -3596,6 +3614,7 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
     }
     while (_focusNodes.length < qtys.length) {
       final fn = FocusNode();
+      fn.addListener(_notifyFocusChange);
       _focusNodes.add(fn);
       _iikoCellFocusNodes.add(fn);
     }

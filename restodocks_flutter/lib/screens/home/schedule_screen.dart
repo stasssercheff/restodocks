@@ -209,14 +209,20 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     return blocks;
   }
 
-  /// ID сотрудников выбранного подразделения (для фильтрации графика)
+  /// ID сотрудников выбранного подразделения (для фильтрации графика).
+  /// Для кухни: department=kitchen + шеф/су-шеф (могут иметь department=management).
   Set<String> get _employeeIdsForDepartment {
     if (widget.department == 'all') return _employees.map((e) => e.id).toSet();
     final dept = widget.department;
     return _employees.where((e) {
-      if (dept == 'kitchen') return e.department == 'kitchen';
-      if (dept == 'bar') return e.department == 'bar';
-      if (dept == 'hall' || dept == 'dining_room') return e.department == 'hall' || e.department == 'dining_room';
+      if (dept == 'kitchen') {
+        return e.department == 'kitchen' ||
+            (e.hasRole('executive_chef') || e.hasRole('sous_chef'));
+      }
+      if (dept == 'bar') return e.department == 'bar' || e.hasRole('bar_manager');
+      if (dept == 'hall' || dept == 'dining_room') {
+        return e.department == 'hall' || e.department == 'dining_room' || e.hasRole('floor_manager');
+      }
       return true;
     }).map((e) => e.id).toSet();
   }
@@ -259,10 +265,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     if (sections.isEmpty) return '';
 
     String sectionKey;
-    // Владелец, шеф-повар и су-шеф — в блок «Управление», не в цех
-    if (employee.hasRole('owner') ||
-        employee.hasRole('executive_chef') ||
-        employee.hasRole('sous_chef')) {
+    // Руководители подразделений — в блок «Управление»: шеф/су-шеф (кухня), барменеджер (бар), менеджер зала (зал).
+    if (employee.hasRole('executive_chef') ||
+        employee.hasRole('sous_chef') ||
+        employee.hasRole('bar_manager') ||
+        employee.hasRole('floor_manager')) {
       sectionKey = 'management';
     } else {
       final departmentToSection = {
@@ -306,9 +313,14 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             _model = _model.copyWith(sections: ScheduleModel.defaultSections);
           }
           // В графике только сотрудники с должностью. Собственник без должности не показывается.
+          // В графике только сотрудники с должностью. Владелец без должности не показывается (positionRole==null при роли только owner).
           final scheduleableEmployees = _employees.where((e) => e.positionRole != null).toList();
           final needsManagement = scheduleableEmployees.any((e) =>
-              e.hasRole('owner') || e.hasRole('executive_chef') || e.hasRole('sous_chef') || e.department == 'management');
+              e.hasRole('executive_chef') ||
+              e.hasRole('sous_chef') ||
+              e.hasRole('bar_manager') ||
+              e.hasRole('floor_manager') ||
+              e.department == 'management');
           if (needsManagement && !_model.sections.any((s) => s.id == 'management')) {
             _model = _model.copyWith(sections: [
               const ScheduleSection(id: 'management', nameKey: 'management'),
