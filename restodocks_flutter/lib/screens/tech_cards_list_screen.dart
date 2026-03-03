@@ -670,6 +670,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     final lang = loc.currentLanguageCode;
     const colCatWidth = 52.0;
     const colCostWidth = 48.0;
+    final est = context.read<AccountManagerSupabase>().establishment;
+    final costSym = est?.currencySymbol ?? Establishment.currencySymbolFor(est?.defaultCurrency ?? 'VND');
     return RefreshIndicator(
       onRefresh: _load,
       child: CustomScrollView(
@@ -684,7 +686,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
               onColor: Theme.of(context).colorScheme.onPrimaryContainer,
               labelName: loc.t('ttk_col_name'),
               labelCat: loc.t('column_category').substring(0, loc.t('column_category').length.clamp(0, 4)),
-              labelCost: '${context.read<AccountManagerSupabase>().establishment?.currencySymbol ?? ''}/${loc.t('kg')}',
+              labelCost: '$costSym/${loc.t('kg')}',
             ),
           ),
           SliverList(

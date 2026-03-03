@@ -2121,8 +2121,8 @@ class _TtkTableState extends State<_TtkTable> {
     final totalFat = ingredients.fold<double>(0, (s, ing) => s + ing.finalFat);
     final totalCarbs = ingredients.fold<double>(0, (s, ing) => s + ing.finalCarbs);
     final accountManager = context.read<AccountManagerSupabase>();
-    final currency = accountManager.currentEmployee?.currency ?? accountManager.establishment?.defaultCurrency ?? 'RUB';
-    final sym = Establishment.currencySymbolFor(currency);
+    final est = accountManager.establishment;
+    final sym = est?.currencySymbol ?? Establishment.currencySymbolFor(est?.defaultCurrency ?? accountManager.currentEmployee?.currency ?? 'VND');
     final hasProSubscription = context.read<AccountManagerSupabase>().currentEmployee?.hasProSubscription ?? false;
 
     final hasDeleteCol = widget.effectiveCanEdit;

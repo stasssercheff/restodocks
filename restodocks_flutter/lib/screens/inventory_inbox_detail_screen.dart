@@ -141,7 +141,10 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
       final nameLabel = loc.t('inventory_item_name');
       final unitLabel = loc.t('inventory_unit');
       final totalLabel = loc.t('inventory_excel_total');
-      final sumLabel = loc.t('inventory_excel_sum') ?? 'Сумма';
+      final acc = context.read<AccountManagerSupabase>();
+      final est = acc.establishment;
+      final currencySym = est?.currencySymbol ?? Establishment.currencySymbolFor(est?.defaultCurrency ?? 'VND');
+      final sumLabel = '${loc.t('inventory_excel_sum') ?? 'Сумма'}${currencySym.isNotEmpty ? ' ($currencySym)' : ''}';
       final fillLabel = loc.t('inventory_excel_fill_data');
 
       final headerCells = <CellValue>[

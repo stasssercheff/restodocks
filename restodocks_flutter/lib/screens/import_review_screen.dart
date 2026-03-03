@@ -340,7 +340,7 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
     } else {
       parts.add(loc.t('new_product_label') ?? 'Новый продукт');
     }
-    final cur = item.currency != null ? ' ${item.currency}' : '';
+    final cur = ' ${Establishment.currencySymbolFor(item.currency ?? context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'VND')}';
     // Для priceUpdate: всегда показываем реальную старую и реальную новую цену
     if (item.category == ModerationCategory.priceUpdate &&
         item.existingProductId != null &&

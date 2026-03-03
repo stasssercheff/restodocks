@@ -322,7 +322,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildScheduleAndSalarySection(Employee employee, Establishment establishment, LocalizationService localization) {
-    final currencySymbol = employee.currencySymbol;
+    final currencySymbol = establishment.currencySymbol;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

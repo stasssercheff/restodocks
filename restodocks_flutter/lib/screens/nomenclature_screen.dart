@@ -1743,7 +1743,7 @@ class _DuplicatesDialogState extends State<_DuplicatesDialog> {
                                     fontWeight: group.indexOf(item) == 0 ? FontWeight.bold : FontWeight.normal,
                                   ),
                                 ),
-                                subtitle: item.price != null ? Text('${item.price} ${item.currency ?? ''}') : null,
+                                subtitle: item.price != null ? Text('${item.price} ${Establishment.currencySymbolFor(item.currency ?? context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'VND')}') : null,
                                 controlAffinity: ListTileControlAffinity.leading,
                                 dense: true,
                               )),
@@ -3454,7 +3454,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 4),
                       child: Text(
-                        '$oldStr → $newStr ${e.currency ?? ''} ($dateStr)',
+                        '$oldStr → $newStr ${Establishment.currencySymbolFor(e.currency ?? context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'VND')} ($dateStr)',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     );
