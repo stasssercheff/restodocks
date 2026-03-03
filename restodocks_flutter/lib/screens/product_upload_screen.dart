@@ -26,6 +26,7 @@ import '../services/intelligent_product_import_service.dart';
 import '../services/translation_service.dart';
 import '../services/translation_manager.dart';
 import '../services/iiko_product_store.dart';
+import '../services/iiko_xlsx_sanitizer.dart';
 import '../widgets/app_bar_home_button.dart';
 
 // Глобальная переменная для хранения debug логов
@@ -386,7 +387,8 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     });
 
     try {
-      final bytes = result.files.single.bytes!;
+      var bytes = result.files.single.bytes!;
+      bytes = IikoXlsxSanitizer.ensureDecodable(bytes);
       final parsed = _parseIikoBlank(bytes, estId);
       final products = parsed.products;
 

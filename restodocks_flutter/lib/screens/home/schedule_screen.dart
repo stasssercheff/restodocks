@@ -128,6 +128,87 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     return (t != key && t.isNotEmpty) ? t : code;
   }
 
+  Employee? _employeeForSlot(ScheduleSlot slot) {
+    if (slot.employeeId == null) return null;
+    return _employees.where((e) => e.id == slot.employeeId).firstOrNull;
+  }
+
+  /// Секции кухни (цеха), без management/bar/hall.
+  static const _kitchenSectionIds = {'hot_kitchen', 'cold_kitchen', 'grill', 'pastry', 'prep', 'cleaning', 'pizza', 'sushi', 'bakery'};
+
+  /// Блоки отображения при department='all': Кухня (управление + цеха), Бар (управление + сотрудники), Зал (управление + сотрудники).
+  List<({bool isDeptHeader, String deptLabel, String? sectionId, String sectionLabel, List<ScheduleSlot> slots})> _displayBlocks(LocalizationService loc) {
+    if (widget.department != 'all') {
+      return _displaySections
+          .map((s) => (
+                isDeptHeader: false,
+                deptLabel: '',
+                sectionId: s.id,
+                sectionLabel: loc.translate(s.nameKey) != s.nameKey ? loc.translate(s.nameKey) : s.id,
+                slots: _displaySlotsBySection[s.id] ?? [],
+              ))
+          .where((b) => b.slots.isNotEmpty)
+          .toList();
+    }
+    final bySection = _displaySlotsBySection;
+    final blocks = <({bool isDeptHeader, String deptLabel, String? sectionId, String sectionLabel, List<ScheduleSlot> slots})>[];
+
+    void addDept(String deptKey, String deptLabel) {
+      blocks.add((isDeptHeader: true, deptLabel: deptLabel, sectionId: null, sectionLabel: '', slots: []));
+    }
+
+    void addSection(String sectionId, String sectionLabel, List<ScheduleSlot> slots) {
+      if (slots.isEmpty) return;
+      blocks.add((isDeptHeader: false, deptLabel: '', sectionId: sectionId, sectionLabel: sectionLabel, slots: slots));
+    }
+
+    // Общее управление (department=='management')
+    final mgmtDeptSlots = (bySection['management'] ?? []).where((s) {
+      final emp = _employeeForSlot(s);
+      return emp != null && emp.department == 'management';
+    }).toList();
+    if (mgmtDeptSlots.isNotEmpty) {
+      addDept('dept_management', loc.t('dept_management'));
+      addSection('management', loc.t('management'), mgmtDeptSlots);
+    }
+
+    // Кухня: управление (по department сотрудника) + цеха
+    addDept('dept_kitchen', loc.t('dept_kitchen'));
+    final mgmtSlots = bySection['management'] ?? [];
+    final kitchenMgmt = mgmtSlots.where((s) {
+      final emp = _employeeForSlot(s);
+      return emp != null && emp.department == 'kitchen';
+    }).toList();
+    addSection('management', loc.t('management'), kitchenMgmt);
+    for (final section in _model.sections) {
+      if (_kitchenSectionIds.contains(section.id)) {
+        final slots = bySection[section.id] ?? [];
+        addSection(section.id, loc.translate(section.nameKey) != section.nameKey ? loc.translate(section.nameKey) : section.id, slots);
+      }
+    }
+
+    // Бар: управление + сотрудники
+    addDept('dept_bar', loc.t('dept_bar'));
+    final barMgmt = mgmtSlots.where((s) {
+      final emp = _employeeForSlot(s);
+      return emp != null && emp.department == 'bar';
+    }).toList();
+    addSection('management', loc.t('management'), barMgmt);
+    final barSlots = bySection['bar'] ?? [];
+    addSection('bar', loc.t('employees'), barSlots);
+
+    // Зал: управление + сотрудники
+    addDept('dept_hall', loc.t('dept_hall'));
+    final hallMgmt = mgmtSlots.where((s) {
+      final emp = _employeeForSlot(s);
+      return emp != null && (emp.department == 'hall' || emp.department == 'dining_room');
+    }).toList();
+    addSection('management', loc.t('management'), hallMgmt);
+    final hallSlots = bySection['hall'] ?? [];
+    addSection('hall', loc.t('employees'), hallSlots);
+    return blocks;
+  }
+
   /// ID сотрудников выбранного подразделения (для фильтрации графика)
   Set<String> get _employeeIdsForDepartment {
     if (widget.department == 'all') return _employees.map((e) => e.id).toSet();
@@ -543,19 +624,32 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       decoration: BoxDecoration(color: headerBg, border: Border(right: BorderSide(color: borderColor))),
     ));
 
-    for (final section in _displaySections) {
-      var sectionSlots = _displaySlotsBySection[section.id] ?? [];
+    final blocks = _displayBlocks(loc);
+    final sectionBg = theme.colorScheme.secondaryContainer.withOpacity(0.6);
+    final sectionFg = theme.colorScheme.onSecondaryContainer;
+    final deptHeaderBg = theme.colorScheme.primary.withOpacity(0.25);
+    final deptHeaderFg = theme.colorScheme.onPrimary;
+
+    for (final block in blocks) {
+      if (block.isDeptHeader) {
+        leftCells.add(leftCell(
+          Text(block.deptLabel, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: deptHeaderFg), overflow: TextOverflow.ellipsis),
+          height: _rowHeight,
+          decoration: BoxDecoration(
+            color: deptHeaderBg,
+            border: Border(right: BorderSide(color: borderColor), bottom: BorderSide(color: borderColor)),
+          ),
+        ));
+        continue;
+      }
+      var sectionSlots = block.slots;
       if (widget.personalOnly && currentEmployeeId != null) {
         sectionSlots = sectionSlots.where(slotMatchesPersonal).toList();
       }
       if (sectionSlots.isEmpty) continue;
-      final sectionName = loc.translate(section.nameKey);
-      final sectionLabel = sectionName == section.nameKey ? section.id : sectionName;
-      final sectionBg = theme.colorScheme.secondaryContainer.withOpacity(0.6);
-      final sectionFg = theme.colorScheme.onSecondaryContainer;
 
       leftCells.add(leftCell(
-        Text(sectionLabel, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: sectionFg), overflow: TextOverflow.ellipsis),
+        Text(block.sectionLabel, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: sectionFg), overflow: TextOverflow.ellipsis),
         height: _rowHeight,
         decoration: BoxDecoration(
           color: sectionBg,
@@ -614,13 +708,16 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         bg: headerCellBg,
       ));
 
-      for (final section in _displaySections) {
-        var sectionSlots = _displaySlotsBySection[section.id] ?? [];
+      for (final block in blocks) {
+        if (block.isDeptHeader) {
+          columnChildren.add(rightCell(const SizedBox.shrink(), bg: deptHeaderBg, mergeRight: !isLastColumn));
+          continue;
+        }
+        var sectionSlots = block.slots;
         if (widget.personalOnly && currentEmployeeId != null) {
           sectionSlots = sectionSlots.where(slotMatchesPersonal).toList();
         }
         if (sectionSlots.isEmpty) continue;
-        final sectionBg = theme.colorScheme.secondaryContainer.withOpacity(0.6);
 
         // Объединённая строка раздела: без правой границы между ячейками (mergeRight), чтобы визуально сливались
         columnChildren.add(rightCell(const SizedBox.shrink(), bg: sectionBg, mergeRight: !isLastColumn));

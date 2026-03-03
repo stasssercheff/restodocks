@@ -11,6 +11,7 @@ import 'package:uuid/uuid.dart';
 
 import '../models/iiko_product.dart';
 import '../services/iiko_product_store.dart';
+import '../services/iiko_xlsx_sanitizer.dart';
 
 import '../models/culinary_units.dart';
 import '../models/product.dart';
@@ -384,7 +385,8 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     if (mounted) setState(() => _iikoUploading = true);
 
     try {
-      final bytes = result.files.single.bytes!;
+      var bytes = result.files.single.bytes!;
+      bytes = IikoXlsxSanitizer.ensureDecodable(bytes);
 
       // Первичный парсинг — проверяем нашёл ли авто все столбцы остатка
       final firstPass = _parseIikoBlank(bytes, estId);

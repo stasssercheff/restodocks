@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/iiko_product.dart';
+import 'iiko_xlsx_sanitizer.dart';
 
 /// Хранилище iiko-продуктов. Использует RPC-функции вместо прямых запросов
 /// к таблице, чтобы обойти возможные проблемы с кэшем схемы PostgREST.
@@ -292,7 +293,8 @@ class IikoProductStore extends ChangeNotifier {
     if (originalBlankBytes == null) return;
 
     try {
-      final excel = Excel.decodeBytes(originalBlankBytes!.toList());
+      final bytes = IikoXlsxSanitizer.ensureDecodable(originalBlankBytes!);
+      final excel = Excel.decodeBytes(bytes.toList());
       // Строим карту: код → sheetName
       final codeToSheet = <String, String>{};
       final foundSheets = <String>[];
