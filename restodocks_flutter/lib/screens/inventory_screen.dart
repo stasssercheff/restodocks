@@ -2356,13 +2356,17 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   }
   // ──────────────────────────────────────────────────────────────────────────
 
-  /// Скрывать нижние кнопки только когда реально открыта клавиатура (mobile).
-  /// На десктопе viewInsets.bottom = 0 — кнопки «Сохранить и скачать» всегда видны.
+  /// Скрывать строку статуса и кнопки при фокусе в поиске/ячейке.
+  /// На десктопе (широкий экран) viewInsets=0 — не скрываем, иначе кнопки пропадут.
+  /// На мобильном скрываем по фокусу (клавиатура занимает место).
   bool get _isKeyboardActive {
     if (!mounted) return false;
+    final hasFocus = _searchFocusNode.hasFocus || _iikoCellFocusNodes.any((n) => n.hasFocus);
+    if (!hasFocus) return false;
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
-    if (bottom <= 0) return false; // Нет клавиатуры — не скрываем кнопки (десктоп)
-    return _searchFocusNode.hasFocus || _iikoCellFocusNodes.any((n) => n.hasFocus);
+    final isNarrow = MediaQuery.sizeOf(context).width < 600;
+    if (isNarrow) return true;  // Мобильный: скрывать по фокусу
+    return bottom > 0;          // Десктоп: только при реальной клавиатуре
   }
 
   @override
