@@ -769,6 +769,19 @@ class _InventoryScreenState extends State<InventoryScreen>
         if (!r.isFree) r.quantities.add(0.0);
       }
     });
+    _scrollToNewColumn();
+  }
+
+  void _scrollToNewColumn() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_hScroll.hasClients) {
+        _hScroll.animateTo(
+          _hScroll.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   void _addProduct(Product p) {
@@ -796,9 +809,10 @@ class _InventoryScreenState extends State<InventoryScreen>
       setState(() {});
     }
 
-    // Если это последняя ячейка и значение > 0, добавляем новую ячейку для этой строки
+    // Если это последняя ячейка и значение > 0, добавляем новую (как в iiko) и скроллим вправо
     if (colIndex == row.quantities.length - 1 && value > 0) {
       row.quantities.add(0.0);
+      _scrollToNewColumn();
     }
 
     saveNow();
@@ -1195,8 +1209,8 @@ class _InventoryScreenState extends State<InventoryScreen>
       });
     }
 
-    // collapseLayout только на десктопе при клавиатуре. На мобильной — не трогаем layout, иначе клавиатура закрывается.
-    final collapseLayout = _isInputMode && !isNarrow;
+    // collapseLayout: скрывать футер и шапку при клавиатуре (десктоп + мобильный).
+    final collapseLayout = (_isInputMode && !isNarrow) || (isNarrow && isKeyboardOpen);
     // На мобильном при открытой клавиатуре скрываем строку с датой/именем (верхняя шапка),
     // но оставляем строку с фильтром — это делается без setState через isKeyboardOpen.
     final mobileKeyboardOpen = isNarrow && isKeyboardOpen;
