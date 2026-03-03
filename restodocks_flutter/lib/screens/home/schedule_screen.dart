@@ -128,6 +128,52 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     return (t != key && t.isNotEmpty) ? t : code;
   }
 
+  /// ID сотрудников выбранного подразделения (для фильтрации графика)
+  Set<String> get _employeeIdsForDepartment {
+    if (widget.department == 'all') return _employees.map((e) => e.id).toSet();
+    final dept = widget.department;
+    return _employees.where((e) {
+      if (dept == 'kitchen') return e.department == 'kitchen';
+      if (dept == 'bar') return e.department == 'bar';
+      if (dept == 'hall' || dept == 'dining_room') return e.department == 'hall' || e.department == 'dining_room';
+      return true;
+    }).map((e) => e.id).toSet();
+  }
+
+  /// Слоты для отображения: при выборе подразделения — только сотрудники этого подразделения
+  List<ScheduleSlot> get _displaySlots {
+    if (widget.department == 'all') return _model.slots;
+    final ids = _employeeIdsForDepartment;
+    return _model.slots.where((s) => s.employeeId != null && ids.contains(s.employeeId!)).toList();
+  }
+
+  /// Секции и слоты по секциям для отображения (с учётом фильтра по подразделению)
+  Map<String, List<ScheduleSlot>> get _displaySlotsBySection {
+    final filtered = _displaySlots;
+    final map = <String, List<ScheduleSlot>>{};
+    for (final section in _model.sections) {
+      final list = filtered.where((s) => s.sectionId == section.id).toList();
+      if (list.isNotEmpty) map[section.id] = list;
+    }
+    // Слоты с sectionId, для которых нет секции (bar, hall) — добавляем секции
+    final orphanSectionIds = filtered.map((s) => s.sectionId).where((id) => id.isNotEmpty && !map.containsKey(id)).toSet();
+    for (final id in orphanSectionIds) {
+      map[id] = filtered.where((s) => s.sectionId == id).toList();
+    }
+    return map;
+  }
+
+  List<ScheduleSection> get _displaySections {
+    final bySection = _displaySlotsBySection;
+    final ordered = ScheduleModel.sectionsInDisplayOrder(_model.sections);
+    final fromModel = ordered.where((s) => bySection.containsKey(s.id)).toList();
+    final orphanIds = bySection.keys.where((id) => !ordered.any((s) => s.id == id)).toList();
+    if (orphanIds.isEmpty) return fromModel;
+    const nameKeys = {'bar': 'dept_bar', 'hall': 'dept_hall'};
+    final extra = orphanIds.map((id) => ScheduleSection(id: id, nameKey: nameKeys[id] ?? id)).toList();
+    return [...fromModel, ...extra];
+  }
+
   String _getSectionIdForEmployee(Employee employee, List<ScheduleSection> sections) {
     if (sections.isEmpty) return '';
 
@@ -497,8 +543,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       decoration: BoxDecoration(color: headerBg, border: Border(right: BorderSide(color: borderColor))),
     ));
 
-    for (final section in ScheduleModel.sectionsInDisplayOrder(_model.sections)) {
-      var sectionSlots = _model.slotsBySection[section.id] ?? [];
+    for (final section in _displaySections) {
+      var sectionSlots = _displaySlotsBySection[section.id] ?? [];
       if (widget.personalOnly && currentEmployeeId != null) {
         sectionSlots = sectionSlots.where(slotMatchesPersonal).toList();
       }
@@ -568,8 +614,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         bg: headerCellBg,
       ));
 
-      for (final section in ScheduleModel.sectionsInDisplayOrder(_model.sections)) {
-        var sectionSlots = _model.slotsBySection[section.id] ?? [];
+      for (final section in _displaySections) {
+        var sectionSlots = _displaySlotsBySection[section.id] ?? [];
         if (widget.personalOnly && currentEmployeeId != null) {
           sectionSlots = sectionSlots.where(slotMatchesPersonal).toList();
         }

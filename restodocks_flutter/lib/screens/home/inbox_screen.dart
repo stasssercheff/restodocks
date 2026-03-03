@@ -25,12 +25,16 @@ enum _InboxTab { checklist, order, inventory, iikoInventory }
 /// Вкладки по подразделениям (для собственника)
 enum _InboxDeptTab { kitchen, bar, hall }
 
+/// Типы документов для 2-го яруса вкладок (собственник)
+enum _InboxTypeTab { order, inventory, iikoInventory }
+
 class _InboxScreenState extends State<InboxScreen> {
   late InboxService _inboxService;
   List<InboxDocument> _documents = [];
   bool _loading = true;
   _InboxTab? _selectedTab;
   _InboxDeptTab? _selectedDeptTab;
+  _InboxTypeTab? _selectedTypeTab;
 
   @override
   void initState() {
@@ -47,7 +51,10 @@ class _InboxScreenState extends State<InboxScreen> {
     final employee = context.read<AccountManagerSupabase>().currentEmployee;
     if (employee == null) return;
     if (employee.hasRole('owner')) {
-      setState(() => _selectedDeptTab = _InboxDeptTab.kitchen);
+      setState(() {
+        _selectedDeptTab = _InboxDeptTab.kitchen;
+        _selectedTypeTab = _InboxTypeTab.order;
+      });
     } else {
       final tabs = _visibleTabs(employee);
       if (tabs.isNotEmpty) {
@@ -101,14 +108,20 @@ class _InboxScreenState extends State<InboxScreen> {
   }
 
   List<InboxDocument> get _filteredDocuments {
-    // Собственник: фильтр по подразделению (Bar, Hall, Kitchen)
-    if (_selectedDeptTab != null) {
+    // Собственник: двухярусная фильтрация — подразделение + тип документа
+    if (_selectedDeptTab != null && _selectedTypeTab != null) {
       final dept = switch (_selectedDeptTab!) {
         _InboxDeptTab.kitchen => 'kitchen',
         _InboxDeptTab.bar => 'bar',
         _InboxDeptTab.hall => 'hall',
       };
-      return _documents.where((d) => d.department == dept).toList();
+      final docsByDept = _documents.where((d) => d.department == dept).toList();
+      final docType = switch (_selectedTypeTab!) {
+        _InboxTypeTab.order => DocumentType.productOrder,
+        _InboxTypeTab.inventory => DocumentType.inventory,
+        _InboxTypeTab.iikoInventory => DocumentType.iikoInventory,
+      };
+      return docsByDept.where((d) => d.type == docType).toList();
     }
     // Остальные: по типу документа
     switch (_selectedTab) {
@@ -147,8 +160,11 @@ class _InboxScreenState extends State<InboxScreen> {
       ),
       body: Column(
         children: [
-          // Собственник: вкладки по подразделениям (Бар, Зал, Кухня)
-          if (isOwner) _buildDeptFilter(loc),
+          // Собственник: двухярусная система вкладок
+          if (isOwner) ...[
+            _buildDeptFilter(loc),
+            _buildTypeFilterForOwner(loc),
+          ],
           // Остальные: фильтр по типу документа
           if (!isOwner && visibleTabs.isNotEmpty) _buildTypeFilter(loc, visibleTabs),
 
@@ -156,7 +172,7 @@ class _InboxScreenState extends State<InboxScreen> {
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
-                : (isOwner ? _selectedDeptTab == null : _selectedTab == null)
+                : (isOwner ? (_selectedDeptTab == null || _selectedTypeTab == null) : _selectedTab == null)
                     ? _buildEmptyState(loc)
                     : _filteredDocuments.isEmpty
                         ? _buildEmptyState(loc)
@@ -201,6 +217,47 @@ class _InboxScreenState extends State<InboxScreen> {
       selected: isSelected,
       onSelected: (_) {
         setState(() => _selectedDeptTab = tab);
+      },
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      selectedColor: Theme.of(context).colorScheme.primaryContainer,
+      checkmarkColor: Theme.of(context).colorScheme.onPrimaryContainer,
+    );
+  }
+
+  Widget _buildTypeFilterForOwner(LocalizationService loc) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        border: Border(
+          bottom: BorderSide(
+            color: Theme.of(context).dividerColor,
+            width: 1,
+          ),
+        ),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _buildTypeChip(_InboxTypeTab.order, loc.t('inbox_tab_order') ?? 'Заказ продуктов', loc),
+            const SizedBox(width: 8),
+            _buildTypeChip(_InboxTypeTab.inventory, loc.t('inbox_tab_inventory') ?? 'Инвентаризация', loc),
+            const SizedBox(width: 8),
+            _buildTypeChip(_InboxTypeTab.iikoInventory, 'Инвентаризация iiko', loc),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTypeChip(_InboxTypeTab tab, String label, LocalizationService loc) {
+    final isSelected = _selectedTypeTab == tab;
+    return FilterChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (_) {
+        setState(() => _selectedTypeTab = tab);
       },
       backgroundColor: Theme.of(context).colorScheme.surface,
       selectedColor: Theme.of(context).colorScheme.primaryContainer,
