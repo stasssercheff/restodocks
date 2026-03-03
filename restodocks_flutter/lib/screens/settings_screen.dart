@@ -19,6 +19,30 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  List<Establishment> _ownerEstablishments = [];
+  bool _loadingEstablishments = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOwnerEstablishments();
+  }
+
+  Future<void> _loadOwnerEstablishments() async {
+    final accountManager = context.read<AccountManagerSupabase>();
+    if (accountManager.currentEmployee?.hasRole('owner') != true) return;
+    setState(() => _loadingEstablishments = true);
+    try {
+      final list = await accountManager.getEstablishmentsForOwner();
+      if (mounted) setState(() {
+        _ownerEstablishments = list;
+        _loadingEstablishments = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loadingEstablishments = false);
+    }
+  }
+
   /// Основные валюты мира (как в Numbers/Excel)
   static const List<Map<String, String>> _currencies = [
     {'code': 'RUB', 'symbol': '₽', 'name': 'Российский рубль'},
@@ -744,6 +768,45 @@ class _SettingsScreenState extends State<SettingsScreen> {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
+            if (currentEmployee.hasRole('owner')) ...[
+              Text(
+                localization.t('establishment') ?? 'Заведение',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              if (_loadingEstablishments)
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))),
+                )
+              else if (_ownerEstablishments.length > 1) ...[
+                ..._ownerEstablishments.map((est) => ListTile(
+                  leading: Icon(
+                    est.id == establishment?.id ? Icons.check_circle : Icons.store,
+                    color: est.id == establishment?.id ? Theme.of(context).colorScheme.primary : null,
+                  ),
+                  title: Text(est.name),
+                  subtitle: est.id == establishment?.id
+                      ? Text(localization.t('current') ?? 'Текущее')
+                      : null,
+                  trailing: est.id == establishment?.id ? const Icon(Icons.check, color: Colors.green) : null,
+                  onTap: est.id == establishment?.id ? null : () async {
+                    await accountManager.switchEstablishment(est);
+                    if (context.mounted) context.go('/home');
+                  },
+                )),
+                const SizedBox(height: 8),
+              ],
+              if (!accountManager.isViewOnlyOwner)
+                ListTile(
+                  leading: const Icon(Icons.add_business),
+                  title: Text(localization.t('add_establishment') ?? 'Добавить заведение'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/add-establishment'),
+                ),
+              const Divider(),
+            ],
             ListTile(
               leading: const Icon(Icons.language),
               title: Text(localization.t('language')),
@@ -815,12 +878,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onTap: () => _showRolePicker(context, localization, currentEmployee, accountManager, pref),
                   ),
                 ),
-              ListTile(
-                leading: const Icon(Icons.person_add),
-                title: Text(localization.t('invite_co_owner')),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => _showInviteCoOwnerDialog(context, localization, accountManager),
-              ),
+              if (!accountManager.isViewOnlyOwner)
+                ListTile(
+                  leading: const Icon(Icons.person_add),
+                  title: Text(localization.t('invite_co_owner')),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _showInviteCoOwnerDialog(context, localization, accountManager),
+                ),
+              if (accountManager.isViewOnlyOwner)
+                ListTile(
+                  leading: const Icon(Icons.visibility),
+                  title: Text(localization.t('view_only_mode') ?? 'Режим только просмотр'),
+                  subtitle: Text(localization.t('view_only_mode_hint') ?? 'Соучредитель при нескольких заведениях'),
+                ),
             ],
             // Кнопка платформенного кабинета — видна только владельцу платформы
             if (_isPlatformAdminEmail(currentEmployee.email)) ...[

@@ -39,14 +39,15 @@ class _RegisterCoOwnerScreenState extends State<RegisterCoOwnerScreen> {
   Future<void> _loadInvitation() async {
     try {
       final accountManager = context.read<AccountManagerSupabase>();
-      final invitation = await accountManager.supabase.client
-          .from('co_owner_invitations')
-          .select('*, establishments(*)')
-          .eq('invitation_token', widget.token)
-          .eq('status', 'accepted')
-          .single();
-
-      if (mounted) setState(() => _invitationData = invitation);
+      final raw = await accountManager.supabase.client.rpc(
+        'get_co_owner_invitation_by_token',
+        params: {'p_token': widget.token},
+      );
+      if (raw != null && mounted) {
+        setState(() => _invitationData = Map<String, dynamic>.from(raw as Map));
+      } else if (mounted) {
+        setState(() => _error = 'Приглашение не найдено или истекло');
+      }
     } catch (e) {
       if (mounted) setState(() => _error = 'Приглашение не найдено');
     }
@@ -61,42 +62,41 @@ class _RegisterCoOwnerScreenState extends State<RegisterCoOwnerScreen> {
       final accountManager = context.read<AccountManagerSupabase>();
       final email = _invitationData!['invited_email'] as String;
       final password = _passwordController.text;
+      final token = widget.token;
       final establishment = _invitationData!['establishments'] as Map<String, dynamic>;
-      final establishmentId = establishment['id'] as String;
+
+      final accSupabase = accountManager as AccountManagerSupabase;
+      final signUpResult = await accSupabase.signUpWithEmailForOwner(email, password);
+      if (signUpResult.userId == null) throw Exception('Не удалось создать учётную запись');
+
+      if (!signUpResult.hasSession) {
+        if (!mounted) return;
+        context.go('/confirm-email?email=${Uri.encodeComponent(email)}');
+        return;
+      }
+
+      final empRaw = await accSupabase.supabase.client.rpc(
+        'create_co_owner_from_invitation',
+        params: {
+          'p_invitation_token': token,
+          'p_full_name': _nameController.text.trim(),
+          'p_surname': null,
+        },
+      );
+      final employee = Employee.fromJson(Map<String, dynamic>.from(empRaw as Map)..['password'] = '');
       final estab = Establishment(
-        id: establishmentId,
+        id: establishment['id'] as String,
         name: establishment['name'] as String,
         pinCode: establishment['pin_code'] as String? ?? '',
-        ownerId: '',
+        ownerId: establishment['owner_id']?.toString() ?? '',
         defaultCurrency: establishment['default_currency'] as String? ?? 'RUB',
         createdAt: DateTime.parse(establishment['created_at'] as String),
         updatedAt: DateTime.parse(establishment['updated_at'] as String),
       );
 
-      final accSupabase = accountManager as AccountManagerSupabase;
-      final signUpResult = await accSupabase.signUpWithEmailForOwner(email, password);
-      final authUserId = signUpResult.userId;
-      if (authUserId == null) throw Exception('Не удалось создать учётную запись');
-
-      final employee = await accountManager.createEmployeeForCompany(
-        company: estab,
-        fullName: _nameController.text.trim(),
-        surname: null,
-        email: email,
-        password: password,
-        department: 'management',
-        section: null,
-        roles: ['owner'],
-        authUserId: authUserId,
-      );
-
       if (!mounted) return;
-      if (signUpResult.hasSession) {
-        await accountManager.login(employee, estab);
-        context.go('/home');
-      } else {
-        context.go('/confirm-email?email=${Uri.encodeComponent(email)}');
-      }
+      await accountManager.login(employee, estab);
+      context.go('/home');
     } catch (e) {
       if (mounted) setState(() {
         _error = e.toString();

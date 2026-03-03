@@ -45,6 +45,9 @@ class AccountManagerSupabase extends ChangeNotifier {
   /// Есть ли PRO подписка
   bool get hasProSubscription => _establishment?.subscriptionType == 'pro' || _establishment?.subscriptionType == 'premium';
 
+  /// Co-owner с view_only: только просмотр (при >1 заведении у пригласившего)
+  bool get isViewOnlyOwner => _currentEmployee?.isViewOnlyOwner ?? false;
+
   /// Авторизован ли пользователь (своя сессия employees или восстановленная из хранилища)
   bool get isLoggedInSync => _currentEmployee != null && _establishment != null;
 
@@ -157,6 +160,50 @@ class AccountManagerSupabase extends ChangeNotifier {
     await _secureStorage.remove(_keyEstablishmentId);
   }
 
+  /// Список заведений владельца (owner_id = auth.uid)
+  Future<List<Establishment>> getEstablishmentsForOwner() async {
+    try {
+      final data = await _supabase.client.rpc('get_establishments_for_owner');
+      if (data == null) return [];
+      final list = data as List;
+      return list.map((e) => Establishment.fromJson(Map<String, dynamic>.from(e as Map))).toList();
+    } catch (e) {
+      print('AccountManager: getEstablishmentsForOwner error: $e');
+      return [];
+    }
+  }
+
+  /// Добавить заведение существующим владельцем (без регистрации владельца)
+  Future<Establishment> addEstablishmentForOwner({
+    required String name,
+    String? address,
+    String? phone,
+    String? email,
+    String? pinCode,
+  }) async {
+    final raw = await _supabase.client.rpc(
+      'add_establishment_for_owner',
+      params: {
+        'p_name': name,
+        'p_address': address,
+        'p_phone': phone,
+        'p_email': email,
+        'p_pin_code': pinCode,
+      },
+    );
+    final response = Map<String, dynamic>.from(raw as Map);
+    response['owner_id'] = response['owner_id']?.toString() ?? '';
+    final created = Establishment.fromJson(response);
+    return created;
+  }
+
+  /// Переключение на другое заведение (для владельца с несколькими заведениями)
+  Future<void> switchEstablishment(Establishment establishment) async {
+    _establishment = establishment;
+    await _secureStorage.set(_keyEstablishmentId, establishment.id);
+    notifyListeners();
+  }
+
   /// Создание нового заведения
   /// [pinCode] — если задан, используется как PIN (иначе генерируется).
   Future<Establishment> createEstablishment({
@@ -255,11 +302,15 @@ class AccountManagerSupabase extends ChangeNotifier {
   }
 
   /// Отправка приглашения соучредителю
+  /// Если у владельца >1 заведения — co-owner получает только просмотр (is_view_only_owner)
   Future<void> inviteCoOwner(String email, String establishmentId) async {
     final currentEmployee = this.currentEmployee;
     if (currentEmployee == null || !currentEmployee.hasRole('owner')) {
       throw Exception('Only owners can send co-owner invitations');
     }
+
+    final establishmentsCount = await getEstablishmentsForOwner();
+    final isViewOnlyOwner = establishmentsCount.length > 1;
 
     final token = DateTime.now().millisecondsSinceEpoch.toString();
     final invitationData = {
@@ -268,6 +319,7 @@ class AccountManagerSupabase extends ChangeNotifier {
       'invited_by': currentEmployee.id,
       'invitation_token': token,
       'status': 'pending',
+      'is_view_only_owner': isViewOnlyOwner,
     };
 
     await _supabase.insertData('co_owner_invitations', invitationData);
@@ -299,7 +351,7 @@ class AccountManagerSupabase extends ChangeNotifier {
 
   /// Регистрация сотрудника в компании
   /// [authUserId] — ID из Supabase Auth (обязательно: employees.id = auth.users.id).
-  /// При подтверждении email нет сессии нового юзера — вставка через RPC create_employee_for_company.
+  /// [ownerAccessLevel] — для co-owner: 'view_only' если у пригласившего >1 заведения
   Future<Employee> createEmployeeForCompany({
     required Establishment company,
     required String fullName,
@@ -310,6 +362,7 @@ class AccountManagerSupabase extends ChangeNotifier {
     String? section,
     required List<String> roles,
     String? authUserId,
+    String? ownerAccessLevel,
   }) async {
     if (authUserId == null || authUserId.isEmpty) {
       throw Exception('employees.id = auth.users.id — требуется authUserId от signUp');
@@ -324,6 +377,7 @@ class AccountManagerSupabase extends ChangeNotifier {
         surname: surname,
         email: email,
         roles: roles,
+        ownerAccessLevel: ownerAccessLevel,
       );
     }
 
@@ -331,19 +385,20 @@ class AccountManagerSupabase extends ChangeNotifier {
     // Владелец добавляет (authenticated) → create_employee_for_company.
     // Саморегистрация (anon) → create_employee_self_register.
     final rpcName = _supabase.isAuthenticated ? 'create_employee_for_company' : 'create_employee_self_register';
-    final res = await _supabase.client.rpc(
-      rpcName,
-      params: {
-        'p_auth_user_id': authUserId,
-        'p_establishment_id': company.id,
-        'p_full_name': fullName,
-        'p_surname': surname ?? '',
-        'p_email': email,
-        'p_department': department,
-        'p_section': section ?? '',
-        'p_roles': roles,
-      },
-    );
+    final params = <String, dynamic>{
+      'p_auth_user_id': authUserId,
+      'p_establishment_id': company.id,
+      'p_full_name': fullName,
+      'p_surname': surname ?? '',
+      'p_email': email,
+      'p_department': department,
+      'p_section': section ?? '',
+      'p_roles': roles,
+    };
+    if (rpcName == 'create_employee_for_company' && ownerAccessLevel != null) {
+      params['p_owner_access_level'] = ownerAccessLevel;
+    }
+    final res = await _supabase.client.rpc(rpcName, params: params);
     final data = Map<String, dynamic>.from(res as Map);
     data['password'] = '';
     data['password_hash'] = '';
@@ -425,6 +480,7 @@ class AccountManagerSupabase extends ChangeNotifier {
   }
 
   /// Создание владельца через RPC (обход RLS при Confirm Email — нет сессии после signUp)
+  /// [ownerAccessLevel] — 'view_only' для co-owner при >1 заведении у пригласившего
   Future<Employee> createOwnerEmployeeViaRpc({
     required String authUserId,
     required Establishment establishment,
@@ -432,18 +488,18 @@ class AccountManagerSupabase extends ChangeNotifier {
     String? surname,
     required String email,
     required List<String> roles,
+    String? ownerAccessLevel,
   }) async {
-    final res = await _supabase.client.rpc(
-      'create_owner_employee',
-      params: {
-        'p_auth_user_id': authUserId,
-        'p_establishment_id': establishment.id,
-        'p_full_name': fullName,
-        'p_surname': surname ?? '',
-        'p_email': email,
-        'p_roles': roles,
-      },
-    );
+    final params = <String, dynamic>{
+      'p_auth_user_id': authUserId,
+      'p_establishment_id': establishment.id,
+      'p_full_name': fullName,
+      'p_surname': surname ?? '',
+      'p_email': email,
+      'p_roles': roles,
+    };
+    if (ownerAccessLevel != null) params['p_owner_access_level'] = ownerAccessLevel;
+    final res = await _supabase.client.rpc('create_owner_employee', params: params);
     final data = Map<String, dynamic>.from(res as Map);
     data['password'] = '';
     data['password_hash'] = '';
@@ -812,14 +868,33 @@ class AccountManagerSupabase extends ChangeNotifier {
       _currentEmployee = Employee.fromJson(employeeData);
       onPreferredLanguageLoaded?.call(_currentEmployee!.preferredLanguage);
 
-      final estData = await _supabase.client
-          .from('establishments')
-          .select()
-          .eq('id', _currentEmployee!.establishmentId)
-          .limit(1)
-          .single();
-
-      _establishment = Establishment.fromJson(estData);
+      // Владелец может иметь несколько заведений — используем сохранённое текущее или первое
+      if (_currentEmployee!.hasRole('owner')) {
+        final list = await getEstablishmentsForOwner();
+        if (list.isNotEmpty) {
+          final storedId = await _secureStorage.get(_keyEstablishmentId);
+          final match = storedId != null
+              ? list.where((e) => e.id == storedId).firstOrNull
+              : null;
+          _establishment = match ?? list.first;
+        } else {
+          final estData = await _supabase.client
+              .from('establishments')
+              .select()
+              .eq('id', _currentEmployee!.establishmentId)
+              .limit(1)
+              .single();
+          _establishment = Establishment.fromJson(estData);
+        }
+      } else {
+        final estData = await _supabase.client
+            .from('establishments')
+            .select()
+            .eq('id', _currentEmployee!.establishmentId)
+            .limit(1)
+            .single();
+        _establishment = Establishment.fromJson(estData);
+      }
 
       await _secureStorage.set(_keyEmployeeId, _currentEmployee!.id);
       await _secureStorage.set(_keyEstablishmentId, _establishment!.id);

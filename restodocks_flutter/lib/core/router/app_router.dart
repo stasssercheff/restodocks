@@ -30,6 +30,7 @@ import '../../screens/order_list_detail_screen.dart';
 import '../../screens/order_create_screen.dart';
 import '../../screens/accept_co_owner_invitation_screen.dart';
 import '../../screens/register_co_owner_screen.dart';
+import '../../screens/add_establishment_screen.dart';
 import '../../screens/confirm_email_screen.dart';
 import '../../screens/admin_screen.dart';
 import '../../models/order_list.dart';
@@ -279,6 +280,11 @@ class AppRouter {
           GoRoute(
             path: '/settings',
             pageBuilder: (context, state) => _slideTransitionPage(state, const SettingsScreen()),
+          ),
+          // Добавить заведение (владелец)
+          GoRoute(
+            path: '/add-establishment',
+            pageBuilder: (context, state) => _slideTransitionPage(state, const AddEstablishmentScreen()),
           ),
 
           GoRoute(
