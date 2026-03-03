@@ -2367,15 +2367,10 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   }
   // ──────────────────────────────────────────────────────────────────────────
 
-  /// Скрывать статус и кнопки при клавиатуре: viewInsets или на узком экране при фокусе в поле.
-  bool get _isKeyboardActive {
-    if (!mounted) return false;
-    final bottom = MediaQuery.viewInsetsOf(context).bottom;
-    if (bottom > 0) return true;
-    final isNarrow = MediaQuery.sizeOf(context).width < 600;
-    if (!isNarrow) return false;
-    return _searchFocusNode.hasFocus || _iikoCellFocusNodes.any((n) => n.hasFocus);
-  }
+  /// Скрывать статус и кнопки только когда клавиатура реально открыта (viewInsets).
+  /// Иначе при фокусе в ячейке без клавиатуры — скрываются кнопки, но клавиатура не появляется.
+  bool get _isKeyboardActive =>
+      mounted && MediaQuery.viewInsetsOf(context).bottom > 0;
 
   @override
   void initState() {
@@ -3336,7 +3331,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                               .reduce((a, b) => a > b ? a : b),
                     ),
                     // Список строк — тап/скролл внутри не закрывает клавиатуру (refocus).
-                    // Задержка 200ms: новая ячейка успевает получить фокус, не перезаписываем.
+                    // Задержка 100ms: поиск refocus быстрее при скролле; ячейка успевает получить фокус.
                     Expanded(
                       child: visibleRows.isEmpty
                           ? const Center(child: Text('Нет позиций'))
@@ -3347,7 +3342,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                                     (_iikoCellFocusNodes.contains(pf) || pf == _searchFocusNode);
                                 if (!isOurInput) return;
                                 final nodeToRestore = pf!;
-                                Future.delayed(const Duration(milliseconds: 200), () {
+                                Future.delayed(const Duration(milliseconds: 100), () {
                                   if (!mounted) return;
                                   final current = FocusManager.instance.primaryFocus;
                                   if (current != null &&
@@ -3635,25 +3630,12 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
     _iikoCellFocusNodes.addAll(_focusNodes);
     for (final fn in _focusNodes) {
       fn.addListener(_notifyFocusChange);
-      fn.addListener(_onCellFocusChanged);
-    }
-  }
-
-  void _onCellFocusChanged() {
-    for (final fn in _focusNodes) {
-      if (fn.hasFocus) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) Scrollable.ensureVisible(context);
-        });
-        break;
-      }
     }
   }
 
   void _unregisterFocusNodes() {
     for (final fn in _focusNodes) {
       fn.removeListener(_notifyFocusChange);
-      fn.removeListener(_onCellFocusChanged);
     }
     for (final fn in _focusNodes) {
       _iikoCellFocusNodes.remove(fn);
@@ -3675,7 +3657,6 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
     while (_focusNodes.length < qtys.length) {
       final fn = FocusNode();
       fn.addListener(_notifyFocusChange);
-      fn.addListener(_onCellFocusChanged);
       _focusNodes.add(fn);
       _iikoCellFocusNodes.add(fn);
     }
