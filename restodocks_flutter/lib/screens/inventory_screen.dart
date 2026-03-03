@@ -2356,18 +2356,10 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   }
   // ──────────────────────────────────────────────────────────────────────────
 
-  /// Скрывать строку статуса и кнопки при фокусе в поиске/ячейке.
-  /// На десктопе (широкий экран) viewInsets=0 — не скрываем, иначе кнопки пропадут.
-  /// На мобильном скрываем по фокусу (клавиатура занимает место).
-  bool get _isKeyboardActive {
-    if (!mounted) return false;
-    final hasFocus = _searchFocusNode.hasFocus || _iikoCellFocusNodes.any((n) => n.hasFocus);
-    if (!hasFocus) return false;
-    final bottom = MediaQuery.viewInsetsOf(context).bottom;
-    final isNarrow = MediaQuery.sizeOf(context).width < 600;
-    if (isNarrow) return true;  // Мобильный: скрывать по фокусу
-    return bottom > 0;          // Десктоп: только при реальной клавиатуре
-  }
+  /// Скрывать статус и кнопки только когда клавиатура реально открыта (viewInsets).
+  /// Иначе при тапе по ячейке без клавиатуры всё скрывалось — неудобно.
+  bool get _isKeyboardActive =>
+      mounted && MediaQuery.viewInsetsOf(context).bottom > 0;
 
   @override
   void initState() {
@@ -3327,9 +3319,8 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                               .map((r) => r.quantities.length)
                               .reduce((a, b) => a > b ? a : b),
                     ),
-                    // Список строк — тап внутри не закрывает клавиатуру (refocus);
-                    // тап снаружи (шапка, статус, кнопки) — закрывает.
-                    // Исключение: тап по другой ячейке — даём ей фокус, не возвращаем старый.
+                    // Список строк — тап/скролл внутри не закрывает клавиатуру (refocus).
+                    // Задержка 120ms: новая ячейка успевает получить фокус, не перезаписываем.
                     Expanded(
                       child: visibleRows.isEmpty
                           ? const Center(child: Text('Нет позиций'))
@@ -3340,10 +3331,9 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                                     (_iikoCellFocusNodes.contains(pf) || pf == _searchFocusNode);
                                 if (!isOurInput) return;
                                 final nodeToRestore = pf!;
-                                WidgetsBinding.instance.addPostFrameCallback((_) {
+                                Future.delayed(const Duration(milliseconds: 120), () {
                                   if (!mounted) return;
                                   final current = FocusManager.instance.primaryFocus;
-                                  // Юзер тапнул другую ячейку/поиск — фокус уже там, не перезаписываем.
                                   if (current != null &&
                                       (_iikoCellFocusNodes.contains(current) ||
                                           current == _searchFocusNode)) return;
