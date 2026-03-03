@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
+import 'dart:js_util.dart' as js_util;
 
 
 import 'package:archive/archive.dart';
@@ -2367,11 +2368,15 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
 
   /// Регистрирует window._flutterNav(dir) — вызывается JS кнопками ▲▼.
   /// dir = 1 → следующая ячейка, dir = -1 → предыдущая.
+  /// allowInterop обязателен — иначе JS не может вызвать Dart-функцию.
   void _registerJsNavChannel() {
     try {
-      html.context['_flutterNav'] = (int dir) {
+      final fn = js_util.allowInterop((dynamic dirArg) {
+        if (!mounted) return;
+        final dir = (dirArg is num) ? dirArg.toInt() : 1;
         _navigateCell(dir);
-      };
+      });
+      js_util.setProperty(html.window, '_flutterNav', fn);
     } catch (_) {}
   }
 
@@ -2409,7 +2414,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     _filterCtrl.dispose();
     _serverSaveTimer?.cancel();
     _iikoCellFocusNodes.clear();
-    try { html.context.deleteProperty('_flutterNav'); } catch (_) {}
+    try { js_util.deleteProperty(html.window, '_flutterNav'); } catch (_) {}
     // Отписываемся от store чтобы не вызывать setState после unmount
     try {
       context.read<IikoProductStore>().removeListener(_onStoreUpdated);
