@@ -18,6 +18,8 @@ class OrderList {
   final DateTime? savedAt;
   /// На когда заказ (желаемая дата поставки).
   final DateTime? orderForDate;
+  /// Подразделение: kitchen, bar, hall (default kitchen).
+  final String department;
 
   const OrderList({
     required this.id,
@@ -32,6 +34,7 @@ class OrderList {
     this.comment = '',
     this.savedAt,
     this.orderForDate,
+    this.department = 'kitchen',
   });
 
   bool get isSavedWithQuantities => savedAt != null;
@@ -49,6 +52,7 @@ class OrderList {
         'comment': comment,
         'savedAt': savedAt?.toIso8601String(),
         'orderForDate': orderForDate?.toIso8601String(),
+        'department': department,
       };
 
   factory OrderList.fromJson(Map<String, dynamic> json) {
@@ -69,6 +73,7 @@ class OrderList {
       comment: json['comment'] as String? ?? '',
       savedAt: savedAtStr != null ? DateTime.tryParse(savedAtStr) : null,
       orderForDate: (json['orderForDate'] as String?) != null ? DateTime.tryParse(json['orderForDate'] as String) : null,
+      department: json['department'] as String? ?? 'kitchen',
     );
   }
 
@@ -85,6 +90,7 @@ class OrderList {
     String? comment,
     DateTime? savedAt,
     DateTime? orderForDate,
+    String? department,
   }) =>
       OrderList(
         id: id ?? this.id,
@@ -99,6 +105,7 @@ class OrderList {
         comment: comment ?? this.comment,
         savedAt: savedAt ?? this.savedAt,
         orderForDate: orderForDate ?? this.orderForDate,
+        department: department ?? this.department,
       );
 }
 

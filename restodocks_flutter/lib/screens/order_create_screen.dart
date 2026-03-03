@@ -15,7 +15,9 @@ import '../widgets/order_export_sheet.dart';
 /// 3. Список продуктов поставщика с вводом количеств
 /// 4. Сохранить в «Списки заказов» или Отправить (почта/мессенджер + во входящие шефу и сушефу)
 class OrderCreateScreen extends StatefulWidget {
-  const OrderCreateScreen({super.key});
+  const OrderCreateScreen({super.key, this.department = 'kitchen'});
+
+  final String department;
 
   @override
   State<OrderCreateScreen> createState() => _OrderCreateScreenState();
@@ -69,7 +71,7 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
       final store = context.read<ProductStoreSupabase>();
       if (store.allProducts.isEmpty) await store.loadProducts();
 
-      final lists = await loadOrderLists(estId);
+      final lists = await loadOrderLists(estId, department: widget.department);
       if (mounted) {
         setState(() {
           _suppliers = lists.where((l) => !l.isSavedWithQuantities).toList();
@@ -130,6 +132,7 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
     try {
       final now = DateTime.now();
       final itemsWithQty = _getItemsWithQuantities();
+      final dept = widget.department;
       final saved = OrderList(
         id: const Uuid().v4(),
         name: _nameCtrl.text.trim(),
@@ -143,10 +146,11 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
         comment: _commentCtrl.text,
         savedAt: now,
         orderForDate: _orderForDate,
+        department: dept,
       );
 
-      final lists = await loadOrderLists(estId);
-      await saveOrderLists(estId, [...lists, saved]);
+      final lists = await loadOrderLists(estId, department: dept);
+      await saveOrderLists(estId, [...lists, saved], department: dept);
 
       // Сохраняем во входящие шефу и собственнику
       final orderForDateStr = _orderForDate != null
@@ -158,6 +162,7 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
         'establishmentName': establishment.name,
         'createdAt': now.toIso8601String(),
         'orderForDate': orderForDateStr,
+        'department': dept,
       };
       final itemsPayload = itemsWithQty.map((item) => {
         'productId': item.productId,

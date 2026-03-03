@@ -1987,6 +1987,7 @@ class _InventoryScreenState extends State<InventoryScreen>
       'establishmentName': establishment.name,
       'employeeName': employee.fullName,
       'employeeRole': employee.roleDisplayName,
+      'department': employee.department,
       'date': '${_date.year}-${_date.month.toString().padLeft(2, '0')}-${_date.day.toString().padLeft(2, '0')}',
       'timeStart': _startTime != null
           ? '${_startTime!.hour.toString().padLeft(2, '0')}:${_startTime!.minute.toString().padLeft(2, '0')}'
@@ -2668,6 +2669,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
           'date': _date.toIso8601String(),
           'establishmentName': establishment.name,
           'employeeName': employee.fullName,
+          'department': employee.department,
           'fileName': fileName,
           'totalPositions': _rows.length,
           'filledPositions': _rows.where((r) => r.total > 0).length,

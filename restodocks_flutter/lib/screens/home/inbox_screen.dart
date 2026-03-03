@@ -19,14 +19,18 @@ class InboxScreen extends StatefulWidget {
   State<InboxScreen> createState() => _InboxScreenState();
 }
 
-/// Типы вкладок во входящих
+/// Типы вкладок во входящих (для сотрудников)
 enum _InboxTab { checklist, order, inventory, iikoInventory }
+
+/// Вкладки по подразделениям (для собственника)
+enum _InboxDeptTab { kitchen, bar, hall }
 
 class _InboxScreenState extends State<InboxScreen> {
   late InboxService _inboxService;
   List<InboxDocument> _documents = [];
   bool _loading = true;
   _InboxTab? _selectedTab;
+  _InboxDeptTab? _selectedDeptTab;
 
   @override
   void initState() {
@@ -42,9 +46,13 @@ class _InboxScreenState extends State<InboxScreen> {
   void _initDefaultTab() {
     final employee = context.read<AccountManagerSupabase>().currentEmployee;
     if (employee == null) return;
-    final tabs = _visibleTabs(employee);
-    if (tabs.isNotEmpty) {
-      setState(() => _selectedTab = tabs.first);
+    if (employee.hasRole('owner')) {
+      setState(() => _selectedDeptTab = _InboxDeptTab.kitchen);
+    } else {
+      final tabs = _visibleTabs(employee);
+      if (tabs.isNotEmpty) {
+        setState(() => _selectedTab = tabs.first);
+      }
     }
   }
 
@@ -93,6 +101,16 @@ class _InboxScreenState extends State<InboxScreen> {
   }
 
   List<InboxDocument> get _filteredDocuments {
+    // Собственник: фильтр по подразделению (Bar, Hall, Kitchen)
+    if (_selectedDeptTab != null) {
+      final dept = switch (_selectedDeptTab!) {
+        _InboxDeptTab.kitchen => 'kitchen',
+        _InboxDeptTab.bar => 'bar',
+        _InboxDeptTab.hall => 'hall',
+      };
+      return _documents.where((d) => d.department == dept).toList();
+    }
+    // Остальные: по типу документа
     switch (_selectedTab) {
       case _InboxTab.checklist:
         return _documents.where((d) => d.type == DocumentType.checklistSubmission).toList();
@@ -112,6 +130,7 @@ class _InboxScreenState extends State<InboxScreen> {
     final loc = context.watch<LocalizationService>();
     final accountManager = context.watch<AccountManagerSupabase>();
     final employee = accountManager.currentEmployee;
+    final isOwner = employee?.hasRole('owner') ?? false;
     final visibleTabs = employee != null ? _visibleTabs(employee) : <_InboxTab>[];
 
     return Scaffold(
@@ -128,14 +147,16 @@ class _InboxScreenState extends State<InboxScreen> {
       ),
       body: Column(
         children: [
-          // Фильтр по типу документа
-          if (visibleTabs.isNotEmpty) _buildTypeFilter(loc, visibleTabs),
+          // Собственник: вкладки по подразделениям (Бар, Зал, Кухня)
+          if (isOwner) _buildDeptFilter(loc),
+          // Остальные: фильтр по типу документа
+          if (!isOwner && visibleTabs.isNotEmpty) _buildTypeFilter(loc, visibleTabs),
 
           // Список документов
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
-                : _selectedTab == null
+                : (isOwner ? _selectedDeptTab == null : _selectedTab == null)
                     ? _buildEmptyState(loc)
                     : _filteredDocuments.isEmpty
                         ? _buildEmptyState(loc)
@@ -143,6 +164,47 @@ class _InboxScreenState extends State<InboxScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildDeptFilter(LocalizationService loc) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        border: Border(
+          bottom: BorderSide(
+            color: Theme.of(context).dividerColor,
+            width: 1,
+          ),
+        ),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _buildDeptChip(_InboxDeptTab.kitchen, loc.t('dept_kitchen') ?? 'Кухня', loc),
+            const SizedBox(width: 8),
+            _buildDeptChip(_InboxDeptTab.bar, loc.t('dept_bar') ?? 'Бар', loc),
+            const SizedBox(width: 8),
+            _buildDeptChip(_InboxDeptTab.hall, loc.t('dept_hall') ?? 'Зал', loc),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDeptChip(_InboxDeptTab tab, String label, LocalizationService loc) {
+    final isSelected = _selectedDeptTab == tab;
+    return FilterChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (_) {
+        setState(() => _selectedDeptTab = tab);
+      },
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      selectedColor: Theme.of(context).colorScheme.primaryContainer,
+      checkmarkColor: Theme.of(context).colorScheme.onPrimaryContainer,
     );
   }
 

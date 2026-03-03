@@ -112,8 +112,9 @@ class _OrderListProductsScreenState extends State<OrderListProductsScreen> {
     final loc = context.read<LocalizationService>();
     final estId = acc.establishment?.id;
     if (estId == null) return;
-    final lists = await loadOrderLists(estId);
-    await saveOrderLists(estId, [...lists, _list]);
+    final dept = _list.department;
+    final lists = await loadOrderLists(estId, department: dept);
+    await saveOrderLists(estId, [...lists, _list], department: dept);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${loc.t('save')} ✓')),

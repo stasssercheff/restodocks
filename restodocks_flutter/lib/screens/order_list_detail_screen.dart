@@ -11,9 +11,10 @@ import '../widgets/order_export_sheet.dart';
 
 /// Просмотр/редактирование списка заказа: наименование, единица (редактируемая), количество. Комментарий. Сохранить список / Отправить (сохранить на устройство).
 class OrderListDetailScreen extends StatefulWidget {
-  const OrderListDetailScreen({super.key, required this.listId});
+  const OrderListDetailScreen({super.key, required this.listId, this.department = 'kitchen'});
 
   final String listId;
+  final String department;
 
   @override
   State<OrderListDetailScreen> createState() => _OrderListDetailScreenState();
@@ -42,8 +43,16 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
     // Загружаем номенклатуру для отображения локализованных имён при экспорте
     final store = context.read<ProductStoreSupabase>();
     await store.loadNomenclature(est.dataEstablishmentId);
-    final lists = await loadOrderLists(est.id);
-    final found = lists.where((l) => l.id == widget.listId).firstOrNull;
+    final lists = await loadOrderLists(est.id, department: widget.department);
+    var found = lists.where((l) => l.id == widget.listId).firstOrNull;
+    if (found == null) {
+      for (final dept in ['kitchen', 'bar', 'hall']) {
+        if (dept == widget.department) continue;
+        final alt = await loadOrderLists(est.id, department: dept);
+        found = alt.where((l) => l.id == widget.listId).firstOrNull;
+        if (found != null) break;
+      }
+    }
     for (final c in _qtyControllers) {
       c.dispose();
     }
@@ -106,6 +115,7 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
           : e.value.quantity;
       return e.value.copyWith(quantity: q);
     }).where((item) => item.quantity > 0).toList();
+    final dept = _list!.department;
     final saved = _list!.copyWith(
       id: const Uuid().v4(),
       name: '${_list!.name} $dateStr',
@@ -113,8 +123,8 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
       savedAt: now,
       items: itemsWithQty,
     );
-    final lists = await loadOrderLists(_establishmentId!);
-    await saveOrderLists(_establishmentId!, [...lists, saved]);
+    final lists = await loadOrderLists(_establishmentId!, department: dept);
+    await saveOrderLists(_establishmentId!, [...lists, saved], department: dept);
 
     // Сохранить во входящие (шефу и собственнику) — цены подставляются на сервере через Edge Function
     final orderForDateStr = saved.orderForDate != null ? DateFormat('yyyy-MM-dd').format(saved.orderForDate!) : null;
@@ -124,6 +134,7 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
       'establishmentName': establishment.name,
       'createdAt': now.toIso8601String(),
       'orderForDate': orderForDateStr,
+      'department': saved.department,
     };
     final itemsPayload = itemsWithQty.map((item) => {
       'productId': item.productId,

@@ -9,10 +9,12 @@ import '../widgets/app_bar_home_button.dart';
 
 /// Экран «Заказ продуктов» — две вкладки: Заказы и Поставщики.
 /// Переключение через FilterChip-кнопки под AppBar, как во «Входящих».
+/// [department] = kitchen|bar|hall для фильтрации по подразделению.
 class OrderListsScreen extends StatefulWidget {
-  const OrderListsScreen({super.key, this.embedded = false});
+  const OrderListsScreen({super.key, this.embedded = false, this.department = 'kitchen'});
 
   final bool embedded;
+  final String department;
 
   @override
   State<OrderListsScreen> createState() => _OrderListsScreenState();
@@ -50,7 +52,7 @@ class _OrderListsScreenState extends State<OrderListsScreen> {
       _establishmentId = est.id;
     });
     try {
-      final list = await loadOrderLists(est.id);
+      final list = await loadOrderLists(est.id, department: widget.department);
       if (mounted) {
         setState(() {
           _allLists = list;
@@ -77,7 +79,7 @@ class _OrderListsScreenState extends State<OrderListsScreen> {
     final estId = _establishmentId;
     if (estId == null) return;
     final updated = _allLists.where((l) => l.id != list.id).toList();
-    await saveOrderLists(estId, updated);
+    await saveOrderLists(estId, updated, department: widget.department);
     if (mounted) setState(() => _allLists = updated);
   }
 
@@ -103,7 +105,7 @@ class _OrderListsScreenState extends State<OrderListsScreen> {
                     ? _OrderListsTab(
                         orders: _savedOrders,
                         onTap: (order) async {
-                          await context.push('/product-order/${order.id}');
+                          await context.push('/product-order/${order.id}?department=${widget.department}');
                           if (mounted) _load();
                         },
                         onDelete: _deleteList,
@@ -119,7 +121,7 @@ class _OrderListsScreenState extends State<OrderListsScreen> {
                             );
                             setState(() => _selectedTab = _OrderTab.suppliers);
                           } else {
-                            await context.push('/product-order/create-order');
+                            await context.push('/product-order/create-order?department=${widget.department}');
                             if (mounted) _load();
                           }
                         },
@@ -128,12 +130,12 @@ class _OrderListsScreenState extends State<OrderListsScreen> {
                     : _SuppliersTab(
                         suppliers: _suppliers,
                         onTap: (supplier) async {
-                          await context.push('/product-order/${supplier.id}');
+                          await context.push('/product-order/${supplier.id}?department=${widget.department}');
                           if (mounted) _load();
                         },
                         onDelete: _deleteList,
                         onCreate: () async {
-                          await context.push('/product-order/new');
+                          await context.push('/product-order/new?department=${widget.department}');
                           if (mounted) _load();
                         },
                         loc: loc,

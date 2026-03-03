@@ -11,6 +11,9 @@ class StaffHomeContent extends StatelessWidget {
 
   final Employee employee;
 
+  /// Подразделение для роутов (dining_room -> hall)
+  static String _deptForRoute(String d) => d == 'dining_room' ? 'hall' : d;
+
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
@@ -44,7 +47,16 @@ class StaffHomeContent extends StatelessWidget {
           title: loc.t('schedule'),
           onTap: () => context.go('/schedule'),
         ),
-        _Tile(icon: Icons.shopping_cart, title: loc.t('product_order'), onTap: () => context.go('/product-order')),
+        _Tile(
+          icon: Icons.shopping_cart,
+          title: loc.t('product_order'),
+          onTap: () => context.go('/product-order?department=${_deptForRoute(employee.department)}'),
+        ),
+        _Tile(
+          icon: Icons.store_outlined,
+          title: loc.t('order_tab_suppliers') ?? 'Поставщики',
+          onTap: () => context.go('/suppliers/${_deptForRoute(employee.department)}'),
+        ),
         _Tile(
           icon: Icons.restaurant_menu,
           title: loc.t('menu'),
@@ -55,8 +67,12 @@ class StaffHomeContent extends StatelessWidget {
           title: employee.department == 'bar' ? loc.t('ttk_bar') : loc.t('ttk_kitchen'),
           onTap: () => context.go('/tech-cards'),
         ),
-        if (employee.department == 'kitchen')
-          _Tile(icon: Icons.checklist, title: loc.t('checklists'), onTap: () => context.go('/checklists')),
+        if (employee.department == 'kitchen' || employee.department == 'bar' || employee.department == 'dining_room')
+          _Tile(
+            icon: Icons.checklist,
+            title: loc.t('checklists'),
+            onTap: () => context.go('/checklists?department=${_deptForRoute(employee.department)}'),
+          ),
         _Tile(icon: Icons.assignment, title: loc.t('inventory_blank'), onTap: () => context.push('/inventory')),
       ],
     );

@@ -9,7 +9,7 @@ class ChecklistServiceSupabase {
 
   final SupabaseService _supabase = SupabaseService();
 
-  Future<List<Checklist>> getChecklistsForEstablishment(String establishmentId) async {
+  Future<List<Checklist>> getChecklistsForEstablishment(String establishmentId, {String department = 'kitchen'}) async {
     try {
       final data = await _supabase.client
           .from('checklists')
@@ -20,6 +20,7 @@ class ChecklistServiceSupabase {
       final list = <Checklist>[];
       for (final row in data) {
         final c = Checklist.fromJson(row);
+        if (c.assignedDepartment != department) continue;
         final itemsData = await _supabase.client
             .from('checklist_items')
             .select()
@@ -67,6 +68,7 @@ class ChecklistServiceSupabase {
     String? additionalName,
     ChecklistType? type,
     ChecklistActionConfig? actionConfig,
+    String assignedDepartment = 'kitchen',
   }) async {
     final now = DateTime.now();
     final data = <String, dynamic>{
@@ -77,6 +79,7 @@ class ChecklistServiceSupabase {
       'updated_at': now.toIso8601String(),
     };
     if (assignedSection != null) data['assigned_section'] = assignedSection;
+    data['assigned_department'] = assignedDepartment;
     if (assignedEmployeeId != null) data['assigned_employee_id'] = assignedEmployeeId;
     if (additionalName != null) data['additional_name'] = additionalName;
     if (type != null) data['type'] = type.code;
@@ -105,6 +108,7 @@ class ChecklistServiceSupabase {
       'updated_at': DateTime.now().toIso8601String(),
     };
     upd['assigned_section'] = checklist.assignedSection;
+    upd['assigned_department'] = checklist.assignedDepartment;
     upd['assigned_employee_id'] = checklist.assignedEmployeeId;
     upd['additional_name'] = checklist.additionalName;
     upd['type'] = checklist.type?.code;
@@ -141,6 +145,7 @@ class ChecklistServiceSupabase {
       additionalName: source.additionalName,
       type: source.type,
       actionConfig: source.actionConfig,
+      assignedDepartment: source.assignedDepartment,
       items: source.items
           .map((e) => ChecklistItem.template(
                 title: e.title,

@@ -422,7 +422,10 @@ class AppRouter {
 
           GoRoute(
             path: '/product-order',
-            pageBuilder: (context, state) => _slideTransitionPage(state, const OrderListsScreen()),
+            pageBuilder: (context, state) {
+              final dept = state.queryParameters['department'] ?? 'kitchen';
+              return _slideTransitionPage(state, OrderListsScreen(department: dept));
+            },
           ),
           GoRoute(
             path: '/product-order-received',
@@ -430,11 +433,17 @@ class AppRouter {
           ),
           GoRoute(
             path: '/product-order/new',
-            pageBuilder: (context, state) => _slideTransitionPage(state, const OrderListCreateScreen()),
+            pageBuilder: (context, state) {
+              final dept = state.queryParameters['department'] ?? 'kitchen';
+              return _slideTransitionPage(state, OrderListCreateScreen(department: dept));
+            },
           ),
           GoRoute(
             path: '/product-order/create-order',
-            pageBuilder: (context, state) => _slideTransitionPage(state, const OrderCreateScreen()),
+            pageBuilder: (context, state) {
+              final dept = state.queryParameters['department'] ?? 'kitchen';
+              return _slideTransitionPage(state, OrderCreateScreen(department: dept));
+            },
           ),
           GoRoute(
             path: '/product-order/new/products',
@@ -445,16 +454,27 @@ class AppRouter {
             },
           ),
           GoRoute(
+            path: '/suppliers/:department',
+            pageBuilder: (context, state) {
+              final dept = state.pathParameters['department'] ?? 'kitchen';
+              return _slideTransitionPage(state, SuppliersScreen(department: dept));
+            },
+          ),
+          GoRoute(
             path: '/product-order/:id',
             pageBuilder: (context, state) {
               final id = state.pathParameters['id'] ?? '';
-              return _slideTransitionPage(state, OrderListDetailScreen(listId: id));
+              final dept = state.queryParameters['department'] ?? 'kitchen';
+              return _slideTransitionPage(state, OrderListDetailScreen(listId: id, department: dept));
             },
           ),
 
           GoRoute(
             path: '/checklists',
-            pageBuilder: (context, state) => _slideTransitionPage(state, const ChecklistsScreen()),
+            pageBuilder: (context, state) {
+              final dept = state.queryParameters['department'] ?? 'kitchen';
+              return _slideTransitionPage(state, ChecklistsScreen(department: dept));
+            },
           ),
           GoRoute(
             path: '/checklists/:id',
