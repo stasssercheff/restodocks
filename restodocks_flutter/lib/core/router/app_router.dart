@@ -493,7 +493,13 @@ class AppRouter {
 
           GoRoute(
             path: '/tech-cards',
-            pageBuilder: (context, state) => _slideTransitionPage(state, const TechCardsListScreen()),
+            pageBuilder: (context, state) {
+              final refresh = state.queryParameters['refresh'] == '1';
+              return _slideTransitionPage(
+                state,
+                TechCardsListScreen(key: refresh ? ValueKey('ttk_refresh_${DateTime.now().millisecondsSinceEpoch}') : null),
+              );
+            },
           ),
           GoRoute(
             path: '/tech-cards/new',

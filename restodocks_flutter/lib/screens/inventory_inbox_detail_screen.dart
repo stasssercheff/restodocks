@@ -97,7 +97,7 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
     return list;
   }
 
-  Future<void> _saveToFile() async {
+  Future<void> _saveToFile({bool withPrice = false}) async {
     final doc = _doc;
     final loc = context.read<LocalizationService>();
     if (doc == null) return;
@@ -106,6 +106,26 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
     final header = payload['header'] as Map<String, dynamic>? ?? {};
     final rows = payload['rows'] as List<dynamic>? ?? [];
     final aggregated = payload['aggregatedProducts'] as List<dynamic>? ?? [];
+
+    Map<String, double>? pricePerProduct;
+    String? establishmentId;
+    if (withPrice) {
+      establishmentId = doc['establishment_id'] as String?;
+      if (establishmentId != null) {
+        final store = context.read<ProductStoreSupabase>();
+        await store.loadNomenclature(establishmentId);
+        pricePerProduct = {};
+        for (final r in rows) {
+          final pid = (r as Map<String, dynamic>)['productId'] as String?;
+          if (pid != null && !pid.startsWith('pf_') && !pid.startsWith('free_')) {
+            final priceInfo = store.getEstablishmentPrice(pid, establishmentId);
+            if (priceInfo != null && priceInfo.$1 != null) {
+              pricePerProduct[pid] = priceInfo.$1!;
+            }
+          }
+        }
+      }
+    }
 
     try {
       var maxCols = 0;
@@ -121,12 +141,14 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
       final nameLabel = loc.t('inventory_item_name');
       final unitLabel = loc.t('inventory_unit');
       final totalLabel = loc.t('inventory_excel_total');
+      final sumLabel = loc.t('inventory_excel_sum') ?? 'Сумма';
       final fillLabel = loc.t('inventory_excel_fill_data');
 
       final headerCells = <CellValue>[
         TextCellValue(numLabel),
         TextCellValue(nameLabel),
         TextCellValue(unitLabel),
+        if (withPrice) TextCellValue(sumLabel),
         TextCellValue(totalLabel),
       ];
       for (var c = 0; c < maxCols; c++) {
@@ -140,6 +162,7 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
       // Сортируем и переводим названия для Excel так же, как в UI
       final rowsSorted = _sortedRows(rows);
       var rowNum = 1;
+      double totalSumAll = 0;
       for (var i = 0; i < rowsSorted.length; i++) {
         final r = rowsSorted[i];
         final originalName = r['productName'] as String? ?? '';
@@ -147,10 +170,23 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
         final unit = r['unit'] as String? ?? '';
         final total = (r['total'] as num?)?.toDouble() ?? 0.0;
         final quantities = r['quantities'] as List<dynamic>? ?? [];
+        double rowSum = 0;
+        if (withPrice && pricePerProduct != null && establishmentId != null) {
+          final pid = r['productId'] as String?;
+          if (pid != null && !pid.startsWith('pf_') && !pid.startsWith('free_')) {
+            final price = pricePerProduct[pid];
+            if (price != null && price > 0) {
+              final totalKg = total / 1000;
+              rowSum = totalKg * price;
+              totalSumAll += rowSum;
+            }
+          }
+        }
         final rowCells = <CellValue>[
           IntCellValue(rowNum++),
           TextCellValue(name),
           TextCellValue(unit),
+          if (withPrice) DoubleCellValue(rowSum),
           DoubleCellValue(total),
         ];
         for (var c = 0; c < maxCols; c++) {
@@ -158,6 +194,18 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
           rowCells.add(DoubleCellValue(q));
         }
         sheet1.appendRow(rowCells);
+      }
+      if (withPrice && totalSumAll > 0) {
+        final totalLabelFinal = loc.t('inventory_excel_total_sum') ?? 'Итого:';
+        final totalRow = <CellValue>[
+          TextCellValue(''),
+          TextCellValue(totalLabelFinal),
+          TextCellValue(''),
+        ];
+        if (withPrice) totalRow.add(DoubleCellValue(totalSumAll));
+        totalRow.add(DoubleCellValue(0));
+        for (var c = 0; c < maxCols; c++) totalRow.add(TextCellValue(''));
+        sheet1.appendRow(totalRow);
       }
 
       if (aggregated.isNotEmpty) {
@@ -331,10 +379,14 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
         leading: appBarBackButton(context),
         title: Text(loc.t('inventory_blank_title')),
         actions: [
-          IconButton(
+          PopupMenuButton<String>(
             icon: const Icon(Icons.download),
             tooltip: loc.t('download') ?? 'Сохранить',
-            onPressed: _saveToFile,
+            onSelected: (v) => _saveToFile(withPrice: v == 'with_price'),
+            itemBuilder: (_) => [
+              PopupMenuItem(value: 'no_price', child: Text(loc.t('inventory_export_no_price') ?? 'Без цены')),
+              PopupMenuItem(value: 'with_price', child: Text(loc.t('inventory_export_with_price') ?? 'С ценой')),
+            ],
           ),
         ],
       ),

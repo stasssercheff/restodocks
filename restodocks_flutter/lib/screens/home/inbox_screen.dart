@@ -216,7 +216,14 @@ class _InboxScreenState extends State<InboxScreen> {
       label: Text(label),
       selected: isSelected,
       onSelected: (_) {
-        setState(() => _selectedDeptTab = tab);
+        setState(() {
+          _selectedDeptTab = tab;
+          if (tab == _InboxDeptTab.bar || tab == _InboxDeptTab.hall) {
+            if (_selectedTypeTab == _InboxTypeTab.iikoInventory) {
+              _selectedTypeTab = _InboxTypeTab.inventory;
+            }
+          }
+        });
       },
       backgroundColor: Theme.of(context).colorScheme.surface,
       selectedColor: Theme.of(context).colorScheme.primaryContainer,
@@ -225,6 +232,7 @@ class _InboxScreenState extends State<InboxScreen> {
   }
 
   Widget _buildTypeFilterForOwner(LocalizationService loc) {
+    final isBarOrHall = _selectedDeptTab == _InboxDeptTab.bar || _selectedDeptTab == _InboxDeptTab.hall;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       decoration: BoxDecoration(
@@ -243,8 +251,10 @@ class _InboxScreenState extends State<InboxScreen> {
             _buildTypeChip(_InboxTypeTab.order, loc.t('inbox_tab_order') ?? 'Заказ продуктов', loc),
             const SizedBox(width: 8),
             _buildTypeChip(_InboxTypeTab.inventory, loc.t('inbox_tab_inventory') ?? 'Инвентаризация', loc),
-            const SizedBox(width: 8),
-            _buildTypeChip(_InboxTypeTab.iikoInventory, 'Инвентаризация iiko', loc),
+            if (!isBarOrHall) ...[
+              const SizedBox(width: 8),
+              _buildTypeChip(_InboxTypeTab.iikoInventory, 'Инвентаризация iiko', loc),
+            ],
           ],
         ),
       ),

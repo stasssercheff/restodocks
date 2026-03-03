@@ -87,7 +87,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(loc.t('tech_cards_import_created').replaceAll('%s', '$created'))),
         );
-        context.go('/tech-cards');
+        context.go('/tech-cards?refresh=1');
       }
     } catch (e) {
       if (mounted) {

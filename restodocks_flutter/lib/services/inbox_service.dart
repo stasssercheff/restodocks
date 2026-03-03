@@ -39,8 +39,8 @@ class InboxService {
 
         // Различаем обычную инвентаризацию и iiko по полю payload['type']
         final isIiko = payload['type'] == 'iiko_inventory';
-
-        final docDept = header['department']?.toString() ?? _mapSectionToDepartment(currentEmployee.department);
+        // iiko — всегда данные кухни, не показывать в баре/зале
+        final docDept = isIiko ? 'kitchen' : (header['department']?.toString() ?? _mapSectionToDepartment(currentEmployee.department));
         documents.add(InboxDocument(
           id: doc['id']?.toString() ?? '',
           type: isIiko ? DocumentType.iikoInventory : DocumentType.inventory,

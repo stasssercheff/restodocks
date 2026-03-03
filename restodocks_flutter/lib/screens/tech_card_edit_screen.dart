@@ -783,7 +783,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           if (urls.isNotEmpty) updated = updated.copyWith(photoUrls: urls);
         }
         await svc.saveTechCard(updated);
-        // Переводим название и технологию фоново
+        // Переводим название и технологию фоново. Используем updated (с фото и ингредиентами),
+        // иначе перезапись через created удалит photoUrls и ingredients.
+        final savedForTranslation = updated;
         final techText = _technologyController.text.trim();
         final fieldsToTranslate = <String, String>{'dish_name': name};
         if (techText.isNotEmpty) fieldsToTranslate['technology'] = techText;
@@ -795,7 +797,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           userId: emp.id,
         ).then((_) async {
           final otherLang = curLang == 'ru' ? 'en' : 'ru';
-          // Обновляем dishNameLocalized
           final translatedName = await translationManager.getLocalizedText(
             entityType: TranslationEntityType.techCard,
             entityId: created.id,
@@ -804,10 +805,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
             sourceLanguage: curLang,
             targetLanguage: otherLang,
           );
-          final nameMap = Map<String, String>.from(created.dishNameLocalized ?? {});
+          final nameMap = Map<String, String>.from(savedForTranslation.dishNameLocalized ?? {});
           nameMap[curLang] = name;
           if (translatedName != name) nameMap[otherLang] = translatedName;
-          // Обновляем technologyLocalized
           final newTechMap = Map<String, String>.from(techMap);
           if (techText.isNotEmpty) {
             final translatedTech = await translationManager.getLocalizedText(
@@ -821,7 +821,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
             if (translatedTech != techText) newTechMap[otherLang] = translatedTech;
           }
           try {
-            await svc.saveTechCard(created.copyWith(
+            await svc.saveTechCard(savedForTranslation.copyWith(
               dishNameLocalized: nameMap,
               technologyLocalized: newTechMap,
             ));
@@ -829,7 +829,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
         });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('tech_card_created'))));
-          context.go('/tech-cards');
+          context.go('/tech-cards?refresh=1');
         }
       } else {
         var photoUrls = List<String>.from(_photoUrls);
@@ -891,7 +891,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
         });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.read<LocalizationService>().t('save') + ' ✓')));
-          context.go('/tech-cards');
+          context.go('/tech-cards?refresh=1');
         }
       }
     } catch (e) {

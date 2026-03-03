@@ -276,7 +276,7 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
     final loc = context.watch<LocalizationService>();
     final theme = Theme.of(context);
     final accountManager = context.read<AccountManagerSupabase>();
-    final currency = accountManager.currentEmployee?.currencySymbol ?? accountManager.establishment?.currencySymbol ?? '₽';
+    final currency = accountManager.establishment?.currencySymbol ?? accountManager.currentEmployee?.currencySymbol ?? Establishment.currencySymbolFor(accountManager.establishment?.defaultCurrency ?? 'VND');
     final dateFormat = DateFormat('dd.MM.yyyy');
 
     return Scaffold(

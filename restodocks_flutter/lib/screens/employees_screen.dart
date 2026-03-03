@@ -326,10 +326,12 @@ class _EmployeeCard extends StatelessWidget {
   /// ПК: одна горизонтальная строка, все колонки вертикально по центру
   Widget _buildDesktop(BuildContext context) {
     final theme = Theme.of(context);
+    final est = context.read<AccountManagerSupabase>().establishment;
+    final currencySymbol = est?.currencySymbol ?? Establishment.currencySymbolFor(est?.defaultCurrency ?? 'VND');
     final isPerShift = employee.paymentType == 'per_shift';
     final rate = isPerShift ? employee.ratePerShift : employee.hourlyRate;
     final rateStr = rate != null && rate > 0
-        ? '${rate.toStringAsFixed(0)} ${loc.t('currency_rub_short')}'
+        ? '${rate.toStringAsFixed(0)} $currencySymbol'
         : '—';
     final sectionStr = (employee.department == 'kitchen' && employee.section != null && employee.section!.isNotEmpty)
         ? (loc.t('section_${employee.section}') != 'section_${employee.section}'
@@ -459,10 +461,12 @@ class _EmployeeCard extends StatelessWidget {
   /// Мобильный: компактная карточка в несколько строк
   Widget _buildMobile(BuildContext context) {
     final theme = Theme.of(context);
+    final est = context.read<AccountManagerSupabase>().establishment;
+    final currencySymbol = est?.currencySymbol ?? Establishment.currencySymbolFor(est?.defaultCurrency ?? 'VND');
     final isPerShift = employee.paymentType == 'per_shift';
     final rate = isPerShift ? employee.ratePerShift : employee.hourlyRate;
     final rateStr = rate != null && rate > 0
-        ? '${rate.toStringAsFixed(0)} ${loc.t('currency_rub_short')}'
+        ? '${rate.toStringAsFixed(0)} $currencySymbol'
         : '—';
     final sectionStr = (employee.department == 'kitchen' && employee.section != null && employee.section!.isNotEmpty)
         ? (loc.t('section_${employee.section}') != 'section_${employee.section}'

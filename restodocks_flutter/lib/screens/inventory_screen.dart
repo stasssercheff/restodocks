@@ -2824,7 +2824,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
           'date': _date.toIso8601String(),
           'establishmentName': establishment.name,
           'employeeName': employee.fullName,
-          'department': employee.department,
+          'department': 'kitchen', // iiko — данные кухни, не показывать в баре/зале
           'fileName': fileName,
           'totalPositions': _rows.length,
           'filledPositions': _rows.where((r) => r.total > 0).length,
