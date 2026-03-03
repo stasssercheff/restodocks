@@ -1864,8 +1864,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                 child: SingleChildScrollView(
                   scrollDirection: Axis.vertical,
                   child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minWidth: MediaQuery.of(context).size.width,
+                    constraints: const BoxConstraints(
+                      minWidth: 0,
                       minHeight: 220,
                     ),
                     child: effectiveCanEdit

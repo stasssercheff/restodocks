@@ -2303,6 +2303,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   String _nameFilter = '';
   String? _selectedSheet; // активный лист (null = первый/все)
   final TextEditingController _filterCtrl = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
 
   // Временное хранилище данных черновика до загрузки продуктов
   Map<String, dynamic>? _pendingDraftData;
@@ -2355,10 +2356,20 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   }
   // ──────────────────────────────────────────────────────────────────────────
 
+  /// Скрывать нижние кнопки только когда реально открыта клавиатура (mobile).
+  /// На десктопе viewInsets.bottom = 0 — кнопки «Сохранить и скачать» всегда видны.
+  bool get _isKeyboardActive {
+    if (!mounted) return false;
+    final bottom = MediaQuery.viewInsetsOf(context).bottom;
+    if (bottom <= 0) return false; // Нет клавиатуры — не скрываем кнопки (десктоп)
+    return _searchFocusNode.hasFocus || _iikoCellFocusNodes.any((n) => n.hasFocus);
+  }
+
   @override
   void initState() {
     super.initState(); // AutoSaveMixin.initState регистрирует lifecycle-хуки
     _filterCtrl.addListener(() => setState(() => _nameFilter = _filterCtrl.text));
+    _searchFocusNode.addListener(() => setState(() {}));
     _registerJsNavChannel();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Подписываемся на store: когда restoreBlankFromStorage завершится и
@@ -2414,6 +2425,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   @override
   void dispose() {
     _filterCtrl.dispose();
+    _searchFocusNode.dispose();
     _serverSaveTimer?.cancel();
     _iikoCellFocusNodes.clear();
     try { js.context.deleteProperty('_flutterNav'); } catch (_) {}
@@ -3229,12 +3241,12 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                         );
                       },
                     ),
-                    // Поиск + статус — скрываем при фокусе на ячейке, освобождая место для строк
-                    if (!_iikoCellFocusNodes.any((n) => n.hasFocus)) ...[
+                    // Поиск — всегда видим
                     Padding(
                       padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
                       child: TextField(
                         controller: _filterCtrl,
+                        focusNode: _searchFocusNode,
                         decoration: const InputDecoration(
                           hintText: 'Поиск по наименованию...',
                           prefixIcon: Icon(Icons.search),
@@ -3243,6 +3255,8 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                         ),
                       ),
                     ),
+                    // Статус-строка — скрываем при фокусе (поиск или ячейка)
+                    if (!_isKeyboardActive)
                     Container(
                       color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -3301,7 +3315,6 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                         ],
                       ),
                     ),
-                    ],
                     // Шапка таблицы
                     _IikoInventoryHeader(
                       qtyCols: _rows.isEmpty
@@ -3321,8 +3334,8 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                               onFocusChange: () => setState(() {}),
                             ),
                     ),
-                    // Кнопки внизу — скрываем при фокусе на ячейке
-                    if (!_iikoCellFocusNodes.any((n) => n.hasFocus))
+                    // Кнопки внизу — скрываем при фокусе (поиск или ячейка)
+                    if (!_isKeyboardActive)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
                       child: Row(
@@ -3467,7 +3480,11 @@ class _IikoInventoryTable extends StatelessWidget {
     }
     // ListView (не builder) — все строки сразу в DOM,
     // Safari видит полную цепочку <input> и активирует кнопки ▲▼ в панели.
-    return ListView(children: items);
+    // keyboardDismissBehavior.manual — на мобильном при прокрутке клавиатура не скрывается.
+    return ListView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
+      children: items,
+    );
   }
 }
 
