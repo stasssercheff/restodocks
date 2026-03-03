@@ -3328,18 +3328,27 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                               .reduce((a, b) => a > b ? a : b),
                     ),
                     // Список строк — тап внутри не закрывает клавиатуру (refocus);
-                    // тап снаружи (шапка, поиск, статус, кнопки) — закрывает.
+                    // тап снаружи (шапка, статус, кнопки) — закрывает.
+                    // Исключение: тап по другой ячейке — даём ей фокус, не возвращаем старый.
                     Expanded(
                       child: visibleRows.isEmpty
                           ? const Center(child: Text('Нет позиций'))
                           : Listener(
                               onPointerDown: (_) {
                                 final pf = FocusManager.instance.primaryFocus;
-                                if (pf != null && _iikoCellFocusNodes.contains(pf)) {
-                                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                                    if (mounted) pf.requestFocus();
-                                  });
-                                }
+                                final isOurInput = pf != null &&
+                                    (_iikoCellFocusNodes.contains(pf) || pf == _searchFocusNode);
+                                if (!isOurInput) return;
+                                final nodeToRestore = pf!;
+                                WidgetsBinding.instance.addPostFrameCallback((_) {
+                                  if (!mounted) return;
+                                  final current = FocusManager.instance.primaryFocus;
+                                  // Юзер тапнул другую ячейку/поиск — фокус уже там, не перезаписываем.
+                                  if (current != null &&
+                                      (_iikoCellFocusNodes.contains(current) ||
+                                          current == _searchFocusNode)) return;
+                                  nodeToRestore.requestFocus();
+                                });
                               },
                               child: _IikoInventoryTable(
                                 rows: visibleRows,
