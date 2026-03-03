@@ -30,6 +30,7 @@ import '../../screens/order_list_detail_screen.dart';
 import '../../screens/order_create_screen.dart';
 import '../../screens/accept_co_owner_invitation_screen.dart';
 import '../../screens/register_co_owner_screen.dart';
+import '../../screens/add_establishment_screen.dart';
 import '../../screens/confirm_email_screen.dart';
 import '../../screens/admin_screen.dart';
 import '../../models/order_list.dart';
@@ -280,6 +281,11 @@ class AppRouter {
             path: '/settings',
             pageBuilder: (context, state) => _slideTransitionPage(state, const SettingsScreen()),
           ),
+          // Добавить заведение (владелец)
+          GoRoute(
+            path: '/add-establishment',
+            pageBuilder: (context, state) => _slideTransitionPage(state, const AddEstablishmentScreen()),
+          ),
 
           GoRoute(
             path: '/schedule',
@@ -416,7 +422,10 @@ class AppRouter {
 
           GoRoute(
             path: '/product-order',
-            pageBuilder: (context, state) => _slideTransitionPage(state, const OrderListsScreen()),
+            pageBuilder: (context, state) {
+              final dept = state.queryParameters['department'] ?? 'kitchen';
+              return _slideTransitionPage(state, OrderListsScreen(department: dept));
+            },
           ),
           GoRoute(
             path: '/product-order-received',
@@ -424,11 +433,17 @@ class AppRouter {
           ),
           GoRoute(
             path: '/product-order/new',
-            pageBuilder: (context, state) => _slideTransitionPage(state, const OrderListCreateScreen()),
+            pageBuilder: (context, state) {
+              final dept = state.queryParameters['department'] ?? 'kitchen';
+              return _slideTransitionPage(state, OrderListCreateScreen(department: dept));
+            },
           ),
           GoRoute(
             path: '/product-order/create-order',
-            pageBuilder: (context, state) => _slideTransitionPage(state, const OrderCreateScreen()),
+            pageBuilder: (context, state) {
+              final dept = state.queryParameters['department'] ?? 'kitchen';
+              return _slideTransitionPage(state, OrderCreateScreen(department: dept));
+            },
           ),
           GoRoute(
             path: '/product-order/new/products',
@@ -439,16 +454,27 @@ class AppRouter {
             },
           ),
           GoRoute(
+            path: '/suppliers/:department',
+            pageBuilder: (context, state) {
+              final dept = state.pathParameters['department'] ?? 'kitchen';
+              return _slideTransitionPage(state, SuppliersScreen(department: dept));
+            },
+          ),
+          GoRoute(
             path: '/product-order/:id',
             pageBuilder: (context, state) {
               final id = state.pathParameters['id'] ?? '';
-              return _slideTransitionPage(state, OrderListDetailScreen(listId: id));
+              final dept = state.queryParameters['department'] ?? 'kitchen';
+              return _slideTransitionPage(state, OrderListDetailScreen(listId: id, department: dept));
             },
           ),
 
           GoRoute(
             path: '/checklists',
-            pageBuilder: (context, state) => _slideTransitionPage(state, const ChecklistsScreen()),
+            pageBuilder: (context, state) {
+              final dept = state.queryParameters['department'] ?? 'kitchen';
+              return _slideTransitionPage(state, ChecklistsScreen(department: dept));
+            },
           ),
           GoRoute(
             path: '/checklists/:id',
@@ -543,22 +569,28 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _checkAuthStatus() async {
-    // Убираем ручное перенаправление - оно должно происходить через redirect функцию GoRouter
     final accountManager = context.read<AccountManagerSupabase>();
     await accountManager.initialize();
     if (!mounted) return;
 
-    // Даем время на инициализацию и позволяем GoRouter redirect обработать маршрутизацию
-    await Future.delayed(const Duration(milliseconds: 100));
-    if (!mounted) return;
-
-    // Принудительно вызываем refresh маршрутизации
     if (accountManager.isLoggedInSync) {
-      // Web: при F5 — исходный путь из URL (getCurrentBrowserPath уже /splash после redirect)
-      final target = kIsWeb
-          ? (initial_loc.getCachedInitialPath() ?? initial_loc.getCurrentBrowserPath())
-          : null;
-      context.go((target != null && target != '/' && target != '/splash' && target.isNotEmpty) ? target : '/home');
+      // Web: при F5 — восстанавливаем исходный путь из кэша или localStorage.
+      // _cachedInitialPath кэшируется в getInitialLocation() который вызывается
+      // в main() до любых redirect, поэтому всегда содержит реальный URL.
+      String? target;
+      if (kIsWeb) {
+        target = initial_loc.getCachedInitialPath();
+        // Дополнительный fallback: читаем из localStorage напрямую
+        if (target == null || target == '/' || target == '/splash') {
+          target = initial_loc.getLastSavedPath();
+        }
+        // Фильтруем служебные пути
+        if (target == '/' || target == '/splash' || target?.isEmpty == true) {
+          target = null;
+        }
+      }
+      debugPrint('[Splash] go → ${target ?? '/home'} (cached=${initial_loc.getCachedInitialPath()})');
+      context.go(target ?? '/home');
     } else {
       context.go('/login');
     }

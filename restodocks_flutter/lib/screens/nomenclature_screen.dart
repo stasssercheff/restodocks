@@ -108,7 +108,7 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
       aiService: context.read<AiServiceSupabase>(),
       supabase: context.read<SupabaseService>(),
     );
-    final estId = account.establishment?.id;
+    final estId = account.dataEstablishmentId;
 
     if (estId == null) {
       if (mounted) {
@@ -340,7 +340,8 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
   Future<void> _ensureLoaded() async {
     final store = context.read<ProductStoreSupabase>();
     final account = context.read<AccountManagerSupabase>();
-    final estId = account.establishment?.id;
+    final est = account.establishment;
+    final estId = est?.dataEstablishmentId;
     if (estId == null) return;
 
     final techCardService = context.read<TechCardServiceSupabase>();
@@ -624,6 +625,9 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
               continue;
             }
             if (nameVal.isEmpty) continue;
+            // Пропускаем строки-заголовки (шапку), которые могут встречаться
+            // на 2-м и последующих листах (напр. «Наименование», «Код» и т.д.)
+            if (_isIikoHeaderRow(nameVal)) continue;
             if (groupVal.isNotEmpty) currentGroupRaw = groupVal;
             sheetProducts.add(IikoProduct(
               id: const Uuid().v4(),
@@ -818,7 +822,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         loc: loc,
         onRemove: (idsToRemove) async {
           final store = context.read<ProductStoreSupabase>();
-          final estId = context.read<AccountManagerSupabase>().establishment?.id;
+          final estId = context.read<AccountManagerSupabase>().dataEstablishmentId;
           if (estId == null) return;
           for (final id in idsToRemove) {
             final item = idToItem[id];
@@ -858,7 +862,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
 
   void _showCreateProductDialog(LocalizationService loc) {
     final account = context.read<AccountManagerSupabase>();
-    final estId = account.establishment?.id;
+    final estId = account.dataEstablishmentId;
     if (estId == null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('no_establishment'))));
       return;
@@ -1144,7 +1148,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     final loc = context.watch<LocalizationService>();
     final store = context.watch<ProductStoreSupabase>();
     final account = context.watch<AccountManagerSupabase>();
-    final estId = account.establishment?.id;
+    final estId = account.dataEstablishmentId;
     final canEdit = account.currentEmployee?.canEditChecklistsAndTechCards ?? false;
 
     // Фильтруем элементы номенклатуры
@@ -1168,7 +1172,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     nomItems = _sortNomenclatureItems(nomItems, _nomSort, lang: loc.currentLanguageCode);
 
     final iikoStore = context.watch<IikoProductStore>();
-    final estId2 = account.establishment?.id ?? '';
+    final estId2 = account.dataEstablishmentId ?? '';
 
     return Scaffold(
       appBar: AppBar(
@@ -1436,7 +1440,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
 
   Future<void> _showAddProductDialog(LocalizationService loc) async {
     final account = context.read<AccountManagerSupabase>();
-    final estId = account.establishment?.id;
+    final estId = account.dataEstablishmentId;
     if (estId == null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('no_establishment'))));
       return;
@@ -1615,7 +1619,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     // Обновляем список после загрузки
     final store = context.read<ProductStoreSupabase>();
     final account = context.read<AccountManagerSupabase>();
-    final estId = account.establishment?.id;
+    final estId = account.dataEstablishmentId;
     if (estId != null) {
       await store.loadProducts(force: true);
       await store.loadNomenclature(estId);
@@ -3696,7 +3700,7 @@ class _NomenclatureSkeletonItem extends StatelessWidget {
       try {
         final store = context.read<ProductStoreSupabase>();
         final account = context.read<AccountManagerSupabase>();
-        final estId = account.establishment?.id;
+        final estId = account.dataEstablishmentId;
 
         if (estId == null) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -3779,6 +3783,14 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab>
   String _query = '';
   String? _selectedSheet; // null = первая вкладка / нет разделения
 
+  /// Проверяет, является ли строка заголовком таблицы (шапкой), а не товаром.
+  static bool _isIikoHeaderRow(String name) {
+    final lower = name.trim().toLowerCase();
+    const headers = ['наименование', 'код', 'ед. изм', 'остаток', 'бланк',
+        'организация', 'на дату', 'склад', 'группа', 'товар'];
+    return headers.any((h) => lower == h || lower.startsWith(h));
+  }
+
   @override
   void initState() {
     super.initState();
@@ -3786,6 +3798,9 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (widget.establishmentId.isNotEmpty) {
         widget.store.loadProducts(widget.establishmentId);
+        // Восстанавливаем sheetNames из localStorage/сервера чтобы вкладки появились
+        widget.store.restoreBlankFromStorage(
+            establishmentId: widget.establishmentId);
       }
     });
   }
@@ -3875,7 +3890,10 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab>
     }
 
     // Сортируем по sort_order чтобы порядок совпадал с оригинальным файлом
-    final sorted = [...products]..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    // Исключаем строки-заголовки и пустые имена (могут попасть из шапки Excel)
+    final sorted = [...products]
+      ..removeWhere((p) => p.name.trim().isEmpty || _IikoNomenclatureTabState._isIikoHeaderRow(p.name))
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
 
     // Листы бланка
     final sheetNames = widget.store.sheetNames;
@@ -3887,8 +3905,13 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab>
         : (hasSheets ? sheetNames.first : null);
 
     // Фильтрация по листу и запросу
+    // Продукты без sheetName (старые данные) показываем на первом листе
     var bySheet = (hasSheets && activeSheet != null)
-        ? sorted.where((p) => p.sheetName == activeSheet).toList()
+        ? sorted.where((p) {
+            final sn = p.sheetName;
+            if (sn == null || sn.isEmpty) return activeSheet == sheetNames.first;
+            return sn == activeSheet;
+          }).toList()
         : sorted;
     final filtered = _query.isEmpty
         ? bySheet

@@ -140,6 +140,10 @@ class Employee extends Equatable {
   @JsonKey(name: 'data_access_enabled')
   final bool dataAccessEnabled;
 
+  /// Уровень доступа владельца: 'full' или 'view_only' (co-owner при >1 заведении)
+  @JsonKey(name: 'owner_access_level')
+  final String? ownerAccessLevel;
+
   @JsonKey(name: 'created_at')
   final DateTime createdAt;
 
@@ -166,6 +170,7 @@ class Employee extends Equatable {
     this.hourlyRate,
     this.isActive = true,
     this.dataAccessEnabled = false,
+    this.ownerAccessLevel = 'full',
     required this.createdAt,
     required this.updatedAt,
   });
@@ -190,6 +195,7 @@ class Employee extends Equatable {
     double? hourlyRate,
     bool? isActive,
     bool? dataAccessEnabled,
+    String? ownerAccessLevel,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -212,6 +218,7 @@ class Employee extends Equatable {
       hourlyRate: hourlyRate ?? this.hourlyRate,
       isActive: isActive ?? this.isActive,
       dataAccessEnabled: dataAccessEnabled ?? this.dataAccessEnabled,
+      ownerAccessLevel: ownerAccessLevel ?? this.ownerAccessLevel,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -236,6 +243,10 @@ class Employee extends Equatable {
 
   /// Секция кухни (если применимо)
   KitchenSection? get kitchenSection => section != null ? KitchenSection.fromCode(section!) : null;
+
+  /// Co-owner с view_only: только просмотр (когда у пригласившего >1 заведения)
+  bool get isViewOnlyOwner =>
+      hasRole('owner') && (ownerAccessLevel ?? 'full') == 'view_only';
 
   /// Проверка, имеет ли сотрудник определенную роль
   bool hasRole(String roleCode) {

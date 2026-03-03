@@ -58,6 +58,8 @@ jobs:
         working-directory: ${{ github.workspace }}
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: team_l4N4pAZyq8RCmMOLAqatxkUn
+          VERCEL_PROJECT_ID: prj_rSIA3SgwSDWTL0pfYVJTCiGVFAke
         run: |
           mkdir -p .vercel/output/static
           cp -r restodocks_flutter/build/web/. .vercel/output/static/

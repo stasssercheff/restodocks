@@ -6,3 +6,5 @@ String? getCachedInitialPath() => null;
 String? getCurrentBrowserPath() => null;
 
 void savePathForRefresh(String path) {}
+
+String? getLastSavedPath() => null;

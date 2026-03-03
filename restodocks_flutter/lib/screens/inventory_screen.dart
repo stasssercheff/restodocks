@@ -1,6 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:js' as js;
+
 
 import 'package:archive/archive.dart';
 
@@ -162,6 +167,7 @@ class _InventoryScreenState extends State<InventoryScreen>
   final TextEditingController _nameFilterCtrl = TextEditingController();
   String _nameFilter = '';
   bool _stateRestored = false; // Флаг: предотвращает двойное восстановление
+  bool _isLoadingProducts = true; // Показывать "Загрузка продуктов..." пока не завершился initScreen
 
 
   /// Сохранить данные немедленно в локальное хранилище (SharedPreferences/localStorage)
@@ -346,6 +352,7 @@ class _InventoryScreenState extends State<InventoryScreen>
       if (estId != null) iikoStore.loadProducts(estId) else Future.value(null),
     ]);
     if (!mounted) return;
+    if (_isLoadingProducts) setState(() => _isLoadingProducts = false);
 
     final stdDraft  = futures[0] as Map<String, dynamic>?;
     final iikoDraft = futures[1] as Map<String, dynamic>?;
@@ -532,7 +539,8 @@ class _InventoryScreenState extends State<InventoryScreen>
     final store = context.read<ProductStoreSupabase>();
     final account = context.read<AccountManagerSupabase>();
     final techCardSvc = context.read<TechCardServiceSupabase>();
-    final estId = account.establishment?.id;
+    final est = account.establishment;
+    final estId = est?.dataEstablishmentId;
     if (estId == null) return;
     await store.loadProducts();
     await store.loadNomenclature(estId);
@@ -1397,6 +1405,18 @@ class _InventoryScreenState extends State<InventoryScreen>
   }
 
   Widget _buildTable(LocalizationService loc) {
+    if (_isLoadingProducts) {
+      return const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Загрузка продуктов...'),
+          ],
+        ),
+      );
+    }
     if (_rows.isEmpty) {
       return Center(
         child: Padding(
@@ -1887,7 +1907,8 @@ class _InventoryScreenState extends State<InventoryScreen>
   Future<void> _showProductPicker(BuildContext context, LocalizationService loc) async {
     final productStore = context.read<ProductStoreSupabase>();
     final account = context.read<AccountManagerSupabase>();
-    final estId = account.establishment?.id;
+    final est = account.establishment;
+    final estId = est?.dataEstablishmentId;
     if (estId == null) return;
     await productStore.loadProducts();
     await productStore.loadNomenclature(estId);
@@ -1966,6 +1987,7 @@ class _InventoryScreenState extends State<InventoryScreen>
       'establishmentName': establishment.name,
       'employeeName': employee.fullName,
       'employeeRole': employee.roleDisplayName,
+      'department': employee.department,
       'date': '${_date.year}-${_date.month.toString().padLeft(2, '0')}-${_date.day.toString().padLeft(2, '0')}',
       'timeStart': _startTime != null
           ? '${_startTime!.hour.toString().padLeft(2, '0')}:${_startTime!.minute.toString().padLeft(2, '0')}'
@@ -2246,7 +2268,7 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
 
 /// Одна строка iiko-инвентаризации: продукт + список замеров (как в стандартной).
 class _IikoInventoryRow {
-  final IikoProduct product;
+  IikoProduct product;
   List<double> quantities; // список замеров, минимум 2
 
   _IikoInventoryRow({required this.product, List<double>? quantities})
@@ -2266,6 +2288,11 @@ class InventoryIikoScreen extends StatefulWidget {
   @override
   State<InventoryIikoScreen> createState() => _InventoryIikoScreenState();
 }
+
+/// Глобальный реестр FocusNode для iiko-ячеек.
+/// Каждый _IikoInventoryRowTileState регистрирует свои узлы при init и снимает при dispose.
+/// _InventoryIikoScreenState.navigate() использует список для перехода между ячейками.
+final List<FocusNode> _iikoCellFocusNodes = [];
 
 class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     with AutoSaveMixin<InventoryIikoScreen> {
@@ -2332,16 +2359,68 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   void initState() {
     super.initState(); // AutoSaveMixin.initState регистрирует lifecycle-хуки
     _filterCtrl.addListener(() => setState(() => _nameFilter = _filterCtrl.text));
+    _registerJsNavChannel();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Подписываемся на store: когда restoreBlankFromStorage завершится и
+      // обновит sheetName у продуктов — синхронизируем _rows
+      final store = context.read<IikoProductStore>();
+      store.addListener(_onStoreUpdated);
       _loadProducts();
-      _startPeriodicServerSave(); // Supabase-бэкап каждые 10с (работает в инкогнито)
+      _startPeriodicServerSave();
     });
+  }
+
+  /// Регистрирует window._flutterNav(dir) — вызывается JS кнопками ▲▼.
+  /// dir = 1 → следующая ячейка, dir = -1 → предыдущая.
+  void _registerJsNavChannel() {
+    try {
+      js.context['_flutterNav'] = (dynamic dirArg) {
+        if (!mounted) return;
+        final dir = (dirArg is num) ? dirArg.toInt() : 1;
+        _navigateCell(dir);
+      };
+    } catch (_) {}
+  }
+
+  void _navigateCell(int dir) {
+    if (_iikoCellFocusNodes.isEmpty) return;
+    // Найти текущий сфокусированный узел
+    final currentIdx = _iikoCellFocusNodes.indexWhere((n) => n.hasFocus);
+    final nextIdx = currentIdx < 0
+        ? (dir > 0 ? 0 : _iikoCellFocusNodes.length - 1)
+        : currentIdx + dir;
+    if (nextIdx >= 0 && nextIdx < _iikoCellFocusNodes.length) {
+      _iikoCellFocusNodes[nextIdx].requestFocus();
+    }
+  }
+
+  /// Вызывается когда IikoProductStore нотифицирует (после restoreBlankFromStorage).
+  /// Синхронизирует sheetName в _rows из актуального store.products.
+  void _onStoreUpdated() {
+    if (!mounted || _rows.isEmpty) return;
+    final store = context.read<IikoProductStore>();
+    final storeProducts = {for (final p in store.products) p.id: p};
+    var changed = false;
+    for (final row in _rows) {
+      final fresh = storeProducts[row.product.id];
+      if (fresh != null && fresh.sheetName != row.product.sheetName) {
+        row.product = fresh;
+        changed = true;
+      }
+    }
+    if (changed) setState(() {});
   }
 
   @override
   void dispose() {
     _filterCtrl.dispose();
     _serverSaveTimer?.cancel();
+    _iikoCellFocusNodes.clear();
+    try { js.context.deleteProperty('_flutterNav'); } catch (_) {}
+    // Отписываемся от store чтобы не вызывать setState после unmount
+    try {
+      context.read<IikoProductStore>().removeListener(_onStoreUpdated);
+    } catch (_) {}
     super.dispose();
   }
 
@@ -2350,15 +2429,25 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     final estId = account.establishment?.id;
     if (estId == null) return;
     final iikoStore = context.read<IikoProductStore>();
-    // Восстанавливаем байты бланка: localStorage → Supabase Storage (инкогнито/другое устройство)
-    await iikoStore.restoreBlankFromStorage(establishmentId: estId);
-    await iikoStore.loadProducts(estId);
-    // Примечание: loadProducts внутри может вызвать _assignSheetNamesInMemory,
-    // который обновит sheetName у продуктов. Берём products ПОСЛЕ завершения.
+
+    // Всегда ждём и бланк, и продукты вместе — так _rows и sheetNames всегда синхронны.
+    // restoreBlankFromStorage запускаем параллельно с loadProducts чтобы не блокировать.
+    final blankFuture = iikoStore.restoreBlankFromStorage(establishmentId: estId);
+
+    if (iikoStore.products.isEmpty) {
+      // Продуктов нет в памяти — грузим из БД
+      await iikoStore.loadProducts(estId);
+    }
+
+    // Ждём завершения бланка (нужен для корректных sheetName у продуктов)
+    await blankFuture;
+
     if (!mounted) return;
     setState(() {
       _rows.clear();
       for (final p in iikoStore.products) {
+        if (p.name.trim().isEmpty) continue;
+        if (_isIikoHeaderRow(p.name)) continue;
         _rows.add(_IikoInventoryRow(product: p));
       }
       _isLoading = false;
@@ -2391,7 +2480,12 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
 
     var rows = _rows;
     if (hasSheets && activeSheet != null) {
-      rows = rows.where((r) => r.product.sheetName == activeSheet).toList();
+      rows = rows.where((r) {
+        final sn = r.product.sheetName;
+        // Продукты без sheetName показываем на первом листе
+        if (sn == null || sn.isEmpty) return activeSheet == sheetNames.first;
+        return sn == activeSheet;
+      }).toList();
     }
     if (_nameFilter.isEmpty) return rows;
     final q = _nameFilter.toLowerCase();
@@ -2575,6 +2669,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
           'date': _date.toIso8601String(),
           'establishmentName': establishment.name,
           'employeeName': employee.fullName,
+          'department': employee.department,
           'fileName': fileName,
           'totalPositions': _rows.length,
           'filledPositions': _rows.where((r) => r.total > 0).length,
@@ -2980,6 +3075,16 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     return crc ^ 0xFFFFFFFF;
   }
 
+  /// Проверяет, является ли строка заголовком таблицы (шапкой), а не товаром.
+  /// Используется для фильтрации строк-заголовков которые могут попасть
+  /// в БД при парсинге 2-го и последующих листов Excel.
+  static bool _isIikoHeaderRow(String name) {
+    final lower = name.trim().toLowerCase();
+    const headers = ['наименование', 'код', 'ед. изм', 'остаток', 'бланк',
+        'организация', 'на дату', 'склад', 'группа', 'товар'];
+    return headers.any((h) => lower == h || lower.startsWith(h));
+  }
+
   String _cellStr(Sheet sheet, int row, int col) {
     try {
       final v = sheet
@@ -3052,10 +3157,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   Widget build(BuildContext context) {
     final account = context.watch<AccountManagerSupabase>();
     final theme = Theme.of(context);
-    final isKeyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
-    final isNarrow = MediaQuery.sizeOf(context).width < 600;
-    // На мобильном при открытой клавиатуре скрываем статус-строку — экономим место
-    final hideStatusRow = isNarrow && isKeyboardOpen;
+    final visibleRows = _filteredRows;
 
     return Scaffold(
       appBar: AppBar(
@@ -3065,24 +3167,25 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text('Инвентаризация iiko', style: TextStyle(fontSize: 16)),
-            if (!hideStatusRow)
-              Text(
+            Text(
                 account.establishment?.name ?? '',
                 style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
               ),
           ],
         ),
-        actions: [
-          if (!_isLoading)
-            TextButton.icon(
-              icon: const Icon(Icons.save_alt),
-              label: const Text('Сохранить'),
-              onPressed: _saveAndExport,
-            ),
-        ],
+        actions: const [],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Загрузка продуктов...'),
+                ],
+              ),
+            )
           : Stack(
               children: [
                 Column(
@@ -3098,7 +3201,23 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                         return _SheetTabBar(
                           sheetNames: sheetNames,
                           selected: activeSheet,
-                          onSelect: (s) => setState(() => _selectedSheet = s),
+                          onSelect: (s) {
+                            setState(() {
+                              _selectedSheet = s;
+                              // Синхронизируем sheetName в _rows из актуального store
+                              // (store мог обновить sheetName после первоначальной загрузки _rows)
+                              final storeProducts = {
+                                for (final p in store.products) p.id: p
+                              };
+                              for (final row in _rows) {
+                                final fresh = storeProducts[row.product.id];
+                                if (fresh != null &&
+                                    fresh.sheetName != row.product.sheetName) {
+                                  row.product = fresh;
+                                }
+                              }
+                            });
+                          },
                         );
                       },
                     ),
@@ -3115,8 +3234,8 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                         ),
                       ),
                     ),
-                    // Статус-строка — скрывается на мобильном при открытой клавиатуре
-                    if (!hideStatusRow) Container(
+                    // Статус-строка
+                    Container(
                       color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                       child: Row(
@@ -3184,15 +3303,15 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                     ),
                     // Список строк
                     Expanded(
-                      child: _filteredRows.isEmpty
+                      child: visibleRows.isEmpty
                           ? const Center(child: Text('Нет позиций'))
                           : _IikoInventoryTable(
-                              rows: _filteredRows,
+                              rows: visibleRows,
                               completed: _completed,
                               onQuantityChanged: _setQuantity,
                             ),
                     ),
-                    // Кнопки внизу — всегда видны
+                    // Кнопки внизу
                     Padding(
                       padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
                       child: Row(
@@ -3301,45 +3420,40 @@ class _IikoInventoryTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     String? lastGroup;
-    return ListView.builder(
-      itemCount: rows.length,
-      itemBuilder: (ctx, i) {
-        final row = rows[i];
-        final groupName = row.product.groupName ?? '';
-        final groupDisplay = row.product.displayGroupName ?? '';
-        Widget? groupHeader;
-        if (groupName != lastGroup) {
-          lastGroup = groupName;
-          if (groupDisplay.isNotEmpty) {
-            final theme = Theme.of(ctx);
-            groupHeader = Container(
-              width: double.infinity,
-              color: theme.colorScheme.primaryContainer.withOpacity(0.25),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              child: Text(
-                groupDisplay,
-                style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: theme.colorScheme.primary),
-              ),
-            );
-          }
-        }
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (groupHeader != null) groupHeader,
-            _IikoInventoryRowTile(
-              row: row,
-              completed: completed,
-              onChanged: (colIdx, qty) => onQuantityChanged(row, colIdx, qty),
+    final items = <Widget>[];
+    for (var i = 0; i < rows.length; i++) {
+      final row = rows[i];
+      final groupName = row.product.groupName ?? '';
+      final groupDisplay = row.product.displayGroupName ?? '';
+      if (groupName != lastGroup) {
+        lastGroup = groupName;
+        if (groupDisplay.isNotEmpty) {
+          items.add(Container(
+            width: double.infinity,
+            color: theme.colorScheme.primaryContainer.withOpacity(0.25),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            child: Text(
+              groupDisplay,
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.primary),
             ),
-          ],
-        );
-      },
-    );
+          ));
+        }
+      }
+      items.add(_IikoInventoryRowTile(
+        key: ValueKey(row.product.id),
+        row: row,
+        completed: completed,
+        onChanged: (colIdx, qty) => onQuantityChanged(row, colIdx, qty),
+      ));
+    }
+    // ListView (не builder) — все строки сразу в DOM,
+    // Safari видит полную цепочку <input> и активирует кнопки ▲▼ в панели.
+    return ListView(children: items);
   }
 }
 
@@ -3399,8 +3513,16 @@ class _SheetTabBar extends StatelessWidget {
   }
 }
 
+// ── Кнопка навигации ▲▼ ─────────────────────────────────────────────────────
+// Критично для Safari iOS: кнопка не должна снимать фокус с TextField.
+// Решение: mousedown.preventDefault() — стандартный браузерный способ сказать
+// «не передавай фокус этому элементу». В Flutter Web это делается через
+// dart:html addEventListener на платформенный элемент кнопки.
+// Дополнительно GestureDetector.onTapDown (синхронный) запускает навигацию.
+
 class _IikoInventoryRowTile extends StatefulWidget {
   const _IikoInventoryRowTile({
+    super.key,
     required this.row,
     required this.completed,
     required this.onChanged,
@@ -3416,11 +3538,14 @@ class _IikoInventoryRowTile extends StatefulWidget {
 
 class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
   final List<TextEditingController> _ctrls = [];
+  final List<FocusNode> _focusNodes = [];
+  final ScrollController _hScroll = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _syncControllers();
+    _registerFocusNodes();
   }
 
   void _syncControllers() {
@@ -3428,8 +3553,24 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
     while (_ctrls.length < widget.row.quantities.length) {
       final idx = _ctrls.length;
       final val = widget.row.quantities[idx];
-      _ctrls.add(TextEditingController(
-          text: val > 0 ? _fmt(val) : ''));
+      _ctrls.add(TextEditingController(text: val > 0 ? _fmt(val) : ''));
+    }
+  }
+
+  void _syncFocusNodes() {
+    while (_focusNodes.length < widget.row.quantities.length) {
+      _focusNodes.add(FocusNode());
+    }
+  }
+
+  void _registerFocusNodes() {
+    _syncFocusNodes();
+    _iikoCellFocusNodes.addAll(_focusNodes);
+  }
+
+  void _unregisterFocusNodes() {
+    for (final fn in _focusNodes) {
+      _iikoCellFocusNodes.remove(fn);
     }
   }
 
@@ -3438,12 +3579,19 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
     super.didUpdateWidget(old);
     final qtys = widget.row.quantities;
 
-    // Если добавилась новая ячейка — создаём контроллер
+    // Если добавилась новая ячейка — создаём контроллер, FocusNode и прокручиваем вправо
+    final hadNewCell = _ctrls.length < qtys.length;
     while (_ctrls.length < qtys.length) {
       final idx = _ctrls.length;
       final val = qtys[idx];
       _ctrls.add(TextEditingController(text: val > 0 ? _fmt(val) : ''));
     }
+    while (_focusNodes.length < qtys.length) {
+      final fn = FocusNode();
+      _focusNodes.add(fn);
+      _iikoCellFocusNodes.add(fn);
+    }
+    if (hadNewCell) _scrollToEnd();
 
     // Если количества были сброшены (обнуление) — обновляем текст контроллеров.
     // Сравниваем только если число ячеек не изменилось (иначе это добавление новой).
@@ -3460,9 +3608,14 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
 
   @override
   void dispose() {
+    _unregisterFocusNodes();
     for (final c in _ctrls) {
       c.dispose();
     }
+    for (final fn in _focusNodes) {
+      fn.dispose();
+    }
+    _hScroll.dispose();
     super.dispose();
   }
 
@@ -3471,6 +3624,18 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
       : v.toStringAsFixed(3)
           .replaceAll(RegExp(r'0+$'), '')
           .replaceAll(RegExp(r'\.$'), '');
+
+  void _scrollToEnd() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_hScroll.hasClients) {
+        _hScroll.animateTo(
+          _hScroll.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -3482,43 +3647,41 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
     final borderClr = theme.dividerColor;
     final cb = BorderSide(color: borderClr);
 
-    // Обособленная ячейка ввода — всегда редактируемая (заполнение не блокируется после сохранения)
+    // Ячейка ввода количества
     Widget numCell(int colIdx) {
       final ctrl = _ctrls[colIdx];
+      final fn = colIdx < _focusNodes.length ? _focusNodes[colIdx] : null;
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 5),
         child: SizedBox(
           width: _iikoColCell - 6,
           child: TextField(
-                  controller: ctrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 13),
-                  decoration: InputDecoration(
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
-                    filled: true,
-                    fillColor: theme.colorScheme.surfaceContainerHighest.withOpacity(0.45),
-                    hintText: '—',
-                    hintStyle: TextStyle(
-                        fontSize: 12,
-                        color: theme.colorScheme.onSurface.withOpacity(0.3)),
-                  ),
-                  onChanged: (v) {
-                    final qty = double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
-                    widget.onChanged(colIdx, qty);
-                  },
-                  onSubmitted: (v) {
-                    final qty = double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
-                    widget.onChanged(colIdx, qty);
-                  },
-                  onEditingComplete: () {
-                    final qty = double.tryParse(ctrl.text.replaceAll(',', '.')) ?? 0.0;
-                    widget.onChanged(colIdx, qty);
-                    FocusScope.of(context).nextFocus();
-                  },
-                ),
+            controller: ctrl,
+            focusNode: fn,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            textInputAction: TextInputAction.next,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 13),
+            decoration: InputDecoration(
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
+              filled: true,
+              fillColor: theme.colorScheme.surfaceContainerHighest.withOpacity(0.45),
+              hintText: '—',
+              hintStyle: TextStyle(
+                  fontSize: 12,
+                  color: theme.colorScheme.onSurface.withOpacity(0.3)),
+            ),
+            onChanged: (v) {
+              final qty = double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
+              widget.onChanged(colIdx, qty);
+            },
+            onSubmitted: (v) {
+              final qty = double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
+              widget.onChanged(colIdx, qty);
+            },
+          ),
         ),
       );
     }
@@ -3583,6 +3746,7 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
             // ── Ячейки ввода — скроллируются вправо ──
             Expanded(
               child: SingleChildScrollView(
+                controller: _hScroll,
                 scrollDirection: Axis.horizontal,
                 physics: const ClampingScrollPhysics(),
                 child: Row(

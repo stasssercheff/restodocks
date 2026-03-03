@@ -54,9 +54,9 @@ class _MenuScreenState extends State<MenuScreen> {
       final productStore = context.read<ProductStoreSupabase>();
       final techCardService = context.read<TechCardServiceSupabase>();
       await productStore.loadProducts();
-      await productStore.loadNomenclature(est.id);
+      await productStore.loadNomenclature(est.dataEstablishmentId);
       final emp = acc.currentEmployee;
-      final allTcs = await techCardService.getTechCardsForEstablishment(est.id);
+      final allTcs = await techCardService.getTechCardsForEstablishment(est.dataEstablishmentId);
       // Фильтр по цеху для кухни
       final tcs = emp == null
           ? allTcs
@@ -67,7 +67,7 @@ class _MenuScreenState extends State<MenuScreen> {
       final enriched = <TechCard>[];
       for (final tc in tcs) {
         if (!tc.isSemiFinished) {
-          enriched.add(_enrichWithCosts(tc, productStore, est.id, currency));
+          enriched.add(_enrichWithCosts(tc, productStore, est.dataEstablishmentId, currency));
         }
       }
       if (mounted) {
@@ -76,7 +76,7 @@ class _MenuScreenState extends State<MenuScreen> {
           _loading = false;
         });
         // Фоновый перевод для ТТК без локализованного названия
-        _translateMissingDishNames(enriched, est.id);
+        _translateMissingDishNames(enriched, est.dataEstablishmentId);
       }
     } catch (e) {
       if (mounted) setState(() { _error = e.toString(); _loading = false; });

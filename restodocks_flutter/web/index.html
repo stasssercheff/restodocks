@@ -10,19 +10,29 @@
         } else {
           p = (location.pathname || '').trim();
         }
+        console.log('[RD] pathname='+p+' href='+location.href+' ls='+localStorage.getItem('restodocks_last_path_persist'));
         if (p && p !== '/' && p !== '/splash') {
           if (p.endsWith('/') && p.length > 1) p = p.slice(0, -1);
           if (location.search && p.indexOf('?') === -1) p += location.search;
           sessionStorage.setItem('restodocks_last_path', p);
+          localStorage.setItem('restodocks_last_path_persist', p);
           document.documentElement.dataset.initialPath = p;
+          console.log('[RD] saved path: '+p);
+        } else {
+          var saved = localStorage.getItem('restodocks_last_path_persist');
+          console.log('[RD] pathname=/ → localStorage saved='+saved);
+          if (saved && saved !== '/' && saved !== '/splash') {
+            document.documentElement.dataset.initialPath = saved;
+            sessionStorage.setItem('restodocks_last_path', saved);
+          }
         }
-        // При обновлении (F5) не показывать экран с лого — пользователь уже в приложении
-        if (sessionStorage.getItem('restodocks_loaded_before')) {
+        if (sessionStorage.getItem('restodocks_loaded_before') ||
+            localStorage.getItem('restodocks_last_path_persist')) {
           var s = document.createElement('style');
           s.textContent = '#loading-screen { display: none !important; }';
           document.head.appendChild(s);
         }
-      } catch(e) {}
+      } catch(e) { console.log('[RD] error: '+e); }
     })();
   </script>
   <!--
@@ -89,5 +99,94 @@
     // Last resort: remove after 20s
     setTimeout(hideLoadingScreen, 20000);
   </script>
+  <script>
+    // iOS Safari/Chrome: кнопки ▲▼ над клавиатурой.
+    // Кнопки удерживают клавиатуру на экране и вызывают window._flutterNav(±1),
+    // который Flutter регистрирует на экране iiko-инвентаризации.
+    // Переход между ячейками происходит через FocusNode.requestFocus() в Dart.
+    (function () {
+      var isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+      if (!isTouch) return;
+
+      var bar, hideTimer;
+
+      function createBar() {
+        if (bar) return;
+        bar = document.createElement('div');
+        bar.style.cssText = [
+          'position:fixed', 'bottom:0', 'left:0', 'right:0', 'height:44px',
+          'background:#d1d5db', 'display:none', 'align-items:center',
+          'padding:0 12px', 'gap:8px', 'z-index:999999', 'box-sizing:border-box',
+          '-webkit-user-select:none', 'user-select:none'
+        ].join(';');
+
+        var btnStyle = [
+          'width:44px', 'height:34px', 'border:none', 'border-radius:6px',
+          'background:#fff', 'font-size:20px', 'cursor:pointer',
+          'display:flex', 'align-items:center', 'justify-content:center',
+          '-webkit-tap-highlight-color:transparent'
+        ].join(';');
+
+        ['▲', '▼'].forEach(function (label, i) {
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.textContent = label;
+          btn.style.cssText = btnStyle;
+          var dir = i === 0 ? -1 : 1;
+          // touchstart синхронный — iOS разрешает focus() внутри
+          btn.addEventListener('touchstart', function (e) {
+            e.preventDefault();
+            if (typeof window._flutterNav === 'function') window._flutterNav(dir);
+          }, { passive: false });
+          btn.addEventListener('mousedown', function (e) {
+            e.preventDefault();
+            if (typeof window._flutterNav === 'function') window._flutterNav(dir);
+          });
+          bar.appendChild(btn);
+        });
+
+        document.body.appendChild(bar);
+      }
+
+      function showBar() {
+        if (!bar) createBar();
+        clearTimeout(hideTimer);
+        bar.style.display = 'flex';
+      }
+
+      function scheduleHide() {
+        clearTimeout(hideTimer);
+        hideTimer = setTimeout(function () {
+          if (bar) bar.style.display = 'none';
+        }, 300);
+      }
+
+      // Слушаем focusin/focusout на весь документ + shadow-хосты Flutter
+      document.addEventListener('focusin', function (e) {
+        if (e.target && e.target.tagName === 'INPUT') showBar();
+      }, true);
+      document.addEventListener('focusout', scheduleHide, true);
+
+      function attachShadowListeners() {
+        document.querySelectorAll('flt-text-editing-host, flt-glass-pane, flt-scene').forEach(function (host) {
+          if (host._rdNavAttached) return;
+          host._rdNavAttached = true;
+          var root = host.shadowRoot || host;
+          root.addEventListener('focusin', function (e) {
+            if (e.target && e.target.tagName === 'INPUT') showBar();
+          }, true);
+          root.addEventListener('focusout', scheduleHide, true);
+        });
+      }
+
+      window.addEventListener('flutter-first-frame', function () {
+        createBar();
+        attachShadowListeners();
+        new MutationObserver(attachShadowListeners)
+          .observe(document.body, { childList: true, subtree: true });
+      });
+    })();
+  </script>
 </body>
 </html>
+

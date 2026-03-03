@@ -35,8 +35,23 @@ class Establishment extends Equatable {
   @JsonKey(name: 'subscription_type')
   final String? subscriptionType;
 
+  /// ID родительского заведения (для филиалов). NULL = основное заведение.
+  @JsonKey(name: 'parent_establishment_id')
+  final String? parentEstablishmentId;
+
   // Alias for subscriptionType for backward compatibility
   String? get subscriptionPlan => subscriptionType;
+
+  /// Основное заведение (не филиал)
+  bool get isMain => parentEstablishmentId == null || parentEstablishmentId!.isEmpty;
+
+  /// Филиал другого заведения
+  bool get isBranch => !isMain;
+
+  /// ID заведения, откуда читаются данные (номенклатура, ТТК). Для филиала — родитель.
+  String get dataEstablishmentId => (parentEstablishmentId != null && parentEstablishmentId!.isNotEmpty)
+      ? parentEstablishmentId!
+      : id;
 
   @JsonKey(name: 'created_at')
   final DateTime createdAt;
@@ -54,6 +69,7 @@ class Establishment extends Equatable {
     this.email,
     this.defaultCurrency = 'RUB',
     this.subscriptionType,
+    this.parentEstablishmentId,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -69,6 +85,7 @@ class Establishment extends Equatable {
     String? email,
     String? defaultCurrency,
     String? subscriptionType,
+    String? parentEstablishmentId,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -82,6 +99,7 @@ class Establishment extends Equatable {
       email: email ?? this.email,
       defaultCurrency: defaultCurrency ?? this.defaultCurrency,
       subscriptionType: subscriptionType ?? this.subscriptionType,
+      parentEstablishmentId: parentEstablishmentId ?? this.parentEstablishmentId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -135,6 +153,7 @@ class Establishment extends Equatable {
     m['name'] = m['name']?.toString() ?? '';
     m['pin_code'] = m['pin_code']?.toString() ?? '';
     m['owner_id'] = m['owner_id']?.toString() ?? '';
+    m['parent_establishment_id'] = m['parent_establishment_id']?.toString();
     return _$EstablishmentFromJson(m);
   }
   Map<String, dynamic> toJson() => _$EstablishmentToJson(this);
@@ -149,6 +168,7 @@ class Establishment extends Equatable {
     phone,
     email,
     defaultCurrency,
+    parentEstablishmentId,
     createdAt,
     updatedAt,
   ];

@@ -1,6 +1,7 @@
 import 'dart:html' as html;
 
 const String _sessionStorageKey = 'restodocks_last_path';
+const String _localStorageKey   = 'restodocks_last_path_persist';
 
 bool _beforeUnloadRegistered = false;
 
@@ -22,16 +23,18 @@ void _registerBeforeUnload() {
         final search = html.window.location.search ?? '';
         if (search.isNotEmpty) path = '$path$search';
         html.window.sessionStorage[_sessionStorageKey] = path;
+        html.window.localStorage[_localStorageKey] = path; // persist через hard refresh
       }
     });
   } catch (_) {}
 }
 
-/// Сохраняет путь в sessionStorage для fallback при F5 (pathname иногда приходит как /).
+/// Сохраняет путь в sessionStorage + localStorage для fallback при F5.
 void savePathForRefresh(String path) {
   try {
     if (path.isNotEmpty && path != '/' && path != '/splash') {
       html.window.sessionStorage[_sessionStorageKey] = path;
+      html.window.localStorage[_localStorageKey] = path;
     }
   } catch (_) {}
 }
@@ -40,6 +43,11 @@ void savePathForRefresh(String path) {
 String? _pathFromSessionStorage() {
   try {
     final s = html.window.sessionStorage[_sessionStorageKey];
+    if (s != null && s.isNotEmpty && s != '/' && s != '/splash') return s;
+  } catch (_) {}
+  // Fallback: localStorage (переживает hard refresh когда pathname == '/')
+  try {
+    final s = html.window.localStorage[_localStorageKey];
     if (s != null && s.isNotEmpty && s != '/' && s != '/splash') return s;
   } catch (_) {}
   return null;
@@ -91,20 +99,45 @@ String _pathFromWindow() {
 String? _cachedInitialPath;
 
 /// Web: при F5 сохраняем текущую страницу из URL. Кэшируем при первом вызове.
-/// Приоритет: pathname → dataset (head script) → sessionStorage.
+/// Приоритет: pathname → localStorage → sessionStorage → dataset.
 String getInitialLocation() {
   _registerBeforeUnload();
   if (_cachedInitialPath == null) {
     final fromWindow = _pathFromWindow();
-    _cachedInitialPath = (fromWindow.isNotEmpty && fromWindow != '/')
-        ? fromWindow
-        : _pathFromDataset() ?? _pathFromSessionStorage() ?? '/';
+    if (fromWindow.isNotEmpty && fromWindow != '/') {
+      // Адресная строка содержит путь — это самый надёжный источник.
+      // Также сразу сохраняем в storage чтобы последующие вызовы тоже его видели.
+      _cachedInitialPath = fromWindow;
+      try {
+        html.window.localStorage[_localStorageKey] = fromWindow;
+        html.window.sessionStorage[_sessionStorageKey] = fromWindow;
+      } catch (_) {}
+    } else {
+      // Pathname == '/' (редкий случай на некоторых конфигурациях).
+      // Берём из localStorage (переживает hard refresh), потом sessionStorage, потом dataset.
+      _cachedInitialPath = _pathFromSessionStorage()
+          ?? _pathFromDataset()
+          ?? '/';
+    }
   }
   return _cachedInitialPath!;
 }
 
 /// Исходный путь до любых redirect — использовать при F5, когда текущий URL уже /splash.
 String? getCachedInitialPath() => _cachedInitialPath;
+
+/// Последний сохранённый путь из localStorage — fallback когда _cachedInitialPath не задан.
+String? getLastSavedPath() {
+  try {
+    final s = html.window.localStorage[_localStorageKey];
+    if (s != null && s.isNotEmpty && s != '/' && s != '/splash') return s;
+  } catch (_) {}
+  try {
+    final s = html.window.sessionStorage[_sessionStorageKey];
+    if (s != null && s.isNotEmpty && s != '/' && s != '/splash') return s;
+  } catch (_) {}
+  return null;
+}
 
 /// Текущий путь из адресной строки (для коррекции в redirect). Возвращает null если корень.
 String? getCurrentBrowserPath() {

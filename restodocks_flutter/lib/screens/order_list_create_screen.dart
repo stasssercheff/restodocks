@@ -10,7 +10,9 @@ import '../widgets/app_bar_home_button.dart';
 /// Создание поставщика: наименование поставщика, контакты (почта, телефон, TG, Zalo, WhatsApp).
 /// Название списка не вводится — используется наименование поставщика.
 class OrderListCreateScreen extends StatefulWidget {
-  const OrderListCreateScreen({super.key});
+  const OrderListCreateScreen({super.key, this.department = 'kitchen'});
+
+  final String department;
 
   @override
   State<OrderListCreateScreen> createState() => _OrderListCreateScreenState();
@@ -52,6 +54,7 @@ class _OrderListCreateScreenState extends State<OrderListCreateScreen> {
       telegram: _telegramCtrl.text.trim().isEmpty ? null : _telegramCtrl.text.trim(),
       zalo: _zaloCtrl.text.trim().isEmpty ? null : _zaloCtrl.text.trim(),
       whatsapp: _whatsappCtrl.text.trim().isEmpty ? null : _whatsappCtrl.text.trim(),
+      department: widget.department,
     );
     context.push('/product-order/new/products', extra: draft);
   }

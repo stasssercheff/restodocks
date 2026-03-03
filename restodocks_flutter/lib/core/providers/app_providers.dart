@@ -26,6 +26,9 @@ class AppProviders {
         ChangeNotifierProvider<OwnerViewPreferenceService>(
           create: (_) => OwnerViewPreferenceService(),
         ),
+        ChangeNotifierProvider<TtkBranchFilterService>(
+          create: (_) => TtkBranchFilterService(),
+        ),
         // Используем Supabase версии сервисов
         ChangeNotifierProvider<AccountManagerSupabase>(
           create: (_) => AccountManagerSupabase(),

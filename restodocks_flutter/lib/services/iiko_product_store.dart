@@ -43,7 +43,18 @@ class IikoProductStore extends ChangeNotifier {
   /// Загружает байты бланка: сначала localStorage, потом Supabase Storage.
   /// Вызывается перед экспортом и при загрузке iiko-экрана.
   Future<void> restoreBlankFromStorage({String? establishmentId}) async {
-    if (originalBlankBytes != null) return; // уже в памяти
+    // Если байты уже есть, но sheetNames пусты — восстанавливаем метаданные
+    if (originalBlankBytes != null) {
+      if (sheetNames.isEmpty) {
+        await _restoreSheetNamesOnly();
+      }
+      // Если продукты загружены без sheetName — проставляем из бланка
+      if (_products.isNotEmpty && _products.every((p) => p.sheetName == null)) {
+        await _assignSheetNamesInMemory();
+        notifyListeners();
+      }
+      return;
+    }
 
     // 1) localStorage (быстро, работает без сети)
     try {
@@ -64,6 +75,11 @@ class IikoProductStore extends ChangeNotifier {
         }
         debugPrint('IikoProductStore: blank restored from localStorage '
             '(${originalBlankBytes!.length} bytes, qtyCol=$originalQuantityColumnIndex, sheets=${sheetNames.length})');
+        // Если продукты уже загружены но без sheetName — проставляем из бланка
+        if (_products.isNotEmpty && _products.every((p) => p.sheetName == null)) {
+          await _assignSheetNamesInMemory();
+        }
+        notifyListeners(); // обновляем вкладки листов в UI
         return;
       }
     } catch (e) {
@@ -74,6 +90,11 @@ class IikoProductStore extends ChangeNotifier {
     final estId = establishmentId ?? _loadedEstablishmentId;
     if (estId == null) return;
     await _restoreBlankFromServer(estId);
+    // Если продукты уже загружены но без sheetName — проставляем из бланка
+    if (_products.isNotEmpty && _products.every((p) => p.sheetName == null)) {
+      await _assignSheetNamesInMemory();
+    }
+    notifyListeners(); // обновляем вкладки листов после загрузки с сервера
   }
 
   /// Скачивает бланк с Supabase Storage и сохраняет в память + localStorage.
@@ -168,6 +189,55 @@ class IikoProductStore extends ChangeNotifier {
       debugPrint('IikoProductStore: blank uploaded to Supabase Storage ($storagePath)');
     } catch (e) {
       debugPrint('IikoProductStore._uploadBlankToServer error: $e');
+    }
+  }
+
+  /// Восстанавливает только sheetNames/sheetQtyColumns из localStorage или Supabase
+  /// когда байты бланка уже есть в памяти, но метаданные листов утеряны.
+  Future<void> _restoreSheetNamesOnly() async {
+    // Сначала пробуем localStorage
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final sheetNamesJson = prefs.getString(_kSheetNamesKey);
+      if (sheetNamesJson != null) {
+        sheetNames = (jsonDecode(sheetNamesJson) as List).cast<String>();
+        final sheetQtyColsJson = prefs.getString(_kSheetQtyColsKey);
+        if (sheetQtyColsJson != null) {
+          sheetQtyColumns = (jsonDecode(sheetQtyColsJson) as Map)
+              .map((k, v) => MapEntry(k as String, v as int));
+        }
+        if (sheetNames.isNotEmpty) {
+          debugPrint('IikoProductStore: sheetNames restored from localStorage: $sheetNames');
+          notifyListeners();
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('IikoProductStore._restoreSheetNamesOnly(local) error: $e');
+    }
+    // Если в localStorage нет — читаем из Supabase метаданные
+    final estId = _loadedEstablishmentId;
+    if (estId == null) return;
+    try {
+      final meta = await _supabase
+          .from('iiko_blank_meta')
+          .select('sheet_names, sheet_qty_cols')
+          .eq('establishment_id', estId)
+          .maybeSingle();
+      if (meta == null) return;
+      final sheetNamesRaw = meta['sheet_names'];
+      if (sheetNamesRaw is List) {
+        sheetNames = sheetNamesRaw.cast<String>();
+      }
+      final sheetQtyColsRaw = meta['sheet_qty_cols'];
+      if (sheetQtyColsRaw is Map) {
+        sheetQtyColumns =
+            sheetQtyColsRaw.map((k, v) => MapEntry(k as String, v as int));
+      }
+      debugPrint('IikoProductStore: sheetNames restored from Supabase: $sheetNames');
+      notifyListeners();
+    } catch (e) {
+      debugPrint('IikoProductStore._restoreSheetNamesOnly(server) error: $e');
     }
   }
 

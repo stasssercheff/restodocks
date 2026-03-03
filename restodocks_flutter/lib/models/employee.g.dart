@@ -26,6 +26,7 @@ Employee _$EmployeeFromJson(Map<String, dynamic> json) => Employee(
       hourlyRate: (json['hourly_rate'] as num?)?.toDouble(),
       isActive: json['is_active'] as bool? ?? true,
       dataAccessEnabled: json['data_access_enabled'] as bool? ?? false,
+      ownerAccessLevel: json['owner_access_level'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
     );
@@ -50,6 +51,7 @@ Map<String, dynamic> _$EmployeeToJson(Employee instance) => <String, dynamic>{
       'hourly_rate': instance.hourlyRate,
       'is_active': instance.isActive,
       'data_access_enabled': instance.dataAccessEnabled,
+      'owner_access_level': instance.ownerAccessLevel,
       'created_at': instance.createdAt.toIso8601String(),
       'updated_at': instance.updatedAt.toIso8601String(),
     };

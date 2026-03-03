@@ -8,9 +8,10 @@ import '../widgets/app_bar_home_button.dart';
 
 /// Список чеклистов-шаблонов. Шеф может править и создавать по аналогии.
 class ChecklistsScreen extends StatefulWidget {
-  const ChecklistsScreen({super.key, this.embedded = false});
+  const ChecklistsScreen({super.key, this.embedded = false, this.department = 'kitchen'});
 
   final bool embedded;
+  final String department;
 
   @override
   State<ChecklistsScreen> createState() => _ChecklistsScreenState();
@@ -39,7 +40,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
     });
     try {
       final svc = context.read<ChecklistServiceSupabase>();
-      final list = await svc.getChecklistsForEstablishment(est.id);
+      final list = await svc.getChecklistsForEstablishment(est.id, department: widget.department);
       if (mounted) setState(() {
         _list = list;
         _loading = false;
@@ -147,6 +148,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
         name: finalName,
         additionalName: finalAdditional.isEmpty ? null : finalAdditional,
         type: type,
+        assignedDepartment: widget.department,
       );
       if (mounted) {
         await _load();

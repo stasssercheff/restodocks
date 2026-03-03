@@ -40,6 +40,7 @@ class InboxService {
         // Различаем обычную инвентаризацию и iiko по полю payload['type']
         final isIiko = payload['type'] == 'iiko_inventory';
 
+        final docDept = header['department']?.toString() ?? _mapSectionToDepartment(currentEmployee.department);
         documents.add(InboxDocument(
           id: doc['id']?.toString() ?? '',
           type: isIiko ? DocumentType.iikoInventory : DocumentType.inventory,
@@ -48,7 +49,7 @@ class InboxService {
           createdAt: createdAt,
           employeeId: doc['created_by_employee_id']?.toString() ?? '',
           employeeName: employeeName,
-          department: _mapSectionToDepartment(currentEmployee.department),
+          department: docDept,
           fileUrl: null,
           metadata: payload,
         ));
@@ -63,6 +64,7 @@ class InboxService {
             : await subSvc.listForChef(currentEmployee.id);
         for (final sub in subList) {
           final submittedName = sub.submittedByName.isNotEmpty ? sub.submittedByName : '—';
+          final subDept = sub.payload['department']?.toString() ?? 'kitchen';
           documents.add(InboxDocument(
             id: sub.id,
             type: DocumentType.checklistSubmission,
@@ -71,7 +73,7 @@ class InboxService {
             createdAt: sub.createdAt,
             employeeId: sub.submittedByEmployeeId ?? '',
             employeeName: submittedName,
-            department: 'kitchen',
+            department: subDept,
             fileUrl: null,
             metadata: {'submission': sub.payload, 'checklistId': sub.checklistId},
           ));
@@ -85,6 +87,7 @@ class InboxService {
         final header = payload['header'] as Map<String, dynamic>? ?? {};
         final supplierName = header['supplierName']?.toString() ?? '—';
         final employeeName = header['employeeName']?.toString() ?? '—';
+        final docDept = header['department']?.toString() ?? _mapSectionToDepartment(currentEmployee.department);
         final createdAt = doc['created_at'] != null
             ? (DateTime.tryParse(doc['created_at'].toString()) ?? DateTime.now()).toLocal()
             : DateTime.now();
@@ -97,7 +100,7 @@ class InboxService {
           createdAt: createdAt,
           employeeId: doc['created_by_employee_id']?.toString() ?? '',
           employeeName: employeeName,
-          department: _mapSectionToDepartment(currentEmployee.department),
+          department: docDept,
           fileUrl: null,
           metadata: payload,
         ));

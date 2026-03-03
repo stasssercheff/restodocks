@@ -179,7 +179,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       }
 
       // Проверяем наличие заведения
-      final establishmentId = account.establishment?.id;
+      final establishmentId = account.dataEstablishmentId;
       if (establishmentId == null) {
         _addDebugLog('No establishment');
         return _buildErrorScreen('Не найдено заведение');
@@ -374,7 +374,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     if (result == null || result.files.isEmpty || result.files.single.bytes == null) return;
 
     final acc = context.read<AccountManagerSupabase>();
-    final estId = acc.establishment?.id;
+    final estId = acc.dataEstablishmentId;
     if (estId == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Не найдено заведение')));
       return;
@@ -1013,8 +1013,8 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       _setLoadingMessage('Сопоставление с базой...');
       final store = context.read<ProductStoreSupabase>();
       await store.loadProducts(force: true);
-      await store.loadNomenclature(est.id);
-      final existingProducts = store.getNomenclatureProducts(est.id);
+      await store.loadNomenclature(est.dataEstablishmentId);
+      final existingProducts = store.getNomenclatureProducts(est.dataEstablishmentId);
       final allProducts = store.allProducts;
 
       final moderationItems = <ModerationItem>[];
@@ -1023,7 +1023,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
       for (var i = 0; i < parsed.length; i++) {
         final p = parsed[i];
-        final match = await _findMatch(p.name, p.price, existingProducts, allProducts, est.id, store);
+        final match = await _findMatch(p.name, p.price, existingProducts, allProducts, est.dataEstablishmentId, store);
         if (match.existingId != null) {
           moderationItems.add(ModerationItem(
             name: p.name,
@@ -1384,7 +1384,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     print('=== _showIntelligentImportDialog called ===');
     final loc = context.read<LocalizationService>();
     final account = context.read<AccountManagerSupabase>();
-    final establishmentId = account.establishment?.id;
+    final establishmentId = account.dataEstablishmentId;
 
     if (establishmentId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1749,7 +1749,7 @@ ${text}
         final est = account.establishment;
         if (est != null) {
           _addDebugLog('Loading nomenclature before AI processing...');
-          await store.loadNomenclature(est.id);
+          await store.loadNomenclature(est.dataEstablishmentId);
           _addDebugLog('Nomenclature loaded for AI processing, products: ${store.nomenclatureProductIds.length}');
         }
 
@@ -2112,7 +2112,7 @@ ${text}
 
       // Проверяем инициализацию Supabase
       _addDebugLog('Checking Supabase initialization...');
-      final estId = account.establishment?.id;
+      final estId = account.dataEstablishmentId;
       final defCur = account.establishment?.defaultCurrency ?? 'VND';
       final sourceLang = loc.currentLanguageCode;
       final allLangs = LocalizationService.productLanguageCodes;

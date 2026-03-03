@@ -17,6 +17,7 @@ Establishment _$EstablishmentFromJson(Map<String, dynamic> json) =>
       email: json['email'] as String?,
       defaultCurrency: json['default_currency'] as String? ?? 'RUB',
       subscriptionType: json['subscription_type'] as String?,
+      parentEstablishmentId: json['parent_establishment_id']?.toString(),
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
     );
@@ -32,6 +33,7 @@ Map<String, dynamic> _$EstablishmentToJson(Establishment instance) =>
       'email': instance.email,
       'default_currency': instance.defaultCurrency,
       'subscription_type': instance.subscriptionType,
+      'parent_establishment_id': instance.parentEstablishmentId,
       'created_at': instance.createdAt.toIso8601String(),
       'updated_at': instance.updatedAt.toIso8601String(),
     };

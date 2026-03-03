@@ -124,7 +124,7 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
 
       print('💾 ImportReview: all saved. created=$created updated=$updated. Reloading...');
       await store.loadProducts(force: true);
-      await store.loadNomenclature(est.id);
+      await store.loadNomenclature(est.dataEstablishmentId);
       print('💾 ImportReview: reload done, navigating to nomenclature');
 
       if (mounted) {

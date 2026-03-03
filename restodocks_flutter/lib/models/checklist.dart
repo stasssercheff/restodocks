@@ -71,6 +71,8 @@ class Checklist extends Equatable {
   final DateTime updatedAt;
   /// Цех/отдел, где отображается чеклист (горячий цех, холодный цех и т.д.)
   final String? assignedSection;
+  /// Подразделение: kitchen, bar, hall (default kitchen)
+  final String assignedDepartment;
   /// Сотрудник, которому назначен чеклист (опционально)
   final String? assignedEmployeeId;
 
@@ -86,6 +88,7 @@ class Checklist extends Equatable {
     required this.createdAt,
     required this.updatedAt,
     this.assignedSection,
+    this.assignedDepartment = 'kitchen',
     this.assignedEmployeeId,
   });
 
@@ -105,6 +108,7 @@ class Checklist extends Equatable {
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
       assignedSection: json['assigned_section'] as String?,
+      assignedDepartment: json['assigned_department'] as String? ?? 'kitchen',
       assignedEmployeeId: json['assigned_employee_id'] as String?,
     );
   }
@@ -120,6 +124,7 @@ class Checklist extends Equatable {
       if (additionalName != null) 'additional_name': additionalName,
       if (type != null) 'type': type!.code,
       if (assignedSection != null) 'assigned_section': assignedSection,
+      'assigned_department': assignedDepartment,
       if (assignedEmployeeId != null) 'assigned_employee_id': assignedEmployeeId,
     };
   }
@@ -136,6 +141,7 @@ class Checklist extends Equatable {
     DateTime? createdAt,
     DateTime? updatedAt,
     String? assignedSection,
+    String? assignedDepartment,
     String? assignedEmployeeId,
   }) {
     return Checklist(
@@ -150,6 +156,7 @@ class Checklist extends Equatable {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       assignedSection: assignedSection ?? this.assignedSection,
+      assignedDepartment: assignedDepartment ?? this.assignedDepartment,
       assignedEmployeeId: assignedEmployeeId ?? this.assignedEmployeeId,
     );
   }

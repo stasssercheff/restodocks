@@ -74,7 +74,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
       int created = 0;
       for (final item in _items) {
         await svc.createTechCardFromRecognitionResult(
-          establishmentId: est.id,
+          establishmentId: est.dataEstablishmentId,
           createdBy: emp.id,
           result: item.result,
           category: item.category,
