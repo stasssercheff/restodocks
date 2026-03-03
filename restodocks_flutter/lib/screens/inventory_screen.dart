@@ -2367,14 +2367,10 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   }
   // ──────────────────────────────────────────────────────────────────────────
 
-  /// Скрывать статус и кнопки при открытой клавиатуре: viewInsets или фокус в поле на мобильном.
-  bool get _isKeyboardActive {
-    if (!mounted) return false;
-    if (MediaQuery.viewInsetsOf(context).bottom > 0) return true;
-    final isNarrow = MediaQuery.sizeOf(context).width < 600;
-    return isNarrow &&
-        (_searchFocusNode.hasFocus || _iikoCellFocusNodes.any((n) => n.hasFocus));
-  }
+  /// Скрывать статус и кнопки только при реальной клавиатуре (viewInsets).
+  /// Не по фокусу — иначе при тапе по ячейке (клавиатура не успела) скрываются кнопки зря.
+  bool get _isKeyboardActive =>
+      mounted && MediaQuery.viewInsetsOf(context).bottom > 0;
 
   @override
   void initState() {
