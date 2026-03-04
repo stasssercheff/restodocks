@@ -109,7 +109,6 @@ class ChecklistServiceSupabase {
       res = await _supabase.insertData('checklists', data);
     } catch (e) {
       if (_isColumnNotFoundError(e)) {
-        // Без assigned_department — колонка может отсутствовать или schema cache не обновлён
         final minimal = <String, dynamic>{
           'establishment_id': establishmentId,
           'created_by': createdBy,
@@ -179,9 +178,11 @@ class ChecklistServiceSupabase {
     } catch (e) {
       if (!_isColumnNotFoundError(e)) rethrow;
     }
-    final withoutDates = Map<String, dynamic>.from(fullUpd)..remove('deadline_at')..remove('scheduled_for_at');
+    const optionalKeys = ['deadline_at', 'scheduled_for_at', 'assigned_section', 'assigned_employee_id', 'additional_name', 'type', 'action_config'];
+    final stripped = Map<String, dynamic>.from(fullUpd);
+    for (final k in optionalKeys) stripped.remove(k);
     try {
-      await _supabase.updateData('checklists', withoutDates, 'id', id);
+      await _supabase.updateData('checklists', stripped, 'id', id);
       return;
     } catch (e) {
       if (!_isColumnNotFoundError(e)) rethrow;
@@ -217,14 +218,15 @@ class ChecklistServiceSupabase {
       'name': checklist.name,
       'updated_at': DateTime.now().toIso8601String(),
     };
-    upd['assigned_section'] = checklist.assignedSection;
-    upd['assigned_employee_id'] = checklist.assignedEmployeeIds?.isNotEmpty == true
+    if (checklist.assignedSection != null) upd['assigned_section'] = checklist.assignedSection;
+    final empId = checklist.assignedEmployeeIds?.isNotEmpty == true
         ? checklist.assignedEmployeeIds!.first
         : checklist.assignedEmployeeId;
-    upd['deadline_at'] = checklist.deadlineAt?.toIso8601String();
-    upd['scheduled_for_at'] = checklist.scheduledForAt?.toIso8601String();
-    upd['additional_name'] = checklist.additionalName;
-    upd['type'] = checklist.type?.code;
+    if (empId != null) upd['assigned_employee_id'] = empId;
+    if (checklist.deadlineAt != null) upd['deadline_at'] = checklist.deadlineAt!.toIso8601String();
+    if (checklist.scheduledForAt != null) upd['scheduled_for_at'] = checklist.scheduledForAt!.toIso8601String();
+    if (checklist.additionalName != null) upd['additional_name'] = checklist.additionalName;
+    if (checklist.type != null) upd['type'] = checklist.type!.code;
     upd['action_config'] = checklist.actionConfig.toJson();
 
     await _updateChecklistWithRetry(checklist.id, upd);
