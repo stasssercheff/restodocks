@@ -1303,11 +1303,17 @@ class _InventoryScreenState extends State<InventoryScreen>
               textCapitalization: TextCapitalization.sentences,
               decoration: InputDecoration(
                 hintText: loc.t('inventory_filter_name') ?? 'По названию',
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                border: const OutlineInputBorder(),
+                prefixIcon: Icon(Icons.search, size: 22, color: theme.colorScheme.onSurfaceVariant),
+                filled: true,
+                fillColor: theme.colorScheme.surfaceContainerHighest,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: theme.colorScheme.outlineVariant, width: 1.5),
+                ),
               ),
-              style: const TextStyle(fontSize: 12),
+              style: const TextStyle(fontSize: 15),
               onChanged: (_) => setState(() {}),
             ),
           ),
@@ -1357,7 +1363,7 @@ class _InventoryScreenState extends State<InventoryScreen>
         : null;
     final nameFilterField = !_completed && _rows.isNotEmpty
         ? SizedBox(
-            width: narrow ? double.infinity : 160,
+            width: narrow ? double.infinity : 240,
             child: TextField(
               controller: _nameFilterCtrl,
               focusNode: _nameFilterFocusNode,
@@ -1365,11 +1371,17 @@ class _InventoryScreenState extends State<InventoryScreen>
               textCapitalization: TextCapitalization.sentences,
               decoration: InputDecoration(
                 hintText: loc.t('inventory_filter_name') ?? 'По названию',
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                border: const OutlineInputBorder(),
+                prefixIcon: Icon(Icons.search, size: 22, color: theme.colorScheme.onSurfaceVariant),
+                filled: true,
+                fillColor: theme.colorScheme.surfaceContainerHighest,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: theme.colorScheme.outlineVariant, width: 1.5),
+                ),
               ),
-              style: const TextStyle(fontSize: 12),
+              style: const TextStyle(fontSize: 15),
               onChanged: (_) => setState(() {}),
             ),
           )

@@ -95,13 +95,13 @@ class ChecklistServiceSupabase {
       res = await _supabase.insertData('checklists', data);
     } catch (e) {
       if (_isColumnNotFoundError(e)) {
+        // Без assigned_department — колонка может отсутствовать или schema cache не обновлён
         final minimal = <String, dynamic>{
           'establishment_id': establishmentId,
           'created_by': createdBy,
           'name': name,
           'created_at': now.toIso8601String(),
           'updated_at': now.toIso8601String(),
-          'assigned_department': assignedDepartment,
         };
         res = await _supabase.insertData('checklists', minimal);
       } else {
