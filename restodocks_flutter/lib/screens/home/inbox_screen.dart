@@ -10,11 +10,13 @@ import '../../models/inbox_document.dart';
 import '../../services/inbox_service.dart';
 import '../../widgets/app_bar_home_button.dart';
 
-/// Входящие: Документы по типам (Чеклисты, Заказы, Инвентаризация)
+/// Входящие: Документы по типам (Чеклисты, Заказы, Инвентаризация) + Сообщения
 class InboxScreen extends StatefulWidget {
-  const InboxScreen({super.key, this.embedded = false});
+  const InboxScreen({super.key, this.embedded = false, this.initialTabMessages = false});
 
   final bool embedded;
+  /// true — открыть сразу вкладку «Сообщения»
+  final bool initialTabMessages;
 
   @override
   State<InboxScreen> createState() => _InboxScreenState();
@@ -51,13 +53,24 @@ class _InboxScreenState extends State<InboxScreen> {
   void _initDefaultTab() {
     final employee = context.read<AccountManagerSupabase>().currentEmployee;
     if (employee == null) return;
+    final tabs = _visibleTabs(employee);
+    if (widget.initialTabMessages && tabs.contains(_InboxTab.messages)) {
+      setState(() {
+        if (employee.hasRole('owner')) {
+          _selectedDeptTab = _InboxDeptTab.kitchen;
+          _selectedTypeTab = _InboxTypeTab.messages;
+        } else {
+          _selectedTab = _InboxTab.messages;
+        }
+      });
+      return;
+    }
     if (employee.hasRole('owner')) {
       setState(() {
         _selectedDeptTab = _InboxDeptTab.kitchen;
         _selectedTypeTab = _InboxTypeTab.order;
       });
     } else {
-      final tabs = _visibleTabs(employee);
       if (tabs.isNotEmpty) {
         setState(() => _selectedTab = tabs.first);
       }
