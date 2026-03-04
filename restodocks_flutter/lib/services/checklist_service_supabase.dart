@@ -82,7 +82,7 @@ class ChecklistServiceSupabase {
       'updated_at': now.toIso8601String(),
     };
     if (assignedSection != null) data['assigned_section'] = assignedSection;
-    data['assigned_department'] = assignedDepartment;
+    // assigned_department — опционально (колонка может отсутствовать в старых схемах)
     if (assignedEmployeeId != null) data['assigned_employee_id'] = assignedEmployeeId;
     if (assignedEmployeeIds != null && assignedEmployeeIds.isNotEmpty) {
       data['assigned_employee_ids'] = assignedEmployeeIds;
@@ -116,7 +116,7 @@ class ChecklistServiceSupabase {
       'updated_at': DateTime.now().toIso8601String(),
     };
     upd['assigned_section'] = checklist.assignedSection;
-    upd['assigned_department'] = checklist.assignedDepartment;
+    // assigned_department — не отправляем, совместимость со схемами без колонки
     upd['assigned_employee_id'] = checklist.assignedEmployeeId;
     upd['assigned_employee_ids'] = checklist.assignedEmployeeIds ?? [];
     upd['deadline_at'] = checklist.deadlineAt?.toIso8601String();
