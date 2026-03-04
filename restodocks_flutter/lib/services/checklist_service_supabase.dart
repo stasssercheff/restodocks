@@ -197,13 +197,11 @@ class ChecklistServiceSupabase {
       await _supabase.updateData('checklists', upd, 'id', checklist.id);
     } catch (e) {
       if (_isColumnNotFoundError(e)) {
+        // Только колонки, гарантированно существующие — schema cache может не видеть deadline_at и др.
         final minimal = <String, dynamic>{
           'name': checklist.name,
           'updated_at': DateTime.now().toIso8601String(),
         };
-        if (checklist.deadlineAt != null) minimal['deadline_at'] = checklist.deadlineAt!.toIso8601String();
-        if (checklist.scheduledForAt != null) minimal['scheduled_for_at'] = checklist.scheduledForAt!.toIso8601String();
-        if (checklist.assignedSection != null) minimal['assigned_section'] = checklist.assignedSection;
         await _supabase.updateData('checklists', minimal, 'id', checklist.id);
       } else {
         rethrow;

@@ -66,18 +66,16 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
   }
 
   Future<void> _createNew() async {
-    final loc = context.read<LocalizationService>();
     final acc = context.read<AccountManagerSupabase>();
     final est = acc.establishment;
     final emp = acc.currentEmployee;
     if (est == null || emp == null) return;
-    final defaultName = loc.t('checklist_new_default') ?? 'Новый чеклист';
     try {
       final svc = context.read<ChecklistServiceSupabase>();
       final created = await svc.createChecklist(
         establishmentId: est.id,
         createdBy: emp.id,
-        name: defaultName,
+        name: '',
         type: ChecklistType.tasks,
         assignedDepartment: widget.department,
       );
@@ -88,7 +86,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))),
+          SnackBar(content: Text(context.read<LocalizationService>().t('error_with_message').replaceAll('%s', e.toString()))),
         );
       }
     }
