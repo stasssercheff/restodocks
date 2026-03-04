@@ -56,6 +56,9 @@ class Product extends Equatable {
   @JsonKey(name: 'package_weight_grams')
   final double? packageWeightGrams; // вес упаковки в граммах
 
+  @JsonKey(name: 'grams_per_piece')
+  final double? gramsPerPiece; // вес 1 шт в граммах (для unit=шт/pcs)
+
   // Единица измерения
   @JsonKey(name: 'unit')
   final String? unit;
@@ -83,6 +86,7 @@ class Product extends Equatable {
     this.currency,
     this.packagePrice,
     this.packageWeightGrams,
+    this.gramsPerPiece,
     this.unit,
     this.primaryWastePct,
     this.supplierIds,
@@ -119,6 +123,8 @@ class Product extends Equatable {
     double? packageWeightGrams,
     bool clearPackagePrice = false,
     bool clearPackageWeight = false,
+    double? gramsPerPiece,
+    bool clearGramsPerPiece = false,
     String? unit,
     double? primaryWastePct,
     List<String>? supplierIds,
@@ -138,6 +144,7 @@ class Product extends Equatable {
       currency: currency ?? this.currency,
       packagePrice: clearPackagePrice ? null : (packagePrice ?? this.packagePrice),
       packageWeightGrams: clearPackageWeight ? null : (packageWeightGrams ?? this.packageWeightGrams),
+      gramsPerPiece: clearGramsPerPiece ? null : (gramsPerPiece ?? this.gramsPerPiece),
       unit: unit ?? this.unit,
       primaryWastePct: primaryWastePct ?? this.primaryWastePct,
       supplierIds: supplierIds ?? this.supplierIds,
@@ -262,6 +269,7 @@ class Product extends Equatable {
     currency,
     packagePrice,
     packageWeightGrams,
+    gramsPerPiece,
     unit,
     primaryWastePct,
     supplierIds,
@@ -282,6 +290,7 @@ class Product extends Equatable {
     String? currency,
     double? packagePrice,
     double? packageWeightGrams,
+    double? gramsPerPiece,
     String? unit,
     List<String>? supplierIds,
   }) {
@@ -300,6 +309,7 @@ class Product extends Equatable {
       currency: currency,
       packagePrice: packagePrice,
       packageWeightGrams: packageWeightGrams,
+      gramsPerPiece: gramsPerPiece,
       unit: unit,
       primaryWastePct: null,
       supplierIds: supplierIds,

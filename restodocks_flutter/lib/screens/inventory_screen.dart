@@ -1825,7 +1825,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                     : _ProductUnitDropdown(
                         value: row.isCountedByPackage ? 'pkg' : row.unit,
                         lang: loc.currentLanguageCode,
-                        hasPackage: row.hasPackage,
+                        product: row.product,
                         onChanged: (v) => _setProductUnit(actualIndex, v),
                         theme: theme,
                       ))
@@ -2140,33 +2140,42 @@ class _InventoryScreenState extends State<InventoryScreen>
   }
 }
 
-/// Выпадающий список единицы измерения для продукта (отдельно от названия).
+/// Выпадающий список единицы измерения для продукта.
+/// Ограничен данными продукта: шт — только при gramsPerPiece; упак — при packageWeightGrams.
 class _ProductUnitDropdown extends StatelessWidget {
   const _ProductUnitDropdown({
     required this.value,
     required this.lang,
     required this.onChanged,
     required this.theme,
-    this.hasPackage = false,
+    this.product,
   });
 
   final String value;
   final String lang;
   final void Function(String) onChanged;
   final ThemeData theme;
-  final bool hasPackage;
+  final Product? product;
 
-  static const List<String> _commonUnits = ['g', 'kg', 'pcs', 'шт', 'ml', 'l'];
+  static const List<String> _baseUnits = ['g', 'kg', 'ml', 'l'];
+
+  static List<String> _allowedUnits(Product? p) {
+    final options = List<String>.from(_baseUnits);
+    final hasGpp = p?.gramsPerPiece != null && p!.gramsPerPiece! > 0;
+    if (hasGpp) {
+      options.addAll(['pcs', 'шт']);
+    }
+    final hasPkg = p?.packageWeightGrams != null && p!.packageWeightGrams! > 0;
+    if (hasPkg) options.add('pkg');
+    return options;
+  }
 
   @override
   Widget build(BuildContext context) {
-    final options = [
-      ..._commonUnits,
-      if (hasPackage) 'pkg',
-    ];
+    final options = _allowedUnits(product);
     final normalized = value.trim().toLowerCase();
     final match = options.where((u) => u.toLowerCase() == normalized).firstOrNull;
-    final displayValue = match ?? 'g';
+    final displayValue = match ?? options.first;
     return DropdownButtonHideUnderline(
       child: DropdownButton<String>(
         value: displayValue,

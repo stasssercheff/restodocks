@@ -3092,6 +3092,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
   late final TextEditingController _priceController;
   late final TextEditingController _packagePriceController;
   late final TextEditingController _packageWeightController;
+  late final TextEditingController _gramsPerPieceController;
   bool _checkingName = false;
   late final TextEditingController _caloriesController;
   late final TextEditingController _proteinController;
@@ -3122,6 +3123,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
     _priceByPackage = p.packagePrice != null || p.packageWeightGrams != null;
     _packagePriceController = TextEditingController(text: p.packagePrice?.toString() ?? '');
     _packageWeightController = TextEditingController(text: p.packageWeightGrams?.toStringAsFixed(0) ?? '');
+    _gramsPerPieceController = TextEditingController(text: p.gramsPerPiece?.toStringAsFixed(0) ?? '');
     // Подставить адекватные калории при открытии карточки
     final saneCal = NutritionApiService.saneCaloriesForProduct(p.name, p.calories);
     final initialCal = saneCal ?? p.calories;
@@ -3154,6 +3156,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
     _priceController.dispose();
     _packagePriceController.dispose();
     _packageWeightController.dispose();
+    _gramsPerPieceController.dispose();
     _caloriesController.dispose();
     _proteinController.dispose();
     _fatController.dispose();
@@ -3234,6 +3237,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
     final double? pkgPrice = _priceByPackage ? _parseNum(_packagePriceController.text) : null;
     final double? pkgWeight = _priceByPackage ? _parseNum(_packageWeightController.text) : null;
 
+    final gpp = CulinaryUnits.isCountable(_unit) ? _parseNum(_gramsPerPieceController.text) : null;
     final updated = widget.product.copyWith(
       name: name,
       names: merged,
@@ -3243,6 +3247,8 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
       clearPackagePrice: !_priceByPackage,
       packageWeightGrams: pkgWeight,
       clearPackageWeight: !_priceByPackage,
+      gramsPerPiece: gpp,
+      clearGramsPerPiece: !CulinaryUnits.isCountable(_unit),
       unit: _unit,
       primaryWastePct: _parseNum(_wastePctController.text)?.clamp(0.0, 99.9),
       calories: _parseNum(_caloriesController.text),
@@ -3327,6 +3333,17 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                 )).toList(),
                 onChanged: (v) => setState(() => _unit = v ?? _unit),
               ),
+              if (CulinaryUnits.isCountable(_unit)) ...[
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _gramsPerPieceController,
+                  decoration: InputDecoration(
+                    labelText: widget.loc.t('grams_per_piece_label') ?? 'Вес 1 шт, г',
+                    border: const OutlineInputBorder(),
+                  ),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                ),
+              ],
               const SizedBox(height: 16),
               // Переключатель: цена за кг/ед vs цена за упаковку
               Row(

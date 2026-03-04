@@ -28,9 +28,19 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
   List<TextEditingController> _qtyControllers = [];
 
   static String _unitLabel(String unitId, String lang) =>
-      CulinaryUnits.displayName(unitId, lang);
+      unitId == 'pkg' ? (lang == 'ru' ? 'упак.' : 'pkg') : CulinaryUnits.displayName(unitId, lang);
 
-  static const _unitIds = ['g', 'kg', 'ml', 'l', 'pcs', 'шт', 'pack', 'can', 'box'];
+  static List<String> _allowedUnitsForProduct(Product? p) {
+    const base = ['g', 'kg', 'ml', 'l'];
+    final options = List<String>.from(base);
+    if (p?.gramsPerPiece != null && p!.gramsPerPiece! > 0) {
+      options.addAll(['pcs', 'шт']);
+    }
+    if (p?.packageWeightGrams != null && p!.packageWeightGrams! > 0) {
+      options.add('pkg');
+    }
+    return options;
+  }
 
   Future<void> _load() async {
     final acc = context.read<AccountManagerSupabase>();
@@ -40,8 +50,8 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
       return;
     }
     _establishmentId = est.id;
-    // Загружаем номенклатуру для отображения локализованных имён при экспорте
     final store = context.read<ProductStoreSupabase>();
+    await store.loadProducts();
     await store.loadNomenclature(est.dataEstablishmentId);
     final lists = await loadOrderLists(est.id, department: widget.department);
     var found = lists.where((l) => l.id == widget.listId).firstOrNull;
@@ -392,6 +402,12 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
                       ...list.items.asMap().entries.map((e) {
                         final i = e.key;
                         final item = e.value;
+                        final store = context.read<ProductStoreSupabase>();
+                        final product = item.productId != null
+                            ? store.allProducts.where((p) => p.id == item.productId).firstOrNull
+                            : null;
+                        final allowedUnits = _allowedUnitsForProduct(product);
+                        final currentUnit = allowedUnits.contains(item.unit) ? item.unit : allowedUnits.first;
                         return TableRow(
                           children: [
                             Padding(
@@ -401,10 +417,10 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
                             Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
                               child: DropdownButton<String>(
-                                value: item.unit,
+                                value: currentUnit,
                                 isDense: true,
                                 isExpanded: true,
-                                items: _unitIds.map((id) => DropdownMenuItem(
+                                items: allowedUnits.map((id) => DropdownMenuItem(
                                   value: id,
                                   child: Text(_unitLabel(id, lang), style: const TextStyle(fontSize: 12)),
                                 )).toList(),
