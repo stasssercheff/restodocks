@@ -505,7 +505,7 @@ class AppRouter {
             path: '/tech-cards/new',
             pageBuilder: (context, state) {
               final initialFromAi = state.extra as TechCardRecognitionResult?;
-              final department = state.uri.queryParameters['department'];
+              final department = state.queryParameters['department'];
               return _slideTransitionPage(state, TechCardEditScreen(techCardId: 'new', initialFromAi: initialFromAi, department: department));
             },
           ),
