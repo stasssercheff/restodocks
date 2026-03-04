@@ -58,8 +58,8 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
       final all = await acc.getEmployeesForEstablishment(est.id);
       // Скрываем только собственника без должности; остальных показываем
       final visible = all.where((e) => !(e.hasRole('owner') && e.positionRole == null)).toList();
-      // Владелец видит всех сотрудников (и кухня, и менеджмент), иначе — только свой отдел
-      final filtered = current.hasRole('owner')
+      // Владелец, шеф, су-шеф видят всех; остальные — только свой отдел
+      final filtered = (current.hasRole('owner') || current.hasRole('executive_chef') || current.hasRole('sous_chef'))
           ? visible
           : (current.department.isEmpty ? visible : visible.where((e) => e.department == current.department).toList());
       // Дедупликация по id (на случай дублей из БД)
@@ -530,7 +530,7 @@ class _EmployeeCard extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               // Аватар
               _EmployeeAvatar(employee: employee, radius: 18),
@@ -577,9 +577,10 @@ class _EmployeeCard extends StatelessWidget {
                   ],
                 ),
               ),
-              // Правая часть: переключатели + кнопки
+              // Правая часть: переключатели + кнопки (центрируем по вертикали)
               Column(
                 mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   if (canToggleDataAccess && !employee.hasRole('owner'))

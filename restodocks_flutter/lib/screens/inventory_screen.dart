@@ -784,15 +784,32 @@ class _InventoryScreenState extends State<InventoryScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_hScroll.hasClients) {
         final maxCols = _maxQuantityColumns;
-        final colStep = _colQtyWidth + _colGap;
-        final targetOffset = maxCols > 3 ? (maxCols - 3) * colStep : 0.0;
-        final clamped = targetOffset.clamp(0.0, _hScroll.position.maxScrollExtent);
-        _hScroll.animateTo(
-          clamped,
-          duration: const Duration(milliseconds: 80),
-          curve: Curves.easeOut,
-        );
+        _scrollToCellFocused(maxCols - 1, maxCols);
       }
+    });
+  }
+
+  /// При фокусе на ячейку: 3-я видимая → скролл на 2-ю; последняя → на 3-ю.
+  void _scrollToCellFocused(int colIndex, int totalCols) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_hScroll.hasClients) return;
+      final colStep = _colQtyWidth + _colGap;
+      double targetOffset;
+      if (totalCols <= 3) {
+        targetOffset = 0;
+      } else if (colIndex == totalCols - 1) {
+        targetOffset = (colIndex - 2) * colStep;
+      } else if (colIndex >= 2) {
+        targetOffset = (colIndex - 1) * colStep;
+      } else {
+        targetOffset = 0;
+      }
+      targetOffset = targetOffset.clamp(0.0, _hScroll.position.maxScrollExtent);
+      _hScroll.animateTo(
+        targetOffset,
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOut,
+      );
     });
   }
 
@@ -1856,6 +1873,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                             textInputAction: isLastCell ? TextInputAction.done : TextInputAction.next,
                             onFocusGained: () {
                               setState(() => _hasInputFocus = true);
+                              _scrollToCellFocused(colIndex, qtyCols);
                               if (colIndex == qtyCols - 1) _onLastCellFocused(actualIndex);
                             },
                             onFocusLost: () {

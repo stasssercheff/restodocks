@@ -631,6 +631,9 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                   ),
                   ..._employees.map((e) {
                     final isSelected = selected.contains(e.id);
+                    final rolesDisplay = e.roles
+                        .map((r) => loc.roleDisplayName(r))
+                        .join(', ');
                     return CheckboxListTile(
                       value: isSelected,
                       onChanged: canEdit ? (v) {
@@ -640,7 +643,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                         });
                       } : null,
                       title: Text(e.fullName),
-                      secondary: Text(e.roles.isNotEmpty ? e.roles.join(', ') : '', style: Theme.of(context).textTheme.bodySmall),
+                      secondary: Text(rolesDisplay.isNotEmpty ? rolesDisplay : '', style: Theme.of(context).textTheme.bodySmall),
                     );
                   }),
                 ],
@@ -668,20 +671,19 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
       children: [
         Row(
           children: [
-            SizedBox(
-              width: 24,
-              height: 24,
-              child: Switch(
-                value: _deadlineEnabled,
-                onChanged: canEdit ? (v) => setState(() {
-                  _deadlineEnabled = v;
-                  if (v && _deadline == null) _deadline = DateTime.now();
-                  scheduleSave();
-                }) : null,
-              ),
+            Switch(
+              value: _deadlineEnabled,
+              onChanged: canEdit ? (v) => setState(() {
+                _deadlineEnabled = v;
+                if (v && _deadline == null) _deadline = DateTime.now();
+                scheduleSave();
+              }) : null,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
-            const SizedBox(width: 12),
-            Text(loc.t('checklist_deadline') ?? 'Срок выполнения'),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(loc.t('checklist_deadline') ?? 'Срок выполнения'),
+            ),
           ],
         ),
         if (_deadlineEnabled && canEdit) ...[
@@ -752,20 +754,19 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
       children: [
         Row(
           children: [
-            SizedBox(
-              width: 24,
-              height: 24,
-              child: Switch(
-                value: _scheduledForEnabled,
-                onChanged: canEdit ? (v) => setState(() {
-                  _scheduledForEnabled = v;
-                  if (v && _scheduledFor == null) _scheduledFor = DateTime.now();
-                  scheduleSave();
-                }) : null,
-              ),
+            Switch(
+              value: _scheduledForEnabled,
+              onChanged: canEdit ? (v) => setState(() {
+                _scheduledForEnabled = v;
+                if (v && _scheduledFor == null) _scheduledFor = DateTime.now();
+                scheduleSave();
+              }) : null,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
-            const SizedBox(width: 12),
-            Text(loc.t('checklist_scheduled_for') ?? 'На когда'),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(loc.t('checklist_scheduled_for') ?? 'На когда'),
+            ),
           ],
         ),
         if (_scheduledForEnabled && canEdit) ...[
