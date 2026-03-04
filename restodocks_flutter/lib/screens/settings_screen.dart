@@ -349,8 +349,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   roles: newRoles,
                   updatedAt: DateTime.now(),
                 );
-                await accountManager.updateEmployee(updatedEmployee);
-                if (ctx.mounted) Navigator.of(ctx).pop();
+                try {
+                  await accountManager.updateEmployee(updatedEmployee);
+                  if (ctx.mounted) Navigator.of(ctx).pop();
+                } catch (e) {
+                  if (ctx.mounted) {
+                    Navigator.of(ctx).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('${loc.t('error') ?? 'Ошибка'}: $e')),
+                    );
+                  }
+                }
               },
             );
           }).toList(),

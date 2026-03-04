@@ -234,35 +234,96 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  void _showPositionPicker(BuildContext context, Employee employee, LocalizationService loc, AccountManagerSupabase accountManager) {
+    const visiblePositionCodes = [
+      'executive_chef', 'sous_chef', 'bar_manager', 'floor_manager', 'general_manager',
+    ];
+    String getDisplayName(String? code) {
+      if (code == null || code.isEmpty) return loc.t('no_position');
+      final key = 'role_$code';
+      final t = loc.t(key);
+      return (t != key && t.isNotEmpty) ? t : code;
+    }
+    final availablePositions = [
+      {'code': null, 'name': loc.t('no_position')},
+      ...visiblePositionCodes.map((code) => {'code': code, 'name': getDisplayName(code)}),
+    ];
+    final currentPosition = employee.positionRole;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('select_position')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: availablePositions.map((pos) {
+            final code = pos['code'] as String?;
+            final isSelected = code == currentPosition;
+            return ListTile(
+              title: Text(pos['name']!),
+              trailing: isSelected ? const Icon(Icons.check, color: Colors.green) : null,
+              onTap: () async {
+                if (isSelected) {
+                  Navigator.of(ctx).pop();
+                  return;
+                }
+                final newRoles = ['owner'];
+                if (code != null && code.isNotEmpty) newRoles.add(code);
+                final updated = employee.copyWith(roles: newRoles, updatedAt: DateTime.now());
+                try {
+                  await accountManager.updateEmployee(updated);
+                  if (ctx.mounted) Navigator.of(ctx).pop();
+                } catch (e) {
+                  if (ctx.mounted) {
+                    Navigator.of(ctx).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('${loc.t('error') ?? 'Ошибка'}: $e')),
+                    );
+                  }
+                }
+              },
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
   Widget _buildProfileInfo(Employee employee, Establishment establishment, LocalizationService localization, bool isOwner) {
     final position = employee.positionRole;
+    final accountManager = context.read<AccountManagerSupabase>();
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // Собственник и должность (если есть)
-            Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              alignment: WrapAlignment.center,
-              children: [
-                if (isOwner)
-                  Chip(
-                    label: Text(localization.t('owner'), style: const TextStyle(fontSize: 12)),
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    visualDensity: VisualDensity.compact,
-                  ),
-                if (position != null && position.isNotEmpty)
+            // Собственник и должность — тап по области для смены должности
+            GestureDetector(
+              onTap: isOwner
+                  ? () => _showPositionPicker(context, employee, localization, accountManager)
+                  : null,
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                alignment: WrapAlignment.center,
+                children: [
+                  if (isOwner)
+                    Chip(
+                      label: Text(localization.t('owner'), style: const TextStyle(fontSize: 12)),
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
+                    ),
                   Chip(
                     label: Text(
-                      localization.roleDisplayName(position),
+                      position != null && position.isNotEmpty
+                          ? localization.roleDisplayName(position)
+                          : localization.t('no_position'),
                       style: const TextStyle(fontSize: 12),
                     ),
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     visualDensity: VisualDensity.compact,
                   ),
-              ],
+                ],
+              ),
             ),
             const SizedBox(height: 16),
 

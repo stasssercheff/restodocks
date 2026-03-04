@@ -790,26 +790,31 @@ class _InventoryScreenState extends State<InventoryScreen>
   }
 
   /// При фокусе на ячейку: 3-я видимая → скролл на 2-ю; последняя → на 3-ю.
+  static const double _scrollableRowPadding = 6;
   void _scrollToCellFocused(int colIndex, int totalCols) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    void doScroll() {
       if (!_hScroll.hasClients) return;
       final colStep = _colQtyWidth + _colGap;
       double targetOffset;
       if (totalCols <= 3) {
         targetOffset = 0;
       } else if (colIndex == totalCols - 1) {
-        targetOffset = (colIndex - 2) * colStep;
+        targetOffset = _scrollableRowPadding + (colIndex - 2) * colStep;
       } else if (colIndex >= 2) {
-        targetOffset = (colIndex - 1) * colStep;
+        targetOffset = _scrollableRowPadding + (colIndex - 1) * colStep;
       } else {
         targetOffset = 0;
       }
       targetOffset = targetOffset.clamp(0.0, _hScroll.position.maxScrollExtent);
       _hScroll.animateTo(
         targetOffset,
-        duration: const Duration(milliseconds: 150),
+        duration: const Duration(milliseconds: 200),
         curve: Curves.easeOut,
       );
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      doScroll();
+      Future.delayed(const Duration(milliseconds: 350), doScroll);
     });
   }
 

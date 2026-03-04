@@ -810,6 +810,7 @@ class AccountManagerSupabase extends ChangeNotifier {
 
       if (_currentEmployee?.id == employee.id) {
         _currentEmployee = employee;
+        notifyListeners();
       }
     } catch (e) {
       print('Ошибка обновления сотрудника: $e');
