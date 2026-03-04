@@ -792,7 +792,16 @@ class AccountManagerSupabase extends ChangeNotifier {
           employee.id,
         );
       } catch (e) {
-        if (_isPaymentColumnError(e)) {
+        if (_isSchemaColumnError(e)) {
+          employeeData = Map<String, dynamic>.from(employeeData)
+            ..remove('can_edit_own_schedule');
+          await _supabase.updateData(
+            'employees',
+            employeeData,
+            'id',
+            employee.id,
+          );
+        } else if (_isPaymentColumnError(e)) {
           employeeData = Map<String, dynamic>.from(employeeData)
             ..remove('payment_type')
             ..remove('rate_per_shift')
@@ -840,6 +849,10 @@ class AccountManagerSupabase extends ChangeNotifier {
         msg.contains('hourly_rate') ||
         msg.contains('pgrst204') ||
         (msg.contains('column') && (msg.contains('exist') || msg.contains('found') || msg.contains('does not')));
+  }
+
+  bool _isSchemaColumnError(Object e) {
+    return e.toString().toLowerCase().contains('can_edit_own_schedule');
   }
 
   /// Обновить данные заведения
