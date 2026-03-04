@@ -31,6 +31,16 @@
 2. После push в `staging` запускается **Build and Deploy to Vercel (Demo/Beta)**
 3. Если падает — смотрите логи, на каком шаге ошибка
 
+## Миграции Supabase (checklists)
+
+Если при создании чеклиста («задачи», «заготовка») появляется ошибка `Could not find the 'assigned_department' column` — примените миграции к staging Supabase:
+
+```bash
+cd restodocks_flutter && supabase db push
+```
+
+Или выполните миграцию вручную в SQL Editor Supabase: `supabase/migrations/20260304160000_ensure_assigned_department.sql`.
+
 ## Если Vercel отозвал токен
 
 Vercel отзывает токены при обнаружении в публичном коде/логах. Создайте новый токен в Vercel → Account Settings → Tokens и обновите `VERCEL_TOKEN` в GitHub Secrets.

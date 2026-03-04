@@ -509,12 +509,13 @@ class _ProfileEditDialogState extends State<_ProfileEditDialog> {
 
     setState(() => _isLoading = true);
     try {
+      final compressed = await ImageService().compressToMaxBytes(bytes, maxBytes: 250 * 1024) ?? bytes;
       final supabase = SupabaseService();
       const bucket = 'avatars';
       final fileName = '${widget.employee.id}.jpg';
       await supabase.client.storage
           .from(bucket)
-          .uploadBinary(fileName, bytes, fileOptions: FileOptions(upsert: true));
+          .uploadBinary(fileName, compressed, fileOptions: FileOptions(upsert: true));
       // Cache-busting: добавляем timestamp чтобы CachedNetworkImage не брал старый кэш
       final baseUrl = supabase.client.storage.from(bucket).getPublicUrl(fileName);
       final url = '$baseUrl?t=${DateTime.now().millisecondsSinceEpoch}';

@@ -203,6 +203,34 @@ class ImageService {
     return createCircularAvatar(resizedBytes, size: 200);
   }
 
+  /// Сжатие изображения до максимального размера (байт) с сохранением качества.
+  /// Использует бинарный поиск по качеству JPEG для достижения целевого размера.
+  Future<Uint8List?> compressToMaxBytes(Uint8List imageBytes, {int maxBytes = 250 * 1024}) async {
+    try {
+      final img.Image? original = img.decodeImage(imageBytes);
+      if (original == null) return null;
+      if (imageBytes.length <= maxBytes) return imageBytes;
+
+      int lo = 10, hi = 95;
+      Uint8List? best;
+      while (lo <= hi) {
+        final q = (lo + hi) ~/ 2;
+        final encoded = img.encodeJpg(original, quality: q);
+        if (encoded.length <= maxBytes) {
+          best = Uint8List.fromList(encoded);
+          lo = q + 1;
+        } else {
+          hi = q - 1;
+        }
+      }
+      if (best != null) return best;
+      return img.encodeJpg(original, quality: hi > 0 ? hi : 10);
+    } catch (e) {
+      print('Ошибка сжатия изображения: $e');
+      return null;
+    }
+  }
+
   /// Проверка размера файла
   bool isValidImageSize(Uint8List bytes, {int maxSizeInMB = 10}) {
     final int maxSizeInBytes = maxSizeInMB * 1024 * 1024;

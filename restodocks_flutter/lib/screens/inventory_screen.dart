@@ -541,6 +541,8 @@ class _InventoryScreenState extends State<InventoryScreen>
 
   /// Автоматическая подстановка: номенклатура заведения + полуфабрикаты (ТТК с типом ПФ).
   Future<void> _loadNomenclature() async {
+    if (!mounted) return;
+    setState(() => _isLoadingProducts = true);
     final store = context.read<ProductStoreSupabase>();
     final account = context.read<AccountManagerSupabase>();
     final techCardSvc = context.read<TechCardServiceSupabase>();
@@ -553,6 +555,8 @@ class _InventoryScreenState extends State<InventoryScreen>
     if (!mounted) return;
     final products = store.getNomenclatureProducts(estId);
     final pfOnly = techCards.where((tc) => tc.isSemiFinished).toList();
+    if (!mounted) return;
+    setState(() => _isLoadingProducts = false);
     final productMap = {for (final p in products) p.id: p};
     final techCardMap = {for (final tc in pfOnly) tc.id: tc};
     setState(() {
@@ -1857,7 +1861,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                             textInputAction: isLastCell ? TextInputAction.done : TextInputAction.next,
                             onFocusGained: () {
                               setState(() => _hasInputFocus = true);
-                              if (isLastCell) _onLastCellFocused(actualIndex);
+                              if (colIndex == qtyCols - 1) _onLastCellFocused(actualIndex);
                             },
                             onFocusLost: () {
                               setState(() => _hasInputFocus = false);

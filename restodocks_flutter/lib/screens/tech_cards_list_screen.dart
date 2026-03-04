@@ -675,9 +675,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   /// Компактная таблица с шапкой: влезает в экран телефона, без горизонтального скролла.
   Widget _buildTechCardsTable(List<TechCard> techCards, LocalizationService loc, bool canEdit) {
     final lang = loc.currentLanguageCode;
-    const colCatWidth = 82.0; // полное слово «Категория»
+    const colCatWidth = 76.0;
     const colCostWidth = 48.0;
-    const colActionsWidth = 52.0; // просмотр + стрелка
+    const colActionsWidth = 62.0; // «Просмотр» целиком
     final est = context.read<AccountManagerSupabase>().establishment;
     final costSym = est?.currencySymbol ?? Establishment.currencySymbolFor(est?.defaultCurrency ?? 'VND');
     return RefreshIndicator(
@@ -723,7 +723,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                         ? () => context.push('/tech-cards/${tc.id}?view=1')
                         : null,
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                       child: Row(
                         children: [
                           Expanded(
@@ -862,7 +862,7 @@ class _TableHeaderDelegate extends SliverPersistentHeaderDelegate {
     final style = TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: onColor);
     return Container(
       color: color,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       child: Row(
         children: [
           Expanded(
@@ -878,7 +878,7 @@ class _TableHeaderDelegate extends SliverPersistentHeaderDelegate {
           ),
           SizedBox(
             width: colActionsWidth,
-            child: Text(labelView, style: style, textAlign: TextAlign.center),
+            child: Text(labelView, style: style, textAlign: TextAlign.center, overflow: TextOverflow.ellipsis),
           ),
         ],
       ),
