@@ -10,7 +10,11 @@ class ChecklistServiceSupabase {
 
   final SupabaseService _supabase = SupabaseService();
 
-  Future<List<Checklist>> getChecklistsForEstablishment(String establishmentId, {String department = 'kitchen'}) async {
+  Future<List<Checklist>> getChecklistsForEstablishment(
+    String establishmentId, {
+    String department = 'kitchen',
+    String? currentEmployeeId,
+  }) async {
     try {
       final data = await _supabase.client
           .from('checklists')
@@ -22,6 +26,16 @@ class ChecklistServiceSupabase {
       for (final row in data) {
         final c = Checklist.fromJson(row);
         if (c.assignedDepartment != department) continue;
+        if (currentEmployeeId != null) {
+          final ids = c.assignedEmployeeIds;
+          final singleId = c.assignedEmployeeId;
+          final hasAssignment = (ids != null && ids.isNotEmpty) || (singleId != null && singleId.isNotEmpty);
+          if (hasAssignment) {
+            final assignedToCurrent = (ids != null && ids.contains(currentEmployeeId)) ||
+                (singleId == currentEmployeeId);
+            if (!assignedToCurrent) continue;
+          }
+        }
         final itemsData = await _supabase.client
             .from('checklist_items')
             .select()

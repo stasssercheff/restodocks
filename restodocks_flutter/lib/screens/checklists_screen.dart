@@ -40,7 +40,11 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
     });
     try {
       final svc = context.read<ChecklistServiceSupabase>();
-      final list = await svc.getChecklistsForEstablishment(est.id, department: widget.department);
+      final list = await svc.getChecklistsForEstablishment(
+        est.id,
+        department: widget.department,
+        currentEmployeeId: emp.id,
+      );
       if (mounted) setState(() {
         _list = list;
         _loading = false;
