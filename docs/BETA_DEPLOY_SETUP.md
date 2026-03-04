@@ -31,18 +31,26 @@
 2. После push в `staging` запускается **Build and Deploy to Vercel (Demo/Beta)**
 3. Если падает — смотрите логи, на каком шаге ошибка
 
-## Миграции Supabase (checklists)
+## Миграции Supabase (демо)
 
-Если при создании чеклиста («задачи», «заготовка») появляется ошибка `Could not find the 'assigned_department' column` — примените миграции к staging Supabase:
+Если чеклисты не сохраняются (0 пунктов, нет даты) или ошибки вида `Could not find the 'X' column` — примените миграции к staging Supabase:
 
 **Вариант 1.** Через CLI: `cd restodocks_flutter && supabase db push`
 
-**Вариант 2.** Вручную: откройте в Supabase Dashboard **SQL Editor**, вставьте и выполните:
+**Вариант 2.** Вручную: Supabase Dashboard → **SQL Editor** → выполните:
 
 ```sql
--- Обеспечить наличие assigned_department (чеклисты «задачи» и «заготовка»)
+-- 1. assigned_department для фильтрации чеклистов
 ALTER TABLE checklists ADD COLUMN IF NOT EXISTS assigned_department TEXT DEFAULT 'kitchen';
-COMMENT ON COLUMN checklists.assigned_department IS 'Подразделение: kitchen, bar, hall. По умолчанию kitchen.';
+
+-- 2. Колонки для deadline и scheduled_for
+ALTER TABLE checklists ADD COLUMN IF NOT EXISTS deadline_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE checklists ADD COLUMN IF NOT EXISTS scheduled_for_at TIMESTAMP WITH TIME ZONE;
+
+-- 3. Колонки для пунктов чеклиста (ПФ с количеством)
+ALTER TABLE checklist_items ADD COLUMN IF NOT EXISTS tech_card_id UUID REFERENCES tech_cards(id) ON DELETE SET NULL;
+ALTER TABLE checklist_items ADD COLUMN IF NOT EXISTS target_quantity numeric(10, 3);
+ALTER TABLE checklist_items ADD COLUMN IF NOT EXISTS target_unit text;
 ```
 
 ## Если Vercel отозвал токен
