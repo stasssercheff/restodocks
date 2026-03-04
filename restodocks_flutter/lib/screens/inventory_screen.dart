@@ -781,21 +781,19 @@ class _InventoryScreenState extends State<InventoryScreen>
   }
 
   void _scrollToNewColumn() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    void doScroll() {
       if (_hScroll.hasClients) {
-        _scrollToEnd();
+        _hScroll.animateTo(
+          _hScroll.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
       }
-    });
-  }
-
-  void _scrollToEnd() {
-    if (_hScroll.hasClients) {
-      _hScroll.animateTo(
-        _hScroll.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOut,
-      );
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      doScroll();
+      Future.delayed(const Duration(milliseconds: 350), doScroll);
+    });
   }
 
   /// При фокусе на ячейку: 3-я видимая → скролл на 2-ю; последняя → на 3-ю.
