@@ -802,14 +802,12 @@ class _InventoryScreenState extends State<InventoryScreen>
     _scrollToNewColumn();
   }
 
-  /// Шаг 3: при заполнении второй ячейки — сдвиг: заполненная встаёт на место первой,
-  /// новая пустая — на место второй. Всегда видно 3 ячейки: [заполненная, заполняемая, пустая].
+  /// При выходе из второй ячейки (после заполнения) — только скролл, ячейку добавляет _onLastCellFocused
   void _onCellFocusLost(int rowIndex, int colIndex) {
     if (rowIndex < 0 || rowIndex >= _rows.length || _rows[rowIndex].isFree) return;
     final row = _rows[rowIndex];
     if (row.quantities.length < 2 || colIndex != row.quantities.length - 2) return;
     if (row.quantities[colIndex] <= 0) return;
-    setState(() => row.quantities.add(0.0));
     _scrollToNewColumn();
   }
 
