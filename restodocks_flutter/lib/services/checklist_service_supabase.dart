@@ -94,9 +94,14 @@ class ChecklistServiceSupabase {
       res = await _supabase.insertData('checklists', data);
     } catch (e) {
       if (_isColumnNotFoundError(e)) {
-        data.remove('deadline_at');
-        data.remove('scheduled_for_at');
-        res = await _supabase.insertData('checklists', data);
+        final minimal = <String, dynamic>{
+          'establishment_id': establishmentId,
+          'created_by': createdBy,
+          'name': name,
+          'created_at': now.toIso8601String(),
+          'updated_at': now.toIso8601String(),
+        };
+        res = await _supabase.insertData('checklists', minimal);
       } else {
         rethrow;
       }
@@ -147,7 +152,7 @@ class ChecklistServiceSupabase {
   bool _isColumnNotFoundError(Object e) {
     final msg = e.toString().toLowerCase();
     return msg.contains('pgrst204') ||
-        (msg.contains('column') && (msg.contains('found') || msg.contains('exist')));
+        (msg.contains('column') && (msg.contains('find') || msg.contains('found') || msg.contains('exist')));
   }
 
   /// Вставка одного пункта; при ошибке схемы (PGRST204) повтор без опциональных колонок.
@@ -156,7 +161,7 @@ class ChecklistServiceSupabase {
       await _supabase.insertData('checklist_items', itemData);
     } catch (e) {
       final msg = e.toString().toLowerCase();
-      if (msg.contains('pgrst204') || msg.contains('column') && (msg.contains('found') || msg.contains('exist'))) {
+      if (msg.contains('pgrst204') || (msg.contains('column') && (msg.contains('find') || msg.contains('found') || msg.contains('exist')))) {
         final minimal = <String, dynamic>{
           'checklist_id': itemData['checklist_id'],
           'title': itemData['title'],
@@ -190,9 +195,11 @@ class ChecklistServiceSupabase {
       await _supabase.updateData('checklists', upd, 'id', checklist.id);
     } catch (e) {
       if (_isColumnNotFoundError(e)) {
-        upd.remove('deadline_at');
-        upd.remove('scheduled_for_at');
-        await _supabase.updateData('checklists', upd, 'id', checklist.id);
+        final minimal = <String, dynamic>{
+          'name': checklist.name,
+          'updated_at': DateTime.now().toIso8601String(),
+        };
+        await _supabase.updateData('checklists', minimal, 'id', checklist.id);
       } else {
         rethrow;
       }

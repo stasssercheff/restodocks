@@ -181,11 +181,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     super.initState();
     _startTime = TimeOfDay.now();
     WidgetsBinding.instance.addPostFrameCallback((_) => _initScreen());
-    _nameFilterCtrl.addListener(() {
-      if (_nameFilter != _nameFilterCtrl.text) {
-        setState(() => _nameFilter = _nameFilterCtrl.text);
-      }
-    });
+    _nameFilterCtrl.addListener(() => setState(() => _nameFilter = _nameFilterCtrl.text));
     _nameFilterFocusNode.addListener(() {
       setState(() => _hasInputFocus = _nameFilterFocusNode.hasFocus);
     });
@@ -1720,8 +1716,8 @@ class _InventoryScreenState extends State<InventoryScreen>
     final theme = Theme.of(context);
     final row = _rows[actualIndex];
 
-    return SizedBox(
-      height: _dataRowHeight,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 44),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
         decoration: BoxDecoration(
@@ -1738,7 +1734,7 @@ class _InventoryScreenState extends State<InventoryScreen>
             child: Text(
               row.productName(loc.currentLanguageCode),
               style: theme.textTheme.bodyMedium,
-              maxLines: 2,
+              maxLines: 4,
               overflow: TextOverflow.ellipsis,
               softWrap: true,
             ),
@@ -2127,8 +2123,7 @@ class _StandardInventoryRowTileState extends State<_StandardInventoryRowTile> {
     final row = widget.row;
     final qtyCols = row.quantities.length;
 
-    return SizedBox(
-      height: widget.dataRowHeight,
+    return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -2145,7 +2140,7 @@ class _StandardInventoryRowTileState extends State<_StandardInventoryRowTile> {
                   border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
                 ),
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     ...List.generate(
                       qtyCols,
@@ -2155,7 +2150,8 @@ class _StandardInventoryRowTileState extends State<_StandardInventoryRowTile> {
                           padding: EdgeInsets.only(right: colIndex < qtyCols - 1 ? widget.colGap : 0),
                           child: SizedBox(
                             width: widget.colQtyWidth,
-                            child: widget.completed
+                            child: Center(
+                              child: widget.completed
                                 ? Text(widget.formatQty(row.quantityDisplayAt(colIndex)), style: theme.textTheme.bodyMedium)
                                 : _QtyCell(
                                     key: ValueKey('qty_${widget.actualIndex}_$colIndex'),
@@ -2175,6 +2171,7 @@ class _StandardInventoryRowTileState extends State<_StandardInventoryRowTile> {
                                       if (colIndex == qtyCols - 2 && row.quantities[colIndex] > 0) _scrollToEnd();
                                     },
                                   ),
+                            ),
                           ),
                         );
                       },
@@ -3564,10 +3561,10 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   }
 }
 
-// Ширина фиксированных колонок (как в стандартной инвентаризации)
-const double _iikoColName  = 140; // Наименование
-const double _iikoColUnit  =  48; // Ед. изм. (= _colUnitWidth)
-const double _iikoColTotal =  56; // Итого (= _colTotalWidth)
+// Ширина фиксированных колонок (единицы и итого уже для названий)
+const double _iikoColName  = 168; // Наименование (больше под длинные названия)
+const double _iikoColUnit  =  34; // Ед. изм. (−30%)
+const double _iikoColTotal =  42; // Итого (−25%)
 const double _iikoColCell  =  48; // Ячейка ввода (= _colQtyWidth)
 const double _iikoColGap   =   4; // Отступ между ячейками (= _colGap)
 
@@ -3888,7 +3885,7 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
     final borderClr = theme.dividerColor;
     final cb = BorderSide(color: borderClr);
 
-    // Ячейка ввода количества (как в стандарте: 48px, gap 4)
+    // Ячейка ввода количества (48px, gap 4; растягивается по высоте строки)
     Widget numCell(int colIdx) {
       final ctrl = _ctrls[colIdx];
       final fn = colIdx < _focusNodes.length ? _focusNodes[colIdx] : null;
@@ -3896,7 +3893,8 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
         padding: EdgeInsets.only(right: colIdx < qtyCols - 1 ? _iikoColGap : 0),
         child: SizedBox(
           width: _iikoColCell,
-          child: TextField(
+          child: Center(
+            child: TextField(
             controller: ctrl,
             focusNode: fn,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -3923,6 +3921,7 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
             },
           ),
         ),
+      ),
       );
     }
 
@@ -3930,10 +3929,10 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
       decoration: BoxDecoration(
         border: Border(left: cb, bottom: cb),
       ),
-      constraints: const BoxConstraints(minHeight: 44),
+      constraints: const BoxConstraints(minHeight: 44), // растёт при длинном названии
       child: IntrinsicHeight(
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.stretch, // все колонки одной высоты
           children: [
             // ── Наименование ──
             Container(
@@ -3944,7 +3943,7 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
               child: Text(
                 widget.row.product.displayName,
                 style: theme.textTheme.bodyMedium,
-                maxLines: 2,
+                maxLines: 4,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -3988,6 +3987,7 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
                 scrollDirection: Axis.horizontal,
                 physics: const ClampingScrollPhysics(),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: List.generate(qtyCols, numCell),
                 ),
               ),
