@@ -80,6 +80,31 @@ class InboxService {
         }
       }
 
+      // Чеклисты с пропущенным дедлайном — для шефа, су-шефа и собственника
+      if (currentEmployee.hasRole('executive_chef') || currentEmployee.hasRole('sous_chef') ||
+          currentEmployee.hasRole('owner') || currentEmployee.department == 'management') {
+        final checklistSvc = ChecklistServiceSupabase();
+        final missed = await checklistSvc.getChecklistsWithMissedDeadline(establishmentId);
+        for (final c in missed) {
+          final deadlineStr = c.deadlineAt != null
+              ? DateTime(c.deadlineAt!.year, c.deadlineAt!.month, c.deadlineAt!.day)
+                  .toIso8601String()
+              : '';
+          documents.add(InboxDocument(
+            id: c.id,
+            type: DocumentType.checklistMissedDeadline,
+            title: 'Чеклист не выполнен: ${c.name}',
+            description: deadlineStr.isNotEmpty ? 'Срок: $deadlineStr' : '',
+            createdAt: c.deadlineAt ?? c.updatedAt,
+            employeeId: '',
+            employeeName: '',
+            department: c.assignedDepartment,
+            fileUrl: null,
+            metadata: {'checklistId': c.id, 'checklistName': c.name},
+          ));
+        }
+      }
+
       // Заказы продуктов — для шефа и собственника по заведению
       final orderDocs = await OrderDocumentService().listForEstablishment(establishmentId);
       for (final doc in orderDocs) {

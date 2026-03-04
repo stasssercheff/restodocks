@@ -340,14 +340,50 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                           onSelected: (v) async {
                             if (v == 'edit') {
                               await context.push('/checklists/${c.id}');
-                            } else {
+                            } else if (v == 'fill') {
                               await context.push('/checklists/${c.id}/fill');
+                            } else if (v == 'delete') {
+                              final confirm = await showDialog<bool>(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  title: Text(loc.t('checklist_delete_confirm') ?? 'Удалить чеклист?'),
+                                  content: Text('${c.name}'),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.of(ctx).pop(false),
+                                      child: Text(loc.t('back') ?? 'Отмена'),
+                                    ),
+                                    FilledButton(
+                                      onPressed: () => Navigator.of(ctx).pop(true),
+                                      style: FilledButton.styleFrom(backgroundColor: Theme.of(ctx).colorScheme.error),
+                                      child: Text(loc.t('delete') ?? 'Удалить'),
+                                    ),
+                                  ],
+                                ),
+                              );
+                              if (confirm == true && mounted) {
+                                try {
+                                  await context.read<ChecklistServiceSupabase>().deleteChecklist(c.id);
+                                  if (mounted) _load();
+                                } catch (e) {
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))),
+                                    );
+                                  }
+                                }
+                              }
                             }
                             if (mounted) _load();
                           },
                           itemBuilder: (_) => [
                             PopupMenuItem(value: 'edit', child: Text(loc.t('edit') ?? 'Редактировать')),
                             PopupMenuItem(value: 'fill', child: Text(loc.t('fill_checklist') ?? 'Заполнить')),
+                            const PopupMenuDivider(),
+                            PopupMenuItem(
+                              value: 'delete',
+                              child: Text(loc.t('delete') ?? 'Удалить', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                            ),
                           ],
                         ),
                       ],

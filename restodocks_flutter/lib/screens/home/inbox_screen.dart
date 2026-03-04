@@ -21,13 +21,13 @@ class InboxScreen extends StatefulWidget {
 }
 
 /// Типы вкладок во входящих (для сотрудников)
-enum _InboxTab { checklist, order, inventory, iikoInventory }
+enum _InboxTab { checklist, order, inventory, iikoInventory, messages }
 
 /// Вкладки по подразделениям (для собственника)
 enum _InboxDeptTab { kitchen, bar, hall }
 
 /// Типы документов для 2-го яруса вкладок (собственник)
-enum _InboxTypeTab { order, inventory, iikoInventory }
+enum _InboxTypeTab { order, inventory, iikoInventory, messages }
 
 class _InboxScreenState extends State<InboxScreen> {
   late InboxService _inboxService;
@@ -79,6 +79,7 @@ class _InboxScreenState extends State<InboxScreen> {
         _documents.any((d) => d.type == DocumentType.iikoInventory)) {
       tabs.add(_InboxTab.iikoInventory);
     }
+    if (isChef || isSousChef || isOwner) tabs.add(_InboxTab.messages);
     return tabs;
   }
 
@@ -111,6 +112,9 @@ class _InboxScreenState extends State<InboxScreen> {
   List<InboxDocument> get _filteredDocuments {
     // Собственник: двухярусная фильтрация — подразделение + тип документа
     if (_selectedDeptTab != null && _selectedTypeTab != null) {
+      if (_selectedTypeTab == _InboxTypeTab.messages) {
+        return _documents.where((d) => d.type == DocumentType.checklistMissedDeadline).toList();
+      }
       final dept = switch (_selectedDeptTab!) {
         _InboxDeptTab.kitchen => 'kitchen',
         _InboxDeptTab.bar => 'bar',
@@ -121,6 +125,7 @@ class _InboxScreenState extends State<InboxScreen> {
         _InboxTypeTab.order => DocumentType.productOrder,
         _InboxTypeTab.inventory => DocumentType.inventory,
         _InboxTypeTab.iikoInventory => DocumentType.iikoInventory,
+        _InboxTypeTab.messages => DocumentType.checklistMissedDeadline,
       };
       return docsByDept.where((d) => d.type == docType).toList();
     }
@@ -134,6 +139,8 @@ class _InboxScreenState extends State<InboxScreen> {
         return _documents.where((d) => d.type == DocumentType.inventory).toList();
       case _InboxTab.iikoInventory:
         return _documents.where((d) => d.type == DocumentType.iikoInventory).toList();
+      case _InboxTab.messages:
+        return _documents.where((d) => d.type == DocumentType.checklistMissedDeadline).toList();
       case null:
         return [];
     }
@@ -256,6 +263,8 @@ class _InboxScreenState extends State<InboxScreen> {
               const SizedBox(width: 8),
               _buildTypeChip(_InboxTypeTab.iikoInventory, 'Инвентаризация iiko', loc),
             ],
+            const SizedBox(width: 8),
+            _buildTypeChip(_InboxTypeTab.messages, loc.t('inbox_tab_messages') ?? 'Сообщения', loc),
           ],
         ),
       ),
@@ -286,6 +295,8 @@ class _InboxScreenState extends State<InboxScreen> {
         return loc.t('inbox_tab_inventory');
       case _InboxTab.iikoInventory:
         return 'Инвентаризация iiko';
+      case _InboxTab.messages:
+        return loc.t('inbox_tab_messages') ?? 'Сообщения';
     }
   }
 
@@ -481,6 +492,8 @@ class _DocumentTile extends StatelessWidget {
                   context.push('/inbox/checklist/${document.id}');
                 } else if (document.type == DocumentType.iikoInventory) {
                   context.push('/inbox/iiko/${document.id}');
+                } else if (document.type == DocumentType.checklistMissedDeadline) {
+                  context.push('/checklists/${document.id}?view=1');
                 } else {
                   onDownload(document);
                 }
@@ -536,6 +549,10 @@ class _DocumentTile extends StatelessWidget {
     }
     if (document.type == DocumentType.iikoInventory) {
       context.push('/inbox/iiko/${document.id}');
+      return;
+    }
+    if (document.type == DocumentType.checklistMissedDeadline) {
+      context.push('/checklists/${document.id}?view=1');
       return;
     }
     final loc = context.read<LocalizationService>();

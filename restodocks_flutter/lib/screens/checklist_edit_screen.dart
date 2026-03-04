@@ -11,9 +11,11 @@ import '../widgets/app_bar_home_button.dart';
 
 /// Редактирование чеклиста-шаблона. Сохранить, создать по аналогии, удалить.
 class ChecklistEditScreen extends StatefulWidget {
-  const ChecklistEditScreen({super.key, required this.checklistId});
+  const ChecklistEditScreen({super.key, required this.checklistId, this.viewOnly = false});
 
   final String checklistId;
+  /// Режим только просмотра (например по ссылке из входящих «чеклист не выполнен»).
+  final bool viewOnly;
 
   @override
   State<ChecklistEditScreen> createState() => _ChecklistEditScreenState();
@@ -907,7 +909,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
     final emp = acc.currentEmployee;
     // Доступ к чеклистам: владелец, шеф, су-шеф, кухня. Редактирование — тем же, кто может создавать.
     final canAccessChecklists = emp?.canViewDepartment('kitchen') ?? false;
-    final canEdit = canAccessChecklists;
+    final canEdit = !widget.viewOnly && canAccessChecklists;
 
     if (emp != null && !canAccessChecklists) {
       return Scaffold(

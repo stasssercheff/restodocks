@@ -1,4 +1,5 @@
 import '../models/models.dart';
+import 'checklist_submission_service.dart';
 import 'supabase_service.dart';
 
 /// Сервис чеклистов-шаблонов (Supabase).
@@ -103,6 +104,32 @@ class ChecklistServiceSupabase {
       await _insertChecklistItem(itemData);
     }
     return (await getChecklistById(c.id)) ?? c;
+  }
+
+  /// Чеклисты с пропущенным дедлайном (deadline_at в прошлом и нет отправки по этому чеклисту).
+  Future<List<Checklist>> getChecklistsWithMissedDeadline(String establishmentId) async {
+    try {
+      final data = await _supabase.client
+          .from('checklists')
+          .select()
+          .eq('establishment_id', establishmentId);
+      final now = DateTime.now();
+      final submissions = await ChecklistSubmissionService().listForEstablishment(establishmentId);
+      final submittedChecklistIds = submissions.map((s) => s.checklistId).toSet();
+
+      final list = <Checklist>[];
+      for (final row in data) {
+        final c = Checklist.fromJson(row);
+        if (c.deadlineAt == null || !c.deadlineAt!.isBefore(now)) continue;
+        if (submittedChecklistIds.contains(c.id)) continue;
+        list.add(c);
+      }
+      list.sort((a, b) => (b.deadlineAt ?? DateTime(0)).compareTo(a.deadlineAt ?? DateTime(0)));
+      return list;
+    } catch (e) {
+      print('Ошибка загрузки чеклистов с пропущенным дедлайном: $e');
+      return [];
+    }
   }
 
   /// Вставка одного пункта; при ошибке схемы (PGRST204) повтор без опциональных колонок.
