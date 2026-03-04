@@ -951,13 +951,12 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     final displayCurrency = accountManager.establishment?.defaultCurrency ?? establishmentPrice?.$2 ?? p.currency ?? 'VND';
     final currencySymbol = _currencySymbol(displayCurrency);
 
-    // Если unit = g, показываем цену за кг (умножаем на 1000)
+    // Цена в establishment_products и basePrice хранится за кг. Показываем как есть.
     String priceText;
     if (rawPrice != null) {
       final unit = (p.unit ?? 'g').trim().toLowerCase();
-      if (unit == 'g' || unit == 'грамм') {
-        final pricePerKg = rawPrice * 1000;
-        priceText = loc.t('price_per_kg').replaceFirst('%s', pricePerKg.toStringAsFixed(0)).replaceFirst('%s', currencySymbol);
+      if (unit == 'g' || unit == 'грамм' || unit == 'kg' || unit == 'кг') {
+        priceText = loc.t('price_per_kg').replaceFirst('%s', rawPrice.toStringAsFixed(0)).replaceFirst('%s', currencySymbol);
       } else {
         priceText = '${rawPrice.toStringAsFixed(0)} $currencySymbol/${_unitDisplay(p.unit, loc.currentLanguageCode)}';
       }
@@ -1643,13 +1642,17 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         store: store,
         loc: loc,
         onSaved: (Establishment updated) async {
-          await account.updateEstablishment(updated);
-          if (context.mounted) setState(() {});
-        },
-        onApplyToAll: (currency) async {
-          await store.bulkUpdateCurrency(currency);
-          await store.loadProducts(force: true);
-          if (context.mounted) setState(() {});
+          try {
+            await account.updateEstablishment(updated);
+            if (context.mounted) setState(() {});
+          } catch (e) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Ошибка сохранения: $e')),
+              );
+            }
+            rethrow; // Чтобы диалог не закрывался при ошибке
+          }
         },
       ),
     );
@@ -3479,14 +3482,12 @@ class _CurrencySettingsDialog extends StatefulWidget {
     required this.store,
     required this.loc,
     required this.onSaved,
-    required this.onApplyToAll,
   });
 
   final Establishment establishment;
   final ProductStoreSupabase store;
   final LocalizationService loc;
   final Future<void> Function(Establishment) onSaved;
-  final Future<void> Function(String) onApplyToAll;
 
   static const _presetCurrencies = ['RUB', 'USD', 'EUR', 'VND', 'THB', 'KZT', 'GBP', 'UAH'];
 
@@ -3523,20 +3524,14 @@ class _CurrencySettingsDialogState extends State<_CurrencySettingsDialog> {
       defaultCurrency: c,
       updatedAt: DateTime.now(),
     );
-    await widget.onSaved(updated);
-    if (!mounted) return;
-    Navigator.of(context).pop();
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(widget.loc.t('currency_saved'))));
-  }
-
-  Future<void> _applyToAll() async {
-    final c = _effectiveCurrency;
-    await widget.onApplyToAll(c);
-    if (!mounted) return;
-    Navigator.of(context).pop();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(widget.loc.t('currency_applied_to_all').replaceAll('%s', widget.store.allProducts.length.toString()))),
-    );
+    try {
+      await widget.onSaved(updated);
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(widget.loc.t('currency_saved'))));
+    } catch (_) {
+      // Ошибка уже показана в onSaved, диалог остаётся открытым
+    }
   }
 
   @override
@@ -3577,19 +3572,10 @@ class _CurrencySettingsDialogState extends State<_CurrencySettingsDialog> {
                   .toList(),
               onChanged: (v) => setState(() => _currency = v ?? _currency),
             ),
-          const SizedBox(height: 16),
-          Text(
-            widget.loc.t('currency_apply_hint'),
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
-          ),
         ],
       ),
       actions: [
         TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(widget.loc.t('cancel'))),
-        FilledButton.tonal(
-          onPressed: _applyToAll,
-          child: Text(widget.loc.t('apply_currency_to_all')),
-        ),
         FilledButton(onPressed: _saveAsDefault, child: Text(widget.loc.t('save'))),
       ],
     );

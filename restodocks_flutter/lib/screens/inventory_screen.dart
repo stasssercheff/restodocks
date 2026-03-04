@@ -2028,9 +2028,10 @@ class _InventoryScreenState extends State<InventoryScreen>
       return r.totalWeightGrams / 1000.0 * pricePerKg;
     }
     if (u == 'g' || u == 'г') {
-      final pricePerG = p.basePrice;
-      if (pricePerG == null) return null;
-      return r.totalWeightGrams * pricePerG;
+      // basePrice в карточке хранится за кг (как и при unit kg)
+      final pricePerKg = p.computedPricePerKg ?? p.basePrice;
+      if (pricePerKg == null) return null;
+      return r.totalWeightGrams / 1000.0 * pricePerKg;
     }
     // pcs, шт, ml, l и т.д. — цена за единицу × количество
     final pricePerUnit = p.basePrice;

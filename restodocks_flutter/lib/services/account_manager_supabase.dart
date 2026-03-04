@@ -844,17 +844,21 @@ class AccountManagerSupabase extends ChangeNotifier {
   /// Обновить данные заведения
   Future<void> updateEstablishment(Establishment establishment) async {
     try {
-      await _supabase.updateData(
-        'establishments',
-        establishment.toJson(),
-        'id',
-        establishment.id,
-      );
+      // Обновляем напрямую — toJson() может включать поля, которые не обновляются
+      await _supabase.client
+          .from('establishments')
+          .update({
+            'default_currency': establishment.defaultCurrency,
+            'updated_at': establishment.updatedAt.toIso8601String(),
+          })
+          .eq('id', establishment.id)
+          .select();
 
       _establishment = establishment;
       notifyListeners(); // Обновить символ валюты в номенклатуре и др.
     } catch (e) {
       print('Ошибка обновления заведения: $e');
+      rethrow; // Пробросить, чтобы UI мог показать ошибку
     }
   }
 
