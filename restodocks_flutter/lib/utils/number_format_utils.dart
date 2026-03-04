@@ -15,4 +15,10 @@ class NumberFormatUtils {
   static String formatDecimal(num value) {
     return _formatDecimal.format(value).replaceAll('\u00A0', ' ');
   }
+
+  /// Форматирует сумму с учётом валюты: для VND/JPY/KRW — без десятичных, иначе — с ними
+  static String formatSum(num value, String currency) {
+    final noDecimals = {'VND', 'JPY', 'KRW'}.contains((currency).toUpperCase());
+    return noDecimals ? formatInt(value) : formatDecimal(value);
+  }
 }

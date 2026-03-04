@@ -8,6 +8,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import '../models/models.dart';
+import '../utils/number_format_utils.dart';
 import 'inventory_download.dart';
 
 /// Формирование текста и Excel для списка заказа (экспорт / отправка).
@@ -281,6 +282,7 @@ class OrderListExportService {
     /// productId или productName → переведённое название
     Map<String, String>? translatedNames,
     String? translatedComment,
+    String currency = 'VND',
   }) async {
     final theme = await _getPdfTheme();
     final doc = pw.Document(theme: theme);
@@ -340,7 +342,7 @@ class OrderListExportService {
                   _pdfCell(t('order_list_unit'), bold: true),
                   _pdfCell(t('order_list_quantity'), bold: true),
                   _pdfCell(t('order_list_unit_price') ?? 'Цена за ед.', bold: true),
-                  _pdfCell(t('order_list_line_total') ?? 'Сумма', bold: true),
+                  _pdfCell((t('order_list_line_total_currency') ?? 'Сумма %s').replaceFirst('%s', currency), bold: true),
                 ],
               ),
               ...items.asMap().entries.map((e) {
@@ -362,8 +364,8 @@ class OrderListExportService {
                     _pdfCell(name),
                     _pdfCell(unit),
                     _pdfCell(qtyStr),
-                    _pdfCell(pricePerUnit.toStringAsFixed(2)),
-                    _pdfCell(lineTotal.toStringAsFixed(2)),
+                    _pdfCell(NumberFormatUtils.formatSum(pricePerUnit, currency)),
+                    _pdfCell(NumberFormatUtils.formatSum(lineTotal, currency)),
                   ],
                 );
               }),
@@ -375,7 +377,7 @@ class OrderListExportService {
                   _pdfCell('', bold: true),
                   _pdfCell('', bold: true),
                   _pdfCell('', bold: true),
-                  _pdfCell(grandTotal.toStringAsFixed(2), bold: true),
+                  _pdfCell(NumberFormatUtils.formatSum(grandTotal, currency), bold: true),
                 ],
               ),
             ],
@@ -400,6 +402,7 @@ class OrderListExportService {
     required String Function(String) t,
     Map<String, String>? translatedNames,
     String? translatedComment,
+    String currency = 'VND',
   }) async {
     final excel = Excel.createExcel();
     final sheet = excel[excel.getDefaultSheet()!];
@@ -426,7 +429,7 @@ class OrderListExportService {
       TextCellValue(t('order_list_unit')),
       TextCellValue(t('order_list_quantity')),
       TextCellValue(t('order_list_unit_price') ?? 'Цена за ед.'),
-      TextCellValue(t('order_list_line_total') ?? 'Сумма'),
+      TextCellValue((t('order_list_line_total_currency') ?? 'Сумма %s').replaceFirst('%s', currency)),
     ]);
     for (var i = 0; i < items.length; i++) {
       final item = items[i] as Map<String, dynamic>;
@@ -440,8 +443,8 @@ class OrderListExportService {
         TextCellValue(displayName),
         TextCellValue((item['unit'] ?? '').toString()),
         DoubleCellValue((item['quantity'] as num?)?.toDouble() ?? 0),
-        DoubleCellValue((item['pricePerUnit'] as num?)?.toDouble() ?? 0),
-        DoubleCellValue((item['lineTotal'] as num?)?.toDouble() ?? 0),
+        TextCellValue(NumberFormatUtils.formatSum((item['pricePerUnit'] as num?)?.toDouble() ?? 0, currency)),
+        TextCellValue(NumberFormatUtils.formatSum((item['lineTotal'] as num?)?.toDouble() ?? 0, currency)),
       ]);
     }
     sheet.appendRow([]);
@@ -451,7 +454,7 @@ class OrderListExportService {
       TextCellValue(''),
       TextCellValue(t('order_list_grand_total') ?? 'Итого:'),
       TextCellValue(''),
-      DoubleCellValue(grandTotal),
+      TextCellValue(NumberFormatUtils.formatSum(grandTotal, currency)),
     ]);
 
     final rawComment = (payload['comment'] as String?)?.trim();

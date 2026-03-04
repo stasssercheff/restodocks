@@ -431,7 +431,8 @@ class _DocumentTile extends StatelessWidget {
     final grandTotal = document.type == DocumentType.productOrder
         ? (document.metadata?['grandTotal'] as num?)?.toDouble()
         : null;
-    final totalStr = grandTotal != null ? NumberFormatUtils.formatDecimal(grandTotal) : null;
+    final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'VND';
+    final totalStr = grandTotal != null ? NumberFormatUtils.formatSum(grandTotal!, currency) : null;
     final totalLabel = loc.t('order_list_grand_total') ?? 'Итого';
 
     return Card(

@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../models/models.dart';
+import '../utils/number_format_utils.dart';
 import '../services/inventory_download.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
@@ -144,7 +145,8 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
       final totalLabel = loc.t('inventory_excel_total');
       final acc = context.read<AccountManagerSupabase>();
       final est = acc.establishment;
-      final currencySym = est?.currencySymbol ?? Establishment.currencySymbolFor(est?.defaultCurrency ?? 'VND');
+      final currency = est?.defaultCurrency ?? 'VND';
+      final currencySym = est?.currencySymbol ?? Establishment.currencySymbolFor(currency);
       final sumLabel = '${loc.t('inventory_excel_sum') ?? 'Сумма'}${currencySym.isNotEmpty ? ' ($currencySym)' : ''}';
       final fillLabel = loc.t('inventory_excel_fill_data');
 
@@ -197,7 +199,7 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
           IntCellValue(rowNum++),
           TextCellValue(name),
           TextCellValue(unit),
-          if (withPrice) DoubleCellValue(rowSum),
+          if (withPrice) TextCellValue(NumberFormatUtils.formatSum(rowSum, currency)),
           DoubleCellValue(total),
         ];
         for (var c = 0; c < maxCols; c++) {
@@ -213,7 +215,7 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
           TextCellValue(totalLabelFinal),
           TextCellValue(''),
         ];
-        if (withPrice) totalRow.add(DoubleCellValue(totalSumAll));
+        if (withPrice) totalRow.add(TextCellValue(NumberFormatUtils.formatSum(totalSumAll, currency)));
         totalRow.add(DoubleCellValue(0));
         for (var c = 0; c < maxCols; c++) totalRow.add(TextCellValue(''));
         sheet1.appendRow(totalRow);
@@ -470,7 +472,7 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
             _cell(theme, loc.t('inventory_item_name'), bold: true),
             _cell(theme, loc.t('inventory_unit'), bold: true),
             _cell(theme, loc.t('inventory_total'), bold: true),
-            _cell(theme, loc.t('inventory_excel_sum') ?? 'Сумма', bold: true),
+            _cell(theme, _sumHeaderLabel(loc), bold: true),
           ],
         ),
         ...rows.asMap().entries.map((e) {
@@ -502,6 +504,14 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
         ),
       ),
     );
+  }
+
+  String _sumHeaderLabel(LocalizationService loc) {
+    final acc = context.read<AccountManagerSupabase>();
+    final est = acc.establishment;
+    final currency = est?.defaultCurrency ?? 'VND';
+    final base = loc.t('inventory_excel_sum') ?? 'Сумма';
+    return currency.isNotEmpty ? '$base $currency' : base;
   }
 
   String _fmt(dynamic v) {

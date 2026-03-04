@@ -352,12 +352,14 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
     }
 
     try {
+      final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'VND';
       if (format == 'pdf') {
         final bytes = await OrderListExportService.buildOrderPdfBytesFromPayload(
           payload: payload,
           t: tLang,
           translatedNames: exportTranslatedNames.isNotEmpty ? exportTranslatedNames : null,
           translatedComment: exportTranslatedComment,
+          currency: currency,
         );
         await saveFileBytes('order_${supplier}_$dateStr.pdf', bytes);
       } else {
@@ -366,6 +368,7 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
           t: tLang,
           translatedNames: exportTranslatedNames.isNotEmpty ? exportTranslatedNames : null,
           translatedComment: exportTranslatedComment,
+          currency: currency,
         );
         await saveFileBytes('order_${supplier}_$dateStr.xlsx', bytes);
       }
@@ -520,7 +523,7 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
                   _cell(theme, loc.t('order_list_unit'), bold: true),
                   _cell(theme, loc.t('order_list_quantity'), bold: true),
                   _cell(theme, loc.t('order_list_unit_price') ?? 'Цена', bold: true),
-                  _cell(theme, loc.t('order_list_line_total') ?? 'Сумма', bold: true),
+                  _cell(theme, _lineTotalHeader(loc), bold: true),
                 ],
               ),
               ...items.asMap().entries.map((e) {
@@ -531,8 +534,8 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
                     _cell(theme, _getItemName(item)),
                     _cell(theme, CulinaryUnits.displayName((item['unit'] ?? '').toString(), loc.currentLanguageCode)),
                     _cell(theme, _fmtNum(item['quantity'])),
-                    _cell(theme, _fmtNum(item['pricePerUnit'])),
-                    _cell(theme, _fmtNum(item['lineTotal'])),
+                    _cell(theme, _fmtSum(item['pricePerUnit'])),
+                    _cell(theme, _fmtSum(item['lineTotal'])),
                   ],
                 );
               }),
@@ -544,7 +547,7 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
                   _cell(theme, '', bold: true),
                   _cell(theme, '', bold: true),
                   _cell(theme, '', bold: true),
-                  _cell(theme, _fmtNum(grandTotal), bold: true),
+                  _cell(theme, _fmtSum(grandTotal), bold: true),
                 ],
               ),
             ],
@@ -578,9 +581,24 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
     );
   }
 
+  String _lineTotalHeader(LocalizationService loc) {
+    final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'VND';
+    final t = loc.t('order_list_line_total_currency') ?? 'Сумма %s';
+    return t.replaceFirst('%s', currency);
+  }
+
   String _fmtNum(dynamic v) {
     if (v == null) return '—';
     if (v is num) return NumberFormatUtils.formatDecimal(v);
+    return v.toString();
+  }
+
+  String _fmtSum(dynamic v) {
+    if (v == null) return '—';
+    if (v is num) {
+      final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'VND';
+      return NumberFormatUtils.formatSum(v, currency);
+    }
     return v.toString();
   }
 }
