@@ -355,7 +355,7 @@ class AppRouter {
           GoRoute(
             path: '/notifications',
             pageBuilder: (context, state) {
-              final messagesOnly = state.uri.queryParameters['tab'] == 'messages';
+              final messagesOnly = state.queryParameters['tab'] == 'messages';
               return _slideTransitionPage(
                 state,
                 InboxScreen(messagesOnly: messagesOnly),

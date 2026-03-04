@@ -283,7 +283,8 @@ class Employee extends Equatable {
     if ((employmentStatus ?? 'permanent') != 'temporary') return false;
     final end = employmentEndDate;
     if (end == null) return false;
-    return DateTime.now().toUtc().date.isAfter(end);
+    final now = DateTime.now().toUtc();
+    return now.isAfter(DateTime(end.year, end.month, end.day, 23, 59, 59, 999));
   }
 
   /// Эффективный доступ к данным: false если временный и период истёк
