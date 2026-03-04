@@ -13,6 +13,9 @@ type Establishment = {
   employee_count: number
   owner_name: string
   owner_email: string
+  registration_ip?: string | null
+  registration_country?: string | null
+  registration_city?: string | null
 }
 
 function formatDate(iso: string | null) {
@@ -104,8 +107,19 @@ function EstablishmentsTab() {
   const filtered = data.filter(e =>
     e.name.toLowerCase().includes(search.toLowerCase()) ||
     e.owner_email.toLowerCase().includes(search.toLowerCase()) ||
-    e.owner_name.toLowerCase().includes(search.toLowerCase())
+    e.owner_name.toLowerCase().includes(search.toLowerCase()) ||
+    (e.registration_ip ?? '').toLowerCase().includes(search.toLowerCase()) ||
+    (e.registration_country ?? '').toLowerCase().includes(search.toLowerCase()) ||
+    (e.registration_city ?? '').toLowerCase().includes(search.toLowerCase())
   )
+
+  function regInfo(row: Establishment) {
+    if (!row.registration_ip) return '—'
+    const parts = [row.registration_ip]
+    if (row.registration_city) parts.push(row.registration_city)
+    if (row.registration_country && row.registration_country !== row.registration_city) parts.push(row.registration_country)
+    return parts.join(', ')
+  }
 
   const total = data.length
   const totalEmployees = data.reduce((s, e) => s + e.employee_count, 0)
@@ -147,6 +161,7 @@ function EstablishmentsTab() {
                   <th className="px-4 py-3 text-left">Email</th>
                   <th className="px-4 py-3 text-center">Сотр.</th>
                   <th className="px-4 py-3 text-left">Дата</th>
+                  <th className="px-4 py-3 text-left">IP регистрации</th>
                 </tr>
               </thead>
               <tbody>
@@ -159,6 +174,7 @@ function EstablishmentsTab() {
                       <span className="bg-gray-800 px-2 py-0.5 rounded text-xs font-mono">{row.employee_count}</span>
                     </td>
                     <td className="px-4 py-3 text-gray-500 text-xs">{formatDate(row.created_at)}</td>
+                    <td className="px-4 py-3 text-gray-400 text-xs font-mono">{regInfo(row)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -178,6 +194,9 @@ function EstablishmentsTab() {
                 <div className="text-gray-400 text-xs">{row.owner_name}</div>
                 <div className="text-gray-500 text-xs">{row.owner_email}</div>
                 <div className="text-gray-600 text-xs mt-1">{formatDate(row.created_at)}</div>
+                {row.registration_ip && (
+                  <div className="text-gray-500 text-xs mt-1 font-mono">{regInfo(row)}</div>
+                )}
               </div>
             ))}
           </div>

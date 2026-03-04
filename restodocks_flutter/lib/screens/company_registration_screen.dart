@@ -132,6 +132,11 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
             'p_establishment_id': establishment.id,
           });
 
+          // Сохраняем IP и геолокацию регистрации (fire-and-forget)
+          supabase.functions.invoke('register-metadata', body: {
+            'establishment_id': establishment.id,
+          });
+
           if (!mounted) return;
           context.push('/register-owner', extra: establishment);
           return;
