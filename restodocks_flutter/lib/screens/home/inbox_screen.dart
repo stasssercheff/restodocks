@@ -176,15 +176,17 @@ class _InboxScreenState extends State<InboxScreen> {
           // Остальные: фильтр по типу документа
           if (!isOwner && visibleTabs.isNotEmpty) _buildTypeFilter(loc, visibleTabs),
 
-          // Список документов
+          // Список документов или чатов (для вкладки Сообщения)
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : (isOwner ? (_selectedDeptTab == null || _selectedTypeTab == null) : _selectedTab == null)
                     ? _buildEmptyState(loc)
-                    : _filteredDocuments.isEmpty
-                        ? _buildEmptyState(loc)
-                        : _buildDocumentsList(),
+                    : _isMessagesTab(isOwner)
+                        ? _buildMessagesContent(loc)
+                        : _filteredDocuments.isEmpty
+                            ? _buildEmptyState(loc)
+                            : _buildDocumentsList(),
           ),
         ],
       ),
@@ -363,6 +365,25 @@ class _InboxScreenState extends State<InboxScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  bool _isMessagesTab(bool isOwner) {
+    if (isOwner) return _selectedTypeTab == _InboxTypeTab.messages;
+    return _selectedTab == _InboxTab.messages;
+  }
+
+  Widget _buildMessagesContent(LocalizationService loc) {
+    final acc = context.read<AccountManagerSupabase>();
+    final emp = acc.currentEmployee;
+    final est = acc.establishment;
+    final missedDocs = _filteredDocuments;
+    return _MessagesContent(
+      currentEmployee: emp,
+      establishmentId: est?.id ?? '',
+      missedDocuments: missedDocs,
+      onDownload: _downloadDocument,
+      onRefresh: _loadDocuments,
     );
   }
 
@@ -585,6 +606,123 @@ class _DocumentTile extends StatelessWidget {
               },
               child: Text(loc.t('inbox_save')),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MessagesContent extends StatefulWidget {
+  const _MessagesContent({
+    required this.currentEmployee,
+    required this.establishmentId,
+    required this.missedDocuments,
+    required this.onDownload,
+    required this.onRefresh,
+  });
+
+  final Employee? currentEmployee;
+  final String establishmentId;
+  final List<InboxDocument> missedDocuments;
+  final Future<void> Function(InboxDocument) onDownload;
+  final VoidCallback onRefresh;
+
+  @override
+  State<_MessagesContent> createState() => _MessagesContentState();
+}
+
+class _MessagesContentState extends State<_MessagesContent> {
+  List<Employee> _employees = [];
+  List<String> _chatPartnerIds = [];
+  bool _loadingEmployees = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEmployees();
+  }
+
+  Future<void> _loadEmployees() async {
+    final emp = widget.currentEmployee;
+    final estId = widget.establishmentId;
+    if (emp == null || estId.isEmpty) {
+      setState(() => _loadingEmployees = false);
+      return;
+    }
+    try {
+      final acc = context.read<AccountManagerSupabase>();
+      final emps = await acc.getEmployeesForEstablishment(estId);
+      final msgSvc = context.read<EmployeeMessageService>();
+      final partnerIds = await msgSvc.getConversationPartnerIds(emp.id, estId);
+      if (mounted) {
+        setState(() {
+          _employees = emps.where((e) => e.id != emp.id).toList();
+          _chatPartnerIds = partnerIds;
+          _loadingEmployees = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingEmployees = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = context.watch<LocalizationService>();
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        widget.onRefresh();
+        await _loadEmployees();
+      },
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              loc.t('chat_with_employees') ?? 'Диалоги с сотрудниками',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+            ),
+          ),
+          if (_loadingEmployees)
+            const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator()))
+          else
+            ..._employees.map((e) => Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                      child: Text(
+                        (e.fullName.isNotEmpty ? e.fullName[0] : '?').toUpperCase(),
+                        style: TextStyle(color: Theme.of(context).colorScheme.onPrimaryContainer),
+                      ),
+                    ),
+                    title: Text(e.fullName),
+                    subtitle: Text(e.primaryRole?.displayName ?? e.department ?? ''),
+                    trailing: _chatPartnerIds.contains(e.id)
+                        ? Icon(Icons.chat_bubble, size: 18, color: Theme.of(context).colorScheme.primary)
+                        : const Icon(Icons.chat_bubble_outline, size: 18),
+                    onTap: () => context.push('/inbox/chat/${e.id}'),
+                  ),
+                )),
+          if (widget.missedDocuments.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                loc.t('inbox_msg_checklist_not_done') ?? 'Чеклист не выполнен',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+              ),
+            ),
+            ...widget.missedDocuments.map((doc) => _DocumentTile(document: doc, onDownload: widget.onDownload)),
+          ],
         ],
       ),
     );

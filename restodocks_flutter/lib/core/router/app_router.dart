@@ -335,6 +335,13 @@ class AppRouter {
                       state, IikoInventoryInboxDetailScreen(documentId: id));
                 },
               ),
+              GoRoute(
+                path: 'chat/:employeeId',
+                pageBuilder: (context, state) {
+                  final employeeId = state.pathParameters['employeeId'] ?? '';
+                  return _slideTransitionPage(state, EmployeeChatScreen(otherEmployeeId: employeeId));
+                },
+              ),
             ],
           ),
           GoRoute(

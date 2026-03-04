@@ -78,6 +78,9 @@ class AppProviders {
         Provider<EmailService>(
           create: (_) => EmailService(),
         ),
+        Provider<EmployeeMessageService>(
+          create: (_) => EmployeeMessageService(),
+        ),
         ChangeNotifierProvider<IikoProductStore>(
           create: (_) => IikoProductStore(),
         ),

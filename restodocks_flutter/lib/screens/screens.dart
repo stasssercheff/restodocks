@@ -36,3 +36,4 @@ export 'product_order_received_screen.dart';
 export 'suppliers_screen.dart';
 export 'salary_expense_screen.dart';
 export 'admin_screen.dart';
+export 'employee_chat_screen.dart';
