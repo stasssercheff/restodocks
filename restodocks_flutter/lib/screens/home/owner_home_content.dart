@@ -16,8 +16,9 @@ class OwnerHomeContent extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // Управление — сверху, с входящими и графиком всех сотрудников
+        // Управление — сверху: сообщения и входящие
         _SectionTitle(title: loc.t('management')),
+        _Tile(icon: Icons.chat_bubble_outline, title: loc.t('inbox_tab_messages') ?? 'Сообщения', onTap: () => context.go('/notifications')),
         _Tile(icon: Icons.inbox, title: loc.t('inbox'), onTap: () => context.go('/inbox')),
         _Tile(icon: Icons.people, title: loc.t('employees'), onTap: () => context.go('/employees')),
         _Tile(icon: Icons.calendar_month, title: loc.t('schedule'), onTap: () => context.go('/schedule/all')),

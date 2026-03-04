@@ -221,8 +221,8 @@ class ChecklistServiceSupabase {
     upd['assigned_employee_id'] = checklist.assignedEmployeeIds?.isNotEmpty == true
         ? checklist.assignedEmployeeIds!.first
         : checklist.assignedEmployeeId;
-    if (checklist.deadlineAt != null) upd['deadline_at'] = checklist.deadlineAt!.toIso8601String();
-    if (checklist.scheduledForAt != null) upd['scheduled_for_at'] = checklist.scheduledForAt!.toIso8601String();
+    upd['deadline_at'] = checklist.deadlineAt?.toIso8601String();
+    upd['scheduled_for_at'] = checklist.scheduledForAt?.toIso8601String();
     upd['additional_name'] = checklist.additionalName;
     upd['type'] = checklist.type?.code;
     upd['action_config'] = checklist.actionConfig.toJson();

@@ -238,11 +238,13 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
               : null;
           final fmtDate = (DateTime d) => '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}';
           final formatDateTime = (DateTime d) {
-            final hasTime = d.hour != 0 || d.minute != 0;
+            final utc = d.toUtc();
+            final hasTime = utc.hour != 0 || utc.minute != 0;
+            final local = d.toLocal();
             if (hasTime) {
-              return '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')} ${fmtDate(d)}';
+              return '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')} ${fmtDate(local)}';
             }
-            return fmtDate(d);
+            return fmtDate(utc);
           };
           final dateParts = <String>[
             if (c.scheduledForAt != null) '${loc.t('checklist_scheduled_for') ?? 'На когда'}: ${formatDateTime(c.scheduledForAt!)}',

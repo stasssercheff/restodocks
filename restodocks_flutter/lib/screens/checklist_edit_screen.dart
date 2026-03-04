@@ -257,11 +257,12 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
       hasToggle: _actionHasToggle,
     );
     final empIds = _selectedEmployeeIds.isEmpty ? null : _selectedEmployeeIds;
+    // Дата без времени — сохраняем как UTC-полночь, чтобы при парсинге hour/minute были 0
     final deadlineVal = _deadlineEnabled && _deadline != null
-        ? (_deadlineWithTime ? _deadline : DateTime(_deadline!.year, _deadline!.month, _deadline!.day))
+        ? (_deadlineWithTime ? _deadline : DateTime.utc(_deadline!.year, _deadline!.month, _deadline!.day))
         : null;
     final scheduledForVal = _scheduledForEnabled && _scheduledFor != null
-        ? (_scheduledForWithTime ? _scheduledFor : DateTime(_scheduledFor!.year, _scheduledFor!.month, _scheduledFor!.day))
+        ? (_scheduledForWithTime ? _scheduledFor : DateTime.utc(_scheduledFor!.year, _scheduledFor!.month, _scheduledFor!.day))
         : null;
     final updated = c.copyWith(
       name: name,

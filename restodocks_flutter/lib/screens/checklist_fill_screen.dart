@@ -385,8 +385,10 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
     final formatTime = (DateTime? t) => t != null ? '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}' : '—';
     final formatDate = (DateTime d) => '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}';
     final formatDateTime = (DateTime d) {
-      final hasTime = d.hour != 0 || d.minute != 0;
-      return hasTime ? '${formatTime(d)} ${formatDate(d)}' : formatDate(d);
+      final utc = d.toUtc();
+      final hasTime = utc.hour != 0 || utc.minute != 0;
+      final local = d.toLocal();
+      return hasTime ? '${formatTime(local)} ${formatDate(local)}' : formatDate(utc);
     };
     return Card(
       child: Padding(
@@ -423,7 +425,7 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
     if (cfg.hasNumeric) children.add(SizedBox(width: 80, child: Text(loc.t('checklist_action_numeric') ?? 'Цифра', style: Theme.of(context).textTheme.labelLarge, textAlign: TextAlign.center)));
     if (cfg.dropdownOptions != null && cfg.dropdownOptions!.isNotEmpty)
       children.add(SizedBox(width: 120, child: Text(loc.t('checklist_action_choice') ?? 'Выбор', style: Theme.of(context).textTheme.labelLarge, textAlign: TextAlign.center)));
-    if (cfg.hasToggle) children.add(SizedBox(width: 100, child: Text(loc.t('checklist_done') ?? 'Сделано', style: Theme.of(context).textTheme.labelLarge, textAlign: TextAlign.center)));
+    if (cfg.hasToggle) children.add(SizedBox(width: 100, child: Text(loc.t('checklist_status') ?? 'Статус', style: Theme.of(context).textTheme.labelLarge, textAlign: TextAlign.center)));
     return Row(children: children);
   }
 
