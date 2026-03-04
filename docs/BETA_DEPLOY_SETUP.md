@@ -55,6 +55,8 @@ ALTER TABLE checklist_items ADD COLUMN IF NOT EXISTS target_quantity numeric(10,
 ALTER TABLE checklist_items ADD COLUMN IF NOT EXISTS target_unit text;
 ```
 
+**После миграций:** Supabase Dashboard → **Settings** → **General** → **Restart project** — обновит schema cache PostgREST (иначе возможны PGRST204 и пустые данные).
+
 ## Если Vercel отозвал токен
 
 Vercel отзывает токены при обнаружении в публичном коде/логах. Создайте новый токен в Vercel → Account Settings → Tokens и обновите `VERCEL_TOKEN` в GitHub Secrets.

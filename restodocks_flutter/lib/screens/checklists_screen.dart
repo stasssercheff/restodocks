@@ -81,7 +81,8 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
       );
       if (mounted) {
         await _load();
-        context.push('/checklists/${created.id}');
+        await context.push('/checklists/${created.id}');
+        if (mounted) await _load();
       }
     } catch (e) {
       if (mounted) {
@@ -320,7 +321,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                   : const Icon(Icons.chevron_right),
               onTap: () async {
                 await context.push(canEdit ? '/checklists/${c.id}' : '/checklists/${c.id}/fill');
-                if (mounted) _load();
+                if (mounted) await _load();
               },
             ),
           );
