@@ -59,6 +59,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       'soup': {'ru': 'Суп', 'en': 'Soup'},
       'misc': {'ru': 'Разное', 'en': 'Misc'},
       'beverages': {'ru': 'Напитки', 'en': 'Beverages'},
+      'alcoholic_cocktails': {'ru': 'Алкогольные коктейли', 'en': 'Alcoholic cocktails'},
+      'non_alcoholic_drinks': {'ru': 'Безалкогольные напитки', 'en': 'Non-alcoholic drinks'},
+      'hot_drinks': {'ru': 'Горячие напитки', 'en': 'Hot drinks'},
+      'drinks_pure': {'ru': 'Напитки в чистом виде', 'en': 'Drinks (neat)'},
+      'snacks': {'ru': 'Снеки', 'en': 'Snacks'},
     };
 
     return categoryTranslations[c]?[lang] ?? c;
@@ -421,7 +426,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                   tooltip: loc.t('create_tech_card'),
                   onSelected: (value) async {
                     if (value == 'new') {
-                      context.push('/tech-cards/new');
+                      context.push(widget.department == 'bar' ? '/tech-cards/new?department=bar' : '/tech-cards/new');
                     }
                   },
                   itemBuilder: (_) => [
@@ -529,7 +534,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       ),
       floatingActionButton: canEdit
           ? FloatingActionButton(
-              onPressed: _loading ? null : () => context.push('/tech-cards/new'),
+              onPressed: _loading ? null : () => context.push(widget.department == 'bar' ? '/tech-cards/new?department=bar' : '/tech-cards/new'),
               child: const Icon(Icons.add),
               tooltip: loc.t('create_tech_card'),
             )

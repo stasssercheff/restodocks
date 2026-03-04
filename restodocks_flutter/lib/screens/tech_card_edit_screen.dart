@@ -436,7 +436,7 @@ TechCard _applyEdits(
 }
 
 class TechCardEditScreen extends StatefulWidget {
-  const TechCardEditScreen({super.key, required this.techCardId, this.initialFromAi, this.forceViewMode = false});
+  const TechCardEditScreen({super.key, required this.techCardId, this.initialFromAi, this.forceViewMode = false, this.department});
 
   /// Пусто для «новой», иначе id существующей ТТК.
   final String techCardId;
@@ -444,6 +444,8 @@ class TechCardEditScreen extends StatefulWidget {
   final TechCardRecognitionResult? initialFromAi;
   /// Режим только просмотра (для управляющих кухней — кнопка «Просмотр ТТК»).
   final bool forceViewMode;
+  /// Отдел при создании: 'bar' — категории бара, иначе кухни.
+  final String? department;
 
   @override
   State<TechCardEditScreen> createState() => _TechCardEditScreenState();
@@ -456,7 +458,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   String? _error;
   /// 'photo' | 'excel' — какая кнопка сейчас загружает (чтобы показывать правильный текст).
   final _nameController = TextEditingController();
-  static const _categoryOptions = ['sauce', 'vegetables', 'salad', 'meat', 'seafood', 'side', 'subside', 'bakery', 'dessert', 'decor', 'soup', 'misc', 'beverages'];
+  static const _kitchenCategoryOptions = ['sauce', 'vegetables', 'salad', 'meat', 'seafood', 'side', 'subside', 'bakery', 'dessert', 'decor', 'soup', 'misc', 'beverages'];
+  static const _barCategoryOptions = ['alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks', 'sauce', 'vegetables', 'salad', 'bakery', 'dessert', 'decor', 'misc', 'beverages'];
+
+  List<String> get _categoryOptions {
+    if (widget.department == 'bar') return _barCategoryOptions;
+    if (_techCard != null && _barCategoryOptions.contains(_techCard!.category)) return _barCategoryOptions;
+    return _kitchenCategoryOptions;
+  }
   // Ключи секций: id → (localization_key, requiresPro)
   // Цеха кухни: код → (ключ локализации, requiresPro)
   static const _sectionKeys = <String, (String, bool)>{
@@ -526,6 +535,11 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
       'soup': {'ru': 'Суп', 'en': 'Soup'},
       'misc': {'ru': 'Разное', 'en': 'Misc'},
       'beverages': {'ru': 'Напитки', 'en': 'Beverages'},
+      'alcoholic_cocktails': {'ru': 'Алкогольные коктейли', 'en': 'Alcoholic cocktails'},
+      'non_alcoholic_drinks': {'ru': 'Безалкогольные напитки', 'en': 'Non-alcoholic drinks'},
+      'hot_drinks': {'ru': 'Горячие напитки', 'en': 'Hot drinks'},
+      'drinks_pure': {'ru': 'Напитки в чистом виде', 'en': 'Drinks (neat)'},
+      'snacks': {'ru': 'Снеки', 'en': 'Snacks'},
     };
 
     return categoryTranslations[c]?[lang] ?? c;
@@ -534,6 +548,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   /// Простой вывод категории из названия блюда (для предзаполнения из ИИ).
   String _inferCategory(String dishName) {
     final lower = dishName.toLowerCase();
+    if (widget.department == 'bar') {
+      if (lower.contains('коктейл') || lower.contains('cocktail') || lower.contains('мохито') || lower.contains('маргарит')) return 'alcoholic_cocktails';
+      if (lower.contains('лимонад') || lower.contains('сок') || lower.contains('кола') || lower.contains('тоник') || lower.contains('soda') || lower.contains('juice')) return 'non_alcoholic_drinks';
+      if (lower.contains('кофе') || lower.contains('чай') || lower.contains('какао') || lower.contains('coffee') || lower.contains('tea') || lower.contains('cocoa')) return 'hot_drinks';
+      if (lower.contains('виски') || lower.contains('ром') || lower.contains('водка') || lower.contains('вино') || lower.contains('пиво') || lower.contains('whiskey') || lower.contains('rum') || lower.contains('vodka') || lower.contains('wine') || lower.contains('beer')) return 'drinks_pure';
+      if (lower.contains('орех') || lower.contains('чипс') || lower.contains('снек') || lower.contains('nuts') || lower.contains('chips') || lower.contains('snack')) return 'snacks';
+    }
     if (lower.contains('соус') || lower.contains('sauce')) return 'sauce';
     if (lower.contains('овощ') || lower.contains('vegetable')) return 'vegetables';
     if (lower.contains('салат') || lower.contains('salad')) return 'salad';
