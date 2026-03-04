@@ -214,6 +214,16 @@ class ChecklistServiceSupabase {
     upd['action_config'] = checklist.actionConfig.toJson();
 
     await _updateChecklistWithRetry(checklist.id, upd);
+    if (checklist.deadlineAt != null || checklist.scheduledForAt != null) {
+      final datesOnly = <String, dynamic>{
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+      if (checklist.deadlineAt != null) datesOnly['deadline_at'] = checklist.deadlineAt!.toIso8601String();
+      if (checklist.scheduledForAt != null) datesOnly['scheduled_for_at'] = checklist.scheduledForAt!.toIso8601String();
+      try {
+        await _supabase.updateData('checklists', datesOnly, 'id', checklist.id);
+      } catch (_) {}
+    }
     await _supabase.client
         .from('checklist_items')
         .delete()

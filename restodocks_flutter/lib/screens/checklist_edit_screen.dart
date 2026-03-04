@@ -81,9 +81,11 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
           _actionHasToggle = c.actionConfig.hasToggle;
           _actionDropdownOptions = List.from(c.actionConfig.dropdownOptions ?? []);
           _dropdownOptionsController.text = _actionDropdownOptions.join(', ');
-          _items
-            ..clear()
-            ..addAll(c.items);
+          if (_items.length <= c.items.length) {
+            _items
+              ..clear()
+              ..addAll(c.items);
+          }
           final ids = c.assignedEmployeeIds;
           if (ids != null && ids.isNotEmpty) {
             _selectedEmployeeIds = List.from(ids);
