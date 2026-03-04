@@ -71,6 +71,15 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
     return s.contains('duplicate') || s.contains('unique') || s.contains('23505');
   }
 
+  String? _promoErrorFromException(Object e, LocalizationService loc) {
+    final msg = e.toString();
+    if (msg.contains('PROMO_INVALID')) return loc.t('promo_code_invalid');
+    if (msg.contains('PROMO_USED')) return loc.t('promo_code_used');
+    if (msg.contains('PROMO_NOT_STARTED')) return loc.t('promo_code_not_started');
+    if (msg.contains('PROMO_EXPIRED')) return loc.t('promo_code_expired');
+    return null;
+  }
+
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -83,26 +92,6 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
     final lang = loc.currentLanguageCode;
 
     try {
-      // Проверяем промокод до создания заведения
-      final promoCode = _promoController.text.trim().toUpperCase();
-      final supabase = Supabase.instance.client;
-      final promoCheck = await supabase.rpc('check_promo_code', params: {'p_code': promoCode});
-
-      if (promoCheck == 'invalid') {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = loc.t('promo_code_invalid');
-        });
-        return;
-      }
-      if (promoCheck == 'used') {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = loc.t('promo_code_used');
-        });
-        return;
-      }
-
       if (_selectedCountry == null) {
         setState(() {
           _isLoading = false;
@@ -111,29 +100,23 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
         return;
       }
 
+      final promoCode = _promoController.text.trim().toUpperCase();
+      final accountManager = context.read<AccountManagerSupabase>();
+      final name = _nameController.text.trim();
+      final address = _selectedCountry!.name(lang);
       const maxRetries = 3;
       String? errorMsg;
 
       for (var attempt = 0; attempt < maxRetries; attempt++) {
         try {
-          final accountManager = context.read<AccountManagerSupabase>();
-          final name = _nameController.text.trim();
-          final address = _selectedCountry!.name(lang);
-
-          final establishment = await accountManager.createEstablishment(
+          final establishment = await accountManager.registerCompanyWithPromo(
+            promoCode: promoCode,
             name: name,
-            pinCode: _pinCode,
             address: address,
+            pinCode: _pinCode,
           );
 
-          // Помечаем промокод как использованный
-          await supabase.rpc('use_promo_code', params: {
-            'p_code': promoCode,
-            'p_establishment_id': establishment.id,
-          });
-
-          // Сохраняем IP и геолокацию регистрации (fire-and-forget)
-          supabase.functions.invoke('register-metadata', body: {
+          Supabase.instance.client.functions.invoke('register-metadata', body: {
             'establishment_id': establishment.id,
           });
 
@@ -142,6 +125,14 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
           return;
         } catch (e) {
           if (!mounted) return;
+          final promoErr = _promoErrorFromException(e, loc);
+          if (promoErr != null) {
+            setState(() {
+              _isLoading = false;
+              _errorMessage = promoErr;
+            });
+            return;
+          }
           if (attempt < maxRetries - 1 && _isDuplicatePinError(e)) {
             setState(() => _pinCode = Establishment.generatePinCode());
             continue;
@@ -159,9 +150,10 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
       }
     } catch (e) {
       if (mounted) {
+        final promoErr = _promoErrorFromException(e, loc);
         setState(() {
           _isLoading = false;
-          _errorMessage = loc.t('register_error', args: {'error': e.toString()});
+          _errorMessage = promoErr ?? loc.t('register_error', args: {'error': e.toString()});
         });
       }
     }

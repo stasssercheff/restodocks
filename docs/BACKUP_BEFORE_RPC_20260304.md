@@ -45,6 +45,13 @@ supabase db dump --db-url 'postgresql://postgres:ПАРОЛЬ@db.osglfptwbuqqmqu
 gzip database_backup_*.sql
 ```
 
+## Порядок деплоя RPC-защиты
+
+1. **Сначала** применить миграцию в Supabase (SQL Editor или `supabase db push`)
+2. **Потом** задеплоить Flutter и beta-admin (push в main/staging)
+
+Если деплоить в обратном порядке — регистрация сломается до применения миграции.
+
 ## Откат после RPC-изменений
 
 Если что-то пойдёт не так:

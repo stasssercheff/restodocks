@@ -263,6 +263,32 @@ class AccountManagerSupabase extends ChangeNotifier {
     return createdEstablishment;
   }
 
+  /// Регистрация компании только через RPC с проверкой промокода (защищённый путь).
+  /// Выбрасывает исключение с сообщением PROMO_INVALID, PROMO_USED, PROMO_NOT_STARTED, PROMO_EXPIRED при ошибке валидации.
+  Future<Establishment> registerCompanyWithPromo({
+    required String promoCode,
+    required String name,
+    required String address,
+    required String pinCode,
+  }) async {
+    final res = await _supabase.client.rpc(
+      'register_company_with_promo',
+      params: {
+        'p_code': promoCode.trim().toUpperCase(),
+        'p_name': name.trim(),
+        'p_address': address.trim(),
+        'p_pin_code': pinCode.trim().toUpperCase(),
+      },
+    );
+    final raw = res as Map<String, dynamic>?;
+    if (raw == null) throw Exception('register_company_with_promo returned null');
+    final m = Map<String, dynamic>.from(raw);
+    m['owner_id'] = m['owner_id']?.toString() ?? '';
+    final est = Establishment.fromJson(m);
+    _establishment = est;
+    return est;
+  }
+
   /// Поиск заведения по названию
   Future<Establishment?> findEstablishmentByName(String name) async {
     try {
