@@ -244,7 +244,7 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
         submittedByEmployeeId: emp.id,
         submittedByName: emp.fullName,
         checklistName: c.name,
-        additionalName: c.additionalName,
+        additionalName: null,
         section: c.assignedSection,
         startTime: _startTime,
         endTime: _endTime,
@@ -327,7 +327,7 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text(c.additionalName != null && c.additionalName!.isNotEmpty ? '${c.name} — ${c.additionalName}' : c.name),
+        title: Text(c.name),
       ),
       body: Column(
         children: [
@@ -389,8 +389,6 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (_checklist?.additionalName != null && _checklist!.additionalName!.isNotEmpty)
-              Text(_checklist!.additionalName!, style: Theme.of(context).textTheme.titleSmall),
             Text(emp?.fullName ?? '—', style: Theme.of(context).textTheme.bodyLarge),
             Text(loc.t('department') ?? 'Отдел: ${emp?.department ?? '—'}', style: Theme.of(context).textTheme.bodySmall),
             Text(loc.t('role') ?? 'Должность: ${emp?.primaryRole?.displayName ?? '—'}', style: Theme.of(context).textTheme.bodySmall),

@@ -29,7 +29,6 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
   String? _error;
   List<TechCard> _techCards = [];
   late final TextEditingController _nameController;
-  late final TextEditingController _additionalNameController;
   late final TextEditingController _newItemController;
   late final TextEditingController _dropdownOptionsController;
   late final TextEditingController _newItemQtyController;
@@ -77,7 +76,6 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
         _loading = false;
         if (c != null) {
           _nameController.text = c.name;
-          _additionalNameController.text = c.additionalName ?? '';
           _type = c.type ?? ChecklistType.tasks;
           _actionHasNumeric = c.actionConfig.hasNumeric;
           _actionHasToggle = c.actionConfig.hasToggle;
@@ -144,7 +142,6 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
     super.initState();
 
     _nameController = createTrackedController();
-    _additionalNameController = createTrackedController();
     _newItemController = createTrackedController();
     _dropdownOptionsController = TextEditingController();
     _newItemQtyController = TextEditingController();
@@ -163,7 +160,6 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
     return {
       'checklistId': widget.checklistId,
       'name': _nameController.text,
-      'additionalName': _additionalNameController.text,
       'type': _type.code,
       'actionHasNumeric': _actionHasNumeric,
       'actionHasToggle': _actionHasToggle,
@@ -192,7 +188,6 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
 
     setState(() {
       _nameController.text = data['name'] ?? '';
-      _additionalNameController.text = data['additionalName'] ?? '';
       _type = ChecklistType.fromCode(data['type'] as String?) ?? ChecklistType.tasks;
       _actionHasNumeric = data['actionHasNumeric'] == true;
       _actionHasToggle = data['actionHasToggle'] != false;
@@ -224,7 +219,6 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
   @override
   void dispose() {
     _nameController.dispose();
-    _additionalNameController.dispose();
     _newItemController.dispose();
     _dropdownOptionsController.dispose();
     _newItemQtyController.dispose();
@@ -269,7 +263,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
         : null;
     final updated = c.copyWith(
       name: name,
-      additionalName: _additionalNameController.text.trim().isEmpty ? null : _additionalNameController.text.trim(),
+      additionalName: null,
       type: _type,
       actionConfig: actionConfig,
       assignedSection: c.assignedSection,
@@ -298,9 +292,6 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
       // Переводим название и пункты чеклиста фоново
       final sourceLang = loc.currentLanguageCode;
       final fieldsToTranslate = <String, String>{'name': name};
-      if (updated.additionalName != null && updated.additionalName!.isNotEmpty) {
-        fieldsToTranslate['additional_name'] = updated.additionalName!;
-      }
       for (var i = 0; i < _items.length; i++) {
         final t = _items[i].title.trim();
         if (t.isNotEmpty) fieldsToTranslate['item_$i'] = t;
@@ -988,15 +979,6 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
               decoration: InputDecoration(
                 labelText: loc.t('checklist_name'),
                 hintText: loc.t('checklist_name_hint'),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _additionalNameController,
-              readOnly: !canEdit,
-              decoration: InputDecoration(
-                labelText: loc.t('checklist_additional_name') ?? 'Дополнительное название',
-                hintText: loc.t('checklist_additional_name_hint') ?? 'Подзаголовок чеклиста',
               ),
             ),
             const SizedBox(height: 12),
