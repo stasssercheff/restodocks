@@ -783,10 +783,19 @@ class _InventoryScreenState extends State<InventoryScreen>
   void _scrollToNewColumn() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_hScroll.hasClients) {
-        final maxCols = _maxQuantityColumns;
-        _scrollToCellFocused(maxCols - 1, maxCols);
+        _scrollToEnd();
       }
     });
+  }
+
+  void _scrollToEnd() {
+    if (_hScroll.hasClients) {
+      _hScroll.animateTo(
+        _hScroll.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+      );
+    }
   }
 
   /// При фокусе на ячейку: 3-я видимая → скролл на 2-ю; последняя → на 3-ю.
