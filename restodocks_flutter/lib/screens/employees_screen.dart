@@ -52,12 +52,12 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     setState(() { _loading = true; _error = null; });
     try {
       final all = await acc.getEmployeesForEstablishment(est.id);
-      // Владелец без должности не показывается (owner — не должность)
-      final withPosition = all.where((e) => e.positionRole != null).toList();
+      // Скрываем только собственника без должности; остальных показываем
+      final visible = all.where((e) => !(e.hasRole('owner') && e.positionRole == null)).toList();
       // Владелец видит всех сотрудников (и кухня, и менеджмент), иначе — только свой отдел
       final filtered = current.hasRole('owner')
-          ? withPosition
-          : (current.department.isEmpty ? withPosition : withPosition.where((e) => e.department == current.department).toList());
+          ? visible
+          : (current.department.isEmpty ? visible : visible.where((e) => e.department == current.department).toList());
       // Дедупликация по id (на случай дублей из БД)
       final seen = <String>{};
       final list = filtered.where((e) => seen.add(e.id)).toList();

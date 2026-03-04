@@ -673,7 +673,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   /// Компактная таблица с шапкой: влезает в экран телефона, без горизонтального скролла.
   Widget _buildTechCardsTable(List<TechCard> techCards, LocalizationService loc, bool canEdit) {
     final lang = loc.currentLanguageCode;
-    const colCatWidth = 52.0;
+    const colCatWidth = 82.0; // полное слово «Категория»
     const colCostWidth = 48.0;
     final est = context.read<AccountManagerSupabase>().establishment;
     final costSym = est?.currencySymbol ?? Establishment.currencySymbolFor(est?.defaultCurrency ?? 'VND');
@@ -690,7 +690,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
               color: Theme.of(context).colorScheme.primaryContainer,
               onColor: Theme.of(context).colorScheme.onPrimaryContainer,
               labelName: loc.t('ttk_col_name'),
-              labelCat: loc.t('column_category').substring(0, loc.t('column_category').length.clamp(0, 4)),
+              labelCat: loc.t('column_category'),
               labelCost: '$costSym/${loc.t('kg')}',
             ),
           ),

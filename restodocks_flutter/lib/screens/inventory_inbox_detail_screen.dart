@@ -1,6 +1,7 @@
 import 'package:excel/excel.dart' hide TextSpan;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../models/models.dart';
@@ -483,7 +484,7 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
               _cell(theme, displayName),
               _cell(theme, (r['unit'] ?? '').toString()),
               _cell(theme, _fmt(r['total'])),
-              _cell(theme, price != null && price > 0 ? _fmt(price) : '—'),
+              _cell(theme, price != null && price > 0 ? _fmtPrice(price) : '—'),
             ],
           );
         }),
@@ -507,5 +508,15 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
     if (v == null) return '—';
     if (v is num) return v == v.truncateToDouble() ? v.toInt().toString() : v.toStringAsFixed(1);
     return v.toString();
+  }
+
+  /// Формат суммы инвентаризации: разделитель тысяч (пробел), для VND и подобных — без десятичных.
+  String _fmtPrice(num value) {
+    final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'VND';
+    final noDecimals = {'VND', 'JPY', 'KRW'}.contains(currency.toUpperCase());
+    final nf = noDecimals
+        ? NumberFormat('#,##0', 'ru_RU')
+        : NumberFormat('#,##0.##', 'ru_RU');
+    return nf.format(noDecimals ? value.round() : value).replaceAll('\u00A0', ' ');
   }
 }

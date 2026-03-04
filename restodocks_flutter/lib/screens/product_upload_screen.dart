@@ -83,6 +83,17 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     _loadingTimeoutTimer = null;
   }
 
+  /// Исключаем из списка «изменённых» no_change и «обновление» с той же ценой (не показываем «старая → новая»).
+  bool _isResultChanged(Map<String, dynamic> r) {
+    if (r['status'] == 'no_change') return false;
+    if (r['status'] == 'updated') {
+      final oldPrice = r['oldPrice'] as double?;
+      final newPrice = r['newPrice'] as double?;
+      if (oldPrice != null && newPrice != null && (oldPrice - newPrice).abs() < 0.01) return false;
+    }
+    return true;
+  }
+
   @override
   void dispose() {
     _cancelLoadingTimeout(); // Отменяем таймер при уничтожении виджета
@@ -1424,7 +1435,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         excel,
         fileName,
         establishmentId,
-        account.establishment?.defaultCurrency ?? 'RUB',
+        account.establishment?.defaultCurrency ?? 'VND',
       );
 
       // Обрабатываем результаты
@@ -1445,7 +1456,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
             importResults,
             {},
             establishmentId,
-            account.establishment?.defaultCurrency ?? 'RUB',
+            account.establishment?.defaultCurrency ?? 'VND',
           );
         }
         // Если null - пользователь отменил, ничего не делаем
@@ -1457,7 +1468,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
             importResults,
             resolutions,
             establishmentId,
-            account.establishment?.defaultCurrency ?? 'RUB',
+            account.establishment?.defaultCurrency ?? 'VND',
           );
         }
       } else {
@@ -1466,7 +1477,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
           importResults,
           {},
           establishmentId,
-          account.establishment?.defaultCurrency ?? 'RUB',
+          account.establishment?.defaultCurrency ?? 'VND',
         );
       }
 
@@ -1558,7 +1569,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       allResults,
       resolutions,
       establishmentId,
-      account.establishment?.defaultCurrency ?? 'RUB',
+      account.establishment?.defaultCurrency ?? 'VND',
     );
   }
 
@@ -2529,7 +2540,7 @@ ${text}
                     ),
                   ],
                   const SizedBox(height: 16),
-                  if (processingResults.where((r) => r['status'] != 'no_change').isNotEmpty) ...[
+                  if (processingResults.where((r) => _isResultChanged(r)).isNotEmpty) ...[
                     const Text(
                       'Детальные результаты:',
                       style: TextStyle(fontWeight: FontWeight.bold),
@@ -2542,9 +2553,9 @@ ${text}
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: ListView.builder(
-                        itemCount: processingResults.where((r) => r['status'] != 'no_change').length,
+                        itemCount: processingResults.where((r) => _isResultChanged(r)).length,
                         itemBuilder: (context, index) {
-                          final _changedResults = processingResults.where((r) => r['status'] != 'no_change').toList();
+                          final _changedResults = processingResults.where((r) => _isResultChanged(r)).toList();
                           final result = _changedResults[index];
                           final status = result['status'] as String;
                           final name = result['name'] as String;
@@ -2569,7 +2580,8 @@ ${text}
                             case 'updated':
                               statusText = 'Цена обновлена';
                               statusColor = Colors.orange;
-                              if (oldPrice != null && newPrice != null) {
+                              final samePrice = oldPrice != null && newPrice != null && (oldPrice - newPrice).abs() < 0.01;
+                              if (!samePrice && oldPrice != null && newPrice != null) {
                                 priceText = '${oldPrice.toStringAsFixed(0)} → ${newPrice.toStringAsFixed(0)} ${defCur}';
                               } else if (newPrice != null) {
                                 priceText = '${newPrice.toStringAsFixed(0)} ${defCur}';
