@@ -311,10 +311,8 @@ class _EmployeeCard extends StatelessWidget {
 
   static String positionDisplay(Employee e, LocalizationService loc) {
     final pos = e.positionRole;
-    if (pos == null) return '—';
-    final key = 'role_$pos';
-    final t = loc.t(key);
-    return (t != key && t.isNotEmpty) ? t : pos;
+    if (pos == null || pos.isEmpty) return '—';
+    return loc.roleDisplayName(pos);
   }
 
   @override
@@ -338,9 +336,10 @@ class _EmployeeCard extends StatelessWidget {
             ? loc.t('section_${employee.section}')
             : (employee.sectionDisplayName ?? employee.section!))
         : null;
-    final deptStr = sectionStr != null
-        ? '${employee.departmentDisplayName} · $sectionStr'
+    final deptLabel = loc.departmentDisplayName(employee.department) != employee.department
+        ? loc.departmentDisplayName(employee.department)
         : employee.departmentDisplayName;
+    final deptStr = sectionStr != null ? '$deptLabel · $sectionStr' : deptLabel;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 6),
@@ -473,9 +472,10 @@ class _EmployeeCard extends StatelessWidget {
             ? loc.t('section_${employee.section}')
             : (employee.sectionDisplayName ?? employee.section!))
         : null;
-    final deptStr = sectionStr != null
-        ? '${employee.departmentDisplayName} · $sectionStr'
+    final deptLabel = loc.departmentDisplayName(employee.department) != employee.department
+        ? loc.departmentDisplayName(employee.department)
         : employee.departmentDisplayName;
+    final deptStr = sectionStr != null ? '$deptLabel · $sectionStr' : deptLabel;
     final posStr = positionDisplay(employee, loc);
     final subStyle = theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant);
 

@@ -256,7 +256,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 if (position != null && position.isNotEmpty)
                   Chip(
                     label: Text(
-                      EmployeeRole.fromCode(position)?.displayName ?? position,
+                      localization.roleDisplayName(position),
                       style: const TextStyle(fontSize: 12),
                     ),
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,

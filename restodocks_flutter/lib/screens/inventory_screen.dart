@@ -1291,7 +1291,9 @@ class _InventoryScreenState extends State<InventoryScreen>
     final dateStr = '${_date.day.toString().padLeft(2, '0')}.${_date.month.toString().padLeft(2, '0')}.${_date.year}';
     final startStr = _startTime != null ? '${_startTime!.hour.toString().padLeft(2, '0')}:${_startTime!.minute.toString().padLeft(2, '0')}' : '—';
     final endStr = _endTime != null ? '${_endTime!.hour.toString().padLeft(2, '0')}:${_endTime!.minute.toString().padLeft(2, '0')}' : null;
-    final roleStr = employee?.roleDisplayName ?? '—';
+    final roleStr = employee != null && employee!.roles.isNotEmpty
+        ? loc.roleDisplayName(employee!.roles.first)
+        : '—';
     final headerLine = '$dateStr ${startStr} ${employee?.fullName ?? '—'} ($roleStr)${endStr != null ? ' $endStr' : ''}';
     final headerRow = Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -2043,10 +2045,12 @@ class _InventoryScreenState extends State<InventoryScreen>
     required String lang,
     List<Map<String, dynamic>>? aggregatedProducts,
   }) {
+    final loc = context.read<LocalizationService>();
+    final roleKey = employee.roles.isNotEmpty ? 'role_${employee.roles.first}' : 'employee';
     final header = {
       'establishmentName': establishment.name,
       'employeeName': employee.fullName,
-      'employeeRole': employee.roleDisplayName,
+      'employeeRole': loc.tForLanguage(lang, roleKey) != roleKey ? loc.tForLanguage(lang, roleKey) : (employee.roleDisplayName),
       'department': employee.department,
       'date': '${_date.year}-${_date.month.toString().padLeft(2, '0')}-${_date.day.toString().padLeft(2, '0')}',
       'timeStart': _startTime != null

@@ -105,9 +105,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   String _getPositionDisplayName(String? code, LocalizationService loc) {
     if (code == null || code.isEmpty) return loc.t('no_position');
-    final key = 'role_$code';
-    final t = loc.t(key);
-    return (t != key && t.isNotEmpty) ? t : code;
+    return loc.roleDisplayName(code);
   }
 
   void _showProRequiredDialog(BuildContext context, LocalizationService loc) {

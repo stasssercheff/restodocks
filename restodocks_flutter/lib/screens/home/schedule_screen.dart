@@ -122,11 +122,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   }
 
   /// Локализованное название должности. Использует ключ role_XXX из переводов.
-  String _positionDisplayName(String code, LocalizationService loc) {
-    final key = 'role_$code';
-    final t = loc.t(key);
-    return (t != key && t.isNotEmpty) ? t : code;
-  }
+  String _positionDisplayName(String code, LocalizationService loc) => loc.roleDisplayName(code);
 
   Employee? _employeeForSlot(ScheduleSlot slot) {
     if (slot.employeeId == null) return null;
