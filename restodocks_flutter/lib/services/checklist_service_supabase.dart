@@ -100,9 +100,31 @@ class ChecklistServiceSupabase {
       if (item.techCardId != null) itemData['tech_card_id'] = item.techCardId;
       if (item.targetQuantity != null) itemData['target_quantity'] = item.targetQuantity;
       if (item.targetUnit != null) itemData['target_unit'] = item.targetUnit;
-      await _supabase.insertData('checklist_items', itemData);
+      await _insertChecklistItem(itemData);
     }
     return (await getChecklistById(c.id)) ?? c;
+  }
+
+  /// Вставка одного пункта; при ошибке схемы (PGRST204) повтор без опциональных колонок.
+  Future<void> _insertChecklistItem(Map<String, dynamic> itemData) async {
+    try {
+      await _supabase.insertData('checklist_items', itemData);
+    } catch (e) {
+      final msg = e.toString().toLowerCase();
+      if (msg.contains('pgrst204') || msg.contains('column') && (msg.contains('found') || msg.contains('exist'))) {
+        final minimal = <String, dynamic>{
+          'checklist_id': itemData['checklist_id'],
+          'title': itemData['title'],
+          'sort_order': itemData['sort_order'],
+        };
+        if (itemData.containsKey('tech_card_id') && itemData['tech_card_id'] != null) {
+          minimal['tech_card_id'] = itemData['tech_card_id'];
+        }
+        await _supabase.insertData('checklist_items', minimal);
+      } else {
+        rethrow;
+      }
+    }
   }
 
   Future<void> saveChecklist(Checklist checklist) async {
@@ -133,7 +155,7 @@ class ChecklistServiceSupabase {
       if (item.techCardId != null) itemData['tech_card_id'] = item.techCardId;
       if (item.targetQuantity != null) itemData['target_quantity'] = item.targetQuantity;
       if (item.targetUnit != null) itemData['target_unit'] = item.targetUnit;
-      await _supabase.insertData('checklist_items', itemData);
+      await _insertChecklistItem(itemData);
     }
   }
 
