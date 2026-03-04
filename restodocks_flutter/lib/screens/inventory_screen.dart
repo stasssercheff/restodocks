@@ -691,11 +691,8 @@ class _InventoryScreenState extends State<InventoryScreen>
 
   void _addQuantityToRow(int rowIndex) {
     if (rowIndex < 0 || rowIndex >= _rows.length) return;
-    if (_rows[rowIndex].isFree) return; // свободные строки — без добавления колонок
-    setState(() {
-      // Всегда добавляем пустую ячейку в конец
-      _rows[rowIndex].quantities.add(0.0);
-    });
+    if (_rows[rowIndex].isFree) return;
+    setState(() => _rows[rowIndex].quantities.add(0.0));
     _scrollToNewColumn();
   }
 
@@ -782,11 +779,35 @@ class _InventoryScreenState extends State<InventoryScreen>
   void _scrollToNewColumn() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_hScroll.hasClients) {
+        final maxCols = _maxQuantityColumns;
+        final colStep = _colQtyWidth + _colGap;
+        final targetOffset = maxCols > 3 ? (maxCols - 3) * colStep : 0.0;
+        final clamped = targetOffset.clamp(0.0, _hScroll.position.maxScrollExtent);
         _hScroll.animateTo(
-          _hScroll.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 200),
+          clamped,
+          duration: const Duration(milliseconds: 80),
           curve: Curves.easeOut,
         );
+      }
+    });
+  }
+
+  void _onLastCellFocused(int rowIndex) {
+    if (rowIndex < 0 || rowIndex >= _rows.length || _rows[rowIndex].isFree) return;
+    setState(() => _rows[rowIndex].quantities.add(0.0));
+    _scrollToNewColumn();
+  }
+
+  void _onCellFocusLost(int rowIndex, int colIndex) {
+    if (rowIndex < 0 || rowIndex >= _rows.length) return;
+    final row = _rows[rowIndex];
+    if (row.quantities.length < 2 || colIndex != row.quantities.length - 2) return;
+    if (row.quantities[colIndex] <= 0) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_hScroll.hasClients) {
+        final colStep = _colQtyWidth + _colGap;
+        final newOffset = (_hScroll.offset + colStep).clamp(0.0, _hScroll.position.maxScrollExtent);
+        _hScroll.animateTo(newOffset, duration: const Duration(milliseconds: 80), curve: Curves.easeOut);
       }
     });
   }
@@ -814,12 +835,6 @@ class _InventoryScreenState extends State<InventoryScreen>
     // Вызываем setState только если значение действительно изменилось
     if (oldValue != value) {
       setState(() {});
-    }
-
-    // Если это последняя ячейка и значение > 0, добавляем новую (как в iiko) и скроллим вправо
-    if (colIndex == row.quantities.length - 1 && value > 0) {
-      setState(() => row.quantities.add(0.0));
-      _scrollToNewColumn();
     }
 
     saveNow();
@@ -1834,17 +1849,20 @@ class _InventoryScreenState extends State<InventoryScreen>
                     width: _colQtyWidth,
                     child: _completed
                         ? Text(_formatQty(row.quantityDisplayAt(colIndex)), style: theme.textTheme.bodyMedium)
-                        : Builder(
-                            builder: (cellContext) => _QtyCell(
-                              key: ValueKey('qty_${actualIndex}_$colIndex'),
-                              value: row.quantities[colIndex],
-                              useGrams: row.isWeightInKg,
-                              onChanged: (v) => _setQuantity(actualIndex, colIndex, v),
-                              textInputAction: isLastCell ? TextInputAction.done : TextInputAction.next,
-                              scrollToContext: cellContext,
-                              onFocusGained: () => setState(() => _hasInputFocus = true),
-                              onFocusLost: () => setState(() => _hasInputFocus = false),
-                            ),
+                        : _QtyCell(
+                            key: ValueKey('qty_${actualIndex}_$colIndex'),
+                            value: row.quantities[colIndex],
+                            useGrams: row.isWeightInKg,
+                            onChanged: (v) => _setQuantity(actualIndex, colIndex, v),
+                            textInputAction: isLastCell ? TextInputAction.done : TextInputAction.next,
+                            onFocusGained: () {
+                              setState(() => _hasInputFocus = true);
+                              if (isLastCell) _onLastCellFocused(actualIndex);
+                            },
+                            onFocusLost: () {
+                              setState(() => _hasInputFocus = false);
+                              _onCellFocusLost(actualIndex, colIndex);
+                            },
                           ),
                   ),
                 );
@@ -2155,8 +2173,6 @@ class _QtyCell extends StatefulWidget {
   final void Function(double) onChanged;
   /// TextInputAction.next — «Далее» на клавиатуре переходит к следующей ячейке.
   final TextInputAction textInputAction;
-  /// Контекст строки для Scrollable.ensureVisible при фокусе (как в iiko).
-  final BuildContext? scrollToContext;
   final VoidCallback? onFocusGained;
   final VoidCallback? onFocusLost;
 
@@ -2166,7 +2182,6 @@ class _QtyCell extends StatefulWidget {
     this.useGrams = false,
     required this.onChanged,
     this.textInputAction = TextInputAction.next,
-    this.scrollToContext,
     this.onFocusGained,
     this.onFocusLost,
   });
@@ -2206,11 +2221,6 @@ class _QtyCellState extends State<_QtyCell> {
   void _onFocusChanged() {
     if (_focus.hasFocus) {
       widget.onFocusGained?.call();
-      if (widget.scrollToContext != null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) Scrollable.ensureVisible(widget.scrollToContext!);
-        });
-      }
     } else {
       widget.onFocusLost?.call();
       // При потере фокуса применяем изменения
