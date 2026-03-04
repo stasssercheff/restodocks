@@ -10,13 +10,13 @@ import '../../models/inbox_document.dart';
 import '../../services/inbox_service.dart';
 import '../../widgets/app_bar_home_button.dart';
 
-/// Входящие: Документы по типам (Чеклисты, Заказы, Инвентаризация) + Сообщения
+/// Входящие: документы (заказы, чеклисты, инвентаризации). Сообщения: диалоги с сотрудниками — отдельно.
 class InboxScreen extends StatefulWidget {
-  const InboxScreen({super.key, this.embedded = false, this.initialTabMessages = false});
+  const InboxScreen({super.key, this.embedded = false, this.messagesOnly = false});
 
   final bool embedded;
-  /// true — открыть сразу вкладку «Сообщения»
-  final bool initialTabMessages;
+  /// true — только диалоги (Сообщения), false — только документы (Входящие)
+  final bool messagesOnly;
 
   @override
   State<InboxScreen> createState() => _InboxScreenState();
@@ -53,18 +53,8 @@ class _InboxScreenState extends State<InboxScreen> {
   void _initDefaultTab() {
     final employee = context.read<AccountManagerSupabase>().currentEmployee;
     if (employee == null) return;
+    if (widget.messagesOnly) return;
     final tabs = _visibleTabs(employee);
-    if (widget.initialTabMessages && tabs.contains(_InboxTab.messages)) {
-      setState(() {
-        if (employee.hasRole('owner')) {
-          _selectedDeptTab = _InboxDeptTab.kitchen;
-          _selectedTypeTab = _InboxTypeTab.messages;
-        } else {
-          _selectedTab = _InboxTab.messages;
-        }
-      });
-      return;
-    }
     if (employee.hasRole('owner')) {
       setState(() {
         _selectedDeptTab = _InboxDeptTab.kitchen;
@@ -77,7 +67,7 @@ class _InboxScreenState extends State<InboxScreen> {
     }
   }
 
-  /// Список вкладок, доступных данному сотруднику
+  /// Входящие: только документы (заказы, чеклисты, инвентаризации). Без диалогов.
   List<_InboxTab> _visibleTabs(Employee employee) {
     final isChef = employee.roles.contains('executive_chef');
     final isSousChef = employee.roles.contains('sous_chef');
@@ -94,7 +84,6 @@ class _InboxScreenState extends State<InboxScreen> {
         tabs.add(_InboxTab.iikoInventory);
       }
     }
-    tabs.add(_InboxTab.messages);
     return tabs;
   }
 
@@ -169,11 +158,10 @@ class _InboxScreenState extends State<InboxScreen> {
     final isOwner = employee?.hasRole('owner') ?? false;
     final visibleTabs = employee != null ? _visibleTabs(employee) : <_InboxTab>[];
 
-    final onlyMessages = visibleTabs.length == 1 && visibleTabs.first == _InboxTab.messages;
     return Scaffold(
       appBar: AppBar(
         leading: widget.embedded ? null : appBarBackButton(context),
-        title: Text(onlyMessages ? (loc.t('inbox_tab_messages') ?? 'Сообщения') : loc.t('inbox')),
+        title: Text(widget.messagesOnly ? (loc.t('inbox_tab_messages') ?? 'Сообщения') : loc.t('inbox')),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -189,20 +177,25 @@ class _InboxScreenState extends State<InboxScreen> {
             _buildDeptFilter(loc),
             _buildTypeFilterForOwner(loc),
           ],
-          // Остальные: фильтр по типу документа (скрыт, если только Сообщения)
-          if (!isOwner && visibleTabs.isNotEmpty && !onlyMessages) _buildTypeFilter(loc, visibleTabs),
+          // Фильтр документов — только для Входящих, не для Сообщений
+          if (!widget.messagesOnly) ...[
+            if (isOwner) _buildDeptFilter(loc),
+            if (isOwner) _buildTypeFilterForOwner(loc),
+            if (!isOwner && visibleTabs.isNotEmpty) _buildTypeFilter(loc, visibleTabs),
+          ],
 
-          // Список документов или чатов (для вкладки Сообщения)
           Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator())
-                : (isOwner ? (_selectedDeptTab == null || _selectedTypeTab == null) : _selectedTab == null)
-                    ? _buildEmptyState(loc)
-                    : _isMessagesTab(isOwner)
-                        ? _buildMessagesContent(loc)
-                        : _filteredDocuments.isEmpty
-                            ? _buildEmptyState(loc)
-                            : _buildDocumentsList(),
+            child: widget.messagesOnly
+                ? _buildMessagesContent(loc)
+                : (_loading
+                    ? const Center(child: CircularProgressIndicator())
+                    : (isOwner ? (_selectedDeptTab == null || _selectedTypeTab == null) : _selectedTab == null)
+                        ? _buildEmptyState(loc)
+                        : _isMessagesTab(isOwner)
+                            ? _buildMessagesContent(loc)
+                            : _filteredDocuments.isEmpty
+                                ? _buildEmptyState(loc)
+                                : _buildDocumentsList()),
           ),
         ],
       ),
@@ -281,8 +274,6 @@ class _InboxScreenState extends State<InboxScreen> {
               const SizedBox(width: 8),
               _buildTypeChip(_InboxTypeTab.iikoInventory, 'Инвентаризация iiko', loc),
             ],
-            const SizedBox(width: 8),
-            _buildTypeChip(_InboxTypeTab.messages, loc.t('inbox_tab_messages') ?? 'Сообщения', loc),
           ],
         ),
       ),

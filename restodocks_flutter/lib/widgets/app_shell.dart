@@ -36,7 +36,7 @@ class AppShell extends StatelessWidget {
       body: child,
       bottomNavigationBar: NavigationBar(
         selectedIndex: selectedIndex,
-        onDestinationSelected: (i) => _onTap(context, i, middleAction, noDataAccess),
+        onDestinationSelected: (i) => _onTap(context, i, middleAction, noDataAccess, currentEmployee),
         destinations: [
           NavigationDestination(
             icon: const Icon(Icons.home_outlined),
@@ -95,7 +95,7 @@ class AppShell extends StatelessWidget {
     return 0;
   }
 
-  void _onTap(BuildContext context, int index, HomeButtonAction action, bool noDataAccess) {
+  void _onTap(BuildContext context, int index, HomeButtonAction action, bool noDataAccess, Employee? employee) {
     final location = GoRouterState.of(context).matchedLocation;
     final currentIndex = _indexForLocation(location, action, noDataAccess);
 
@@ -103,11 +103,16 @@ class AppShell extends StatelessWidget {
     final isBackward = index < currentIndex;
     final extra = isBackward ? {'back': true} : null;
 
+    String middleRoute = action.route;
+    if (!noDataAccess && action == HomeButtonAction.inbox) {
+      middleRoute = (employee?.hasInboxDocuments ?? true) ? '/inbox' : '/notifications?tab=messages';
+    }
+
     switch (index) {
       case 0:
         context.go('/home', extra: extra);
       case 1:
-        context.go(noDataAccess ? '/schedule?personal=1' : action.route, extra: extra);
+        context.go(noDataAccess ? '/schedule?personal=1' : middleRoute, extra: extra);
       case 2:
         context.go('/personal-cabinet', extra: extra);
       default:
