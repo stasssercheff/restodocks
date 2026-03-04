@@ -459,7 +459,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   String? _error;
   /// 'photo' | 'excel' — какая кнопка сейчас загружает (чтобы показывать правильный текст).
   final _nameController = TextEditingController();
-  static const _kitchenCategoryOptions = ['sauce', 'vegetables', 'salad', 'meat', 'seafood', 'side', 'subside', 'bakery', 'dessert', 'decor', 'soup', 'misc', 'beverages'];
+  static const _kitchenCategoryOptions = ['sauce', 'vegetables', 'salad', 'meat', 'seafood', 'side', 'subside', 'bakery', 'dessert', 'decor', 'soup', 'misc', 'beverages', 'banquet', 'catering'];
   static const _barCategoryOptions = ['alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks', 'sauce', 'vegetables', 'salad', 'bakery', 'dessert', 'decor', 'misc', 'beverages'];
 
   List<String> get _categoryOptions {
@@ -478,6 +478,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     'pizza':         ('section_pizza', false),
     'sushi':         ('section_sushi', false),
     'bakery':        ('section_bakery', false),
+    'banquet_catering': ('section_banquet_catering', false),
   };
 
   // Русские названия цехов (fallback если нет локализации)
@@ -490,6 +491,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     'pizza':         'Пицца',
     'sushi':         'Суши',
     'bakery':        'Пекарня',
+    'banquet_catering': 'Банкет / Кейтринг',
   };
 
   Map<String, String> _getAvailableSections(bool hasPro, LocalizationService loc) {
@@ -541,6 +543,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
       'hot_drinks': {'ru': 'Горячие напитки', 'en': 'Hot drinks'},
       'drinks_pure': {'ru': 'Напитки в чистом виде', 'en': 'Drinks (neat)'},
       'snacks': {'ru': 'Снеки', 'en': 'Snacks'},
+      'banquet': {'ru': 'Банкет', 'en': 'Banquet'},
+      'catering': {'ru': 'Кейтеринг', 'en': 'Catering'},
     };
 
     return categoryTranslations[c]?[lang] ?? c;

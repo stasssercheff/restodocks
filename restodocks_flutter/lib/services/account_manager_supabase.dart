@@ -838,6 +838,17 @@ class AccountManagerSupabase extends ChangeNotifier {
             'id',
             employee.id,
           );
+        } else if (_isEmploymentColumnError(e)) {
+          employeeData = Map<String, dynamic>.from(employeeData)
+            ..remove('employment_status')
+            ..remove('employment_start_date')
+            ..remove('employment_end_date');
+          await _supabase.updateData(
+            'employees',
+            employeeData,
+            'id',
+            employee.id,
+          );
         } else {
           rethrow;
         }
@@ -875,6 +886,13 @@ class AccountManagerSupabase extends ChangeNotifier {
         msg.contains('hourly_rate') ||
         msg.contains('pgrst204') ||
         (msg.contains('column') && (msg.contains('exist') || msg.contains('found') || msg.contains('does not')));
+  }
+
+  bool _isEmploymentColumnError(Object e) {
+    final msg = e.toString().toLowerCase();
+    return msg.contains('employment_status') ||
+        msg.contains('employment_start_date') ||
+        msg.contains('employment_end_date');
   }
 
   bool _isSchemaColumnError(Object e) {

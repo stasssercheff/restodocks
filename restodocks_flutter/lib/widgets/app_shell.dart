@@ -24,19 +24,20 @@ class AppShell extends StatelessWidget {
     final isOwner = currentEmployee.hasRole('owner');
     final homeBtnConfig = context.watch<HomeButtonConfigService>();
     final middleAction = homeBtnConfig.action;
-    final noDataAccess = !isOwner && !currentEmployee.dataAccessEnabled;
+    final noDataAccess = !isOwner && !currentEmployee.effectiveDataAccess;
+    final isKitchenNoData = noDataAccess && currentEmployee.department == 'kitchen';
     final middleLabel = noDataAccess
-        ? loc.t('personal_schedule')
+        ? (isKitchenNoData ? loc.t('schedule') : loc.t('personal_schedule'))
         : _labelForAction(loc, middleAction, currentEmployee);
 
     final location = GoRouterState.of(context).matchedLocation;
-    final selectedIndex = _indexForLocation(location, middleAction, noDataAccess);
+    final selectedIndex = _indexForLocation(location, middleAction, noDataAccess, isKitchenNoData);
 
     return Scaffold(
       body: child,
       bottomNavigationBar: NavigationBar(
         selectedIndex: selectedIndex,
-        onDestinationSelected: (i) => _onTap(context, i, middleAction, noDataAccess, currentEmployee),
+        onDestinationSelected: (i) => _onTap(context, i, middleAction, noDataAccess, isKitchenNoData, currentEmployee),
         destinations: [
           NavigationDestination(
             icon: const Icon(Icons.home_outlined),
@@ -75,7 +76,7 @@ class AppShell extends StatelessWidget {
     }
   }
 
-  int _indexForLocation(String location, HomeButtonAction action, bool noDataAccess) {
+  int _indexForLocation(String location, HomeButtonAction action, bool noDataAccess, [bool isKitchenNoData = false]) {
     if (location == '/home' || location == '/') return 0;
     if (location.startsWith('/personal-cabinet') || location.startsWith('/profile') || location.startsWith('/settings')) return 2;
 
@@ -95,9 +96,9 @@ class AppShell extends StatelessWidget {
     return 0;
   }
 
-  void _onTap(BuildContext context, int index, HomeButtonAction action, bool noDataAccess, Employee? employee) {
+  void _onTap(BuildContext context, int index, HomeButtonAction action, bool noDataAccess, bool isKitchenNoData, Employee? employee) {
     final location = GoRouterState.of(context).matchedLocation;
-    final currentIndex = _indexForLocation(location, action, noDataAccess);
+    final currentIndex = _indexForLocation(location, action, noDataAccess, isKitchenNoData);
 
     // Если переходим на вкладку с меньшим индексом — анимируем как «назад» (вправо)
     final isBackward = index < currentIndex;
@@ -106,13 +107,15 @@ class AppShell extends StatelessWidget {
     String middleRoute = action.route;
     if (!noDataAccess && action == HomeButtonAction.inbox) {
       middleRoute = (employee?.hasInboxDocuments ?? true) ? '/inbox' : '/notifications?tab=messages';
+    } else if (noDataAccess) {
+      middleRoute = isKitchenNoData ? '/schedule' : '/schedule?personal=1';
     }
 
     switch (index) {
       case 0:
         context.go('/home', extra: extra);
       case 1:
-        context.go(noDataAccess ? '/schedule?personal=1' : middleRoute, extra: extra);
+        context.go(middleRoute, extra: extra);
       case 2:
         context.go('/personal-cabinet', extra: extra);
       default:

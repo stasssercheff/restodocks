@@ -25,5 +25,8 @@ enum KitchenSection: String, Codable, CaseIterable, Identifiable {
     // ===== КЛИНИНГ =====
     case cleaning             // мойка / клининг
 
+    // ===== БАНКЕТ / КЕЙТРИНГ =====
+    case banquetCatering      // банкет / кейтринг
+
     var id: String { rawValue }
 }

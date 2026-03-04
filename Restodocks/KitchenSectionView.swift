@@ -128,6 +128,8 @@ struct KitchenSectionView: View {
             return "cleaning"
         case .kitchenManagement:
             return "kitchen_management"
+        case .banquetCatering:
+            return "banquet_catering"
         }
     }
 }

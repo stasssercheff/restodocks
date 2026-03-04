@@ -19,8 +19,34 @@ class ManagementHomeContent extends StatelessWidget {
     final isBarManager = roles.contains('bar_manager');
     final isGeneral = roles.contains('general_manager');
 
-    // Без доступа к данным — только личный график (как в личном кабинете)
-    if (!employee.hasRole('owner') && !employee.dataAccessEnabled) {
+    // Без доступа к данным
+    if (!employee.hasRole('owner') && !employee.effectiveDataAccess) {
+      // Сотрудник в цехе (кухня): только график общий и сообщения
+      if (employee.department == 'kitchen') {
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            _Tile(
+              icon: Icons.calendar_month,
+              title: loc.t('schedule'),
+              onTap: () => context.go('/schedule'),
+            ),
+            _Tile(
+              icon: Icons.chat_bubble_outline,
+              title: loc.t('inbox_tab_messages') ?? 'Сообщения',
+              onTap: () => context.go('/notifications?tab=messages'),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: Text(
+                loc.t('data_access_required_hint') ?? 'Доступ к остальным разделам выдаёт руководитель.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
+            ),
+          ],
+        );
+      }
+      // Менеджмент не кухня: только личный график
       return ListView(
         padding: const EdgeInsets.all(16),
         children: [

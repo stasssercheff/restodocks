@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../services/services.dart';
+import '../../services/home_layout_config_service.dart';
 import '../../models/models.dart';
 
 /// Домашняя страница сотрудника (кухня/бар/зал): график, меню, ТТК, чеклисты.
@@ -18,8 +19,34 @@ class StaffHomeContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
 
-    // Без доступа к данным — только личный график (как в личном кабинете)
-    if (!employee.hasRole('owner') && !employee.dataAccessEnabled) {
+    // Без доступа к данным (в т.ч. временный с истёкшим периодом)
+    if (!employee.hasRole('owner') && !employee.effectiveDataAccess) {
+      // Сотрудник в цехе (кухня): только график общий и сообщения
+      if (employee.department == 'kitchen') {
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            _Tile(
+              icon: Icons.calendar_month,
+              title: loc.t('schedule'),
+              onTap: () => context.go('/schedule'),
+            ),
+            _Tile(
+              icon: Icons.chat_bubble_outline,
+              title: loc.t('inbox_tab_messages') ?? 'Сообщения',
+              onTap: () => context.go('/notifications?tab=messages'),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: Text(
+                loc.t('data_access_required_hint') ?? 'Доступ к остальным разделам выдаёт руководитель.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
+            ),
+          ],
+        );
+      }
+      // Бар/зал: только личный график
       return ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -39,47 +66,55 @@ class StaffHomeContent extends StatelessWidget {
       );
     }
 
+    final layoutSvc = context.watch<HomeLayoutConfigService>();
+    final order = layoutSvc.getOrder(employee.id);
+    final tiles = <HomeTileId, Widget>{
+      HomeTileId.messages: _Tile(
+        icon: Icons.chat_bubble_outline,
+        title: loc.t('inbox_tab_messages') ?? 'Сообщения',
+        onTap: () => context.go('/notifications'),
+      ),
+      HomeTileId.schedule: _Tile(
+        icon: Icons.calendar_month,
+        title: loc.t('schedule'),
+        onTap: () => context.go('/schedule'),
+      ),
+      HomeTileId.productOrder: _Tile(
+        icon: Icons.shopping_cart,
+        title: loc.t('product_order'),
+        onTap: () => context.go('/product-order?department=${_deptForRoute(employee.department)}'),
+      ),
+      HomeTileId.suppliers: _Tile(
+        icon: Icons.store_outlined,
+        title: loc.t('order_tab_suppliers') ?? 'Поставщики',
+        onTap: () => context.go('/suppliers/${_deptForRoute(employee.department)}'),
+      ),
+      HomeTileId.menu: _Tile(
+        icon: Icons.restaurant_menu,
+        title: loc.t('menu'),
+        onTap: () => context.go('/menu/${employee.department}'),
+      ),
+      HomeTileId.ttk: _Tile(
+        icon: Icons.description,
+        title: employee.department == 'bar' ? loc.t('ttk_bar') : loc.t('ttk_kitchen'),
+        onTap: () => context.go('/tech-cards'),
+      ),
+      HomeTileId.checklists: _Tile(
+        icon: Icons.checklist,
+        title: loc.t('checklists'),
+        onTap: () => context.go('/checklists?department=${_deptForRoute(employee.department)}'),
+      ),
+      HomeTileId.inventory: _Tile(icon: Icons.assignment, title: loc.t('inventory_blank'), onTap: () => context.push('/inventory')),
+    };
+    final showChecklists = employee.department == 'kitchen' || employee.department == 'bar' || employee.department == 'dining_room';
+    final ordered = order
+        .where((id) => id != HomeTileId.checklists || showChecklists)
+        .where((id) => tiles.containsKey(id))
+        .map((id) => tiles[id]!)
+        .toList();
     return ListView(
       padding: const EdgeInsets.all(16),
-      children: [
-        _Tile(
-          icon: Icons.chat_bubble_outline,
-          title: loc.t('inbox_tab_messages') ?? 'Сообщения',
-          onTap: () => context.go('/notifications'),
-        ),
-        _Tile(
-          icon: Icons.calendar_month,
-          title: loc.t('schedule'),
-          onTap: () => context.go('/schedule'),
-        ),
-        _Tile(
-          icon: Icons.shopping_cart,
-          title: loc.t('product_order'),
-          onTap: () => context.go('/product-order?department=${_deptForRoute(employee.department)}'),
-        ),
-        _Tile(
-          icon: Icons.store_outlined,
-          title: loc.t('order_tab_suppliers') ?? 'Поставщики',
-          onTap: () => context.go('/suppliers/${_deptForRoute(employee.department)}'),
-        ),
-        _Tile(
-          icon: Icons.restaurant_menu,
-          title: loc.t('menu'),
-          onTap: () => context.go('/menu/${employee.department}'),
-        ),
-        _Tile(
-          icon: Icons.description,
-          title: employee.department == 'bar' ? loc.t('ttk_bar') : loc.t('ttk_kitchen'),
-          onTap: () => context.go('/tech-cards'),
-        ),
-        if (employee.department == 'kitchen' || employee.department == 'bar' || employee.department == 'dining_room')
-          _Tile(
-            icon: Icons.checklist,
-            title: loc.t('checklists'),
-            onTap: () => context.go('/checklists?department=${_deptForRoute(employee.department)}'),
-          ),
-        _Tile(icon: Icons.assignment, title: loc.t('inventory_blank'), onTap: () => context.push('/inventory')),
-      ],
+      children: ordered,
     );
   }
 }

@@ -571,6 +571,9 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
   late bool _isActive;
   late bool _dataAccessEnabled;
   late bool _canEditOwnSchedule;
+  late String _employmentStatus;
+  DateTime? _employmentStartDate;
+  DateTime? _employmentEndDate;
   bool _saving = false;
   String? _error;
 
@@ -590,6 +593,9 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
     _isActive = widget.employee.isActive;
     _dataAccessEnabled = widget.employee.dataAccessEnabled;
     _canEditOwnSchedule = widget.employee.canEditOwnSchedule;
+    _employmentStatus = widget.employee.employmentStatus ?? 'permanent';
+    _employmentStartDate = widget.employee.employmentStartDate;
+    _employmentEndDate = widget.employee.employmentEndDate;
   }
 
   @override
@@ -624,6 +630,9 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
         isActive: _isActive,
         dataAccessEnabled: _dataAccessEnabled,
         canEditOwnSchedule: _canEditOwnSchedule,
+        employmentStatus: _employmentStatus,
+        employmentStartDate: _employmentStartDate,
+        employmentEndDate: _employmentEndDate,
       );
       await context.read<AccountManagerSupabase>().updateEmployee(updated);
       if (mounted) widget.onSaved();
@@ -767,6 +776,61 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
                           value: _canEditOwnSchedule,
                           onChanged: (v) => setState(() => _canEditOwnSchedule = v),
                         ),
+                      if (widget.canToggleDataAccess &&
+                          !widget.employee.hasRole('owner') &&
+                          (_department == 'kitchen' || _department == 'bar' || _department == 'dining_room')) ...[
+                        const SizedBox(height: 8),
+                        Text(loc.t('employment_status') ?? 'Статус', style: theme.textTheme.titleSmall),
+                        DropdownButtonFormField<String>(
+                          value: _employmentStatus,
+                          decoration: InputDecoration(labelText: loc.t('employment_status') ?? 'Статус', border: const OutlineInputBorder(), filled: true),
+                          items: [
+                            DropdownMenuItem(value: 'permanent', child: Text(loc.t('employment_permanent') ?? 'Постоянный')),
+                            DropdownMenuItem(value: 'temporary', child: Text(loc.t('employment_temporary') ?? 'Временный')),
+                          ],
+                          onChanged: (v) => setState(() {
+                            _employmentStatus = v ?? 'permanent';
+                            if (_employmentStatus == 'permanent') {
+                              _employmentStartDate = null;
+                              _employmentEndDate = null;
+                            }
+                          }),
+                        ),
+                        if (_employmentStatus == 'temporary') ...[
+                          const SizedBox(height: 8),
+                          ListTile(
+                            title: Text(loc.t('employment_period') ?? 'Период доступа'),
+                            subtitle: Text(
+                              (_employmentStartDate != null ? '${_employmentStartDate!.day}.${_employmentStartDate!.month}.${_employmentStartDate!.year}' : '—') +
+                                  ' – ' +
+                                  (_employmentEndDate != null ? '${_employmentEndDate!.day}.${_employmentEndDate!.month}.${_employmentEndDate!.year}' : '—'),
+                            ),
+                            trailing: TextButton(
+                              onPressed: () async {
+                                final start = await showDatePicker(
+                                  context: context,
+                                  initialDate: _employmentStartDate ?? DateTime.now(),
+                                  firstDate: DateTime(2020),
+                                  lastDate: DateTime(2030),
+                                );
+                                if (start != null && mounted) {
+                                  final end = await showDatePicker(
+                                    context: context,
+                                    initialDate: _employmentEndDate ?? start.add(const Duration(days: 30)),
+                                    firstDate: start,
+                                    lastDate: DateTime(2030),
+                                  );
+                                  if (mounted) setState(() {
+                                    _employmentStartDate = start;
+                                    _employmentEndDate = end;
+                                  });
+                                }
+                              },
+                              child: Text(loc.t('set_period') ?? 'Задать период'),
+                            ),
+                          ),
+                        ],
+                      ],
                       if (_error != null) ...[
                         const SizedBox(height: 8),
                         Text(_error!, style: TextStyle(color: theme.colorScheme.error)),

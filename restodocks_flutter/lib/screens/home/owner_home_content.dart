@@ -50,6 +50,11 @@ class OwnerHomeContent extends StatelessWidget {
         _Tile(icon: Icons.store_outlined, title: loc.t('order_tab_suppliers') ?? 'Поставщики', onTap: () => context.go('/suppliers/hall')),
 
         const SizedBox(height: 16),
+        _SectionTitle(title: loc.t('banquet_catering') ?? 'Банкет / Кейтринг'),
+        _Tile(icon: Icons.restaurant_menu, title: loc.t('menu'), onTap: () => context.go('/menu/banquet-catering')),
+        _Tile(icon: Icons.description, title: loc.t('ttk_kitchen'), onTap: () => context.go('/tech-cards/banquet-catering')),
+
+        const SizedBox(height: 16),
         _SectionTitle(title: '${loc.t('expenses')} (${loc.t('pro')})'),
         _Tile(icon: Icons.payments, title: loc.t('salary_expenses'), subtitle: loc.t('salary_period_hint'), onTap: () => context.go('/expenses/salary')),
         // Аренда, Закупка, Свой вариант — временно скрыты

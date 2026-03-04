@@ -38,6 +38,8 @@ class _MenuScreenState extends State<MenuScreen> {
       'soup': {'ru': 'Суп', 'en': 'Soup'},
       'misc': {'ru': 'Разное', 'en': 'Misc'},
       'beverages': {'ru': 'Напитки', 'en': 'Beverages'},
+      'banquet': {'ru': 'Банкет', 'en': 'Banquet'},
+      'catering': {'ru': 'Кейтеринг', 'en': 'Catering'},
     };
     return categoryTranslations[c]?[lang] ?? c;
   }
@@ -57,10 +59,17 @@ class _MenuScreenState extends State<MenuScreen> {
       await productStore.loadNomenclature(est.dataEstablishmentId);
       final emp = acc.currentEmployee;
       final allTcs = await techCardService.getTechCardsForEstablishment(est.dataEstablishmentId);
-      // Фильтр по цеху для кухни
-      final tcs = emp == null
-          ? allTcs
-          : allTcs.where((tc) => emp.canSeeTechCard(tc.sections)).toList();
+      // Банкет/кейтеринг: только блюда с категорией banquet или catering
+      List<TechCard> tcs;
+      if (widget.department == 'banquet-catering') {
+        tcs = allTcs.where((tc) =>
+            !tc.isSemiFinished &&
+            (tc.category == 'banquet' || tc.category == 'catering')).toList();
+      } else {
+        tcs = emp == null
+            ? allTcs
+            : allTcs.where((tc) => emp.canSeeTechCard(tc.sections)).toList();
+      }
       if (!mounted) return;
       final currency = emp?.currency ?? acc.establishment?.defaultCurrency ?? 'RUB';
       // Пересчитываем стоимость ингредиентов по актуальным ценам номенклатуры

@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../models/models.dart';
 import '../services/services.dart';
+import '../services/home_layout_config_service.dart';
 import '../widgets/app_bar_home_button.dart';
 
 const _adminEmails = <String>{'stasssercheff@gmail.com'};
@@ -404,6 +405,67 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     if (ctx.mounted) Navigator.of(ctx).pop();
                   },
                 )),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showHomeLayoutConfig(BuildContext context, LocalizationService loc) {
+    final account = context.read<AccountManagerSupabase>();
+    final emp = account.currentEmployee;
+    if (emp == null) return;
+    final layoutSvc = context.read<HomeLayoutConfigService>();
+    final order = List<HomeTileId>.from(layoutSvc.getOrder(emp.id));
+    final tileLabels = <HomeTileId, String>{
+      HomeTileId.messages: loc.t('inbox_tab_messages') ?? 'Сообщения',
+      HomeTileId.schedule: loc.t('schedule'),
+      HomeTileId.productOrder: loc.t('product_order'),
+      HomeTileId.suppliers: loc.t('order_tab_suppliers') ?? 'Поставщики',
+      HomeTileId.menu: loc.t('menu'),
+      HomeTileId.ttk: emp.department == 'bar' ? loc.t('ttk_bar') : loc.t('ttk_kitchen'),
+      HomeTileId.checklists: loc.t('checklists'),
+      HomeTileId.inventory: loc.t('inventory_blank'),
+    };
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx2, setState) => AlertDialog(
+          title: Text(loc.t('home_layout_config') ?? 'Настройка домашнего экрана'),
+          content: SizedBox(
+            width: 320,
+            height: 400,
+            child: ReorderableListView.builder(
+              itemCount: order.length,
+              onReorder: (oldIndex, newIndex) {
+                setState(() {
+                  if (newIndex > oldIndex) newIndex--;
+                  final item = order.removeAt(oldIndex);
+                  order.insert(newIndex, item);
+                });
+              },
+              itemBuilder: (ctx, i) {
+                final id = order[i];
+                return ListTile(
+                  key: ValueKey(id.key),
+                  leading: const Icon(Icons.drag_handle),
+                  title: Text(tileLabels[id] ?? id.key),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+            ),
+            FilledButton(
+              onPressed: () async {
+                await layoutSvc.setOrder(emp.id, order);
+                if (ctx.mounted) Navigator.of(ctx).pop();
+              },
+              child: Text(loc.t('save')),
+            ),
           ],
         ),
       ),
@@ -865,6 +927,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               const Divider(),
             ],
+            ListTile(
+              leading: const Icon(Icons.dashboard_customize),
+              title: Text(localization.t('home_layout_config') ?? 'Настройка домашнего экрана'),
+              subtitle: Text(localization.t('home_layout_config_hint') ?? 'Изменить порядок кнопок на главной'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _showHomeLayoutConfig(context, localization),
+            ),
             ListTile(
               leading: const Icon(Icons.language),
               title: Text(localization.t('language')),
