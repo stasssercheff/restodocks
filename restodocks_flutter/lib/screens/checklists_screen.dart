@@ -236,6 +236,18 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
           final sectionLabel = c.assignedSection != null
               ? (KitchenSection.fromCode(c.assignedSection!)?.getLocalizedName(lang) ?? c.assignedSection)
               : null;
+          final fmtDate = (DateTime d) => '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}';
+          final formatDateTime = (DateTime d) {
+            final hasTime = d.hour != 0 || d.minute != 0;
+            if (hasTime) {
+              return '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')} ${fmtDate(d)}';
+            }
+            return fmtDate(d);
+          };
+          final dateParts = <String>[
+            if (c.scheduledForAt != null) '${loc.t('checklist_scheduled_for') ?? 'На когда'}: ${formatDateTime(c.scheduledForAt!)}',
+            if (c.deadlineAt != null) '${loc.t('checklist_complete_by') ?? 'Завершить до'}: ${formatDateTime(c.deadlineAt!)}',
+          ];
           return Card(
             margin: const EdgeInsets.only(bottom: 8),
             child: ListTile(
@@ -255,6 +267,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
               title: Text((c.name.trim().isNotEmpty ? c.name : c.additionalName?.trim().isNotEmpty == true ? c.additionalName! : (loc.t('checklist_no_name') ?? 'Без названия'))),
               subtitle: Text([
                 if (sectionLabel != null) sectionLabel,
+                ...dateParts,
                 '${c.items.length} ${loc.t('items_count')}',
               ].join(' • ')),
               trailing: canEdit

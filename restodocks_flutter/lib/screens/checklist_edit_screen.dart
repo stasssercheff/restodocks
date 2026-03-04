@@ -705,7 +705,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
             ),
             const SizedBox(width: 16),
             Expanded(
-              child: Text(loc.t('checklist_deadline') ?? 'Срок выполнения'),
+              child: Text(loc.t('checklist_complete_by') ?? 'Завершить до'),
             ),
           ],
         ),
