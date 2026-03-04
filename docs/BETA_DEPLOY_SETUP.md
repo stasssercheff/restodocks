@@ -53,6 +53,24 @@ ALTER TABLE checklists ADD COLUMN IF NOT EXISTS scheduled_for_at TIMESTAMP WITH 
 ALTER TABLE checklist_items ADD COLUMN IF NOT EXISTS tech_card_id UUID REFERENCES tech_cards(id) ON DELETE SET NULL;
 ALTER TABLE checklist_items ADD COLUMN IF NOT EXISTS target_quantity numeric(10, 3);
 ALTER TABLE checklist_items ADD COLUMN IF NOT EXISTS target_unit text;
+
+-- 4. RPC для сохранения дат (обходит schema cache PostgREST)
+CREATE OR REPLACE FUNCTION public.update_checklist_dates(
+  p_checklist_id uuid,
+  p_deadline_at timestamptz DEFAULT NULL,
+  p_scheduled_for_at timestamptz DEFAULT NULL
+)
+RETURNS void
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  UPDATE checklists
+  SET updated_at = now(), deadline_at = p_deadline_at, scheduled_for_at = p_scheduled_for_at
+  WHERE id = p_checklist_id;
+$$;
+GRANT EXECUTE ON FUNCTION public.update_checklist_dates(uuid, timestamptz, timestamptz) TO anon;
+GRANT EXECUTE ON FUNCTION public.update_checklist_dates(uuid, timestamptz, timestamptz) TO authenticated;
 ```
 
 **После миграций:** Supabase Dashboard → **Settings** → **General** → **Restart project** — обновит schema cache PostgREST (иначе возможны PGRST204 и пустые данные).
