@@ -35,11 +35,15 @@
 
 Если при создании чеклиста («задачи», «заготовка») появляется ошибка `Could not find the 'assigned_department' column` — примените миграции к staging Supabase:
 
-```bash
-cd restodocks_flutter && supabase db push
-```
+**Вариант 1.** Через CLI: `cd restodocks_flutter && supabase db push`
 
-Или выполните миграцию вручную в SQL Editor Supabase: `supabase/migrations/20260304160000_ensure_assigned_department.sql`.
+**Вариант 2.** Вручную: откройте в Supabase Dashboard **SQL Editor**, вставьте и выполните:
+
+```sql
+-- Обеспечить наличие assigned_department (чеклисты «задачи» и «заготовка»)
+ALTER TABLE checklists ADD COLUMN IF NOT EXISTS assigned_department TEXT DEFAULT 'kitchen';
+COMMENT ON COLUMN checklists.assigned_department IS 'Подразделение: kitchen, bar, hall. По умолчанию kitchen.';
+```
 
 ## Если Vercel отозвал токен
 

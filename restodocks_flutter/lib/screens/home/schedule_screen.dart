@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoTimerPicker, CupertinoTimerPickerMode;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -836,6 +837,102 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   }
 }
 
+/// Поле выбора времени через bottom sheet — на мобильном не «улетает» пикер.
+class _TimePickerField extends StatelessWidget {
+  const _TimePickerField({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+    required this.loc,
+  });
+
+  final String label;
+  final String value;
+  final ValueChanged<String> onChanged;
+  final LocalizationService loc;
+
+  static TimeOfDay _parse(String s) {
+    final parts = s.trim().split(RegExp(r'[:\s.,-]'));
+    if (parts.isEmpty) return const TimeOfDay(hour: 9, minute: 0);
+    final h = int.tryParse(parts[0]) ?? 9;
+    final m = parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0;
+    return TimeOfDay(hour: h.clamp(0, 23), minute: m.clamp(0, 59));
+  }
+
+  static String _format(TimeOfDay t) =>
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  Future<void> _openPicker(BuildContext context) async {
+    final initial = _parse(value);
+    Duration duration = Duration(hours: initial.hour, minutes: initial.minute);
+    Duration? result;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => SafeArea(
+        child: SizedBox(
+          height: 280,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                height: 220,
+                child: CupertinoTimerPicker(
+                  mode: CupertinoTimerPickerMode.hm,
+                  initialTimerDuration: duration,
+                  onTimerDurationChanged: (d) => duration = d,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      onPressed: () {
+                        result = duration;
+                        Navigator.of(ctx).pop();
+                      },
+                      child: Text(loc.t('save')),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (result != null) {
+      final t = TimeOfDay(hour: result!.inHours % 24, minute: result!.inMinutes % 60);
+      onChanged(_format(t));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () => _openPicker(context),
+      borderRadius: BorderRadius.circular(4),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: label,
+          border: const OutlineInputBorder(),
+          isDense: true,
+          suffixIcon: const Icon(Icons.schedule, size: 20),
+        ),
+        child: Text(value.isEmpty ? 'HH:mm' : value),
+      ),
+    );
+  }
+}
+
 class _ScheduleCellDialog extends StatefulWidget {
   const _ScheduleCellDialog({
     required this.date,
@@ -961,18 +1058,26 @@ class _ScheduleCellDialogState extends State<_ScheduleCellDialog> {
         Row(
           children: [
             Expanded(
-              child: TextField(
-                controller: _startCtrl,
-                decoration: InputDecoration(labelText: loc.t('schedule_time_start'), border: const OutlineInputBorder(), isDense: true),
-                keyboardType: TextInputType.datetime,
+              child: _TimePickerField(
+                label: loc.t('schedule_time_start'),
+                value: _startCtrl.text,
+                onChanged: (s) {
+                  _startCtrl.text = s;
+                  setState(() {});
+                },
+                loc: loc,
               ),
             ),
             const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('–')),
             Expanded(
-              child: TextField(
-                controller: _endCtrl,
-                decoration: InputDecoration(labelText: loc.t('schedule_time_end'), border: const OutlineInputBorder(), isDense: true),
-                keyboardType: TextInputType.datetime,
+              child: _TimePickerField(
+                label: loc.t('schedule_time_end'),
+                value: _endCtrl.text,
+                onChanged: (s) {
+                  _endCtrl.text = s;
+                  setState(() {});
+                },
+                loc: loc,
               ),
             ),
           ],
