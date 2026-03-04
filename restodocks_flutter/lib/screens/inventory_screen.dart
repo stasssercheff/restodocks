@@ -696,6 +696,7 @@ class _InventoryScreenState extends State<InventoryScreen>
       // Всегда добавляем пустую ячейку в конец
       _rows[rowIndex].quantities.add(0.0);
     });
+    _scrollToNewColumn();
   }
 
   void _setPfUnit(int rowIndex, String unit) {
@@ -1833,14 +1834,17 @@ class _InventoryScreenState extends State<InventoryScreen>
                     width: _colQtyWidth,
                     child: _completed
                         ? Text(_formatQty(row.quantityDisplayAt(colIndex)), style: theme.textTheme.bodyMedium)
-                        : _QtyCell(
-                            key: ValueKey('qty_${actualIndex}_$colIndex'),
-                            value: row.quantities[colIndex],
-                            useGrams: row.isWeightInKg,
-                            onChanged: (v) => _setQuantity(actualIndex, colIndex, v),
-                            textInputAction: isLastCell ? TextInputAction.done : TextInputAction.next,
-                            onFocusGained: () => setState(() => _hasInputFocus = true),
-                            onFocusLost: () => setState(() => _hasInputFocus = false),
+                        : Builder(
+                            builder: (cellContext) => _QtyCell(
+                              key: ValueKey('qty_${actualIndex}_$colIndex'),
+                              value: row.quantities[colIndex],
+                              useGrams: row.isWeightInKg,
+                              onChanged: (v) => _setQuantity(actualIndex, colIndex, v),
+                              textInputAction: isLastCell ? TextInputAction.done : TextInputAction.next,
+                              scrollToContext: cellContext,
+                              onFocusGained: () => setState(() => _hasInputFocus = true),
+                              onFocusLost: () => setState(() => _hasInputFocus = false),
+                            ),
                           ),
                   ),
                 );
