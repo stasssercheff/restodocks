@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+
 import '../models/models.dart';
+import '../utils/number_format_utils.dart';
 import '../models/nomenclature_item.dart';
 import '../services/services.dart';
 
@@ -378,7 +380,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   const SizedBox.shrink(), // Стоимость (пусто)
                   widget.isCook
                       ? const SizedBox.shrink() // Скрываем стоимость для поваров
-                      : _buildTotalCell('${costPerKgFinishedProduct.toStringAsFixed(0)} $_currencySymbol'), // Стоимость за кг готового продукта
+                      : _buildTotalCell('${NumberFormatUtils.formatInt(costPerKgFinishedProduct)} $_currencySymbol'), // Стоимость за кг готового продукта
                   const SizedBox.shrink(), // Удаление
                 ],
               ),
@@ -909,11 +911,12 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   Widget _buildCostCell(TTIngredient ingredient) {
     final pricePerKg = _resolvePricePerKg(ingredient);
     final sym = _currencySymbol;
+    final fmt = NumberFormatUtils.formatInt(pricePerKg);
     return Container(
       height: 44,
       child: Center(
         child: Text(
-          sym.isNotEmpty ? '${pricePerKg.toStringAsFixed(0)} $sym' : pricePerKg.toStringAsFixed(0),
+          sym.isNotEmpty ? '$fmt $sym' : fmt,
           style: const TextStyle(fontSize: 12),
         ),
       ),
@@ -925,12 +928,13 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     final pricePerKg = _resolvePricePerKg(ingredient);
     final grossCost = pricePerKg * (ingredient.grossWeight / 1000);
     final sym = _currencySymbol;
+    final fmt = NumberFormatUtils.formatInt(grossCost);
 
     return Container(
       height: 44,
       child: Center(
         child: Text(
-          sym.isNotEmpty ? '${grossCost.toStringAsFixed(0)} $sym' : grossCost.toStringAsFixed(0),
+          sym.isNotEmpty ? '$fmt $sym' : fmt,
           style: const TextStyle(fontSize: 12),
         ),
       ),

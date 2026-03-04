@@ -1,6 +1,8 @@
 import 'dart:typed_data';
 
 import 'package:excel/excel.dart' hide Border;
+
+import '../utils/number_format_utils.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -704,7 +706,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                 final selected = _selectedTechCards.contains(tc.id);
                 final name = tc.getDisplayNameInLists(lang);
                 final cat = _categoryLabel(tc.category, loc);
-                final cost = _calculateCostPerKg(tc).toStringAsFixed(0);
+                final cost = NumberFormatUtils.formatInt(_calculateCostPerKg(tc));
                 return Material(
                   color: selected
                       ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.5)
@@ -763,23 +765,17 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                                   value: selected,
                                   onChanged: (_) => _toggleTechCardSelection(tc.id),
                                 )
-                                : Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      if (canEdit)
-                                        IconButton(
-                                          icon: const Icon(Icons.visibility_outlined, size: 20),
-                                          tooltip: loc.t('ttk_view'),
-                                          onPressed: () => context.push('/tech-cards/${tc.id}?view=1'),
-                                          style: IconButton.styleFrom(
-                                            minimumSize: const Size(36, 36),
-                                            padding: EdgeInsets.zero,
-                                          ),
+                                : (canEdit
+                                    ? IconButton(
+                                        icon: const Icon(Icons.visibility_outlined, size: 20),
+                                        tooltip: loc.t('ttk_view'),
+                                        onPressed: () => context.push('/tech-cards/${tc.id}?view=1'),
+                                        style: IconButton.styleFrom(
+                                          minimumSize: const Size(36, 36),
+                                          padding: EdgeInsets.zero,
                                         ),
-                                      Icon(Icons.chevron_right, size: 20, color: Theme.of(context).colorScheme.outline),
-                                    ],
-                                  ),
+                                      )
+                                    : const SizedBox.shrink()),
                           ),
                         ],
                       ),
@@ -819,7 +815,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                 cells: [
                   DataCell(Text(tc.getDisplayNameInLists(lang))),
                   DataCell(Text(_categoryLabel(tc.category, loc))),
-                  DataCell(Text(_calculateCostPerKg(tc).toStringAsFixed(0))),
+                  DataCell(Text(NumberFormatUtils.formatInt(_calculateCostPerKg(tc)))),
                 ],
                 onSelectChanged: _selectionMode ? null : (_) => context.push('/tech-cards/${tc.id}'),
               );

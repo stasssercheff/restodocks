@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../core/config/roles_config.dart';
 import '../models/models.dart';
+import '../utils/number_format_utils.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
 
@@ -359,7 +360,7 @@ class _EmployeeCard extends StatelessWidget {
     final isPerShift = employee.paymentType == 'per_shift';
     final rate = isPerShift ? employee.ratePerShift : employee.hourlyRate;
     final rateStr = rate != null && rate > 0
-        ? '${rate.toStringAsFixed(0)} $currencySymbol'
+        ? '${NumberFormatUtils.formatInt(rate)} $currencySymbol'
         : '—';
     final sectionStr = (employee.department == 'kitchen' && employee.section != null && employee.section!.isNotEmpty)
         ? (loc.t('section_${employee.section}') != 'section_${employee.section}'
@@ -507,7 +508,7 @@ class _EmployeeCard extends StatelessWidget {
     final isPerShift = employee.paymentType == 'per_shift';
     final rate = isPerShift ? employee.ratePerShift : employee.hourlyRate;
     final rateStr = rate != null && rate > 0
-        ? '${rate.toStringAsFixed(0)} $currencySymbol'
+        ? '${NumberFormatUtils.formatInt(rate)} $currencySymbol'
         : '—';
     final sectionStr = (employee.department == 'kitchen' && employee.section != null && employee.section!.isNotEmpty)
         ? (loc.t('section_${employee.section}') != 'section_${employee.section}'

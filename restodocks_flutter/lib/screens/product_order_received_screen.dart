@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../services/inventory_download.dart';
 import '../services/services.dart';
+import '../utils/number_format_utils.dart';
 import '../widgets/app_bar_home_button.dart';
 
 /// Полученные и отправленные заказы продуктов: просмотр и скачивание.
@@ -280,7 +281,7 @@ class _ProductOrderReceivedScreenState extends State<ProductOrderReceivedScreen>
 
   String _fmtNum(dynamic v) {
     if (v == null) return '—';
-    if (v is num) return v == v.truncateToDouble() ? v.toInt().toString() : v.toStringAsFixed(1);
+    if (v is num) return NumberFormatUtils.formatDecimal(v);
     return v.toString();
   }
 

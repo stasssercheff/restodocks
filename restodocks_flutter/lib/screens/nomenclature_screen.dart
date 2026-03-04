@@ -10,6 +10,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/iiko_product.dart';
+import '../utils/number_format_utils.dart';
 import '../services/iiko_product_store.dart';
 import '../services/iiko_xlsx_sanitizer.dart';
 
@@ -956,9 +957,9 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     if (rawPrice != null) {
       final unit = (p.unit ?? 'g').trim().toLowerCase();
       if (unit == 'g' || unit == 'грамм' || unit == 'kg' || unit == 'кг') {
-        priceText = loc.t('price_per_kg').replaceFirst('%s', rawPrice.toStringAsFixed(0)).replaceFirst('%s', currencySymbol);
+        priceText = loc.t('price_per_kg').replaceFirst('%s', NumberFormatUtils.formatInt(rawPrice)).replaceFirst('%s', currencySymbol);
       } else {
-        priceText = '${rawPrice.toStringAsFixed(0)} $currencySymbol/${_unitDisplay(p.unit, loc.currentLanguageCode)}';
+        priceText = '${NumberFormatUtils.formatInt(rawPrice)} $currencySymbol/${_unitDisplay(p.unit, loc.currentLanguageCode)}';
       }
     } else {
       priceText = loc.t('price_not_set');
@@ -994,7 +995,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     final sym = _currencySymbol(context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'VND');
 
     return loc.t('pf_price_per_kg')
-        .replaceFirst('%s', costPerKg.toStringAsFixed(0))
+        .replaceFirst('%s', NumberFormatUtils.formatInt(costPerKg))
         .replaceFirst('%s', sym)
         .replaceFirst('%s', tc.yield.toStringAsFixed(0));
   }
@@ -2505,7 +2506,7 @@ class _VerifyProductsResultsDialog extends StatelessWidget {
                           ],
                           if (r.suggestedPrice != null && r.suggestedPrice != p.basePrice) ...[
                             const SizedBox(height: 2),
-                            Text('${loc.t('price')}: ${p.basePrice?.toStringAsFixed(2) ?? '—'} → ${r.suggestedPrice!.toStringAsFixed(2)}', style: Theme.of(context).textTheme.bodySmall),
+                            Text('${loc.t('price')}: ${p.basePrice != null ? NumberFormatUtils.formatDecimal(p.basePrice!) : '—'} → ${NumberFormatUtils.formatDecimal(r.suggestedPrice!)}', style: Theme.of(context).textTheme.bodySmall),
                           ],
                           if (r.suggestedCalories != null || r.suggestedProtein != null || r.suggestedFat != null || r.suggestedCarbs != null) ...[
                             const SizedBox(height: 2),

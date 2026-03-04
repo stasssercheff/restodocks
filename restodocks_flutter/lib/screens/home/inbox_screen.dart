@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../services/services.dart';
 import '../../models/models.dart';
+import '../../utils/number_format_utils.dart';
 import '../../models/inbox_document.dart';
 import '../../services/inbox_service.dart';
 import '../../widgets/app_bar_home_button.dart';
@@ -430,7 +431,7 @@ class _DocumentTile extends StatelessWidget {
     final grandTotal = document.type == DocumentType.productOrder
         ? (document.metadata?['grandTotal'] as num?)?.toDouble()
         : null;
-    final totalStr = grandTotal != null ? NumberFormat('#,##0.00', 'ru').format(grandTotal) : null;
+    final totalStr = grandTotal != null ? NumberFormatUtils.formatDecimal(grandTotal) : null;
     final totalLabel = loc.t('order_list_grand_total') ?? 'Итого';
 
     return Card(

@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../models/models.dart';
 import '../services/services.dart';
+import '../utils/number_format_utils.dart';
 import '../services/inventory_download.dart';
 import '../widgets/app_bar_home_button.dart';
 
@@ -579,10 +580,7 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
 
   String _fmtNum(dynamic v) {
     if (v == null) return '—';
-    if (v is num) {
-      final nf = NumberFormat('#,##0.##', 'en_US');
-      return nf.format(v).replaceAll(',', ' ');
-    }
+    if (v is num) return NumberFormatUtils.formatDecimal(v);
     return v.toString();
   }
 }

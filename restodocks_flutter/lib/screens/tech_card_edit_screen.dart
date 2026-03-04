@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 
 import '../models/models.dart';
 import '../services/services.dart';
+import '../utils/number_format_utils.dart';
 import '../widgets/app_bar_home_button.dart';
 import 'excel_style_ttk_table.dart';
 
@@ -2522,9 +2523,9 @@ class _TtkTableState extends State<_TtkTable> {
                         ),
                       )),
                     )
-                  : _cell(ing.cost.toStringAsFixed(2)),
+                  : _cell(NumberFormatUtils.formatDecimal(ing.cost)),
               // Цена за 1 кг/шт блюда (по ингредиенту: стоимость за кг при выходе)
-              _cell(_outputForPrice(ing) > 0 ? (ing.cost * 1000 / _outputForPrice(ing)).toStringAsFixed(2) : ''),
+              _cell(_outputForPrice(ing) > 0 ? NumberFormatUtils.formatDecimal(ing.cost * 1000 / _outputForPrice(ing)) : ''),
               // Колонка «Технология» — только в первой строке контент, в остальных пустая ячейка
               isFirstRow && widget.technologyController != null
                   ? TableCell(
@@ -2586,8 +2587,8 @@ class _TtkTableState extends State<_TtkTable> {
             _totalCell(''),
             _totalCell(''),
             _totalCell(totalNet.toStringAsFixed(0)),
-            _totalCell(totalCost.toStringAsFixed(2)),
-            _totalCell(totalNet > 0 ? (totalCost * 1000 / totalNet).toStringAsFixed(2) : ''),
+            _totalCell(NumberFormatUtils.formatDecimal(totalCost)),
+            _totalCell(totalNet > 0 ? NumberFormatUtils.formatDecimal(totalCost * 1000 / totalNet) : ''),
             _totalCell(''),
             if (hasDeleteCol) _totalCell(''),
           ],
