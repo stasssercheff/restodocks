@@ -903,25 +903,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
       appBar: AppBar(
         leading: appBarBackButton(context),
         title: Text(loc.t('checklists')),
-        actions: [
-          if (canEdit)
-            TextButton.icon(
-              onPressed: () => context.push('/checklists/${widget.checklistId}/fill'),
-              icon: const Icon(Icons.task_alt, size: 18),
-              label: Text(loc.t('fill_checklist') ?? 'Заполнить'),
-            ),
-          if (canEdit)
-            TextButton(
-              onPressed: _duplicate,
-              child: Text(loc.t('create_by_analogy')),
-            ),
-          if (canEdit)
-            IconButton(
-              icon: const Icon(Icons.delete_outline),
-              onPressed: _delete,
-              tooltip: loc.t('delete'),
-            ),
-        ],
+        actions: const [],
       ),
       body: Stack(
         children: [

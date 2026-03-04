@@ -82,11 +82,8 @@ class ChecklistServiceSupabase {
       'updated_at': now.toIso8601String(),
     };
     if (assignedSection != null) data['assigned_section'] = assignedSection;
-    // assigned_department — опционально (колонка может отсутствовать в старых схемах)
     if (assignedEmployeeId != null) data['assigned_employee_id'] = assignedEmployeeId;
-    if (assignedEmployeeIds != null && assignedEmployeeIds.isNotEmpty) {
-      data['assigned_employee_ids'] = assignedEmployeeIds;
-    }
+    // assigned_employee_ids — не отправляем: колонка может отсутствовать (миграция 20260304120000)
     if (deadlineAt != null) data['deadline_at'] = deadlineAt.toIso8601String();
     if (scheduledForAt != null) data['scheduled_for_at'] = scheduledForAt.toIso8601String();
     if (additionalName != null) data['additional_name'] = additionalName;
@@ -116,9 +113,10 @@ class ChecklistServiceSupabase {
       'updated_at': DateTime.now().toIso8601String(),
     };
     upd['assigned_section'] = checklist.assignedSection;
-    // assigned_department — не отправляем, совместимость со схемами без колонки
-    upd['assigned_employee_id'] = checklist.assignedEmployeeId;
-    upd['assigned_employee_ids'] = checklist.assignedEmployeeIds ?? [];
+    upd['assigned_employee_id'] = checklist.assignedEmployeeIds?.isNotEmpty == true
+        ? checklist.assignedEmployeeIds!.first
+        : checklist.assignedEmployeeId;
+    // assigned_employee_ids не отправляем: колонка может отсутствовать в схеме
     upd['deadline_at'] = checklist.deadlineAt?.toIso8601String();
     upd['scheduled_for_at'] = checklist.scheduledForAt?.toIso8601String();
     upd['additional_name'] = checklist.additionalName;
