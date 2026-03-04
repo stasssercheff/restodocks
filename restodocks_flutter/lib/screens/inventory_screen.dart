@@ -3564,11 +3564,12 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   }
 }
 
-// Ширина фиксированных колонок
-const double _iikoColName  = 180; // Наименование
-const double _iikoColUnit  =  32; // Ед. изм. (узкая, только аббревиатура)
-const double _iikoColTotal =  56; // Итого
-const double _iikoColCell  =  58; // Каждая ячейка ввода
+// Ширина фиксированных колонок (как в стандартной инвентаризации)
+const double _iikoColName  = 140; // Наименование
+const double _iikoColUnit  =  48; // Ед. изм. (= _colUnitWidth)
+const double _iikoColTotal =  56; // Итого (= _colTotalWidth)
+const double _iikoColCell  =  48; // Ячейка ввода (= _colQtyWidth)
+const double _iikoColGap   =   4; // Отступ между ячейками (= _colGap)
 
 // ── Шапка таблицы ────────────────────────────────────────────────────────────
 // Левая часть фиксирована (Наименование + Итого), правая скроллируется вместе со строками.
@@ -3580,16 +3581,16 @@ class _IikoInventoryHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final headerBg   = theme.colorScheme.surfaceContainerHighest;
+    final headerBg   = theme.colorScheme.surfaceContainerHighest.withOpacity(0.5);
     final borderClr  = theme.dividerColor;
-    final textStyle  = TextStyle(
-        fontSize: 11, fontWeight: FontWeight.w700,
-        color: theme.colorScheme.onSurface);
+    final textStyle  = theme.textTheme.labelMedium?.copyWith(
+        fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface) ??
+        const TextStyle(fontSize: 12, fontWeight: FontWeight.bold);
     final border = BorderSide(color: borderClr);
 
     Widget hCell(String t, double w) => Container(
           width: w,
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 7),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
           decoration: BoxDecoration(
             color: headerBg,
             border: Border(right: border, bottom: border),
@@ -3887,21 +3888,21 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
     final borderClr = theme.dividerColor;
     final cb = BorderSide(color: borderClr);
 
-    // Ячейка ввода количества
+    // Ячейка ввода количества (как в стандарте: 48px, gap 4)
     Widget numCell(int colIdx) {
       final ctrl = _ctrls[colIdx];
       final fn = colIdx < _focusNodes.length ? _focusNodes[colIdx] : null;
       return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 5),
+        padding: EdgeInsets.only(right: colIdx < qtyCols - 1 ? _iikoColGap : 0),
         child: SizedBox(
-          width: _iikoColCell - 6,
+          width: _iikoColCell,
           child: TextField(
             controller: ctrl,
             focusNode: fn,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             textInputAction: TextInputAction.next,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 13),
+            style: theme.textTheme.bodyMedium,
             decoration: InputDecoration(
               isDense: true,
               contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
@@ -3909,8 +3910,7 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
               filled: true,
               fillColor: theme.colorScheme.surfaceContainerHighest.withOpacity(0.45),
               hintText: '—',
-              hintStyle: TextStyle(
-                  fontSize: 12,
+              hintStyle: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurface.withOpacity(0.3)),
             ),
             onChanged: (v) {
@@ -3930,7 +3930,7 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
       decoration: BoxDecoration(
         border: Border(left: cb, bottom: cb),
       ),
-      constraints: const BoxConstraints(minHeight: 48),
+      constraints: const BoxConstraints(minHeight: 44),
       child: IntrinsicHeight(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -3938,12 +3938,12 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
             // ── Наименование ──
             Container(
               width: _iikoColName,
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
               decoration: BoxDecoration(border: Border(right: cb)),
               alignment: Alignment.centerLeft,
               child: Text(
                 widget.row.product.displayName,
-                style: const TextStyle(fontSize: 13),
+                style: theme.textTheme.bodyMedium,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -3956,12 +3956,11 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
                 color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
                 border: Border(right: cb),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 1),
+              padding: const EdgeInsets.symmetric(horizontal: 4),
               child: Text(
                 unit,
-                style: TextStyle(
-                    fontSize: 10,
-                    color: theme.colorScheme.onSurface.withOpacity(0.7)),
+                style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant),
                 textAlign: TextAlign.center,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -3977,8 +3976,7 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
               ),
               child: Text(
                 total > 0 ? _fmt(total) : '',
-                style: TextStyle(
-                    fontSize: 13,
+                style: theme.textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                     color: total > 0 ? theme.colorScheme.primary : null),
               ),
