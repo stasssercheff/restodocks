@@ -582,7 +582,7 @@ class TTIngredient extends Equatable {
   }
 
   /// Информация о стоимости
-  String get costInfo => '${cost.toStringAsFixed(2)} ₽'; // TODO: использовать текущую валюту
+  String costInfo(String currencySymbol) => '${cost.toStringAsFixed(2)} $currencySymbol';
 
   /// Вес после первичной обработки (нетто до ужарки). При ручном вводе — manualEffectiveGross, иначе формула.
   double get effectiveGrossWeight => manualEffectiveGross ?? (grossWeight * (1.0 - (primaryWastePct.clamp(0.0, 99.9) / 100.0)));

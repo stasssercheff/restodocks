@@ -36,7 +36,9 @@ Map<String, dynamic> _$InboxDocumentToJson(InboxDocument instance) =>
 
 const _$DocumentTypeEnumMap = {
   DocumentType.inventory: 'inventory',
+  DocumentType.iikoInventory: 'iikoInventory',
   DocumentType.productOrder: 'productOrder',
   DocumentType.shiftConfirmation: 'shiftConfirmation',
   DocumentType.checklistSubmission: 'checklistSubmission',
+  DocumentType.checklistMissedDeadline: 'checklistMissedDeadline',
 };

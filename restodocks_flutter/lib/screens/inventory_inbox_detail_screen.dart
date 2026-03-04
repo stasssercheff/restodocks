@@ -1,9 +1,11 @@
 import 'package:excel/excel.dart' hide TextSpan;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../models/models.dart';
+import '../utils/number_format_utils.dart';
 import '../services/inventory_download.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
@@ -97,7 +99,7 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
     return list;
   }
 
-  Future<void> _saveToFile() async {
+  Future<void> _saveToFile({bool withPrice = false}) async {
     final doc = _doc;
     final loc = context.read<LocalizationService>();
     if (doc == null) return;
@@ -106,6 +108,26 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
     final header = payload['header'] as Map<String, dynamic>? ?? {};
     final rows = payload['rows'] as List<dynamic>? ?? [];
     final aggregated = payload['aggregatedProducts'] as List<dynamic>? ?? [];
+
+    Map<String, double>? pricePerProduct;
+    String? establishmentId;
+    if (withPrice) {
+      establishmentId = doc['establishment_id'] as String?;
+      if (establishmentId != null) {
+        final store = context.read<ProductStoreSupabase>();
+        await store.loadNomenclature(establishmentId);
+        pricePerProduct = {};
+        for (final r in rows) {
+          final pid = (r as Map<String, dynamic>)['productId'] as String?;
+          if (pid != null && !pid.startsWith('pf_') && !pid.startsWith('free_')) {
+            final priceInfo = store.getEstablishmentPrice(pid, establishmentId);
+            if (priceInfo != null && priceInfo.$1 != null) {
+              pricePerProduct[pid] = priceInfo.$1!;
+            }
+          }
+        }
+      }
+    }
 
     try {
       var maxCols = 0;
@@ -121,12 +143,18 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
       final nameLabel = loc.t('inventory_item_name');
       final unitLabel = loc.t('inventory_unit');
       final totalLabel = loc.t('inventory_excel_total');
+      final acc = context.read<AccountManagerSupabase>();
+      final est = acc.establishment;
+      final currency = est?.defaultCurrency ?? 'VND';
+      final currencySym = est?.currencySymbol ?? Establishment.currencySymbolFor(currency);
+      final sumLabel = '${loc.t('inventory_excel_sum') ?? 'Сумма'}${currencySym.isNotEmpty ? ' ($currencySym)' : ''}';
       final fillLabel = loc.t('inventory_excel_fill_data');
 
       final headerCells = <CellValue>[
         TextCellValue(numLabel),
         TextCellValue(nameLabel),
         TextCellValue(unitLabel),
+        if (withPrice) TextCellValue(sumLabel),
         TextCellValue(totalLabel),
       ];
       for (var c = 0; c < maxCols; c++) {
@@ -140,6 +168,7 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
       // Сортируем и переводим названия для Excel так же, как в UI
       final rowsSorted = _sortedRows(rows);
       var rowNum = 1;
+      double totalSumAll = 0;
       for (var i = 0; i < rowsSorted.length; i++) {
         final r = rowsSorted[i];
         final originalName = r['productName'] as String? ?? '';
@@ -147,10 +176,30 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
         final unit = r['unit'] as String? ?? '';
         final total = (r['total'] as num?)?.toDouble() ?? 0.0;
         final quantities = r['quantities'] as List<dynamic>? ?? [];
+        double rowSum = 0;
+        if (withPrice) {
+          // Приоритет: цена из payload (пересчитана при завершении из карточки продукта)
+          final priceFromPayload = (r['price'] as num?)?.toDouble();
+          if (priceFromPayload != null && priceFromPayload > 0) {
+            rowSum = priceFromPayload;
+            totalSumAll += rowSum;
+          } else if (pricePerProduct != null && establishmentId != null) {
+            final pid = r['productId'] as String?;
+            if (pid != null && !pid.startsWith('pf_') && !pid.startsWith('free_')) {
+              final price = pricePerProduct[pid];
+              if (price != null && price > 0) {
+                final totalKg = total / 1000;
+                rowSum = totalKg * price;
+                totalSumAll += rowSum;
+              }
+            }
+          }
+        }
         final rowCells = <CellValue>[
           IntCellValue(rowNum++),
           TextCellValue(name),
           TextCellValue(unit),
+          if (withPrice) TextCellValue(NumberFormatUtils.formatSum(rowSum, currency)),
           DoubleCellValue(total),
         ];
         for (var c = 0; c < maxCols; c++) {
@@ -158,6 +207,18 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
           rowCells.add(DoubleCellValue(q));
         }
         sheet1.appendRow(rowCells);
+      }
+      if (withPrice && totalSumAll > 0) {
+        final totalLabelFinal = loc.t('inventory_excel_total_sum') ?? 'Итого:';
+        final totalRow = <CellValue>[
+          TextCellValue(''),
+          TextCellValue(totalLabelFinal),
+          TextCellValue(''),
+        ];
+        if (withPrice) totalRow.add(TextCellValue(NumberFormatUtils.formatSum(totalSumAll, currency)));
+        totalRow.add(DoubleCellValue(0));
+        for (var c = 0; c < maxCols; c++) totalRow.add(TextCellValue(''));
+        sheet1.appendRow(totalRow);
       }
 
       if (aggregated.isNotEmpty) {
@@ -331,10 +392,14 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
         leading: appBarBackButton(context),
         title: Text(loc.t('inventory_blank_title')),
         actions: [
-          IconButton(
+          PopupMenuButton<String>(
             icon: const Icon(Icons.download),
             tooltip: loc.t('download') ?? 'Сохранить',
-            onPressed: _saveToFile,
+            onSelected: (v) => _saveToFile(withPrice: v == 'with_price'),
+            itemBuilder: (_) => [
+              PopupMenuItem(value: 'no_price', child: Text(loc.t('inventory_export_no_price') ?? 'Без цены')),
+              PopupMenuItem(value: 'with_price', child: Text(loc.t('inventory_export_with_price') ?? 'С ценой')),
+            ],
           ),
         ],
       ),
@@ -397,6 +462,7 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
         1: FlexColumnWidth(2),
         2: FlexColumnWidth(0.5),
         3: FlexColumnWidth(0.6),
+        4: FlexColumnWidth(0.6),
       },
       children: [
         TableRow(
@@ -406,18 +472,21 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
             _cell(theme, loc.t('inventory_item_name'), bold: true),
             _cell(theme, loc.t('inventory_unit'), bold: true),
             _cell(theme, loc.t('inventory_total'), bold: true),
+            _cell(theme, _sumHeaderLabel(loc), bold: true),
           ],
         ),
         ...rows.asMap().entries.map((e) {
           final r = e.value;
           final originalName = (r['productName'] ?? '').toString();
           final displayName = _translatedNames[originalName] ?? originalName;
+          final price = (r['price'] as num?)?.toDouble();
           return TableRow(
             children: [
               _cell(theme, '${e.key + 1}'),
               _cell(theme, displayName),
               _cell(theme, (r['unit'] ?? '').toString()),
               _cell(theme, _fmt(r['total'])),
+              _cell(theme, price != null && price > 0 ? _fmtPrice(price) : '—'),
             ],
           );
         }),
@@ -437,9 +506,27 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
     );
   }
 
+  String _sumHeaderLabel(LocalizationService loc) {
+    final acc = context.read<AccountManagerSupabase>();
+    final est = acc.establishment;
+    final currency = est?.defaultCurrency ?? 'VND';
+    final base = loc.t('inventory_excel_sum') ?? 'Сумма';
+    return currency.isNotEmpty ? '$base $currency' : base;
+  }
+
   String _fmt(dynamic v) {
     if (v == null) return '—';
     if (v is num) return v == v.truncateToDouble() ? v.toInt().toString() : v.toStringAsFixed(1);
     return v.toString();
+  }
+
+  /// Формат суммы инвентаризации: разделитель тысяч (пробел), для VND и подобных — без десятичных.
+  String _fmtPrice(num value) {
+    final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'VND';
+    final noDecimals = {'VND', 'JPY', 'KRW'}.contains(currency.toUpperCase());
+    final nf = noDecimals
+        ? NumberFormat('#,##0', 'ru_RU')
+        : NumberFormat('#,##0.##', 'ru_RU');
+    return nf.format(noDecimals ? value.round() : value).replaceAll('\u00A0', ' ');
   }
 }

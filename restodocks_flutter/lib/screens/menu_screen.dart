@@ -149,7 +149,7 @@ class _MenuScreenState extends State<MenuScreen> {
     final loc = context.watch<LocalizationService>();
     final accountManager = context.read<AccountManagerSupabase>();
     final currency = accountManager.currentEmployee?.currency ?? accountManager.establishment?.defaultCurrency ?? 'RUB';
-    final sym = accountManager.currentEmployee?.currencySymbol ?? accountManager.establishment?.currencySymbol ?? '₽';
+    final sym = accountManager.establishment?.currencySymbol ?? accountManager.currentEmployee?.currencySymbol ?? Establishment.currencySymbolFor(accountManager.establishment?.defaultCurrency ?? 'VND');
 
     return Scaffold(
       appBar: AppBar(

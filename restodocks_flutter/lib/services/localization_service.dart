@@ -109,6 +109,23 @@ class LocalizationService extends ChangeNotifier {
     return translate(key, args: args);
   }
 
+  /// Отображаемое название должности по коду (role_bar_manager → «Барменеджер»).
+  /// Используется в профиле, инвентаризации, списке сотрудников и везде, где показывается должность.
+  String roleDisplayName(String roleCode) {
+    if (roleCode.isEmpty) return t('employee');
+    final key = 'role_$roleCode';
+    final translated = t(key);
+    return translated == key ? roleCode : translated;
+  }
+
+  /// Отображаемое название отдела по коду (department_kitchen и т.д.), если есть ключ.
+  String departmentDisplayName(String departmentCode) {
+    if (departmentCode.isEmpty) return departmentCode;
+    final key = 'department_$departmentCode';
+    final translated = t(key);
+    return translated == key ? departmentCode : translated;
+  }
+
   /// Получение перевода для указанного языка (для экспорта списка заказа на выбранном языке)
   String tForLanguage(String languageCode, String key, {Map<String, String>? args}) {
     var translation = _translations[languageCode]?[key] ??

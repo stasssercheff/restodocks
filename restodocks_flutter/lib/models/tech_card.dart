@@ -254,7 +254,7 @@ class TechCard extends Equatable {
     final calories = totalCalories.round();
     final cost = totalCost.toStringAsFixed(2);
 
-    return '$dishName: $ingredientCount ингр., $calories ккал, $cost ₽';
+    return '$dishName: $ingredientCount ингр., $calories ккал, $cost';
   }
 
 

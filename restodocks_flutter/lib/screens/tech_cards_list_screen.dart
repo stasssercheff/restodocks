@@ -1,6 +1,8 @@
 import 'dart:typed_data';
 
 import 'package:excel/excel.dart' hide Border;
+
+import '../utils/number_format_utils.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -59,6 +61,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       'soup': {'ru': 'Суп', 'en': 'Soup'},
       'misc': {'ru': 'Разное', 'en': 'Misc'},
       'beverages': {'ru': 'Напитки', 'en': 'Beverages'},
+      'alcoholic_cocktails': {'ru': 'Алкогольные коктейли', 'en': 'Alcoholic cocktails'},
+      'non_alcoholic_drinks': {'ru': 'Безалкогольные напитки', 'en': 'Non-alcoholic drinks'},
+      'hot_drinks': {'ru': 'Горячие напитки', 'en': 'Hot drinks'},
+      'drinks_pure': {'ru': 'Напитки в чистом виде', 'en': 'Drinks (neat)'},
+      'snacks': {'ru': 'Снеки', 'en': 'Snacks'},
     };
 
     return categoryTranslations[c]?[lang] ?? c;
@@ -421,7 +428,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                   tooltip: loc.t('create_tech_card'),
                   onSelected: (value) async {
                     if (value == 'new') {
-                      context.push('/tech-cards/new');
+                      context.push(widget.department == 'bar' ? '/tech-cards/new?department=bar' : '/tech-cards/new');
                     }
                   },
                   itemBuilder: (_) => [
@@ -529,7 +536,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       ),
       floatingActionButton: canEdit
           ? FloatingActionButton(
-              onPressed: _loading ? null : () => context.push('/tech-cards/new'),
+              onPressed: _loading ? null : () => context.push(widget.department == 'bar' ? '/tech-cards/new?department=bar' : '/tech-cards/new'),
               child: const Icon(Icons.add),
               tooltip: loc.t('create_tech_card'),
             )
@@ -668,8 +675,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   /// Компактная таблица с шапкой: влезает в экран телефона, без горизонтального скролла.
   Widget _buildTechCardsTable(List<TechCard> techCards, LocalizationService loc, bool canEdit) {
     final lang = loc.currentLanguageCode;
-    const colCatWidth = 52.0;
+    const colCatWidth = 76.0;
     const colCostWidth = 48.0;
+    const colActionsWidth = 62.0; // «Просмотр» целиком
+    final est = context.read<AccountManagerSupabase>().establishment;
+    final costSym = est?.currencySymbol ?? Establishment.currencySymbolFor(est?.defaultCurrency ?? 'VND');
     return RefreshIndicator(
       onRefresh: _load,
       child: CustomScrollView(
@@ -680,11 +690,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
             delegate: _TableHeaderDelegate(
               colCatWidth: colCatWidth,
               colCostWidth: colCostWidth,
+              colActionsWidth: colActionsWidth,
               color: Theme.of(context).colorScheme.primaryContainer,
               onColor: Theme.of(context).colorScheme.onPrimaryContainer,
               labelName: loc.t('ttk_col_name'),
-              labelCat: loc.t('column_category').substring(0, loc.t('column_category').length.clamp(0, 4)),
-              labelCost: '${context.read<AccountManagerSupabase>().establishment?.currencySymbol ?? ''}/${loc.t('kg')}',
+              labelCat: loc.t('column_category'),
+              labelCost: '$costSym/${loc.t('kg')}',
+              labelView: loc.t('ttk_col_view'),
             ),
           ),
           SliverList(
@@ -694,7 +706,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                 final selected = _selectedTechCards.contains(tc.id);
                 final name = tc.getDisplayNameInLists(lang);
                 final cat = _categoryLabel(tc.category, loc);
-                final cost = _calculateCostPerKg(tc).toStringAsFixed(0);
+                final cost = NumberFormatUtils.formatInt(_calculateCostPerKg(tc));
                 return Material(
                   color: selected
                       ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.5)
@@ -711,7 +723,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                         ? () => context.push('/tech-cards/${tc.id}?view=1')
                         : null,
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                       child: Row(
                         children: [
                           Expanded(
@@ -732,6 +744,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
                             ),
                           ),
                           SizedBox(
@@ -742,29 +755,28 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                                 fontSize: 12,
                                 color: Theme.of(context).colorScheme.onSurfaceVariant,
                               ),
+                              textAlign: TextAlign.center,
                             ),
                           ),
-                          _selectionMode
-                              ? Checkbox(
+                          SizedBox(
+                            width: colActionsWidth,
+                            child: _selectionMode
+                                ? Checkbox(
                                   value: selected,
                                   onChanged: (_) => _toggleTechCardSelection(tc.id),
                                 )
-                              : Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (canEdit)
-                                      IconButton(
-                        icon: const Icon(Icons.visibility_outlined, size: 20),
-                        tooltip: loc.t('ttk_view'),
+                                : (canEdit
+                                    ? IconButton(
+                                        icon: const Icon(Icons.visibility_outlined, size: 20),
+                                        tooltip: loc.t('ttk_view'),
                                         onPressed: () => context.push('/tech-cards/${tc.id}?view=1'),
                                         style: IconButton.styleFrom(
                                           minimumSize: const Size(36, 36),
                                           padding: EdgeInsets.zero,
                                         ),
-                                      ),
-                                    Icon(Icons.chevron_right, size: 20, color: Theme.of(context).colorScheme.outline),
-                                  ],
-                                ),
+                                      )
+                                    : const SizedBox.shrink()),
+                          ),
                         ],
                       ),
                     ),
@@ -803,7 +815,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                 cells: [
                   DataCell(Text(tc.getDisplayNameInLists(lang))),
                   DataCell(Text(_categoryLabel(tc.category, loc))),
-                  DataCell(Text(_calculateCostPerKg(tc).toStringAsFixed(0))),
+                  DataCell(Text(NumberFormatUtils.formatInt(_calculateCostPerKg(tc)))),
                 ],
                 onSelectChanged: _selectionMode ? null : (_) => context.push('/tech-cards/${tc.id}'),
               );
@@ -815,25 +827,29 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   }
 }
 
-/// Делегат для липкой шапки таблицы ТТК (Название | Кат. | /кг).
+/// Делегат для липкой шапки таблицы ТТК (Название | Категория | ₽/кг | Просмотр).
 class _TableHeaderDelegate extends SliverPersistentHeaderDelegate {
   _TableHeaderDelegate({
     required this.colCatWidth,
     required this.colCostWidth,
+    required this.colActionsWidth,
     required this.color,
     required this.onColor,
     required this.labelName,
     required this.labelCat,
     required this.labelCost,
+    required this.labelView,
   });
 
   final double colCatWidth;
   final double colCostWidth;
+  final double colActionsWidth;
   final Color color;
   final Color onColor;
   final String labelName;
   final String labelCat;
   final String labelCost;
+  final String labelView;
 
   @override
   double get minExtent => 40;
@@ -843,27 +859,27 @@ class _TableHeaderDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    final style = TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: onColor);
     return Container(
       color: color,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      alignment: Alignment.centerLeft,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       child: Row(
         children: [
           Expanded(
-            child: Text(
-              labelName,
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: onColor),
-            ),
+            child: Text(labelName, style: style),
           ),
           SizedBox(
             width: colCatWidth,
-            child: Text(labelCat, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: onColor)),
+            child: Text(labelCat, style: style, textAlign: TextAlign.center),
           ),
           SizedBox(
             width: colCostWidth,
-            child: Text(labelCost, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: onColor)),
+            child: Text(labelCost, style: style, textAlign: TextAlign.center),
           ),
-          const SizedBox(width: 24),
+          SizedBox(
+            width: colActionsWidth,
+            child: Text(labelView, style: style, textAlign: TextAlign.center, overflow: TextOverflow.ellipsis),
+          ),
         ],
       ),
     );
@@ -873,10 +889,12 @@ class _TableHeaderDelegate extends SliverPersistentHeaderDelegate {
   bool shouldRebuild(covariant _TableHeaderDelegate oldDelegate) {
     return oldDelegate.colCatWidth != colCatWidth ||
         oldDelegate.colCostWidth != colCostWidth ||
+        oldDelegate.colActionsWidth != colActionsWidth ||
         oldDelegate.color != color ||
         oldDelegate.onColor != onColor ||
         oldDelegate.labelName != labelName ||
         oldDelegate.labelCat != labelCat ||
-        oldDelegate.labelCost != labelCost;
+        oldDelegate.labelCost != labelCost ||
+        oldDelegate.labelView != labelView;
   }
 }

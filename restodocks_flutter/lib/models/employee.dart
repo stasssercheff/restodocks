@@ -140,6 +140,10 @@ class Employee extends Equatable {
   @JsonKey(name: 'data_access_enabled')
   final bool dataAccessEnabled;
 
+  /// Может ли сотрудник редактировать свой личный график (как шеф).
+  @JsonKey(name: 'can_edit_own_schedule')
+  final bool canEditOwnSchedule;
+
   /// Уровень доступа владельца: 'full' или 'view_only' (co-owner при >1 заведении)
   @JsonKey(name: 'owner_access_level')
   final String? ownerAccessLevel;
@@ -170,6 +174,7 @@ class Employee extends Equatable {
     this.hourlyRate,
     this.isActive = true,
     this.dataAccessEnabled = false,
+    this.canEditOwnSchedule = false,
     this.ownerAccessLevel = 'full',
     required this.createdAt,
     required this.updatedAt,
@@ -195,6 +200,7 @@ class Employee extends Equatable {
     double? hourlyRate,
     bool? isActive,
     bool? dataAccessEnabled,
+    bool? canEditOwnSchedule,
     String? ownerAccessLevel,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -218,6 +224,7 @@ class Employee extends Equatable {
       hourlyRate: hourlyRate ?? this.hourlyRate,
       isActive: isActive ?? this.isActive,
       dataAccessEnabled: dataAccessEnabled ?? this.dataAccessEnabled,
+      canEditOwnSchedule: canEditOwnSchedule ?? this.canEditOwnSchedule,
       ownerAccessLevel: ownerAccessLevel ?? this.ownerAccessLevel,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -266,7 +273,7 @@ class Employee extends Equatable {
            hasRole('manager');
   }
 
-  /// Редактирование графика: только шеф-повар и су-шеф
+  /// Редактирование графика: только шеф-повар и су-шеф (всех). Остальные — только свой при canEditOwnSchedule (проверяется в schedule_screen).
   bool get canEditSchedule {
     return hasRole('executive_chef') || hasRole('sous_chef');
   }
@@ -385,6 +392,7 @@ class Employee extends Equatable {
     m['department'] = _str(m['department'], 'management');
     m['full_name'] = _str(m['full_name'], '');
     if (!m.containsKey('data_access_enabled')) m['data_access_enabled'] = false;
+    if (!m.containsKey('can_edit_own_schedule')) m['can_edit_own_schedule'] = false;
     return _$EmployeeFromJson(m);
   }
   static String _str(dynamic v, String fallback) {
@@ -419,6 +427,7 @@ class Employee extends Equatable {
     hourlyRate,
     isActive,
     dataAccessEnabled,
+    canEditOwnSchedule,
     createdAt,
     updatedAt,
   ];
@@ -450,6 +459,7 @@ class Employee extends Equatable {
       personalPin: _generatePersonalPin(),
       isActive: true,
       dataAccessEnabled: false,
+      canEditOwnSchedule: false,
       createdAt: now,
       updatedAt: now,
     );

@@ -20,7 +20,7 @@ struct HomeView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                // ТТК и Просмотр ТТК — для шеф/су-шеф
+                // ТТК, Просмотр ТТК и Меню — для шеф/су-шеф (как у собственника)
                 if isChefOrSousChef {
                     NavigationLink {
                         TTKView()
@@ -32,6 +32,12 @@ struct HomeView: View {
                         DepartmentTTKView(department: "kitchen")
                     } label: {
                         HomeButton(title: lang.t("view_ttk"))
+                    }
+
+                    NavigationLink {
+                        KitchenMenuView()
+                    } label: {
+                        HomeButton(title: lang.t("menu"))
                     }
                 }
 

@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/models.dart';
 import 'ai_service.dart';
+import 'image_service.dart';
 import 'supabase_service.dart';
 
 /// Bucket для фото ТТК (блюда и ПФ). Создать в Supabase Storage вручную, public.
@@ -25,10 +26,11 @@ class TechCardServiceSupabase {
     required Uint8List bytes,
   }) async {
     try {
+      final compressed = await ImageService().compressToMaxBytes(bytes, maxBytes: 250 * 1024) ?? bytes;
       final path = '$establishmentId/$techCardId/$index.jpg';
       await _supabase.client.storage
           .from(kTechCardPhotosBucket)
-          .uploadBinary(path, bytes, fileOptions: FileOptions(upsert: true));
+          .uploadBinary(path, compressed, fileOptions: FileOptions(upsert: true));
       final url = _supabase.client.storage.from(kTechCardPhotosBucket).getPublicUrl(path);
       return url;
     } catch (e) {

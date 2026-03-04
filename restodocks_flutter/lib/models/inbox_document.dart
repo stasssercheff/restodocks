@@ -13,6 +13,8 @@ enum DocumentType {
   productOrder,
   shiftConfirmation,
   checklistSubmission,
+  /// Чеклист с пропущенным сроком выполнения (не выполнен к дедлайну).
+  checklistMissedDeadline,
 }
 
 /// Модель документа во входящих
@@ -70,6 +72,8 @@ class InboxDocument extends Equatable {
         return Icons.how_to_reg;
       case DocumentType.checklistSubmission:
         return Icons.checklist;
+      case DocumentType.checklistMissedDeadline:
+        return Icons.warning_amber;
     }
   }
 
@@ -91,6 +95,8 @@ class InboxDocument extends Equatable {
         return loc.t('inbox_title_checklist').replaceFirst('%s', name);
       case DocumentType.shiftConfirmation:
         return loc.t('doc_type_shift_confirmation');
+      case DocumentType.checklistMissedDeadline:
+        return title;
     }
   }
 
@@ -107,6 +113,8 @@ class InboxDocument extends Equatable {
         return loc.t('doc_type_shift_confirmation');
       case DocumentType.checklistSubmission:
         return loc.t('doc_type_checklist');
+      case DocumentType.checklistMissedDeadline:
+        return loc.t('inbox_msg_checklist_not_done') ?? 'Чеклист не выполнен';
     }
   }
 

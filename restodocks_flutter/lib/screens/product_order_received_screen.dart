@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../services/inventory_download.dart';
 import '../services/services.dart';
+import '../utils/number_format_utils.dart';
 import '../widgets/app_bar_home_button.dart';
 
 /// Полученные и отправленные заказы продуктов: просмотр и скачивание.
@@ -190,7 +191,7 @@ class _ProductOrderReceivedScreenState extends State<ProductOrderReceivedScreen>
               FilledButton.icon(
                 icon: const Icon(Icons.download),
                 label: Text(loc.t('download') ?? 'Скачать'),
-                onPressed: () => _downloadOrder(doc, loc),
+                onPressed: () => _downloadOrder(ctx, doc, loc),
               ),
             ],
           ),
@@ -215,6 +216,8 @@ class _ProductOrderReceivedScreenState extends State<ProductOrderReceivedScreen>
   Widget _buildOrderTable(BuildContext context, LocalizationService loc, List<dynamic> rows) {
     final theme = Theme.of(context);
     final hasPrices = rows.isNotEmpty && (rows.first as Map<String, dynamic>).containsKey('pricePerUnit');
+    final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'VND';
+    final lineTotalHeader = (loc.t('order_list_line_total_currency') ?? 'Сумма %s').replaceFirst('%s', currency);
     if (hasPrices) {
       return Table(
         border: TableBorder.all(color: theme.dividerColor),
@@ -227,7 +230,7 @@ class _ProductOrderReceivedScreenState extends State<ProductOrderReceivedScreen>
               _tableCell(theme, loc.t('order_list_unit'), bold: true),
               _tableCell(theme, loc.t('order_list_quantity'), bold: true),
               _tableCell(theme, loc.t('order_list_unit_price') ?? 'Цена', bold: true),
-              _tableCell(theme, loc.t('order_list_line_total') ?? 'Сумма', bold: true),
+              _tableCell(theme, lineTotalHeader, bold: true),
             ],
           ),
           ...rows.map((r) {
@@ -237,8 +240,8 @@ class _ProductOrderReceivedScreenState extends State<ProductOrderReceivedScreen>
                 _tableCell(theme, (m['productName'] ?? '').toString()),
                 _tableCell(theme, (m['unit'] ?? '').toString()),
                 _tableCell(theme, _fmtNum(m['quantity'])),
-                _tableCell(theme, _fmtNum(m['pricePerUnit'])),
-                _tableCell(theme, _fmtNum(m['lineTotal'])),
+                _tableCell(theme, _fmtSum(m['pricePerUnit'], currency)),
+                _tableCell(theme, _fmtSum(m['lineTotal'], currency)),
               ],
             );
           }),
@@ -280,16 +283,24 @@ class _ProductOrderReceivedScreenState extends State<ProductOrderReceivedScreen>
 
   String _fmtNum(dynamic v) {
     if (v == null) return '—';
-    if (v is num) return v == v.truncateToDouble() ? v.toInt().toString() : v.toStringAsFixed(1);
+    if (v is num) return NumberFormatUtils.formatDecimal(v);
     return v.toString();
   }
 
-  Future<void> _downloadOrder(Map<String, dynamic> doc, LocalizationService loc) async {
+  String _fmtSum(dynamic v, String currency) {
+    if (v == null) return '—';
+    if (v is num) return NumberFormatUtils.formatSum(v, currency);
+    return v.toString();
+  }
+
+  Future<void> _downloadOrder(BuildContext context, Map<String, dynamic> doc, LocalizationService loc) async {
     final payload = doc['payload'] as Map<String, dynamic>? ?? {};
+    final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'VND';
     try {
       final bytes = await OrderListExportService.buildOrderExcelBytesFromPayload(
         payload: payload,
         t: (k) => loc.t(k) ?? k,
+        currency: currency,
       );
       if (bytes.isNotEmpty) {
         final dateStr = DateFormat('yyyy-MM-dd').format(DateTime.tryParse(doc['created_at']?.toString() ?? '') ?? DateTime.now());

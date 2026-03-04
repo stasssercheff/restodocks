@@ -39,8 +39,8 @@ class InboxService {
 
         // Различаем обычную инвентаризацию и iiko по полю payload['type']
         final isIiko = payload['type'] == 'iiko_inventory';
-
-        final docDept = header['department']?.toString() ?? _mapSectionToDepartment(currentEmployee.department);
+        // iiko — всегда данные кухни, не показывать в баре/зале
+        final docDept = isIiko ? 'kitchen' : (header['department']?.toString() ?? _mapSectionToDepartment(currentEmployee.department));
         documents.add(InboxDocument(
           id: doc['id']?.toString() ?? '',
           type: isIiko ? DocumentType.iikoInventory : DocumentType.inventory,
@@ -76,6 +76,31 @@ class InboxService {
             department: subDept,
             fileUrl: null,
             metadata: {'submission': sub.payload, 'checklistId': sub.checklistId},
+          ));
+        }
+      }
+
+      // Чеклисты с пропущенным дедлайном — для шефа, су-шефа и собственника
+      if (currentEmployee.hasRole('executive_chef') || currentEmployee.hasRole('sous_chef') ||
+          currentEmployee.hasRole('owner') || currentEmployee.department == 'management') {
+        final checklistSvc = ChecklistServiceSupabase();
+        final missed = await checklistSvc.getChecklistsWithMissedDeadline(establishmentId);
+        for (final c in missed) {
+          final deadlineStr = c.deadlineAt != null
+              ? DateTime(c.deadlineAt!.year, c.deadlineAt!.month, c.deadlineAt!.day)
+                  .toIso8601String()
+              : '';
+          documents.add(InboxDocument(
+            id: c.id,
+            type: DocumentType.checklistMissedDeadline,
+            title: 'Чеклист не выполнен: ${c.name}',
+            description: deadlineStr.isNotEmpty ? 'Срок: $deadlineStr' : '',
+            createdAt: c.deadlineAt ?? c.updatedAt,
+            employeeId: '',
+            employeeName: '',
+            department: c.assignedDepartment,
+            fileUrl: null,
+            metadata: {'checklistId': c.id, 'checklistName': c.name},
           ));
         }
       }

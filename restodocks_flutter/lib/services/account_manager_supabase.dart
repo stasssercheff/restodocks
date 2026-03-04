@@ -792,7 +792,16 @@ class AccountManagerSupabase extends ChangeNotifier {
           employee.id,
         );
       } catch (e) {
-        if (_isPaymentColumnError(e)) {
+        if (_isSchemaColumnError(e)) {
+          employeeData = Map<String, dynamic>.from(employeeData)
+            ..remove('can_edit_own_schedule');
+          await _supabase.updateData(
+            'employees',
+            employeeData,
+            'id',
+            employee.id,
+          );
+        } else if (_isPaymentColumnError(e)) {
           employeeData = Map<String, dynamic>.from(employeeData)
             ..remove('payment_type')
             ..remove('rate_per_shift')
@@ -810,6 +819,7 @@ class AccountManagerSupabase extends ChangeNotifier {
 
       if (_currentEmployee?.id == employee.id) {
         _currentEmployee = employee;
+        notifyListeners();
       }
     } catch (e) {
       print('Ошибка обновления сотрудника: $e');
@@ -841,20 +851,28 @@ class AccountManagerSupabase extends ChangeNotifier {
         (msg.contains('column') && (msg.contains('exist') || msg.contains('found') || msg.contains('does not')));
   }
 
+  bool _isSchemaColumnError(Object e) {
+    return e.toString().toLowerCase().contains('can_edit_own_schedule');
+  }
+
   /// Обновить данные заведения
   Future<void> updateEstablishment(Establishment establishment) async {
     try {
-      await _supabase.updateData(
-        'establishments',
-        establishment.toJson(),
-        'id',
-        establishment.id,
-      );
+      // Обновляем напрямую — toJson() может включать поля, которые не обновляются
+      await _supabase.client
+          .from('establishments')
+          .update({
+            'default_currency': establishment.defaultCurrency,
+            'updated_at': establishment.updatedAt.toIso8601String(),
+          })
+          .eq('id', establishment.id)
+          .select();
 
       _establishment = establishment;
       notifyListeners(); // Обновить символ валюты в номенклатуре и др.
     } catch (e) {
       print('Ошибка обновления заведения: $e');
+      rethrow; // Пробросить, чтобы UI мог показать ошибку
     }
   }
 

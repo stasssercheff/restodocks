@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../services/services.dart';
 import '../../models/models.dart';
+import '../../utils/number_format_utils.dart';
 import '../../models/inbox_document.dart';
 import '../../services/inbox_service.dart';
 import '../../widgets/app_bar_home_button.dart';
@@ -20,10 +21,13 @@ class InboxScreen extends StatefulWidget {
 }
 
 /// Типы вкладок во входящих (для сотрудников)
-enum _InboxTab { checklist, order, inventory, iikoInventory }
+enum _InboxTab { checklist, order, inventory, iikoInventory, messages }
 
 /// Вкладки по подразделениям (для собственника)
 enum _InboxDeptTab { kitchen, bar, hall }
+
+/// Типы документов для 2-го яруса вкладок (собственник)
+enum _InboxTypeTab { order, inventory, iikoInventory, messages }
 
 class _InboxScreenState extends State<InboxScreen> {
   late InboxService _inboxService;
@@ -31,6 +35,7 @@ class _InboxScreenState extends State<InboxScreen> {
   bool _loading = true;
   _InboxTab? _selectedTab;
   _InboxDeptTab? _selectedDeptTab;
+  _InboxTypeTab? _selectedTypeTab;
 
   @override
   void initState() {
@@ -47,7 +52,10 @@ class _InboxScreenState extends State<InboxScreen> {
     final employee = context.read<AccountManagerSupabase>().currentEmployee;
     if (employee == null) return;
     if (employee.hasRole('owner')) {
-      setState(() => _selectedDeptTab = _InboxDeptTab.kitchen);
+      setState(() {
+        _selectedDeptTab = _InboxDeptTab.kitchen;
+        _selectedTypeTab = _InboxTypeTab.order;
+      });
     } else {
       final tabs = _visibleTabs(employee);
       if (tabs.isNotEmpty) {
@@ -71,6 +79,7 @@ class _InboxScreenState extends State<InboxScreen> {
         _documents.any((d) => d.type == DocumentType.iikoInventory)) {
       tabs.add(_InboxTab.iikoInventory);
     }
+    if (isChef || isSousChef || isOwner) tabs.add(_InboxTab.messages);
     return tabs;
   }
 
@@ -101,14 +110,24 @@ class _InboxScreenState extends State<InboxScreen> {
   }
 
   List<InboxDocument> get _filteredDocuments {
-    // Собственник: фильтр по подразделению (Bar, Hall, Kitchen)
-    if (_selectedDeptTab != null) {
+    // Собственник: двухярусная фильтрация — подразделение + тип документа
+    if (_selectedDeptTab != null && _selectedTypeTab != null) {
+      if (_selectedTypeTab == _InboxTypeTab.messages) {
+        return _documents.where((d) => d.type == DocumentType.checklistMissedDeadline).toList();
+      }
       final dept = switch (_selectedDeptTab!) {
         _InboxDeptTab.kitchen => 'kitchen',
         _InboxDeptTab.bar => 'bar',
         _InboxDeptTab.hall => 'hall',
       };
-      return _documents.where((d) => d.department == dept).toList();
+      final docsByDept = _documents.where((d) => d.department == dept).toList();
+      final docType = switch (_selectedTypeTab!) {
+        _InboxTypeTab.order => DocumentType.productOrder,
+        _InboxTypeTab.inventory => DocumentType.inventory,
+        _InboxTypeTab.iikoInventory => DocumentType.iikoInventory,
+        _InboxTypeTab.messages => DocumentType.checklistMissedDeadline,
+      };
+      return docsByDept.where((d) => d.type == docType).toList();
     }
     // Остальные: по типу документа
     switch (_selectedTab) {
@@ -120,6 +139,8 @@ class _InboxScreenState extends State<InboxScreen> {
         return _documents.where((d) => d.type == DocumentType.inventory).toList();
       case _InboxTab.iikoInventory:
         return _documents.where((d) => d.type == DocumentType.iikoInventory).toList();
+      case _InboxTab.messages:
+        return _documents.where((d) => d.type == DocumentType.checklistMissedDeadline).toList();
       case null:
         return [];
     }
@@ -147,8 +168,11 @@ class _InboxScreenState extends State<InboxScreen> {
       ),
       body: Column(
         children: [
-          // Собственник: вкладки по подразделениям (Бар, Зал, Кухня)
-          if (isOwner) _buildDeptFilter(loc),
+          // Собственник: двухярусная система вкладок
+          if (isOwner) ...[
+            _buildDeptFilter(loc),
+            _buildTypeFilterForOwner(loc),
+          ],
           // Остальные: фильтр по типу документа
           if (!isOwner && visibleTabs.isNotEmpty) _buildTypeFilter(loc, visibleTabs),
 
@@ -156,7 +180,7 @@ class _InboxScreenState extends State<InboxScreen> {
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
-                : (isOwner ? _selectedDeptTab == null : _selectedTab == null)
+                : (isOwner ? (_selectedDeptTab == null || _selectedTypeTab == null) : _selectedTab == null)
                     ? _buildEmptyState(loc)
                     : _filteredDocuments.isEmpty
                         ? _buildEmptyState(loc)
@@ -200,7 +224,60 @@ class _InboxScreenState extends State<InboxScreen> {
       label: Text(label),
       selected: isSelected,
       onSelected: (_) {
-        setState(() => _selectedDeptTab = tab);
+        setState(() {
+          _selectedDeptTab = tab;
+          if (tab == _InboxDeptTab.bar || tab == _InboxDeptTab.hall) {
+            if (_selectedTypeTab == _InboxTypeTab.iikoInventory) {
+              _selectedTypeTab = _InboxTypeTab.inventory;
+            }
+          }
+        });
+      },
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      selectedColor: Theme.of(context).colorScheme.primaryContainer,
+      checkmarkColor: Theme.of(context).colorScheme.onPrimaryContainer,
+    );
+  }
+
+  Widget _buildTypeFilterForOwner(LocalizationService loc) {
+    final isBarOrHall = _selectedDeptTab == _InboxDeptTab.bar || _selectedDeptTab == _InboxDeptTab.hall;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        border: Border(
+          bottom: BorderSide(
+            color: Theme.of(context).dividerColor,
+            width: 1,
+          ),
+        ),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _buildTypeChip(_InboxTypeTab.order, loc.t('inbox_tab_order') ?? 'Заказ продуктов', loc),
+            const SizedBox(width: 8),
+            _buildTypeChip(_InboxTypeTab.inventory, loc.t('inbox_tab_inventory') ?? 'Инвентаризация', loc),
+            if (!isBarOrHall) ...[
+              const SizedBox(width: 8),
+              _buildTypeChip(_InboxTypeTab.iikoInventory, 'Инвентаризация iiko', loc),
+            ],
+            const SizedBox(width: 8),
+            _buildTypeChip(_InboxTypeTab.messages, loc.t('inbox_tab_messages') ?? 'Сообщения', loc),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTypeChip(_InboxTypeTab tab, String label, LocalizationService loc) {
+    final isSelected = _selectedTypeTab == tab;
+    return FilterChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (_) {
+        setState(() => _selectedTypeTab = tab);
       },
       backgroundColor: Theme.of(context).colorScheme.surface,
       selectedColor: Theme.of(context).colorScheme.primaryContainer,
@@ -218,6 +295,8 @@ class _InboxScreenState extends State<InboxScreen> {
         return loc.t('inbox_tab_inventory');
       case _InboxTab.iikoInventory:
         return 'Инвентаризация iiko';
+      case _InboxTab.messages:
+        return loc.t('inbox_tab_messages') ?? 'Сообщения';
     }
   }
 
@@ -363,7 +442,8 @@ class _DocumentTile extends StatelessWidget {
     final grandTotal = document.type == DocumentType.productOrder
         ? (document.metadata?['grandTotal'] as num?)?.toDouble()
         : null;
-    final totalStr = grandTotal != null ? NumberFormat('#,##0.00', 'ru').format(grandTotal) : null;
+    final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'VND';
+    final totalStr = grandTotal != null ? NumberFormatUtils.formatSum(grandTotal!, currency) : null;
     final totalLabel = loc.t('order_list_grand_total') ?? 'Итого';
 
     return Card(
@@ -412,6 +492,8 @@ class _DocumentTile extends StatelessWidget {
                   context.push('/inbox/checklist/${document.id}');
                 } else if (document.type == DocumentType.iikoInventory) {
                   context.push('/inbox/iiko/${document.id}');
+                } else if (document.type == DocumentType.checklistMissedDeadline) {
+                  context.push('/checklists/${document.id}?view=1');
                 } else {
                   onDownload(document);
                 }
@@ -467,6 +549,10 @@ class _DocumentTile extends StatelessWidget {
     }
     if (document.type == DocumentType.iikoInventory) {
       context.push('/inbox/iiko/${document.id}');
+      return;
+    }
+    if (document.type == DocumentType.checklistMissedDeadline) {
+      context.push('/checklists/${document.id}?view=1');
       return;
     }
     final loc = context.read<LocalizationService>();

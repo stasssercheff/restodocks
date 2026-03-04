@@ -10,7 +10,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/iiko_product.dart';
+import '../utils/number_format_utils.dart';
 import '../services/iiko_product_store.dart';
+import '../services/iiko_xlsx_sanitizer.dart';
 
 import '../models/culinary_units.dart';
 import '../models/product.dart';
@@ -384,7 +386,8 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     if (mounted) setState(() => _iikoUploading = true);
 
     try {
-      final bytes = result.files.single.bytes!;
+      var bytes = result.files.single.bytes!;
+      bytes = IikoXlsxSanitizer.ensureDecodable(bytes);
 
       // Первичный парсинг — проверяем нашёл ли авто все столбцы остатка
       final firstPass = _parseIikoBlank(bytes, estId);
@@ -949,15 +952,14 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     final displayCurrency = accountManager.establishment?.defaultCurrency ?? establishmentPrice?.$2 ?? p.currency ?? 'VND';
     final currencySymbol = _currencySymbol(displayCurrency);
 
-    // Если unit = g, показываем цену за кг (умножаем на 1000)
+    // Цена в establishment_products и basePrice хранится за кг. Показываем как есть.
     String priceText;
     if (rawPrice != null) {
       final unit = (p.unit ?? 'g').trim().toLowerCase();
-      if (unit == 'g' || unit == 'грамм') {
-        final pricePerKg = rawPrice * 1000;
-        priceText = loc.t('price_per_kg').replaceFirst('%s', pricePerKg.toStringAsFixed(0)).replaceFirst('%s', currencySymbol);
+      if (unit == 'g' || unit == 'грамм' || unit == 'kg' || unit == 'кг') {
+        priceText = loc.t('price_per_kg').replaceFirst('%s', NumberFormatUtils.formatInt(rawPrice)).replaceFirst('%s', currencySymbol);
       } else {
-        priceText = '${rawPrice.toStringAsFixed(0)} $currencySymbol/${_unitDisplay(p.unit, loc.currentLanguageCode)}';
+        priceText = '${NumberFormatUtils.formatInt(rawPrice)} $currencySymbol/${_unitDisplay(p.unit, loc.currentLanguageCode)}';
       }
     } else {
       priceText = loc.t('price_not_set');
@@ -993,7 +995,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     final sym = _currencySymbol(context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'VND');
 
     return loc.t('pf_price_per_kg')
-        .replaceFirst('%s', costPerKg.toStringAsFixed(0))
+        .replaceFirst('%s', NumberFormatUtils.formatInt(costPerKg))
         .replaceFirst('%s', sym)
         .replaceFirst('%s', tc.yield.toStringAsFixed(0));
   }
@@ -1641,13 +1643,17 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         store: store,
         loc: loc,
         onSaved: (Establishment updated) async {
-          await account.updateEstablishment(updated);
-          if (context.mounted) setState(() {});
-        },
-        onApplyToAll: (currency) async {
-          await store.bulkUpdateCurrency(currency);
-          await store.loadProducts(force: true);
-          if (context.mounted) setState(() {});
+          try {
+            await account.updateEstablishment(updated);
+            if (context.mounted) setState(() {});
+          } catch (e) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Ошибка сохранения: $e')),
+              );
+            }
+            rethrow; // Чтобы диалог не закрывался при ошибке
+          }
         },
       ),
     );
@@ -1741,7 +1747,7 @@ class _DuplicatesDialogState extends State<_DuplicatesDialog> {
                                     fontWeight: group.indexOf(item) == 0 ? FontWeight.bold : FontWeight.normal,
                                   ),
                                 ),
-                                subtitle: item.price != null ? Text('${item.price} ${item.currency ?? ''}') : null,
+                                subtitle: item.price != null ? Text('${item.price} ${Establishment.currencySymbolFor(item.currency ?? context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'VND')}') : null,
                                 controlAffinity: ListTileControlAffinity.leading,
                                 dense: true,
                               )),
@@ -2500,7 +2506,7 @@ class _VerifyProductsResultsDialog extends StatelessWidget {
                           ],
                           if (r.suggestedPrice != null && r.suggestedPrice != p.basePrice) ...[
                             const SizedBox(height: 2),
-                            Text('${loc.t('price')}: ${p.basePrice?.toStringAsFixed(2) ?? '—'} → ${r.suggestedPrice!.toStringAsFixed(2)}', style: Theme.of(context).textTheme.bodySmall),
+                            Text('${loc.t('price')}: ${p.basePrice != null ? NumberFormatUtils.formatDecimal(p.basePrice!) : '—'} → ${NumberFormatUtils.formatDecimal(r.suggestedPrice!)}', style: Theme.of(context).textTheme.bodySmall),
                           ],
                           if (r.suggestedCalories != null || r.suggestedProtein != null || r.suggestedFat != null || r.suggestedCarbs != null) ...[
                             const SizedBox(height: 2),
@@ -3086,6 +3092,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
   late final TextEditingController _priceController;
   late final TextEditingController _packagePriceController;
   late final TextEditingController _packageWeightController;
+  late final TextEditingController _gramsPerPieceController;
   bool _checkingName = false;
   late final TextEditingController _caloriesController;
   late final TextEditingController _proteinController;
@@ -3116,6 +3123,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
     _priceByPackage = p.packagePrice != null || p.packageWeightGrams != null;
     _packagePriceController = TextEditingController(text: p.packagePrice?.toString() ?? '');
     _packageWeightController = TextEditingController(text: p.packageWeightGrams?.toStringAsFixed(0) ?? '');
+    _gramsPerPieceController = TextEditingController(text: p.gramsPerPiece?.toStringAsFixed(0) ?? '');
     // Подставить адекватные калории при открытии карточки
     final saneCal = NutritionApiService.saneCaloriesForProduct(p.name, p.calories);
     final initialCal = saneCal ?? p.calories;
@@ -3148,6 +3156,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
     _priceController.dispose();
     _packagePriceController.dispose();
     _packageWeightController.dispose();
+    _gramsPerPieceController.dispose();
     _caloriesController.dispose();
     _proteinController.dispose();
     _fatController.dispose();
@@ -3228,6 +3237,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
     final double? pkgPrice = _priceByPackage ? _parseNum(_packagePriceController.text) : null;
     final double? pkgWeight = _priceByPackage ? _parseNum(_packageWeightController.text) : null;
 
+    final gpp = CulinaryUnits.isCountable(_unit) ? _parseNum(_gramsPerPieceController.text) : null;
     final updated = widget.product.copyWith(
       name: name,
       names: merged,
@@ -3237,6 +3247,8 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
       clearPackagePrice: !_priceByPackage,
       packageWeightGrams: pkgWeight,
       clearPackageWeight: !_priceByPackage,
+      gramsPerPiece: gpp,
+      clearGramsPerPiece: !CulinaryUnits.isCountable(_unit),
       unit: _unit,
       primaryWastePct: _parseNum(_wastePctController.text)?.clamp(0.0, 99.9),
       calories: _parseNum(_caloriesController.text),
@@ -3321,6 +3333,17 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                 )).toList(),
                 onChanged: (v) => setState(() => _unit = v ?? _unit),
               ),
+              if (CulinaryUnits.isCountable(_unit)) ...[
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _gramsPerPieceController,
+                  decoration: InputDecoration(
+                    labelText: widget.loc.t('grams_per_piece_label') ?? 'Вес 1 шт, г',
+                    border: const OutlineInputBorder(),
+                  ),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                ),
+              ],
               const SizedBox(height: 16),
               // Переключатель: цена за кг/ед vs цена за упаковку
               Row(
@@ -3452,7 +3475,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 4),
                       child: Text(
-                        '$oldStr → $newStr ${e.currency ?? ''} ($dateStr)',
+                        '$oldStr → $newStr ${Establishment.currencySymbolFor(e.currency ?? context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'VND')} ($dateStr)',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     );
@@ -3477,14 +3500,12 @@ class _CurrencySettingsDialog extends StatefulWidget {
     required this.store,
     required this.loc,
     required this.onSaved,
-    required this.onApplyToAll,
   });
 
   final Establishment establishment;
   final ProductStoreSupabase store;
   final LocalizationService loc;
   final Future<void> Function(Establishment) onSaved;
-  final Future<void> Function(String) onApplyToAll;
 
   static const _presetCurrencies = ['RUB', 'USD', 'EUR', 'VND', 'THB', 'KZT', 'GBP', 'UAH'];
 
@@ -3521,20 +3542,14 @@ class _CurrencySettingsDialogState extends State<_CurrencySettingsDialog> {
       defaultCurrency: c,
       updatedAt: DateTime.now(),
     );
-    await widget.onSaved(updated);
-    if (!mounted) return;
-    Navigator.of(context).pop();
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(widget.loc.t('currency_saved'))));
-  }
-
-  Future<void> _applyToAll() async {
-    final c = _effectiveCurrency;
-    await widget.onApplyToAll(c);
-    if (!mounted) return;
-    Navigator.of(context).pop();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(widget.loc.t('currency_applied_to_all').replaceAll('%s', widget.store.allProducts.length.toString()))),
-    );
+    try {
+      await widget.onSaved(updated);
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(widget.loc.t('currency_saved'))));
+    } catch (_) {
+      // Ошибка уже показана в onSaved, диалог остаётся открытым
+    }
   }
 
   @override
@@ -3575,19 +3590,10 @@ class _CurrencySettingsDialogState extends State<_CurrencySettingsDialog> {
                   .toList(),
               onChanged: (v) => setState(() => _currency = v ?? _currency),
             ),
-          const SizedBox(height: 16),
-          Text(
-            widget.loc.t('currency_apply_hint'),
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
-          ),
         ],
       ),
       actions: [
         TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(widget.loc.t('cancel'))),
-        FilledButton.tonal(
-          onPressed: _applyToAll,
-          child: Text(widget.loc.t('apply_currency_to_all')),
-        ),
         FilledButton(onPressed: _saveAsDefault, child: Text(widget.loc.t('save'))),
       ],
     );

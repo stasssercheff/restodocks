@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/iiko_product.dart';
+import 'iiko_xlsx_sanitizer.dart';
 
 /// Хранилище iiko-продуктов. Использует RPC-функции вместо прямых запросов
 /// к таблице, чтобы обойти возможные проблемы с кэшем схемы PostgREST.
@@ -292,7 +293,8 @@ class IikoProductStore extends ChangeNotifier {
     if (originalBlankBytes == null) return;
 
     try {
-      final excel = Excel.decodeBytes(originalBlankBytes!.toList());
+      final bytes = IikoXlsxSanitizer.ensureDecodable(originalBlankBytes!);
+      final excel = Excel.decodeBytes(bytes.toList());
       // Строим карту: код → sheetName
       final codeToSheet = <String, String>{};
       final foundSheets = <String>[];
@@ -300,21 +302,29 @@ class IikoProductStore extends ChangeNotifier {
       for (final sName in excel.tables.keys) {
         final sheet = excel.tables[sName];
         if (sheet == null) continue;
-        // Ищем колонку кода (первые 20 строк)
-        int codeCol = 2;
+        // Ищем колонку кода (первые 20 строк). На 2-м листе заголовок может отличаться.
+        int codeCol = 2; // стандарт iiko: колонка C
+        outer:
         for (var r = 0; r < sheet.maxRows && r < 20; r++) {
           for (var c = 0; c < (sheet.maxColumns > 15 ? 15 : sheet.maxColumns); c++) {
             final v = _excelCellStr(sheet, r, c).toLowerCase();
-            if (v == 'код' || v == 'code') { codeCol = c; break; }
+            if (v == 'код' || v == 'code' ||
+                (v.contains('код') && !v.contains('штрих') && !v.contains('баркод')) ||
+                v.contains('артикул') || v.contains('external id')) {
+              codeCol = c;
+              break outer;
+            }
           }
         }
         var hasProducts = false;
+        const headerWords = ['код', 'наименование', 'товар', 'группа', 'остаток', 'ед', 'ед.изм'];
         for (var r = 0; r < sheet.maxRows; r++) {
           final code = _excelCellStr(sheet, r, codeCol).trim();
-          if (code.isNotEmpty) {
-            codeToSheet[code] = sName;
-            hasProducts = true;
-          }
+          if (code.isEmpty) continue;
+          final lower = code.toLowerCase();
+          if (headerWords.any((h) => lower == h || lower.startsWith(h))) continue;
+          codeToSheet[code] = sName;
+          hasProducts = true;
         }
         if (hasProducts) foundSheets.add(sName);
       }

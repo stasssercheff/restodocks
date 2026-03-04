@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 
 import '../models/models.dart';
 import '../services/services.dart';
+import '../utils/number_format_utils.dart';
 import '../widgets/app_bar_home_button.dart';
 import 'excel_style_ttk_table.dart';
 
@@ -436,7 +437,7 @@ TechCard _applyEdits(
 }
 
 class TechCardEditScreen extends StatefulWidget {
-  const TechCardEditScreen({super.key, required this.techCardId, this.initialFromAi, this.forceViewMode = false});
+  const TechCardEditScreen({super.key, required this.techCardId, this.initialFromAi, this.forceViewMode = false, this.department});
 
   /// Пусто для «новой», иначе id существующей ТТК.
   final String techCardId;
@@ -444,6 +445,8 @@ class TechCardEditScreen extends StatefulWidget {
   final TechCardRecognitionResult? initialFromAi;
   /// Режим только просмотра (для управляющих кухней — кнопка «Просмотр ТТК»).
   final bool forceViewMode;
+  /// Отдел при создании: 'bar' — категории бара, иначе кухни.
+  final String? department;
 
   @override
   State<TechCardEditScreen> createState() => _TechCardEditScreenState();
@@ -456,7 +459,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   String? _error;
   /// 'photo' | 'excel' — какая кнопка сейчас загружает (чтобы показывать правильный текст).
   final _nameController = TextEditingController();
-  static const _categoryOptions = ['sauce', 'vegetables', 'salad', 'meat', 'seafood', 'side', 'subside', 'bakery', 'dessert', 'decor', 'soup', 'misc', 'beverages'];
+  static const _kitchenCategoryOptions = ['sauce', 'vegetables', 'salad', 'meat', 'seafood', 'side', 'subside', 'bakery', 'dessert', 'decor', 'soup', 'misc', 'beverages'];
+  static const _barCategoryOptions = ['alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks', 'sauce', 'vegetables', 'salad', 'bakery', 'dessert', 'decor', 'misc', 'beverages'];
+
+  List<String> get _categoryOptions {
+    if (widget.department == 'bar') return _barCategoryOptions;
+    if (_techCard != null && _barCategoryOptions.contains(_techCard!.category)) return _barCategoryOptions;
+    return _kitchenCategoryOptions;
+  }
   // Ключи секций: id → (localization_key, requiresPro)
   // Цеха кухни: код → (ключ локализации, requiresPro)
   static const _sectionKeys = <String, (String, bool)>{
@@ -526,6 +536,11 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
       'soup': {'ru': 'Суп', 'en': 'Soup'},
       'misc': {'ru': 'Разное', 'en': 'Misc'},
       'beverages': {'ru': 'Напитки', 'en': 'Beverages'},
+      'alcoholic_cocktails': {'ru': 'Алкогольные коктейли', 'en': 'Alcoholic cocktails'},
+      'non_alcoholic_drinks': {'ru': 'Безалкогольные напитки', 'en': 'Non-alcoholic drinks'},
+      'hot_drinks': {'ru': 'Горячие напитки', 'en': 'Hot drinks'},
+      'drinks_pure': {'ru': 'Напитки в чистом виде', 'en': 'Drinks (neat)'},
+      'snacks': {'ru': 'Снеки', 'en': 'Snacks'},
     };
 
     return categoryTranslations[c]?[lang] ?? c;
@@ -534,6 +549,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   /// Простой вывод категории из названия блюда (для предзаполнения из ИИ).
   String _inferCategory(String dishName) {
     final lower = dishName.toLowerCase();
+    if (widget.department == 'bar') {
+      if (lower.contains('коктейл') || lower.contains('cocktail') || lower.contains('мохито') || lower.contains('маргарит')) return 'alcoholic_cocktails';
+      if (lower.contains('лимонад') || lower.contains('сок') || lower.contains('кола') || lower.contains('тоник') || lower.contains('soda') || lower.contains('juice')) return 'non_alcoholic_drinks';
+      if (lower.contains('кофе') || lower.contains('чай') || lower.contains('какао') || lower.contains('coffee') || lower.contains('tea') || lower.contains('cocoa')) return 'hot_drinks';
+      if (lower.contains('виски') || lower.contains('ром') || lower.contains('водка') || lower.contains('вино') || lower.contains('пиво') || lower.contains('whiskey') || lower.contains('rum') || lower.contains('vodka') || lower.contains('wine') || lower.contains('beer')) return 'drinks_pure';
+      if (lower.contains('орех') || lower.contains('чипс') || lower.contains('снек') || lower.contains('nuts') || lower.contains('chips') || lower.contains('snack')) return 'snacks';
+    }
     if (lower.contains('соус') || lower.contains('sauce')) return 'sauce';
     if (lower.contains('овощ') || lower.contains('vegetable')) return 'vegetables';
     if (lower.contains('салат') || lower.contains('salad')) return 'salad';
@@ -783,7 +805,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           if (urls.isNotEmpty) updated = updated.copyWith(photoUrls: urls);
         }
         await svc.saveTechCard(updated);
-        // Переводим название и технологию фоново
+        // Переводим название и технологию фоново. Используем updated (с фото и ингредиентами),
+        // иначе перезапись через created удалит photoUrls и ingredients.
+        final savedForTranslation = updated;
         final techText = _technologyController.text.trim();
         final fieldsToTranslate = <String, String>{'dish_name': name};
         if (techText.isNotEmpty) fieldsToTranslate['technology'] = techText;
@@ -795,7 +819,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           userId: emp.id,
         ).then((_) async {
           final otherLang = curLang == 'ru' ? 'en' : 'ru';
-          // Обновляем dishNameLocalized
           final translatedName = await translationManager.getLocalizedText(
             entityType: TranslationEntityType.techCard,
             entityId: created.id,
@@ -804,10 +827,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
             sourceLanguage: curLang,
             targetLanguage: otherLang,
           );
-          final nameMap = Map<String, String>.from(created.dishNameLocalized ?? {});
+          final nameMap = Map<String, String>.from(savedForTranslation.dishNameLocalized ?? {});
           nameMap[curLang] = name;
           if (translatedName != name) nameMap[otherLang] = translatedName;
-          // Обновляем technologyLocalized
           final newTechMap = Map<String, String>.from(techMap);
           if (techText.isNotEmpty) {
             final translatedTech = await translationManager.getLocalizedText(
@@ -821,7 +843,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
             if (translatedTech != techText) newTechMap[otherLang] = translatedTech;
           }
           try {
-            await svc.saveTechCard(created.copyWith(
+            await svc.saveTechCard(savedForTranslation.copyWith(
               dishNameLocalized: nameMap,
               technologyLocalized: newTechMap,
             ));
@@ -829,7 +851,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
         });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('tech_card_created'))));
-          context.go('/tech-cards');
+          context.go('/tech-cards?refresh=1');
         }
       } else {
         var photoUrls = List<String>.from(_photoUrls);
@@ -891,7 +913,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
         });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.read<LocalizationService>().t('save') + ' ✓')));
-          context.go('/tech-cards');
+          context.go('/tech-cards?refresh=1');
         }
       }
     } catch (e) {
@@ -1864,8 +1886,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                 child: SingleChildScrollView(
                   scrollDirection: Axis.vertical,
                   child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minWidth: MediaQuery.of(context).size.width,
+                    constraints: const BoxConstraints(
+                      minWidth: 0,
                       minHeight: 220,
                     ),
                     child: effectiveCanEdit
@@ -2121,8 +2143,8 @@ class _TtkTableState extends State<_TtkTable> {
     final totalFat = ingredients.fold<double>(0, (s, ing) => s + ing.finalFat);
     final totalCarbs = ingredients.fold<double>(0, (s, ing) => s + ing.finalCarbs);
     final accountManager = context.read<AccountManagerSupabase>();
-    final currency = accountManager.currentEmployee?.currency ?? accountManager.establishment?.defaultCurrency ?? 'RUB';
-    final sym = Establishment.currencySymbolFor(currency);
+    final est = accountManager.establishment;
+    final sym = est?.currencySymbol ?? Establishment.currencySymbolFor(est?.defaultCurrency ?? accountManager.currentEmployee?.currency ?? 'VND');
     final hasProSubscription = context.read<AccountManagerSupabase>().currentEmployee?.hasProSubscription ?? false;
 
     final hasDeleteCol = widget.effectiveCanEdit;
@@ -2501,9 +2523,9 @@ class _TtkTableState extends State<_TtkTable> {
                         ),
                       )),
                     )
-                  : _cell(ing.cost.toStringAsFixed(2)),
+                  : _cell(NumberFormatUtils.formatDecimal(ing.cost)),
               // Цена за 1 кг/шт блюда (по ингредиенту: стоимость за кг при выходе)
-              _cell(_outputForPrice(ing) > 0 ? (ing.cost * 1000 / _outputForPrice(ing)).toStringAsFixed(2) : ''),
+              _cell(_outputForPrice(ing) > 0 ? NumberFormatUtils.formatDecimal(ing.cost * 1000 / _outputForPrice(ing)) : ''),
               // Колонка «Технология» — только в первой строке контент, в остальных пустая ячейка
               isFirstRow && widget.technologyController != null
                   ? TableCell(
@@ -2565,8 +2587,8 @@ class _TtkTableState extends State<_TtkTable> {
             _totalCell(''),
             _totalCell(''),
             _totalCell(totalNet.toStringAsFixed(0)),
-            _totalCell(totalCost.toStringAsFixed(2)),
-            _totalCell(totalNet > 0 ? (totalCost * 1000 / totalNet).toStringAsFixed(2) : ''),
+            _totalCell(NumberFormatUtils.formatDecimal(totalCost)),
+            _totalCell(totalNet > 0 ? NumberFormatUtils.formatDecimal(totalCost * 1000 / totalNet) : ''),
             _totalCell(''),
             if (hasDeleteCol) _totalCell(''),
           ],

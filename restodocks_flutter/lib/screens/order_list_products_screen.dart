@@ -26,11 +26,19 @@ class _OrderListProductsScreenState extends State<OrderListProductsScreen> {
   }
 
   static String _unitLabel(String unitId, String lang) =>
-      CulinaryUnits.displayName(unitId, lang);
+      unitId == 'pkg' ? (lang == 'ru' ? 'упак.' : 'pkg') : CulinaryUnits.displayName(unitId, lang);
 
-  static List<String> get _unitIds => [
-        'g', 'kg', 'ml', 'l', 'pcs', 'шт', 'pack', 'can', 'box',
-      ];
+  static List<String> _allowedUnitsForProduct(Product? p) {
+    const base = ['g', 'kg', 'ml', 'l'];
+    final options = List<String>.from(base);
+    if (p?.gramsPerPiece != null && p!.gramsPerPiece! > 0) {
+      options.addAll(['pcs', 'шт']);
+    }
+    if (p?.packageWeightGrams != null && p!.packageWeightGrams! > 0) {
+      options.add('pkg');
+    }
+    return options;
+  }
 
   Future<void> _addProduct() async {
     final acc = context.read<AccountManagerSupabase>();
@@ -57,7 +65,9 @@ class _OrderListProductsScreenState extends State<OrderListProductsScreen> {
       ),
     );
     if (product == null || !mounted) return;
-    String unit = 'g';
+    final allowedUnits = _allowedUnitsForProduct(product);
+    final preferredUnit = product.unit ?? 'g';
+    String unit = allowedUnits.contains(preferredUnit) ? preferredUnit : allowedUnits.first;
     final unitResult = await showDialog<String>(
       context: context,
       builder: (ctx) {
@@ -66,14 +76,14 @@ class _OrderListProductsScreenState extends State<OrderListProductsScreen> {
           builder: (ctx, setState) => AlertDialog(
             title: Text(product.getLocalizedName(loc.currentLanguageCode)),
             content: DropdownButtonFormField<String>(
-              value: selected,
+              value: allowedUnits.contains(selected) ? selected : allowedUnits.first,
               decoration: InputDecoration(
                 labelText: loc.t('order_list_unit'),
                 border: const OutlineInputBorder(),
               ),
-              items: _unitIds.map((id) => DropdownMenuItem(
+              items: allowedUnits.map((id) => DropdownMenuItem(
                 value: id,
-                child: Text(_unitLabel(id, loc.currentLanguageCode)),
+                child: Text(id == 'pkg' ? (loc.currentLanguageCode == 'ru' ? 'упак.' : 'pkg') : _unitLabel(id, loc.currentLanguageCode)),
               )).toList(),
               onChanged: (v) => setState(() => selected = v ?? selected),
             ),
@@ -187,18 +197,20 @@ class _OrderListProductsScreenState extends State<OrderListProductsScreen> {
                       final displayName = product != null
                           ? product.getLocalizedName(lang)
                           : item.productName;
+                      final allowedUnits = _allowedUnitsForProduct(product);
+                      final currentUnit = allowedUnits.contains(item.unit) ? item.unit : allowedUnits.first;
                       return Card(
                         margin: const EdgeInsets.only(bottom: 8),
                         child: ListTile(
                           title: Text(displayName, overflow: TextOverflow.ellipsis),
-                          subtitle: Text(_unitLabel(item.unit, lang)),
+                          subtitle: Text(_unitLabel(currentUnit, lang)),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               DropdownButton<String>(
-                                value: item.unit,
+                                value: currentUnit,
                                 isDense: true,
-                                items: _unitIds.map((id) => DropdownMenuItem(
+                                items: allowedUnits.map((id) => DropdownMenuItem(
                                   value: id,
                                   child: Text(_unitLabel(id, lang), style: const TextStyle(fontSize: 12)),
                                 )).toList(),

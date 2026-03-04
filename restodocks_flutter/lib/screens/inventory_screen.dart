@@ -162,9 +162,11 @@ class _InventoryScreenState extends State<InventoryScreen>
   TimeOfDay? _endTime;
   bool _completed = false;
   bool _isInputMode = false; // Режим ввода количества (клавиатура открыта)
+  bool _hasInputFocus = false; // Фокус в ячейке/фильтре — для скрытия шапки на мобильном
   _InventorySort _sortMode = _InventorySort.alphabetAsc;
   _InventoryBlockFilter _blockFilter = _InventoryBlockFilter.all;
   final TextEditingController _nameFilterCtrl = TextEditingController();
+  final FocusNode _nameFilterFocusNode = FocusNode();
   String _nameFilter = '';
   bool _stateRestored = false; // Флаг: предотвращает двойное восстановление
   bool _isLoadingProducts = true; // Показывать "Загрузка продуктов..." пока не завершился initScreen
@@ -184,6 +186,9 @@ class _InventoryScreenState extends State<InventoryScreen>
       if (_nameFilter != _nameFilterCtrl.text) {
         setState(() => _nameFilter = _nameFilterCtrl.text);
       }
+    });
+    _nameFilterFocusNode.addListener(() {
+      setState(() => _hasInputFocus = _nameFilterFocusNode.hasFocus);
     });
 
     // Настроить автосохранение - сохранять чаще
@@ -536,6 +541,8 @@ class _InventoryScreenState extends State<InventoryScreen>
 
   /// Автоматическая подстановка: номенклатура заведения + полуфабрикаты (ТТК с типом ПФ).
   Future<void> _loadNomenclature() async {
+    if (!mounted) return;
+    setState(() => _isLoadingProducts = true);
     final store = context.read<ProductStoreSupabase>();
     final account = context.read<AccountManagerSupabase>();
     final techCardSvc = context.read<TechCardServiceSupabase>();
@@ -548,6 +555,8 @@ class _InventoryScreenState extends State<InventoryScreen>
     if (!mounted) return;
     final products = store.getNomenclatureProducts(estId);
     final pfOnly = techCards.where((tc) => tc.isSemiFinished).toList();
+    if (!mounted) return;
+    setState(() => _isLoadingProducts = false);
     final productMap = {for (final p in products) p.id: p};
     final techCardMap = {for (final tc in pfOnly) tc.id: tc};
     setState(() {
@@ -633,6 +642,7 @@ class _InventoryScreenState extends State<InventoryScreen>
   void dispose() {
     _hScroll.dispose();
     _nameFilterCtrl.dispose();
+    _nameFilterFocusNode.dispose();
     _serverAutoSaveTimer?.cancel(); // Отменить таймер автосохранения на сервер
     super.dispose();
   }
@@ -685,11 +695,9 @@ class _InventoryScreenState extends State<InventoryScreen>
 
   void _addQuantityToRow(int rowIndex) {
     if (rowIndex < 0 || rowIndex >= _rows.length) return;
-    if (_rows[rowIndex].isFree) return; // свободные строки — без добавления колонок
-    setState(() {
-      // Всегда добавляем пустую ячейку в конец
-      _rows[rowIndex].quantities.add(0.0);
-    });
+    if (_rows[rowIndex].isFree) return;
+    setState(() => _rows[rowIndex].quantities.add(0.0));
+    _scrollToNewColumn();
   }
 
   void _setPfUnit(int rowIndex, String unit) {
@@ -769,6 +777,67 @@ class _InventoryScreenState extends State<InventoryScreen>
         if (!r.isFree) r.quantities.add(0.0);
       }
     });
+    _scrollToNewColumn();
+  }
+
+  void _scrollToNewColumn() {
+    void doScroll() {
+      if (_hScroll.hasClients) {
+        _hScroll.animateTo(
+          _hScroll.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
+      }
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      doScroll();
+      Future.delayed(const Duration(milliseconds: 350), doScroll);
+    });
+  }
+
+  /// При фокусе на ячейку: 3-я видимая → скролл на 2-ю; последняя → на 3-ю.
+  static const double _scrollableRowPadding = 6;
+  void _scrollToCellFocused(int colIndex, int totalCols) {
+    void doScroll() {
+      if (!_hScroll.hasClients) return;
+      final colStep = _colQtyWidth + _colGap;
+      double targetOffset;
+      if (totalCols <= 3) {
+        targetOffset = 0;
+      } else if (colIndex == totalCols - 1) {
+        targetOffset = _scrollableRowPadding + (colIndex - 2) * colStep;
+      } else if (colIndex >= 2) {
+        targetOffset = _scrollableRowPadding + (colIndex - 1) * colStep;
+      } else {
+        targetOffset = 0;
+      }
+      targetOffset = targetOffset.clamp(0.0, _hScroll.position.maxScrollExtent);
+      _hScroll.animateTo(
+        targetOffset,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+      );
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      doScroll();
+      Future.delayed(const Duration(milliseconds: 350), doScroll);
+    });
+  }
+
+  void _onLastCellFocused(int rowIndex) {
+    if (rowIndex < 0 || rowIndex >= _rows.length || _rows[rowIndex].isFree) return;
+    setState(() => _rows[rowIndex].quantities.add(0.0));
+    _scrollToNewColumn();
+  }
+
+  /// При выходе из второй ячейки (после заполнения) — только скролл, ячейку добавляет _onLastCellFocused
+  void _onCellFocusLost(int rowIndex, int colIndex) {
+    if (rowIndex < 0 || rowIndex >= _rows.length || _rows[rowIndex].isFree) return;
+    final row = _rows[rowIndex];
+    if (row.quantities.length < 2 || colIndex != row.quantities.length - 2) return;
+    if (row.quantities[colIndex] <= 0) return;
+    _scrollToNewColumn();
   }
 
   void _addProduct(Product p) {
@@ -794,11 +863,6 @@ class _InventoryScreenState extends State<InventoryScreen>
     // Вызываем setState только если значение действительно изменилось
     if (oldValue != value) {
       setState(() {});
-    }
-
-    // Если это последняя ячейка и значение > 0, добавляем новую ячейку для этой строки
-    if (colIndex == row.quantities.length - 1 && value > 0) {
-      row.quantities.add(0.0);
     }
 
     saveNow();
@@ -991,6 +1055,7 @@ class _InventoryScreenState extends State<InventoryScreen>
       final nameLabel = loc.t('inventory_item_name');
       final unitLabel = loc.t('inventory_unit');
       final totalLabel = loc.t('inventory_excel_total');
+      final sumLabel = loc.t('inventory_excel_sum') ?? 'Сумма';
       final fillLabel = loc.t('inventory_excel_fill_data');
 
       // ЛИСТ 1: Продукты + ПФ с итогами + перерасчет ПФ в брутто (объединенный)
@@ -999,6 +1064,7 @@ class _InventoryScreenState extends State<InventoryScreen>
         TextCellValue(numLabel),
         TextCellValue(nameLabel),
         TextCellValue(unitLabel),
+        TextCellValue(sumLabel),
         TextCellValue(totalLabel),
       ];
       for (var c = 0; c < maxCols; c++) {
@@ -1015,11 +1081,13 @@ class _InventoryScreenState extends State<InventoryScreen>
         final name = r['productName'] as String? ?? '';
         final unit = r['unit'] as String? ?? '';
         final total = r['total'] as num? ?? 0;
+        final price = (r['price'] as num?)?.toDouble();
         final quantities = r['quantities'] as List<dynamic>? ?? [];
         final rowCells = <CellValue>[
           IntCellValue(rowNum++),
           TextCellValue(name),
           TextCellValue(unit),
+          DoubleCellValue(price ?? 0),
           DoubleCellValue(total.toDouble()),
         ];
         for (var c = 0; c < maxCols; c++) {
@@ -1089,10 +1157,12 @@ class _InventoryScreenState extends State<InventoryScreen>
         final total = r['total'] as num? ?? 0;
         final quantities = r['quantities'] as List<dynamic>? ?? [];
 
+        final priceVal = (r['price'] as num?)?.toDouble() ?? 0.0;
         if (allProducts.containsKey(name)) {
-          // Суммируем количества
+          // Суммируем количества и цену
           final existing = allProducts[name]!;
           existing['total'] = (existing['total'] as double) + total.toDouble();
+          existing['price'] = (existing['price'] as double? ?? 0) + priceVal;
           final existingQuantities = existing['quantities'] as List<double>;
           for (var c = 0; c < quantities.length && c < existingQuantities.length; c++) {
             existingQuantities[c] += (quantities[c] as num?)?.toDouble() ?? 0.0;
@@ -1102,6 +1172,7 @@ class _InventoryScreenState extends State<InventoryScreen>
             'productName': name,
             'unit': unit,
             'total': total.toDouble(),
+            'price': priceVal,
             'quantities': List<double>.from(quantities.map((q) => (q as num?)?.toDouble() ?? 0.0)),
           };
         }
@@ -1143,12 +1214,14 @@ class _InventoryScreenState extends State<InventoryScreen>
         final name = p['productName'] as String;
         final unit = p['unit'] as String;
         final total = p['total'] as double;
+        final price = (p['price'] as num?)?.toDouble() ?? 0.0;
         final quantities = p['quantities'] as List<double>;
 
         final rowCells = <CellValue>[
           IntCellValue(i + 1),
           TextCellValue(name),
           TextCellValue(unit),
+          DoubleCellValue(price),
           DoubleCellValue(total),
         ];
         for (var c = 0; c < maxCols; c++) {
@@ -1195,8 +1268,9 @@ class _InventoryScreenState extends State<InventoryScreen>
       });
     }
 
-    // collapseLayout только на десктопе при клавиатуре. На мобильной — не трогаем layout, иначе клавиатура закрывается.
-    final collapseLayout = _isInputMode && !isNarrow;
+    // collapseLayout: скрывать футер и шапку при клавиатуре. На мобильном viewInsets ненадёжен — по фокусу.
+    final collapseLayout = (_isInputMode && !isNarrow) ||
+        (isNarrow && (isKeyboardOpen || _hasInputFocus));
     // На мобильном при открытой клавиатуре скрываем строку с датой/именем (верхняя шапка),
     // но оставляем строку с фильтром — это делается без setState через isKeyboardOpen.
     final mobileKeyboardOpen = isNarrow && isKeyboardOpen;
@@ -1230,12 +1304,13 @@ class _InventoryScreenState extends State<InventoryScreen>
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _buildHeader(
-                loc, establishment, employee,
-                collapseLayout: collapseLayout,
-                hideInfoRow: mobileKeyboardOpen,
-              ),
-              const Divider(height: 1),
+              if (!collapseLayout)
+                _buildHeader(
+                  loc, establishment, employee,
+                  collapseLayout: collapseLayout,
+                  hideInfoRow: mobileKeyboardOpen,
+                ),
+              if (!collapseLayout) const Divider(height: 1),
               Expanded(
                 child: _buildTable(loc),
               ),
@@ -1260,7 +1335,9 @@ class _InventoryScreenState extends State<InventoryScreen>
     final dateStr = '${_date.day.toString().padLeft(2, '0')}.${_date.month.toString().padLeft(2, '0')}.${_date.year}';
     final startStr = _startTime != null ? '${_startTime!.hour.toString().padLeft(2, '0')}:${_startTime!.minute.toString().padLeft(2, '0')}' : '—';
     final endStr = _endTime != null ? '${_endTime!.hour.toString().padLeft(2, '0')}:${_endTime!.minute.toString().padLeft(2, '0')}' : null;
-    final roleStr = employee?.roleDisplayName ?? '—';
+    final roleStr = employee != null && employee!.roles.isNotEmpty
+        ? loc.roleDisplayName(employee!.roles.first)
+        : '—';
     final headerLine = '$dateStr ${startStr} ${employee?.fullName ?? '—'} ($roleStr)${endStr != null ? ' $endStr' : ''}';
     final headerRow = Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -1289,6 +1366,7 @@ class _InventoryScreenState extends State<InventoryScreen>
             width: narrow ? double.infinity : 160,
             child: TextField(
               controller: _nameFilterCtrl,
+              focusNode: _nameFilterFocusNode,
               keyboardType: TextInputType.text,
               textCapitalization: TextCapitalization.sentences,
               decoration: InputDecoration(
@@ -1754,7 +1832,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                     : _ProductUnitDropdown(
                         value: row.isCountedByPackage ? 'pkg' : row.unit,
                         lang: loc.currentLanguageCode,
-                        hasPackage: row.hasPackage,
+                        product: row.product,
                         onChanged: (v) => _setProductUnit(actualIndex, v),
                         theme: theme,
                       ))
@@ -1789,30 +1867,39 @@ class _InventoryScreenState extends State<InventoryScreen>
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-          ...List.generate(
-            qtyCols,
-            (colIndex) {
-              final isLastCell = isLastRow && colIndex == qtyCols - 1;
-              return Padding(
-              padding: EdgeInsets.only(right: colIndex < qtyCols - 1 ? _colGap : 0),
-              child: SizedBox(
-                width: _colQtyWidth,
-                child: _completed
-                    ? Text(_formatQty(row.quantityDisplayAt(colIndex)), style: theme.textTheme.bodyMedium)
-                    : _QtyCell(
-                        key: ValueKey('qty_${actualIndex}_$colIndex'),
-                        value: row.quantities[colIndex],
-                        useGrams: row.isWeightInKg,
-                        onChanged: (v) => _setQuantity(actualIndex, colIndex, v),
-                        textInputAction: isLastCell ? TextInputAction.done : TextInputAction.next,
-                      ),
-              ),
-            );
-            },
-          ),
-        ],
+            ...List.generate(
+              qtyCols,
+              (colIndex) {
+                final isLastCell = isLastRow && colIndex == qtyCols - 1;
+                return Padding(
+                  padding: EdgeInsets.only(right: colIndex < qtyCols - 1 ? _colGap : 0),
+                  child: SizedBox(
+                    width: _colQtyWidth,
+                    child: _completed
+                        ? Text(_formatQty(row.quantityDisplayAt(colIndex)), style: theme.textTheme.bodyMedium)
+                        : _QtyCell(
+                            key: ValueKey('qty_${actualIndex}_$colIndex'),
+                            value: row.quantities[colIndex],
+                            useGrams: row.isWeightInKg,
+                            onChanged: (v) => _setQuantity(actualIndex, colIndex, v),
+                            textInputAction: isLastCell ? TextInputAction.done : TextInputAction.next,
+                            onFocusGained: () {
+                              setState(() => _hasInputFocus = true);
+                              _scrollToCellFocused(colIndex, qtyCols);
+                              if (colIndex == qtyCols - 1) _onLastCellFocused(actualIndex);
+                            },
+                            onFocusLost: () {
+                              setState(() => _hasInputFocus = false);
+                              _onCellFocusLost(actualIndex, colIndex);
+                            },
+                          ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
       ),
-    ),
     );
   }
 
@@ -1976,6 +2063,33 @@ class _InventoryScreenState extends State<InventoryScreen>
     await saveFileBytes(fileName, bytes);
   }
 
+  /// Цена строки: из карточки продукта × итого. 100 руб/кг → 10 г = 1 руб.
+  double? _computeRowPrice(_InventoryRow r) {
+    final p = r.product;
+    if (p == null) return null;
+    if (r.isCountedByPackage) {
+      final pp = p.packagePrice;
+      if (pp == null) return null;
+      return r.total * pp;
+    }
+    final u = (p.unit ?? 'g').toLowerCase();
+    if (u == 'kg' || u == 'кг') {
+      final pricePerKg = p.computedPricePerKg ?? p.basePrice;
+      if (pricePerKg == null) return null;
+      return r.totalWeightGrams / 1000.0 * pricePerKg;
+    }
+    if (u == 'g' || u == 'г') {
+      // basePrice в карточке хранится за кг (как и при unit kg)
+      final pricePerKg = p.computedPricePerKg ?? p.basePrice;
+      if (pricePerKg == null) return null;
+      return r.totalWeightGrams / 1000.0 * pricePerKg;
+    }
+    // pcs, шт, ml, l и т.д. — цена за единицу × количество
+    final pricePerUnit = p.basePrice;
+    if (pricePerUnit == null) return null;
+    return r.total * pricePerUnit;
+  }
+
   Map<String, dynamic> _buildPayload({
     required Establishment establishment,
     required Employee employee,
@@ -1983,10 +2097,12 @@ class _InventoryScreenState extends State<InventoryScreen>
     required String lang,
     List<Map<String, dynamic>>? aggregatedProducts,
   }) {
+    final loc = context.read<LocalizationService>();
+    final roleKey = employee.roles.isNotEmpty ? 'role_${employee.roles.first}' : 'employee';
     final header = {
       'establishmentName': establishment.name,
       'employeeName': employee.fullName,
-      'employeeRole': employee.roleDisplayName,
+      'employeeRole': loc.tForLanguage(lang, roleKey) != roleKey ? loc.tForLanguage(lang, roleKey) : (employee.roleDisplayName),
       'department': employee.department,
       'date': '${_date.year}-${_date.month.toString().padLeft(2, '0')}-${_date.day.toString().padLeft(2, '0')}',
       'timeStart': _startTime != null
@@ -2017,6 +2133,9 @@ class _InventoryScreenState extends State<InventoryScreen>
         map['unitRaw'] = lang == 'ru' ? 'упак.' : 'pkg';
       }
       if (r.isPf) map['pfUnit'] = r.pfUnit ?? _pfUnitPcs;
+      // Цена: из карточки продукта × итого с учётом единиц (100 руб/кг → 10 г = 1 руб)
+      final price = _computeRowPrice(r);
+      if (price != null && price > 0) map['price'] = price;
       return map;
     }).toList();
     return {
@@ -2028,33 +2147,42 @@ class _InventoryScreenState extends State<InventoryScreen>
   }
 }
 
-/// Выпадающий список единицы измерения для продукта (отдельно от названия).
+/// Выпадающий список единицы измерения для продукта.
+/// Ограничен данными продукта: шт — только при gramsPerPiece; упак — при packageWeightGrams.
 class _ProductUnitDropdown extends StatelessWidget {
   const _ProductUnitDropdown({
     required this.value,
     required this.lang,
     required this.onChanged,
     required this.theme,
-    this.hasPackage = false,
+    this.product,
   });
 
   final String value;
   final String lang;
   final void Function(String) onChanged;
   final ThemeData theme;
-  final bool hasPackage;
+  final Product? product;
 
-  static const List<String> _commonUnits = ['g', 'kg', 'pcs', 'шт', 'ml', 'l'];
+  static const List<String> _baseUnits = ['g', 'kg', 'ml', 'l'];
+
+  static List<String> _allowedUnits(Product? p) {
+    final options = List<String>.from(_baseUnits);
+    final hasGpp = p?.gramsPerPiece != null && p!.gramsPerPiece! > 0;
+    if (hasGpp) {
+      options.addAll(['pcs', 'шт']);
+    }
+    final hasPkg = p?.packageWeightGrams != null && p!.packageWeightGrams! > 0;
+    if (hasPkg) options.add('pkg');
+    return options;
+  }
 
   @override
   Widget build(BuildContext context) {
-    final options = [
-      ..._commonUnits,
-      if (hasPackage) 'pkg',
-    ];
+    final options = _allowedUnits(product);
     final normalized = value.trim().toLowerCase();
     final match = options.where((u) => u.toLowerCase() == normalized).firstOrNull;
-    final displayValue = match ?? 'g';
+    final displayValue = match ?? options.first;
     return DropdownButtonHideUnderline(
       child: DropdownButton<String>(
         value: displayValue,
@@ -2083,6 +2211,8 @@ class _QtyCell extends StatefulWidget {
   final void Function(double) onChanged;
   /// TextInputAction.next — «Далее» на клавиатуре переходит к следующей ячейке.
   final TextInputAction textInputAction;
+  final VoidCallback? onFocusGained;
+  final VoidCallback? onFocusLost;
 
   const _QtyCell({
     super.key,
@@ -2090,6 +2220,8 @@ class _QtyCell extends StatefulWidget {
     this.useGrams = false,
     required this.onChanged,
     this.textInputAction = TextInputAction.next,
+    this.onFocusGained,
+    this.onFocusLost,
   });
 
   @override
@@ -2125,7 +2257,10 @@ class _QtyCellState extends State<_QtyCell> {
   }
 
   void _onFocusChanged() {
-    if (!_focus.hasFocus) {
+    if (_focus.hasFocus) {
+      widget.onFocusGained?.call();
+    } else {
+      widget.onFocusLost?.call();
       // При потере фокуса применяем изменения
       final textValue = _controller.text.trim();
       final parsedValue = double.tryParse(textValue.replaceFirst(',', '.')) ?? 0;
@@ -2303,6 +2438,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   String _nameFilter = '';
   String? _selectedSheet; // активный лист (null = первый/все)
   final TextEditingController _filterCtrl = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
 
   // Временное хранилище данных черновика до загрузки продуктов
   Map<String, dynamic>? _pendingDraftData;
@@ -2355,10 +2491,20 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   }
   // ──────────────────────────────────────────────────────────────────────────
 
+  /// Скрывать статус и кнопки при клавиатуре. На мобильном viewInsets часто 0,
+  /// поэтому на узком экране скрываем по фокусу в поле.
+  bool get _isKeyboardActive {
+    if (!mounted) return false;
+    if (MediaQuery.viewInsetsOf(context).bottom > 0) return true;
+    if (MediaQuery.sizeOf(context).width >= 600) return false;
+    return _searchFocusNode.hasFocus || _iikoCellFocusNodes.any((n) => n.hasFocus);
+  }
+
   @override
   void initState() {
     super.initState(); // AutoSaveMixin.initState регистрирует lifecycle-хуки
     _filterCtrl.addListener(() => setState(() => _nameFilter = _filterCtrl.text));
+    _searchFocusNode.addListener(() => setState(() {}));
     _registerJsNavChannel();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Подписываемся на store: когда restoreBlankFromStorage завершится и
@@ -2414,6 +2560,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   @override
   void dispose() {
     _filterCtrl.dispose();
+    _searchFocusNode.dispose();
     _serverSaveTimer?.cancel();
     _iikoCellFocusNodes.clear();
     try { js.context.deleteProperty('_flutterNav'); } catch (_) {}
@@ -2669,7 +2816,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
           'date': _date.toIso8601String(),
           'establishmentName': establishment.name,
           'employeeName': employee.fullName,
-          'department': employee.department,
+          'department': 'kitchen', // iiko — данные кухни, не показывать в баре/зале
           'fileName': fileName,
           'totalPositions': _rows.length,
           'filledPositions': _rows.where((r) => r.total > 0).length,
@@ -2805,7 +2952,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
       outer:
       for (final rowM in RegExp(r'<row r="(\d+)"[^>]*>(.*?)</row>', dotAll: true).allMatches(xml)) {
         if (int.parse(rowM.group(1)!) > 20) break;
-        for (final cm in RegExp(r'<c r="([A-Z]+)\d+"[^>]*t="s"[^>]*><v>(\d+)</v></c>').allMatches(rowM.group(2)!)) {
+        for (final cm in RegExp(r'<c r="([A-Z]+)\d+"(?:[^>]*)t="s"(?:[^>]*)><v>(\d+)</v></c>').allMatches(rowM.group(2)!)) {
           final idx = int.tryParse(cm.group(2)!) ?? -1;
           if (idx >= 0 && idx < sharedStrings.length) {
             final v = sharedStrings[idx].trim().toLowerCase();
@@ -2830,14 +2977,22 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
           var   rowBody  = m.group(3)!;
           final rowClose = m.group(4)!;
 
-          final codeM = RegExp(
-            '<c r="${RegExp.escape(codeColLetter)}$rowIdx"'
-            r'[^>]*t="s"[^>]*><v>(\d+)</v></c>',
-          ).firstMatch(rowBody);
+          // Код может быть shared string (t="s") или число (бланки из Numbers)
+          final codeCellRe = RegExp(
+            '<c r="${RegExp.escape(codeColLetter)}$rowIdx"([^>]*)><v>([^<]+)</v></c>',
+          );
+          final codeM = codeCellRe.firstMatch(rowBody);
           if (codeM == null) return m.group(0)!;
-          final ssIdx = int.tryParse(codeM.group(1)!) ?? -1;
-          if (ssIdx < 0 || ssIdx >= sharedStrings.length) return m.group(0)!;
-          final qty = qtyByCode[sharedStrings[ssIdx].trim()];
+          final attrs = codeM.group(1) ?? '';
+          final val = codeM.group(2) ?? '';
+          final String codeStr = attrs.contains('t="s"')
+              ? ((int.tryParse(val) ?? -1) >= 0 &&
+                        (int.tryParse(val) ?? -1) < sharedStrings.length
+                    ? sharedStrings[int.parse(val)].trim()
+                    : '')
+              : val.trim();
+          if (codeStr.isEmpty) return m.group(0)!;
+          final qty = qtyByCode[codeStr];
           if (qty == null) return m.group(0)!;
 
           final qtyStr = qty == qty.roundToDouble()
@@ -3221,11 +3376,12 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                         );
                       },
                     ),
-                    // Поиск
+                    // Поиск — всегда видим
                     Padding(
                       padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
                       child: TextField(
                         controller: _filterCtrl,
+                        focusNode: _searchFocusNode,
                         decoration: const InputDecoration(
                           hintText: 'Поиск по наименованию...',
                           prefixIcon: Icon(Icons.search),
@@ -3234,7 +3390,8 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                         ),
                       ),
                     ),
-                    // Статус-строка
+                    // Статус-строка — скрываем при фокусе (поиск или ячейка)
+                    if (!_isKeyboardActive)
                     Container(
                       color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -3301,17 +3458,37 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                               .map((r) => r.quantities.length)
                               .reduce((a, b) => a > b ? a : b),
                     ),
-                    // Список строк
+                    // Список строк — тап/скролл внутри не закрывает клавиатуру (refocus).
+                    // Задержка 100ms: поиск refocus быстрее при скролле; ячейка успевает получить фокус.
                     Expanded(
                       child: visibleRows.isEmpty
                           ? const Center(child: Text('Нет позиций'))
-                          : _IikoInventoryTable(
-                              rows: visibleRows,
-                              completed: _completed,
-                              onQuantityChanged: _setQuantity,
+                          : Listener(
+                              onPointerDown: (_) {
+                                final pf = FocusManager.instance.primaryFocus;
+                                final isOurInput = pf != null &&
+                                    (_iikoCellFocusNodes.contains(pf) || pf == _searchFocusNode);
+                                if (!isOurInput) return;
+                                final nodeToRestore = pf!;
+                                Future.delayed(const Duration(milliseconds: 100), () {
+                                  if (!mounted) return;
+                                  final current = FocusManager.instance.primaryFocus;
+                                  if (current != null &&
+                                      (_iikoCellFocusNodes.contains(current) ||
+                                          current == _searchFocusNode)) return;
+                                  nodeToRestore.requestFocus();
+                                });
+                              },
+                              child: _IikoInventoryTable(
+                                rows: visibleRows,
+                                completed: _completed,
+                                onQuantityChanged: _setQuantity,
+                                onFocusChange: () => setState(() {}),
+                              ),
                             ),
                     ),
-                    // Кнопки внизу
+                    // Кнопки внизу — скрываем при фокусе (поиск или ячейка)
+                    if (!_isKeyboardActive)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
                       child: Row(
@@ -3411,12 +3588,14 @@ class _IikoInventoryTable extends StatelessWidget {
     required this.rows,
     required this.completed,
     required this.onQuantityChanged,
+    this.onFocusChange,
   });
 
   final List<_IikoInventoryRow> rows;
   final bool completed;
   final void Function(_IikoInventoryRow row, int colIndex, double qty)
       onQuantityChanged;
+  final VoidCallback? onFocusChange;
 
   @override
   Widget build(BuildContext context) {
@@ -3449,11 +3628,16 @@ class _IikoInventoryTable extends StatelessWidget {
         row: row,
         completed: completed,
         onChanged: (colIdx, qty) => onQuantityChanged(row, colIdx, qty),
+        onFocusChange: onFocusChange,
       ));
     }
     // ListView (не builder) — все строки сразу в DOM,
     // Safari видит полную цепочку <input> и активирует кнопки ▲▼ в панели.
-    return ListView(children: items);
+    // keyboardDismissBehavior.manual — на мобильном при прокрутке клавиатура не скрывается.
+    return ListView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
+      children: items,
+    );
   }
 }
 
@@ -3526,11 +3710,13 @@ class _IikoInventoryRowTile extends StatefulWidget {
     required this.row,
     required this.completed,
     required this.onChanged,
+    this.onFocusChange,
   });
 
   final _IikoInventoryRow row;
   final bool completed;
   final void Function(int colIndex, double qty) onChanged;
+  final VoidCallback? onFocusChange;
 
   @override
   State<_IikoInventoryRowTile> createState() => _IikoInventoryRowTileState();
@@ -3563,12 +3749,22 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
     }
   }
 
+  void _notifyFocusChange() {
+    if (mounted) widget.onFocusChange?.call();
+  }
+
   void _registerFocusNodes() {
     _syncFocusNodes();
     _iikoCellFocusNodes.addAll(_focusNodes);
+    for (final fn in _focusNodes) {
+      fn.addListener(_notifyFocusChange);
+    }
   }
 
   void _unregisterFocusNodes() {
+    for (final fn in _focusNodes) {
+      fn.removeListener(_notifyFocusChange);
+    }
     for (final fn in _focusNodes) {
       _iikoCellFocusNodes.remove(fn);
     }
@@ -3588,6 +3784,7 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
     }
     while (_focusNodes.length < qtys.length) {
       final fn = FocusNode();
+      fn.addListener(_notifyFocusChange);
       _focusNodes.add(fn);
       _iikoCellFocusNodes.add(fn);
     }

@@ -480,7 +480,8 @@ class AppRouter {
             path: '/checklists/:id',
             pageBuilder: (context, state) {
               final id = state.pathParameters['id'] ?? '';
-              return _slideTransitionPage(state, ChecklistEditScreen(checklistId: id));
+              final viewOnly = state.uri.queryParameters['view'] == '1';
+              return _slideTransitionPage(state, ChecklistEditScreen(checklistId: id, viewOnly: viewOnly));
             },
           ),
           GoRoute(
@@ -493,13 +494,20 @@ class AppRouter {
 
           GoRoute(
             path: '/tech-cards',
-            pageBuilder: (context, state) => _slideTransitionPage(state, const TechCardsListScreen()),
+            pageBuilder: (context, state) {
+              final refresh = state.queryParameters['refresh'] == '1';
+              return _slideTransitionPage(
+                state,
+                TechCardsListScreen(key: refresh ? ValueKey('ttk_refresh_${DateTime.now().millisecondsSinceEpoch}') : null),
+              );
+            },
           ),
           GoRoute(
             path: '/tech-cards/new',
             pageBuilder: (context, state) {
               final initialFromAi = state.extra as TechCardRecognitionResult?;
-              return _slideTransitionPage(state, TechCardEditScreen(techCardId: 'new', initialFromAi: initialFromAi));
+              final department = state.queryParameters['department'];
+              return _slideTransitionPage(state, TechCardEditScreen(techCardId: 'new', initialFromAi: initialFromAi, department: department));
             },
           ),
           GoRoute(
