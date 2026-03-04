@@ -37,6 +37,13 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
   List<String> _actionDropdownOptions = [];
   /// Единица для нового пункта
   String _newItemUnit = 'kg';
+  List<Employee> _employees = [];
+  /// null или пусто = всем
+  List<String> _selectedEmployeeIds = [];
+  bool _deadlineEnabled = false;
+  DateTime? _deadline;
+  bool _scheduledForEnabled = false;
+  DateTime? _scheduledFor;
 
   Future<void> _load() async {
     setState(() {
@@ -50,13 +57,16 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
       final techSvc = context.read<TechCardServiceSupabase>();
       final c = await svc.getChecklistById(widget.checklistId);
       List<TechCard> techs = [];
+      List<Employee> emps = [];
       if (est != null) {
         techs = await techSvc.getTechCardsForEstablishment(est.dataEstablishmentId);
+        emps = await acc.getEmployeesForEstablishment(est.id);
       }
       if (!mounted) return;
       setState(() {
         _checklist = c;
         _techCards = techs;
+        _employees = emps;
         _loading = false;
         if (c != null) {
           _nameController.text = c.name;
@@ -69,6 +79,18 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
           _items
             ..clear()
             ..addAll(c.items);
+          final ids = c.assignedEmployeeIds;
+          if (ids != null && ids.isNotEmpty) {
+            _selectedEmployeeIds = List.from(ids);
+          } else if (c.assignedEmployeeId != null && c.assignedEmployeeId!.isNotEmpty) {
+            _selectedEmployeeIds = [c.assignedEmployeeId!];
+          } else {
+            _selectedEmployeeIds = [];
+          }
+          _deadlineEnabled = c.deadlineAt != null;
+          _deadline = c.deadlineAt;
+          _scheduledForEnabled = c.scheduledForAt != null;
+          _scheduledFor = c.scheduledForAt;
         }
       });
       _ensureTechCardTranslations(techSvc, techs);
@@ -135,6 +157,11 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
       'actionHasNumeric': _actionHasNumeric,
       'actionHasToggle': _actionHasToggle,
       'actionDropdownOptions': _actionDropdownOptions,
+      'selectedEmployeeIds': _selectedEmployeeIds,
+      'deadlineEnabled': _deadlineEnabled,
+      'deadline': _deadline?.toIso8601String(),
+      'scheduledForEnabled': _scheduledForEnabled,
+      'scheduledFor': _scheduledFor?.toIso8601String(),
       'items': _items.map((item) => {
         'id': item.id,
         'title': item.title,
@@ -157,6 +184,11 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
       _actionHasNumeric = data['actionHasNumeric'] == true;
       _actionHasToggle = data['actionHasToggle'] != false;
       _actionDropdownOptions = List<String>.from(data['actionDropdownOptions'] as List<dynamic>? ?? []);
+      _selectedEmployeeIds = List<String>.from(data['selectedEmployeeIds'] as List<dynamic>? ?? []);
+      _deadlineEnabled = data['deadlineEnabled'] == true;
+      _deadline = data['deadline'] != null ? DateTime.tryParse(data['deadline'] as String) : null;
+      _scheduledForEnabled = data['scheduledForEnabled'] == true;
+      _scheduledFor = data['scheduledFor'] != null ? DateTime.tryParse(data['scheduledFor'] as String) : null;
       final itemsData = data['items'] as List<dynamic>? ?? [];
       _items.clear();
       for (final itemData in itemsData) {
@@ -204,12 +236,19 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
       dropdownOptions: opts.isEmpty ? null : opts,
       hasToggle: _actionHasToggle,
     );
+    final empIds = _selectedEmployeeIds.isEmpty ? null : _selectedEmployeeIds;
+    final deadlineVal = _deadlineEnabled && _deadline != null ? _deadline : null;
+    final scheduledForVal = _scheduledForEnabled && _scheduledFor != null ? _scheduledFor : null;
     final updated = c.copyWith(
       name: name,
       additionalName: _additionalNameController.text.trim().isEmpty ? null : _additionalNameController.text.trim(),
       type: _type,
       actionConfig: actionConfig,
       assignedSection: c.assignedSection,
+      assignedEmployeeIds: empIds,
+      assignedEmployeeId: empIds?.length == 1 ? empIds!.first : null,
+      deadlineAt: deadlineVal,
+      scheduledForAt: scheduledForVal,
       items: _items
           .map((e) => ChecklistItem(
                 id: e.id,
@@ -549,6 +588,248 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
     );
   }
 
+  Widget _buildEmployeeSelector(LocalizationService loc, String lang, bool canEdit) {
+    final label = _selectedEmployeeIds.isEmpty
+        ? loc.t('checklist_employee_all') ?? 'Все'
+        : '${_selectedEmployeeIds.length} ${loc.t('checklist_employee')}';
+    return InkWell(
+      onTap: canEdit ? () => _showEmployeePicker(loc, lang, canEdit) : null,
+      borderRadius: BorderRadius.circular(12),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: loc.t('checklist_employee') ?? 'Сотрудник',
+          hintText: loc.t('checklist_employee_select') ?? 'Выбрать сотрудников',
+          border: const OutlineInputBorder(),
+          suffixIcon: canEdit ? Icon(Icons.arrow_drop_down, color: Theme.of(context).colorScheme.onSurfaceVariant) : null,
+        ),
+        child: Text(label),
+      ),
+    );
+  }
+
+  Future<void> _showEmployeePicker(LocalizationService loc, String lang, bool canEdit) async {
+    final selected = List<String>.from(_selectedEmployeeIds);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setInner) {
+          return AlertDialog(
+            title: Text(loc.t('checklist_employee') ?? 'Сотрудник'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  ListTile(
+                    leading: Radio<bool>(
+                      value: true,
+                      groupValue: selected.isEmpty,
+                      onChanged: (_) => setInner(() => selected.clear()),
+                    ),
+                    title: Text(loc.t('checklist_employee_all') ?? 'Все'),
+                    onTap: () => setInner(() => selected.clear()),
+                  ),
+                  ..._employees.map((e) {
+                    final isSelected = selected.contains(e.id);
+                    return CheckboxListTile(
+                      value: isSelected,
+                      onChanged: canEdit ? (v) {
+                        setInner(() {
+                          if (v == true) selected.add(e.id);
+                          else selected.remove(e.id);
+                        });
+                      } : null,
+                      title: Text(e.fullName),
+                      secondary: Text(e.roles.isNotEmpty ? e.roles.join(', ') : '', style: Theme.of(context).textTheme.bodySmall),
+                    );
+                  }),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(loc.t('cancel'))),
+              FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(loc.t('save'))),
+            ],
+          );
+        },
+      ),
+    );
+    if (ok == true && mounted) {
+      setState(() {
+        _selectedEmployeeIds = selected;
+        scheduleSave();
+      });
+    }
+  }
+
+  Widget _buildDeadlineRow(LocalizationService loc, String lang, bool canEdit) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            SizedBox(
+              width: 24,
+              height: 24,
+              child: Switch(
+                value: _deadlineEnabled,
+                onChanged: canEdit ? (v) => setState(() {
+                  _deadlineEnabled = v;
+                  if (v && _deadline == null) _deadline = DateTime.now();
+                  scheduleSave();
+                }) : null,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(loc.t('checklist_deadline') ?? 'Срок выполнения'),
+          ],
+        ),
+        if (_deadlineEnabled && canEdit) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: InkWell(
+                  onTap: () async {
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: _deadline ?? DateTime.now(),
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime(2030),
+                    );
+                    if (date != null && mounted) {
+                      setState(() {
+                        final d = _deadline ?? DateTime.now();
+                        _deadline = DateTime(date.year, date.month, date.day, d.hour, d.minute);
+                        scheduleSave();
+                      });
+                    }
+                  },
+                  child: InputDecorator(
+                    decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
+                    child: Text(_deadline != null ? '${_deadline!.day.toString().padLeft(2, '0')}.${_deadline!.month.toString().padLeft(2, '0')}.${_deadline!.year}' : '—'),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: InkWell(
+                  onTap: () async {
+                    final time = await showTimePicker(
+                      context: context,
+                      initialTime: _deadline != null
+                        ? TimeOfDay(hour: _deadline!.hour, minute: _deadline!.minute)
+                        : TimeOfDay.now(),
+                    );
+                    if (time != null && mounted) {
+                      setState(() {
+                        final d = _deadline ?? DateTime.now();
+                        _deadline = DateTime(d.year, d.month, d.day, time.hour, time.minute);
+                        scheduleSave();
+                      });
+                    }
+                  },
+                  child: InputDecorator(
+                    decoration: InputDecoration(
+                      border: const OutlineInputBorder(),
+                      isDense: true,
+                      labelText: loc.t('time') ?? 'Время',
+                    ),
+                    child: Text(_deadline != null ? '${_deadline!.hour.toString().padLeft(2, '0')}:${_deadline!.minute.toString().padLeft(2, '0')}' : '—'),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildScheduledForRow(LocalizationService loc, String lang, bool canEdit) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            SizedBox(
+              width: 24,
+              height: 24,
+              child: Switch(
+                value: _scheduledForEnabled,
+                onChanged: canEdit ? (v) => setState(() {
+                  _scheduledForEnabled = v;
+                  if (v && _scheduledFor == null) _scheduledFor = DateTime.now();
+                  scheduleSave();
+                }) : null,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(loc.t('checklist_scheduled_for') ?? 'На когда'),
+          ],
+        ),
+        if (_scheduledForEnabled && canEdit) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: InkWell(
+                  onTap: () async {
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: _scheduledFor ?? DateTime.now(),
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime(2030),
+                    );
+                    if (date != null && mounted) {
+                      setState(() {
+                        final d = _scheduledFor ?? DateTime.now();
+                        _scheduledFor = DateTime(date.year, date.month, date.day, d.hour, d.minute);
+                        scheduleSave();
+                      });
+                    }
+                  },
+                  child: InputDecorator(
+                    decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
+                    child: Text(_scheduledFor != null ? '${_scheduledFor!.day.toString().padLeft(2, '0')}.${_scheduledFor!.month.toString().padLeft(2, '0')}.${_scheduledFor!.year}' : '—'),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: InkWell(
+                  onTap: () async {
+                    final time = await showTimePicker(
+                      context: context,
+                      initialTime: _scheduledFor != null
+                        ? TimeOfDay(hour: _scheduledFor!.hour, minute: _scheduledFor!.minute)
+                        : TimeOfDay.now(),
+                    );
+                    if (time != null && mounted) {
+                      setState(() {
+                        final d = _scheduledFor ?? DateTime.now();
+                        _scheduledFor = DateTime(d.year, d.month, d.day, time.hour, time.minute);
+                        scheduleSave();
+                      });
+                    }
+                  },
+                  child: InputDecorator(
+                    decoration: InputDecoration(
+                      border: const OutlineInputBorder(),
+                      isDense: true,
+                      labelText: loc.t('time') ?? 'Время',
+                    ),
+                    child: Text(_scheduledFor != null ? '${_scheduledFor!.hour.toString().padLeft(2, '0')}:${_scheduledFor!.minute.toString().padLeft(2, '0')}' : '—'),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
@@ -719,6 +1000,12 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                 ),
                 onChanged: (_) => scheduleSave(),
               ),
+            const SizedBox(height: 16),
+            _buildEmployeeSelector(loc, lang, canEdit),
+            const SizedBox(height: 16),
+            _buildDeadlineRow(loc, lang, canEdit),
+            const SizedBox(height: 12),
+            _buildScheduledForRow(loc, lang, canEdit),
             const SizedBox(height: 16),
             DropdownButtonFormField<String?>(
               value: _checklist?.assignedSection?.isNotEmpty == true ? _checklist!.assignedSection : null,

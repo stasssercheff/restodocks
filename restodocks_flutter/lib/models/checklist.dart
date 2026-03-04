@@ -73,8 +73,14 @@ class Checklist extends Equatable {
   final String? assignedSection;
   /// Подразделение: kitchen, bar, hall (default kitchen)
   final String assignedDepartment;
-  /// Сотрудник, которому назначен чеклист (опционально)
+  /// Сотрудник, которому назначен чеклист (опционально, для обратной совместимости)
   final String? assignedEmployeeId;
+  /// Сотрудники, которым адресован чеклист. null/пусто = всем
+  final List<String>? assignedEmployeeIds;
+  /// Срок выполнения (опционально)
+  final DateTime? deadlineAt;
+  /// На когда назначен чеклист (опционально)
+  final DateTime? scheduledForAt;
 
   const Checklist({
     required this.id,
@@ -90,6 +96,9 @@ class Checklist extends Equatable {
     this.assignedSection,
     this.assignedDepartment = 'kitchen',
     this.assignedEmployeeId,
+    this.assignedEmployeeIds,
+    this.deadlineAt,
+    this.scheduledForAt,
   });
 
   factory Checklist.fromJson(Map<String, dynamic> json) {
@@ -110,6 +119,14 @@ class Checklist extends Equatable {
       assignedSection: json['assigned_section'] as String?,
       assignedDepartment: json['assigned_department'] as String? ?? 'kitchen',
       assignedEmployeeId: json['assigned_employee_id'] as String?,
+      assignedEmployeeIds: (json['assigned_employee_ids'] as List<dynamic>?)
+          ?.map((e) => e.toString()).where((s) => s.isNotEmpty).toList(),
+      deadlineAt: json['deadline_at'] != null
+          ? DateTime.parse(json['deadline_at'] as String)
+          : null,
+      scheduledForAt: json['scheduled_for_at'] != null
+          ? DateTime.parse(json['scheduled_for_at'] as String)
+          : null,
     );
   }
 
@@ -126,6 +143,10 @@ class Checklist extends Equatable {
       if (assignedSection != null) 'assigned_section': assignedSection,
       'assigned_department': assignedDepartment,
       if (assignedEmployeeId != null) 'assigned_employee_id': assignedEmployeeId,
+      if (assignedEmployeeIds != null && assignedEmployeeIds!.isNotEmpty)
+        'assigned_employee_ids': assignedEmployeeIds,
+      if (deadlineAt != null) 'deadline_at': deadlineAt!.toIso8601String(),
+      if (scheduledForAt != null) 'scheduled_for_at': scheduledForAt!.toIso8601String(),
     };
   }
 
@@ -143,6 +164,9 @@ class Checklist extends Equatable {
     String? assignedSection,
     String? assignedDepartment,
     String? assignedEmployeeId,
+    List<String>? assignedEmployeeIds,
+    DateTime? deadlineAt,
+    DateTime? scheduledForAt,
   }) {
     return Checklist(
       id: id ?? this.id,
@@ -158,6 +182,9 @@ class Checklist extends Equatable {
       assignedSection: assignedSection ?? this.assignedSection,
       assignedDepartment: assignedDepartment ?? this.assignedDepartment,
       assignedEmployeeId: assignedEmployeeId ?? this.assignedEmployeeId,
+      assignedEmployeeIds: assignedEmployeeIds ?? this.assignedEmployeeIds,
+      deadlineAt: deadlineAt ?? this.deadlineAt,
+      scheduledForAt: scheduledForAt ?? this.scheduledForAt,
     );
   }
 

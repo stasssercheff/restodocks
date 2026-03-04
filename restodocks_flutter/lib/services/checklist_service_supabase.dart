@@ -65,6 +65,9 @@ class ChecklistServiceSupabase {
     List<ChecklistItem> items = const [],
     String? assignedSection,
     String? assignedEmployeeId,
+    List<String>? assignedEmployeeIds,
+    DateTime? deadlineAt,
+    DateTime? scheduledForAt,
     String? additionalName,
     ChecklistType? type,
     ChecklistActionConfig? actionConfig,
@@ -81,6 +84,11 @@ class ChecklistServiceSupabase {
     if (assignedSection != null) data['assigned_section'] = assignedSection;
     data['assigned_department'] = assignedDepartment;
     if (assignedEmployeeId != null) data['assigned_employee_id'] = assignedEmployeeId;
+    if (assignedEmployeeIds != null && assignedEmployeeIds.isNotEmpty) {
+      data['assigned_employee_ids'] = assignedEmployeeIds;
+    }
+    if (deadlineAt != null) data['deadline_at'] = deadlineAt.toIso8601String();
+    if (scheduledForAt != null) data['scheduled_for_at'] = scheduledForAt.toIso8601String();
     if (additionalName != null) data['additional_name'] = additionalName;
     if (type != null) data['type'] = type.code;
     if (actionConfig != null) data['action_config'] = actionConfig.toJson();
@@ -110,6 +118,9 @@ class ChecklistServiceSupabase {
     upd['assigned_section'] = checklist.assignedSection;
     upd['assigned_department'] = checklist.assignedDepartment;
     upd['assigned_employee_id'] = checklist.assignedEmployeeId;
+    upd['assigned_employee_ids'] = checklist.assignedEmployeeIds ?? [];
+    upd['deadline_at'] = checklist.deadlineAt?.toIso8601String();
+    upd['scheduled_for_at'] = checklist.scheduledForAt?.toIso8601String();
     upd['additional_name'] = checklist.additionalName;
     upd['type'] = checklist.type?.code;
     upd['action_config'] = checklist.actionConfig.toJson();
@@ -146,6 +157,11 @@ class ChecklistServiceSupabase {
       type: source.type,
       actionConfig: source.actionConfig,
       assignedDepartment: source.assignedDepartment,
+      assignedSection: source.assignedSection,
+      assignedEmployeeId: source.assignedEmployeeId,
+      assignedEmployeeIds: source.assignedEmployeeIds,
+      deadlineAt: source.deadlineAt,
+      scheduledForAt: source.scheduledForAt,
       items: source.items
           .map((e) => ChecklistItem.template(
                 title: e.title,
