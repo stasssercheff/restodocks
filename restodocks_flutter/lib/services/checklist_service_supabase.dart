@@ -84,11 +84,23 @@ class ChecklistServiceSupabase {
     };
     if (assignedSection != null) data['assigned_section'] = assignedSection;
     if (assignedEmployeeId != null) data['assigned_employee_id'] = assignedEmployeeId;
-    // deadline_at, scheduled_for_at — не отправляем: колонки могут отсутствовать в схеме
+    if (deadlineAt != null) data['deadline_at'] = deadlineAt.toIso8601String();
+    if (scheduledForAt != null) data['scheduled_for_at'] = scheduledForAt.toIso8601String();
     if (additionalName != null) data['additional_name'] = additionalName;
     if (type != null) data['type'] = type.code;
     if (actionConfig != null) data['action_config'] = actionConfig.toJson();
-    final res = await _supabase.insertData('checklists', data);
+    Map<String, dynamic> res;
+    try {
+      res = await _supabase.insertData('checklists', data);
+    } catch (e) {
+      if (_isColumnNotFoundError(e)) {
+        data.remove('deadline_at');
+        data.remove('scheduled_for_at');
+        res = await _supabase.insertData('checklists', data);
+      } else {
+        rethrow;
+      }
+    }
     final c = Checklist.fromJson(res);
 
     for (var i = 0; i < items.length; i++) {
@@ -132,6 +144,12 @@ class ChecklistServiceSupabase {
     }
   }
 
+  bool _isColumnNotFoundError(Object e) {
+    final msg = e.toString().toLowerCase();
+    return msg.contains('pgrst204') ||
+        (msg.contains('column') && (msg.contains('found') || msg.contains('exist')));
+  }
+
   /// Вставка одного пункта; при ошибке схемы (PGRST204) повтор без опциональных колонок.
   Future<void> _insertChecklistItem(Map<String, dynamic> itemData) async {
     try {
@@ -163,11 +181,22 @@ class ChecklistServiceSupabase {
     upd['assigned_employee_id'] = checklist.assignedEmployeeIds?.isNotEmpty == true
         ? checklist.assignedEmployeeIds!.first
         : checklist.assignedEmployeeId;
-    // deadline_at, scheduled_for_at не отправляем: колонки могут отсутствовать
+    if (checklist.deadlineAt != null) upd['deadline_at'] = checklist.deadlineAt!.toIso8601String();
+    if (checklist.scheduledForAt != null) upd['scheduled_for_at'] = checklist.scheduledForAt!.toIso8601String();
     upd['additional_name'] = checklist.additionalName;
     upd['type'] = checklist.type?.code;
     upd['action_config'] = checklist.actionConfig.toJson();
-    await _supabase.updateData('checklists', upd, 'id', checklist.id);
+    try {
+      await _supabase.updateData('checklists', upd, 'id', checklist.id);
+    } catch (e) {
+      if (_isColumnNotFoundError(e)) {
+        upd.remove('deadline_at');
+        upd.remove('scheduled_for_at');
+        await _supabase.updateData('checklists', upd, 'id', checklist.id);
+      } else {
+        rethrow;
+      }
+    }
     await _supabase.client
         .from('checklist_items')
         .delete()
