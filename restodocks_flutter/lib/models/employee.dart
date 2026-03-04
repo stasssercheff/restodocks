@@ -326,6 +326,13 @@ class Employee extends Equatable {
     }
   }
 
+  /// Руководство получает документы во входящих (чеклисты, заказы, инвентаризации). Линейные — только сообщения.
+  bool get hasInboxDocuments =>
+      hasRole('owner') ||
+      hasRole('executive_chef') ||
+      hasRole('sous_chef') ||
+      canViewDepartment('management');
+
   /// Отображаемое имя роли (первая роль)
   String get roleDisplayName {
     if (roles.isEmpty) return 'Сотрудник';

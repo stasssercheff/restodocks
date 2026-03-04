@@ -69,17 +69,19 @@ class _InboxScreenState extends State<InboxScreen> {
     final isChef = employee.roles.contains('executive_chef');
     final isSousChef = employee.roles.contains('sous_chef');
     final isOwner = employee.roles.contains('owner');
+    final hasDocs = employee.hasInboxDocuments;
 
     final tabs = <_InboxTab>[];
-    if (isChef || isSousChef) tabs.add(_InboxTab.checklist);
-    if (isChef || isSousChef) tabs.add(_InboxTab.order);
-    if (isChef || isOwner) tabs.add(_InboxTab.inventory);
-    // Вкладка iiko — только если есть хотя бы один документ такого типа
-    if ((isChef || isOwner) &&
-        _documents.any((d) => d.type == DocumentType.iikoInventory)) {
-      tabs.add(_InboxTab.iikoInventory);
+    if (hasDocs) {
+      if (isChef || isSousChef) tabs.add(_InboxTab.checklist);
+      if (isChef || isSousChef) tabs.add(_InboxTab.order);
+      if (isChef || isOwner) tabs.add(_InboxTab.inventory);
+      if ((isChef || isOwner) &&
+          _documents.any((d) => d.type == DocumentType.iikoInventory)) {
+        tabs.add(_InboxTab.iikoInventory);
+      }
     }
-    if (isChef || isSousChef || isOwner) tabs.add(_InboxTab.messages);
+    tabs.add(_InboxTab.messages);
     return tabs;
   }
 
@@ -154,10 +156,11 @@ class _InboxScreenState extends State<InboxScreen> {
     final isOwner = employee?.hasRole('owner') ?? false;
     final visibleTabs = employee != null ? _visibleTabs(employee) : <_InboxTab>[];
 
+    final onlyMessages = visibleTabs.length == 1 && visibleTabs.first == _InboxTab.messages;
     return Scaffold(
       appBar: AppBar(
         leading: widget.embedded ? null : appBarBackButton(context),
-        title: Text(loc.t('inbox')),
+        title: Text(onlyMessages ? (loc.t('inbox_tab_messages') ?? 'Сообщения') : loc.t('inbox')),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -173,8 +176,8 @@ class _InboxScreenState extends State<InboxScreen> {
             _buildDeptFilter(loc),
             _buildTypeFilterForOwner(loc),
           ],
-          // Остальные: фильтр по типу документа
-          if (!isOwner && visibleTabs.isNotEmpty) _buildTypeFilter(loc, visibleTabs),
+          // Остальные: фильтр по типу документа (скрыт, если только Сообщения)
+          if (!isOwner && visibleTabs.isNotEmpty && !onlyMessages) _buildTypeFilter(loc, visibleTabs),
 
           // Список документов или чатов (для вкладки Сообщения)
           Expanded(

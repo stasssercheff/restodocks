@@ -43,6 +43,11 @@ class StaffHomeContent extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       children: [
         _Tile(
+          icon: Icons.chat_bubble_outline,
+          title: loc.t('inbox_tab_messages') ?? 'Сообщения',
+          onTap: () => context.go('/notifications'),
+        ),
+        _Tile(
           icon: Icons.calendar_month,
           title: loc.t('schedule'),
           onTap: () => context.go('/schedule'),

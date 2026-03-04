@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../models/models.dart';
 import '../services/localization_service.dart';
 import '../services/account_manager_supabase.dart';
 import '../services/home_button_config_service.dart';
@@ -26,7 +27,7 @@ class AppShell extends StatelessWidget {
     final noDataAccess = !isOwner && !currentEmployee.dataAccessEnabled;
     final middleLabel = noDataAccess
         ? loc.t('personal_schedule')
-        : _labelForAction(loc, middleAction);
+        : _labelForAction(loc, middleAction, currentEmployee);
 
     final location = GoRouterState.of(context).matchedLocation;
     final selectedIndex = _indexForLocation(location, middleAction, noDataAccess);
@@ -57,10 +58,12 @@ class AppShell extends StatelessWidget {
     );
   }
 
-  String _labelForAction(LocalizationService loc, HomeButtonAction action) {
+  String _labelForAction(LocalizationService loc, HomeButtonAction action, Employee? employee) {
     switch (action) {
       case HomeButtonAction.inbox:
-        return loc.t('inbox');
+        return (employee?.hasInboxDocuments ?? true)
+            ? loc.t('inbox')
+            : (loc.t('inbox_tab_messages') ?? 'Сообщения');
       case HomeButtonAction.schedule:
         return loc.t('schedule');
       case HomeButtonAction.checklists:
