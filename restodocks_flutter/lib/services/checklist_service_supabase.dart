@@ -157,6 +157,28 @@ class ChecklistServiceSupabase {
         (msg.contains('column') && (msg.contains('find') || msg.contains('found') || msg.contains('exist')));
   }
 
+  /// Обновление чеклиста с поэтапным retry: при PGRST204 исключаем проблемные колонки.
+  Future<void> _updateChecklistWithRetry(String id, Map<String, dynamic> fullUpd) async {
+    try {
+      await _supabase.updateData('checklists', fullUpd, 'id', id);
+      return;
+    } catch (e) {
+      if (!_isColumnNotFoundError(e)) rethrow;
+    }
+    final withoutDates = Map<String, dynamic>.from(fullUpd)..remove('deadline_at')..remove('scheduled_for_at');
+    try {
+      await _supabase.updateData('checklists', withoutDates, 'id', id);
+      return;
+    } catch (e) {
+      if (!_isColumnNotFoundError(e)) rethrow;
+    }
+    final minimal = <String, dynamic>{
+      'name': fullUpd['name'],
+      'updated_at': fullUpd['updated_at'],
+    };
+    await _supabase.updateData('checklists', minimal, 'id', id);
+  }
+
   /// Вставка одного пункта; при ошибке схемы (PGRST204) повтор без опциональных колонок.
   Future<void> _insertChecklistItem(Map<String, dynamic> itemData) async {
     try {
@@ -169,9 +191,6 @@ class ChecklistServiceSupabase {
           'title': itemData['title'],
           'sort_order': itemData['sort_order'],
         };
-        if (itemData.containsKey('tech_card_id') && itemData['tech_card_id'] != null) {
-          minimal['tech_card_id'] = itemData['tech_card_id'];
-        }
         await _supabase.insertData('checklist_items', minimal);
       } else {
         rethrow;
@@ -193,20 +212,8 @@ class ChecklistServiceSupabase {
     upd['additional_name'] = checklist.additionalName;
     upd['type'] = checklist.type?.code;
     upd['action_config'] = checklist.actionConfig.toJson();
-    try {
-      await _supabase.updateData('checklists', upd, 'id', checklist.id);
-    } catch (e) {
-      if (_isColumnNotFoundError(e)) {
-        // Только колонки, гарантированно существующие — schema cache может не видеть deadline_at и др.
-        final minimal = <String, dynamic>{
-          'name': checklist.name,
-          'updated_at': DateTime.now().toIso8601String(),
-        };
-        await _supabase.updateData('checklists', minimal, 'id', checklist.id);
-      } else {
-        rethrow;
-      }
-    }
+
+    await _updateChecklistWithRetry(checklist.id, upd);
     await _supabase.client
         .from('checklist_items')
         .delete()
