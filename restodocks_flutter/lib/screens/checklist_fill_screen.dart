@@ -337,7 +337,7 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _buildHeader(loc, emp),
+                  _buildHeader(loc, emp, c),
                   const SizedBox(height: 24),
                   _buildTableHeader(loc, cfg),
                   const Divider(height: 24),
@@ -381,8 +381,13 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
     );
   }
 
-  Widget _buildHeader(LocalizationService loc, Employee? emp) {
-    final format = (DateTime? t) => t != null ? '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}' : '—';
+  Widget _buildHeader(LocalizationService loc, Employee? emp, Checklist checklist) {
+    final formatTime = (DateTime? t) => t != null ? '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}' : '—';
+    final formatDate = (DateTime d) => '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}';
+    final formatDateTime = (DateTime d) {
+      final hasTime = d.hour != 0 || d.minute != 0;
+      return hasTime ? '${formatDate(d)} ${formatTime(d)}' : formatDate(d);
+    };
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -394,9 +399,16 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
             Text(loc.t('role') ?? 'Должность: ${emp?.primaryRole?.displayName ?? '—'}', style: Theme.of(context).textTheme.bodySmall),
             if (emp?.department == 'kitchen' && emp?.section != null)
               Text('${loc.t('kitchen_section') ?? 'Цех'}: ${KitchenSection.fromCode(emp!.section!)?.displayName ?? emp.section}', style: Theme.of(context).textTheme.bodySmall),
+            if (checklist.deadlineAt != null || checklist.scheduledForAt != null) ...[
+              const SizedBox(height: 6),
+              if (checklist.scheduledForAt != null)
+                Text('${loc.t('checklist_scheduled_for') ?? 'На когда'}: ${formatDateTime(checklist.scheduledForAt!)}', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+              if (checklist.deadlineAt != null)
+                Text('${loc.t('checklist_deadline') ?? 'Срок выполнения'}: ${formatDateTime(checklist.deadlineAt!)}', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+            ],
             const SizedBox(height: 4),
-            Text('${loc.t('checklist_start_time') ?? 'Начало'}: ${format(_startTime)}', style: Theme.of(context).textTheme.labelSmall),
-            Text('${loc.t('checklist_end_time') ?? 'Конец'}: ${format(_endTime)}', style: Theme.of(context).textTheme.labelSmall),
+            Text('${loc.t('checklist_start_time') ?? 'Начало'}: ${formatTime(_startTime)}', style: Theme.of(context).textTheme.labelSmall),
+            Text('${loc.t('checklist_end_time') ?? 'Конец'}: ${formatTime(_endTime)}', style: Theme.of(context).textTheme.labelSmall),
           ],
         ),
       ),
