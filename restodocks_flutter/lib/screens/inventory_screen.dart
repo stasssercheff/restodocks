@@ -1447,6 +1447,12 @@ class _InventoryScreenState extends State<InventoryScreen>
               )
             : Row(
                 children: [
+                  if (sortAlphabetButton != null && nameFilterField != null) ...[
+                    if (!collapseLayout) sortAlphabetButton!,
+                    if (!collapseLayout) const SizedBox(width: 6),
+                    nameFilterField!,
+                    const SizedBox(width: 12),
+                  ],
                   if (!collapseLayout) ...[
                     Icon(Icons.store, size: 16, color: theme.colorScheme.primary),
                     const SizedBox(width: 4),
@@ -1474,12 +1480,6 @@ class _InventoryScreenState extends State<InventoryScreen>
                     '${_startTime?.hour.toString().padLeft(2, '0') ?? '—'}:${_startTime?.minute.toString().padLeft(2, '0') ?? '—'}',
                     style: theme.textTheme.bodySmall,
                   ),
-                  if (sortAlphabetButton != null && nameFilterField != null) ...[
-                    const SizedBox(width: 6),
-                    if (!collapseLayout) sortAlphabetButton!,
-                    if (!collapseLayout) const SizedBox(width: 6),
-                    nameFilterField!,
-                  ],
                 ],
               ),
           ),
