@@ -23,6 +23,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
     with AutoSaveMixin<ChecklistEditScreen>, InputChangeListenerMixin<ChecklistEditScreen> {
   Checklist? _checklist;
   bool _loading = true;
+  bool _saving = false;
   String? _error;
   List<TechCard> _techCards = [];
   late final TextEditingController _nameController;
@@ -230,7 +231,14 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
 
   Future<void> _save() async {
     final c = _checklist;
-    if (c == null) return;
+    if (c == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.read<LocalizationService>().t('checklist_not_found') ?? 'Чеклист не найден')),
+        );
+      }
+      return;
+    }
     final name = _nameController.text.trim();
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -238,6 +246,8 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
       );
       return;
     }
+    if (_saving) return;
+    setState(() => _saving = true);
     final opts = _dropdownOptionsController.text
         .split(',')
         .map((s) => s.trim())
@@ -305,7 +315,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
           SnackBar(content: Text(loc.t('save') + ' ✓')),
         );
         clearDraft();
-        _load();
+        context.pop();
       }
     } catch (e) {
       if (mounted) {
@@ -313,6 +323,8 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
           SnackBar(content: Text(context.read<LocalizationService>().t('error_with_message').replaceAll('%s', e.toString()))),
         );
       }
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -1202,8 +1214,8 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
             if (canEdit) ...[
               const SizedBox(height: 24),
               FilledButton(
-                onPressed: _save,
-                child: Text(loc.t('save')),
+                onPressed: _saving ? null : _save,
+                child: _saving ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : Text(loc.t('save')),
               ),
             ],
           ],
