@@ -42,8 +42,12 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
   List<String> _selectedEmployeeIds = [];
   bool _deadlineEnabled = false;
   DateTime? _deadline;
+  /// Тумблер «указать время» для срока выполнения (по умолчанию выключен — только дата).
+  bool _deadlineWithTime = false;
   bool _scheduledForEnabled = false;
   DateTime? _scheduledFor;
+  /// Тумблер «указать время» для «На когда» (по умолчанию выключен — только дата).
+  bool _scheduledForWithTime = false;
 
   Future<void> _load() async {
     setState(() {
@@ -89,8 +93,12 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
           }
           _deadlineEnabled = c.deadlineAt != null;
           _deadline = c.deadlineAt;
+          final dt = c.deadlineAt;
+          _deadlineWithTime = dt != null && (dt.hour != 0 || dt.minute != 0);
           _scheduledForEnabled = c.scheduledForAt != null;
           _scheduledFor = c.scheduledForAt;
+          final sf = c.scheduledForAt;
+          _scheduledForWithTime = sf != null && (sf.hour != 0 || sf.minute != 0);
         }
       });
       _ensureTechCardTranslations(techSvc, techs);
@@ -160,8 +168,10 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
       'selectedEmployeeIds': _selectedEmployeeIds,
       'deadlineEnabled': _deadlineEnabled,
       'deadline': _deadline?.toIso8601String(),
+      'deadlineWithTime': _deadlineWithTime,
       'scheduledForEnabled': _scheduledForEnabled,
       'scheduledFor': _scheduledFor?.toIso8601String(),
+      'scheduledForWithTime': _scheduledForWithTime,
       'items': _items.map((item) => {
         'id': item.id,
         'title': item.title,
@@ -187,8 +197,10 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
       _selectedEmployeeIds = List<String>.from(data['selectedEmployeeIds'] as List<dynamic>? ?? []);
       _deadlineEnabled = data['deadlineEnabled'] == true;
       _deadline = data['deadline'] != null ? DateTime.tryParse(data['deadline'] as String) : null;
+      _deadlineWithTime = data['deadlineWithTime'] == true;
       _scheduledForEnabled = data['scheduledForEnabled'] == true;
       _scheduledFor = data['scheduledFor'] != null ? DateTime.tryParse(data['scheduledFor'] as String) : null;
+      _scheduledForWithTime = data['scheduledForWithTime'] == true;
       final itemsData = data['items'] as List<dynamic>? ?? [];
       _items.clear();
       for (final itemData in itemsData) {
@@ -237,8 +249,12 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
       hasToggle: _actionHasToggle,
     );
     final empIds = _selectedEmployeeIds.isEmpty ? null : _selectedEmployeeIds;
-    final deadlineVal = _deadlineEnabled && _deadline != null ? _deadline : null;
-    final scheduledForVal = _scheduledForEnabled && _scheduledFor != null ? _scheduledFor : null;
+    final deadlineVal = _deadlineEnabled && _deadline != null
+        ? (_deadlineWithTime ? _deadline : DateTime(_deadline!.year, _deadline!.month, _deadline!.day))
+        : null;
+    final scheduledForVal = _scheduledForEnabled && _scheduledFor != null
+        ? (_scheduledForWithTime ? _scheduledFor : DateTime(_scheduledFor!.year, _scheduledFor!.month, _scheduledFor!.day))
+        : null;
     final updated = c.copyWith(
       name: name,
       additionalName: _additionalNameController.text.trim().isEmpty ? null : _additionalNameController.text.trim(),
@@ -713,34 +729,54 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: InkWell(
-                  onTap: () async {
-                    final time = await showTimePicker(
-                      context: context,
-                      initialTime: _deadline != null
-                        ? TimeOfDay(hour: _deadline!.hour, minute: _deadline!.minute)
-                        : TimeOfDay.now(),
-                    );
-                    if (time != null && mounted) {
-                      setState(() {
-                        final d = _deadline ?? DateTime.now();
-                        _deadline = DateTime(d.year, d.month, d.day, time.hour, time.minute);
-                        scheduleSave();
-                      });
-                    }
-                  },
-                  child: InputDecorator(
-                    decoration: InputDecoration(
-                      border: const OutlineInputBorder(),
-                      isDense: true,
-                      labelText: loc.t('time') ?? 'Время',
+              if (_deadlineWithTime) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: InkWell(
+                    onTap: () async {
+                      final time = await showTimePicker(
+                        context: context,
+                        initialTime: _deadline != null
+                          ? TimeOfDay(hour: _deadline!.hour, minute: _deadline!.minute)
+                          : TimeOfDay.now(),
+                      );
+                      if (time != null && mounted) {
+                        setState(() {
+                          final d = _deadline ?? DateTime.now();
+                          _deadline = DateTime(d.year, d.month, d.day, time.hour, time.minute);
+                          scheduleSave();
+                        });
+                      }
+                    },
+                    child: InputDecorator(
+                      decoration: InputDecoration(
+                        border: const OutlineInputBorder(),
+                        isDense: true,
+                        labelText: loc.t('time') ?? 'Время',
+                      ),
+                      child: Text(_deadline != null ? '${_deadline!.hour.toString().padLeft(2, '0')}:${_deadline!.minute.toString().padLeft(2, '0')}' : '—'),
                     ),
-                    child: Text(_deadline != null ? '${_deadline!.hour.toString().padLeft(2, '0')}:${_deadline!.minute.toString().padLeft(2, '0')}' : '—'),
                   ),
                 ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Switch(
+                value: _deadlineWithTime,
+                onChanged: canEdit ? (v) => setState(() {
+                  _deadlineWithTime = v;
+                  if (!v && _deadline != null) {
+                    _deadline = DateTime(_deadline!.year, _deadline!.month, _deadline!.day);
+                  }
+                  scheduleSave();
+                }) : null,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
+              const SizedBox(width: 16),
+              Expanded(child: Text(loc.t('checklist_include_time') ?? 'Указать время')),
             ],
           ),
         ],
@@ -796,34 +832,54 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: InkWell(
-                  onTap: () async {
-                    final time = await showTimePicker(
-                      context: context,
-                      initialTime: _scheduledFor != null
-                        ? TimeOfDay(hour: _scheduledFor!.hour, minute: _scheduledFor!.minute)
-                        : TimeOfDay.now(),
-                    );
-                    if (time != null && mounted) {
-                      setState(() {
-                        final d = _scheduledFor ?? DateTime.now();
-                        _scheduledFor = DateTime(d.year, d.month, d.day, time.hour, time.minute);
-                        scheduleSave();
-                      });
-                    }
-                  },
-                  child: InputDecorator(
-                    decoration: InputDecoration(
-                      border: const OutlineInputBorder(),
-                      isDense: true,
-                      labelText: loc.t('time') ?? 'Время',
+              if (_scheduledForWithTime) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: InkWell(
+                    onTap: () async {
+                      final time = await showTimePicker(
+                        context: context,
+                        initialTime: _scheduledFor != null
+                          ? TimeOfDay(hour: _scheduledFor!.hour, minute: _scheduledFor!.minute)
+                          : TimeOfDay.now(),
+                      );
+                      if (time != null && mounted) {
+                        setState(() {
+                          final d = _scheduledFor ?? DateTime.now();
+                          _scheduledFor = DateTime(d.year, d.month, d.day, time.hour, time.minute);
+                          scheduleSave();
+                        });
+                      }
+                    },
+                    child: InputDecorator(
+                      decoration: InputDecoration(
+                        border: const OutlineInputBorder(),
+                        isDense: true,
+                        labelText: loc.t('time') ?? 'Время',
+                      ),
+                      child: Text(_scheduledFor != null ? '${_scheduledFor!.hour.toString().padLeft(2, '0')}:${_scheduledFor!.minute.toString().padLeft(2, '0')}' : '—'),
                     ),
-                    child: Text(_scheduledFor != null ? '${_scheduledFor!.hour.toString().padLeft(2, '0')}:${_scheduledFor!.minute.toString().padLeft(2, '0')}' : '—'),
                   ),
                 ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Switch(
+                value: _scheduledForWithTime,
+                onChanged: canEdit ? (v) => setState(() {
+                  _scheduledForWithTime = v;
+                  if (!v && _scheduledFor != null) {
+                    _scheduledFor = DateTime(_scheduledFor!.year, _scheduledFor!.month, _scheduledFor!.day);
+                  }
+                  scheduleSave();
+                }) : null,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
+              const SizedBox(width: 16),
+              Expanded(child: Text(loc.t('checklist_include_time') ?? 'Указать время')),
             ],
           ),
         ],
