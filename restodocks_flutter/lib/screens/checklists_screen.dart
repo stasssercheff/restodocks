@@ -249,7 +249,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                   ],
                 ],
               ),
-              title: Text(c.name),
+              title: Text((c.name.trim().isNotEmpty ? c.name : c.additionalName?.trim().isNotEmpty == true ? c.additionalName! : (loc.t('checklist_no_name') ?? 'Без названия'))),
               subtitle: Text([
                 if (sectionLabel != null) sectionLabel,
                 '${c.items.length} ${loc.t('items_count')}',
@@ -278,7 +278,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                                 context: context,
                                 builder: (ctx) => AlertDialog(
                                   title: Text(loc.t('checklist_delete_confirm') ?? 'Удалить чеклист?'),
-                                  content: Text('${c.name}'),
+                                  content: Text(c.name.trim().isNotEmpty ? c.name : (c.additionalName ?? loc.t('checklist_no_name') ?? 'Без названия')),
                                   actions: [
                                     TextButton(
                                       onPressed: () => Navigator.of(ctx).pop(false),

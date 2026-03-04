@@ -107,7 +107,7 @@ class Checklist extends Equatable {
       id: json['id'] as String,
       establishmentId: json['establishment_id'] as String,
       createdBy: json['created_by'] as String,
-      name: json['name'] as String,
+      name: (json['name'] as String?) ?? '',
       additionalName: json['additional_name'] as String?,
       type: ChecklistType.fromCode(json['type'] as String?),
       actionConfig: ac is Map

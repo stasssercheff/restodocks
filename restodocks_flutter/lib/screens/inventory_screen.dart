@@ -1256,13 +1256,61 @@ class _InventoryScreenState extends State<InventoryScreen>
                   collapseLayout: collapseLayout,
                   hideInfoRow: mobileKeyboardOpen,
                 ),
+              if (collapseLayout && !_completed && _rows.isNotEmpty)
+                _buildCompactSearchBar(loc),
               if (!collapseLayout) const Divider(height: 1),
+              if (collapseLayout && !_completed && _rows.isNotEmpty) const Divider(height: 1),
               Expanded(
                 child: _buildTable(loc),
               ),
             ],
           ),
           if (!collapseLayout && !mobileKeyboardOpen) DataSafetyIndicator(isVisible: true),
+        ],
+      ),
+    );
+  }
+
+  /// Компактная строка поиска (при открытой клавиатуре — как в iiko)
+  Widget _buildCompactSearchBar(LocalizationService loc) {
+    final theme = Theme.of(context);
+    final sortAlphabetButton = IconButton(
+      icon: const Icon(Icons.sort_by_alpha, size: 22),
+      tooltip: _sortMode == _InventorySort.alphabetAsc
+          ? (loc.t('inventory_sort_az') ?? 'А–Я')
+          : (loc.t('inventory_sort_za') ?? 'Я–А'),
+      onPressed: () => setState(() {
+        _sortMode = _sortMode == _InventorySort.alphabetAsc
+            ? _InventorySort.alphabetDesc
+            : _InventorySort.alphabetAsc;
+      }),
+    );
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
+      ),
+      child: Row(
+        children: [
+          sortAlphabetButton,
+          const SizedBox(width: 8),
+          Expanded(
+            child: TextField(
+              controller: _nameFilterCtrl,
+              focusNode: _nameFilterFocusNode,
+              keyboardType: TextInputType.text,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: InputDecoration(
+                hintText: loc.t('inventory_filter_name') ?? 'По названию',
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                border: const OutlineInputBorder(),
+              ),
+              style: const TextStyle(fontSize: 12),
+              onChanged: (_) => setState(() {}),
+            ),
+          ),
         ],
       ),
     );
@@ -3564,7 +3612,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
 // Ширина фиксированных колонок (единицы и итого уже для названий)
 const double _iikoColName  = 168; // Наименование (больше под длинные названия)
 const double _iikoColUnit  =  34; // Ед. изм. (−30%)
-const double _iikoColTotal =  42; // Итого (−25%)
+const double _iikoColTotal =  52; // Итого (чтобы слово влезало целиком)
 const double _iikoColCell  =  48; // Ячейка ввода (= _colQtyWidth)
 const double _iikoColGap   =   4; // Отступ между ячейками (= _colGap)
 

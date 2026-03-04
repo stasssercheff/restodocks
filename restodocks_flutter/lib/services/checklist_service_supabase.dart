@@ -87,6 +87,7 @@ class ChecklistServiceSupabase {
     if (deadlineAt != null) data['deadline_at'] = deadlineAt.toIso8601String();
     if (scheduledForAt != null) data['scheduled_for_at'] = scheduledForAt.toIso8601String();
     if (additionalName != null) data['additional_name'] = additionalName;
+    data['assigned_department'] = assignedDepartment;
     if (type != null) data['type'] = type.code;
     if (actionConfig != null) data['action_config'] = actionConfig.toJson();
     Map<String, dynamic> res;
@@ -100,6 +101,7 @@ class ChecklistServiceSupabase {
           'name': name,
           'created_at': now.toIso8601String(),
           'updated_at': now.toIso8601String(),
+          'assigned_department': assignedDepartment,
         };
         res = await _supabase.insertData('checklists', minimal);
       } else {
@@ -199,6 +201,9 @@ class ChecklistServiceSupabase {
           'name': checklist.name,
           'updated_at': DateTime.now().toIso8601String(),
         };
+        if (checklist.deadlineAt != null) minimal['deadline_at'] = checklist.deadlineAt!.toIso8601String();
+        if (checklist.scheduledForAt != null) minimal['scheduled_for_at'] = checklist.scheduledForAt!.toIso8601String();
+        if (checklist.assignedSection != null) minimal['assigned_section'] = checklist.assignedSection;
         await _supabase.updateData('checklists', minimal, 'id', checklist.id);
       } else {
         rethrow;
