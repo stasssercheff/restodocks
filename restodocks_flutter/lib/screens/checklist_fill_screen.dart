@@ -386,7 +386,7 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
     final formatDate = (DateTime d) => '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}';
     final formatDateTime = (DateTime d) {
       final hasTime = d.hour != 0 || d.minute != 0;
-      return hasTime ? '${formatDate(d)} ${formatTime(d)}' : formatDate(d);
+      return hasTime ? '${formatTime(d)} ${formatDate(d)}' : formatDate(d);
     };
     return Card(
       child: Padding(
@@ -404,7 +404,7 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
               if (checklist.scheduledForAt != null)
                 Text('${loc.t('checklist_scheduled_for') ?? 'На когда'}: ${formatDateTime(checklist.scheduledForAt!)}', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
               if (checklist.deadlineAt != null)
-                Text('${loc.t('checklist_deadline') ?? 'Срок выполнения'}: ${formatDateTime(checklist.deadlineAt!)}', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+                Text('${loc.t('checklist_complete_by') ?? 'Завершить до'}: ${formatDateTime(checklist.deadlineAt!)}', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
             ],
             const SizedBox(height: 4),
             Text('${loc.t('checklist_start_time') ?? 'Начало'}: ${formatTime(_startTime)}', style: Theme.of(context).textTheme.labelSmall),
