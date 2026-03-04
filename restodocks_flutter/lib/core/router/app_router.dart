@@ -480,7 +480,7 @@ class AppRouter {
             path: '/checklists/:id',
             pageBuilder: (context, state) {
               final id = state.pathParameters['id'] ?? '';
-              final viewOnly = state.uri.queryParameters['view'] == '1';
+              final viewOnly = state.queryParameters['view'] == '1';
               return _slideTransitionPage(state, ChecklistEditScreen(checklistId: id, viewOnly: viewOnly));
             },
           ),
