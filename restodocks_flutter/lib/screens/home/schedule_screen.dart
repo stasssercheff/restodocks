@@ -544,7 +544,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     final loc = context.watch<LocalizationService>();
     final theme = Theme.of(context);
     final acc = context.watch<AccountManagerSupabase>();
-    final canEdit = acc.currentEmployee?.canEditSchedule ?? false;
+    final canEdit = (acc.currentEmployee?.canEditSchedule ?? false) ||
+        (widget.personalOnly && (acc.currentEmployee?.canEditOwnSchedule ?? false));
     final locale = loc.currentLocale;
     final localeStr = '${locale.languageCode}_${locale.countryCode ?? ''}';
     final weekdays = List.generate(7, (i) {

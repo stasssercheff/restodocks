@@ -37,6 +37,9 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
         current.hasRole('floor_manager');
   }
 
+  /// Может ли переключать право редактировать личный график: те же роли, что и доступ к данным.
+  bool _canToggleScheduleEdit(Employee? current) => _canToggleDataAccess(current);
+
   bool _canConfirmShifts(Employee? current) {
     return current?.canEditSchedule ?? false;
   }
@@ -88,11 +91,11 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loading ? null : _load, tooltip: loc.t('refresh')),
         ],
       ),
-      body: _buildBody(loc, theme, canEdit, canToggleDataAccess: _canToggleDataAccess(acc.currentEmployee), canConfirmShifts: _canConfirmShifts(acc.currentEmployee)),
+      body: _buildBody(loc, theme, canEdit, canToggleDataAccess: _canToggleDataAccess(acc.currentEmployee), canToggleScheduleEdit: _canToggleScheduleEdit(acc.currentEmployee), canConfirmShifts: _canConfirmShifts(acc.currentEmployee)),
     );
   }
 
-  Widget _buildBody(LocalizationService loc, ThemeData theme, bool canEdit, {bool canToggleDataAccess = false, bool canConfirmShifts = false}) {
+  Widget _buildBody(LocalizationService loc, ThemeData theme, bool canEdit, {bool canToggleDataAccess = false, bool canToggleScheduleEdit = false, bool canConfirmShifts = false}) {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
       return Center(
@@ -154,15 +157,17 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
               onTap: () => context.push('/shift-confirmation'),
             ),
           ),
-        _EmployeeTableHeader(loc: loc, canEdit: canEdit, canToggleDataAccess: canToggleDataAccess),
+        _EmployeeTableHeader(loc: loc, canEdit: canEdit, canToggleDataAccess: canToggleDataAccess, canToggleScheduleEdit: canToggleScheduleEdit),
         const SizedBox(height: 4),
         ...List.generate(_list.length, (i) => _EmployeeCard(
         employee: _list[i],
         loc: loc,
         canEdit: canEdit,
         canToggleDataAccess: canToggleDataAccess,
+        canToggleScheduleEdit: canToggleScheduleEdit,
         onUpdated: _load,
         onToggleDataAccess: _toggleDataAccess,
+        onToggleScheduleEdit: _toggleScheduleEdit,
         onEdit: () => _openEditEmployee(context, _list[i]),
         onDelete: () => _deleteEmployee(context, _list[i]),
       )),
@@ -228,6 +233,23 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     }
   }
 
+  Future<void> _toggleScheduleEdit(Employee employee, bool enabled) async {
+    try {
+      final acc = context.read<AccountManagerSupabase>();
+      final updated = employee.copyWith(canEditOwnSchedule: enabled, updatedAt: DateTime.now());
+      await acc.updateEmployee(updated);
+      await _load();
+      if (mounted) {
+        final loc = context.read<LocalizationService>();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(enabled ? (loc.t('schedule_edit_enabled') ?? 'Редактирование графика включено') : (loc.t('schedule_edit_disabled') ?? 'Редактирование графика выключено'))),
+        );
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+    }
+  }
+
   void _openEditEmployee(BuildContext context, Employee employee) {
     final canToggle = _canToggleDataAccess(context.read<AccountManagerSupabase>().currentEmployee);
     showDialog<void>(
@@ -235,6 +257,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
       builder: (ctx) => _EmployeeEditSheet(
         employee: employee,
         canToggleDataAccess: canToggle,
+        canToggleScheduleEdit: _canToggleScheduleEdit(context.read<AccountManagerSupabase>().currentEmployee),
         onSaved: () {
           Navigator.of(ctx).pop();
           _load();
@@ -250,11 +273,13 @@ class _EmployeeTableHeader extends StatelessWidget {
     required this.loc,
     required this.canEdit,
     required this.canToggleDataAccess,
+    required this.canToggleScheduleEdit,
   });
 
   final LocalizationService loc;
   final bool canEdit;
   final bool canToggleDataAccess;
+  final bool canToggleScheduleEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -281,6 +306,7 @@ class _EmployeeTableHeader extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(flex: 2, child: Text(loc.t('rate') ?? 'Ставка', style: style)),
           if (canToggleDataAccess) const SizedBox(width: 56),
+          if (canToggleScheduleEdit) const SizedBox(width: 56),
           if (canEdit) const SizedBox(width: 64),
         ],
       ),
@@ -294,8 +320,10 @@ class _EmployeeCard extends StatelessWidget {
     required this.loc,
     required this.canEdit,
     required this.canToggleDataAccess,
+    required this.canToggleScheduleEdit,
     required this.onUpdated,
     required this.onToggleDataAccess,
+    required this.onToggleScheduleEdit,
     required this.onEdit,
     required this.onDelete,
   });
@@ -304,8 +332,10 @@ class _EmployeeCard extends StatelessWidget {
   final LocalizationService loc;
   final bool canEdit;
   final bool canToggleDataAccess;
+  final bool canToggleScheduleEdit;
   final VoidCallback onUpdated;
   final void Function(Employee employee, bool enabled) onToggleDataAccess;
+  final void Function(Employee employee, bool enabled) onToggleScheduleEdit;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
@@ -431,6 +461,18 @@ class _EmployeeCard extends StatelessWidget {
                   ),
                 ),
               ],
+              // Редактирование своего графика (только у сотрудников с должностью)
+              if (canToggleScheduleEdit && !employee.hasRole('owner') && employee.positionRole != null) ...[
+                const SizedBox(width: 4),
+                Tooltip(
+                  message: loc.t('schedule_edit_own') ?? 'Менять график',
+                  child: Switch(
+                    value: employee.canEditOwnSchedule,
+                    onChanged: (v) => onToggleScheduleEdit(employee, v),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+              ],
               // Кнопки редактирования
               if (canEdit) ...[
                 IconButton(
@@ -534,7 +576,7 @@ class _EmployeeCard extends StatelessWidget {
                   ],
                 ),
               ),
-              // Правая часть: переключатель + кнопки
+              // Правая часть: переключатели + кнопки
               Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -544,6 +586,15 @@ class _EmployeeCard extends StatelessWidget {
                       value: employee.dataAccessEnabled,
                       onChanged: (v) => onToggleDataAccess(employee, v),
                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  if (canToggleScheduleEdit && !employee.hasRole('owner') && employee.positionRole != null)
+                    Tooltip(
+                      message: loc.t('schedule_edit_own') ?? 'Менять график',
+                      child: Switch(
+                        value: employee.canEditOwnSchedule,
+                        onChanged: (v) => onToggleScheduleEdit(employee, v),
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
                     ),
                   if (canEdit)
                     Row(
@@ -595,12 +646,14 @@ class _EmployeeEditSheet extends StatefulWidget {
   const _EmployeeEditSheet({
     required this.employee,
     required this.canToggleDataAccess,
+    required this.canToggleScheduleEdit,
     required this.onSaved,
     required this.onCancel,
   });
 
   final Employee employee;
   final bool canToggleDataAccess;
+  final bool canToggleScheduleEdit;
   final VoidCallback onSaved;
   final VoidCallback onCancel;
 
@@ -617,6 +670,7 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
   late String _paymentType;
   late bool _isActive;
   late bool _dataAccessEnabled;
+  late bool _canEditOwnSchedule;
   bool _saving = false;
   String? _error;
 
@@ -635,6 +689,7 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
     _paymentType = widget.employee.paymentType ?? 'hourly';
     _isActive = widget.employee.isActive;
     _dataAccessEnabled = widget.employee.dataAccessEnabled;
+    _canEditOwnSchedule = widget.employee.canEditOwnSchedule;
   }
 
   @override
@@ -668,6 +723,7 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
         hourlyRate: _paymentType == 'hourly' ? rate : null,
         isActive: _isActive,
         dataAccessEnabled: _dataAccessEnabled,
+        canEditOwnSchedule: _canEditOwnSchedule,
       );
       await context.read<AccountManagerSupabase>().updateEmployee(updated);
       if (mounted) widget.onSaved();
@@ -803,6 +859,13 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
                           subtitle: Text(loc.t('data_access_hint') ?? 'Без доступа сотрудник видит только график'),
                           value: _dataAccessEnabled,
                           onChanged: (v) => setState(() => _dataAccessEnabled = v),
+                        ),
+                      if (widget.canToggleScheduleEdit && !widget.employee.hasRole('owner') && widget.employee.positionRole != null)
+                        SwitchListTile(
+                          title: Text(loc.t('schedule_edit_own') ?? 'Менять график'),
+                          subtitle: Text(loc.t('schedule_edit_own_hint') ?? 'Сотрудник может редактировать свой личный график'),
+                          value: _canEditOwnSchedule,
+                          onChanged: (v) => setState(() => _canEditOwnSchedule = v),
                         ),
                       if (_error != null) ...[
                         const SizedBox(height: 8),
