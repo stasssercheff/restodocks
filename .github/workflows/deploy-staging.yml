@@ -1,8 +1,7 @@
 name: Build and Deploy to Vercel (Demo/Beta)
 
+# DISABLED: Vercel deploys отключены, используется Netlify
 on:
-  push:
-    branches: [staging]
   workflow_dispatch:
 
 jobs:

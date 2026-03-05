@@ -1,11 +1,7 @@
 name: Build and Deploy to Vercel (Production)
 
+# DISABLED: Vercel deploys отключены, используется Netlify
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'restodocks_flutter/**'
-      - '.github/workflows/deploy.yml'
   workflow_dispatch:
 
 jobs:
