@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  distDir: 'dist', // Netlify expects dist when using base directory
   serverExternalPackages: ['@supabase/supabase-js'],
   async headers() {
     return [
