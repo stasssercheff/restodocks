@@ -54,6 +54,67 @@ https://*.restodocks.pages.dev/
 
 ---
 
+## Настройка кастомного домена (Namecheap)
+
+DNS остаётся в Namecheap (Resend, почта и др. — не трогать). Записи добавляем вручную.
+
+### Шаг 1: Добавить домен в Cloudflare Pages
+
+1. Cloudflare Dashboard → **Workers & Pages** → проект Restodocks → **Custom domains**
+2. **Set up a custom domain** → введите `www.restodocks.com` → **Continue**
+3. Cloudflare создаст запись. Пока домен не привязан — будет 522, это нормально.
+4. При необходимости добавьте и `restodocks.com` (apex) — см. шаг 3.
+
+> Важно: домен нужно сначала привязать в Pages, иначе CNAME даст 522.
+
+### Шаг 2: CNAME для www
+
+Namecheap → Domain List → ваш домен → **Manage** → **Advanced DNS**:
+
+| Type | Host | Value | TTL |
+|------|------|-------|-----|
+| CNAME | www | `restodocks.pages.dev` | Automatic |
+
+(У prod-проекта URL может быть другим — смотрите в Custom domains.)
+
+### Шаг 3: Apex (restodocks.com без www)
+
+DNS не позволяет CNAME на apex. Варианты:
+
+**А) URL Redirect в Namecheap** (простой):  
+Domain List → Manage → **Redirect Domain** → redirect `restodocks.com` → `https://www.restodocks.com`
+
+**Б) A-записи Cloudflare** (если apex добавлен в Pages):  
+Cloudflare покажет IP в Custom domains. Добавьте в Namecheap:
+
+| Type | Host | Value |
+|------|------|-------|
+| A | @ | `188.114.96.1` |
+| A | @ | `188.114.97.1` |
+| AAAA | @ | `2a06:98c1:3600::1` |
+| AAAA | @ | `2a06:98c1:3601::1` |
+
+> Точные IP смотрите в Cloudflare Pages → Custom domains при добавлении apex.
+
+### Шаг 4: Supabase Auth
+
+В Supabase → **Authentication** → **URL Configuration** → **Redirect URLs** добавьте:
+
+```
+https://www.restodocks.com
+https://www.restodocks.com/
+https://restodocks.com
+https://restodocks.com/
+```
+
+### Итого
+
+- Не трогать: MX, TXT (Resend, почта), прочие записи
+- Добавить: CNAME `www` → `restodocks.pages.dev`
+- Apex: Redirect или A/AAAA по инструкции выше
+
+---
+
 ## Контрольный список при переносе хостинга
 
 | Шаг | Действие |
