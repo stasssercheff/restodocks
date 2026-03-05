@@ -39,6 +39,8 @@
 
 **Вариант 2.** Вручную: Supabase Dashboard → **SQL Editor** → выполните скрипт из файла **`docs/STAGING_SUPABASE_MIGRATIONS.sql`** (скопируйте всё содержимое и выполните один раз).
 
+**Только сообщения не работают?** Выполните **`docs/EMPLOYEE_MESSAGES_TABLE.sql`** — создаёт таблицу `employee_direct_messages`.
+
 **После миграций обязательно:** Supabase Dashboard → **Settings** → **General** → **Restart project** — обновит schema cache PostgREST. Без перезапуска возможны PGRST204/PGRST205.
 
 ## Если Vercel отозвал токен

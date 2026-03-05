@@ -39,6 +39,7 @@ GRANT EXECUTE ON FUNCTION public.update_checklist_dates(uuid, timestamptz, times
 GRANT EXECUTE ON FUNCTION public.update_checklist_dates(uuid, timestamptz, timestamptz) TO authenticated;
 
 -- 5. EMPLOYEE DIRECT MESSAGES (таблица для личных сообщений)
+--    ⚠️ После выполнения: Settings → General → Restart project
 CREATE TABLE IF NOT EXISTS employee_direct_messages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   sender_employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
@@ -52,10 +53,12 @@ CREATE INDEX IF NOT EXISTS idx_employee_direct_messages_recipient ON employee_di
 CREATE INDEX IF NOT EXISTS idx_employee_direct_messages_created ON employee_direct_messages(created_at DESC);
 
 ALTER TABLE employee_direct_messages ENABLE ROW LEVEL SECURITY;
+
 DROP POLICY IF EXISTS "auth_employee_messages_select" ON employee_direct_messages;
 CREATE POLICY "auth_employee_messages_select" ON employee_direct_messages
   FOR SELECT TO authenticated
   USING (sender_employee_id = auth.uid() OR recipient_employee_id = auth.uid());
+
 DROP POLICY IF EXISTS "auth_employee_messages_insert" ON employee_direct_messages;
 CREATE POLICY "auth_employee_messages_insert" ON employee_direct_messages
   FOR INSERT TO authenticated
@@ -63,10 +66,12 @@ CREATE POLICY "auth_employee_messages_insert" ON employee_direct_messages
     sender_employee_id = auth.uid()
     AND recipient_employee_id != auth.uid()
     AND recipient_employee_id IN (
-      SELECT id FROM employees e
+      SELECT e.id FROM employees e
       WHERE e.establishment_id = (SELECT establishment_id FROM employees WHERE id = auth.uid())
     )
   );
+
+GRANT SELECT, INSERT ON employee_direct_messages TO authenticated;
 
 -- 6. EMPLOYEE: employment_status (постоянный/временный)
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS employment_status TEXT DEFAULT 'permanent';
