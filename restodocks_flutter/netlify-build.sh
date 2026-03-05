@@ -18,6 +18,9 @@ fi
 SUPABASE_URL=$(echo "$SUPABASE_URL" | tr -d '\n\r\t' | sed 's/supabase\.con/supabase.co/')
 SUPABASE_ANON_KEY=$(echo "$SUPABASE_ANON_KEY" | tr -d '\n\r\t')
 
+# DEBUG: показать какой Supabase используется (Production=osglfptwbuqqmqunttha, Staging=kzhaezanjttvnqkgpxnh)
+echo "==> BUILD SUPABASE_URL=${SUPABASE_URL}"
+
 echo "==> Installing Flutter 3.38.7..."
 FLUTTER_DIR=".flutter"
 rm -rf "$FLUTTER_DIR"
