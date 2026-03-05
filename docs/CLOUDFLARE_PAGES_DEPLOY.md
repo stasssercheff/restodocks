@@ -8,27 +8,16 @@
 
 ### 1. Environment Variables в Cloudflare Pages
 
-Cloudflare Pages → проект → **Settings** → **Environment variables** → **Add variable**
+Cloudflare Pages → проект → **Settings** → **Variables and Secrets**
 
-**Основной (Production) сайт** — добавь одну переменную:
-| Key | Value |
-|-----|-------|
-| `DEPLOY_TARGET` | `production` |
+Для каждого проекта задайте свои переменные:
 
-Скрипт сам подставит Production Supabase. Beta оставь без этой переменной.
+| Проект | SUPABASE_URL | SUPABASE_ANON_KEY |
+|--------|--------------|-------------------|
+| **Prod** (основной) | `https://osglfptwbuqqmqunttha.supabase.co` | anon key из Production |
+| **Beta** (демо) | `https://kzhaezanjttvnqkgpxnh.supabase.co` | anon key из Staging |
 
-**Либо вручную** (если не хочешь DEPLOY_TARGET):
-| Key | Value |
-|-----|-------|
-| `SUPABASE_URL` | `https://osglfptwbuqqmqunttha.supabase.co` |
-| `SUPABASE_ANON_KEY` | anon key из Supabase (Production) |
-
-Где взять:
-- Supabase Dashboard → ваш проект → **Project Settings** → **API**
-- **Project URL** → `SUPABASE_URL`
-- **anon public** → `SUPABASE_ANON_KEY`
-
-Берите ключи **из Production проекта**, где лежат данные пользователей. Не из Staging.
+Supabase Dashboard → Project Settings → API (для Prod — проект osglfptwbuqqmqunttha, для Beta — kzhaezanjttvnqkgpxnh).
 
 ### 2. Supabase Auth: добавить новый домен
 
