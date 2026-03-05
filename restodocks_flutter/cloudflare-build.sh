@@ -1,16 +1,25 @@
 #!/usr/bin/env bash
 set -e
 # Cloudflare Pages build для Flutter web.
-# Требует env: SUPABASE_URL, SUPABASE_ANON_KEY (или NEXT_PUBLIC_*)
-# Задайте в каждом проекте Cloudflare свои переменные: Production для основного, Staging для beta.
+# Prod: задайте DEPLOY_TARGET=production — будет использован Production Supabase.
+# Beta/demo: SUPABASE_URL и SUPABASE_ANON_KEY (Staging) — без DEPLOY_TARGET.
 
-if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_ANON_KEY:-}" ]; then
-  if [ -n "${NEXT_PUBLIC_SUPABASE_URL:-}" ] && [ -n "${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}" ]; then
-    export SUPABASE_URL="$NEXT_PUBLIC_SUPABASE_URL"
-    export SUPABASE_ANON_KEY="$NEXT_PUBLIC_SUPABASE_ANON_KEY"
-  else
-    echo "ERROR: SUPABASE_URL and SUPABASE_ANON_KEY must be set in Cloudflare Pages Environment variables"
-    exit 2
+PROD_URL="https://osglfptwbuqqmqunttha.supabase.co"
+PROD_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zZ2xmcHR3YnVxcW1xdW50dGhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUwNTk0MDQsImV4cCI6MjA4MDYzNTQwNH0.Jy7yi2TNdSrmoBdILXBGRYB_vxGtq8scCZ9eCA9vfTE"
+
+if [ "${DEPLOY_TARGET:-}" = "production" ]; then
+  export SUPABASE_URL="$PROD_URL"
+  export SUPABASE_ANON_KEY="$PROD_KEY"
+  echo "==> DEPLOY_TARGET=production: using Production Supabase"
+else
+  if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_ANON_KEY:-}" ]; then
+    if [ -n "${NEXT_PUBLIC_SUPABASE_URL:-}" ] && [ -n "${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}" ]; then
+      export SUPABASE_URL="$NEXT_PUBLIC_SUPABASE_URL"
+      export SUPABASE_ANON_KEY="$NEXT_PUBLIC_SUPABASE_ANON_KEY"
+    else
+      echo "ERROR: SUPABASE_URL and SUPABASE_ANON_KEY must be set (or DEPLOY_TARGET=production)"
+      exit 2
+    fi
   fi
 fi
 

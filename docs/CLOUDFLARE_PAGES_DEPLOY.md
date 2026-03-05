@@ -10,10 +10,18 @@
 
 Cloudflare Pages → проект → **Settings** → **Environment variables** → **Add variable**
 
-| Key | Value | Environment |
-|-----|-------|-------------|
-| `SUPABASE_URL` | `https://osglfptwbuqqmqunttha.supabase.co` | Production, Preview |
-| `SUPABASE_ANON_KEY` | anon key из Supabase Dashboard → Project Settings → API | Production, Preview |
+**Основной (Production) сайт** — добавь одну переменную:
+| Key | Value |
+|-----|-------|
+| `DEPLOY_TARGET` | `production` |
+
+Скрипт сам подставит Production Supabase. Beta оставь без этой переменной.
+
+**Либо вручную** (если не хочешь DEPLOY_TARGET):
+| Key | Value |
+|-----|-------|
+| `SUPABASE_URL` | `https://osglfptwbuqqmqunttha.supabase.co` |
+| `SUPABASE_ANON_KEY` | anon key из Supabase (Production) |
 
 Где взять:
 - Supabase Dashboard → ваш проект → **Project Settings** → **API**
