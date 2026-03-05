@@ -558,7 +558,8 @@ class AccountManagerSupabase extends ChangeNotifier {
     return Employee.fromJson(data);
   }
 
-  /// Вход по email и паролю: сначала Supabase Auth, при отсутствии — legacy (employees.password_hash)
+  /// Вход по email и паролю: сначала legacy (Edge Function), потом Supabase Auth
+  /// Порядок: legacy первым — большинство учёток в employees.password_hash; Auth даёт 400 для legacy.
   Future<({Employee employee, Establishment establishment})?> findEmployeeByEmailAndPasswordGlobal({
     required String email,
     required String password,
@@ -567,7 +568,11 @@ class AccountManagerSupabase extends ChangeNotifier {
     final passwordTrimmed = password.trim();
     if (emailTrim.isEmpty) return null;
 
-    // 1. Пробуем Supabase Auth (для новых учёток)
+    // 1. Сначала legacy: BCrypt через Edge Function (без вызова Auth — избегаем 400)
+    final legacyResult = await _findEmployeeByPasswordHashViaEdgeFunction(emailTrim, passwordTrimmed);
+    if (legacyResult != null) return legacyResult;
+
+    // 2. Supabase Auth (для учёток с auth.users)
     try {
       await _supabase.signInWithEmail(emailTrim, passwordTrimmed);
       if (_supabase.isAuthenticated) {
@@ -593,7 +598,6 @@ class AccountManagerSupabase extends ChangeNotifier {
           return (employee: employee, establishment: establishment);
         }
 
-        // Вход в Auth успешен, но employee нет — пробуем авто-исправление (владелец без записи)
         try {
           final fixRes = await _supabase.client.rpc('fix_owner_without_employee', params: {'p_email': emailTrim});
           if (fixRes != null) {
@@ -620,16 +624,13 @@ class AccountManagerSupabase extends ChangeNotifier {
       if (authErr is Exception && authErr.toString().contains('employee_not_found')) {
         rethrow;
       }
-      if (kDebugMode) {
-        debugPrint('🔐 Login: Supabase Auth failed: $authErr');
-      }
+      if (kDebugMode) debugPrint('🔐 Login: Supabase Auth failed: $authErr');
       try {
         await _supabase.signOut();
-      } catch (_) { /* игнор при ошибке выхода */ }
+      } catch (_) { /* ignore */ }
     }
 
-    // 2. Legacy: проверка password_hash через Edge Function на сервере
-    return _findEmployeeByPasswordHashViaEdgeFunction(emailTrim, passwordTrimmed);
+    return null;
   }
 
   /// Legacy: BCrypt-проверка пароля через Edge Function authenticate-employee.
