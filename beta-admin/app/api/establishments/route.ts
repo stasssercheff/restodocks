@@ -18,7 +18,7 @@ export async function GET() {
 
   const { data: establishments, error } = await supabase
     .from('establishments')
-    .select('id, name, address, created_at, default_currency, owner_id')
+    .select('id, name, address, created_at, default_currency, owner_id, registration_ip, registration_country, registration_city')
     .order('created_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

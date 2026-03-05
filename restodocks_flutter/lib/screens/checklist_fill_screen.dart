@@ -244,7 +244,7 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
         submittedByEmployeeId: emp.id,
         submittedByName: emp.fullName,
         checklistName: c.name,
-        additionalName: c.additionalName,
+        additionalName: null,
         section: c.assignedSection,
         startTime: _startTime,
         endTime: _endTime,
@@ -327,7 +327,7 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text(c.additionalName != null && c.additionalName!.isNotEmpty ? '${c.name} — ${c.additionalName}' : c.name),
+        title: Text(c.name),
       ),
       body: Column(
         children: [
@@ -337,7 +337,7 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _buildHeader(loc, emp),
+                  _buildHeader(loc, emp, c),
                   const SizedBox(height: 24),
                   _buildTableHeader(loc, cfg),
                   const Divider(height: 24),
@@ -381,24 +381,36 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
     );
   }
 
-  Widget _buildHeader(LocalizationService loc, Employee? emp) {
-    final format = (DateTime? t) => t != null ? '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}' : '—';
+  Widget _buildHeader(LocalizationService loc, Employee? emp, Checklist checklist) {
+    final formatTime = (DateTime? t) => t != null ? '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}' : '—';
+    final formatDate = (DateTime d) => '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}';
+    final formatDateTime = (DateTime d) {
+      final utc = d.toUtc();
+      final hasTime = utc.hour != 0 || utc.minute != 0;
+      final local = d.toLocal();
+      return hasTime ? '${formatTime(local)} ${formatDate(local)}' : formatDate(utc);
+    };
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (_checklist?.additionalName != null && _checklist!.additionalName!.isNotEmpty)
-              Text(_checklist!.additionalName!, style: Theme.of(context).textTheme.titleSmall),
             Text(emp?.fullName ?? '—', style: Theme.of(context).textTheme.bodyLarge),
             Text(loc.t('department') ?? 'Отдел: ${emp?.department ?? '—'}', style: Theme.of(context).textTheme.bodySmall),
             Text(loc.t('role') ?? 'Должность: ${emp?.primaryRole?.displayName ?? '—'}', style: Theme.of(context).textTheme.bodySmall),
             if (emp?.department == 'kitchen' && emp?.section != null)
               Text('${loc.t('kitchen_section') ?? 'Цех'}: ${KitchenSection.fromCode(emp!.section!)?.displayName ?? emp.section}', style: Theme.of(context).textTheme.bodySmall),
+            if (checklist.deadlineAt != null || checklist.scheduledForAt != null) ...[
+              const SizedBox(height: 6),
+              if (checklist.scheduledForAt != null)
+                Text('${loc.t('checklist_scheduled_for') ?? 'На когда'}: ${formatDateTime(checklist.scheduledForAt!)}', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+              if (checklist.deadlineAt != null)
+                Text('${loc.t('checklist_complete_by') ?? 'Завершить до'}: ${formatDateTime(checklist.deadlineAt!)}', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+            ],
             const SizedBox(height: 4),
-            Text('${loc.t('checklist_start_time') ?? 'Начало'}: ${format(_startTime)}', style: Theme.of(context).textTheme.labelSmall),
-            Text('${loc.t('checklist_end_time') ?? 'Конец'}: ${format(_endTime)}', style: Theme.of(context).textTheme.labelSmall),
+            Text('${loc.t('checklist_start_time') ?? 'Начало'}: ${formatTime(_startTime)}', style: Theme.of(context).textTheme.labelSmall),
+            Text('${loc.t('checklist_end_time') ?? 'Конец'}: ${formatTime(_endTime)}', style: Theme.of(context).textTheme.labelSmall),
           ],
         ),
       ),
@@ -413,7 +425,7 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
     if (cfg.hasNumeric) children.add(SizedBox(width: 80, child: Text(loc.t('checklist_action_numeric') ?? 'Цифра', style: Theme.of(context).textTheme.labelLarge, textAlign: TextAlign.center)));
     if (cfg.dropdownOptions != null && cfg.dropdownOptions!.isNotEmpty)
       children.add(SizedBox(width: 120, child: Text(loc.t('checklist_action_choice') ?? 'Выбор', style: Theme.of(context).textTheme.labelLarge, textAlign: TextAlign.center)));
-    if (cfg.hasToggle) children.add(SizedBox(width: 100, child: Text(loc.t('checklist_done') ?? 'Сделано', style: Theme.of(context).textTheme.labelLarge, textAlign: TextAlign.center)));
+    if (cfg.hasToggle) children.add(SizedBox(width: 100, child: Text(loc.t('checklist_status') ?? 'Статус', style: Theme.of(context).textTheme.labelLarge, textAlign: TextAlign.center)));
     return Row(children: children);
   }
 

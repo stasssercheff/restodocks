@@ -50,7 +50,8 @@ enum KitchenSection {
   prep('prep', 'Заготовки'),
   pastry('pastry', 'Кондитерский'),
   bakery('bakery', 'Пекарня'),
-  cleaning('cleaning', 'Уборка');
+  cleaning('cleaning', 'Уборка'),
+  banquetCatering('banquet_catering', 'Банкет / Кейтринг');
 
   const KitchenSection(this.code, this.displayName);
   final String code;
@@ -66,6 +67,7 @@ enum KitchenSection {
     'pastry':       {'ru': 'Кондитерский',   'en': 'Pastry',        'es': 'Pastelería',      'de': 'Konditorei',     'fr': 'Pâtisserie'},
     'bakery':       {'ru': 'Пекарня',        'en': 'Bakery',        'es': 'Panadería',       'de': 'Bäckerei',       'fr': 'Boulangerie'},
     'cleaning':     {'ru': 'Уборка',         'en': 'Cleaning',      'es': 'Limpieza',        'de': 'Reinigung',      'fr': 'Nettoyage'},
+    'banquet_catering': {'ru': 'Банкет / Кейтринг', 'en': 'Banquet / Catering', 'es': 'Banquete / Catering', 'de': 'Bankett / Catering', 'fr': 'Banquet / Traiteur'},
   };
 
   String getLocalizedName(String lang) =>
@@ -148,6 +150,18 @@ class Employee extends Equatable {
   @JsonKey(name: 'owner_access_level')
   final String? ownerAccessLevel;
 
+  /// Статус: permanent — постоянный, temporary — временный (цех кухни, бара, зала)
+  @JsonKey(name: 'employment_status')
+  final String? employmentStatus;
+
+  /// Дата начала периода (для временных). Задаёт шеф/барменеджер/менеджер зала.
+  @JsonKey(name: 'employment_start_date')
+  final DateTime? employmentStartDate;
+
+  /// Дата конца периода (для временных). После неё — только личный график.
+  @JsonKey(name: 'employment_end_date')
+  final DateTime? employmentEndDate;
+
   @JsonKey(name: 'created_at')
   final DateTime createdAt;
 
@@ -176,6 +190,9 @@ class Employee extends Equatable {
     this.dataAccessEnabled = false,
     this.canEditOwnSchedule = false,
     this.ownerAccessLevel = 'full',
+    this.employmentStatus = 'permanent',
+    this.employmentStartDate,
+    this.employmentEndDate,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -202,6 +219,9 @@ class Employee extends Equatable {
     bool? dataAccessEnabled,
     bool? canEditOwnSchedule,
     String? ownerAccessLevel,
+    String? employmentStatus,
+    DateTime? employmentStartDate,
+    DateTime? employmentEndDate,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -226,6 +246,9 @@ class Employee extends Equatable {
       dataAccessEnabled: dataAccessEnabled ?? this.dataAccessEnabled,
       canEditOwnSchedule: canEditOwnSchedule ?? this.canEditOwnSchedule,
       ownerAccessLevel: ownerAccessLevel ?? this.ownerAccessLevel,
+      employmentStatus: employmentStatus ?? this.employmentStatus,
+      employmentStartDate: employmentStartDate ?? this.employmentStartDate,
+      employmentEndDate: employmentEndDate ?? this.employmentEndDate,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -254,6 +277,19 @@ class Employee extends Equatable {
   /// Co-owner с view_only: только просмотр (когда у пригласившего >1 заведения)
   bool get isViewOnlyOwner =>
       hasRole('owner') && (ownerAccessLevel ?? 'full') == 'view_only';
+
+  /// Временный сотрудник, у которого истёк период — доступ только к личному графику
+  bool get isTemporaryAccessExpired {
+    if ((employmentStatus ?? 'permanent') != 'temporary') return false;
+    final end = employmentEndDate;
+    if (end == null) return false;
+    final now = DateTime.now().toUtc();
+    return now.isAfter(DateTime(end.year, end.month, end.day, 23, 59, 59, 999));
+  }
+
+  /// Эффективный доступ к данным: false если временный и период истёк
+  bool get effectiveDataAccess =>
+      dataAccessEnabled && !isTemporaryAccessExpired;
 
   /// Проверка, имеет ли сотрудник определенную роль
   bool hasRole(String roleCode) {
@@ -325,6 +361,13 @@ class Employee extends Equatable {
         return false;
     }
   }
+
+  /// Руководство получает документы во входящих (чеклисты, заказы, инвентаризации). Линейные — только сообщения.
+  bool get hasInboxDocuments =>
+      hasRole('owner') ||
+      hasRole('executive_chef') ||
+      hasRole('sous_chef') ||
+      canViewDepartment('management');
 
   /// Отображаемое имя роли (первая роль)
   String get roleDisplayName {
@@ -428,6 +471,9 @@ class Employee extends Equatable {
     isActive,
     dataAccessEnabled,
     canEditOwnSchedule,
+    employmentStatus,
+    employmentStartDate,
+    employmentEndDate,
     createdAt,
     updatedAt,
   ];

@@ -53,6 +53,10 @@ class RolesConfig {
     'cleaning': [
       SectionRole('dishwasher', false),
     ],
+    'banquet_catering': [
+      SectionRole('cook', false),
+      SectionRole('cook_assistant', false),
+    ],
   };
 
   /// Бар: только роли.

@@ -31,19 +31,17 @@
 2. После push в `staging` запускается **Build and Deploy to Vercel (Demo/Beta)**
 3. Если падает — смотрите логи, на каком шаге ошибка
 
-## Миграции Supabase (checklists)
+## Миграции Supabase (демо)
 
-Если при создании чеклиста («задачи», «заготовка») появляется ошибка `Could not find the 'assigned_department' column` — примените миграции к staging Supabase:
+**Важно:** без миграций чеклисты не сохраняются, сообщения не работают (ошибки `PGRST204`, `PGRST205`).
 
 **Вариант 1.** Через CLI: `cd restodocks_flutter && supabase db push`
 
-**Вариант 2.** Вручную: откройте в Supabase Dashboard **SQL Editor**, вставьте и выполните:
+**Вариант 2.** Вручную: Supabase Dashboard → **SQL Editor** → выполните скрипт из файла **`docs/STAGING_SUPABASE_MIGRATIONS.sql`** (скопируйте всё содержимое и выполните один раз).
 
-```sql
--- Обеспечить наличие assigned_department (чеклисты «задачи» и «заготовка»)
-ALTER TABLE checklists ADD COLUMN IF NOT EXISTS assigned_department TEXT DEFAULT 'kitchen';
-COMMENT ON COLUMN checklists.assigned_department IS 'Подразделение: kitchen, bar, hall. По умолчанию kitchen.';
-```
+**Только сообщения не работают?** Выполните **`docs/EMPLOYEE_MESSAGES_TABLE.sql`** — создаёт таблицу `employee_direct_messages`.
+
+**После миграций обязательно:** Supabase Dashboard → **Settings** → **General** → **Restart project** — обновит schema cache PostgREST. Без перезапуска возможны PGRST204/PGRST205.
 
 ## Если Vercel отозвал токен
 

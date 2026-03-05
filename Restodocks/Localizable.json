@@ -69,6 +69,13 @@
     "de": "Patisserie",
     "fr": "Pâtisserie"
   },
+  "banquet_catering": {
+    "ru": "Банкет / Кейтринг",
+    "en": "Banquet / Catering",
+    "es": "Banquete / Catering",
+    "de": "Bankett / Catering",
+    "fr": "Banquet / Traiteur"
+  },
   "cleaning": {
     "ru": "Клининг",
     "en": "Cleaning",

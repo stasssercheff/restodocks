@@ -233,13 +233,14 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() => _errorMessage = loc.t('employee_not_found_use_fix_script'));
         return;
       }
+      final fallback = loc.t('invalid_email_or_password');
       final msg = _safeErrorString(
         e,
-        loc.t('invalid_email_or_password'),
+        fallback,
         confirmEmailMsg: loc.t('confirm_email_then_login'),
       );
       setState(() {
-        _errorMessage = loc.t('login_error', args: {'error': msg});
+        _errorMessage = (msg == fallback) ? msg : loc.t('login_error', args: {'error': msg});
       });
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -318,11 +319,15 @@ class _LoginScreenState extends State<LoginScreen> {
           confirmEmailMsg != null) {
         return confirmEmailMsg;
       }
-      // Ошибки Auth при 400/token
-      if (s.contains('jsnull') ||
-          s.contains('invalid_grant') ||
+      // Неверный пароль / учётные данные (Auth, Edge Function 401)
+      if (s.contains('invalid_credentials') ||
           s.contains('invalid login credentials') ||
-          (s.contains('400') && s.contains('token'))) {
+          s.contains('invalid_grant') ||
+          (s.contains('401') && s.contains('error'))) {
+        return authErrorFallback;
+      }
+      // Ошибки Auth при 400/token
+      if (s.contains('jsnull') || (s.contains('400') && s.contains('token'))) {
         return authErrorFallback;
       }
       return e.toString();

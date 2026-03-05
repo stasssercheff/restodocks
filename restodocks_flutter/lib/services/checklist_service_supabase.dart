@@ -10,7 +10,11 @@ class ChecklistServiceSupabase {
 
   final SupabaseService _supabase = SupabaseService();
 
-  Future<List<Checklist>> getChecklistsForEstablishment(String establishmentId, {String department = 'kitchen'}) async {
+  Future<List<Checklist>> getChecklistsForEstablishment(
+    String establishmentId, {
+    String department = 'kitchen',
+    String? currentEmployeeId,
+  }) async {
     try {
       final data = await _supabase.client
           .from('checklists')
@@ -22,6 +26,16 @@ class ChecklistServiceSupabase {
       for (final row in data) {
         final c = Checklist.fromJson(row);
         if (c.assignedDepartment != department) continue;
+        if (currentEmployeeId != null) {
+          final ids = c.assignedEmployeeIds;
+          final singleId = c.assignedEmployeeId;
+          final hasAssignment = (ids != null && ids.isNotEmpty) || (singleId != null && singleId.isNotEmpty);
+          if (hasAssignment) {
+            final assignedToCurrent = (ids != null && ids.contains(currentEmployeeId)) ||
+                (singleId == currentEmployeeId);
+            if (!assignedToCurrent) continue;
+          }
+        }
         final itemsData = await _supabase.client
             .from('checklist_items')
             .select()
@@ -84,11 +98,29 @@ class ChecklistServiceSupabase {
     };
     if (assignedSection != null) data['assigned_section'] = assignedSection;
     if (assignedEmployeeId != null) data['assigned_employee_id'] = assignedEmployeeId;
-    // deadline_at, scheduled_for_at — не отправляем: колонки могут отсутствовать в схеме
+    if (deadlineAt != null) data['deadline_at'] = deadlineAt.toIso8601String();
+    if (scheduledForAt != null) data['scheduled_for_at'] = scheduledForAt.toIso8601String();
     if (additionalName != null) data['additional_name'] = additionalName;
+    data['assigned_department'] = assignedDepartment;
     if (type != null) data['type'] = type.code;
     if (actionConfig != null) data['action_config'] = actionConfig.toJson();
-    final res = await _supabase.insertData('checklists', data);
+    Map<String, dynamic> res;
+    try {
+      res = await _supabase.insertData('checklists', data);
+    } catch (e) {
+      if (_isColumnNotFoundError(e)) {
+        final minimal = <String, dynamic>{
+          'establishment_id': establishmentId,
+          'created_by': createdBy,
+          'name': name,
+          'created_at': now.toIso8601String(),
+          'updated_at': now.toIso8601String(),
+        };
+        res = await _supabase.insertData('checklists', minimal);
+      } else {
+        rethrow;
+      }
+    }
     final c = Checklist.fromJson(res);
 
     for (var i = 0; i < items.length; i++) {
@@ -132,21 +164,48 @@ class ChecklistServiceSupabase {
     }
   }
 
+  bool _isColumnNotFoundError(Object e) {
+    final msg = e.toString().toLowerCase();
+    return msg.contains('pgrst204') ||
+        (msg.contains('column') && (msg.contains('find') || msg.contains('found') || msg.contains('exist')));
+  }
+
+  /// Обновление чеклиста с поэтапным retry: при PGRST204 исключаем проблемные колонки.
+  Future<void> _updateChecklistWithRetry(String id, Map<String, dynamic> fullUpd) async {
+    try {
+      await _supabase.updateData('checklists', fullUpd, 'id', id);
+      return;
+    } catch (e) {
+      if (!_isColumnNotFoundError(e)) rethrow;
+    }
+    const optionalKeys = ['deadline_at', 'scheduled_for_at', 'assigned_section', 'assigned_employee_id', 'additional_name', 'type', 'action_config'];
+    final stripped = Map<String, dynamic>.from(fullUpd);
+    for (final k in optionalKeys) stripped.remove(k);
+    try {
+      await _supabase.updateData('checklists', stripped, 'id', id);
+      return;
+    } catch (e) {
+      if (!_isColumnNotFoundError(e)) rethrow;
+    }
+    final minimal = <String, dynamic>{
+      'name': fullUpd['name'],
+      'updated_at': fullUpd['updated_at'],
+    };
+    await _supabase.updateData('checklists', minimal, 'id', id);
+  }
+
   /// Вставка одного пункта; при ошибке схемы (PGRST204) повтор без опциональных колонок.
   Future<void> _insertChecklistItem(Map<String, dynamic> itemData) async {
     try {
       await _supabase.insertData('checklist_items', itemData);
     } catch (e) {
       final msg = e.toString().toLowerCase();
-      if (msg.contains('pgrst204') || msg.contains('column') && (msg.contains('found') || msg.contains('exist'))) {
+      if (msg.contains('pgrst204') || (msg.contains('column') && (msg.contains('find') || msg.contains('found') || msg.contains('exist')))) {
         final minimal = <String, dynamic>{
           'checklist_id': itemData['checklist_id'],
           'title': itemData['title'],
           'sort_order': itemData['sort_order'],
         };
-        if (itemData.containsKey('tech_card_id') && itemData['tech_card_id'] != null) {
-          minimal['tech_card_id'] = itemData['tech_card_id'];
-        }
         await _supabase.insertData('checklist_items', minimal);
       } else {
         rethrow;
@@ -159,15 +218,39 @@ class ChecklistServiceSupabase {
       'name': checklist.name,
       'updated_at': DateTime.now().toIso8601String(),
     };
-    upd['assigned_section'] = checklist.assignedSection;
-    upd['assigned_employee_id'] = checklist.assignedEmployeeIds?.isNotEmpty == true
+    if (checklist.assignedSection != null) upd['assigned_section'] = checklist.assignedSection;
+    final empId = checklist.assignedEmployeeIds?.isNotEmpty == true
         ? checklist.assignedEmployeeIds!.first
         : checklist.assignedEmployeeId;
-    // deadline_at, scheduled_for_at не отправляем: колонки могут отсутствовать
-    upd['additional_name'] = checklist.additionalName;
-    upd['type'] = checklist.type?.code;
+    if (empId != null) upd['assigned_employee_id'] = empId;
+    if (checklist.deadlineAt != null) upd['deadline_at'] = checklist.deadlineAt!.toIso8601String();
+    if (checklist.scheduledForAt != null) upd['scheduled_for_at'] = checklist.scheduledForAt!.toIso8601String();
+    if (checklist.additionalName != null) upd['additional_name'] = checklist.additionalName;
+    if (checklist.type != null) upd['type'] = checklist.type!.code;
     upd['action_config'] = checklist.actionConfig.toJson();
-    await _supabase.updateData('checklists', upd, 'id', checklist.id);
+
+    await _updateChecklistWithRetry(checklist.id, upd);
+    if (checklist.deadlineAt != null || checklist.scheduledForAt != null) {
+      try {
+        await _supabase.client.rpc(
+          'update_checklist_dates',
+          params: {
+            'p_checklist_id': checklist.id,
+            'p_deadline_at': checklist.deadlineAt?.toIso8601String(),
+            'p_scheduled_for_at': checklist.scheduledForAt?.toIso8601String(),
+          },
+        );
+      } catch (_) {
+        try {
+          final datesOnly = <String, dynamic>{
+            'updated_at': DateTime.now().toIso8601String(),
+          };
+          if (checklist.deadlineAt != null) datesOnly['deadline_at'] = checklist.deadlineAt!.toIso8601String();
+          if (checklist.scheduledForAt != null) datesOnly['scheduled_for_at'] = checklist.scheduledForAt!.toIso8601String();
+          await _supabase.updateData('checklists', datesOnly, 'id', checklist.id);
+        } catch (_) {}
+      }
+    }
     await _supabase.client
         .from('checklist_items')
         .delete()

@@ -152,7 +152,6 @@ class InventoryScreen extends StatefulWidget {
 
 class _InventoryScreenState extends State<InventoryScreen>
     with AutoSaveMixin<InventoryScreen>, InputChangeListenerMixin<InventoryScreen> {
-  final ScrollController _hScroll = ScrollController();
   Timer? _serverAutoSaveTimer; // Таймер для автоматической отправки на сервер каждые 30 секунд
   final List<_InventoryRow> _rows = [];
   /// Продукты, перерасчитанные из ПФ (третья секция); заполняется при загрузке файла.
@@ -182,11 +181,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     super.initState();
     _startTime = TimeOfDay.now();
     WidgetsBinding.instance.addPostFrameCallback((_) => _initScreen());
-    _nameFilterCtrl.addListener(() {
-      if (_nameFilter != _nameFilterCtrl.text) {
-        setState(() => _nameFilter = _nameFilterCtrl.text);
-      }
-    });
+    _nameFilterCtrl.addListener(() => setState(() => _nameFilter = _nameFilterCtrl.text));
     _nameFilterFocusNode.addListener(() {
       setState(() => _hasInputFocus = _nameFilterFocusNode.hasFocus);
     });
@@ -203,6 +198,7 @@ class _InventoryScreenState extends State<InventoryScreen>
         _autoSaveToServer();
       }
     });
+
   }
 
   @override
@@ -640,7 +636,6 @@ class _InventoryScreenState extends State<InventoryScreen>
 
   @override
   void dispose() {
-    _hScroll.dispose();
     _nameFilterCtrl.dispose();
     _nameFilterFocusNode.dispose();
     _serverAutoSaveTimer?.cancel(); // Отменить таймер автосохранения на сервер
@@ -697,7 +692,6 @@ class _InventoryScreenState extends State<InventoryScreen>
     if (rowIndex < 0 || rowIndex >= _rows.length) return;
     if (_rows[rowIndex].isFree) return;
     setState(() => _rows[rowIndex].quantities.add(0.0));
-    _scrollToNewColumn();
   }
 
   void _setPfUnit(int rowIndex, String unit) {
@@ -777,67 +771,19 @@ class _InventoryScreenState extends State<InventoryScreen>
         if (!r.isFree) r.quantities.add(0.0);
       }
     });
-    _scrollToNewColumn();
-  }
-
-  void _scrollToNewColumn() {
-    void doScroll() {
-      if (_hScroll.hasClients) {
-        _hScroll.animateTo(
-          _hScroll.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOut,
-        );
-      }
-    }
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      doScroll();
-      Future.delayed(const Duration(milliseconds: 350), doScroll);
-    });
-  }
-
-  /// При фокусе на ячейку: 3-я видимая → скролл на 2-ю; последняя → на 3-ю.
-  static const double _scrollableRowPadding = 6;
-  void _scrollToCellFocused(int colIndex, int totalCols) {
-    void doScroll() {
-      if (!_hScroll.hasClients) return;
-      final colStep = _colQtyWidth + _colGap;
-      double targetOffset;
-      if (totalCols <= 3) {
-        targetOffset = 0;
-      } else if (colIndex == totalCols - 1) {
-        targetOffset = _scrollableRowPadding + (colIndex - 2) * colStep;
-      } else if (colIndex >= 2) {
-        targetOffset = _scrollableRowPadding + (colIndex - 1) * colStep;
-      } else {
-        targetOffset = 0;
-      }
-      targetOffset = targetOffset.clamp(0.0, _hScroll.position.maxScrollExtent);
-      _hScroll.animateTo(
-        targetOffset,
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOut,
-      );
-    }
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      doScroll();
-      Future.delayed(const Duration(milliseconds: 350), doScroll);
-    });
   }
 
   void _onLastCellFocused(int rowIndex) {
     if (rowIndex < 0 || rowIndex >= _rows.length || _rows[rowIndex].isFree) return;
     setState(() => _rows[rowIndex].quantities.add(0.0));
-    _scrollToNewColumn();
   }
 
-  /// При выходе из второй ячейки (после заполнения) — только скролл, ячейку добавляет _onLastCellFocused
+  /// При выходе из второй ячейки (после заполнения) — скролл выполняет tile через didUpdateWidget
   void _onCellFocusLost(int rowIndex, int colIndex) {
     if (rowIndex < 0 || rowIndex >= _rows.length || _rows[rowIndex].isFree) return;
     final row = _rows[rowIndex];
     if (row.quantities.length < 2 || colIndex != row.quantities.length - 2) return;
     if (row.quantities[colIndex] <= 0) return;
-    _scrollToNewColumn();
   }
 
   void _addProduct(Product p) {
@@ -1310,13 +1256,67 @@ class _InventoryScreenState extends State<InventoryScreen>
                   collapseLayout: collapseLayout,
                   hideInfoRow: mobileKeyboardOpen,
                 ),
+              if (collapseLayout && !_completed && _rows.isNotEmpty)
+                _buildCompactSearchBar(loc),
               if (!collapseLayout) const Divider(height: 1),
+              if (collapseLayout && !_completed && _rows.isNotEmpty) const Divider(height: 1),
               Expanded(
                 child: _buildTable(loc),
               ),
             ],
           ),
           if (!collapseLayout && !mobileKeyboardOpen) DataSafetyIndicator(isVisible: true),
+        ],
+      ),
+    );
+  }
+
+  /// Компактная строка поиска (при открытой клавиатуре — как в iiko)
+  Widget _buildCompactSearchBar(LocalizationService loc) {
+    final theme = Theme.of(context);
+    final sortAlphabetButton = IconButton(
+      icon: const Icon(Icons.sort_by_alpha, size: 22),
+      tooltip: _sortMode == _InventorySort.alphabetAsc
+          ? (loc.t('inventory_sort_az') ?? 'А–Я')
+          : (loc.t('inventory_sort_za') ?? 'Я–А'),
+      onPressed: () => setState(() {
+        _sortMode = _sortMode == _InventorySort.alphabetAsc
+            ? _InventorySort.alphabetDesc
+            : _InventorySort.alphabetAsc;
+      }),
+    );
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
+      ),
+      child: Row(
+        children: [
+          sortAlphabetButton,
+          const SizedBox(width: 8),
+          Expanded(
+            child: TextField(
+              controller: _nameFilterCtrl,
+              focusNode: _nameFilterFocusNode,
+              keyboardType: TextInputType.text,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: InputDecoration(
+                hintText: loc.t('inventory_filter_name') ?? 'По названию',
+                prefixIcon: Icon(Icons.search, size: 22, color: theme.colorScheme.onSurfaceVariant),
+                filled: true,
+                fillColor: theme.colorScheme.surfaceContainerHighest,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: theme.colorScheme.outlineVariant, width: 1.5),
+                ),
+              ),
+              style: const TextStyle(fontSize: 15),
+              onChanged: (_) => setState(() {}),
+            ),
+          ),
         ],
       ),
     );
@@ -1363,7 +1363,7 @@ class _InventoryScreenState extends State<InventoryScreen>
         : null;
     final nameFilterField = !_completed && _rows.isNotEmpty
         ? SizedBox(
-            width: narrow ? double.infinity : 160,
+            width: narrow ? double.infinity : 240,
             child: TextField(
               controller: _nameFilterCtrl,
               focusNode: _nameFilterFocusNode,
@@ -1371,11 +1371,17 @@ class _InventoryScreenState extends State<InventoryScreen>
               textCapitalization: TextCapitalization.sentences,
               decoration: InputDecoration(
                 hintText: loc.t('inventory_filter_name') ?? 'По названию',
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                border: const OutlineInputBorder(),
+                prefixIcon: Icon(Icons.search, size: 22, color: theme.colorScheme.onSurfaceVariant),
+                filled: true,
+                fillColor: theme.colorScheme.surfaceContainerHighest,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: theme.colorScheme.outlineVariant, width: 1.5),
+                ),
               ),
-              style: const TextStyle(fontSize: 12),
+              style: const TextStyle(fontSize: 15),
               onChanged: (_) => setState(() {}),
             ),
           )
@@ -1441,6 +1447,12 @@ class _InventoryScreenState extends State<InventoryScreen>
               )
             : Row(
                 children: [
+                  if (sortAlphabetButton != null && nameFilterField != null) ...[
+                    if (!collapseLayout) sortAlphabetButton!,
+                    if (!collapseLayout) const SizedBox(width: 6),
+                    nameFilterField!,
+                    const SizedBox(width: 12),
+                  ],
                   if (!collapseLayout) ...[
                     Icon(Icons.store, size: 16, color: theme.colorScheme.primary),
                     const SizedBox(width: 4),
@@ -1468,12 +1480,6 @@ class _InventoryScreenState extends State<InventoryScreen>
                     '${_startTime?.hour.toString().padLeft(2, '0') ?? '—'}:${_startTime?.minute.toString().padLeft(2, '0') ?? '—'}',
                     style: theme.textTheme.bodySmall,
                   ),
-                  if (sortAlphabetButton != null && nameFilterField != null) ...[
-                    const SizedBox(width: 6),
-                    if (!collapseLayout) sortAlphabetButton!,
-                    if (!collapseLayout) const SizedBox(width: 6),
-                    nameFilterField!,
-                  ],
                 ],
               ),
           ),
@@ -1572,8 +1578,6 @@ class _InventoryScreenState extends State<InventoryScreen>
 
   Widget _buildTableWithFixedColumn(LocalizationService loc) {
     final leftW = _leftWidth(context);
-    final screenW = MediaQuery.of(context).size.width;
-    final rightW = _maxQuantityColumns * (_colQtyWidth + _colGap) + 48;
 
     return Column(
       children: [
@@ -1585,92 +1589,37 @@ class _InventoryScreenState extends State<InventoryScreen>
               width: leftW,
               child: _buildFixedHeaderRow(loc),
             ),
-            // Scrollable right header
-            Expanded(
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            controller: _hScroll,
-            physics: const AlwaysScrollableScrollPhysics(),
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
-                child: SizedBox(
-                  width: rightW.clamp(screenW - leftW, double.infinity),
-                  child: _buildScrollableHeaderRow(loc),
-                ),
-              ),
-            ),
+            // Номера колонок (без скролла — каждая строка скроллится сама)
+            Expanded(child: _buildScrollableHeaderRow(loc)),
           ],
         ),
         Expanded(
           child: SingleChildScrollView(
             physics: const ClampingScrollPhysics(),
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
-            child: Row(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  width: leftW,
-                  decoration: BoxDecoration(
-                    border: Border(right: BorderSide(color: Theme.of(context).dividerColor.withOpacity(0.3))),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (_blockFilter != _InventoryBlockFilter.pfOnly && _productIndices.isNotEmpty) ...[
-                        _buildSectionHeader(loc, loc.t('inventory_block_products'), isFixed: true),
-                        ..._productIndices.asMap().entries.map((e) => _buildFixedDataRow(loc, e.value, e.key + 1)),
-                      ],
-                      if (_blockFilter != _InventoryBlockFilter.productsOnly && _pfIndices.isNotEmpty) ...[
-                        _buildSectionHeader(loc, loc.t('inventory_block_pf'), isFixed: true),
-                        ..._pfIndices.asMap().entries.map((e) {
-                          final rowNum = _blockFilter == _InventoryBlockFilter.pfOnly ? e.key + 1 : _productIndices.length + e.key + 1;
-                          return _buildFixedDataRow(loc, e.value, rowNum);
-                        }),
-                      ],
-                      if (_aggregatedFromFile != null && _aggregatedFromFile!.isNotEmpty) ...[
-                        _buildSectionHeader(loc, loc.t('inventory_pf_products_title'), isFixed: true),
-                        _buildFixedAggregatedHeaderRow(loc),
-                        ..._aggregatedFromFile!.asMap().entries.map((e) => _buildFixedAggregatedDataRow(loc, e.value, e.key + 1)),
-                      ],
-                    ],
-                  ),
-                ),
-                Expanded(
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            controller: _hScroll,
-            physics: const AlwaysScrollableScrollPhysics(),
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
-                    child: SizedBox(
-                      width: rightW.clamp(screenW - leftW, double.infinity),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (_blockFilter != _InventoryBlockFilter.pfOnly && _productIndices.isNotEmpty) ...[
-                            SizedBox(height: _sectionHeaderHeight),
-                            ..._productIndices.asMap().entries.map((e) {
-                              final lastIdx = _pfIndices.isNotEmpty ? _pfIndices.last : _productIndices.last;
-                              return _buildScrollableDataRow(loc, e.value, isLastRow: e.value == lastIdx);
-                            }),
-                          ],
-                          if (_blockFilter != _InventoryBlockFilter.productsOnly && _pfIndices.isNotEmpty) ...[
-                            SizedBox(height: _sectionHeaderHeight),
-                            ..._pfIndices.asMap().entries.map((e) {
-                              final lastIdx = _pfIndices.last;
-                              return _buildScrollableDataRow(loc, e.value, isLastRow: e.value == lastIdx);
-                            }),
-                          ],
-                          if (_aggregatedFromFile != null && _aggregatedFromFile!.isNotEmpty) ...[
-                            SizedBox(height: _sectionHeaderHeight),
-                            _buildScrollableAggregatedHeaderRow(loc),
-                            ..._aggregatedFromFile!.asMap().entries.map((e) => _buildScrollableAggregatedDataRow(loc, e.value)),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
+                if (_blockFilter != _InventoryBlockFilter.pfOnly && _productIndices.isNotEmpty) ...[
+                  _buildSectionHeaderRow(loc, loc.t('inventory_block_products'), leftW),
+                  ..._productIndices.asMap().entries.map((e) {
+                    final lastIdx = _pfIndices.isNotEmpty ? _pfIndices.last : _productIndices.last;
+                    return _buildScrollableDataRow(loc, e.value, e.key + 1, isLastRow: e.value == lastIdx);
+                  }),
+                ],
+                if (_blockFilter != _InventoryBlockFilter.productsOnly && _pfIndices.isNotEmpty) ...[
+                  _buildSectionHeaderRow(loc, loc.t('inventory_block_pf'), leftW),
+                  ..._pfIndices.asMap().entries.map((e) {
+                    final lastIdx = _pfIndices.last;
+                    final rowNum = _blockFilter == _InventoryBlockFilter.pfOnly ? e.key + 1 : _productIndices.length + e.key + 1;
+                    return _buildScrollableDataRow(loc, e.value, rowNum, isLastRow: e.value == lastIdx);
+                  }),
+                ],
+                if (_aggregatedFromFile != null && _aggregatedFromFile!.isNotEmpty) ...[
+                  _buildSectionHeaderRow(loc, loc.t('inventory_pf_products_title'), leftW),
+                  _buildAggregatedBlockRow(loc, leftW),
+                ],
               ],
             ),
           ),
@@ -1708,6 +1657,44 @@ class _InventoryScreenState extends State<InventoryScreen>
 
   double _colNameWidth(BuildContext context) =>
       _leftWidth(context) - _colNoWidth - _colGap - _colUnitWidth - _colGap - _colTotalWidth;
+
+  Widget _buildSectionHeaderRow(LocalizationService loc, String title, double leftW) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(width: leftW, child: _buildSectionHeader(loc, title, isFixed: true)),
+        Expanded(child: SizedBox(height: _sectionHeaderHeight)),
+      ],
+    );
+  }
+
+  Widget _buildAggregatedBlockRow(LocalizationService loc, double leftW) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: leftW,
+          decoration: BoxDecoration(border: Border(right: BorderSide(color: Theme.of(context).dividerColor.withOpacity(0.3)))),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildFixedAggregatedHeaderRow(loc),
+              ..._aggregatedFromFile!.asMap().entries.map((e) => _buildFixedAggregatedDataRow(loc, e.value, e.key + 1)),
+            ],
+          ),
+        ),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildScrollableAggregatedHeaderRow(loc),
+              ..._aggregatedFromFile!.asMap().entries.map((e) => _buildScrollableAggregatedDataRow(loc, e.value)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _buildSectionHeader(LocalizationService loc, String title, {bool isFixed = false}) {
     final theme = Theme.of(context);
@@ -1789,8 +1776,8 @@ class _InventoryScreenState extends State<InventoryScreen>
     final theme = Theme.of(context);
     final row = _rows[actualIndex];
 
-    return SizedBox(
-      height: _dataRowHeight,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 44),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
         decoration: BoxDecoration(
@@ -1807,7 +1794,7 @@ class _InventoryScreenState extends State<InventoryScreen>
             child: Text(
               row.productName(loc.currentLanguageCode),
               style: theme.textTheme.bodyMedium,
-              maxLines: 2,
+              maxLines: 4,
               overflow: TextOverflow.ellipsis,
               softWrap: true,
             ),
@@ -1851,57 +1838,27 @@ class _InventoryScreenState extends State<InventoryScreen>
     );
   }
 
-  Widget _buildScrollableDataRow(LocalizationService loc, int actualIndex, {bool isLastRow = false}) {
-    final theme = Theme.of(context);
+  Widget _buildScrollableDataRow(LocalizationService loc, int actualIndex, int rowNumber, {bool isLastRow = false}) {
     final row = _rows[actualIndex];
-    final qtyCols = row.quantities.length;
-
-    return SizedBox(
-      height: _dataRowHeight,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            ...List.generate(
-              qtyCols,
-              (colIndex) {
-                final isLastCell = isLastRow && colIndex == qtyCols - 1;
-                return Padding(
-                  padding: EdgeInsets.only(right: colIndex < qtyCols - 1 ? _colGap : 0),
-                  child: SizedBox(
-                    width: _colQtyWidth,
-                    child: _completed
-                        ? Text(_formatQty(row.quantityDisplayAt(colIndex)), style: theme.textTheme.bodyMedium)
-                        : _QtyCell(
-                            key: ValueKey('qty_${actualIndex}_$colIndex'),
-                            value: row.quantities[colIndex],
-                            useGrams: row.isWeightInKg,
-                            onChanged: (v) => _setQuantity(actualIndex, colIndex, v),
-                            textInputAction: isLastCell ? TextInputAction.done : TextInputAction.next,
-                            onFocusGained: () {
-                              setState(() => _hasInputFocus = true);
-                              _scrollToCellFocused(colIndex, qtyCols);
-                              if (colIndex == qtyCols - 1) _onLastCellFocused(actualIndex);
-                            },
-                            onFocusLost: () {
-                              setState(() => _hasInputFocus = false);
-                              _onCellFocusLost(actualIndex, colIndex);
-                            },
-                          ),
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
+    return _StandardInventoryRowTile(
+      fixedPart: _buildFixedDataRow(loc, actualIndex, rowNumber),
+      row: row,
+      actualIndex: actualIndex,
+      isLastRow: isLastRow,
+      completed: _completed,
+      formatQty: _formatQty,
+      onSetQuantity: _setQuantity,
+      onLastCellFocused: _onLastCellFocused,
+      onCellFocusLost: _onCellFocusLost,
+      onFocusChange: (hasFocus) => setState(() => _hasInputFocus = hasFocus),
+      leftWidth: _leftWidth(context),
+      colQtyWidth: _colQtyWidth,
+      colGap: _colGap,
+      dataRowHeight: _dataRowHeight,
+      loc: loc,
     );
   }
+
 
   String _formatQty(double q) {
     if (q == q.truncateToDouble()) return q.toInt().toString();
@@ -2144,6 +2101,149 @@ class _InventoryScreenState extends State<InventoryScreen>
       'aggregatedProducts': aggregatedProducts ?? [],
       'sourceLang': lang,
     };
+  }
+}
+
+/// Строка стандартной инвентаризации: [фикс.часть | скролл ячеек]. Скролл — per-row, как в iiko.
+class _StandardInventoryRowTile extends StatefulWidget {
+  const _StandardInventoryRowTile({
+    required this.fixedPart,
+    required this.row,
+    required this.actualIndex,
+    required this.isLastRow,
+    required this.completed,
+    required this.formatQty,
+    required this.onSetQuantity,
+    required this.onLastCellFocused,
+    required this.onCellFocusLost,
+    required this.onFocusChange,
+    required this.leftWidth,
+    required this.colQtyWidth,
+    required this.colGap,
+    required this.dataRowHeight,
+    required this.loc,
+  });
+
+  final Widget fixedPart;
+  final _InventoryRow row;
+  final int actualIndex;
+  final bool isLastRow;
+  final bool completed;
+  final String Function(double) formatQty;
+  final void Function(int, int, double) onSetQuantity;
+  final void Function(int) onLastCellFocused;
+  final void Function(int, int) onCellFocusLost;
+  final void Function(bool) onFocusChange;
+  final double leftWidth;
+  final double colQtyWidth;
+  final double colGap;
+  final double dataRowHeight;
+  final LocalizationService loc;
+
+  @override
+  State<_StandardInventoryRowTile> createState() => _StandardInventoryRowTileState();
+}
+
+class _StandardInventoryRowTileState extends State<_StandardInventoryRowTile> {
+  final ScrollController _hScroll = ScrollController();
+
+  @override
+  void dispose() {
+    _hScroll.dispose();
+    super.dispose();
+  }
+
+  void _scrollToEnd() {
+    void doScroll() {
+      if (_hScroll.hasClients) {
+        _hScroll.animateTo(
+          _hScroll.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
+      }
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      doScroll();
+      Future.delayed(const Duration(milliseconds: 350), doScroll);
+    });
+  }
+
+  @override
+  void didUpdateWidget(_StandardInventoryRowTile old) {
+    super.didUpdateWidget(old);
+    if (old.row.quantities.length < widget.row.quantities.length) {
+      _scrollToEnd();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final row = widget.row;
+    final qtyCols = row.quantities.length;
+
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(width: widget.leftWidth, child: widget.fixedPart),
+          Expanded(
+            child: SingleChildScrollView(
+              controller: _hScroll,
+              scrollDirection: Axis.horizontal,
+              physics: const ClampingScrollPhysics(),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface,
+                  border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    ...List.generate(
+                      qtyCols,
+                      (colIndex) {
+                        final isLastCell = widget.isLastRow && colIndex == qtyCols - 1;
+                        return Padding(
+                          padding: EdgeInsets.only(right: colIndex < qtyCols - 1 ? widget.colGap : 0),
+                          child: SizedBox(
+                            width: widget.colQtyWidth,
+                            child: Center(
+                              child: widget.completed
+                                ? Text(widget.formatQty(row.quantityDisplayAt(colIndex)), style: theme.textTheme.bodyMedium)
+                                : _QtyCell(
+                                    key: ValueKey('qty_${widget.actualIndex}_$colIndex'),
+                                    value: row.quantities[colIndex],
+                                    useGrams: row.isWeightInKg,
+                                    onChanged: (v) => widget.onSetQuantity(widget.actualIndex, colIndex, v),
+                                    textInputAction: isLastCell ? TextInputAction.done : TextInputAction.next,
+                                    onFocusGained: () {
+                                      widget.onFocusChange(true);
+                                      if (colIndex == qtyCols - 1) {
+                                        widget.onLastCellFocused(widget.actualIndex);
+                                      }
+                                    },
+                                    onFocusLost: () {
+                                      widget.onFocusChange(false);
+                                      widget.onCellFocusLost(widget.actualIndex, colIndex);
+                                      if (colIndex == qtyCols - 2 && row.quantities[colIndex] > 0) _scrollToEnd();
+                                    },
+                                  ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -3521,11 +3621,12 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   }
 }
 
-// Ширина фиксированных колонок
-const double _iikoColName  = 180; // Наименование
-const double _iikoColUnit  =  32; // Ед. изм. (узкая, только аббревиатура)
-const double _iikoColTotal =  56; // Итого
-const double _iikoColCell  =  58; // Каждая ячейка ввода
+// Ширина фиксированных колонок (единицы и итого уже для названий)
+const double _iikoColName  = 168; // Наименование (больше под длинные названия)
+const double _iikoColUnit  =  34; // Ед. изм. (−30%)
+const double _iikoColTotal =  52; // Итого (чтобы слово влезало целиком)
+const double _iikoColCell  =  48; // Ячейка ввода (= _colQtyWidth)
+const double _iikoColGap   =   4; // Отступ между ячейками (= _colGap)
 
 // ── Шапка таблицы ────────────────────────────────────────────────────────────
 // Левая часть фиксирована (Наименование + Итого), правая скроллируется вместе со строками.
@@ -3537,16 +3638,16 @@ class _IikoInventoryHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final headerBg   = theme.colorScheme.surfaceContainerHighest;
+    final headerBg   = theme.colorScheme.surfaceContainerHighest.withOpacity(0.5);
     final borderClr  = theme.dividerColor;
-    final textStyle  = TextStyle(
-        fontSize: 11, fontWeight: FontWeight.w700,
-        color: theme.colorScheme.onSurface);
+    final textStyle  = theme.textTheme.labelMedium?.copyWith(
+        fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface) ??
+        const TextStyle(fontSize: 12, fontWeight: FontWeight.bold);
     final border = BorderSide(color: borderClr);
 
     Widget hCell(String t, double w) => Container(
           width: w,
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 7),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
           decoration: BoxDecoration(
             color: headerBg,
             border: Border(right: border, bottom: border),
@@ -3844,21 +3945,22 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
     final borderClr = theme.dividerColor;
     final cb = BorderSide(color: borderClr);
 
-    // Ячейка ввода количества
+    // Ячейка ввода количества (48px, gap 4; растягивается по высоте строки)
     Widget numCell(int colIdx) {
       final ctrl = _ctrls[colIdx];
       final fn = colIdx < _focusNodes.length ? _focusNodes[colIdx] : null;
       return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 5),
+        padding: EdgeInsets.only(right: colIdx < qtyCols - 1 ? _iikoColGap : 0),
         child: SizedBox(
-          width: _iikoColCell - 6,
-          child: TextField(
+          width: _iikoColCell,
+          child: Center(
+            child: TextField(
             controller: ctrl,
             focusNode: fn,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             textInputAction: TextInputAction.next,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 13),
+            style: theme.textTheme.bodyMedium,
             decoration: InputDecoration(
               isDense: true,
               contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
@@ -3866,8 +3968,7 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
               filled: true,
               fillColor: theme.colorScheme.surfaceContainerHighest.withOpacity(0.45),
               hintText: '—',
-              hintStyle: TextStyle(
-                  fontSize: 12,
+              hintStyle: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurface.withOpacity(0.3)),
             ),
             onChanged: (v) {
@@ -3880,6 +3981,7 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
             },
           ),
         ),
+      ),
       );
     }
 
@@ -3887,21 +3989,21 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
       decoration: BoxDecoration(
         border: Border(left: cb, bottom: cb),
       ),
-      constraints: const BoxConstraints(minHeight: 48),
+      constraints: const BoxConstraints(minHeight: 44), // растёт при длинном названии
       child: IntrinsicHeight(
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.stretch, // все колонки одной высоты
           children: [
             // ── Наименование ──
             Container(
               width: _iikoColName,
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
               decoration: BoxDecoration(border: Border(right: cb)),
               alignment: Alignment.centerLeft,
               child: Text(
                 widget.row.product.displayName,
-                style: const TextStyle(fontSize: 13),
-                maxLines: 2,
+                style: theme.textTheme.bodyMedium,
+                maxLines: 4,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -3913,12 +4015,11 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
                 color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
                 border: Border(right: cb),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 1),
+              padding: const EdgeInsets.symmetric(horizontal: 4),
               child: Text(
                 unit,
-                style: TextStyle(
-                    fontSize: 10,
-                    color: theme.colorScheme.onSurface.withOpacity(0.7)),
+                style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant),
                 textAlign: TextAlign.center,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -3934,8 +4035,7 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
               ),
               child: Text(
                 total > 0 ? _fmt(total) : '',
-                style: TextStyle(
-                    fontSize: 13,
+                style: theme.textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                     color: total > 0 ? theme.colorScheme.primary : null),
               ),
@@ -3947,6 +4047,7 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
                 scrollDirection: Axis.horizontal,
                 physics: const ClampingScrollPhysics(),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: List.generate(qtyCols, numCell),
                 ),
               ),

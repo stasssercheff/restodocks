@@ -19,8 +19,34 @@ class ManagementHomeContent extends StatelessWidget {
     final isBarManager = roles.contains('bar_manager');
     final isGeneral = roles.contains('general_manager');
 
-    // Без доступа к данным — только личный график (как в личном кабинете)
-    if (!employee.hasRole('owner') && !employee.dataAccessEnabled) {
+    // Без доступа к данным
+    if (!employee.hasRole('owner') && !employee.effectiveDataAccess) {
+      // Сотрудник в цехе (кухня): только график общий и сообщения
+      if (employee.department == 'kitchen') {
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            _Tile(
+              icon: Icons.calendar_month,
+              title: loc.t('schedule'),
+              onTap: () => context.go('/schedule'),
+            ),
+            _Tile(
+              icon: Icons.chat_bubble_outline,
+              title: loc.t('inbox_tab_messages') ?? 'Сообщения',
+              onTap: () => context.go('/notifications?tab=messages'),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: Text(
+                loc.t('data_access_required_hint') ?? 'Доступ к остальным разделам выдаёт руководитель.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
+            ),
+          ],
+        );
+      }
+      // Менеджмент не кухня: только личный график
       return ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -44,7 +70,8 @@ class ManagementHomeContent extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       children: [
         _Tile(icon: Icons.calendar_month, title: loc.t('schedule'), onTap: () => context.go('/schedule')),
-        _Tile(icon: Icons.inbox, title: loc.t('inbox'), onTap: () => context.go('/notifications')),
+        _Tile(icon: Icons.chat_bubble_outline, title: loc.t('inbox_tab_messages') ?? 'Сообщения', onTap: () => context.go('/notifications?tab=messages')),
+        _Tile(icon: Icons.inbox, title: loc.t('inbox'), onTap: () => context.go('/inbox')),
         _Tile(icon: Icons.people, title: loc.t('employees'), onTap: () => context.go('/employees')),
         if (isChef || roles.contains('sous_chef'))
           _Tile(icon: Icons.how_to_reg, title: loc.t('shift_confirmation'), onTap: () => context.go('/shift-confirmation')),
@@ -56,6 +83,20 @@ class ManagementHomeContent extends StatelessWidget {
           _Tile(icon: Icons.assignment, title: loc.t('nomenclature'), onTap: () => context.go('/nomenclature')),
         _Tile(icon: Icons.shopping_cart, title: loc.t('product_order'), onTap: () => context.go('/product-order')),
         _Tile(icon: Icons.assignment, title: loc.t('inventory_blank'), onTap: () => context.push('/inventory')),
+        if (isChef || roles.contains('sous_chef')) ...[
+          Padding(
+            padding: const EdgeInsets.only(top: 16, bottom: 8),
+            child: Text(
+              loc.t('banquet_catering') ?? 'Банкет / Кейтринг',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+            ),
+          ),
+          _Tile(icon: Icons.restaurant_menu, title: loc.t('menu'), onTap: () => context.go('/menu/banquet-catering')),
+          _Tile(icon: Icons.description, title: loc.t('ttk_kitchen'), onTap: () => context.go('/tech-cards/banquet-catering')),
+        ],
         if (isGeneral) ...[
           _Tile(icon: Icons.savings, title: '${loc.t('expenses')} (${loc.t('pro')})', onTap: () => context.go('/expenses')),
         ],

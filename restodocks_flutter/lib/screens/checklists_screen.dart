@@ -40,7 +40,11 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
     });
     try {
       final svc = context.read<ChecklistServiceSupabase>();
-      final list = await svc.getChecklistsForEstablishment(est.id, department: widget.department);
+      final list = await svc.getChecklistsForEstablishment(
+        est.id,
+        department: widget.department,
+        currentEmployeeId: emp.id,
+      );
       if (mounted) setState(() {
         _list = list;
         _loading = false;
@@ -66,98 +70,28 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
   }
 
   Future<void> _createNew() async {
-    final loc = context.read<LocalizationService>();
-    ChecklistType type = ChecklistType.tasks;
-    String name = '';
-    String additionalName = '';
-    final nameCtrl = TextEditingController();
-    final addNameCtrl = TextEditingController();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: Text(loc.t('create_checklist')),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    DropdownButtonFormField<ChecklistType>(
-                      value: type,
-                      decoration: InputDecoration(
-                        labelText: loc.t('checklist_type') ?? 'Тип',
-                      ),
-                      items: ChecklistType.values
-                          .map((t) => DropdownMenuItem(value: t, child: Text(t.getLocalizedName(loc.currentLanguageCode))))
-                          .toList(),
-                      onChanged: (v) => setDialogState(() => type = v ?? type),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: nameCtrl,
-                      decoration: InputDecoration(
-                        labelText: loc.t('checklist_name'),
-                        hintText: loc.t('checklist_name_hint'),
-                      ),
-                      autofocus: true,
-                      onChanged: (_) => setDialogState(() {}),
-                    ),
-                    if (type == ChecklistType.prep) ...[
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: addNameCtrl,
-                        decoration: InputDecoration(
-                          labelText: loc.t('checklist_additional_name') ?? 'Дополнительное название',
-                          hintText: loc.t('checklist_additional_name_hint'),
-                        ),
-                        onChanged: (_) => setDialogState(() {}),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(false),
-                  child: Text(loc.t('cancel')),
-                ),
-                FilledButton(
-                  onPressed: () => Navigator.of(ctx).pop(nameCtrl.text.trim().isNotEmpty),
-                  child: Text(loc.t('save')),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-    if (ok != true || !mounted) return;
-    final finalName = nameCtrl.text.trim();
-    final finalAdditional = addNameCtrl.text.trim();
-    if (finalName.isEmpty) return;
     final acc = context.read<AccountManagerSupabase>();
-    final est = acc.establishment!;
-    final emp = acc.currentEmployee!;
+    final est = acc.establishment;
+    final emp = acc.currentEmployee;
+    if (est == null || emp == null) return;
     try {
       final svc = context.read<ChecklistServiceSupabase>();
       final created = await svc.createChecklist(
         establishmentId: est.id,
         createdBy: emp.id,
-        name: finalName,
-        additionalName: finalAdditional.isEmpty ? null : finalAdditional,
-        type: type,
+        name: '',
+        type: ChecklistType.tasks,
         assignedDepartment: widget.department,
       );
       if (mounted) {
         await _load();
-        context.push('/checklists/${created.id}');
+        await context.push('/checklists/${created.id}');
+        if (mounted) await _load();
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))),
+          SnackBar(content: Text(context.read<LocalizationService>().t('error_with_message').replaceAll('%s', e.toString()))),
         );
       }
     }
@@ -302,6 +236,20 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
           final sectionLabel = c.assignedSection != null
               ? (KitchenSection.fromCode(c.assignedSection!)?.getLocalizedName(lang) ?? c.assignedSection)
               : null;
+          final fmtDate = (DateTime d) => '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}';
+          final formatDateTime = (DateTime d) {
+            final utc = d.toUtc();
+            final hasTime = utc.hour != 0 || utc.minute != 0;
+            final local = d.toLocal();
+            if (hasTime) {
+              return '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')} ${fmtDate(local)}';
+            }
+            return fmtDate(utc);
+          };
+          final dateParts = <String>[
+            if (c.scheduledForAt != null) '${loc.t('checklist_scheduled_for') ?? 'На когда'}: ${formatDateTime(c.scheduledForAt!)}',
+            if (c.deadlineAt != null) '${loc.t('checklist_complete_by') ?? 'Завершить до'}: ${formatDateTime(c.deadlineAt!)}',
+          ];
           return Card(
             margin: const EdgeInsets.only(bottom: 8),
             child: ListTile(
@@ -318,9 +266,10 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                   ],
                 ],
               ),
-              title: Text(c.name),
+              title: Text((c.name.trim().isNotEmpty ? c.name : c.additionalName?.trim().isNotEmpty == true ? c.additionalName! : (loc.t('checklist_no_name') ?? 'Без названия'))),
               subtitle: Text([
                 if (sectionLabel != null) sectionLabel,
+                ...dateParts,
                 '${c.items.length} ${loc.t('items_count')}',
               ].join(' • ')),
               trailing: canEdit
@@ -347,7 +296,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                                 context: context,
                                 builder: (ctx) => AlertDialog(
                                   title: Text(loc.t('checklist_delete_confirm') ?? 'Удалить чеклист?'),
-                                  content: Text('${c.name}'),
+                                  content: Text(c.name.trim().isNotEmpty ? c.name : (c.additionalName ?? loc.t('checklist_no_name') ?? 'Без названия')),
                                   actions: [
                                     TextButton(
                                       onPressed: () => Navigator.of(ctx).pop(false),
@@ -391,7 +340,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                   : const Icon(Icons.chevron_right),
               onTap: () async {
                 await context.push(canEdit ? '/checklists/${c.id}' : '/checklists/${c.id}/fill');
-                if (mounted) _load();
+                if (mounted) await _load();
               },
             ),
           );

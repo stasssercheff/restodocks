@@ -335,6 +335,13 @@ class AppRouter {
                       state, IikoInventoryInboxDetailScreen(documentId: id));
                 },
               ),
+              GoRoute(
+                path: 'chat/:employeeId',
+                pageBuilder: (context, state) {
+                  final employeeId = state.pathParameters['employeeId'] ?? '';
+                  return _slideTransitionPage(state, EmployeeChatScreen(otherEmployeeId: employeeId));
+                },
+              ),
             ],
           ),
           GoRoute(
@@ -347,7 +354,13 @@ class AppRouter {
           ),
           GoRoute(
             path: '/notifications',
-            pageBuilder: (context, state) => _slideTransitionPage(state, const InboxScreen()),
+            pageBuilder: (context, state) {
+              final messagesOnly = state.queryParameters['tab'] == 'messages';
+              return _slideTransitionPage(
+                state,
+                InboxScreen(messagesOnly: messagesOnly),
+              );
+            },
           ),
           GoRoute(
             path: '/expenses',
@@ -480,7 +493,7 @@ class AppRouter {
             path: '/checklists/:id',
             pageBuilder: (context, state) {
               final id = state.pathParameters['id'] ?? '';
-              final viewOnly = state.uri.queryParameters['view'] == '1';
+              final viewOnly = state.queryParameters['view'] == '1';
               return _slideTransitionPage(state, ChecklistEditScreen(checklistId: id, viewOnly: viewOnly));
             },
           ),
@@ -522,7 +535,7 @@ class AppRouter {
             path: '/tech-cards/:segment',
             pageBuilder: (context, state) {
               final segment = state.pathParameters['segment'] ?? '';
-              const knownDepartments = ['kitchen', 'bar', 'dining_room'];
+              const knownDepartments = ['kitchen', 'bar', 'dining_room', 'banquet-catering'];
               if (knownDepartments.contains(segment)) {
                 return _slideTransitionPage(state, TechCardsListScreen(department: segment));
               }

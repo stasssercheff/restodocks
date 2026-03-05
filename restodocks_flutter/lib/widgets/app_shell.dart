@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../models/models.dart';
 import '../services/localization_service.dart';
 import '../services/account_manager_supabase.dart';
 import '../services/home_button_config_service.dart';
@@ -23,19 +24,20 @@ class AppShell extends StatelessWidget {
     final isOwner = currentEmployee.hasRole('owner');
     final homeBtnConfig = context.watch<HomeButtonConfigService>();
     final middleAction = homeBtnConfig.action;
-    final noDataAccess = !isOwner && !currentEmployee.dataAccessEnabled;
+    final noDataAccess = !isOwner && !currentEmployee.effectiveDataAccess;
+    final isKitchenNoData = noDataAccess && currentEmployee.department == 'kitchen';
     final middleLabel = noDataAccess
-        ? loc.t('personal_schedule')
-        : _labelForAction(loc, middleAction);
+        ? (isKitchenNoData ? loc.t('schedule') : loc.t('personal_schedule'))
+        : _labelForAction(loc, middleAction, currentEmployee);
 
     final location = GoRouterState.of(context).matchedLocation;
-    final selectedIndex = _indexForLocation(location, middleAction, noDataAccess);
+    final selectedIndex = _indexForLocation(location, middleAction, noDataAccess, isKitchenNoData);
 
     return Scaffold(
       body: child,
       bottomNavigationBar: NavigationBar(
         selectedIndex: selectedIndex,
-        onDestinationSelected: (i) => _onTap(context, i, middleAction, noDataAccess),
+        onDestinationSelected: (i) => _onTap(context, i, middleAction, noDataAccess, isKitchenNoData, currentEmployee),
         destinations: [
           NavigationDestination(
             icon: const Icon(Icons.home_outlined),
@@ -57,10 +59,12 @@ class AppShell extends StatelessWidget {
     );
   }
 
-  String _labelForAction(LocalizationService loc, HomeButtonAction action) {
+  String _labelForAction(LocalizationService loc, HomeButtonAction action, Employee? employee) {
     switch (action) {
       case HomeButtonAction.inbox:
-        return loc.t('inbox');
+        return (employee?.hasInboxDocuments ?? true)
+            ? loc.t('inbox')
+            : (loc.t('inbox_tab_messages') ?? 'Сообщения');
       case HomeButtonAction.schedule:
         return loc.t('schedule');
       case HomeButtonAction.checklists:
@@ -72,7 +76,7 @@ class AppShell extends StatelessWidget {
     }
   }
 
-  int _indexForLocation(String location, HomeButtonAction action, bool noDataAccess) {
+  int _indexForLocation(String location, HomeButtonAction action, bool noDataAccess, [bool isKitchenNoData = false]) {
     if (location == '/home' || location == '/') return 0;
     if (location.startsWith('/personal-cabinet') || location.startsWith('/profile') || location.startsWith('/settings')) return 2;
 
@@ -92,19 +96,26 @@ class AppShell extends StatelessWidget {
     return 0;
   }
 
-  void _onTap(BuildContext context, int index, HomeButtonAction action, bool noDataAccess) {
+  void _onTap(BuildContext context, int index, HomeButtonAction action, bool noDataAccess, bool isKitchenNoData, Employee? employee) {
     final location = GoRouterState.of(context).matchedLocation;
-    final currentIndex = _indexForLocation(location, action, noDataAccess);
+    final currentIndex = _indexForLocation(location, action, noDataAccess, isKitchenNoData);
 
     // Если переходим на вкладку с меньшим индексом — анимируем как «назад» (вправо)
     final isBackward = index < currentIndex;
     final extra = isBackward ? {'back': true} : null;
 
+    String middleRoute = action.route;
+    if (!noDataAccess && action == HomeButtonAction.inbox) {
+      middleRoute = (employee?.hasInboxDocuments ?? true) ? '/inbox' : '/notifications?tab=messages';
+    } else if (noDataAccess) {
+      middleRoute = isKitchenNoData ? '/schedule' : '/schedule?personal=1';
+    }
+
     switch (index) {
       case 0:
         context.go('/home', extra: extra);
       case 1:
-        context.go(noDataAccess ? '/schedule?personal=1' : action.route, extra: extra);
+        context.go(middleRoute, extra: extra);
       case 2:
         context.go('/personal-cabinet', extra: extra);
       default:

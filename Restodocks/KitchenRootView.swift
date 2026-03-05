@@ -94,11 +94,18 @@ struct KitchenRootView: View {
                 }
 
                     // Bakery
-                NavigationLink {
-                    KitchenSectionView(section: .bakery)
-                } label: {
-                    Text(lang.t("bakery"))
-                }
+                    NavigationLink {
+                        KitchenSectionView(section: .bakery)
+                    } label: {
+                        Text(lang.t("bakery"))
+                    }
+
+                    // Banquet / Catering
+                    NavigationLink {
+                        KitchenSectionView(section: .banquetCatering)
+                    } label: {
+                        Text(lang.t("banquet_catering"))
+                    }
             } else {
                     // PRO Locked
                 NavigationLink {

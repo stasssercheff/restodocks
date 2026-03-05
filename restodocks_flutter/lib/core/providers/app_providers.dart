@@ -23,6 +23,9 @@ class AppProviders {
         ChangeNotifierProvider<HomeButtonConfigService>(
           create: (_) => HomeButtonConfigService(),
         ),
+        ChangeNotifierProvider<HomeLayoutConfigService>(
+          create: (_) => HomeLayoutConfigService(),
+        ),
         ChangeNotifierProvider<OwnerViewPreferenceService>(
           create: (_) => OwnerViewPreferenceService(),
         ),
@@ -78,6 +81,9 @@ class AppProviders {
         Provider<EmailService>(
           create: (_) => EmailService(),
         ),
+        Provider<EmployeeMessageService>(
+          create: (_) => EmployeeMessageService(),
+        ),
         ChangeNotifierProvider<IikoProductStore>(
           create: (_) => IikoProductStore(),
         ),
@@ -89,6 +95,7 @@ class AppProviders {
             await accountManager.initialize();
             if (accountManager.isLoggedInSync) {
               await context.read<ProductStoreSupabase>().loadProducts();
+              await context.read<HomeLayoutConfigService>().loadForEmployee(accountManager.currentEmployee?.id);
             }
           },
           initialData: null,

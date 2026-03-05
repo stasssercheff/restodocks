@@ -66,6 +66,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       'hot_drinks': {'ru': 'Горячие напитки', 'en': 'Hot drinks'},
       'drinks_pure': {'ru': 'Напитки в чистом виде', 'en': 'Drinks (neat)'},
       'snacks': {'ru': 'Снеки', 'en': 'Snacks'},
+      'banquet': {'ru': 'Банкет', 'en': 'Banquet'},
+      'catering': {'ru': 'Кейтеринг', 'en': 'Catering'},
     };
 
     return categoryTranslations[c]?[lang] ?? c;
@@ -93,10 +95,15 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     try {
       final svc = context.read<TechCardServiceSupabase>();
       final all = await svc.getTechCardsForEstablishment(est.dataEstablishmentId);
-      // Фильтрация по цеху для кухни
-      final list = emp == null
-          ? all
-          : all.where((tc) => emp.canSeeTechCard(tc.sections)).toList();
+      List<TechCard> list;
+      if (widget.department == 'banquet-catering') {
+        list = all.where((tc) =>
+            tc.category == 'banquet' || tc.category == 'catering').toList();
+      } else {
+        list = emp == null
+            ? all
+            : all.where((tc) => emp.canSeeTechCard(tc.sections)).toList();
+      }
       if (mounted) {
         setState(() { _list = list; _loading = false; });
         _ensureTechCardTranslations(svc, list);

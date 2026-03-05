@@ -16,8 +16,9 @@ class OwnerHomeContent extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // Управление — сверху, с входящими и графиком всех сотрудников
+        // Управление — сверху: сообщения и входящие
         _SectionTitle(title: loc.t('management')),
+        _Tile(icon: Icons.chat_bubble_outline, title: loc.t('inbox_tab_messages') ?? 'Сообщения', onTap: () => context.go('/notifications?tab=messages')),
         _Tile(icon: Icons.inbox, title: loc.t('inbox'), onTap: () => context.go('/inbox')),
         _Tile(icon: Icons.people, title: loc.t('employees'), onTap: () => context.go('/employees')),
         _Tile(icon: Icons.calendar_month, title: loc.t('schedule'), onTap: () => context.go('/schedule/all')),
@@ -47,6 +48,11 @@ class OwnerHomeContent extends StatelessWidget {
         _Tile(icon: Icons.schedule, title: loc.t('schedule'), onTap: () => context.go('/schedule/dining_room')),
         _Tile(icon: Icons.restaurant_menu, title: loc.t('menu'), onTap: () => context.go('/menu/dining_room')),
         _Tile(icon: Icons.store_outlined, title: loc.t('order_tab_suppliers') ?? 'Поставщики', onTap: () => context.go('/suppliers/hall')),
+
+        const SizedBox(height: 16),
+        _SectionTitle(title: loc.t('banquet_catering') ?? 'Банкет / Кейтринг'),
+        _Tile(icon: Icons.restaurant_menu, title: loc.t('menu'), onTap: () => context.go('/menu/banquet-catering')),
+        _Tile(icon: Icons.description, title: loc.t('ttk_kitchen'), onTap: () => context.go('/tech-cards/banquet-catering')),
 
         const SizedBox(height: 16),
         _SectionTitle(title: '${loc.t('expenses')} (${loc.t('pro')})'),

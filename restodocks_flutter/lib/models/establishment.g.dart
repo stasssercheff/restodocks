@@ -17,7 +17,7 @@ Establishment _$EstablishmentFromJson(Map<String, dynamic> json) =>
       email: json['email'] as String?,
       defaultCurrency: json['default_currency'] as String? ?? 'RUB',
       subscriptionType: json['subscription_type'] as String?,
-      parentEstablishmentId: json['parent_establishment_id']?.toString(),
+      parentEstablishmentId: json['parent_establishment_id'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
     );

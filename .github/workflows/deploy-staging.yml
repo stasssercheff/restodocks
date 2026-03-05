@@ -46,13 +46,20 @@ jobs:
           SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
 
+      - name: Flutter clean
+        working-directory: restodocks_flutter
+        run: flutter clean
+
       - name: Flutter pub get
         working-directory: restodocks_flutter
         run: flutter pub get
 
       - name: Flutter build web
         working-directory: restodocks_flutter
-        run: flutter build web --release
+        env:
+          SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+        run: flutter build web --release --verbose --dart-define=SUPABASE_URL="$SUPABASE_URL" --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
 
       - name: Setup Node
         uses: actions/setup-node@v4
