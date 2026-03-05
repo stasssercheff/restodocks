@@ -106,6 +106,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
         }
       });
       _ensureTechCardTranslations(techSvc, techs);
+      if (mounted) await restoreDraftNow();
     } catch (e) {
       if (mounted) setState(() {
         _error = e.toString();
@@ -157,6 +158,9 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
 
   @override
   String get draftKey => 'checklist_edit_${widget.checklistId}';
+
+  @override
+  bool get restoreDraftAfterLoad => true;
 
   @override
   Map<String, dynamic> getCurrentState() {

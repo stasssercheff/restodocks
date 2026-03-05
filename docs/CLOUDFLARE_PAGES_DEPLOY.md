@@ -1,15 +1,33 @@
 # Деплой Restodocks на Cloudflare Pages
 
-Инструкция по настройке Restodocks Flutter на Cloudflare Pages (prod и demo).
+Основной хостинг. Netlify выключен, миграция завершена.  
+Инструкция с учётом лимитов (500 сборок/месяц бесплатно).
+
+---
+
+## Лимиты Cloudflare Pages (Free)
+
+| Параметр | Значение |
+|----------|----------|
+| Сборок в месяц | 500 |
+| Одновременных сборок | 1 |
+| Бандид | безлимит |
+| Проектов | до 100 |
+
+**Экономия сборок:** отключите «Builds for non-production branches» и используйте Build watch paths (см. раздел 9).
 
 ---
 
 ## Схема
 
-| Сайт | Репозиторий | Root directory | Production branch | Supabase |
-|------|-------------|----------------|-------------------|----------|
-| Restodocks (prod) | restodocks | restodocks_flutter | main | Production |
-| Restodocks Demo | restodocks | restodocks_flutter | staging | Staging |
+| Сайт | Root directory | Production branch | Supabase |
+|------|----------------|-------------------|----------|
+| Restodocks (prod) | restodocks_flutter | main | Production |
+| Restodocks Demo | restodocks_flutter | staging | Staging |
+| Admin (prod) | beta-admin | main | Production |
+| Admin Demo | beta-admin | staging | Staging |
+
+> **Admin** (Next.js с SSR): на Cloudflare нужен @cloudflare/next-on-pages — отдельная настройка. Restodocks (Flutter) — готов.
 
 ---
 
@@ -79,13 +97,37 @@ Preview-деплои создаются для веток и pull requests.
 
 ---
 
-## 7. Файлы в репозитории
+## 7. Экономия сборок (не выйти за 500/месяц)
+
+В **Settings → Builds & deployments** каждого проекта:
+
+1. **Builds for non-production branches: Disabled** — не собирать каждый PR и feature branch.
+2. **Build watch paths** (если доступно) — включить только нужные папки:
+   - Restodocks: `restodocks_flutter/**` — сборка только при изменении Flutter.
+3. Пушить осознанно: 1 push в main ≈ 1 сборка Restodocks prod; 1 push в staging ≈ 1 сборка Demo.  
+   При ~10–20 пушах в неделю в main и staging укладываемся в 500/месяц.
+
+---
+
+## 8. Файлы в репозитории
 
 - `restodocks_flutter/cloudflare-build.sh` — скрипт сборки для Cloudflare Pages
 - Генерирует `_redirects` (SPA-маршрутизация) и `_headers` (кэш) в `build/web`
 
 ---
 
-## 8. DeepL и нейросети
+## 9. DeepL и нейросети
 
 Подключены к **Supabase Edge Functions**, не к Cloudflare. При переходе на Pages меняется только хостинг Flutter-приложения — Supabase, Edge Functions и секреты остаются без изменений.
+
+---
+
+## 10. Чек-лист миграции
+
+| Шаг | Действие | Статус |
+|-----|----------|--------|
+| 1 | Restodocks Demo (staging) на Cloudflare Pages | ✓ задеплоено |
+| 2 | Restodocks prod (main) — создать 2-й проект Pages, main, Production Supabase | |
+| 3 | В обоих: Builds for non-production branches = Disabled | |
+| 4 | Admin prod + Admin Demo — Cloudflare (next-on-pages) или Vercel | |
+| 5 | Перенести домены на Cloudflare (когда всё проверено) | |

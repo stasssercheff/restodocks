@@ -1,7 +1,11 @@
 # Деплой Restodocks на Netlify
 
-Инструкция по настройке 4 сайтов на Netlify: Restodocks prod, Restodocks demo, Admin prod, Admin demo.  
-Vercel не трогаем — работаем параллельно.
+> **⚠️ Устарело.** Netlify выключен, миграция на Cloudflare Pages.  
+> Актуальная инструкция: [CLOUDFLARE_PAGES_DEPLOY.md](./CLOUDFLARE_PAGES_DEPLOY.md)
+
+---
+
+Инструкция по настройке 4 сайтов на Netlify (архивная): Restodocks prod, Restodocks demo, Admin prod, Admin demo.
 
 ---
 
