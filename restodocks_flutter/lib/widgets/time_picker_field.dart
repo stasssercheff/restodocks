@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 
 /// Поле выбора времени: на мобильном — Cupertino scroll picker, на ПК — ввод цифр без диалога.
 class TimePickerField extends StatefulWidget {
@@ -131,9 +132,12 @@ class _TimePickerFieldState extends State<TimePickerField> {
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 600;
+    final isPhone = defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.android;
+    final isNarrow = MediaQuery.of(context).size.width < 600;
+    final useScrollPicker = isPhone || isNarrow;
 
-    if (isMobile) {
+    if (useScrollPicker) {
       return InkWell(
         onTap: widget.enabled ? _openMobilePicker : null,
         borderRadius: BorderRadius.circular(4),
