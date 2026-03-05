@@ -6,14 +6,15 @@ on:
     paths:
       - 'restodocks_flutter/supabase/functions/**'
       - 'supabase/functions/**'
+      - '.github/workflows/deploy-supabase-functions.yml'
+
+env:
+  SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
 jobs:
-  deploy:
+  deploy-production:
+    name: Deploy to Production
     runs-on: ubuntu-latest
-    env:
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      PROJECT_REF: osglfptwbuqqmqunttha
-
     steps:
       - uses: actions/checkout@v4
 
@@ -22,6 +23,21 @@ jobs:
         with:
           version: latest
 
-      - name: Deploy Edge Functions
-        run: supabase functions deploy --project-ref $PROJECT_REF
-        working-directory: .
+      - name: Deploy Edge Functions (Production)
+        run: supabase functions deploy --project-ref osglfptwbuqqmqunttha
+        working-directory: restodocks_flutter
+
+  deploy-staging:
+    name: Deploy to Staging (Demo)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy Edge Functions (Staging)
+        run: supabase functions deploy --project-ref kzhaezanjttvnqkgpxnh
+        working-directory: restodocks_flutter
