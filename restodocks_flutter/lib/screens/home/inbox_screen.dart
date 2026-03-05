@@ -172,15 +172,12 @@ class _InboxScreenState extends State<InboxScreen> {
       ),
       body: Column(
         children: [
-          // Собственник: двухярусная система вкладок
-          if (isOwner) ...[
-            _buildDeptFilter(loc),
-            _buildTypeFilterForOwner(loc),
-          ],
-          // Фильтр документов — только для Входящих, не для Сообщений
+          // Фильтр документов (Кухня/Бар/Зал, Заказы/Инвентаризация) — только для Входящих, не для Сообщений
           if (!widget.messagesOnly) ...[
-            if (isOwner) _buildDeptFilter(loc),
-            if (isOwner) _buildTypeFilterForOwner(loc),
+            if (isOwner) ...[
+              _buildDeptFilter(loc),
+              _buildTypeFilterForOwner(loc),
+            ],
             if (!isOwner && visibleTabs.isNotEmpty) _buildTypeFilter(loc, visibleTabs),
           ],
 

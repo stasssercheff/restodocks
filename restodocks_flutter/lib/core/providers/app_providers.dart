@@ -32,6 +32,9 @@ class AppProviders {
         ChangeNotifierProvider<TtkBranchFilterService>(
           create: (_) => TtkBranchFilterService(),
         ),
+        ChangeNotifierProvider<ScreenLayoutPreferenceService>(
+          create: (_) => ScreenLayoutPreferenceService(),
+        ),
         // Используем Supabase версии сервисов
         ChangeNotifierProvider<AccountManagerSupabase>(
           create: (_) => AccountManagerSupabase(),

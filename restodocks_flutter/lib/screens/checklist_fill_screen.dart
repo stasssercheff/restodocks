@@ -237,6 +237,17 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
     }
 
     try {
+      final emps = await acc.getEmployeesForEstablishment(est.id);
+      final chefIds = emps
+          .where((e) => e.hasRole('executive_chef') || e.hasRole('sous_chef'))
+          .map((e) => e.id)
+          .toList();
+      if (chefIds.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.t('checklist_no_chefs') ?? 'Нет шефа/су-шефа для отправки')),
+        );
+        return;
+      }
       final subSvc = context.read<ChecklistSubmissionService>();
       await subSvc.submit(
         establishmentId: est.id,
@@ -244,8 +255,9 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
         submittedByEmployeeId: emp.id,
         submittedByName: emp.fullName,
         checklistName: c.name,
-        additionalName: null,
+        additionalName: c.additionalName,
         section: c.assignedSection,
+        recipientChefIds: chefIds,
         startTime: _startTime,
         endTime: _endTime,
         department: emp.department,

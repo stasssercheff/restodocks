@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../services/services.dart';
 import '../../services/home_layout_config_service.dart';
+import '../../services/screen_layout_preference_service.dart';
 import '../../models/models.dart';
 
 /// Домашняя страница сотрудника (кухня/бар/зал): график, меню, ТТК, чеклисты.
@@ -67,6 +68,7 @@ class StaffHomeContent extends StatelessWidget {
     }
 
     final layoutSvc = context.watch<HomeLayoutConfigService>();
+    final screenPref = context.watch<ScreenLayoutPreferenceService>();
     final order = layoutSvc.getOrder(employee.id);
     final tiles = <HomeTileId, Widget>{
       HomeTileId.messages: _Tile(
@@ -117,7 +119,7 @@ class StaffHomeContent extends StatelessWidget {
       HomeTileId.inventory: _Tile(icon: Icons.assignment, title: loc.t('inventory_blank'), onTap: () => context.push('/inventory')),
     };
     final showChecklists = employee.department == 'kitchen' || employee.department == 'bar' || employee.department == 'dining_room';
-    final showBanquet = employee.department == 'kitchen';
+    final showBanquet = employee.department == 'kitchen' && screenPref.showBanquetCatering;
     final ordered = order
         .where((id) => id != HomeTileId.checklists || showChecklists)
         .where((id) => (id != HomeTileId.banquetMenu && id != HomeTileId.banquetTtk) || showBanquet)

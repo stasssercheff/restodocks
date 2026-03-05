@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../services/services.dart';
+import '../../services/screen_layout_preference_service.dart';
 import '../../models/models.dart';
 
 /// Домашняя страница менеджмента (шеф, барменеджер, менеджер зала, управляющий).
@@ -14,6 +15,7 @@ class ManagementHomeContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
+    final screenPref = context.watch<ScreenLayoutPreferenceService>();
     final roles = employee.roles;
     final isChef = roles.contains('executive_chef');
     final isBarManager = roles.contains('bar_manager');
@@ -83,7 +85,7 @@ class ManagementHomeContent extends StatelessWidget {
           _Tile(icon: Icons.assignment, title: loc.t('nomenclature'), onTap: () => context.go('/nomenclature')),
         _Tile(icon: Icons.shopping_cart, title: loc.t('product_order'), onTap: () => context.go('/product-order')),
         _Tile(icon: Icons.assignment, title: loc.t('inventory_blank'), onTap: () => context.push('/inventory')),
-        if (isChef || roles.contains('sous_chef')) ...[
+        if ((isChef || roles.contains('sous_chef')) && screenPref.showBanquetCatering) ...[
           Padding(
             padding: const EdgeInsets.only(top: 16, bottom: 8),
             child: Text(

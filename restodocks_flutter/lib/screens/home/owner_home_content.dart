@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../services/services.dart';
+import '../../services/screen_layout_preference_service.dart';
 
 /// Домашняя страница владельца: график, кухня, бар, зал, менеджмент, уведомления, расходы.
 /// Визуал как у менеджмента/сотрудника — Card + ListTile, без цветных плиток.
@@ -12,6 +13,7 @@ class OwnerHomeContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
+    final screenPref = context.watch<ScreenLayoutPreferenceService>();
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -49,11 +51,12 @@ class OwnerHomeContent extends StatelessWidget {
         _Tile(icon: Icons.restaurant_menu, title: loc.t('menu'), onTap: () => context.go('/menu/dining_room')),
         _Tile(icon: Icons.store_outlined, title: loc.t('order_tab_suppliers') ?? 'Поставщики', onTap: () => context.go('/suppliers/hall')),
 
-        const SizedBox(height: 16),
-        _SectionTitle(title: loc.t('banquet_catering') ?? 'Банкет / Кейтринг'),
-        _Tile(icon: Icons.restaurant_menu, title: loc.t('menu'), onTap: () => context.go('/menu/banquet-catering')),
-        _Tile(icon: Icons.description, title: loc.t('ttk_kitchen'), onTap: () => context.go('/tech-cards/banquet-catering')),
-
+        if (screenPref.showBanquetCatering) ...[
+          const SizedBox(height: 16),
+          _SectionTitle(title: loc.t('banquet_catering') ?? 'Банкет / Кейтринг'),
+          _Tile(icon: Icons.restaurant_menu, title: loc.t('menu'), onTap: () => context.go('/menu/banquet-catering')),
+          _Tile(icon: Icons.description, title: loc.t('ttk_kitchen'), onTap: () => context.go('/tech-cards/banquet-catering')),
+        ],
         const SizedBox(height: 16),
         _SectionTitle(title: '${loc.t('expenses')} (${loc.t('pro')})'),
         _Tile(icon: Icons.payments, title: loc.t('salary_expenses'), subtitle: loc.t('salary_period_hint'), onTap: () => context.go('/expenses/salary')),

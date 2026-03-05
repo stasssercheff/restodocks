@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/models.dart';
 import '../services/services.dart';
 import '../services/home_layout_config_service.dart';
+import '../services/screen_layout_preference_service.dart';
 import '../widgets/app_bar_home_button.dart';
 
 const _adminEmails = <String>{'stasssercheff@gmail.com'};
@@ -940,6 +941,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
               trailing: const Icon(Icons.chevron_right),
               onTap: () => _showHomeLayoutConfig(context, localization),
             ),
+            Text(
+              localization.t('screen_settings') ?? 'Настройка экрана',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            if (currentEmployee.hasRole('owner'))
+              Consumer<HomeButtonConfigService>(
+                builder: (_, homeBtn, __) => ListTile(
+                  leading: const Icon(Icons.tune),
+                  title: Text(localization.t('central_button')),
+                  subtitle: Text(_homeButtonActionLabel(localization, homeBtn.action)),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _showHomeButtonPicker(context, localization, homeBtn),
+                ),
+              ),
+            Consumer<ScreenLayoutPreferenceService>(
+              builder: (_, screenPref, __) => SwitchListTile(
+                secondary: const Icon(Icons.restaurant_menu),
+                title: Text(localization.t('show_banquet_catering') ?? 'Банкеты и кейтринг в меню'),
+                subtitle: Text(localization.t('show_banquet_catering_hint') ?? 'Показывать «Меню — Банкет/Кейтринг» и «ТТК — Банкет/Кейтринг»'),
+                value: screenPref.showBanquetCatering,
+                onChanged: (v) => screenPref.setShowBanquetCatering(v),
+              ),
+            ),
             ListTile(
               leading: const Icon(Icons.language),
               title: Text(localization.t('language')),
@@ -983,15 +1009,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               },
             ),
             if (currentEmployee.hasRole('owner')) ...[
-              Consumer<HomeButtonConfigService>(
-                builder: (_, homeBtn, __) => ListTile(
-                  leading: const Icon(Icons.tune),
-                  title: Text(localization.t('central_button')),
-                  subtitle: Text(_homeButtonActionLabel(localization, homeBtn.action)),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => _showHomeButtonPicker(context, localization, homeBtn),
-                ),
-              ),
               // 1. Должность — добавляемая должность для собственника (не «собственник»)
               ListTile(
                 leading: const Icon(Icons.work),

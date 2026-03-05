@@ -55,6 +55,7 @@ void main() async {
   await HomeButtonConfigService().initialize();
   await OwnerViewPreferenceService().initialize();
   await TtkBranchFilterService().initialize();
+  await ScreenLayoutPreferenceService().initialize();
   runApp(const RestodocksApp());
 }
 
