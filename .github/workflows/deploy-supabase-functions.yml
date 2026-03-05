@@ -7,6 +7,7 @@ on:
       - 'restodocks_flutter/supabase/functions/**'
       - 'supabase/functions/**'
       - '.github/workflows/deploy-supabase-functions.yml'
+  workflow_dispatch:
 
 jobs:
   deploy-production:
