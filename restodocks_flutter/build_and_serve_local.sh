@@ -26,12 +26,12 @@ SUPABASE_ANON_KEY=$(echo "$SUPABASE_ANON_KEY" | tr -d '\n\r\t')
 echo "==> flutter pub get"
 flutter pub get
 
-echo "==> flutter build web (как на Vercel: profile + source-maps)"
-if ! flutter build web --profile --source-maps --no-tree-shake-icons \
+echo "==> flutter build web (--no-web-resources-cdn: CanvasKit в билде, без CDN)"
+if ! flutter build web --profile --source-maps --no-tree-shake-icons --no-web-resources-cdn \
   --dart-define=SUPABASE_URL="$SUPABASE_URL" \
   --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"; then
   echo "==> Profile не прошёл, пробуем release..."
-  flutter build web --release \
+  flutter build web --release --no-web-resources-cdn \
     --dart-define=SUPABASE_URL="$SUPABASE_URL" \
     --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
 fi
