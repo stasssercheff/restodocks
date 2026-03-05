@@ -21,15 +21,23 @@
 В поле **Redirect URLs** добавьте (каждая с новой строки):
 
 ```
+https://restodocks.pages.dev
+https://restodocks.pages.dev/**
+https://*.pages.dev
+https://*.pages.dev/**
 https://www.restodocks.com
 https://www.restodocks.com/
 https://restodocks.com
 https://restodocks.com/
+https://demo.restodocks.com
+https://demo.restodocks.com/**
 http://localhost:3000
 http://localhost:8080
 http://127.0.0.1:3000
 http://127.0.0.1:8080
 ```
+
+**Автоматически (через API):** GitHub Actions → `Supabase add Cloudflare URLs` → Run workflow. Использует `SUPABASE_ACCESS_TOKEN`.
 
 - `www.restodocks.com` и `restodocks.com` — production
 - `localhost` — для локальной разработки

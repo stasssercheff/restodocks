@@ -45,9 +45,9 @@
 2. Авторизуйте GitHub, выберите репозиторий `restodocks`
 3. **Set up builds and deployments**:
    - **Production branch:** `main`
-   - **Root directory (advanced):** `restodocks_flutter`
+   - **Root directory (advanced):** оставить пустым (скрипт в корне)
    - **Build command:** `chmod +x cloudflare-build.sh && ./cloudflare-build.sh`
-   - **Build output directory:** `build/web`
+   - **Build output directory:** `restodocks_flutter/build/web`
 4. **Environment variables** → **Add variable**:
    | Key | Value | Environment |
    |-----|-------|-------------|
@@ -63,9 +63,9 @@
 2. Тот же репозиторий `restodocks`
 3. **Set up builds**:
    - **Production branch:** `staging`
-   - **Root directory:** `restodocks_flutter`
+   - **Root directory:** пусто
    - **Build command:** `chmod +x cloudflare-build.sh && ./cloudflare-build.sh`
-   - **Build output directory:** `build/web`
+   - **Build output directory:** `restodocks_flutter/build/web`
 4. **Environment variables** — те же ключи, значения от **Staging** Supabase
 5. **Save and Deploy**
 
@@ -79,7 +79,21 @@ Pages → ваш проект → **Custom domains** → **Set up a custom domai
 
 ---
 
-## 5. Если «Page not found» (404)
+## 5. Если «Неверный пароль» или 401 на beta
+
+**Beta** (restodocks.pages.dev) использует **Staging Supabase**. Входите учёткой, которая есть в Staging (не Production).
+
+Добавьте Cloudflare URL в Supabase Auth: **GitHub Actions** → **Supabase add Cloudflare URLs** → **Run workflow** (требует `SUPABASE_ACCESS_TOKEN` в secrets). Либо вручную: Authentication → URL Configuration → Redirect URLs: `https://restodocks.pages.dev`, `https://restodocks.pages.dev/**`.
+
+---
+
+## 6. Если `cloudflare-build.sh: No such file or directory`
+
+Cloudflare запускает сборку из корня. В корне репо лежит `cloudflare-build.sh` (wrapper). Root directory оставьте пустым, Build output = `restodocks_flutter/build/web`.
+
+---
+
+## 7. Если «Page not found» (404)
 
 Убедитесь, что:
 - **Root directory** = `restodocks_flutter` (не `/`)
@@ -89,7 +103,7 @@ Pages → ваш проект → **Custom domains** → **Set up a custom domai
 
 ---
 
-## 6. Автодеплой
+## 8. Автодеплой
 
 - Push в `main` → деплой Restodocks prod
 - Push в `staging` → деплой Restodocks Demo  
@@ -97,7 +111,7 @@ Preview-деплои создаются для веток и pull requests.
 
 ---
 
-## 7. Экономия сборок (не выйти за 500/месяц)
+## 9. Экономия сборок (не выйти за 500/месяц)
 
 В **Settings → Builds & deployments** каждого проекта:
 
@@ -109,20 +123,21 @@ Preview-деплои создаются для веток и pull requests.
 
 ---
 
-## 8. Файлы в репозитории
+## 10. Файлы в репозитории
 
-- `restodocks_flutter/cloudflare-build.sh` — скрипт сборки для Cloudflare Pages
+- `cloudflare-build.sh` (корень) — wrapper, вызывает `restodocks_flutter/cloudflare-build.sh`
+- `restodocks_flutter/cloudflare-build.sh` — скрипт сборки Flutter
 - Генерирует `_redirects` (SPA-маршрутизация) и `_headers` (кэш) в `build/web`
 
 ---
 
-## 9. DeepL и нейросети
+## 11. DeepL и нейросети
 
 Подключены к **Supabase Edge Functions**, не к Cloudflare. При переходе на Pages меняется только хостинг Flutter-приложения — Supabase, Edge Functions и секреты остаются без изменений.
 
 ---
 
-## 10. Чек-лист миграции
+## 12. Чек-лист миграции
 
 | Шаг | Действие | Статус |
 |-----|----------|--------|

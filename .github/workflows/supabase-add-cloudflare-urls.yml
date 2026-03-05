@@ -1,0 +1,25 @@
+# Добавляет Cloudflare Pages URL в Supabase Auth (Redirect URLs).
+# Запуск: Actions -> supabase-add-cloudflare-urls -> Run workflow
+# Секреты: SUPABASE_ACCESS_TOKEN (есть для deploy functions)
+name: Supabase add Cloudflare URLs
+
+on:
+  workflow_dispatch:
+
+jobs:
+  add-urls:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add Cloudflare URLs to Supabase Staging
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: kzhaezanjttvnqkgpxnh
+        run: ./scripts/supabase-add-cloudflare-urls.sh
+
+      - name: Add Cloudflare URLs to Supabase Production
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: osglfptwbuqqmqunttha
+        run: ./scripts/supabase-add-cloudflare-urls.sh
