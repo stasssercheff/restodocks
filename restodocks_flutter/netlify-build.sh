@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
 set -e
 # Netlify build для Flutter web.
-# Требует env: SUPABASE_URL, SUPABASE_ANON_KEY (Netlify → Site settings → Environment variables)
+# Требует env: SUPABASE_URL, SUPABASE_ANON_KEY (или NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY)
 
-if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
-  echo "ERROR: SUPABASE_URL and SUPABASE_ANON_KEY must be set in Netlify Environment variables"
-  exit 1
+# ensure SUPABASE_URL and SUPABASE_ANON_KEY are available, accept NEXT_PUBLIC_* fallbacks
+if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_ANON_KEY:-}" ]; then
+  if [ -n "${NEXT_PUBLIC_SUPABASE_URL:-}" ] && [ -n "${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}" ]; then
+    export SUPABASE_URL="$NEXT_PUBLIC_SUPABASE_URL"
+    export SUPABASE_ANON_KEY="$NEXT_PUBLIC_SUPABASE_ANON_KEY"
+  else
+    echo "ERROR: SUPABASE_URL and SUPABASE_ANON_KEY must be set in Netlify Environment variables"
+    exit 2
+  fi
 fi
 
 # Очистка env от переносов/пробелов
