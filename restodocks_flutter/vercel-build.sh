@@ -58,15 +58,21 @@ flutter clean || true
 echo "==> flutter pub get"
 flutter pub get || { echo "ERROR: pub get failed"; exit 1; }
 
-# Build for release with source maps
+# Build for release with source maps (dart-define from env)
 echo "==> flutter build web --profile --source-maps --no-tree-shake-icons"
-flutter build web --profile --source-maps --no-tree-shake-icons 2>&1 | tee build.log
+flutter build web --profile --source-maps --no-tree-shake-icons \
+  --dart-define=SUPABASE_URL="$SUPABASE_URL" \
+  --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
+  2>&1 | tee build.log
 BUILD_EXIT=${PIPESTATUS[0]}
 
 if [ "$BUILD_EXIT" -ne 0 ]; then
   echo "==> Profile build failed, trying release build without source maps..."
   echo "==> flutter build web --release --dart-define=FLUTTER_WEB_OBFUSCATE=true"
-  flutter build web --release --dart-define=FLUTTER_WEB_OBFUSCATE=true 2>&1 | tee build.log
+  flutter build web --release --dart-define=FLUTTER_WEB_OBFUSCATE=true \
+    --dart-define=SUPABASE_URL="$SUPABASE_URL" \
+    --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
+    2>&1 | tee build.log
   BUILD_EXIT=${PIPESTATUS[0]}
 fi
 if [ "$BUILD_EXIT" -ne 0 ]; then

@@ -1,0 +1,26 @@
+# Netlify config для Restodocks Flutter (prod или demo — env задаёт Supabase)
+# Используется при Base directory = restodocks_flutter
+
+[build]
+  command = "chmod +x netlify-build.sh && ./netlify-build.sh"
+  publish = "build/web"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
+  for = "/*.js"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.wasm"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
