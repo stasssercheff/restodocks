@@ -18,12 +18,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check SUPABASE_ACCESS_TOKEN
+        run: |
+          if [ -z "${{ secrets.SUPABASE_ACCESS_TOKEN }}" ]; then
+            echo "::error::SUPABASE_ACCESS_TOKEN is not set. Add it in GitHub Settings → Secrets."
+            exit 1
+          fi
+          echo "Token is set (length OK)"
+
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
         with:
           version: latest
 
       - name: Deploy Edge Functions (Production)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: supabase functions deploy --project-ref osglfptwbuqqmqunttha
         working-directory: restodocks_flutter
 
