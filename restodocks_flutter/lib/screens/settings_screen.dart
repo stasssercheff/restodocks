@@ -416,7 +416,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final emp = account.currentEmployee;
     if (emp == null) return;
     final layoutSvc = context.read<HomeLayoutConfigService>();
-    final order = List<HomeTileId>.from(layoutSvc.getOrder(emp.id));
+    var order = List<HomeTileId>.from(layoutSvc.getOrder(emp.id));
+    final showBanquet = emp.department == 'kitchen';
+    if (!showBanquet) {
+      order = order.where((id) => id != HomeTileId.banquetMenu && id != HomeTileId.banquetTtk).toList();
+    }
     final tileLabels = <HomeTileId, String>{
       HomeTileId.messages: loc.t('inbox_tab_messages') ?? 'Сообщения',
       HomeTileId.schedule: loc.t('schedule'),
@@ -424,6 +428,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       HomeTileId.suppliers: loc.t('order_tab_suppliers') ?? 'Поставщики',
       HomeTileId.menu: loc.t('menu'),
       HomeTileId.ttk: emp.department == 'bar' ? loc.t('ttk_bar') : loc.t('ttk_kitchen'),
+      HomeTileId.banquetMenu: '${loc.t('menu')} — ${loc.t('banquet_catering') ?? 'Банкет / Кейтринг'}',
+      HomeTileId.banquetTtk: '${loc.t('ttk_kitchen')} — ${loc.t('banquet_catering') ?? 'Банкет / Кейтринг'}',
       HomeTileId.checklists: loc.t('checklists'),
       HomeTileId.inventory: loc.t('inventory_blank'),
     };

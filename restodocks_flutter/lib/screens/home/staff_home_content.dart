@@ -99,6 +99,16 @@ class StaffHomeContent extends StatelessWidget {
         title: employee.department == 'bar' ? loc.t('ttk_bar') : loc.t('ttk_kitchen'),
         onTap: () => context.go('/tech-cards'),
       ),
+      HomeTileId.banquetMenu: _Tile(
+        icon: Icons.restaurant_menu,
+        title: '${loc.t('menu')} — ${loc.t('banquet_catering') ?? 'Банкет / Кейтринг'}',
+        onTap: () => context.go('/menu/banquet-catering'),
+      ),
+      HomeTileId.banquetTtk: _Tile(
+        icon: Icons.description,
+        title: '${loc.t('ttk_kitchen')} — ${loc.t('banquet_catering') ?? 'Банкет / Кейтринг'}',
+        onTap: () => context.go('/tech-cards/banquet-catering'),
+      ),
       HomeTileId.checklists: _Tile(
         icon: Icons.checklist,
         title: loc.t('checklists'),
@@ -107,8 +117,10 @@ class StaffHomeContent extends StatelessWidget {
       HomeTileId.inventory: _Tile(icon: Icons.assignment, title: loc.t('inventory_blank'), onTap: () => context.push('/inventory')),
     };
     final showChecklists = employee.department == 'kitchen' || employee.department == 'bar' || employee.department == 'dining_room';
+    final showBanquet = employee.department == 'kitchen';
     final ordered = order
         .where((id) => id != HomeTileId.checklists || showChecklists)
+        .where((id) => (id != HomeTileId.banquetMenu && id != HomeTileId.banquetTtk) || showBanquet)
         .where((id) => tiles.containsKey(id))
         .map((id) => tiles[id]!)
         .toList();

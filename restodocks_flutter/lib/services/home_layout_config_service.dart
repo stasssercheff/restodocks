@@ -11,6 +11,8 @@ enum HomeTileId {
   suppliers,
   menu,
   ttk,
+  banquetMenu,
+  banquetTtk,
   checklists,
   inventory,
 }
