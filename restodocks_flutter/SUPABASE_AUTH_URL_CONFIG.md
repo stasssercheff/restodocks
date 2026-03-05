@@ -18,21 +18,26 @@
 - Это основной URL, куда Supabase будет редиректить по умолчанию.
 
 ### 3. Добавьте Redirect URLs
-В поле **Redirect URLs** добавьте (каждая с новой строки):
+В поле **Redirect URLs** добавьте все домены, где размещено приложение (каждый с новой строки):
 
 ```
 https://www.restodocks.com
 https://www.restodocks.com/
 https://restodocks.com
 https://restodocks.com/
+https://restodocks.vercel.app
+https://restodocks.vercel.app/
+https://restodocks.pages.dev
+https://restodocks.pages.dev/
+https://*.netlify.app
+https://*.pages.dev
 http://localhost:3000
 http://localhost:8080
 http://127.0.0.1:3000
 http://127.0.0.1:8080
 ```
 
-- `www.restodocks.com` и `restodocks.com` — production
-- `localhost` — для локальной разработки
+**Важно при переносе хостинга:** каждый новый домен (Vercel, Netlify, Cloudflare Pages и т.д.) нужно добавить сюда. Иначе Auth может давать «неверный пароль» или другие ошибки.
 
 ### 4. Сохраните изменения
 Нажмите **Save**.
