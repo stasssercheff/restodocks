@@ -17,7 +17,7 @@ alwaysApply: true
    ```bash
    git commit -m "Update: $(date +%Y-%m-%d\ %H:%M)" && git push
    ```
-3. Деплой: Cloudflare Pages (Prod + Beta при push в `main`). Чтобы деплоить только Prod — в Cloudflare Beta выключить Continuous deployment.
+3. Деплой: push в `main` → Prod; push в `staging` → Beta. Если Beta смотрит `main` — в Cloudflare Beta: Production branch = `staging`.
 
 ## Важно
 

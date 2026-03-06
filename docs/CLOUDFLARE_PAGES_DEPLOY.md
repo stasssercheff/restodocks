@@ -41,17 +41,24 @@ https://*.restodocks.pages.dev/
 
 ### 3. Сборка Cloudflare Pages
 
-**Основной (Production) сайт** — Build command: `./cloudflare-build-prod.sh`  
-Всегда использует Production Supabase, переменные не нужны.
+**Разделение деплоев по веткам** (как на Netlify):
 
-**Beta (демо)** — Build command: `./cloudflare-build.sh`  
-Использует SUPABASE_URL и SUPABASE_ANON_KEY (Staging).
+| Проект | Branch to deploy | Build command | Supabase |
+|--------|------------------|---------------|----------|
+| Prod | `main` | `./cloudflare-build-prod.sh` | Production |
+| Beta | `staging` | `./cloudflare-build.sh` | Staging |
 
-**Отключить деплой Beta** (если работает и не нужны обновления):  
-Cloudflare → проект Beta → **Settings** → **Builds & deployments** → **Continuous deployment** → **Stop builds**. Деплой будет только вручную.
+Cloudflare → проект → **Settings** → **Builds & deployments** → **Production branch**:
+- Prod: `main` — push в main запускает только Prod
+- Beta: `staging` — push в staging запускает только Beta
+
+**Основной (Production) сайт** — Build command: `./cloudflare-build-prod.sh`, Production branch: `main`.  
+**Beta (демо)** — Build command: `./cloudflare-build.sh`, Production branch: `staging`, env: SUPABASE_URL + SUPABASE_ANON_KEY (Staging).
 
 - **Framework preset**: None
 - **Build output directory**: `restodocks_flutter/build/web`
+
+> Если Prod и Beta оба смотрят `main` — при push деплоятся оба. Поставь Beta на ветку `staging` в Production branch, тогда деплои раздельные.
 
 ### 4. Деплой каждые 5 минут
 
