@@ -178,7 +178,7 @@ class ChecklistServiceSupabase {
     } catch (e) {
       if (!_isColumnNotFoundError(e)) rethrow;
     }
-    const optionalKeys = ['deadline_at', 'scheduled_for_at', 'assigned_section', 'assigned_employee_id', 'additional_name', 'type', 'action_config'];
+    const optionalKeys = ['deadline_at', 'scheduled_for_at', 'assigned_section', 'assigned_employee_id', 'assigned_employee_ids', 'additional_name', 'type', 'action_config'];
     final stripped = Map<String, dynamic>.from(fullUpd);
     for (final k in optionalKeys) stripped.remove(k);
     try {
@@ -219,10 +219,10 @@ class ChecklistServiceSupabase {
       'updated_at': DateTime.now().toIso8601String(),
     };
     if (checklist.assignedSection != null) upd['assigned_section'] = checklist.assignedSection;
-    final empId = checklist.assignedEmployeeIds?.isNotEmpty == true
-        ? checklist.assignedEmployeeIds!.first
-        : checklist.assignedEmployeeId;
+    final empIds = checklist.assignedEmployeeIds;
+    final empId = empIds?.isNotEmpty == true ? empIds!.first : checklist.assignedEmployeeId;
     if (empId != null) upd['assigned_employee_id'] = empId;
+    if (empIds != null && empIds.isNotEmpty) upd['assigned_employee_ids'] = empIds;
     if (checklist.deadlineAt != null) upd['deadline_at'] = checklist.deadlineAt!.toIso8601String();
     if (checklist.scheduledForAt != null) upd['scheduled_for_at'] = checklist.scheduledForAt!.toIso8601String();
     if (checklist.additionalName != null) upd['additional_name'] = checklist.additionalName;

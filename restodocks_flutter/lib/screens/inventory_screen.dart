@@ -3411,6 +3411,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   @override
   Widget build(BuildContext context) {
     final account = context.watch<AccountManagerSupabase>();
+    final loc = context.watch<LocalizationService>();
     final theme = Theme.of(context);
     final visibleRows = _filteredRows;
 
@@ -3421,7 +3422,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Инвентаризация iiko', style: TextStyle(fontSize: 16)),
+            Text(loc.t('iiko_inventory_title') ?? 'Инвентаризация iiko', style: const TextStyle(fontSize: 16)),
             Text(
                 account.establishment?.name ?? '',
                 style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal),

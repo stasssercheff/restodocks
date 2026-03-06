@@ -16,7 +16,7 @@ import '../../screens/inventory_screen.dart';
 import '../../screens/order_inbox_detail_screen.dart';
 import '../../screens/checklist_inbox_detail_screen.dart';
 import '../../screens/iiko_inventory_inbox_detail_screen.dart';
-import '../../screens/home/expenses_placeholder_screen.dart';
+import '../../screens/home/expenses_screen.dart';
 import '../../screens/home/department_placeholder_screen.dart';
 import '../../screens/supabase_test_screen.dart';
 import '../../screens/checklist_edit_screen.dart';
@@ -364,7 +364,7 @@ class AppRouter {
           ),
           GoRoute(
             path: '/expenses',
-            pageBuilder: (context, state) => _slideTransitionPage(state, const ExpensesPlaceholderScreen()),
+            pageBuilder: (context, state) => _slideTransitionPage(state, const ExpensesScreen()),
           ),
           GoRoute(
             path: '/expenses/salary',

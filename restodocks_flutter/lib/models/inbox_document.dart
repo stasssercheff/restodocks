@@ -85,7 +85,7 @@ class InboxDocument extends Equatable {
         return loc.t('inbox_title_inventory').replaceFirst('%s', date);
       case DocumentType.iikoInventory:
         final date = metadata?['header']?['date']?.toString() ?? '';
-        return 'Инвентаризация iiko $date';
+        return '${loc.t('iiko_inventory_title') ?? 'Инвентаризация iiko'} $date';
       case DocumentType.productOrder:
         final supplier = metadata?['header']?['supplierName']?.toString() ?? '—';
         return loc.t('inbox_title_order').replaceFirst('%s', supplier);
@@ -106,7 +106,7 @@ class InboxDocument extends Equatable {
       case DocumentType.inventory:
         return loc.t('doc_type_inventory');
       case DocumentType.iikoInventory:
-        return 'Инвентаризация iiko';
+        return loc.t('iiko_inventory_title') ?? 'Инвентаризация iiko';
       case DocumentType.productOrder:
         return loc.t('doc_type_product_order');
       case DocumentType.shiftConfirmation:

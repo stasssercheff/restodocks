@@ -4,7 +4,9 @@ import 'package:provider/provider.dart';
 
 import '../models/models.dart';
 import '../models/translation.dart';
+import '../services/screen_layout_preference_service.dart';
 import '../services/services.dart';
+import '../utils/translit_utils.dart';
 import '../mixins/auto_save_mixin.dart';
 import '../mixins/input_change_listener_mixin.dart';
 import '../widgets/app_bar_home_button.dart';
@@ -671,8 +673,13 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                           else selected.remove(e.id);
                         });
                       } : null,
-                      title: Text(e.fullName),
-                      secondary: Text(rolesDisplay.isNotEmpty ? rolesDisplay : '', style: Theme.of(context).textTheme.bodySmall),
+                      title: Text(rolesDisplay.isNotEmpty ? rolesDisplay : (loc.t('employee') ?? 'Сотрудник'), style: Theme.of(ctx).textTheme.bodyMedium),
+                      subtitle: Text(
+                        ctx.read<ScreenLayoutPreferenceService>().showNameTranslit
+                            ? cyrillicToLatin(e.fullName)
+                            : e.fullName,
+                        style: Theme.of(ctx).textTheme.bodySmall,
+                      ),
                     );
                   }),
                 ],

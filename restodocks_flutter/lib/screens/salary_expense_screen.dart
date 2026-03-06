@@ -38,8 +38,11 @@ class _EmployeeAdjustment {
 
 /// ФЗП: список сотрудников с оплатой за смену/час. Часы/смены подтягиваются из графика.
 /// Собственник без должности не отображается. Toggle — включать ли в итог.
+/// [embedInScaffold] = false: только контент (для вкладки в экране «Расходы»).
 class SalaryExpenseScreen extends StatefulWidget {
-  const SalaryExpenseScreen({super.key});
+  const SalaryExpenseScreen({super.key, this.embedInScaffold = true});
+
+  final bool embedInScaffold;
 
   @override
   State<SalaryExpenseScreen> createState() => _SalaryExpenseScreenState();
@@ -190,6 +193,7 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
   }
 
   void _showAddAdjustmentDialog(BuildContext context, Employee e, String currency) {
+    final loc = context.read<LocalizationService>();
     _AdjustmentType selectedType = _AdjustmentType.bonus;
     final amountController = TextEditingController();
 
@@ -197,15 +201,15 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('Добавить удержание / поощрение'),
+          title: Text(loc.t('salary_add_adjustment_dialog_title') ?? 'Добавить удержание / поощрение'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               DropdownButtonFormField<_AdjustmentType>(
                 value: selectedType,
-                decoration: const InputDecoration(
-                  labelText: 'Причина',
+                decoration: InputDecoration(
+                  labelText: loc.t('salary_adjustment_reason') ?? 'Причина',
                   border: OutlineInputBorder(),
                   filled: true,
                 ),
@@ -221,7 +225,7 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
                 controller: amountController,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 decoration: InputDecoration(
-                  labelText: 'Сумма ($currency)',
+                  labelText: '${loc.t('salary_adjustment_amount') ?? 'Сумма'} ($currency)',
                   border: const OutlineInputBorder(),
                   filled: true,
                 ),
@@ -246,7 +250,7 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
                 });
                 Navigator.pop(ctx);
               },
-              child: const Text('Добавить'),
+              child: Text(loc.t('salary_add_adjustment') ?? 'Добавить'),
             ),
           ],
         ),
@@ -279,12 +283,7 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
     final currency = accountManager.establishment?.currencySymbol ?? accountManager.currentEmployee?.currencySymbol ?? Establishment.currencySymbolFor(accountManager.establishment?.defaultCurrency ?? 'VND');
     final dateFormat = DateFormat('dd.MM.yyyy');
 
-    return Scaffold(
-      appBar: AppBar(
-        leading: appBarBackButton(context),
-        title: Text(loc.t('salary_expenses')),
-      ),
-      body: _loading
+    final body = _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? Center(
@@ -374,6 +373,13 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
                                             Text(e.fullName, style: theme.textTheme.titleMedium),
+                                            if (e.positionRole != null && e.positionRole!.isNotEmpty) ...[
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                loc.roleDisplayName(e.positionRole!),
+                                                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                                              ),
+                                            ],
                                             const SizedBox(height: 12),
                                             Row(
                                               children: [
@@ -415,7 +421,7 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
                                                     ),
                                                     const SizedBox(width: 6),
                                                     Text(
-                                                      'Удержания и поощрения',
+                                                      loc.t('salary_deductions_bonuses') ?? 'Удержания и поощрения',
                                                       style: theme.textTheme.bodySmall?.copyWith(
                                                         color: theme.colorScheme.primary,
                                                         fontWeight: FontWeight.w600,
@@ -463,7 +469,7 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
                                                       Padding(
                                                         padding: const EdgeInsets.all(12),
                                                         child: Text(
-                                                          'Нет записей',
+                                                          loc.t('salary_no_adjustments') ?? 'Нет записей',
                                                           style: theme.textTheme.bodySmall?.copyWith(
                                                             color: theme.colorScheme.onSurfaceVariant,
                                                           ),
@@ -521,7 +527,7 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
                                                       child: OutlinedButton.icon(
                                                         onPressed: () => _showAddAdjustmentDialog(context, e, currency),
                                                         icon: const Icon(Icons.add, size: 16),
-                                                        label: const Text('Добавить'),
+                                                        label: Text(loc.t('salary_add_adjustment') ?? 'Добавить'),
                                                         style: OutlinedButton.styleFrom(
                                                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                                           minimumSize: const Size(0, 32),
@@ -546,7 +552,7 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
                                             const SizedBox(height: 8),
                                             // Итоговая сумма
                                             Text(
-                                              'К выплате: ${total.toStringAsFixed(0)} $currency',
+                                              '${loc.t('salary_payable') ?? 'К выплате'}: ${total.toStringAsFixed(0)} $currency',
                                               style: theme.textTheme.titleSmall?.copyWith(
                                                 color: theme.colorScheme.primary,
                                                 fontWeight: FontWeight.bold,
@@ -592,5 +598,15 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
                       ],
                     ),
     );
+    if (widget.embedInScaffold) {
+      return Scaffold(
+        appBar: AppBar(
+          leading: appBarBackButton(context),
+          title: Text(loc.t('salary_expenses')),
+        ),
+        body: body,
+      );
+    }
+    return body;
   }
 }

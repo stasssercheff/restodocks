@@ -8,6 +8,7 @@ import '../services/inventory_document_service.dart';
 import '../services/inventory_download.dart';
 import '../services/iiko_product_store.dart';
 import '../services/iiko_xlsx_patcher.dart';
+import '../services/localization_service.dart';
 import '../widgets/app_bar_home_button.dart';
 
 /// Просмотр iiko-инвентаризации из входящих.
@@ -114,8 +115,9 @@ class _IikoInventoryInboxDetailScreenState
   /// Запасной Excel если оригинальный бланк недоступен.
   Uint8List _buildFallback(
       List<Map<String, dynamic>> rows, Map<String, dynamic> header) {
+    final loc = context.read<LocalizationService>();
     final excel = Excel.createExcel();
-    const sheetName = 'Инвентаризация iiko';
+    final sheetName = loc.t('iiko_inventory_title') ?? 'Инвентаризация iiko';
     final sheet = excel[sheetName];
 
     sheet.appendRow([
@@ -195,10 +197,11 @@ class _IikoInventoryInboxDetailScreenState
 
     final filledCount = rows.where((r) => ((r['total'] as num?)?.toDouble() ?? 0.0) > 0).length;
 
+    final loc = context.watch<LocalizationService>();
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: const Text('Инвентаризация iiko'),
+        title: Text(loc.t('iiko_inventory_title') ?? 'Инвентаризация iiko'),
         actions: [
           IconButton(
             icon: const Icon(Icons.download),

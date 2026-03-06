@@ -59,7 +59,7 @@ class OwnerHomeContent extends StatelessWidget {
         ],
         const SizedBox(height: 16),
         _SectionTitle(title: '${loc.t('expenses')} (${loc.t('pro')})'),
-        _Tile(icon: Icons.payments, title: loc.t('salary_expenses'), subtitle: loc.t('salary_period_hint'), onTap: () => context.go('/expenses/salary')),
+        _Tile(icon: Icons.payments, title: loc.t('expenses'), subtitle: loc.t('salary_period_hint'), onTap: () => context.go('/expenses')),
         // Аренда, Закупка, Свой вариант — временно скрыты
       ],
     );

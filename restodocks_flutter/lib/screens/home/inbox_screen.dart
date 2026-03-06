@@ -269,7 +269,7 @@ class _InboxScreenState extends State<InboxScreen> {
             _buildTypeChip(_InboxTypeTab.inventory, loc.t('inbox_tab_inventory') ?? 'Инвентаризация', loc),
             if (!isBarOrHall) ...[
               const SizedBox(width: 8),
-              _buildTypeChip(_InboxTypeTab.iikoInventory, 'Инвентаризация iiko', loc),
+              _buildTypeChip(_InboxTypeTab.iikoInventory, loc.t('iiko_inventory_title') ?? 'Инвентаризация iiko', loc),
             ],
           ],
         ),
@@ -300,7 +300,7 @@ class _InboxScreenState extends State<InboxScreen> {
       case _InboxTab.inventory:
         return loc.t('inbox_tab_inventory');
       case _InboxTab.iikoInventory:
-        return 'Инвентаризация iiko';
+        return loc.t('iiko_inventory_title') ?? 'Инвентаризация iiko';
       case _InboxTab.messages:
         return loc.t('inbox_tab_messages') ?? 'Сообщения';
     }

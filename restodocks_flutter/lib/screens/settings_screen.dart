@@ -934,29 +934,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               const Divider(),
             ],
-            ListTile(
-              leading: const Icon(Icons.dashboard_customize),
-              title: Text(localization.t('home_layout_config') ?? 'Настройка домашнего экрана'),
-              subtitle: Text(localization.t('home_layout_config_hint') ?? 'Изменить порядок кнопок на главной'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => _showHomeLayoutConfig(context, localization),
-            ),
             Text(
-              localization.t('screen_settings') ?? 'Настройка экрана',
+              localization.t('home_layout_config') ?? 'Настройка домашнего экрана',
               style: Theme.of(context).textTheme.titleSmall?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.dashboard_customize),
+              title: Text(localization.t('home_layout_config_hint') ?? 'Изменить порядок кнопок на главной'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _showHomeLayoutConfig(context, localization),
             ),
             if (currentEmployee.hasRole('owner'))
               Consumer<HomeButtonConfigService>(
                 builder: (_, homeBtn, __) => ListTile(
                   leading: const Icon(Icons.tune),
-                  title: Text(localization.t('central_button')),
+                  title: Text(localization.t('central_button') ?? 'Центральная кнопка'),
                   subtitle: Text(_homeButtonActionLabel(localization, homeBtn.action)),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => _showHomeButtonPicker(context, localization, homeBtn),
                 ),
               ),
+            Consumer<ScreenLayoutPreferenceService>(
+              builder: (_, screenPref, __) => SwitchListTile(
+                secondary: const Icon(Icons.translate),
+                title: Text(localization.t('show_name_translit') ?? 'Показывать имена транслитом'),
+                subtitle: Text(localization.t('show_name_translit_hint') ?? 'Отображать ФИО сотрудников латиницей'),
+                value: screenPref.showNameTranslit,
+                onChanged: (v) => screenPref.setShowNameTranslit(v),
+              ),
+            ),
             Consumer<ScreenLayoutPreferenceService>(
               builder: (_, screenPref, __) => SwitchListTile(
                 secondary: const Icon(Icons.restaurant_menu),
