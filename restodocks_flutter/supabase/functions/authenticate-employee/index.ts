@@ -4,39 +4,12 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import bcrypt from "npm:bcryptjs@2";
 
-const ALLOWED_ORIGINS = [
-  "https://restodocks.com",
-  "https://www.restodocks.com",
-  "https://restodocks.vercel.app",
-  "https://restodocks.netlify.app",
-  "https://restodocks.pages.dev",
-  "http://localhost",
-  "http://127.0.0.1",
-];
-const ALLOWED_SUFFIXES = [".pages.dev", ".netlify.app", ".vercel.app"];
-
-function getCorsHeaders(origin: string | null): Record<string, string> {
-  const base: Record<string, string> = {
+function corsHeaders(origin: string | null): Record<string, string> {
+  return {
+    "Access-Control-Allow-Origin": origin || "*",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   };
-  if (origin && isOriginAllowed(origin)) {
-    base["Access-Control-Allow-Origin"] = origin;
-  }
-  return base;
-}
-
-function isOriginAllowed(origin: string | null): boolean {
-  if (!origin || typeof origin !== "string") return false;
-  try {
-    const url = new URL(origin);
-    const host = url.hostname.toLowerCase();
-    if (ALLOWED_ORIGINS.includes(origin) || ALLOWED_ORIGINS.includes(`${url.protocol}//${host}`)) return true;
-    if (host === "localhost" || host === "127.0.0.1") return true;
-    return ALLOWED_SUFFIXES.some((s) => host.endsWith(s));
-  } catch {
-    return false;
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -60,7 +33,7 @@ function checkRateLimit(ip: string): boolean {
 }
 
 Deno.serve(async (req: Request) => {
-  const cors = getCorsHeaders(req.headers.get("Origin"));
+  const cors = corsHeaders(req.headers.get("Origin"));
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: cors });
   }
