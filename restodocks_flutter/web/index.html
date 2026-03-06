@@ -3,6 +3,14 @@
 <head>
   <script>
     (function(){
+      // Редирект restodocks.com → restodocks-2u8.pages.dev (вход работает только там)
+      var h = (location.hostname || '').toLowerCase();
+      if (h === 'restodocks.com' || h === 'www.restodocks.com') {
+        var target = 'https://restodocks-2u8.pages.dev' + (location.pathname || '/') + (location.search || '');
+        if (location.hash) target += location.hash;
+        location.replace(target);
+        return;
+      }
       try {
         var p = '';
         if (location.hash && location.hash.indexOf('#/') === 0) {
