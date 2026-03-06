@@ -53,8 +53,10 @@ Cloudflare → проект → **Settings** → **Builds & deployments** → **
 - Prod: `main` — push в main запускает только Prod
 - Beta: `staging` — push в staging запускает только Beta
 
-**Prod** — Build command: `./cloudflare-build-prod.sh`, env: SUPABASE_URL + SUPABASE_ANON_KEY (те же, что у Beta).  
-**Beta** — Build command: `./cloudflare-build.sh`, env: те же SUPABASE_URL + SUPABASE_ANON_KEY.
+**Prod** — Build command: `bash cloudflare-build-prod.sh` или `./cloudflare-build-prod.sh`, env: SUPABASE_URL + SUPABASE_ANON_KEY.  
+**Beta** — Build command: `bash cloudflare-build.sh` или `./cloudflare-build.sh`, env: те же.
+
+> Если "Permission denied" — используй `bash cloudflare-build.sh` (без ./).
 
 - **Framework preset**: None
 - **Build output directory**: `restodocks_flutter/build/web`
