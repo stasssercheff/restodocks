@@ -47,10 +47,17 @@ https://*.restodocks.pages.dev/
 **Beta (демо)** — Build command: `./cloudflare-build.sh`  
 Использует SUPABASE_URL и SUPABASE_ANON_KEY (Staging).
 
+**Отключить деплой Beta** (если работает и не нужны обновления):  
+Cloudflare → проект Beta → **Settings** → **Builds & deployments** → **Continuous deployment** → **Stop builds**. Деплой будет только вручную.
+
 - **Framework preset**: None
 - **Build output directory**: `restodocks_flutter/build/web`
 
-### 4. Пересборка после правок env
+### 4. Деплой каждые 5 минут
+
+Если деплои идут без пуша — Cloudflare → проект → **Settings** → **Builds & deployments**. Проверить: **Retry policy** (отключить автоповтор), лишние **Build hooks**. Должен быть деплой только по push.
+
+### 5. Пересборка после правок env
 
 После добавления/изменения Environment Variables нужно **Clear build cache** и **Retry deployment**, чтобы сборка использовала новые значения.
 
