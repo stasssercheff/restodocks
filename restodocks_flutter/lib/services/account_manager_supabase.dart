@@ -620,7 +620,8 @@ class AccountManagerSupabase extends ChangeNotifier {
       if (authErr is Exception && authErr.toString().contains('employee_not_found')) {
         rethrow;
       }
-      if (kDebugMode) debugPrint('🔐 Login: Supabase Auth failed: $authErr');
+      // Логируем всегда — иначе в prod (kDebugMode=false) не увидим причину
+      print('🔐 Login: Supabase Auth failed: $authErr');
       try {
         await _supabase.signOut();
       } catch (_) { /* ignore */ }
@@ -637,7 +638,7 @@ class AccountManagerSupabase extends ChangeNotifier {
     String password,
   ) async {
     try {
-      if (kDebugMode) debugPrint('🔐 Login: Legacy — calling authenticate-employee Edge Function');
+      print('🔐 Login: Legacy fallback — calling authenticate-employee');
 
       final res = await _supabase.client.functions.invoke(
         'authenticate-employee',
@@ -645,12 +646,12 @@ class AccountManagerSupabase extends ChangeNotifier {
       );
 
       if (res.status == 401) {
-        if (kDebugMode) debugPrint('🔐 Login: Legacy — invalid credentials (401)');
+        print('🔐 Login: Legacy — invalid credentials (401)');
         return null;
       }
 
       if (res.status != 200) {
-        if (kDebugMode) debugPrint('🔐 Login: Legacy — Edge Function error: ${res.status}');
+        print('🔐 Login: Legacy — Edge Function error: ${res.status}, data=${res.data}');
         return null;
       }
 
@@ -674,10 +675,7 @@ class AccountManagerSupabase extends ChangeNotifier {
       if (kDebugMode) debugPrint('🔐 Login: Legacy — success for ${employee.email}');
       return (employee: employee, establishment: establishment);
     } catch (e, st) {
-      if (kDebugMode) {
-        debugPrint('🔐 Login: Legacy Edge Function error: $e');
-        debugPrint('🔐 Login: Stack: $st');
-      }
+      print('🔐 Login: Legacy Edge Function threw: $e');
       rethrow;
     }
   }
