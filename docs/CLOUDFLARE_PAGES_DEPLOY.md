@@ -10,14 +10,16 @@
 
 Cloudflare Pages → проект → **Settings** → **Variables and Secrets**
 
-Для каждого проекта задайте свои переменные:
+**Вариант A (рекомендуется):** задать SUPABASE_URL и SUPABASE_ANON_KEY в каждом проекте.
 
 | Проект | SUPABASE_URL | SUPABASE_ANON_KEY |
 |--------|--------------|-------------------|
-| **Prod** (основной) | `https://osglfptwbuqqmqunttha.supabase.co` | anon key из Production |
-| **Beta** (демо) | `https://kzhaezanjttvnqkgpxnh.supabase.co` | anon key из Staging |
+| **Prod** | `https://osglfptwbuqqmqunttha.supabase.co` | anon key Production |
+| **Beta** | `https://kzhaezanjttvnqkgpxnh.supabase.co` | anon key Staging |
 
-Supabase Dashboard → Project Settings → API (для Prod — проект osglfptwbuqqmqunttha, для Beta — kzhaezanjttvnqkgpxnh).
+**Вариант B:** для Prod добавить только `DEPLOY_TARGET` = `production` — скрипт подставит Production Supabase. Beta — SUPABASE_URL и SUPABASE_ANON_KEY (Staging).
+
+Supabase Dashboard → Project Settings → API.
 
 ### 2. Supabase Auth: добавить новый домен
 
