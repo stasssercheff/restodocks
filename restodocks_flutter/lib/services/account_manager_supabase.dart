@@ -558,8 +558,8 @@ class AccountManagerSupabase extends ChangeNotifier {
     return Employee.fromJson(data);
   }
 
-  /// Вход по email и паролю: сначала legacy (Edge Function), потом Supabase Auth
-  /// Порядок: legacy первым — большинство учёток в employees.password_hash; Auth даёт 400 для legacy.
+  /// Вход по email и паролю: сначала Supabase Auth, при отсутствии — legacy (Edge Function)
+  /// Порядок как в staging — иначе Prod не входит (учётки в auth.users).
   Future<({Employee employee, Establishment establishment})?> findEmployeeByEmailAndPasswordGlobal({
     required String email,
     required String password,
@@ -568,11 +568,7 @@ class AccountManagerSupabase extends ChangeNotifier {
     final passwordTrimmed = password.trim();
     if (emailTrim.isEmpty) return null;
 
-    // 1. Сначала legacy: BCrypt через Edge Function (без вызова Auth — избегаем 400)
-    final legacyResult = await _findEmployeeByPasswordHashViaEdgeFunction(emailTrim, passwordTrimmed);
-    if (legacyResult != null) return legacyResult;
-
-    // 2. Supabase Auth (для учёток с auth.users)
+    // 1. Пробуем Supabase Auth (учётки в auth.users)
     try {
       await _supabase.signInWithEmail(emailTrim, passwordTrimmed);
       if (_supabase.isAuthenticated) {
@@ -630,7 +626,8 @@ class AccountManagerSupabase extends ChangeNotifier {
       } catch (_) { /* ignore */ }
     }
 
-    return null;
+    // 2. Legacy: password_hash через Edge Function (employees без auth.users)
+    return _findEmployeeByPasswordHashViaEdgeFunction(emailTrim, passwordTrimmed);
   }
 
   /// Legacy: BCrypt-проверка пароля через Edge Function authenticate-employee.
