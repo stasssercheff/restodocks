@@ -21,7 +21,14 @@ Cloudflare Pages → проект → **Settings** → **Variables and Secrets**
 
 > После переключения Prod на эту БД можно **остановить** второй проект Supabase (osglfptwbuqqmqunttha), чтобы не платить за два.
 
-**Если вход не работает** — см. [CLOUDFLARE_LOGIN_FIX.md](CLOUDFLARE_LOGIN_FIX.md).
+**Чек-лист: вход на Prod не работает, Beta работает**
+1. Cloudflare Prod → Build command: `bash cloudflare-build.sh` (как у Beta)
+2. Root directory: пусто (оба одинаково)
+3. Preview branch = None в обоих
+4. SUPABASE_URL и SUPABASE_ANON_KEY — одинаковые в Prod и Beta
+5. Retry deployment Prod с Clear build cache
+
+**Если всё равно не работает** — см. [CLOUDFLARE_LOGIN_FIX.md](CLOUDFLARE_LOGIN_FIX.md).
 
 **Admin** — см. [CLOUDFLARE_ADMIN_DEPLOY.md](CLOUDFLARE_ADMIN_DEPLOY.md).
 
@@ -42,26 +49,20 @@ https://*.restodocks.pages.dev
 
 ### 3. Сборка Cloudflare Pages
 
-**Разделение деплоев по веткам** (как на Netlify):
+**Prod и Beta — ИДЕНТИЧНАЯ конфигурация** (иначе вход на Prod ломается):
 
-| Проект | Branch to deploy | Build command | Supabase |
-|--------|------------------|---------------|----------|
-| Prod | `main` | `./cloudflare-build-prod.sh` | одна (Staging) |
-| Beta | `staging` | `./cloudflare-build.sh` | та же |
+| Параметр | Prod | Beta |
+|----------|------|------|
+| Production branch | `main` | `staging` |
+| Root directory | **пусто** (корень репо) | **пусто** |
+| Build command | `bash cloudflare-build.sh` | `bash cloudflare-build.sh` |
+| Build output | `restodocks_flutter/build/web` | `restodocks_flutter/build/web` |
+| Env | SUPABASE_URL, SUPABASE_ANON_KEY (одни и те же) | те же |
+| Preview branch | None | None |
 
-Cloudflare → проект → **Settings** → **Builds & deployments** → **Production branch**:
-- Prod: `main` — push в main запускает только Prod
-- Beta: `staging` — push в staging запускает только Beta
-
-**Prod** — Build command: `bash cloudflare-build-prod.sh` или `./cloudflare-build-prod.sh`, env: SUPABASE_URL + SUPABASE_ANON_KEY.  
-**Beta** — Build command: `bash cloudflare-build.sh` или `./cloudflare-build.sh`, env: те же.
-
-> Если "Permission denied" — используй `bash cloudflare-build.sh` (без ./).
+**Если вход на Prod не работает** — убедись, что Prod использует ТОЧНО такой же Build command и Root directory, как Beta. Оба должны вызывать `bash cloudflare-build.sh` из корня.
 
 - **Framework preset**: None
-- **Build output directory**: `restodocks_flutter/build/web`
-
-> Если Prod и Beta оба смотрят `main` — при push деплоятся оба. Поставь Beta на ветку `staging` в Production branch, тогда деплои раздельные.
 
 ### 4. Деплой каждые 5 минут
 
