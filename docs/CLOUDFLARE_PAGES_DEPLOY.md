@@ -10,34 +10,35 @@
 
 Cloudflare Pages → проект → **Settings** → **Variables and Secrets**
 
-Задайте SUPABASE_URL и SUPABASE_ANON_KEY в каждом проекте — как на Vercel.
+**Одна БД** — Prod и Beta используют один Supabase. Задайте одинаковые значения:
 
 | Проект | SUPABASE_URL | SUPABASE_ANON_KEY |
 |--------|--------------|-------------------|
-| Prod | `https://osglfptwbuqqmqunttha.supabase.co` | anon key Production |
-| Beta | `https://kzhaezanjttvnqkgpxnh.supabase.co` | anon key Staging |
+| Prod | `https://kzhaezanjttvnqkgpxnh.supabase.co` | anon key из Supabase (Dashboard → API) |
+| Beta | `https://kzhaezanjttvnqkgpxnh.supabase.co` | тот же anon key |
 
-Supabase Dashboard → Project Settings → API.
+Скопируй из Beta в Prod — один проект Supabase для обоих.
+
+> После переключения Prod на эту БД можно **остановить** второй проект Supabase (osglfptwbuqqmqunttha), чтобы не платить за два.
 
 **Если вход не работает** — см. [CLOUDFLARE_LOGIN_FIX.md](CLOUDFLARE_LOGIN_FIX.md).
 
 **Admin** — см. [CLOUDFLARE_ADMIN_DEPLOY.md](CLOUDFLARE_ADMIN_DEPLOY.md).
 
-### 2. Supabase Auth: добавить новый домен
+### 2. Supabase Auth: Redirect URLs
 
-Без этого Auth может работать некорректно.
-
-1. Supabase Dashboard → **Authentication** → **URL Configuration**
-2. В **Redirect URLs** добавьте (если ещё нет):
+Supabase → проект (тот что kzhaezanjttvnqkgpxnh) → **Authentication** → **URL Configuration** → **Redirect URLs**. Добавьте:
 
 ```
+https://restodocks.com
+https://restodocks.com/
+https://www.restodocks.com
+https://www.restodocks.com/
 https://restodocks.pages.dev
-https://restodocks.pages.dev/
 https://*.restodocks.pages.dev
-https://*.restodocks.pages.dev/
 ```
 
-3. **Save**
+**Save**
 
 ### 3. Сборка Cloudflare Pages
 
@@ -45,15 +46,15 @@ https://*.restodocks.pages.dev/
 
 | Проект | Branch to deploy | Build command | Supabase |
 |--------|------------------|---------------|----------|
-| Prod | `main` | `./cloudflare-build-prod.sh` | Production |
-| Beta | `staging` | `./cloudflare-build.sh` | Staging |
+| Prod | `main` | `./cloudflare-build-prod.sh` | одна (Staging) |
+| Beta | `staging` | `./cloudflare-build.sh` | та же |
 
 Cloudflare → проект → **Settings** → **Builds & deployments** → **Production branch**:
 - Prod: `main` — push в main запускает только Prod
 - Beta: `staging` — push в staging запускает только Beta
 
-**Основной (Production) сайт** — Build command: `./cloudflare-build-prod.sh`, Production branch: `main`.  
-**Beta (демо)** — Build command: `./cloudflare-build.sh`, Production branch: `staging`, env: SUPABASE_URL + SUPABASE_ANON_KEY (Staging).
+**Prod** — Build command: `./cloudflare-build-prod.sh`, env: SUPABASE_URL + SUPABASE_ANON_KEY (те же, что у Beta).  
+**Beta** — Build command: `./cloudflare-build.sh`, env: те же SUPABASE_URL + SUPABASE_ANON_KEY.
 
 - **Framework preset**: None
 - **Build output directory**: `restodocks_flutter/build/web`

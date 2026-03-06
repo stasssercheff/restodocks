@@ -1,10 +1,20 @@
 #!/usr/bin/env bash
 set -e
-# Production: всегда используем Production Supabase (osglfptwbuqqmqunttha).
-# Использовать для основного сайта в Cloudflare Pages.
+# Production: используем ту же Supabase, что и Beta (одна БД для обоих).
+# Задайте SUPABASE_URL и SUPABASE_ANON_KEY в Cloudflare Prod Variables — те же, что у Beta.
 
-export SUPABASE_URL="https://osglfptwbuqqmqunttha.supabase.co"
-export SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zZ2xmcHR3YnVxcW1xdW50dGhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUwNTk0MDQsImV4cCI6MjA4MDYzNTQwNH0.Jy7yi2TNdSrmoBdILXBGRYB_vxGtq8scCZ9eCA9vfTE"
+if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_ANON_KEY:-}" ]; then
+  if [ -n "${NEXT_PUBLIC_SUPABASE_URL:-}" ] && [ -n "${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}" ]; then
+    export SUPABASE_URL="$NEXT_PUBLIC_SUPABASE_URL"
+    export SUPABASE_ANON_KEY="$NEXT_PUBLIC_SUPABASE_ANON_KEY"
+  else
+    echo "ERROR: Set SUPABASE_URL and SUPABASE_ANON_KEY in Cloudflare Prod Variables (скопируй из Beta — одна БД)"
+    exit 2
+  fi
+fi
+
+SUPABASE_URL=$(echo "$SUPABASE_URL" | tr -d '\n\r\t ')
+SUPABASE_ANON_KEY=$(echo "$SUPABASE_ANON_KEY" | tr -d '\n\r\t ')
 
 echo "==> Production build: SUPABASE_URL=${SUPABASE_URL}"
 
