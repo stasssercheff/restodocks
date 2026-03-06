@@ -1,6 +1,14 @@
 # Вход не работает на Cloudflare Pages — чеклист
 
-## 1. Variables и Environment
+## 0. Production: использовать cloudflare-build-prod.sh
+
+Для **основного** сайта в Build settings задайте: **Build command** = `./cloudflare-build-prod.sh`
+
+Этот скрипт всегда использует Production Supabase. Variables не нужны.
+
+---
+
+## 1. Variables и Environment (только для Beta)
 
 Cloudflare Pages → проект → **Settings** → **Variables and Secrets**
 

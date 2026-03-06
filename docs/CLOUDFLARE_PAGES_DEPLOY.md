@@ -41,13 +41,14 @@ https://*.restodocks.pages.dev/
 
 ### 3. Сборка Cloudflare Pages
 
-При подключении репозитория к Cloudflare Pages:
+**Основной (Production) сайт** — Build command: `./cloudflare-build-prod.sh`  
+Всегда использует Production Supabase, переменные не нужны.
+
+**Beta (демо)** — Build command: `./cloudflare-build.sh`  
+Использует SUPABASE_URL и SUPABASE_ANON_KEY (Staging).
 
 - **Framework preset**: None
-- **Build command**: `./cloudflare-build.sh`
 - **Build output directory**: `restodocks_flutter/build/web`
-
-Скрипт в корне репо переходит в `restodocks_flutter` и вызывает `./cloudflare-build.sh` оттуда.
 
 ### 4. Пересборка после правок env
 
