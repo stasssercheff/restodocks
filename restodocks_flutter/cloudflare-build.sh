@@ -40,6 +40,11 @@ fi
 
 echo "/*    /index.html   200" > build/web/_redirects
 
+# Pages Functions: только /supabase-auth/* — остальное статика
+cat > build/web/_routes.json << 'EOF'
+{"version":1,"include":["/supabase-auth/*"],"exclude":[]}
+EOF
+
 cat > build/web/_headers << 'EOF'
 /index.html
   Cache-Control: no-cache, no-store, must-revalidate

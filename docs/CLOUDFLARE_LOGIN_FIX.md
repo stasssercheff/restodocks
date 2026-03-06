@@ -1,5 +1,9 @@
 # Вход не работает на Cloudflare Pages — чеклист
 
+## Прокси для restodocks.com (автоматически)
+
+Если вход не работает на restodocks.com, но работает на restodocks-2u8.pages.dev — в проекте настроен **Cloudflare Pages Function** `functions/supabase-auth/`, который проксирует все запросы к Supabase через тот же домен. Приложение само переключается на этот прокси, когда открыто с restodocks.com. Ничего настраивать не нужно — деплой по push в main.
+
 ## 0a. Кастомный домен: restodocks.com vs restodocks-2u8.pages.dev
 
 Если вход работает на `restodocks-2u8.pages.dev`, но **не работает на restodocks.com** — проверь настройки домена:

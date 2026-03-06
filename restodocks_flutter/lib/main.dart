@@ -14,7 +14,7 @@ import 'services/services.dart';
 import 'services/translation_manager.dart';
 import 'screens/screens.dart';
 
-const String _supabaseUrl = String.fromEnvironment(
+const String _supabaseUrlEnv = String.fromEnvironment(
   'SUPABASE_URL',
   defaultValue: 'https://osglfptwbuqqmqunttha.supabase.co',
 );
@@ -22,6 +22,18 @@ const String _supabaseAnonKey = String.fromEnvironment(
   'SUPABASE_ANON_KEY',
   defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zZ2xmcHR3YnVxcW1xdW50dGhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUwNTk0MDQsImV4cCI6MjA4MDYzNTQwNH0.Jy7yi2TNdSrmoBdILXBGRYB_vxGtq8scCZ9eCA9vfTE',
 );
+
+/// На restodocks.com Supabase Auth отклоняет origin — используем прокси через тот же домен.
+String _resolveSupabaseUrl() {
+  if (!kIsWeb) return _supabaseUrlEnv;
+  try {
+    final origin = Uri.base.origin.toLowerCase();
+    if (origin == 'https://restodocks.com' || origin == 'https://www.restodocks.com') {
+      return origin + '/supabase-auth';
+    }
+  } catch (_) {}
+  return _supabaseUrlEnv;
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,10 +45,11 @@ void main() async {
     debugPrint('Stack: ${details.stack}');
   };
 
-  print('=== SUPABASE INIT: url=${_supabaseUrl.substring(0, 20)}... key=${_supabaseAnonKey.substring(0, 15)}... ===');
+  final supabaseUrl = _resolveSupabaseUrl();
+  print('=== SUPABASE INIT: url=${supabaseUrl.substring(0, supabaseUrl.length > 30 ? 30 : supabaseUrl.length)}... key=${_supabaseAnonKey.substring(0, 15)}... ===');
 
   await Supabase.initialize(
-    url: _supabaseUrl,
+    url: supabaseUrl,
     anonKey: _supabaseAnonKey,
     authOptions: const FlutterAuthClientOptions(
       detectSessionInUri: true, // автоматический вход при переходе по ссылке подтверждения
