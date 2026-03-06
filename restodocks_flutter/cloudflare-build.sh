@@ -1,24 +1,13 @@
 #!/usr/bin/env bash
 set -e
-# Cloudflare Pages build для Flutter web.
-# Задайте SUPABASE_URL и SUPABASE_ANON_KEY в каждом проекте.
-# Опционально: DEPLOY_TARGET=production в Prod — принудительно Production Supabase.
-
-PROD_URL="https://osglfptwbuqqmqunttha.supabase.co"
-PROD_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zZ2xmcHR3YnVxcW1xdW50dGhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUwNTk0MDQsImV4cCI6MjA4MDYzNTQwNH0.Jy7yi2TNdSrmoBdILXBGRYB_vxGtq8scCZ9eCA9vfTE"
-
-if [ "${DEPLOY_TARGET:-}" = "production" ]; then
-  export SUPABASE_URL="$PROD_URL"
-  export SUPABASE_ANON_KEY="$PROD_KEY"
-  echo "==> DEPLOY_TARGET=production: Production Supabase"
-fi
+# Cloudflare Pages: SUPABASE_URL и SUPABASE_ANON_KEY — как на Vercel.
 
 if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_ANON_KEY:-}" ]; then
   if [ -n "${NEXT_PUBLIC_SUPABASE_URL:-}" ] && [ -n "${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}" ]; then
     export SUPABASE_URL="$NEXT_PUBLIC_SUPABASE_URL"
     export SUPABASE_ANON_KEY="$NEXT_PUBLIC_SUPABASE_ANON_KEY"
   else
-    echo "ERROR: Set SUPABASE_URL and SUPABASE_ANON_KEY in Cloudflare Variables"
+    echo "ERROR: Set SUPABASE_URL and SUPABASE_ANON_KEY"
     exit 2
   fi
 fi

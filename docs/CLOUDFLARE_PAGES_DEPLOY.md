@@ -10,14 +10,12 @@
 
 Cloudflare Pages → проект → **Settings** → **Variables and Secrets**
 
-**Вариант A (рекомендуется):** задать SUPABASE_URL и SUPABASE_ANON_KEY в каждом проекте.
+Задайте SUPABASE_URL и SUPABASE_ANON_KEY в каждом проекте — как на Vercel.
 
 | Проект | SUPABASE_URL | SUPABASE_ANON_KEY |
 |--------|--------------|-------------------|
-| **Prod** | `https://osglfptwbuqqmqunttha.supabase.co` | anon key Production |
-| **Beta** | `https://kzhaezanjttvnqkgpxnh.supabase.co` | anon key Staging |
-
-**Вариант B:** для Prod добавить только `DEPLOY_TARGET` = `production` — скрипт подставит Production Supabase. Beta — SUPABASE_URL и SUPABASE_ANON_KEY (Staging).
+| Prod | `https://osglfptwbuqqmqunttha.supabase.co` | anon key Production |
+| Beta | `https://kzhaezanjttvnqkgpxnh.supabase.co` | anon key Staging |
 
 Supabase Dashboard → Project Settings → API.
 
