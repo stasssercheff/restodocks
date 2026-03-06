@@ -106,6 +106,8 @@ Deno.serve(async (req: Request) => {
     const password = body.password?.trim();
     const establishmentId = body.establishment_id?.trim();
 
+    console.log(`[authenticate-employee] Attempt for email=${email ?? "(empty)"}, establishment_id=${establishmentId ?? "(none)"}`);
+
     if (!email || !password) {
       return new Response(
         JSON.stringify({ error: "email and password are required" }),
@@ -135,17 +137,22 @@ Deno.serve(async (req: Request) => {
     }
 
     if (!employees || employees.length === 0) {
-      // Одинаковый ответ независимо от причины — не раскрываем существование email
+      console.log("[authenticate-employee] No active employees found for email");
       return new Response(
         JSON.stringify({ error: "invalid_credentials" }),
         { status: 401, headers: { ...cors, "Content-Type": "application/json" } }
       );
     }
 
+    console.log(`[authenticate-employee] Found ${employees.length} employee(s), checking password`);
+
     // Перебираем — может быть несколько заведений с одним email
     for (const emp of employees) {
       const hash = emp.password_hash as string | null;
-      if (!hash) continue;
+      if (!hash) {
+        console.log(`[authenticate-employee] Employee ${emp.id} has no password_hash, skipping`);
+        continue;
+      }
 
       let passwordMatch = false;
 
@@ -165,7 +172,12 @@ Deno.serve(async (req: Request) => {
         passwordMatch = false;
       }
 
-      if (!passwordMatch) continue;
+      if (!passwordMatch) {
+        console.log(`[authenticate-employee] Password mismatch for employee ${emp.id}`);
+        continue;
+      }
+
+      console.log(`[authenticate-employee] Password OK for employee ${emp.id}, fetching establishment`);
 
       // Нашли — загружаем заведение
       const { data: estData, error: estError } = await supabase
@@ -191,7 +203,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Ни один пароль не подошёл
+    console.log("[authenticate-employee] No matching password for any employee");
     return new Response(
       JSON.stringify({ error: "invalid_credentials" }),
       { status: 401, headers: { ...cors, "Content-Type": "application/json" } }
