@@ -4,11 +4,40 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import bcrypt from "npm:bcryptjs@2";
 
-const corsHeaders: Record<string, string> = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const ALLOWED_ORIGINS = [
+  "https://restodocks.com",
+  "https://www.restodocks.com",
+  "https://restodocks.vercel.app",
+  "https://restodocks.netlify.app",
+  "https://restodocks.pages.dev",
+  "http://localhost",
+  "http://127.0.0.1",
+];
+const ALLOWED_SUFFIXES = [".pages.dev", ".netlify.app", ".vercel.app"];
+
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  const base: Record<string, string> = {
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  };
+  if (origin && isOriginAllowed(origin)) {
+    base["Access-Control-Allow-Origin"] = origin;
+  }
+  return base;
+}
+
+function isOriginAllowed(origin: string | null): boolean {
+  if (!origin || typeof origin !== "string") return false;
+  try {
+    const url = new URL(origin);
+    const host = url.hostname.toLowerCase();
+    if (ALLOWED_ORIGINS.includes(origin) || ALLOWED_ORIGINS.includes(`${url.protocol}//${host}`)) return true;
+    if (host === "localhost" || host === "127.0.0.1") return true;
+    return ALLOWED_SUFFIXES.some((s) => host.endsWith(s));
+  } catch {
+    return false;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Simple in-memory rate limiter: max 10 attempts per IP per 15 minutes
@@ -31,13 +60,14 @@ function checkRateLimit(ip: string): boolean {
 }
 
 Deno.serve(async (req: Request) => {
+  const cors = getCorsHeaders(req.headers.get("Origin"));
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: cors });
   }
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...cors, "Content-Type": "application/json" },
     });
   }
 
@@ -46,7 +76,7 @@ Deno.serve(async (req: Request) => {
   if (!checkRateLimit(clientIp)) {
     return new Response(
       JSON.stringify({ error: "Too many requests. Please try again later." }),
-      { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": "900" } }
+      { status: 429, headers: { ...cors, "Content-Type": "application/json", "Retry-After": "900" } }
     );
   }
 
@@ -56,7 +86,7 @@ Deno.serve(async (req: Request) => {
   if (!supabaseUrl || !supabaseServiceKey) {
     return new Response(
       JSON.stringify({ error: "Server configuration error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 500, headers: { ...cors, "Content-Type": "application/json" } }
     );
   }
 
@@ -79,7 +109,7 @@ Deno.serve(async (req: Request) => {
     if (!email || !password) {
       return new Response(
         JSON.stringify({ error: "email and password are required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 400, headers: { ...cors, "Content-Type": "application/json" } }
       );
     }
 
@@ -100,7 +130,7 @@ Deno.serve(async (req: Request) => {
       console.error("[authenticate-employee] DB error:", empError.message);
       return new Response(
         JSON.stringify({ error: "Database error" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 500, headers: { ...cors, "Content-Type": "application/json" } }
       );
     }
 
@@ -108,7 +138,7 @@ Deno.serve(async (req: Request) => {
       // Одинаковый ответ независимо от причины — не раскрываем существование email
       return new Response(
         JSON.stringify({ error: "invalid_credentials" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 401, headers: { ...cors, "Content-Type": "application/json" } }
       );
     }
 
@@ -157,21 +187,21 @@ Deno.serve(async (req: Request) => {
           employee: employeeWithoutHash,
           establishment: estData,
         }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...cors, "Content-Type": "application/json" } }
       );
     }
 
     // Ни один пароль не подошёл
     return new Response(
       JSON.stringify({ error: "invalid_credentials" }),
-      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 401, headers: { ...cors, "Content-Type": "application/json" } }
     );
 
   } catch (e) {
     console.error("[authenticate-employee] Unexpected error:", e);
     return new Response(
       JSON.stringify({ error: "Internal server error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 500, headers: { ...cors, "Content-Type": "application/json" } }
     );
   }
 });
