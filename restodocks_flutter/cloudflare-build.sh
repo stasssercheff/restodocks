@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 set -e
-# Cloudflare Pages: SUPABASE_URL и SUPABASE_ANON_KEY — как на Vercel.
+# Cloudflare Pages: SUPABASE_URL и SUPABASE_ANON_KEY (как на Vercel).
 
 if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_ANON_KEY:-}" ]; then
   if [ -n "${NEXT_PUBLIC_SUPABASE_URL:-}" ] && [ -n "${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}" ]; then
     export SUPABASE_URL="$NEXT_PUBLIC_SUPABASE_URL"
     export SUPABASE_ANON_KEY="$NEXT_PUBLIC_SUPABASE_ANON_KEY"
   else
-    echo "ERROR: Set SUPABASE_URL and SUPABASE_ANON_KEY"
+    echo "ERROR: Set SUPABASE_URL and SUPABASE_ANON_KEY in Cloudflare Variables (Production + Preview)"
     exit 2
   fi
 fi
 
-SUPABASE_URL=$(echo "$SUPABASE_URL" | tr -d '\n\r\t' | sed 's/supabase\.con/supabase.co/')
-SUPABASE_ANON_KEY=$(echo "$SUPABASE_ANON_KEY" | tr -d '\n\r\t')
+SUPABASE_URL=$(echo "$SUPABASE_URL" | tr -d '\n\r\t ')
+SUPABASE_ANON_KEY=$(echo "$SUPABASE_ANON_KEY" | tr -d '\n\r\t ')
 
 echo "==> BUILD SUPABASE_URL=${SUPABASE_URL}"
 

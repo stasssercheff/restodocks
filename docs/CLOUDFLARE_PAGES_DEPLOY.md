@@ -19,6 +19,8 @@ Cloudflare Pages → проект → **Settings** → **Variables and Secrets**
 
 Supabase Dashboard → Project Settings → API.
 
+**Если вход не работает** — см. [CLOUDFLARE_LOGIN_FIX.md](CLOUDFLARE_LOGIN_FIX.md).
+
 ### 2. Supabase Auth: добавить новый домен
 
 Без этого Auth может работать некорректно.
