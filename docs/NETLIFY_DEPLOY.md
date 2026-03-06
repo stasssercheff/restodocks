@@ -1,7 +1,11 @@
 # Деплой Restodocks на Netlify
 
-Инструкция по настройке 4 сайтов на Netlify: Restodocks prod, Restodocks demo, Admin prod, Admin demo.  
-Vercel не трогаем — работаем параллельно.
+> **На паузе.** Сейчас используется Cloudflare Pages (основное приложение) и Cloudflare Workers (Admin).  
+> См. [CLOUDFLARE_PAGES_DEPLOY.md](CLOUDFLARE_PAGES_DEPLOY.md) и [CLOUDFLARE_ADMIN_DEPLOY.md](CLOUDFLARE_ADMIN_DEPLOY.md).
+
+---
+
+Инструкция по настройке 4 сайтов на Netlify (для справки).
 
 ---
 

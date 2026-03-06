@@ -21,6 +21,8 @@ Supabase Dashboard → Project Settings → API.
 
 **Если вход не работает** — см. [CLOUDFLARE_LOGIN_FIX.md](CLOUDFLARE_LOGIN_FIX.md).
 
+**Admin** — см. [CLOUDFLARE_ADMIN_DEPLOY.md](CLOUDFLARE_ADMIN_DEPLOY.md).
+
 ### 2. Supabase Auth: добавить новый домен
 
 Без этого Auth может работать некорректно.
