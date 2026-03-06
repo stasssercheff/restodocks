@@ -14,8 +14,8 @@
 3. **Authentication** → **URL Configuration**
 
 ### 2. Установите Site URL
-- **Site URL**: `https://www.restodocks.com`
-- Это основной URL, куда Supabase будет редиректить по умолчанию.
+- **Site URL**: `https://restodocks.com` (основной домен без www)
+- Для входа с restodocks.com в адресной строке Site URL должен быть без www.
 
 ### 3. Добавьте Redirect URLs
 В поле **Redirect URLs** добавьте все домены, где размещено приложение (каждый с новой строки):
