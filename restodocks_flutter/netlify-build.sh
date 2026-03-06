@@ -32,8 +32,8 @@ flutter --version
 echo "==> flutter pub get"
 flutter pub get
 
-echo "==> flutter build web"
-flutter build web --release \
+echo "==> flutter build web (--no-web-resources-cdn: CanvasKit в билде)"
+flutter build web --release --no-web-resources-cdn \
   --dart-define=SUPABASE_URL="$SUPABASE_URL" \
   --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
 

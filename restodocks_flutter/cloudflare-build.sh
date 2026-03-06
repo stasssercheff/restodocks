@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -e
-# Cloudflare Pages: SUPABASE_URL и SUPABASE_ANON_KEY (как на Vercel).
+# Cloudflare Pages build для Flutter web.
+# Требует env: SUPABASE_URL, SUPABASE_ANON_KEY (или NEXT_PUBLIC_*)
 
 if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_ANON_KEY:-}" ]; then
   if [ -n "${NEXT_PUBLIC_SUPABASE_URL:-}" ] && [ -n "${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}" ]; then
@@ -12,8 +13,8 @@ if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_ANON_KEY:-}" ]; then
   fi
 fi
 
-SUPABASE_URL=$(echo "$SUPABASE_URL" | tr -d '\n\r\t ')
-SUPABASE_ANON_KEY=$(echo "$SUPABASE_ANON_KEY" | tr -d '\n\r\t ')
+SUPABASE_URL=$(echo "$SUPABASE_URL" | tr -d '\n\r\t' | sed 's/supabase\.con/supabase.co/')
+SUPABASE_ANON_KEY=$(echo "$SUPABASE_ANON_KEY" | tr -d '\n\r\t')
 
 echo "==> BUILD SUPABASE_URL=${SUPABASE_URL}"
 
@@ -28,8 +29,8 @@ flutter --version
 echo "==> flutter pub get"
 flutter pub get
 
-echo "==> flutter build web"
-flutter build web --release \
+echo "==> flutter build web (--no-web-resources-cdn)"
+flutter build web --release --no-web-resources-cdn \
   --dart-define=SUPABASE_URL="$SUPABASE_URL" \
   --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
 
@@ -38,5 +39,16 @@ if [ -f scripts/sw_cleanup.js ]; then
 fi
 
 echo "/*    /index.html   200" > build/web/_redirects
+
+cat > build/web/_headers << 'EOF'
+/index.html
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/*.js
+  Cache-Control: public, max-age=31536000, immutable
+
+/*.wasm
+  Cache-Control: public, max-age=31536000, immutable
+EOF
 
 echo "==> Build OK: build/web"

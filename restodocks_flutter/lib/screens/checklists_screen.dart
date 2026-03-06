@@ -267,11 +267,31 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                 ],
               ),
               title: Text((c.name.trim().isNotEmpty ? c.name : c.additionalName?.trim().isNotEmpty == true ? c.additionalName! : (loc.t('checklist_no_name') ?? 'Без названия'))),
-              subtitle: Text([
-                if (sectionLabel != null) sectionLabel,
-                ...dateParts,
-                '${c.items.length} ${loc.t('items_count')}',
-              ].join(' • ')),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text([
+                    if (sectionLabel != null) sectionLabel,
+                    '${c.items.length} ${loc.t('items_count')}',
+                  ].join(' • ')),
+                  if (dateParts.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: dateParts.map((p) => Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(p, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+                      )).toList(),
+                    ),
+                  ],
+                ],
+              ),
               trailing: canEdit
                   ? Row(
                       mainAxisSize: MainAxisSize.min,

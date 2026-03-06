@@ -15,6 +15,10 @@ mixin AutoSaveMixin<T extends StatefulWidget> on State<T> {
   /// Ключ для сохранения (должен быть переопределен в классе)
   String get draftKey;
 
+  /// Если true — черновик восстанавливается только после вызова [restoreDraftNow]
+  /// (например, после загрузки данных с сервера).
+  bool get restoreDraftAfterLoad => false;
+
   /// Метод для получения текущего состояния (должен быть переопределен)
   Map<String, dynamic> getCurrentState();
 
@@ -31,7 +35,11 @@ mixin AutoSaveMixin<T extends StatefulWidget> on State<T> {
 
     // Восстановить состояние при инициализации
     SchedulerBinding.instance.addPostFrameCallback((_) {
-      _restoreDraft();
+      if (!restoreDraftAfterLoad) {
+        _restoreDraft();
+      } else {
+        _isInitialized = true;
+      }
     });
   }
 
@@ -72,6 +80,11 @@ mixin AutoSaveMixin<T extends StatefulWidget> on State<T> {
       debugPrint('Failed to restore draft: $e');
       _isInitialized = true;
     }
+  }
+
+  /// Восстановить черновик (для экранов с [restoreDraftAfterLoad]).
+  Future<void> restoreDraftNow() async {
+    await _restoreDraft();
   }
 
   /// Запланировать сохранение с задержкой (данные намертво в localStorage)

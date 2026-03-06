@@ -59,8 +59,9 @@ echo "==> flutter pub get"
 flutter pub get || { echo "ERROR: pub get failed"; exit 1; }
 
 # Build for release with source maps (dart-define from env)
-echo "==> flutter build web --profile --source-maps --no-tree-shake-icons"
-flutter build web --profile --source-maps --no-tree-shake-icons \
+# --no-web-resources-cdn: CanvasKit в билде, без зависания на загрузке с CDN
+echo "==> flutter build web --profile --source-maps --no-tree-shake-icons --no-web-resources-cdn"
+flutter build web --profile --source-maps --no-tree-shake-icons --no-web-resources-cdn \
   --dart-define=SUPABASE_URL="$SUPABASE_URL" \
   --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
   2>&1 | tee build.log
@@ -69,7 +70,7 @@ BUILD_EXIT=${PIPESTATUS[0]}
 if [ "$BUILD_EXIT" -ne 0 ]; then
   echo "==> Profile build failed, trying release build without source maps..."
   echo "==> flutter build web --release --dart-define=FLUTTER_WEB_OBFUSCATE=true"
-  flutter build web --release --dart-define=FLUTTER_WEB_OBFUSCATE=true \
+  flutter build web --release --no-web-resources-cdn --dart-define=FLUTTER_WEB_OBFUSCATE=true \
     --dart-define=SUPABASE_URL="$SUPABASE_URL" \
     --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
     2>&1 | tee build.log

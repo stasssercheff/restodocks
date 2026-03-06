@@ -21,16 +21,20 @@
 В поле **Redirect URLs** добавьте все домены, где размещено приложение (каждый с новой строки):
 
 ```
+https://restodocks.pages.dev
+https://restodocks.pages.dev/**
+https://restodocks.pages.dev/
+https://*.pages.dev
+https://*.pages.dev/**
 https://www.restodocks.com
 https://www.restodocks.com/
 https://restodocks.com
 https://restodocks.com/
 https://restodocks.vercel.app
 https://restodocks.vercel.app/
-https://restodocks.pages.dev
-https://restodocks.pages.dev/
+https://demo.restodocks.com
+https://demo.restodocks.com/**
 https://*.netlify.app
-https://*.pages.dev
 http://localhost:3000
 http://localhost:8080
 http://127.0.0.1:3000

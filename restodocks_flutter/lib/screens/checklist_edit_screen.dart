@@ -8,6 +8,7 @@ import '../services/services.dart';
 import '../mixins/auto_save_mixin.dart';
 import '../mixins/input_change_listener_mixin.dart';
 import '../widgets/app_bar_home_button.dart';
+import '../widgets/time_picker_field.dart';
 
 /// Редактирование чеклиста-шаблона. Сохранить, создать по аналогии, удалить.
 class ChecklistEditScreen extends StatefulWidget {
@@ -105,6 +106,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
         }
       });
       _ensureTechCardTranslations(techSvc, techs);
+      if (mounted) await restoreDraftNow();
     } catch (e) {
       if (mounted) setState(() {
         _error = e.toString();
@@ -156,6 +158,9 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
 
   @override
   String get draftKey => 'checklist_edit_${widget.checklistId}';
+
+  @override
+  bool get restoreDraftAfterLoad => true;
 
   @override
   Map<String, dynamic> getCurrentState() {
@@ -740,30 +745,24 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
               if (_deadlineWithTime) ...[
                 const SizedBox(width: 8),
                 Expanded(
-                  child: InkWell(
-                    onTap: () async {
-                      final time = await showTimePicker(
-                        context: context,
-                        initialTime: _deadline != null
-                          ? TimeOfDay(hour: _deadline!.hour, minute: _deadline!.minute)
-                          : TimeOfDay.now(),
-                      );
-                      if (time != null && mounted) {
+                  child: TimePickerField(
+                    label: loc.t('time') ?? 'Время',
+                    value: _deadline != null
+                        ? '${_deadline!.hour.toString().padLeft(2, '0')}:${_deadline!.minute.toString().padLeft(2, '0')}'
+                        : '00:00',
+                    onChanged: (s) {
+                      final parts = s.split(':');
+                      if (parts.length >= 2 && mounted) {
+                        final h = int.tryParse(parts[0]) ?? 0;
+                        final m = int.tryParse(parts[1]) ?? 0;
                         setState(() {
                           final d = _deadline ?? DateTime.now();
-                          _deadline = DateTime(d.year, d.month, d.day, time.hour, time.minute);
+                          _deadline = DateTime(d.year, d.month, d.day, h.clamp(0, 23), m.clamp(0, 59));
                           scheduleSave();
                         });
                       }
                     },
-                    child: InputDecorator(
-                      decoration: InputDecoration(
-                        border: const OutlineInputBorder(),
-                        isDense: true,
-                        labelText: loc.t('time') ?? 'Время',
-                      ),
-                      child: Text(_deadline != null ? '${_deadline!.hour.toString().padLeft(2, '0')}:${_deadline!.minute.toString().padLeft(2, '0')}' : '—'),
-                    ),
+                    enabled: canEdit,
                   ),
                 ),
               ],
@@ -843,30 +842,24 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
               if (_scheduledForWithTime) ...[
                 const SizedBox(width: 8),
                 Expanded(
-                  child: InkWell(
-                    onTap: () async {
-                      final time = await showTimePicker(
-                        context: context,
-                        initialTime: _scheduledFor != null
-                          ? TimeOfDay(hour: _scheduledFor!.hour, minute: _scheduledFor!.minute)
-                          : TimeOfDay.now(),
-                      );
-                      if (time != null && mounted) {
+                  child: TimePickerField(
+                    label: loc.t('time') ?? 'Время',
+                    value: _scheduledFor != null
+                        ? '${_scheduledFor!.hour.toString().padLeft(2, '0')}:${_scheduledFor!.minute.toString().padLeft(2, '0')}'
+                        : '00:00',
+                    onChanged: (s) {
+                      final parts = s.split(':');
+                      if (parts.length >= 2 && mounted) {
+                        final h = int.tryParse(parts[0]) ?? 0;
+                        final m = int.tryParse(parts[1]) ?? 0;
                         setState(() {
                           final d = _scheduledFor ?? DateTime.now();
-                          _scheduledFor = DateTime(d.year, d.month, d.day, time.hour, time.minute);
+                          _scheduledFor = DateTime(d.year, d.month, d.day, h.clamp(0, 23), m.clamp(0, 59));
                           scheduleSave();
                         });
                       }
                     },
-                    child: InputDecorator(
-                      decoration: InputDecoration(
-                        border: const OutlineInputBorder(),
-                        isDense: true,
-                        labelText: loc.t('time') ?? 'Время',
-                      ),
-                      child: Text(_scheduledFor != null ? '${_scheduledFor!.hour.toString().padLeft(2, '0')}:${_scheduledFor!.minute.toString().padLeft(2, '0')}' : '—'),
-                    ),
+                    enabled: canEdit,
                   ),
                 ),
               ],
