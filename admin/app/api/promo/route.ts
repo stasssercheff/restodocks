@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
-import { getAdminPassword } from '@/lib/admin-env'
+import { getAdminPassword, getSupabaseConfig } from '@/lib/admin-env'
 import { verifySessionToken } from '@/lib/session'
 
-function getServiceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? ''
-  return createClient(url, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+export const dynamic = 'force-dynamic'
+
+async function getServiceClient() {
+  const config = await getSupabaseConfig()
+  if (!config) throw new Error('Supabase not configured')
+  return createClient(config.url, config.serviceRoleKey)
 }
 
 async function checkAuth(): Promise<boolean> {
@@ -20,7 +23,7 @@ async function checkAuth(): Promise<boolean> {
 export async function GET() {
   if (!await checkAuth()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const supabase = getServiceClient()
+  const supabase = await getServiceClient()
   const { data, error } = await supabase
     .from('promo_codes')
     .select('*, establishments:used_by_establishment_id(name)')
@@ -55,7 +58,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid expires_at: must be a valid ISO date string' }, { status: 400 })
   }
 
-  const supabase = getServiceClient()
+  const supabase = await getServiceClient()
   const { data, error } = await supabase
     .from('promo_codes')
     .insert({
@@ -81,7 +84,7 @@ export async function PATCH(req: NextRequest) {
   const patch = Object.fromEntries(
     Object.entries(updates).filter(([k]) => allowed.includes(k as typeof allowed[number]))
   )
-  const supabase = getServiceClient()
+  const supabase = await getServiceClient()
   const { error } = await supabase
     .from('promo_codes')
     .update(patch)
@@ -95,7 +98,7 @@ export async function DELETE(req: NextRequest) {
   if (!await checkAuth()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { id } = await req.json()
-  const supabase = getServiceClient()
+  const supabase = await getServiceClient()
   const { error } = await supabase
     .from('promo_codes')
     .delete()

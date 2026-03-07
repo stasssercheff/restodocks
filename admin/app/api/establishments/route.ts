@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
-import { getAdminPassword } from '@/lib/admin-env'
+import { getAdminPassword, getSupabaseConfig } from '@/lib/admin-env'
 import { verifySessionToken } from '@/lib/session'
+
+export const dynamic = 'force-dynamic'
 
 export async function GET() {
   const cookieStore = await cookies()
@@ -12,8 +14,9 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? ''
-  const supabase = createClient(url, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+  const config = await getSupabaseConfig()
+  if (!config) return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 })
+  const supabase = createClient(config.url, config.serviceRoleKey)
 
   const { data: establishments, error } = await supabase
     .from('establishments')

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAdminPassword } from '@/lib/admin-env'
 import { createSessionToken } from '@/lib/session'
 
+export const dynamic = 'force-dynamic'
+
 export async function POST(req: NextRequest) {
   const { password } = await req.json()
   const adminPassword = await getAdminPassword()
@@ -14,7 +16,7 @@ export async function POST(req: NextRequest) {
   const res = NextResponse.json({ ok: true })
   res.cookies.set('admin_session', token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: process.env.NODE_ENV !== 'development',
     sameSite: 'strict',
     maxAge: 60 * 60 * 24,
     path: '/',
