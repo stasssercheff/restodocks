@@ -50,7 +50,7 @@ Cloudflare Pages → проект → **Settings** → **Variables and Secrets**
 | Prod и Beta |
 |-------------|
 | SUPABASE_URL = `https://osglfptwbuqqmqunttha.supabase.co` |
-| SUPABASE_ANON_KEY = anon key из Supabase (Dashboard → API) |
+| SUPABASE_ANON_KEY = anon key из Supabase → Settings → API Keys (anon public) |
 
 ## 2. Retry deployment
 
@@ -81,17 +81,26 @@ https://restodocks.pages.dev
 
 **Site URL** = `https://restodocks.com`
 
-**Project Settings** → **API** — если есть **CORS / Allowed Origins**, добавь:
-`https://restodocks.com`, `https://www.restodocks.com`
+**CORS / Allowed Origins** (если есть): в новых версиях дашборда Supabase настройки CORS могут быть в **Settings** → **API** или **Data API**. Добавь домены:
+`https://restodocks.com`, `https://www.restodocks.com`, `https://restodocks.pages.dev`, `https://restodocks-2u8.pages.dev`.  
+Если отдельного поля нет — Redirect URLs выше обычно достаточно для Auth.
 
 ---
 
-## 6. Отладка: если restodocks.com всё равно не входит
+## 6. 401 от authenticate-employee
+
+Если в Network видишь **401** на `authenticate-employee`:
+- Сначала пробуется **Supabase Auth** (signInWithPassword), при ошибке — **legacy** (Edge Function).
+- 401 от legacy = неверный email/пароль **или** учётка в auth.users без password_hash в employees.
+- Проверь: тот же логин работает на restodocks-2u8.pages.dev? Если да — добавь restodocks.com в Supabase (п. 5).
+- В консоли должно быть: `🔐 Login: Supabase Auth failed: ...` — по этому сообщению можно понять причину.
+
+## 7. Отладка: auth/v1/token
 
 1. Открой restodocks.com → F12 → **Network**
 2. Попробуй войти
 3. Найди запрос к `auth/v1/token` или `token`
 4. Статус:
-   - **CORS error** / (blocked) — Supabase не разрешает origin restodocks.com
-   - **400/401** — открой ответ (Response): там текст ошибки Supabase
+   - **CORS error** / (blocked) — добавь restodocks.com в Auth Redirect URLs и Site URL (п. 5)
+   - **400** "Invalid login credentials" — неверный пароль
 5. Пришли результат — по нему можно понять причину

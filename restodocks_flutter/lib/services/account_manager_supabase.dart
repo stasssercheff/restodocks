@@ -25,6 +25,9 @@ class AccountManagerSupabase extends ChangeNotifier {
   /// Callback вызывается после загрузки профиля — применяет preferred_language к LocalizationService.
   void Function(String languageCode)? onPreferredLanguageLoaded;
 
+  /// Последняя техническая ошибка при входе (для отладки на restodocks.com)
+  String? lastLoginError;
+
   /// Доступ к SupabaseService
   SupabaseService get supabase => _supabase;
 
@@ -558,15 +561,24 @@ class AccountManagerSupabase extends ChangeNotifier {
     return Employee.fromJson(data);
   }
 
-  /// Вход по email и паролю: сначала Supabase Auth, при отсутствии — legacy (Edge Function)
-  /// Порядок как в staging — иначе Prod не входит (учётки в auth.users).
+  /// Вход по email и паролю: Supabase Auth или legacy (Edge Function)
+  /// На кастомном домене (restodocks.com) пробуем legacy первым — Auth иногда падает из‑за cookies/ошибок.
   Future<({Employee employee, Establishment establishment})?> findEmployeeByEmailAndPasswordGlobal({
     required String email,
     required String password,
   }) async {
     final emailTrim = email.trim();
     final passwordTrimmed = password.trim();
+    lastLoginError = null;
     if (emailTrim.isEmpty) return null;
+
+    final isCustomDomain = kIsWeb && Uri.base.host.contains('restodocks');
+
+    // На кастомном домене: сначала legacy (обход проблем Auth на restodocks.com)
+    if (isCustomDomain) {
+      final legacyResult = await _findEmployeeByPasswordHashViaEdgeFunction(emailTrim, passwordTrimmed);
+      if (legacyResult != null) return legacyResult;
+    }
 
     // 1. Пробуем Supabase Auth (учётки в auth.users)
     try {
@@ -621,7 +633,13 @@ class AccountManagerSupabase extends ChangeNotifier {
         rethrow;
       }
       // Логируем всегда — иначе в prod (kDebugMode=false) не увидим причину
+      lastLoginError = 'Auth: ${authErr.toString().replaceAll(RegExp(r'\s+'), ' ')}';
       print('🔐 Login: Supabase Auth failed: $authErr');
+      if (authErr.toString().contains('Invalid login credentials')) {
+        print('🔐 Login: (Invalid credentials → пробуем legacy authenticate-employee)');
+      } else if (authErr.toString().toLowerCase().contains('cors') || authErr.toString().toLowerCase().contains('network')) {
+        print('🔐 Login: (CORS/сеть? Добавь restodocks.com в Supabase Auth Redirect URLs и API CORS)');
+      }
       try {
         await _supabase.signOut();
       } catch (_) { /* ignore */ }
@@ -646,11 +664,13 @@ class AccountManagerSupabase extends ChangeNotifier {
       );
 
       if (res.status == 401) {
+        lastLoginError = (lastLoginError != null ? '$lastLoginError → ' : '') + 'Legacy: 401 invalid credentials';
         print('🔐 Login: Legacy — invalid credentials (401)');
         return null;
       }
 
       if (res.status != 200) {
+        lastLoginError = (lastLoginError != null ? '$lastLoginError → ' : '') + 'Legacy: ${res.status} ${res.data}';
         print('🔐 Login: Legacy — Edge Function error: ${res.status}, data=${res.data}');
         return null;
       }
@@ -675,6 +695,7 @@ class AccountManagerSupabase extends ChangeNotifier {
       if (kDebugMode) debugPrint('🔐 Login: Legacy — success for ${employee.email}');
       return (employee: employee, establishment: establishment);
     } catch (e, st) {
+      lastLoginError = (lastLoginError != null ? '$lastLoginError → ' : '') + 'Legacy exception: $e';
       print('🔐 Login: Legacy Edge Function threw: $e');
       rethrow;
     }

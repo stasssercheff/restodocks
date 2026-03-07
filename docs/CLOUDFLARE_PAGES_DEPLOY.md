@@ -14,7 +14,7 @@ Cloudflare Pages → проект → **Settings** → **Variables and Secrets**
 
 | Проект | SUPABASE_URL | SUPABASE_ANON_KEY |
 |--------|--------------|-------------------|
-| Prod | `https://osglfptwbuqqmqunttha.supabase.co` | anon key из Supabase (Dashboard → API) |
+| Prod | `https://osglfptwbuqqmqunttha.supabase.co` | anon key из Supabase → Settings → API Keys |
 | Beta | `https://osglfptwbuqqmqunttha.supabase.co` | тот же anon key |
 
 Prod и Beta используют **один** проект Supabase (osglfptwbuqqmqunttha).

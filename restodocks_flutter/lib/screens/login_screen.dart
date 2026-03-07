@@ -162,7 +162,11 @@ class _LoginScreenState extends State<LoginScreen> {
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: Colors.red.shade200),
           ),
-          child: Text(_errorMessage!, style: TextStyle(color: Colors.red.shade700)),
+          child: SelectableText(
+            _errorMessage!,
+            style: TextStyle(color: Colors.red.shade700, fontSize: 13),
+            maxLines: 8,
+          ),
         ),
       const SizedBox(height: 24),
       ElevatedButton(
@@ -205,7 +209,13 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (result == null) {
-        if (mounted) setState(() => _errorMessage = loc.t('invalid_email_or_password'));
+        if (mounted) {
+          final am = context.read<AccountManagerSupabase>();
+          final detail = am.lastLoginError;
+          setState(() => _errorMessage = detail != null
+              ? '${loc.t('invalid_email_or_password')}\n\n$detail'
+              : loc.t('invalid_email_or_password'));
+        }
         return;
       }
 
