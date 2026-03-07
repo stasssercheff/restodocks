@@ -428,17 +428,45 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     });
     final store = context.read<ProductStoreSupabase>();
     final loc = context.read<LocalizationService>();
+    final translationSvc = context.read<TranslationService>();
     final targetLang = loc.currentLanguageCode;
+    const sourceLang = 'ru';
     int updated = 0;
     const setStateEvery = 10; // реже setState — меньше мерцания
     for (var i = 0; i < list.length; i++) {
       if (!mounted) return;
+      Product? updatedProduct;
       try {
-        final r = await store.translateProductAwait(list[i].id);
+        var r = await store.translateProductAwait(list[i].id);
+        // Fallback: если DeepL не вернул перевод — пробуем TranslationService (Google/MyMemory)
+        if ((r == null || (r[targetLang] ?? '').trim().isEmpty)) {
+          final p = list[i];
+          final sourceText = (p.names?[sourceLang] ?? p.name).trim();
+          if (sourceText.isNotEmpty) {
+            final translated = await translationSvc.translate(
+              entityType: TranslationEntityType.product,
+              entityId: p.id,
+              fieldName: 'name',
+              text: sourceText,
+              from: sourceLang,
+              to: targetLang,
+            );
+            if (translated != null && translated.trim().isNotEmpty && translated != sourceText) {
+              final merged = Map<String, String>.from(p.names ?? {});
+              merged[sourceLang] = sourceText;
+              merged[targetLang] = translated.trim();
+              final upd = p.copyWith(names: merged);
+              await store.updateProduct(upd);
+              r = merged;
+              updatedProduct = upd;
+            }
+          }
+        } else {
+          updatedProduct = store.allProducts.where((p) => p.id == list[i].id).firstOrNull;
+        }
         if (r != null && (r[targetLang] ?? '').trim().isNotEmpty) {
           updated++;
           _translatingDone = updated; // шкала = только реально переведённые
-          final updatedProduct = store.allProducts.where((p) => p.id == list[i].id).firstOrNull;
           if (updatedProduct != null && mounted) {
             final idx = _nomenclatureItems.indexWhere((item) => item.isProduct && item.product!.id == list[i].id);
             if (idx >= 0) {
@@ -447,7 +475,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
             }
           }
         }
-        // Пауза между запросами — снизить rate limit DeepL
+        // Пауза между запросами — снизить rate limit
         if (i < list.length - 1) await Future<void>.delayed(const Duration(milliseconds: 400));
       } catch (_) {}
       _translatingProcessed = i + 1;
