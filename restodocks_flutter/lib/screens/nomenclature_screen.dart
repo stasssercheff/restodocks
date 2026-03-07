@@ -3244,7 +3244,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
   void initState() {
     super.initState();
     final p = widget.product;
-    _nameController = TextEditingController(text: p.name);
+    _nameController = TextEditingController(text: p.getLocalizedName(widget.loc.currentLanguageCode));
     double? initialPrice = p.basePrice;
     if (widget.establishmentId != null && widget.establishmentId!.isNotEmpty) {
       final ep = widget.store.getEstablishmentPrice(p.id, widget.establishmentId);
