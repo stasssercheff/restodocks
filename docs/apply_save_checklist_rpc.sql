@@ -28,13 +28,16 @@ DECLARE
   v_item jsonb;
   v_idx int := 0;
 BEGIN
-  SELECT establishment_id INTO v_establishment_id
-  FROM checklists
-  WHERE id = p_checklist_id
-    AND establishment_id IN (SELECT current_user_establishment_ids());
+  SELECT c.establishment_id INTO v_establishment_id
+  FROM checklists c
+  WHERE c.id = p_checklist_id
+    AND (
+      EXISTS (SELECT 1 FROM establishments e WHERE e.id = c.establishment_id AND e.owner_id = auth.uid())
+      OR EXISTS (SELECT 1 FROM employees emp WHERE emp.establishment_id = c.establishment_id AND emp.id = auth.uid())
+    );
 
   IF v_establishment_id IS NULL THEN
-    RAISE EXCEPTION 'checklist not found or access denied';
+    RAISE EXCEPTION 'checklist not found or access denied (auth.uid=% or not owner/employee)', COALESCE(auth.uid()::text, 'NULL');
   END IF;
 
   IF is_current_user_view_only_owner() THEN

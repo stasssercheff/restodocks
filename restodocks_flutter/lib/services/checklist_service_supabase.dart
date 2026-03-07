@@ -249,6 +249,7 @@ class ChecklistServiceSupabase {
       return;
     } catch (e) {
       final msg = e.toString().toLowerCase();
+      print('ChecklistService: save_checklist RPC error: $e');
       if (msg.contains('function') && (msg.contains('does not exist') || msg.contains('not found'))) {
         // RPC ещё не применён — fallback на прямой update
       } else {

@@ -74,12 +74,42 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
     final est = acc.establishment;
     final emp = acc.currentEmployee;
     if (est == null || emp == null) return;
+    final loc = context.read<LocalizationService>();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        final controller = TextEditingController();
+        return AlertDialog(
+          title: Text(loc.t('create_checklist') ?? 'Новый чеклист'),
+          content: TextField(
+            controller: controller,
+            decoration: InputDecoration(
+              labelText: loc.t('checklist_name') ?? 'Название',
+              hintText: 'Например: Ежедневные заготовки',
+            ),
+            autofocus: true,
+            onSubmitted: (_) => Navigator.of(ctx).pop(controller.text.trim()),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(null),
+              child: Text(loc.t('back') ?? 'Отмена'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+              child: Text(loc.t('create') ?? 'Создать'),
+            ),
+          ],
+        );
+      },
+    );
+    if (name == null || !mounted) return;
     try {
       final svc = context.read<ChecklistServiceSupabase>();
       final created = await svc.createChecklist(
         establishmentId: est.id,
         createdBy: emp.id,
-        name: '',
+        name: name.isEmpty ? (loc.t('checklist_no_name') ?? 'Без названия') : name,
         type: ChecklistType.tasks,
         assignedDepartment: widget.department,
       );
