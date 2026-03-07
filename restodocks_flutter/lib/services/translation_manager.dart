@@ -5,18 +5,19 @@ import '../models/translation.dart';
 import 'ai_service_supabase.dart';
 import 'translation_service.dart';
 
-/// Универсальный менеджер переводов
+/// Универсальный менеджер переводов. supportedLanguageCodes — из LocalizationService.productLanguageCodes.
 class TranslationManager {
-  static const List<String> _supportedLanguages = ['ru', 'en'];
-
   final AiServiceSupabase _aiService;
   final TranslationService _translationService;
+  final List<String> Function() _getSupportedLanguages;
 
   TranslationManager({
     required AiServiceSupabase aiService,
     required TranslationService translationService,
+    required List<String> Function() getSupportedLanguages,
   }) : _aiService = aiService,
-       _translationService = translationService;
+       _translationService = translationService,
+       _getSupportedLanguages = getSupportedLanguages;
 
   /// Обработать сохранение сущности и выполнить переводы
   Future<void> handleEntitySave({
@@ -40,7 +41,7 @@ class TranslationManager {
       final sourceText = textFields[fieldName]!;
       if (sourceText.trim().isEmpty) continue;
 
-      for (final targetLang in _supportedLanguages) {
+      for (final targetLang in _getSupportedLanguages()) {
         if (targetLang == detectedLanguage) continue;
 
         try {
@@ -127,7 +128,7 @@ class TranslationManager {
     final translations = <String, String>{};
     translations[sourceLanguage] = productName;
 
-    for (final targetLang in _supportedLanguages) {
+    for (final targetLang in _getSupportedLanguages()) {
       if (targetLang == sourceLanguage) continue;
 
       try {
@@ -173,7 +174,8 @@ class TranslationManager {
       final detectedLang = response?['result']?.toString().trim().toLowerCase() ?? 'en';
 
       // Валидируем
-      return _supportedLanguages.contains(detectedLang) ? detectedLang : 'en';
+      final codes = _getSupportedLanguages();
+      return codes.contains(detectedLang) ? detectedLang : 'en';
     } catch (e) {
       debugPrint('TranslationManager: Failed to detect language: $e');
       return 'en'; // fallback
