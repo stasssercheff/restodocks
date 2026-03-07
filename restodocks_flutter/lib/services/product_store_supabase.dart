@@ -629,16 +629,29 @@ class ProductStoreSupabase {
     }
   }
 
-  /// Удалить ВСЕ продукты из номенклатуры заведения
+  /// Удалить ВСЕ продукты из номенклатуры заведения.
+  /// Использует RPC для быстрого bulk delete (без возврата тысяч строк).
+  /// Fallback на прямой DELETE если RPC ещё не применён.
   Future<void> clearAllNomenclature(String establishmentId) async {
     print('🗑️ ProductStore: Clearing all nomenclature for establishment $establishmentId');
 
     try {
-      // Удаляем все записи из establishment_products для этого заведения
-      await _supabase.client
-          .from('establishment_products')
-          .delete()
-          .eq('establishment_id', establishmentId);
+      try {
+        await _supabase.client.rpc(
+          'clear_establishment_nomenclature',
+          params: {'p_establishment_id': establishmentId},
+        );
+      } on PostgrestException catch (e) {
+        if (e.code == 'PGRST202') {
+          // RPC не найден — fallback на прямой delete
+          await _supabase.client
+              .from('establishment_products')
+              .delete()
+              .eq('establishment_id', establishmentId);
+        } else {
+          rethrow;
+        }
+      }
 
       // Очищаем локальный кэш
       _nomenclatureIds.clear();
