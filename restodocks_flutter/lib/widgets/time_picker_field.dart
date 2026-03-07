@@ -1,8 +1,9 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/services.dart';
 
-/// Поле выбора времени: на мобильном — Cupertino scroll picker, на ПК — ввод цифр без диалога.
+/// Поле выбора времени: на мобильном — Cupertino scroll picker (прокрутка как на iOS),
+/// на веб/ПК — простой ввод цифр HH:mm.
 class TimePickerField extends StatefulWidget {
   const TimePickerField({
     super.key,
@@ -32,22 +33,21 @@ class _TimePickerFieldState extends State<TimePickerField> {
     final initialHour = parts.isNotEmpty ? _parseHour(parts[0]) : 0;
     final initialMin = parts.length > 1 ? _parseMin(parts[1]) : 0;
 
-    // Android, desktop, web — Material showTimePicker (цифры + циферблат)
-    if (defaultTargetPlatform != TargetPlatform.iOS) {
-      final picked = await showTimePicker(
-        context: context,
-        initialTime: TimeOfDay(hour: initialHour, minute: initialMin),
-      );
-      if (picked != null) {
-        widget.onChanged('${_fmt(picked.hour)}:${_fmt(picked.minute)}');
+    // Мобильный (узкий экран) — Cupertino scroll picker, как на iOS
+    final isMobile = MediaQuery.of(context).size.shortestSide < 600;
+
+    if (!isMobile) {
+      // Веб, ПК — простой ввод цифр
+      final result = await _showSimpleTimeInputDialog(initialHour, initialMin);
+      if (result != null) {
+        widget.onChanged('${_fmt(result.$1)}:${_fmt(result.$2)}');
       }
       return;
     }
 
-    // iOS — Cupertino scroll picker
+    // Мобильный — Cupertino scroll picker
     var duration = Duration(hours: initialHour, minutes: initialMin);
-    Duration? result;
-    await showModalBottomSheet<void>(
+    final result = await showModalBottomSheet<Duration>(
       context: context,
       isScrollControlled: true,
       builder: (ctx) => SafeArea(
@@ -76,10 +76,7 @@ class _TimePickerFieldState extends State<TimePickerField> {
                     ),
                     const SizedBox(width: 8),
                     FilledButton(
-                      onPressed: () {
-                        result = duration;
-                        Navigator.of(ctx).pop();
-                      },
+                      onPressed: () => Navigator.of(ctx).pop(duration),
                       child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
                     ),
                   ],
@@ -97,6 +94,78 @@ class _TimePickerFieldState extends State<TimePickerField> {
     }
   }
 
+  /// Диалог с простым вводом времени цифрами (час и минуты).
+  Future<(int, int)?> _showSimpleTimeInputDialog(int initialHour, int initialMin) async {
+    final hourController = TextEditingController(text: _fmt(initialHour));
+    final minController = TextEditingController(text: _fmt(initialMin));
+
+    return showDialog<(int, int)?>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(widget.label),
+        content: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 56,
+              child: TextField(
+                controller: hourController,
+                keyboardType: TextInputType.number,
+                maxLength: 2,
+                textAlign: TextAlign.center,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  _TimeInputFormatter(0, 23),
+                ],
+                decoration: const InputDecoration(
+                  labelText: 'ЧЧ',
+                  counterText: '',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Text(':', style: Theme.of(ctx).textTheme.headlineSmall),
+            ),
+            SizedBox(
+              width: 56,
+              child: TextField(
+                controller: minController,
+                keyboardType: TextInputType.number,
+                maxLength: 2,
+                textAlign: TextAlign.center,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  _TimeInputFormatter(0, 59),
+                ],
+                decoration: const InputDecoration(
+                  labelText: 'ММ',
+                  counterText: '',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null),
+            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+          ),
+          FilledButton(
+            onPressed: () {
+              final h = _parseHour(hourController.text);
+              final m = _parseMin(minController.text);
+              Navigator.of(ctx).pop((h, m));
+            },
+            child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return InkWell(
@@ -112,5 +181,26 @@ class _TimePickerFieldState extends State<TimePickerField> {
         child: Text(widget.value.isEmpty ? 'HH:mm' : widget.value),
       ),
     );
+  }
+}
+
+/// Ограничивает ввод числом в диапазоне [minVal, maxVal].
+class _TimeInputFormatter extends TextInputFormatter {
+  final int minVal;
+  final int maxVal;
+
+  _TimeInputFormatter(this.minVal, this.maxVal);
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (newValue.text.isEmpty) return newValue;
+    final n = int.tryParse(newValue.text);
+    if (n == null) return oldValue;
+    if (n < minVal) return TextEditingValue(text: minVal.toString(), selection: TextSelection.collapsed(offset: minVal.toString().length));
+    if (n > maxVal) return TextEditingValue(text: maxVal.toString(), selection: TextSelection.collapsed(offset: maxVal.toString().length));
+    return newValue;
   }
 }

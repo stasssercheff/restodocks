@@ -662,14 +662,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         return ListTile(
                           leading: Text(language['flag']!, style: const TextStyle(fontSize: 24)),
                           title: Text(language['name']!),
-                          onTap: () async {
+                            onTap: () async {
                             final code = language['code']!;
                             await localization.setLocale(Locale(code));
                             if (ctx.mounted) {
                               await ctx.read<AccountManagerSupabase>().savePreferredLanguage(code);
                               Navigator.of(ctx).pop();
-                              // Фоновая подстановка переводов продуктов для нового языка
-                              _translateProductsForLanguage(ctx, code);
+                              // Фоновая подстановка переводов продуктов через Edge Function (DeepL)
+                              _translateProductsForLanguage(context, code);
                             }
                           },
                         );
@@ -686,48 +686,57 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   /// Переводит продукты, у которых нет имени на выбранном языке (в фоне).
-  /// Автоматически вызывается при смене языка в профиле.
+  /// Использует Edge Function auto-translate-product (DeepL) — работает на web.
   void _translateProductsForLanguage(BuildContext context, String targetLang) {
     final store = context.read<ProductStoreSupabase>();
-    final aiService = context.read<AiServiceSupabase>();
     final scaffoldMessenger = ScaffoldMessenger.of(context);
     final loc = context.read<LocalizationService>();
+
+    final needTranslation = <Product>[];
     Future(() async {
-      // Сначала загружаем продукты, чтобы store.allProducts не был пустым
       await store.loadProducts(force: true);
-      final translationService = TranslationService(
-        aiService: aiService,
-        supabase: SupabaseService(),
-      );
-      int updated = 0;
       for (final p in store.allProducts) {
         final names = p.names ?? {};
         if ((names[targetLang] ?? '').trim().isNotEmpty) continue;
-        final source = (names['ru'] ?? names['en'] ?? p.name).toString().trim();
-        if (source.isEmpty) continue;
-        final sourceLang = names['ru'] != null && (names['ru'] ?? '').trim().isNotEmpty ? 'ru' : 'en';
-        if (sourceLang == targetLang) continue;
+        if ((p.name).trim().isEmpty) continue;
+        needTranslation.add(p);
+      }
+      if (needTranslation.isEmpty) return;
+
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              ),
+              const SizedBox(width: 12),
+              Text(loc.t('translating_products')),
+            ],
+          ),
+          duration: const Duration(hours: 1),
+        ),
+      );
+
+      int updated = 0;
+      for (final p in needTranslation) {
         try {
-          final tr = await translationService.translate(
-            entityType: TranslationEntityType.product,
-            entityId: p.id ?? p.name,
-            fieldName: 'name',
-            text: source,
-            from: sourceLang,
-            to: targetLang,
-          );
-          if (tr != null && tr.trim().isNotEmpty) {
-            final merged = Map<String, String>.from(names)..[targetLang] = tr.trim();
-            await store.updateProduct(p.copyWith(names: merged));
+          final result = await store.translateProductAwait(p.id);
+          if (result != null && (result[targetLang] ?? '').trim().isNotEmpty) {
             updated++;
           }
         } catch (_) {}
       }
-      if (updated > 0) {
-        scaffoldMessenger.showSnackBar(
-          SnackBar(content: Text('${loc.t('translate_done')} (+$updated)')),
-        );
-      }
+
+      scaffoldMessenger.removeCurrentSnackBar();
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text(updated > 0 ? '${loc.t('translate_done')} (+$updated)' : loc.t('translate_done')),
+          backgroundColor: updated > 0 ? Colors.green : null,
+        ),
+      );
     });
   }
 
