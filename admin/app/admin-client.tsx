@@ -92,12 +92,19 @@ function EstablishmentsTab() {
   const [data, setData] = useState<Establishment[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
+    setError(null)
     const res = await fetch('/api/establishments')
     const json = await res.json()
-    setData(Array.isArray(json) ? json : [])
+    if (!res.ok) {
+      setError(typeof json?.error === 'string' ? json.error : 'Ошибка загрузки')
+      setData([])
+    } else {
+      setData(Array.isArray(json) ? json : [])
+    }
     setLoading(false)
   }, [])
 
@@ -125,6 +132,11 @@ function EstablishmentsTab() {
 
   return (
     <>
+      {error && (
+        <div className="mb-4 p-4 bg-red-900/30 border border-red-700 rounded-lg text-red-200 text-sm">
+          {error} — проверь GitHub Secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+        </div>
+      )}
       <div className="grid grid-cols-3 gap-2 mb-4 sm:gap-3 sm:mb-8">
         <StatCard label="Заведений" value={total} />
         <StatCard label="Сотрудников" value={totalEmployees} />
@@ -211,6 +223,7 @@ function PromoTab() {
   const [codes, setCodes] = useState<PromoCode[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [newCode, setNewCode] = useState('')
   const [newNote, setNewNote] = useState('')
   const [newStartDate, setNewStartDate] = useState('')
@@ -221,9 +234,15 @@ function PromoTab() {
 
   const loadCodes = useCallback(async () => {
     setLoading(true)
+    setError(null)
     const res = await fetch('/api/promo')
     const data = await res.json()
-    setCodes(Array.isArray(data) ? data : [])
+    if (!res.ok) {
+      setError(typeof data?.error === 'string' ? data.error : 'Ошибка загрузки')
+      setCodes([])
+    } else {
+      setCodes(Array.isArray(data) ? data : [])
+    }
     setLoading(false)
   }, [])
 
@@ -312,6 +331,11 @@ function PromoTab() {
 
   return (
     <>
+      {error && (
+        <div className="mb-4 p-4 bg-red-900/30 border border-red-700 rounded-lg text-red-200 text-sm">
+          {error}
+        </div>
+      )}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4 sm:gap-3 sm:mb-6">
         <StatCard label="Всего" value={total} />
         <StatCard label="Свободно" value={freeCount} />
