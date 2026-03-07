@@ -38,6 +38,18 @@ $$;
 GRANT EXECUTE ON FUNCTION public.update_checklist_dates(uuid, timestamptz, timestamptz) TO anon;
 GRANT EXECUTE ON FUNCTION public.update_checklist_dates(uuid, timestamptz, timestamptz) TO authenticated;
 
+-- 4b. CHECKLIST_SUBMISSIONS: filled_by_employee_id (приложение пишет эту колонку)
+ALTER TABLE checklist_submissions ADD COLUMN IF NOT EXISTS filled_by_employee_id UUID REFERENCES employees(id) ON DELETE SET NULL;
+ALTER TABLE checklist_submissions ADD COLUMN IF NOT EXISTS submitted_by_employee_id UUID REFERENCES employees(id) ON DELETE SET NULL;
+ALTER TABLE checklist_submissions ADD COLUMN IF NOT EXISTS recipient_chef_id UUID REFERENCES employees(id) ON DELETE SET NULL;
+ALTER TABLE checklist_submissions ADD COLUMN IF NOT EXISTS checklist_name TEXT DEFAULT '';
+ALTER TABLE checklist_submissions ADD COLUMN IF NOT EXISTS section TEXT;
+DO $$ BEGIN
+  ALTER TABLE checklist_submissions ALTER COLUMN recipient_chef_id DROP NOT NULL;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+UPDATE checklist_submissions SET filled_by_employee_id = submitted_by_employee_id WHERE filled_by_employee_id IS NULL AND submitted_by_employee_id IS NOT NULL;
+
 -- 5. EMPLOYEE DIRECT MESSAGES (таблица для личных сообщений)
 --    ⚠️ После выполнения: Settings → General → Restart project
 CREATE TABLE IF NOT EXISTS employee_direct_messages (
