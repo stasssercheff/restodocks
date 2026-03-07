@@ -24,6 +24,7 @@ AS $$
 DECLARE
   v_item jsonb;
   v_idx int := 0;
+  v_updated int;
 BEGIN
   UPDATE checklists SET
     name = p_name,
@@ -38,6 +39,10 @@ BEGIN
     additional_name = p_additional_name,
     type = p_type
   WHERE id = p_checklist_id;
+  GET DIAGNOSTICS v_updated = ROW_COUNT;
+  IF v_updated = 0 THEN
+    RAISE EXCEPTION 'save_checklist: checklist % not found or not updated', p_checklist_id;
+  END IF;
 
   DELETE FROM checklist_items WHERE checklist_id = p_checklist_id;
 

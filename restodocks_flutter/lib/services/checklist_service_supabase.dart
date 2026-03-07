@@ -217,34 +217,40 @@ class ChecklistServiceSupabase {
     final now = DateTime.now().toUtc().toIso8601String();
     final empIds = checklist.assignedEmployeeIds ?? [];
     final empId = empIds.isNotEmpty ? empIds.first : checklist.assignedEmployeeId;
+    final itemsPayload = checklist.items
+        .map((e) => {
+              'title': e.title,
+              'sort_order': e.sortOrder,
+              'tech_card_id': e.techCardId,
+              'target_quantity': e.targetQuantity,
+              'target_unit': e.targetUnit,
+            })
+        .toList();
 
-    // RPC обходит RLS — работает при любых политиках
-    await _supabase.client.rpc(
-      'save_checklist',
-      params: {
-        'p_checklist_id': checklist.id,
-        'p_name': checklist.name,
-        'p_updated_at': now,
-        'p_action_config': checklist.actionConfig.toJson(),
-        'p_assigned_department': checklist.assignedDepartment,
-        'p_assigned_section': checklist.assignedSection,
-        'p_assigned_employee_id': empId,
-        'p_assigned_employee_ids': empIds,
-        'p_deadline_at': checklist.deadlineAt?.toUtc().toIso8601String(),
-        'p_scheduled_for_at': checklist.scheduledForAt?.toUtc().toIso8601String(),
-        'p_additional_name': checklist.additionalName,
-        'p_type': checklist.type?.code,
-        'p_items': checklist.items
-            .map((e) => {
-                  'title': e.title,
-                  'sort_order': e.sortOrder,
-                  'tech_card_id': e.techCardId,
-                  'target_quantity': e.targetQuantity,
-                  'target_unit': e.targetUnit,
-                })
-            .toList(),
-      },
-    );
+    try {
+      await _supabase.client.rpc(
+        'save_checklist',
+        params: {
+          'p_checklist_id': checklist.id,
+          'p_name': checklist.name,
+          'p_updated_at': now,
+          'p_action_config': checklist.actionConfig.toJson(),
+          'p_assigned_department': checklist.assignedDepartment,
+          'p_assigned_section': checklist.assignedSection,
+          'p_assigned_employee_id': empId,
+          'p_assigned_employee_ids': empIds,
+          'p_deadline_at': checklist.deadlineAt?.toUtc().toIso8601String(),
+          'p_scheduled_for_at': checklist.scheduledForAt?.toUtc().toIso8601String(),
+          'p_additional_name': checklist.additionalName,
+          'p_type': checklist.type?.code,
+          'p_items': itemsPayload,
+        },
+      );
+      return;
+    } catch (e) {
+      print('ChecklistService: RPC save_checklist failed: $e');
+      rethrow;
+    }
   }
 
   Future<void> deleteChecklist(String id) async {
