@@ -370,6 +370,84 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  void _showClearNomenclatureConfirm(BuildContext context, LocalizationService loc) {
+    showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('clear_nomenclature') ?? 'Очистить номенклатуру?'),
+        content: Text(
+          loc.t('clear_nomenclature_confirm') ??
+              'Это действие удалит ВСЕ продукты из номенклатуры заведения.\n\n'
+              'Продукты можно добавить заново через загрузку.\n\n'
+              'Это действие нельзя отменить!',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: Text(loc.t('clear_nomenclature') ?? 'Удалить всё'),
+          ),
+        ],
+      ),
+    ).then((confirmed) async {
+      if (confirmed != true || !context.mounted) return;
+      final store = context.read<ProductStoreSupabase>();
+      final account = context.read<AccountManagerSupabase>();
+      final estId = account.dataEstablishmentId;
+      if (estId == null) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(loc.t('establishment') ?? 'Не найдено заведение')),
+          );
+        }
+        return;
+      }
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          content: Row(
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(width: 16),
+              Text(loc.t('clear_nomenclature_progress') ?? 'Очищаем номенклатуру...'),
+            ],
+          ),
+        ),
+      );
+      try {
+        await store.clearAllNomenclature(estId);
+        if (context.mounted && Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(loc.t('clear_nomenclature_done') ?? 'Вся номенклатура очищена'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (context.mounted && Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${loc.t('error') ?? 'Ошибка'}: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    });
+  }
+
   void _showTtkBranchFilterPicker(
     BuildContext context,
     LocalizationService loc,
@@ -1043,6 +1121,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 subtitle: Text(establishment?.currencySymbol ?? Establishment.currencySymbolFor(establishment?.defaultCurrency ?? 'VND')),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => _showCurrencyPicker(context, localization),
+              ),
+            ],
+            // Очистить номенклатуру — шеф, барменеджер, менеджер зала
+            if (currentEmployee.hasRole('executive_chef') || currentEmployee.hasRole('bar_manager') || currentEmployee.hasRole('floor_manager')) ...[
+              ListTile(
+                leading: const Icon(Icons.delete_forever, color: Colors.red),
+                title: Text(localization.t('clear_nomenclature') ?? 'Очистить номенклатуру'),
+                subtitle: Text(localization.t('clear_nomenclature_hint') ?? 'Удалить все продукты из номенклатуры заведения'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _showClearNomenclatureConfirm(context, localization),
               ),
             ],
             // Настройки про — одна кнопка: статус, промокод, кнопка «Домой»
