@@ -2,7 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const DEEPL_URL = "https://api-free.deepl.com/v2/translate";
-const SUPPORTED_LANGS = ["ru", "en"];
+const SUPPORTED_LANGS = ["ru", "en", "es"];
 
 function corsHeaders(origin: string | null) {
   return {
@@ -31,16 +31,20 @@ async function translateWithDeepL(
   const src = sourceLang.toUpperCase();
   const tgt = targetLang.toUpperCase();
 
-  // Проверяем кэш
-  const { data: cached } = await supabase
-    .from("translation_cache")
-    .select("translated")
-    .eq("source_text", text.trim())
-    .eq("source_lang", src)
-    .eq("target_lang", tgt)
-    .maybeSingle();
+  // Проверяем кэш (если таблица есть)
+  try {
+    const { data: cached } = await supabase
+      .from("translation_cache")
+      .select("translated")
+      .eq("source_text", text.trim())
+      .eq("source_lang", src)
+      .eq("target_lang", tgt)
+      .maybeSingle();
 
-  if (cached?.translated) return cached.translated as string;
+    if (cached?.translated) return cached.translated as string;
+  } catch (e) {
+    console.log("[auto-translate-product] Cache read skip:", (e as Error)?.message);
+  }
 
   // Запрашиваем DeepL
   const res = await fetch(DEEPL_URL, {
@@ -61,11 +65,13 @@ async function translateWithDeepL(
   const translated = data?.translations?.[0]?.text?.trim();
   if (!translated) return null;
 
-  // Сохраняем в кэш
-  await supabase.from("translation_cache").upsert(
-    { source_text: text.trim(), source_lang: src, target_lang: tgt, translated },
-    { onConflict: "source_text,source_lang,target_lang" },
-  );
+  // Сохраняем в кэш (если таблица есть)
+  try {
+    await supabase.from("translation_cache").upsert(
+      { source_text: text.trim(), source_lang: src, target_lang: tgt, translated },
+      { onConflict: "source_text,source_lang,target_lang" },
+    );
+  } catch (_) {}
 
   return translated;
 }
@@ -165,6 +171,8 @@ Deno.serve(async (req: Request) => {
   const { product_id } = body;
   if (!product_id) return jsonResponse({ error: "product_id or batch required" }, 400, origin);
 
+  console.log("[auto-translate-product] Processing product_id:", product_id);
+
   const { data: product, error: fetchError } = await supabase
     .from("products")
     .select("id, name, names")
@@ -182,6 +190,8 @@ Deno.serve(async (req: Request) => {
   const updatedNames: Record<string, string> = { ...names, [sourceLang]: sourceText };
   let needsUpdate = false;
 
+  console.log("[auto-translate-product] sourceLang:", sourceLang, "sourceText:", sourceText?.slice(0, 30));
+
   for (const targetLang of SUPPORTED_LANGS) {
     if (targetLang === sourceLang) continue;
     if (updatedNames[targetLang]?.trim() && updatedNames[targetLang] !== sourceText) continue;
@@ -190,12 +200,17 @@ Deno.serve(async (req: Request) => {
     if (result && result !== sourceText) {
       updatedNames[targetLang] = result;
       needsUpdate = true;
+      console.log("[auto-translate-product] Translated to", targetLang, ":", result?.slice(0, 30));
+    } else {
+      console.log("[auto-translate-product] No translation for", targetLang, "result:", result ? "same text" : "null");
     }
   }
 
   if (needsUpdate) {
-    await supabase.from("products").update({ names: updatedNames }).eq("id", product.id);
+    const { error: updateErr } = await supabase.from("products").update({ names: updatedNames }).eq("id", product.id);
+    if (updateErr) console.error("[auto-translate-product] DB update error:", updateErr.message);
   }
 
+  console.log("[auto-translate-product] Done. needsUpdate:", needsUpdate);
   return jsonResponse({ product_id, names: updatedNames, updated: needsUpdate }, 200, origin);
 });

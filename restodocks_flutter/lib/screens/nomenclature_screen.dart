@@ -6,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
@@ -329,6 +330,11 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
   // Список элементов номенклатуры (продукты + ТТК ПФ)
   List<NomenclatureItem> _nomenclatureItems = [];
   bool _isLoading = true;
+  bool _isTranslatingProducts = false;
+  int _translatingDone = 0;   // реально переведено (шкала = done/total)
+  int _translatingTotal = 0;
+  int _translatingProcessed = 0; // обработано вызовов API
+  bool _hasRunAutoTranslationThisSession = false;
 
   // Активная вкладка
   _NomTab _selectedTab = _NomTab.nomenclature;
@@ -339,7 +345,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _ensureLoaded());
   }
 
-  Future<void> _ensureLoaded() async {
+  Future<void> _ensureLoaded({bool skipAutoTranslation = false}) async {
     final store = context.read<ProductStoreSupabase>();
     final account = context.read<AccountManagerSupabase>();
     final est = account.establishment;
@@ -365,7 +371,141 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       }
     }
 
-    if (mounted) setState(() => _isLoading = false);
+    if (mounted) {
+      setState(() => _isLoading = false);
+      // Автоперевод только один раз за сессию или не сразу после неудачного прогона
+      if (!skipAutoTranslation && !_hasRunAutoTranslationThisSession) {
+        final loc = context.read<LocalizationService>();
+        if (loc.currentLanguageCode != 'ru') {
+          final needTranslate = _nomenclatureItems
+              .where((i) => i.isProduct && _needsTranslation(i))
+              .map((i) => i.product!)
+              .toList();
+          if (needTranslate.isNotEmpty) {
+            final shouldSkip = await _shouldSkipAutoTranslate();
+            if (!shouldSkip && mounted) {
+              _hasRunAutoTranslationThisSession = true;
+              _runAutoTranslation(needTranslate);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  static const _kAutoTranslateSkipKey = 'nomenclature_autotranslate_skip_until';
+  static const _kAutoTranslateSkipMinutes = 30;
+
+  /// Не запускать автоперевод сразу после неудачного прогона (0 обновлений).
+  Future<bool> _shouldSkipAutoTranslate() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final until = prefs.getInt(_kAutoTranslateSkipKey);
+      if (until != null && DateTime.now().millisecondsSinceEpoch < until) return true;
+    } catch (_) {}
+    return false;
+  }
+
+  /// Запомнить, что автоперевод дал 0 обновлений — не запускать снова 30 мин.
+  Future<void> _markAutoTranslateZeroUpdates() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final until = DateTime.now().add(const Duration(minutes: _kAutoTranslateSkipMinutes));
+      await prefs.setInt(_kAutoTranslateSkipKey, until.millisecondsSinceEpoch);
+    } catch (_) {}
+  }
+
+  /// Фоновый перевод продуктов (Edge Function DeepL). Один прогон, честная шкала.
+  /// setState не чаще чем раз в 10 продуктов — меньше мерцания.
+  /// Пауза между запросами — снизить rate limit DeepL.
+  Future<void> _runAutoTranslation(List<Product> list) async {
+    if (_isTranslatingProducts || !mounted) return;
+    setState(() {
+      _isTranslatingProducts = true;
+      _translatingDone = 0;
+      _translatingTotal = list.length;
+      _translatingProcessed = 0;
+    });
+    final store = context.read<ProductStoreSupabase>();
+    final loc = context.read<LocalizationService>();
+    final translationSvc = context.read<TranslationService>();
+    final targetLang = loc.currentLanguageCode;
+    const sourceLang = 'ru';
+    int updated = 0;
+    const setStateEvery = 10; // реже setState — меньше мерцания
+    for (var i = 0; i < list.length; i++) {
+      if (!mounted) return;
+      Product? updatedProduct;
+      try {
+        var r = await store.translateProductAwait(list[i].id);
+        // Fallback: если DeepL не вернул перевод — пробуем TranslationService (Google/MyMemory)
+        if ((r == null || (r[targetLang] ?? '').trim().isEmpty)) {
+          final p = list[i];
+          final sourceText = (p.names?[sourceLang] ?? p.name).trim();
+          if (sourceText.isNotEmpty) {
+            final translated = await translationSvc.translate(
+              entityType: TranslationEntityType.product,
+              entityId: p.id,
+              fieldName: 'name',
+              text: sourceText,
+              from: sourceLang,
+              to: targetLang,
+            );
+            if (translated != null && translated.trim().isNotEmpty && translated != sourceText) {
+              final merged = Map<String, String>.from(p.names ?? {});
+              merged[sourceLang] = sourceText;
+              merged[targetLang] = translated.trim();
+              final upd = p.copyWith(names: merged);
+              await store.updateProduct(upd);
+              r = merged;
+              updatedProduct = upd;
+            }
+          }
+        } else {
+          updatedProduct = store.allProducts.where((p) => p.id == list[i].id).firstOrNull;
+        }
+        if (r != null && (r[targetLang] ?? '').trim().isNotEmpty) {
+          updated++;
+          _translatingDone = updated; // шкала = только реально переведённые
+          if (updatedProduct != null && mounted) {
+            final idx = _nomenclatureItems.indexWhere((item) => item.isProduct && item.product!.id == list[i].id);
+            if (idx >= 0) {
+              _nomenclatureItems = List.from(_nomenclatureItems)
+                ..[idx] = NomenclatureItem.product(updatedProduct);
+            }
+          }
+        }
+        // Пауза между запросами — снизить rate limit
+        if (i < list.length - 1) await Future<void>.delayed(const Duration(milliseconds: 400));
+      } catch (_) {}
+      _translatingProcessed = i + 1;
+      // setState: при успешных переводах, при прогрессе обработки (каждые N), в конце
+      if (!mounted) return;
+      if ((updated > 0 && updated % setStateEvery == 0) ||
+          _translatingProcessed % setStateEvery == 0 ||
+          i == list.length - 1) {
+        setState(() {});
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _isTranslatingProducts = false;
+      _translatingTotal = 0;
+    });
+    await _ensureLoaded(skipAutoTranslation: true);
+    if (mounted) {
+      setState(() {});
+      if (updated == 0) await _markAutoTranslateZeroUpdates();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            updated > 0 ? '${loc.t('translate_done')} (+$updated)' : loc.t('translate_no_changes'),
+          ),
+          backgroundColor: updated > 0 ? Colors.green : null,
+          duration: updated > 0 ? const Duration(seconds: 3) : const Duration(seconds: 5),
+        ),
+      );
+    }
   }
 
   /// Категории продуктов/ПФ для подразделений. general = без фильтра (все).
@@ -848,7 +988,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
               await store.removeFromNomenclature(estId, id);
             }
           }
-          await _ensureLoaded();
+          await _ensureLoaded(skipAutoTranslation: true);
           if (mounted) setState(() {});
         },
       ),
@@ -908,7 +1048,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         store: store,
         loc: loc,
         establishmentId: estId,
-        onSaved: () => _ensureLoaded().then((_) => setState(() {})),
+        onSaved: () => _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {})),
         isCreate: true,
       ),
     );
@@ -1055,7 +1195,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         loc: loc,
         onComplete: () {
           Navigator.of(ctx).pop();
-          _ensureLoaded().then((_) => setState(() {}));
+          _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {}));
           if (ctx.mounted) {
             ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(loc.t('kbju_load_done'))));
           }
@@ -1067,7 +1207,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         },
       ),
     );
-    if (context.mounted) _ensureLoaded().then((_) => setState(() {}));
+    if (context.mounted) _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {}));
   }
 
   Future<void> _loadTranslationsForAll(BuildContext context, List<Product> list) async {
@@ -1083,7 +1223,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         loc: loc,
         onComplete: () {
           Navigator.of(ctx).pop();
-          _ensureLoaded().then((_) => setState(() {}));
+          _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {}));
           if (ctx.mounted) {
             ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(loc.t('translate_done'))));
           }
@@ -1095,7 +1235,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         },
       ),
     );
-    if (context.mounted) _ensureLoaded().then((_) => setState(() {}));
+    if (context.mounted) _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {}));
   }
 
   Future<void> _verifyWithAi(BuildContext context, List<Product> list) async {
@@ -1127,7 +1267,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     final withSuggestions = results.where((e) => e.hasAnySuggestion).toList();
     if (withSuggestions.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('verify_no_suggestions'))));
-      _ensureLoaded().then((_) => setState(() {}));
+      _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {}));
       return;
     }
     await showDialog<void>(
@@ -1138,14 +1278,14 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         loc: loc,
         onApplied: () {
           Navigator.of(ctx).pop();
-          _ensureLoaded().then((_) => setState(() {}));
+          _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {}));
           if (ctx.mounted) {
             ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(loc.t('verify_applied'))));
           }
         },
       ),
     );
-    if (context.mounted) _ensureLoaded().then((_) => setState(() {}));
+    if (context.mounted) _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {}));
   }
 
   Widget _tabChip(_NomTab tab, String label) {
@@ -1239,10 +1379,10 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
               tooltip: loc.t('default_currency'),
             ),
           ],
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () async {
-              await _ensureLoaded();
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: () async {
+              await _ensureLoaded(skipAutoTranslation: true);
               if (mounted) setState(() {});
             },
             tooltip: loc.t('refresh'),
@@ -1251,6 +1391,63 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       ),
       body: Column(
         children: [
+          // ── Баннер «Переводим продукты» с прогрессом ────────────────────────
+          if (_isTranslatingProducts)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              color: Theme.of(context).colorScheme.primaryContainer,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          value: _translatingTotal > 0 ? _translatingDone / _translatingTotal : null,
+                          color: Theme.of(context).colorScheme.onPrimaryContainer,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '${loc.t('translating_products')} '
+                              '${loc.t('translated_count').replaceFirst('%s', '$_translatingDone').replaceFirst('%s', '$_translatingTotal')}',
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            if (_translatingProcessed < _translatingTotal && _translatingTotal > 0)
+                              Text(
+                                loc.t('processed_count').replaceFirst('%s', '$_translatingProcessed').replaceFirst('%s', '$_translatingTotal'),
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.onPrimaryContainer.withOpacity(0.8),
+                                  fontSize: 12,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  LinearProgressIndicator(
+                    value: _translatingTotal > 0 ? _translatingDone / _translatingTotal : 0,
+                    backgroundColor: Theme.of(context).colorScheme.onPrimaryContainer.withOpacity(0.3),
+                    valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.onPrimaryContainer),
+                  ),
+                ],
+              ),
+            ),
           // ── Переключатель вкладок (FilterChip, как в Входящих) ──────────────
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -1264,7 +1461,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  _tabChip(_NomTab.nomenclature, 'Номенклатура'),
+                  _tabChip(_NomTab.nomenclature, loc.t('nomenclature')),
                   const SizedBox(width: 8),
                   _tabChip(_NomTab.iiko, 'iiko'),
                 ],
@@ -1305,13 +1502,14 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                               filterType: _nomFilter,
                               onSortChanged: (s) => setState(() => _nomSort = s),
                               onFilterTypeChanged: (f) => setState(() => _nomFilter = f),
-                              onRefresh: () => _ensureLoaded().then((_) => setState(() {})),
+                              onRefresh: () => _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {})),
                               onSwitchToCatalog: () => _showCreateProductDialog(loc),
-                              onEditProduct: (ctx, p) => _showEditProductForNomenclature(ctx, p, store, loc, () => _ensureLoaded().then((_) => setState(() {})), estId ?? ''),
-                              onRemoveProduct: (ctx, p) => _confirmRemoveForNomenclature(ctx, p, store, loc, () => _ensureLoaded().then((_) => setState(() {})), estId ?? ''),
+                              onEditProduct: (ctx, p) => _showEditProductForNomenclature(ctx, p, store, loc, () => _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {})), estId ?? ''),
+                              onRemoveProduct: (ctx, p) => _confirmRemoveForNomenclature(ctx, p, store, loc, () => _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {})), estId ?? ''),
                               onLoadKbju: (ctx, list) => _loadKbjuForAll(ctx, list),
                               onLoadTranslations: (ctx, list) => _loadTranslationsForAll(ctx, list),
                               onVerifyWithAi: (ctx, list) => _verifyWithAi(ctx, list),
+                              isTranslating: _isTranslatingProducts,
                               onNeedsKbju: (item) => _needsKbju(item),
                               onNeedsTranslation: (item) => _needsTranslation(item),
                               onCanShowNutrition: (context) => _canShowNutrition(context),
@@ -1927,6 +2125,7 @@ class _NomenclatureTab extends StatefulWidget {
     required this.onLoadKbju,
     required this.onLoadTranslations,
     required this.onVerifyWithAi,
+    required this.isTranslating,
     required this.onNeedsKbju,
     required this.onNeedsTranslation,
     required this.onCanShowNutrition,
@@ -1950,6 +2149,7 @@ class _NomenclatureTab extends StatefulWidget {
   final void Function(BuildContext, List<Product>) onLoadKbju;
   final void Function(BuildContext, List<Product>) onLoadTranslations;
   final void Function(BuildContext, List<Product>) onVerifyWithAi;
+  final bool isTranslating;
   final bool Function(NomenclatureItem) onNeedsKbju;
   final bool Function(NomenclatureItem) onNeedsTranslation;
   final bool Function(BuildContext) onCanShowNutrition;
@@ -2022,6 +2222,12 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
                     onPressed: () => widget.onLoadKbju(context, needsKbju.where((item) => item.isProduct).map((item) => item.product!).toList()),
                     icon: const Icon(Icons.cloud_download, size: 20),
                     label: Text(widget.loc.t('load_kbju_for_all').replaceAll('%s', '${needsKbju.length}')),
+                  ),
+                if (needsTranslation.isNotEmpty && !widget.isTranslating)
+                  FilledButton.tonalIcon(
+                    onPressed: () => widget.onLoadTranslations(context, needsTranslation.where((item) => item.isProduct).map((item) => item.product!).toList()),
+                    icon: const Icon(Icons.translate, size: 20),
+                    label: Text(widget.loc.t('translate_names_for_all').replaceAll('%s', '${needsTranslation.length}')),
                   ),
               ],
             ),
@@ -2590,43 +2796,14 @@ class _LoadTranslationsProgressDialogState extends State<_LoadTranslationsProgre
   }
 
   Future<void> _run() async {
-    final translationService = TranslationService(
-      aiService: context.read<AiServiceSupabase>(),
-      supabase: context.read<SupabaseService>(),
-    );
-    final allLangs = LocalizationService.productLanguageCodes;
     for (final p in widget.list) {
       try {
-        final source = p.names?['ru'] ?? p.names?['en'] ?? p.name;
-        if (source.trim().isEmpty) {
+        if ((p.name).trim().isEmpty) {
           setState(() => _done++);
           continue;
         }
-        final missing = allLangs.where((c) => (p.names?[c] ?? '').trim().isEmpty).toList();
-        if (missing.isEmpty) {
-          setState(() => _done++);
-          continue;
-        }
-        final sourceLang = p.names?['ru'] != null && (p.names!['ru'] ?? '').trim().isNotEmpty
-            ? 'ru'
-            : (p.names?['en'] != null && (p.names!['en'] ?? '').trim().isNotEmpty ? 'en' : 'ru');
-        final merged = Map<String, String>.from(p.names ?? {});
-        for (final target in missing) {
-          if (target == sourceLang) continue;
-          final tr = await translationService.translate(
-            entityType: TranslationEntityType.product,
-            entityId: p.id ?? p.name,
-            fieldName: 'name',
-            text: source,
-            from: sourceLang,
-            to: target,
-          );
-          if (tr != null && tr.trim().isNotEmpty) merged[target] = tr;
-          await Future<void>.delayed(const Duration(milliseconds: 150));
-        }
-        if (merged.length > (p.names?.length ?? 0)) {
-          final updated = p.copyWith(names: merged);
-          await widget.store.updateProduct(updated);
+        final result = await widget.store.translateProductAwait(p.id);
+        if (result != null && result.length > (p.names?.length ?? 0)) {
           if (!mounted) return;
           setState(() => _updated++);
         }
@@ -3127,7 +3304,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
   void initState() {
     super.initState();
     final p = widget.product;
-    _nameController = TextEditingController(text: p.name);
+    _nameController = TextEditingController(text: p.getLocalizedName(widget.loc.currentLanguageCode));
     double? initialPrice = p.basePrice;
     if (widget.establishmentId != null && widget.establishmentId!.isNotEmpty) {
       final ep = widget.store.getEstablishmentPrice(p.id, widget.establishmentId);

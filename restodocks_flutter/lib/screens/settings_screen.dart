@@ -370,6 +370,127 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  void _showClearNomenclatureConfirm(BuildContext context, LocalizationService loc) {
+    final account = context.read<AccountManagerSupabase>();
+    final establishment = account.establishment;
+    if (establishment == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('establishment') ?? 'Не найдено заведение')),
+      );
+      return;
+    }
+    final pinController = TextEditingController();
+    final pinKey = GlobalKey<FormState>();
+    showDialog<String?>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('clear_nomenclature') ?? 'Очистить номенклатуру?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              loc.t('clear_nomenclature_enter_pin') ?? 'Введите PIN заведения для подтверждения:',
+              style: Theme.of(ctx).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 12),
+            Form(
+              key: pinKey,
+              child: TextFormField(
+                controller: pinController,
+                obscureText: true,
+                autofocus: true,
+                textCapitalization: TextCapitalization.characters,
+                decoration: InputDecoration(
+                  labelText: loc.t('company_pin') ?? 'PIN компании',
+                  hintText: loc.t('enter_company_pin') ?? 'Введите PIN компании',
+                ),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return loc.t('company_pin_required') ?? 'PIN обязателен';
+                  return null;
+                },
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null),
+            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (!pinKey.currentState!.validate()) return;
+              final pin = pinController.text.trim();
+              if (!establishment.verifyPinCode(pin)) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  SnackBar(content: Text(loc.t('clear_nomenclature_wrong_pin') ?? 'Неверный PIN')),
+                );
+                return;
+              }
+              Navigator.of(ctx).pop(pin);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: Text(loc.t('clear_nomenclature') ?? 'Удалить всё'),
+          ),
+        ],
+      ),
+    ).then((pinVerified) async {
+      if (pinVerified == null || !context.mounted) return;
+      final store = context.read<ProductStoreSupabase>();
+      final account = context.read<AccountManagerSupabase>();
+      final estId = account.dataEstablishmentId;
+      if (estId == null) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(loc.t('establishment') ?? 'Не найдено заведение')),
+          );
+        }
+        return;
+      }
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          content: Row(
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(width: 16),
+              Text(loc.t('clear_nomenclature_progress') ?? 'Очищаем номенклатуру...'),
+            ],
+          ),
+        ),
+      );
+      try {
+        await store.clearAllNomenclature(estId);
+        if (context.mounted && Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(loc.t('clear_nomenclature_done') ?? 'Вся номенклатура очищена'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (context.mounted && Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${loc.t('error') ?? 'Ошибка'}: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    });
+  }
+
   void _showTtkBranchFilterPicker(
     BuildContext context,
     LocalizationService loc,
@@ -541,14 +662,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         return ListTile(
                           leading: Text(language['flag']!, style: const TextStyle(fontSize: 24)),
                           title: Text(language['name']!),
-                          onTap: () async {
+                            onTap: () async {
                             final code = language['code']!;
                             await localization.setLocale(Locale(code));
                             if (ctx.mounted) {
                               await ctx.read<AccountManagerSupabase>().savePreferredLanguage(code);
                               Navigator.of(ctx).pop();
-                              // Фоновая подстановка переводов продуктов для нового языка
-                              _translateProductsForLanguage(ctx, code);
+                              // Фоновая подстановка переводов продуктов через Edge Function (DeepL)
+                              _translateProductsForLanguage(context, code);
                             }
                           },
                         );
@@ -565,45 +686,57 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   /// Переводит продукты, у которых нет имени на выбранном языке (в фоне).
+  /// Использует Edge Function auto-translate-product (DeepL) — работает на web.
   void _translateProductsForLanguage(BuildContext context, String targetLang) {
     final store = context.read<ProductStoreSupabase>();
-    final aiService = context.read<AiServiceSupabase>();
     final scaffoldMessenger = ScaffoldMessenger.of(context);
     final loc = context.read<LocalizationService>();
+
+    final needTranslation = <Product>[];
     Future(() async {
-      final translationService = TranslationService(
-        aiService: aiService,
-        supabase: SupabaseService(),
-      );
-      int updated = 0;
+      await store.loadProducts(force: true);
       for (final p in store.allProducts) {
         final names = p.names ?? {};
         if ((names[targetLang] ?? '').trim().isNotEmpty) continue;
-        final source = (names['ru'] ?? names['en'] ?? p.name).toString().trim();
-        if (source.isEmpty) continue;
-        final sourceLang = names['ru'] != null && (names['ru'] ?? '').trim().isNotEmpty ? 'ru' : 'en';
-        if (sourceLang == targetLang) continue;
+        if ((p.name).trim().isEmpty) continue;
+        needTranslation.add(p);
+      }
+      if (needTranslation.isEmpty) return;
+
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              ),
+              const SizedBox(width: 12),
+              Text(loc.t('translating_products')),
+            ],
+          ),
+          duration: const Duration(hours: 1),
+        ),
+      );
+
+      int updated = 0;
+      for (final p in needTranslation) {
         try {
-          final tr = await translationService.translate(
-            entityType: TranslationEntityType.product,
-            entityId: p.id ?? p.name,
-            fieldName: 'name',
-            text: source,
-            from: sourceLang,
-            to: targetLang,
-          );
-          if (tr != null && tr.trim().isNotEmpty) {
-            final merged = Map<String, String>.from(names)..[targetLang] = tr.trim();
-            await store.updateProduct(p.copyWith(names: merged));
+          final result = await store.translateProductAwait(p.id);
+          if (result != null && (result[targetLang] ?? '').trim().isNotEmpty) {
             updated++;
           }
         } catch (_) {}
       }
-      if (updated > 0) {
-        scaffoldMessenger.showSnackBar(
-          SnackBar(content: Text('${loc.t('translate_done')} (+$updated)')),
-        );
-      }
+
+      scaffoldMessenger.removeCurrentSnackBar();
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text(updated > 0 ? '${loc.t('translate_done')} (+$updated)' : loc.t('translate_done')),
+          backgroundColor: updated > 0 ? Colors.green : null,
+        ),
+      );
     });
   }
 
@@ -1043,6 +1176,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 subtitle: Text(establishment?.currencySymbol ?? Establishment.currencySymbolFor(establishment?.defaultCurrency ?? 'VND')),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => _showCurrencyPicker(context, localization),
+              ),
+            ],
+            // Очистить номенклатуру — шеф, барменеджер, менеджер зала
+            if (currentEmployee.hasRole('executive_chef') || currentEmployee.hasRole('bar_manager') || currentEmployee.hasRole('floor_manager')) ...[
+              ListTile(
+                leading: const Icon(Icons.delete_forever, color: Colors.red),
+                title: Text(localization.t('clear_nomenclature') ?? 'Очистить номенклатуру'),
+                subtitle: Text(localization.t('clear_nomenclature_hint') ?? 'Удалить все продукты из номенклатуры заведения'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _showClearNomenclatureConfirm(context, localization),
               ),
             ],
             // Настройки про — одна кнопка: статус, промокод, кнопка «Домой»

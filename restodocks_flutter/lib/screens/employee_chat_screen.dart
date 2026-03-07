@@ -1,8 +1,12 @@
+import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/models.dart';
 import '../models/employee_direct_message.dart';
 import '../services/services.dart';
@@ -26,27 +30,60 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
   bool _loading = true;
   bool _sending = false;
 
+  RealtimeChannel? _realtimeChannel;
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _load();
+      _subscribeRealtime();
+    });
   }
 
   @override
   void dispose() {
+    _realtimeChannel?.unsubscribe();
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
-  Future<void> _load() async {
+  void _subscribeRealtime() {
+    final acc = context.read<AccountManagerSupabase>();
+    final emp = acc.currentEmployee;
+    if (emp == null) return;
+    final myId = emp.id;
+    final otherId = widget.otherEmployeeId;
+    final supabase = Supabase.instance.client;
+    _realtimeChannel = supabase.channel('employee_chat_$otherId').onPostgresChanges(
+      event: PostgresChangeEvent.insert,
+      schema: 'public',
+      table: 'employee_direct_messages',
+      callback: (payload) {
+        final newRow = payload.newRecord;
+        final sender = newRow['sender_employee_id']?.toString();
+        final recipient = newRow['recipient_employee_id']?.toString();
+        if (sender == null || recipient == null) return;
+        final isForThisChat = (sender == myId && recipient == otherId) ||
+            (sender == otherId && recipient == myId);
+        if (isForThisChat && mounted) {
+          _load(silent: true);
+        }
+      },
+    );
+    _realtimeChannel!.subscribe();
+  }
+
+  Future<void> _load({bool silent = false}) async {
     final acc = context.read<AccountManagerSupabase>();
     final emp = acc.currentEmployee;
     final est = acc.establishment;
     if (emp == null || est == null) return;
-    setState(() => _loading = true);
+    if (!silent) setState(() => _loading = true);
     final msgSvc = context.read<EmployeeMessageService>();
     try {
+      await msgSvc.markAsRead(emp.id, widget.otherEmployeeId);
       final emps = await acc.getEmployeesForEstablishment(est.id);
       _otherEmployee = emps.where((e) => e.id == widget.otherEmployeeId).firstOrNull;
       final list = await msgSvc.getMessagesWith(emp.id, widget.otherEmployeeId);
@@ -58,7 +95,7 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
         _scrollToBottom();
       }
     } catch (e) {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && !silent) setState(() => _loading = false);
     }
   }
 
@@ -72,6 +109,71 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
         );
       }
     });
+  }
+
+  Future<void> _sendPhoto() async {
+    final acc = context.read<AccountManagerSupabase>();
+    final emp = acc.currentEmployee;
+    if (emp == null || _sending) return;
+    Uint8List? bytes;
+    if (kIsWeb) {
+      final result = await FilePicker.platform.pickFiles(type: FileType.image, withData: true);
+      if (result == null || result.files.isEmpty) return;
+      bytes = result.files.single.bytes;
+    } else {
+      final loc = context.read<LocalizationService>();
+      final isGallery = await showModalBottomSheet<bool>(
+        context: context,
+        builder: (ctx) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo_library),
+                title: Text(loc.t('photo_from_gallery')),
+                onTap: () => Navigator.pop(ctx, true),
+              ),
+              ListTile(
+                leading: const Icon(Icons.camera_alt),
+                title: Text(loc.t('photo_from_camera')),
+                onTap: () => Navigator.pop(ctx, false),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (isGallery == null || !mounted) return;
+      final file = await ImagePicker().pickImage(
+        source: isGallery ? ImageSource.gallery : ImageSource.camera,
+        maxWidth: 1280,
+        maxHeight: 1280,
+        imageQuality: 85,
+      );
+      if (file == null || !mounted) return;
+      bytes = await file.readAsBytes();
+    }
+    if (bytes == null || bytes.isEmpty || !mounted) return;
+    setState(() => _sending = true);
+    try {
+      final msgSvc = context.read<EmployeeMessageService>();
+      final sent = await msgSvc.sendPhoto(emp.id, widget.otherEmployeeId, bytes);
+      if (mounted && sent != null) {
+        setState(() {
+          _messages = [..._messages, sent];
+          _sending = false;
+        });
+        _scrollToBottom();
+      } else if (mounted) {
+        setState(() => _sending = false);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _sending = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${context.read<LocalizationService>().t('photo_upload_error') ?? 'Ошибка'}: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _send() async {
@@ -114,6 +216,13 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
       appBar: AppBar(
         leading: appBarBackButton(context),
         title: Text(otherName),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loading ? null : () => _load(),
+            tooltip: loc.t('inbox_refresh') ?? 'Обновить',
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -121,17 +230,29 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : _messages.isEmpty
-                    ? Center(
-                        child: Text(
-                          loc.t('chat_empty') ?? 'Нет сообщений. Напишите первым.',
-                          style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    ? RefreshIndicator(
+                        onRefresh: _load,
+                        child: SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          child: SizedBox(
+                            height: MediaQuery.of(context).size.height * 0.5,
+                            child: Center(
+                              child: Text(
+                                loc.t('chat_empty') ?? 'Нет сообщений. Напишите первым.',
+                                style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                              ),
+                            ),
+                          ),
                         ),
                       )
-                    : ListView.builder(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        itemCount: _messages.length,
-                        itemBuilder: (context, i) {
+                    : RefreshIndicator(
+                        onRefresh: _load,
+                        child: ListView.builder(
+                          controller: _scrollController,
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          itemCount: _messages.length,
+                          itemBuilder: (context, i) {
                           final msg = _messages[i];
                           final isMe = msg.senderEmployeeId == context.read<AccountManagerSupabase>().currentEmployee?.id;
                           return Align(
@@ -143,6 +264,7 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
                             ),
                           );
                         },
+                        ),
                       ),
           ),
           SafeArea(
@@ -154,6 +276,11 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
               ),
               child: Row(
                 children: [
+                  IconButton(
+                    icon: const Icon(Icons.add_photo_alternate_outlined),
+                    onPressed: _sending ? null : _sendPhoto,
+                    tooltip: loc.t('photo_from_gallery') ?? 'Фото',
+                  ),
                   Expanded(
                     child: TextField(
                       controller: _controller,
@@ -187,6 +314,11 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
       ),
     );
   }
+}
+
+/// Форматирует время сообщения: полная дата + время (dd.MM.yyyy HH:mm).
+String _formatMessageTime(DateTime dt) {
+  return DateFormat('dd.MM.yyyy HH:mm').format(dt.toLocal());
 }
 
 /// Определяет язык текста: ru если есть кириллица, иначе en.
@@ -264,18 +396,55 @@ class _ChatMessageBubbleState extends State<_ChatMessageBubble> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
+          if (widget.message.hasImage)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: GestureDetector(
+                onTap: () => _showImageFullScreen(context, widget.message.imageUrl!),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(
+                    widget.message.imageUrl!,
+                    fit: BoxFit.cover,
+                    width: 200,
+                    height: 200,
+                    loadingBuilder: (_, child, progress) =>
+                        progress == null ? child : const SizedBox(width: 200, height: 200, child: Center(child: CircularProgressIndicator())),
+                    errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, size: 48),
+                  ),
+                ),
+              ),
+            ),
+          if (content.isNotEmpty)
+            Text(
+              content,
+              style: widget.theme.textTheme.bodyMedium,
+            ),
+          if (content.isNotEmpty) const SizedBox(height: 4),
           Text(
-            content,
-            style: widget.theme.textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            DateFormat('HH:mm').format(widget.message.createdAt),
+            _formatMessageTime(widget.message.createdAt),
             style: widget.theme.textTheme.labelSmall?.copyWith(
               color: widget.theme.colorScheme.onSurfaceVariant,
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showImageFullScreen(BuildContext context, String url) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: GestureDetector(
+          onTap: () => Navigator.pop(ctx),
+          child: InteractiveViewer(
+            minScale: 0.5,
+            maxScale: 4,
+            child: Image.network(url, fit: BoxFit.contain),
+          ),
+        ),
       ),
     );
   }
