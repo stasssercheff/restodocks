@@ -330,8 +330,9 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
   List<NomenclatureItem> _nomenclatureItems = [];
   bool _isLoading = true;
   bool _isTranslatingProducts = false;
-  int _translatingDone = 0;
+  int _translatingDone = 0;   // реально переведено (шкала = done/total)
   int _translatingTotal = 0;
+  int _translatingProcessed = 0; // обработано вызовов API
   bool _hasRunAutoTranslationThisSession = false;
 
   // Активная вкладка
@@ -394,6 +395,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       _isTranslatingProducts = true;
       _translatingDone = 0;
       _translatingTotal = list.length;
+      _translatingProcessed = 0;
     });
     final store = context.read<ProductStoreSupabase>();
     final loc = context.read<LocalizationService>();
@@ -406,6 +408,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         final r = await store.translateProductAwait(list[i].id);
         if (r != null && (r[targetLang] ?? '').trim().isNotEmpty) {
           updated++;
+          _translatingDone = updated; // шкала = только реально переведённые
           final updatedProduct = store.allProducts.where((p) => p.id == list[i].id).firstOrNull;
           if (updatedProduct != null && mounted) {
             final idx = _nomenclatureItems.indexWhere((item) => item.isProduct && item.product!.id == list[i].id);
@@ -416,10 +419,12 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
           }
         }
       } catch (_) {}
-      _translatingDone = i + 1;
-      // setState только каждые N продуктов или на последнем
+      _translatingProcessed = i + 1;
+      // setState: при успешных переводах, при прогрессе обработки (каждые N), в конце
       if (!mounted) return;
-      if ((i + 1) % setStateEvery == 0 || i == list.length - 1) {
+      if ((updated > 0 && updated % setStateEvery == 0) ||
+          _translatingProcessed % setStateEvery == 0 ||
+          i == list.length - 1) {
         setState(() {});
       }
     }
@@ -1349,12 +1354,27 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: Text(
-                          '${loc.t('translating_products')} $_translatingDone / $_translatingTotal',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onPrimaryContainer,
-                            fontWeight: FontWeight.w500,
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '${loc.t('translating_products')} '
+                              '${loc.t('translated_count').replaceFirst('%s', '$_translatingDone').replaceFirst('%s', '$_translatingTotal')}',
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            if (_translatingProcessed < _translatingTotal && _translatingTotal > 0)
+                              Text(
+                                loc.t('processed_count').replaceFirst('%s', '$_translatingProcessed').replaceFirst('%s', '$_translatingTotal'),
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.onPrimaryContainer.withOpacity(0.8),
+                                  fontSize: 12,
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                     ],
