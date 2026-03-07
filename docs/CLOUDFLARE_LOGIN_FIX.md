@@ -1,8 +1,8 @@
 # Вход не работает на Cloudflare Pages — чеклист
 
-## Прокси для restodocks.com (автоматически)
+## restodocks.com: прямой URL Supabase
 
-Если вход не работает на restodocks.com, но работает на restodocks-2u8.pages.dev — в проекте настроен **Cloudflare Pages Function** `functions/supabase-auth/`, который проксирует все запросы к Supabase через тот же домен. Приложение само переключается на этот прокси, когда открыто с restodocks.com. Ничего настраивать не нужно — деплой по push в main.
+Приложение использует **прямой URL Supabase** для всех доменов (restodocks.com, restodocks-2u8.pages.dev, restodocks.pages.dev). Для работы входа **restodocks.com** должен быть в Supabase Auth → Redirect URLs (см. п. 5 ниже). Прокси больше не используется.
 
 ## 0a. Кастомный домен: restodocks.com vs restodocks-2u8.pages.dev
 
@@ -66,11 +66,9 @@ Cloudflare Pages → проект → **Settings** → **Variables and Secrets**
 - `url=https://osglfptwbuqq...` — Prod, всё верно
 - `url=https://kzhaezanjttv...` — Staging, для основного сайта должно быть Prod
 
-## 5. Supabase Auth Redirect URLs
+## 5. Supabase: Redirect URLs + API CORS
 
-Supabase Dashboard → **Authentication** → **URL Configuration** → **Redirect URLs**
-
-Должны быть добавлены (с wildcard для restodocks.com — иначе вход только на restodocks-2u8.pages.dev):
+**Authentication** → **URL Configuration** → **Redirect URLs** — должны быть:
 ```
 https://restodocks.com
 https://restodocks.com/**
@@ -82,6 +80,9 @@ https://restodocks.pages.dev
 ```
 
 **Site URL** = `https://restodocks.com`
+
+**Project Settings** → **API** — если есть **CORS / Allowed Origins**, добавь:
+`https://restodocks.com`, `https://www.restodocks.com`
 
 ---
 

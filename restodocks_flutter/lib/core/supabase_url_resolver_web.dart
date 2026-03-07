@@ -1,13 +1,6 @@
-import 'dart:html' as html;
-
-/// На restodocks.com Supabase Auth отклоняет origin — используем прокси через тот же домен.
+/// Прямой URL Supabase для всех доменов.
+/// restodocks.com должен быть в Supabase: Authentication → URL Configuration → Redirect URLs
+/// и в Supabase: Project Settings → API → CORS Allowed Origins (если есть).
 String resolveSupabaseUrl(String envUrl) {
-  try {
-    final host = (html.window.location.hostname ?? '').toLowerCase();
-    if (host == 'restodocks.com' || host == 'www.restodocks.com') {
-      final origin = '${html.window.location.protocol}//${html.window.location.host}';
-      return '$origin/supabase-auth';
-    }
-  } catch (_) {}
   return envUrl;
 }
