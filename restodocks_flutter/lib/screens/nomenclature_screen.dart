@@ -342,7 +342,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _ensureLoaded());
   }
 
-  Future<void> _ensureLoaded() async {
+  Future<void> _ensureLoaded({bool skipAutoTranslation = false}) async {
     final store = context.read<ProductStoreSupabase>();
     final account = context.read<AccountManagerSupabase>();
     final est = account.establishment;
@@ -370,19 +370,22 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
 
     if (mounted) {
       setState(() => _isLoading = false);
-      // Автоперевод: если язык не русский и есть продукты без перевода
-      final loc = context.read<LocalizationService>();
-      if (loc.currentLanguageCode != 'ru') {
-        final needTranslate = _nomenclatureItems
-            .where((i) => i.isProduct && _needsTranslation(i))
-            .map((i) => i.product!)
-            .toList();
-        if (needTranslate.isNotEmpty) _runAutoTranslation(needTranslate);
+      // Автоперевод только при первой загрузке (не после завершённого перевода)
+      if (!skipAutoTranslation) {
+        final loc = context.read<LocalizationService>();
+        if (loc.currentLanguageCode != 'ru') {
+          final needTranslate = _nomenclatureItems
+              .where((i) => i.isProduct && _needsTranslation(i))
+              .map((i) => i.product!)
+              .toList();
+          if (needTranslate.isNotEmpty) _runAutoTranslation(needTranslate);
+        }
       }
     }
   }
 
   /// Фоновый перевод продуктов (Edge Function DeepL). Показывает баннер с прогрессом.
+  /// Перевод отображается сразу по мере готовности каждого продукта.
   Future<void> _runAutoTranslation(List<Product> list) async {
     if (_isTranslatingProducts || !mounted) return;
     setState(() {
@@ -398,7 +401,19 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       if (!mounted) return;
       try {
         final r = await store.translateProductAwait(list[i].id);
-        if (r != null && (r[targetLang] ?? '').trim().isNotEmpty) updated++;
+        if (r != null && (r[targetLang] ?? '').trim().isNotEmpty) {
+          updated++;
+          // Обновляем элемент в списке сразу — перевод виден по мере готовности
+          final updatedProduct = store.allProducts.where((p) => p.id == list[i].id).firstOrNull;
+          if (updatedProduct != null && mounted) {
+            final idx = _nomenclatureItems.indexWhere((item) => item.isProduct && item.product!.id == list[i].id);
+            if (idx >= 0) {
+              _nomenclatureItems = List.from(_nomenclatureItems)
+                ..[idx] = NomenclatureItem.product(updatedProduct);
+              setState(() => _translatingDone = i + 1);
+            }
+          }
+        }
       } catch (_) {}
       if (!mounted) return;
       setState(() => _translatingDone = i + 1);
@@ -408,13 +423,16 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       _isTranslatingProducts = false;
       _translatingTotal = 0;
     });
-    await _ensureLoaded();
+    await _ensureLoaded(skipAutoTranslation: true);
     if (mounted) {
       setState(() {});
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(updated > 0 ? '${loc.t('translate_done')} (+$updated)' : loc.t('translate_done')),
+          content: Text(
+            updated > 0 ? '${loc.t('translate_done')} (+$updated)' : loc.t('translate_no_changes'),
+          ),
           backgroundColor: updated > 0 ? Colors.green : null,
+          duration: updated > 0 ? null : const Duration(seconds: 5),
         ),
       );
     }
