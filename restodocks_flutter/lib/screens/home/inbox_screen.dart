@@ -707,7 +707,7 @@ class _MessagesContentState extends State<_MessagesContent> {
                       ),
                     ),
                     title: Text(
-                      ctx.read<ScreenLayoutPreferenceService>().showNameTranslit
+                      context.read<ScreenLayoutPreferenceService>().showNameTranslit
                           ? cyrillicToLatin(e.fullName)
                           : e.fullName,
                     ),
