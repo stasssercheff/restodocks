@@ -217,12 +217,15 @@ class ChecklistItem extends Equatable {
   });
 
   factory ChecklistItem.fromJson(Map<String, dynamic> json) {
+    final raw = json['tech_card_id'];
+    final techCardId = raw == null ? null : (raw is String ? raw : raw.toString()).trim();
+    final tc = techCardId != null && techCardId.isNotEmpty && techCardId != 'null' ? techCardId : null;
     return ChecklistItem(
       id: json['id'] as String,
       checklistId: json['checklist_id'] as String,
       title: (json['title'] as String?) ?? '',
       sortOrder: (json['sort_order'] as num?)?.toInt() ?? 0,
-      techCardId: json['tech_card_id'] as String?,
+      techCardId: tc,
       targetQuantity: (json['target_quantity'] as num?)?.toDouble(),
       targetUnit: json['target_unit'] as String?,
     );

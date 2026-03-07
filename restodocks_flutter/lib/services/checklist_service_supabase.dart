@@ -38,7 +38,7 @@ class ChecklistServiceSupabase {
         }
         final itemsData = await _supabase.client
             .from('checklist_items')
-            .select()
+            .select('id, checklist_id, title, sort_order, tech_card_id, target_quantity, target_unit')
             .eq('checklist_id', c.id)
             .order('sort_order');
         final items = (itemsData as List).map((e) => ChecklistItem.fromJson(e)).toList();
@@ -62,7 +62,7 @@ class ChecklistServiceSupabase {
       final c = Checklist.fromJson(row);
       final itemsData = await _supabase.client
           .from('checklist_items')
-          .select()
+          .select('id, checklist_id, title, sort_order, tech_card_id, target_quantity, target_unit')
           .eq('checklist_id', c.id)
           .order('sort_order');
       final items = (itemsData as List).map((e) => ChecklistItem.fromJson(e)).toList();
@@ -217,17 +217,18 @@ class ChecklistServiceSupabase {
     final upd = <String, dynamic>{
       'name': checklist.name,
       'updated_at': DateTime.now().toIso8601String(),
+      'action_config': checklist.actionConfig.toJson(),
     };
+    if (checklist.assignedDepartment != null) upd['assigned_department'] = checklist.assignedDepartment;
     if (checklist.assignedSection != null) upd['assigned_section'] = checklist.assignedSection;
     final empIds = checklist.assignedEmployeeIds;
     final empId = empIds?.isNotEmpty == true ? empIds!.first : checklist.assignedEmployeeId;
     if (empId != null) upd['assigned_employee_id'] = empId;
-    if (empIds != null && empIds.isNotEmpty) upd['assigned_employee_ids'] = empIds;
+    if (empIds != null) upd['assigned_employee_ids'] = empIds ?? <String>[];
     if (checklist.deadlineAt != null) upd['deadline_at'] = checklist.deadlineAt!.toIso8601String();
     if (checklist.scheduledForAt != null) upd['scheduled_for_at'] = checklist.scheduledForAt!.toIso8601String();
     if (checklist.additionalName != null) upd['additional_name'] = checklist.additionalName;
     if (checklist.type != null) upd['type'] = checklist.type!.code;
-    upd['action_config'] = checklist.actionConfig.toJson();
 
     await _updateChecklistWithRetry(checklist.id, upd);
     if (checklist.deadlineAt != null || checklist.scheduledForAt != null) {

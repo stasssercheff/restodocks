@@ -75,7 +75,7 @@ class SupabaseService {
     return response.first;
   }
 
-  /// Обновление данных в таблице
+  /// Обновление данных в таблице. Бросает исключение если обновлено 0 строк (RLS/не найден).
   Future<Map<String, dynamic>> updateData(
     String tableName,
     Map<String, dynamic> data,
@@ -93,16 +93,16 @@ class SupabaseService {
         final first = list.first;
         return first is Map<String, dynamic> ? Map<String, dynamic>.from(first) : {...data, column: value};
       }
+      // 0 строк — RLS блокирует или запись не найдена. Показываем ошибку пользователю.
+      throw Exception(
+        'Не удалось сохранить: нет доступа к записи или она не найдена (таблица $tableName, $column=$value). '
+        'Проверьте права доступа (RLS) и что пользователь привязан к заведению.',
+      );
     } catch (e) {
-      print('DEBUG SupabaseService: updateData error: $e');
-    }
-    try {
-      await client.from(tableName).update(data).eq(column, value);
-    } catch (e) {
-      print('DEBUG SupabaseService: updateData (no select) failed: $e');
+      if (e is Exception) rethrow;
+      print('DEBUG SupabaseService: updateData error ($tableName): $e');
       rethrow;
     }
-    return {...data, column: value};
   }
 
   /// Удаление данных из таблицы
