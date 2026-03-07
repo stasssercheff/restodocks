@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../models/models.dart';
 import '../../services/services.dart';
 import '../../utils/number_format_utils.dart';
 import '../../widgets/app_bar_home_button.dart';

@@ -373,13 +373,19 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
                                             Text(e.fullName, style: theme.textTheme.titleMedium),
-                                            if (e.positionRole != null && e.positionRole!.isNotEmpty) ...[
-                                              const SizedBox(height: 2),
-                                              Text(
-                                                loc.roleDisplayName(e.positionRole!),
-                                                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                                              ),
-                                            ],
+                                            Builder(
+                                              builder: (_) {
+                                                final roleCode = e.positionRole ?? e.roles.firstOrNull ?? '';
+                                                if (roleCode.isEmpty) return const SizedBox.shrink();
+                                                return Padding(
+                                                  padding: const EdgeInsets.only(top: 2),
+                                                  child: Text(
+                                                    loc.roleDisplayName(roleCode),
+                                                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                                                  ),
+                                                );
+                                              },
+                                            ),
                                             const SizedBox(height: 12),
                                             Row(
                                               children: [
@@ -596,8 +602,7 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
                           ),
                         ),
                       ],
-                    ),
-    );
+                    );
     if (widget.embedInScaffold) {
       return Scaffold(
         appBar: AppBar(
