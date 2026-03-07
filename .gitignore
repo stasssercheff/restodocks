@@ -8,3 +8,6 @@ backups/
 backup_config.env
 admin/node_modules/
 admin/.next/
+beta-admin/node_modules/
+beta-admin/.next/
+node_modules
