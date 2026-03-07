@@ -97,7 +97,7 @@ function EstablishmentsTab() {
     setLoading(true)
     const res = await fetch('/api/establishments')
     const json = await res.json()
-    setData(json)
+    setData(Array.isArray(json) ? json : [])
     setLoading(false)
   }, [])
 

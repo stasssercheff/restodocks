@@ -24,16 +24,17 @@ export async function GET() {
     .order('created_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  const list = establishments ?? []
 
   // Для каждого заведения считаем сотрудников и находим владельца
-  const ids = establishments.map(e => e.id)
+  const ids = list.map(e => e.id)
 
   const { data: employees } = await supabase
     .from('employees')
     .select('id, full_name, email, roles, establishment_id')
     .in('establishment_id', ids)
 
-  const result = establishments.map(est => {
+  const result = list.map(est => {
     const estEmployees = employees?.filter(e => e.establishment_id === est.id) ?? []
     const owner = estEmployees.find(e => e.roles?.includes('owner'))
     return {

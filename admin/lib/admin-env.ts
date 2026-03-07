@@ -17,8 +17,20 @@ export async function getAdminPassword(): Promise<string> {
 }
 
 export async function getSupabaseConfig(): Promise<{ url: string; serviceRoleKey: string } | null> {
-  const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? ''
+  let url = (process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim()
+  let key = (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim()
+  if (!url || !key) {
+    try {
+      const { env } = await getCloudflareContext()
+      const kv = (env as { ADMIN_CONFIG?: { get: (k: string) => Promise<string | null> } }).ADMIN_CONFIG
+      if (kv) {
+        url = (await kv.get('supabase_url')) ?? url
+        key = (await kv.get('supabase_service_role_key')) ?? key
+      }
+    } catch {
+      // ignore
+    }
+  }
   if (!url || !key) return null
   return { url, serviceRoleKey: key }
 }
