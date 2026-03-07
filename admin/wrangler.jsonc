@@ -2,6 +2,9 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "main": ".open-next/worker.js",
   "name": "restodocks-admin",
+  "kv_namespaces": [
+    { "binding": "ADMIN_CONFIG", "id": "3f9acc45fa9e41a585e0d9be3e34ab02" }
+  ],
   "compatibility_date": "2024-12-30",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
-import { getSupabaseConfig } from '@/lib/admin-env'
+import { getAdminPassword, getSupabaseConfig } from '@/lib/admin-env'
 import { verifySessionToken } from '@/lib/session'
 
 export const dynamic = 'force-dynamic'
@@ -15,7 +15,7 @@ async function getServiceClient() {
 async function checkAuth(): Promise<boolean> {
   const cookieStore = await cookies()
   const session = cookieStore.get('admin_session')?.value
-  const adminPassword = process.env.ADMIN_PASSWORD
+  const adminPassword = await getAdminPassword()
   if (!session || !adminPassword) return false
   return verifySessionToken(session, adminPassword)
 }

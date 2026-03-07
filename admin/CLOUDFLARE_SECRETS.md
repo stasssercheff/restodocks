@@ -1,23 +1,22 @@
 # Cloudflare Admin — необходимые секреты
 
-Для работы админки на Cloudflare Workers нужны секреты.
-
 ## GitHub Actions (Repository Secrets)
-
-Добавь в **Settings → Secrets and variables → Actions**:
 
 | Секрет | Описание |
 |--------|----------|
-| `ADMIN_PASSWORD` | Пароль для входа в админку |
+| `ADMIN_PASSWORD` | Пароль для входа — сохраняется в KV при каждом деплое |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role key из Supabase → Settings → API |
 | `SUPABASE_URL` | Уже есть (используется как NEXT_PUBLIC_SUPABASE_URL) |
 
-## Cloudflare Dashboard (альтернатива)
+## Как хранится пароль
 
-Можно задать вручную: **Workers & Pages** → restodocks-admin → **Settings** → **Variables and Secrets**:
+Пароль берётся из **Cloudflare KV** (namespace `ADMIN_CONFIG`). При каждом деплое workflow записывает `ADMIN_PASSWORD` из GitHub Secret в KV. KV bindings работают надёжно в Workers.
 
-- `ADMIN_PASSWORD` (Secret)
-- `SUPABASE_SERVICE_ROLE_KEY` (Secret)
-- `SUPABASE_URL` (Secret или Variable)
+## Ручная установка пароля (если деплой не записал)
 
-Важно: **не включать Encrypt** при сохранении — иначе значение может не совпадать с ожидаемым.
+```bash
+cd admin
+printf '%s' 'твой_пароль' > /tmp/admin_pw
+npx wrangler kv key put --namespace-id=3f9acc45fa9e41a585e0d9be3e34ab02 "admin_password" --path=/tmp/admin_pw --remote
+rm /tmp/admin_pw
+```
