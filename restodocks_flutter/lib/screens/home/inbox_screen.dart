@@ -628,6 +628,7 @@ class _DocumentTile extends StatelessWidget {
 
 class _MessagesContent extends StatefulWidget {
   const _MessagesContent({
+    super.key,
     required this.currentEmployee,
     required this.establishmentId,
     required this.missedDocuments,
