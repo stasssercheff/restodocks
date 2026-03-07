@@ -1,0 +1,13 @@
+# Netlify config для Restodocks Admin (prod или demo — env задаёт Supabase)
+# Используется при Base directory = admin
+
+[build]
+  command = "npm ci && npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Next.js plugin (Netlify автоопределяет, но можно явно)
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
