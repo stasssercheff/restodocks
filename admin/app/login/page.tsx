@@ -1,10 +1,15 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { getAdminPassword } from '@/lib/admin-env'
+import { verifySessionToken } from '@/lib/session'
 import LoginClient from './login-client'
 
 export default async function LoginPage() {
   const cookieStore = await cookies()
   const session = cookieStore.get('admin_session')?.value
-  if (session) redirect('/')
+  const adminPassword = await getAdminPassword()
+  if (session && adminPassword && (await verifySessionToken(session, adminPassword))) {
+    redirect('/')
+  }
   return <LoginClient />
 }
