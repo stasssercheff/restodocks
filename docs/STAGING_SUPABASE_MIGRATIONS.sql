@@ -1,6 +1,6 @@
 -- =============================================================================
--- Миграции для staging Supabase (restodocks-demo)
--- Выполнить в Supabase Dashboard → SQL Editor
+-- Миграции (ранее для staging; Staging Supabase удалён — одна БД Prod)
+-- Выполнить в Supabase Dashboard → SQL Editor (если применимо)
 -- После выполнения: Settings → General → Restart project (обновит schema cache)
 -- =============================================================================
 

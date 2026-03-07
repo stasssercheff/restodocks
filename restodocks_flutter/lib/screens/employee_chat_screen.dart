@@ -45,10 +45,10 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
     final est = acc.establishment;
     if (emp == null || est == null) return;
     setState(() => _loading = true);
+    final msgSvc = context.read<EmployeeMessageService>();
     try {
       final emps = await acc.getEmployeesForEstablishment(est.id);
       _otherEmployee = emps.where((e) => e.id == widget.otherEmployeeId).firstOrNull;
-      final msgSvc = context.read<EmployeeMessageService>();
       final list = await msgSvc.getMessagesWith(emp.id, widget.otherEmployeeId);
       if (mounted) {
         setState(() {
@@ -136,37 +136,10 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
                           final isMe = msg.senderEmployeeId == context.read<AccountManagerSupabase>().currentEmployee?.id;
                           return Align(
                             alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                            child: Container(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                              constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
-                              decoration: BoxDecoration(
-                                color: isMe
-                                    ? theme.colorScheme.primaryContainer
-                                    : theme.colorScheme.surfaceContainerHighest,
-                                borderRadius: BorderRadius.only(
-                                  topLeft: const Radius.circular(16),
-                                  topRight: const Radius.circular(16),
-                                  bottomLeft: Radius.circular(isMe ? 16 : 4),
-                                  bottomRight: Radius.circular(isMe ? 4 : 16),
-                                ),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    msg.content,
-                                    style: theme.textTheme.bodyMedium,
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    DateFormat('HH:mm').format(msg.createdAt),
-                                    style: theme.textTheme.labelSmall?.copyWith(
-                                      color: theme.colorScheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                            child: _ChatMessageBubble(
+                              message: msg,
+                              isMe: isMe,
+                              theme: theme,
                             ),
                           );
                         },
@@ -208,6 +181,98 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
                   ),
                 ],
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Определяет язык текста: ru если есть кириллица, иначе en.
+String _detectLanguage(String text) {
+  if (text.isEmpty) return 'ru';
+  final hasCyrillic = text.runes.any((r) => r >= 0x0400 && r <= 0x04FF);
+  return hasCyrillic ? 'ru' : 'en';
+}
+
+/// Пузырёк сообщения с переводом по выбранному языку.
+class _ChatMessageBubble extends StatefulWidget {
+  const _ChatMessageBubble({
+    required this.message,
+    required this.isMe,
+    required this.theme,
+  });
+
+  final EmployeeDirectMessage message;
+  final bool isMe;
+  final ThemeData theme;
+
+  @override
+  State<_ChatMessageBubble> createState() => _ChatMessageBubbleState();
+}
+
+class _ChatMessageBubbleState extends State<_ChatMessageBubble> {
+  String? _translatedContent;
+
+  @override
+  void initState() {
+    super.initState();
+    _translateIfNeeded();
+  }
+
+  Future<void> _translateIfNeeded() async {
+    final loc = context.read<LocalizationService>();
+    final targetLang = loc.currentLanguageCode;
+    if (targetLang == 'ru') return;
+    final sourceLang = _detectLanguage(widget.message.content);
+    if (sourceLang == targetLang) return;
+    try {
+      final translationManager = context.read<TranslationManager>();
+      final translated = await translationManager.getLocalizedText(
+        entityType: TranslationEntityType.ui,
+        entityId: 'chat_${widget.message.id}',
+        fieldName: 'content',
+        sourceText: widget.message.content,
+        sourceLanguage: sourceLang,
+        targetLanguage: targetLang,
+      );
+      if (mounted && translated != widget.message.content) {
+        setState(() => _translatedContent = translated);
+      }
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final content = _translatedContent ?? widget.message.content;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+      decoration: BoxDecoration(
+        color: widget.isMe
+            ? widget.theme.colorScheme.primaryContainer
+            : widget.theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.only(
+          topLeft: const Radius.circular(16),
+          topRight: const Radius.circular(16),
+          bottomLeft: Radius.circular(widget.isMe ? 16 : 4),
+          bottomRight: Radius.circular(widget.isMe ? 4 : 16),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            content,
+            style: widget.theme.textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            DateFormat('HH:mm').format(widget.message.createdAt),
+            style: widget.theme.textTheme.labelSmall?.copyWith(
+              color: widget.theme.colorScheme.onSurfaceVariant,
             ),
           ),
         ],

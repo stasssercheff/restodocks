@@ -18,10 +18,17 @@ class MenuScreen extends StatefulWidget {
   State<MenuScreen> createState() => _MenuScreenState();
 }
 
+/// Категории, относящиеся к бару (напитки).
+const _barCategories = {'beverages'};
+
 class _MenuScreenState extends State<MenuScreen> {
   List<TechCard> _dishes = [];
+  List<TechCard> _dishesBar = [];
+  List<TechCard> _dishesKitchen = [];
   bool _loading = true;
   String? _error;
+  /// Для зала: выбранная вкладка (bar | kitchen).
+  String _hallTab = 'bar';
 
   String _categoryLabel(String c, String lang) {
     final Map<String, Map<String, String>> categoryTranslations = {
@@ -60,15 +67,27 @@ class _MenuScreenState extends State<MenuScreen> {
       final emp = acc.currentEmployee;
       final allTcs = await techCardService.getTechCardsForEstablishment(est.dataEstablishmentId);
       // Банкет/кейтеринг: только блюда с категорией banquet или catering
+      // Зал: все блюда (отображаем вкладки Бар/Кухня)
       List<TechCard> tcs;
       if (widget.department == 'banquet-catering') {
         tcs = allTcs.where((tc) =>
             !tc.isSemiFinished &&
             (tc.category == 'banquet' || tc.category == 'catering')).toList();
+      } else if (widget.department == 'hall' || widget.department == 'dining_room') {
+        tcs = allTcs.where((tc) => !tc.isSemiFinished).toList();
+      } else if (widget.department == 'bar') {
+        tcs = allTcs.where((tc) =>
+            !tc.isSemiFinished &&
+            (_barCategories.contains(tc.category) ||
+                tc.sections.contains('bar') ||
+                tc.sections.contains('all'))).toList();
       } else {
+        final byDept = allTcs.where((tc) =>
+            !tc.isSemiFinished &&
+            (!_barCategories.contains(tc.category) || tc.sections.contains('all'))).toList();
         tcs = emp == null
-            ? allTcs
-            : allTcs.where((tc) => emp.canSeeTechCard(tc.sections)).toList();
+            ? byDept
+            : byDept.where((tc) => emp.canSeeTechCard(tc.sections)).toList();
       }
       if (!mounted) return;
       final currency = emp?.currency ?? acc.establishment?.defaultCurrency ?? 'RUB';
@@ -80,8 +99,12 @@ class _MenuScreenState extends State<MenuScreen> {
         }
       }
       if (mounted) {
+        final barOnly = enriched.where((tc) => _barCategories.contains(tc.category)).toList();
+        final kitchenOnly = enriched.where((tc) => !_barCategories.contains(tc.category)).toList();
         setState(() {
           _dishes = enriched;
+          _dishesBar = barOnly;
+          _dishesKitchen = kitchenOnly;
           _loading = false;
         });
         // Фоновый перевод для ТТК без локализованного названия
@@ -153,6 +176,8 @@ class _MenuScreenState extends State<MenuScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
+  bool get _isHallMenu => widget.department == 'hall' || widget.department == 'dining_room';
+
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
@@ -164,12 +189,47 @@ class _MenuScreenState extends State<MenuScreen> {
       appBar: AppBar(
         title: Text(loc.t('menu')),
         leading: appBarBackButton(context),
+        bottom: _isHallMenu && !_loading && (_dishesBar.isNotEmpty || _dishesKitchen.isNotEmpty)
+            ? PreferredSize(
+                preferredSize: const Size.fromHeight(48),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _HallTabChip(
+                          label: loc.t('dept_bar') ?? 'Бар',
+                          selected: _hallTab == 'bar',
+                          onTap: () => setState(() => _hallTab = 'bar'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _HallTabChip(
+                          label: loc.t('dept_kitchen') ?? 'Кухня',
+                          selected: _hallTab == 'kitchen',
+                          onTap: () => setState(() => _hallTab = 'kitchen'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            : null,
         actions: [
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loading ? null : _load, tooltip: loc.t('refresh')),
         ],
       ),
       body: _buildBody(loc, sym),
     );
+  }
+
+  List<TechCard> get _displayDishes {
+    if (_isHallMenu) {
+      return _hallTab == 'bar' ? _dishesBar : _dishesKitchen;
+    }
+    return _dishes;
   }
 
   Widget _buildBody(LocalizationService loc, String currencySym) {
@@ -189,7 +249,8 @@ class _MenuScreenState extends State<MenuScreen> {
         ),
       );
     }
-    if (_dishes.isEmpty) {
+    final dishesToShow = _displayDishes;
+    if (dishesToShow.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
@@ -215,9 +276,9 @@ class _MenuScreenState extends State<MenuScreen> {
       onRefresh: _load,
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-        itemCount: _dishes.length,
+        itemCount: dishesToShow.length,
         itemBuilder: (context, index) {
-          final tc = _dishes[index];
+          final tc = dishesToShow[index];
           final totalCost = tc.totalCost;
           final lang = loc.currentLanguageCode;
           final photoUrls = tc.photoUrls ?? [];
@@ -287,6 +348,43 @@ class _MenuScreenState extends State<MenuScreen> {
       context: ctx,
       barrierColor: Colors.black87,
       builder: (_) => _MenuPhotoViewer(urls: urls),
+    );
+  }
+}
+
+/// Вкладка для меню зала (Бар / Кухня).
+class _HallTabChip extends StatelessWidget {
+  const _HallTabChip({required this.label, required this.selected, required this.onTap});
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected
+          ? Theme.of(context).colorScheme.primaryContainer
+          : Theme.of(context).colorScheme.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontWeight: selected ? FontWeight.w600 : null,
+                color: selected
+                    ? Theme.of(context).colorScheme.onPrimaryContainer
+                    : Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

@@ -30,7 +30,7 @@ class StaffHomeContent extends StatelessWidget {
             _Tile(
               icon: Icons.calendar_month,
               title: loc.t('schedule'),
-              onTap: () => context.go('/schedule'),
+              onTap: () => context.go('/schedule/${_deptForRoute(employee.department)}'),
             ),
             _Tile(
               icon: Icons.chat_bubble_outline,
@@ -79,7 +79,7 @@ class StaffHomeContent extends StatelessWidget {
       HomeTileId.schedule: _Tile(
         icon: Icons.calendar_month,
         title: loc.t('schedule'),
-        onTap: () => context.go('/schedule'),
+        onTap: () => context.go('/schedule/${_deptForRoute(employee.department)}'),
       ),
       HomeTileId.productOrder: _Tile(
         icon: Icons.shopping_cart,
@@ -94,12 +94,12 @@ class StaffHomeContent extends StatelessWidget {
       HomeTileId.menu: _Tile(
         icon: Icons.restaurant_menu,
         title: loc.t('menu'),
-        onTap: () => context.go('/menu/${employee.department}'),
+        onTap: () => context.go('/menu/${_deptForRoute(employee.department)}'),
       ),
       HomeTileId.ttk: _Tile(
         icon: Icons.description,
         title: employee.department == 'bar' ? loc.t('ttk_bar') : loc.t('ttk_kitchen'),
-        onTap: () => context.go('/tech-cards'),
+        onTap: () => context.go('/tech-cards/${_deptForRoute(employee.department)}'),
       ),
       HomeTileId.banquetMenu: _Tile(
         icon: Icons.restaurant_menu,
@@ -120,9 +120,11 @@ class StaffHomeContent extends StatelessWidget {
     };
     final showChecklists = employee.department == 'kitchen' || employee.department == 'bar' || employee.department == 'dining_room';
     final showBanquet = employee.department == 'kitchen' && screenPref.showBanquetCatering;
+    final showTtk = employee.department != 'dining_room' && employee.department != 'hall';
     final ordered = order
         .where((id) => id != HomeTileId.checklists || showChecklists)
         .where((id) => (id != HomeTileId.banquetMenu && id != HomeTileId.banquetTtk) || showBanquet)
+        .where((id) => id != HomeTileId.ttk || showTtk)
         .where((id) => tiles.containsKey(id))
         .map((id) => tiles[id]!)
         .toList();

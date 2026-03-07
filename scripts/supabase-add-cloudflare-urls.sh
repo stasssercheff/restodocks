@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Добавляет Cloudflare Pages URL в Supabase Auth (Redirect URLs + Site URL).
 # Требует: SUPABASE_ACCESS_TOKEN (из https://supabase.com/dashboard/account/tokens)
-#           SUPABASE_PROJECT_REF (например kzhaezanjttvnqkgpxnh для Staging)
+#           SUPABASE_PROJECT_REF (например osglfptwbuqqmqunttha)
 #
 # Использование:
-#   SUPABASE_ACCESS_TOKEN=sbp_xxx SUPABASE_PROJECT_REF=kzhaezanjttvnqkgpxnh ./scripts/supabase-add-cloudflare-urls.sh
+#   SUPABASE_ACCESS_TOKEN=sbp_xxx SUPABASE_PROJECT_REF=osglfptwbuqqmqunttha ./scripts/supabase-add-cloudflare-urls.sh
 
 set -e
 
@@ -15,7 +15,7 @@ API="https://api.supabase.com/v1"
 if [ -z "$TOKEN" ] || [ -z "$REF" ]; then
   echo "Usage: SUPABASE_ACCESS_TOKEN=xxx SUPABASE_PROJECT_REF=xxx $0"
   echo "  SUPABASE_ACCESS_TOKEN: Personal Access Token from https://supabase.com/dashboard/account/tokens"
-  echo "  SUPABASE_PROJECT_REF: project ref from your Supabase URL (e.g. kzhaezanjttvnqkgpxnh)"
+  echo "  SUPABASE_PROJECT_REF: project ref from your Supabase URL (e.g. osglfptwbuqqmqunttha)"
   exit 1
 fi
 

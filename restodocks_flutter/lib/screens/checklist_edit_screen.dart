@@ -665,6 +665,9 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                     final rolesDisplay = e.roles
                         .map((r) => loc.roleDisplayName(r))
                         .join(', ');
+                    final displayName = ctx.read<ScreenLayoutPreferenceService>().showNameTranslit
+                        ? cyrillicToLatin(e.fullName)
+                        : e.fullName;
                     return CheckboxListTile(
                       value: isSelected,
                       onChanged: canEdit ? (v) {
@@ -673,11 +676,9 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                           else selected.remove(e.id);
                         });
                       } : null,
-                      title: Text(rolesDisplay.isNotEmpty ? rolesDisplay : (loc.t('employee') ?? 'Сотрудник'), style: Theme.of(ctx).textTheme.bodyMedium),
+                      title: Text(displayName, style: Theme.of(ctx).textTheme.bodyMedium),
                       subtitle: Text(
-                        ctx.read<ScreenLayoutPreferenceService>().showNameTranslit
-                            ? cyrillicToLatin(e.fullName)
-                            : e.fullName,
+                        rolesDisplay.isNotEmpty ? rolesDisplay : (loc.t('employee') ?? 'Сотрудник'),
                         style: Theme.of(ctx).textTheme.bodySmall,
                       ),
                     );

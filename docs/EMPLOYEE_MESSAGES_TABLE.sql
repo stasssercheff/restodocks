@@ -1,5 +1,5 @@
 -- Таблица для личных сообщений между сотрудниками
--- Выполнить в Supabase Dashboard → SQL Editor (проект, к которому подключается restodocks-demo)
+-- Выполнить в Supabase Dashboard → SQL Editor
 -- После выполнения: Settings → General → Restart project
 
 CREATE TABLE IF NOT EXISTS employee_direct_messages (

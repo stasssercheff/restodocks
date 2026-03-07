@@ -7,21 +7,22 @@ alwaysApply: true
 
 ## Workflow
 
-- **Разработка и push — в staging.** Не трогай main.
-- **Beta** смотрит `staging` (Cloudflare Production branch = staging)
-- **Prod** смотрит `main` (Cloudflare Production branch = main)
-- Релиз: merge staging → main, push. Только тогда деплоится Prod.
+- **Разработка и push — ТОЛЬКО в staging.** Не коммитить в main, не мерджить main в staging.
+- **Beta** смотрит `staging` (Cloudflare: Production branch = staging)
+- **Prod** смотрит `main` (Cloudflare: Production branch = main)
+- Релиз в Prod: merge staging → main, push. Только когда всё проверено на Beta.
 
 ## Пушить только по запросу
 
-НЕ пушить автоматически. Только когда пользователь явно просит ("сделай коммит", "запушь", "задеплой").
+НЕ пушить автоматически. Только когда пользователь явно просит.
 
 ## При пуше по запросу
 
-- Пушить в `staging` (для теста на Beta). Не в main.
-- Для релиза в Prod: `git checkout main && git merge staging && git push` — только по запросу.
+- Для Beta: `git push origin staging` (никогда не пушить main).
+- Для Prod: `git checkout main && git merge staging && git push origin main` — только по явному запросу на релиз.
 
-## Cloudflare
+## Cloudflare (проверить в Dashboard)
 
-- Preview = None в обоих проектах (иначе двойные сборки)
-- 500 сборок/месяц — не тратить попусту
+- Prod: Production branch = **main**, Preview = **None**
+- Beta: Production branch = **staging**, Preview = **None**
+- Иначе оба сайта будут обновляться вместе — см. docs/DEPLOY_RULES.md

@@ -47,10 +47,10 @@ Cloudflare Pages → проект → **Settings** → **Variables and Secrets**
 - Переменные должны быть заданы для **обоих** Environment: **Production** и **Preview**
 - Проверь scope: отметь **Production** и **Preview**
 
-| Prod-сайт (основной) | Beta (демо) |
-|----------------------|-------------|
-| SUPABASE_URL = `https://osglfptwbuqqmqunttha.supabase.co` | `https://kzhaezanjttvnqkgpxnh.supabase.co` |
-| SUPABASE_ANON_KEY = anon key из Production | anon key из Staging |
+| Prod и Beta |
+|-------------|
+| SUPABASE_URL = `https://osglfptwbuqqmqunttha.supabase.co` |
+| SUPABASE_ANON_KEY = anon key из Supabase (Dashboard → API) |
 
 ## 2. Retry deployment
 
@@ -64,7 +64,7 @@ Cloudflare Pages → проект → **Settings** → **Variables and Secrets**
 
 Открой консоль (F12) → вкладка Console. При загрузке страницы:
 - `url=https://osglfptwbuqq...` — Prod, всё верно
-- `url=https://kzhaezanjttv...` — Staging, для основного сайта должно быть Prod
+- `url=https://osglfptwbuqq...` — Prod Supabase
 
 ## 5. Supabase: Redirect URLs + API CORS
 

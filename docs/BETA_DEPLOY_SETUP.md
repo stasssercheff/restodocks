@@ -1,52 +1,39 @@
-# Настройка бета-деплоя (staging → Vercel)
+# Настройка бета-деплоя (staging → Beta)
+
+Основной деплой: **Cloudflare Pages** (см. [CLOUDFLARE_PAGES_DEPLOY.md](CLOUDFLARE_PAGES_DEPLOY.md)).  
+Beta смотрит ветку `staging`. Prod смотрит `main`. Не пушить в main до релиза.
 
 ## 1. Включить GitHub Actions
 
-1. Откройте репозиторий: https://github.com/stasssercheff/restodocks
-2. **Settings** → **Actions** → **General**
-3. В блоке **Actions permissions** выберите **Allow all actions and reusable workflows**
-4. Сохраните (**Save**)
+1. Откройте репозиторий → **Settings** → **Actions** → **General**
+2. В блоке **Actions permissions** выберите **Allow all actions and reusable workflows**
+3. Сохраните (**Save**)
 
-## 2. Добавить Secrets
+## 2. Секреты GitHub (для Prod и Edge Functions)
 
-**Settings** → **Secrets and variables** → **Actions** → **New repository secret**
+**Settings** → **Secrets and variables** → **Actions**
 
-Добавьте 3 секрета:
+| Секрет | Использование |
+|--------|---------------|
+| `CLOUDFLARE_API_TOKEN` | Cloudflare Pages (Prod), Admin Workers |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare (Dashboard → Overview) |
+| `SUPABASE_URL` | Prod deploy, Edge Functions |
+| `SUPABASE_ANON_KEY` | Prod deploy |
+| `SUPABASE_ACCESS_TOKEN` | Edge Functions, supabase-add-cloudflare-urls |
 
-| Имя | Откуда взять |
-|-----|--------------|
-| `STAGING_SUPABASE_URL` | Supabase Dashboard → Project Settings → API → Project URL |
-| `STAGING_SUPABASE_ANON_KEY` | Supabase Dashboard → Project Settings → API → anon public |
-| `VERCEL_TOKEN` | Vercel → Account Settings → Tokens → Create Token (scope: Full Account). **Никогда не коммитить в код** — иначе Vercel автоматически отзовёт токен. |
+## 3. Beta
 
-## 3. Связать Vercel-проект (если нужно)
+Beta деплоится автоматически при push в `staging` — Cloudflare Pages (проект Restodocks Beta, Production branch = staging). Настройка в [CLOUDFLARE_PAGES_DEPLOY.md](CLOUDFLARE_PAGES_DEPLOY.md).
 
-1. https://vercel.com/dashboard
-2. Проект для беты (prj_rSIA3SgwSDWTL0pfYVJTCiGVFAke)
-3. Settings → Git — можно оставить отключённым, т.к. деплой идёт через CLI
+## 4. Admin
 
-## 4. Проверка
+Admin (beta-admin) — Cloudflare Workers. При push в `main` деплоится workflow **Deploy Admin to Cloudflare Workers**.  
+Настройка: [CLOUDFLARE_ADMIN_DEPLOY.md](CLOUDFLARE_ADMIN_DEPLOY.md).
 
-1. **Actions** → вкладка **Actions**
-2. После push в `staging` запускается **Build and Deploy to Vercel (Demo/Beta)**
-3. Если падает — смотрите логи, на каком шаге ошибка
+## Миграции Supabase
 
-## Миграции Supabase (демо)
+**Важно:** без миграций чеклисты и сообщения не работают (PGRST204, PGRST205).
 
-**Важно:** без миграций чеклисты не сохраняются, сообщения не работают (ошибки `PGRST204`, `PGRST205`).
-
-**Вариант 1.** Через CLI: `cd restodocks_flutter && supabase db push`
-
-**Вариант 2.** Вручную: Supabase Dashboard → **SQL Editor** → выполните скрипт из файла **`docs/STAGING_SUPABASE_MIGRATIONS.sql`** (скопируйте всё содержимое и выполните один раз).
-
-**Только сообщения не работают?** Выполните **`docs/EMPLOYEE_MESSAGES_TABLE.sql`** — создаёт таблицу `employee_direct_messages`.
-
-**После миграций обязательно:** Supabase Dashboard → **Settings** → **General** → **Restart project** — обновит schema cache PostgREST. Без перезапуска возможны PGRST204/PGRST205.
-
-## Если Vercel отозвал токен
-
-Vercel отзывает токены при обнаружении в публичном коде/логах. Создайте новый токен в Vercel → Account Settings → Tokens и обновите `VERCEL_TOKEN` в GitHub Secrets.
-
-## Ручной запуск
-
-Actions → **Build and Deploy to Vercel (Demo/Beta)** → **Run workflow** → **Run workflow**
+- **CLI:** `cd restodocks_flutter && supabase db push`
+- **Вручную:** Supabase Dashboard → SQL Editor → `docs/CHECKLIST_SETUP.sql` или `supabase/migrations/`
+- **После миграций:** Settings → General → **Restart project**

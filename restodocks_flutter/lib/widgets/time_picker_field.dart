@@ -75,10 +75,22 @@ class _TimePickerFieldState extends State<TimePickerField> {
 
   Future<void> _openMobilePicker() async {
     final parts = widget.value.trim().split(RegExp(r'[:\s.,-]'));
-    var duration = Duration(
-      hours: parts.isNotEmpty ? _parseHour(parts[0]) : 0,
-      minutes: parts.length > 1 ? _parseMin(parts[1]) : 0,
-    );
+    final initialHour = parts.isNotEmpty ? _parseHour(parts[0]) : 0;
+    final initialMin = parts.length > 1 ? _parseMin(parts[1]) : 0;
+
+    // На Android используем Material showTimePicker — он стабильнее
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      final picked = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay(hour: initialHour, minute: initialMin),
+      );
+      if (picked != null) {
+        widget.onChanged('${_fmt(picked.hour)}:${_fmt(picked.minute)}');
+      }
+      return;
+    }
+
+    var duration = Duration(hours: initialHour, minutes: initialMin);
     Duration? result;
     await showModalBottomSheet<void>(
       context: context,

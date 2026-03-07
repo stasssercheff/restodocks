@@ -934,28 +934,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               const Divider(),
             ],
-            Text(
-              localization.t('home_layout_config') ?? 'Настройка домашнего экрана',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-            ListTile(
+            ExpansionTile(
               leading: const Icon(Icons.dashboard_customize),
-              title: Text(localization.t('home_layout_config_hint') ?? 'Изменить порядок кнопок на главной'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => _showHomeLayoutConfig(context, localization),
-            ),
-            if (currentEmployee.hasRole('owner'))
-              Consumer<HomeButtonConfigService>(
-                builder: (_, homeBtn, __) => ListTile(
-                  leading: const Icon(Icons.tune),
-                  title: Text(localization.t('central_button') ?? 'Центральная кнопка'),
-                  subtitle: Text(_homeButtonActionLabel(localization, homeBtn.action)),
+              title: Text(localization.t('home_layout_config') ?? 'Настройка домашнего экрана'),
+              children: [
+                ListTile(
+                  leading: const SizedBox(width: 24),
+                  title: Text(localization.t('home_layout_config_hint') ?? 'Изменить порядок кнопок на главной'),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () => _showHomeButtonPicker(context, localization, homeBtn),
+                  onTap: () => _showHomeLayoutConfig(context, localization),
                 ),
-              ),
+                if (currentEmployee.hasRole('owner'))
+                  Consumer<HomeButtonConfigService>(
+                    builder: (_, homeBtn, __) => ListTile(
+                      leading: const SizedBox(width: 24),
+                      title: Text(localization.t('central_button') ?? 'Центральная кнопка'),
+                      subtitle: Text(_homeButtonActionLabel(localization, homeBtn.action)),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => _showHomeButtonPicker(context, localization, homeBtn),
+                    ),
+                  ),
+              ],
+            ),
             Consumer<ScreenLayoutPreferenceService>(
               builder: (_, screenPref, __) => SwitchListTile(
                 secondary: const Icon(Icons.translate),

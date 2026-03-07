@@ -7,10 +7,14 @@ import '../../services/screen_layout_preference_service.dart';
 import '../../models/models.dart';
 
 /// Домашняя страница менеджмента (шеф, барменеджер, менеджер зала, управляющий).
+/// Каждый видит только данные своего отдела.
 class ManagementHomeContent extends StatelessWidget {
   const ManagementHomeContent({super.key, required this.employee});
 
   final Employee employee;
+
+  /// Подразделение для роутов (dining_room -> hall, management -> kitchen для шефа)
+  static String _deptForRoute(String d) => d == 'dining_room' ? 'hall' : (d == 'management' ? 'kitchen' : d);
 
   @override
   Widget build(BuildContext context) {
@@ -31,7 +35,7 @@ class ManagementHomeContent extends StatelessWidget {
             _Tile(
               icon: Icons.calendar_month,
               title: loc.t('schedule'),
-              onTap: () => context.go('/schedule'),
+              onTap: () => context.go('/schedule/${_deptForRoute(employee.department)}'),
             ),
             _Tile(
               icon: Icons.chat_bubble_outline,
@@ -71,19 +75,20 @@ class ManagementHomeContent extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        _Tile(icon: Icons.calendar_month, title: loc.t('schedule'), onTap: () => context.go('/schedule')),
+        _Tile(icon: Icons.calendar_month, title: loc.t('schedule'), onTap: () => context.go('/schedule/${_deptForRoute(employee.department)}')),
         _Tile(icon: Icons.chat_bubble_outline, title: loc.t('inbox_tab_messages') ?? 'Сообщения', onTap: () => context.go('/notifications?tab=messages')),
         _Tile(icon: Icons.inbox, title: loc.t('inbox'), onTap: () => context.go('/inbox')),
         _Tile(icon: Icons.people, title: loc.t('employees'), onTap: () => context.go('/employees')),
         if (isChef || roles.contains('sous_chef'))
           _Tile(icon: Icons.how_to_reg, title: loc.t('shift_confirmation'), onTap: () => context.go('/shift-confirmation')),
         // Чеклисты: кухня или шеф/су-шеф (у шефа часто отдел «Управление» — иначе плитки нет)
-        if (employee.department == 'kitchen' || isChef || roles.contains('sous_chef'))
-          _Tile(icon: Icons.checklist, title: loc.t('checklists'), onTap: () => context.go('/checklists')),
-        _Tile(icon: Icons.description, title: isBarManager ? loc.t('ttk_bar') : loc.t('ttk_kitchen'), onTap: () => context.go('/tech-cards')),
+        if (employee.department == 'kitchen' || isChef || roles.contains('sous_chef') || employee.department == 'bar' || employee.department == 'dining_room')
+          _Tile(icon: Icons.checklist, title: loc.t('checklists'), onTap: () => context.go('/checklists?department=${_deptForRoute(employee.department)}')),
+        if (employee.department != 'dining_room' && employee.department != 'hall')
+          _Tile(icon: Icons.description, title: isBarManager ? loc.t('ttk_bar') : loc.t('ttk_kitchen'), onTap: () => context.go('/tech-cards/${_deptForRoute(employee.department)}')),
         if (isChef)
-          _Tile(icon: Icons.assignment, title: loc.t('nomenclature'), onTap: () => context.go('/nomenclature')),
-        _Tile(icon: Icons.shopping_cart, title: loc.t('product_order'), onTap: () => context.go('/product-order')),
+          _Tile(icon: Icons.assignment, title: loc.t('nomenclature'), onTap: () => context.go('/nomenclature/${_deptForRoute(employee.department)}')),
+        _Tile(icon: Icons.shopping_cart, title: loc.t('product_order'), onTap: () => context.go('/product-order?department=${_deptForRoute(employee.department)}')),
         _Tile(icon: Icons.assignment, title: loc.t('inventory_blank'), onTap: () => context.push('/inventory')),
         if ((isChef || roles.contains('sous_chef')) && screenPref.showBanquetCatering) ...[
           Padding(

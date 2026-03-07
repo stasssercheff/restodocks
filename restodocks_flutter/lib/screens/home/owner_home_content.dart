@@ -47,9 +47,11 @@ class OwnerHomeContent extends StatelessWidget {
 
         const SizedBox(height: 16),
         _SectionTitle(title: loc.t('dining_room')),
-        _Tile(icon: Icons.schedule, title: loc.t('schedule'), onTap: () => context.go('/schedule/dining_room')),
-        _Tile(icon: Icons.restaurant_menu, title: loc.t('menu'), onTap: () => context.go('/menu/dining_room')),
+        _Tile(icon: Icons.schedule, title: loc.t('schedule'), onTap: () => context.go('/schedule/hall')),
+        _Tile(icon: Icons.restaurant_menu, title: loc.t('menu'), onTap: () => context.go('/menu/hall')),
+        _Tile(icon: Icons.checklist, title: loc.t('checklists'), onTap: () => context.go('/checklists?department=hall')),
         _Tile(icon: Icons.store_outlined, title: loc.t('order_tab_suppliers') ?? 'Поставщики', onTap: () => context.go('/suppliers/hall')),
+        _Tile(icon: Icons.shopping_cart, title: loc.t('product_order'), onTap: () => context.go('/product-order?department=hall')),
 
         if (screenPref.showBanquetCatering) ...[
           const SizedBox(height: 16),

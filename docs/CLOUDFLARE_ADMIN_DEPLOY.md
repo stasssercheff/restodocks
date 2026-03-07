@@ -62,7 +62,10 @@ npm run preview
 
 ---
 
-## 6. Production vs Staging
+## 6. Одна БД
 
-Для **Admin Prod** используйте Production Supabase (osglfptwbuqqmqunttha).  
-Для **Admin Demo** — Staging (kzhaezanjttvnqkgpxnh). Создайте два Workers с разными именами и разными env.
+Prod и Admin Demo используют один Supabase (osglfptwbuqqmqunttha).
+
+## 7. GitHub Actions
+
+При push в `main` (с изменениями в `beta-admin/`) автоматически запускается **Deploy Admin to Cloudflare Workers**. Секреты: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`.

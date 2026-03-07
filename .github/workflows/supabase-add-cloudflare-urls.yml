@@ -12,14 +12,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Add Cloudflare URLs to Supabase Staging
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_PROJECT_REF: kzhaezanjttvnqkgpxnh
-        run: ./scripts/supabase-add-cloudflare-urls.sh
-
-      - name: Add Cloudflare URLs to Supabase Production
+      - name: Add Cloudflare URLs to Supabase
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_REF: osglfptwbuqqmqunttha
         run: ./scripts/supabase-add-cloudflare-urls.sh
+

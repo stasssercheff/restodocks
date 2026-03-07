@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../services/services.dart';
 import '../../models/models.dart';
 import '../../utils/number_format_utils.dart';
+import '../../utils/translit_utils.dart';
 import '../../models/inbox_document.dart';
 import '../../services/inbox_service.dart';
 import '../../widgets/app_bar_home_button.dart';
@@ -705,8 +706,16 @@ class _MessagesContentState extends State<_MessagesContent> {
                         style: TextStyle(color: Theme.of(context).colorScheme.onPrimaryContainer),
                       ),
                     ),
-                    title: Text(e.fullName),
-                    subtitle: Text(e.primaryRole?.displayName ?? e.department ?? ''),
+                    title: Text(
+                      ctx.read<ScreenLayoutPreferenceService>().showNameTranslit
+                          ? cyrillicToLatin(e.fullName)
+                          : e.fullName,
+                    ),
+                    subtitle: Text(
+                      e.roles.isNotEmpty
+                          ? e.roles.map((r) => loc.roleDisplayName(r)).where((s) => s.isNotEmpty).join(', ')
+                          : (e.department.isNotEmpty ? loc.departmentDisplayName(e.department) : ''),
+                    ),
                     trailing: _chatPartnerIds.contains(e.id)
                         ? Icon(Icons.chat_bubble, size: 18, color: Theme.of(context).colorScheme.primary)
                         : const Icon(Icons.chat_bubble_outline, size: 18),

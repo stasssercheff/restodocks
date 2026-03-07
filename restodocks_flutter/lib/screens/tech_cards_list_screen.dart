@@ -99,10 +99,20 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       if (widget.department == 'banquet-catering') {
         list = all.where((tc) =>
             tc.category == 'banquet' || tc.category == 'catering').toList();
+      } else if (widget.department == 'bar') {
+        list = all.where((tc) =>
+            tc.category == 'beverages' ||
+            tc.sections.contains('bar') ||
+            tc.sections.contains('all')).toList();
+      } else if (widget.department == 'hall') {
+        list = []; // Зал не имеет своих ТТК
       } else {
-        list = emp == null
-            ? all
-            : all.where((tc) => emp.canSeeTechCard(tc.sections)).toList();
+        list = all.where((tc) =>
+            tc.category != 'beverages' ||
+            tc.sections.contains('all')).toList();
+        if (emp != null && !emp.hasRole('owner') && !emp.hasRole('executive_chef') && !emp.hasRole('sous_chef')) {
+          list = list.where((tc) => emp.canSeeTechCard(tc.sections)).toList();
+        }
       }
       if (mounted) {
         setState(() { _list = list; _loading = false; });

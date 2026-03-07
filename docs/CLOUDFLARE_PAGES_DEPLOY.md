@@ -14,12 +14,10 @@ Cloudflare Pages → проект → **Settings** → **Variables and Secrets**
 
 | Проект | SUPABASE_URL | SUPABASE_ANON_KEY |
 |--------|--------------|-------------------|
-| Prod | `https://kzhaezanjttvnqkgpxnh.supabase.co` | anon key из Supabase (Dashboard → API) |
-| Beta | `https://kzhaezanjttvnqkgpxnh.supabase.co` | тот же anon key |
+| Prod | `https://osglfptwbuqqmqunttha.supabase.co` | anon key из Supabase (Dashboard → API) |
+| Beta | `https://osglfptwbuqqmqunttha.supabase.co` | тот же anon key |
 
-Скопируй из Beta в Prod — один проект Supabase для обоих.
-
-> После переключения Prod на эту БД можно **остановить** второй проект Supabase (osglfptwbuqqmqunttha), чтобы не платить за два.
+Prod и Beta используют **один** проект Supabase (osglfptwbuqqmqunttha).
 
 **Чек-лист: вход на Prod не работает, Beta работает**
 1. Cloudflare Prod → Build command: `bash cloudflare-build.sh` (как у Beta)
@@ -34,7 +32,7 @@ Cloudflare Pages → проект → **Settings** → **Variables and Secrets**
 
 ### 2. Supabase Auth: Redirect URLs
 
-Supabase → проект (тот что kzhaezanjttvnqkgpxnh) → **Authentication** → **URL Configuration** → **Redirect URLs**. Добавьте:
+Supabase → проект osglfptwbuqqmqunttha → **Authentication** → **URL Configuration** → **Redirect URLs**. Добавьте:
 
 ```
 https://restodocks.com
@@ -49,16 +47,24 @@ https://*.restodocks.pages.dev
 
 ### 3. Сборка Cloudflare Pages
 
-**Prod и Beta — ИДЕНТИЧНАЯ конфигурация** (иначе вход на Prod ломается):
+**Критично:** Production branch разный — иначе оба сайта обновляются вместе.
 
 | Параметр | Prod | Beta |
 |----------|------|------|
-| Production branch | `main` | `staging` |
+| Production branch | **main** (только!) | **staging** (только!) |
 | Root directory | **пусто** (корень репо) | **пусто** |
 | Build command | `bash cloudflare-build.sh` | `bash cloudflare-build.sh` |
 | Build output | `restodocks_flutter/build/web` | `restodocks_flutter/build/web` |
 | Env | SUPABASE_URL, SUPABASE_ANON_KEY (одни и те же) | те же |
-| Preview branch | None | None |
+| Preview branch | **None** (обязательно!) | **None** (обязательно!) |
+
+Если Preview включён — будут строиться ветки при push, и Prod может обновиться от staging.
+
+**Prod обновляется при push в staging — Cloudflare не должен вообще запускать Prod-сборку.**  
+Prod → Settings → Builds & deployments → **Preview branch control** = **None**.  
+При None Cloudflare не строит preview-ветки — staging для Prod считается preview (production = main), поэтому сборка не запустится. Если стоит "All non-Production branches" — смени на **None**.
+
+**Если Preview=None уже стоит, а Prod всё равно строит при push в staging** — см. раздел «Prod: только GitHub Action» ниже.
 
 **Если вход на Prod не работает** — убедись, что Prod использует ТОЧНО такой же Build command и Root directory, как Beta. Оба должны вызывать `bash cloudflare-build.sh` из корня.
 
@@ -71,6 +77,28 @@ https://*.restodocks.pages.dev
 ### 5. Пересборка после правок env
 
 После добавления/изменения Environment Variables нужно **Clear build cache** и **Retry deployment**, чтобы сборка использовала новые значения.
+
+---
+
+### Prod: только GitHub Action (Cloudflare не запускает Prod при push в staging)
+
+Если Prod всё равно собирается при push в staging, несмотря на Preview=None:
+
+1. **Отключить авто-деплой Prod по Git.**  
+   Prod → Settings → Builds & deployments → **Configure Production deployments** → снять галочку **Enable automatic production branch deployments** → Save.
+
+2. **Деплой Prod только через GitHub Action.**  
+   Workflow `deploy-cloudflare-prod.yml` запускается **только при push в main**. Сборка и деплой — в GitHub, Cloudflare не получает webhook'и для Prod (или получает, но не деплоит).
+
+3. **Секреты в GitHub:**  
+   Settings → Secrets → Actions → добавить:
+   - `CLOUDFLARE_API_TOKEN` — Cloudflare API Token (Account → Cloudflare Pages → Edit)
+   - `CLOUDFLARE_ACCOUNT_ID` — ID аккаунта (в правой колонке Overview)
+
+4. **Имя проекта.**  
+   В workflow `--project-name=restodocks`. Если проект называется иначе — изменить в `.github/workflows/deploy-cloudflare-prod.yml`.
+
+Итог: Prod обновляется **только** при push в main, через Action. Push в staging — Cloudflare Prod вообще не трогает.
 
 ---
 
