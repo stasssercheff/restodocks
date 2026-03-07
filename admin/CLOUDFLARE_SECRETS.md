@@ -21,4 +21,6 @@ npx wrangler kv key put --namespace-id=3f9acc45fa9e41a585e0d9be3e34ab02 "admin_p
 rm /tmp/admin_pw
 ```
 
+GitHub Secrets: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_PASSWORD`
+
 ---
