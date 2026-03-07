@@ -51,7 +51,6 @@ export default function AdminClient() {
       <header className="border-b border-amber-900/40 bg-gray-950 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-2">
           <span className="font-bold text-base">Restodocks</span>
-          <span className="bg-amber-500 text-black text-xs font-bold px-1.5 py-0.5 rounded">BETA</span>
           <span className="text-gray-500 text-sm hidden sm:inline">/ Admin</span>
         </div>
         <button onClick={logout} className="text-sm text-gray-500 hover:text-white transition">

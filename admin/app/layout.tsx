@@ -2,8 +2,8 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Restodocks Beta Admin',
-  description: 'Beta platform administration',
+  title: 'Restodocks Admin',
+  description: 'Restodocks platform administration',
   robots: 'noindex, nofollow',
 }
 

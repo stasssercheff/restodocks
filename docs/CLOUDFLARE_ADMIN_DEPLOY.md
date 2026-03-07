@@ -1,20 +1,46 @@
 # Деплой Admin на Cloudflare Workers
 
-Admin (beta-admin) — Next.js приложение. Деплоится на Cloudflare Workers через @opennextjs/cloudflare.
+Admin — Next.js приложение. Деплоится на Cloudflare Workers через @opennextjs/cloudflare.
+
+---
+
+## Cloudflare Workers Builds (Git)
+
+Если подключаешь Worker к Git в Cloudflare Dashboard:
+
+| Поле | Значение |
+|------|----------|
+| **Path** (Root directory) | `admin` |
+| **Build command** | `bash build.sh` |
+| **Deploy command** | `bash deploy.sh` |
+
+Скрипты `admin/build.sh` и `admin/deploy.sh` — Path=admin, команды из папки admin.
+
+---
+
+## Где админка
+
+После деплоя админка доступна по URL Cloudflare Workers:
+
+- **Cloudflare Dashboard** → **Workers & Pages** → **restodocks-admin** → вверху показан URL вида:
+  - `https://restodocks-admin.<ваш-аккаунт>.workers.dev`
+- Либо можно добавить кастомный домен (например `admin.restodocks.com`) в настройках Worker → **Triggers** → **Custom Domains**
+
+Вход: пароль из `ADMIN_PASSWORD`. Вкладки: **Заведения**, **Промокоды**.
 
 ---
 
 ## 1. Подготовка
 
 1. Cloudflare аккаунт, Wrangler CLI
-2. В терминале: `cd beta-admin`
+2. В терминале: `cd admin`
 
 ---
 
 ## 2. Установка зависимостей
 
 ```bash
-cd beta-admin
+cd admin
 npm install
 ```
 
@@ -68,4 +94,4 @@ Prod и Admin Demo используют один Supabase (osglfptwbuqqmqunttha)
 
 ## 7. GitHub Actions
 
-При push в `main` (с изменениями в `beta-admin/`) автоматически запускается **Deploy Admin to Cloudflare Workers**. Секреты: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`.
+При push в `main` (с изменениями в `admin/`) автоматически запускается **Deploy Admin to Cloudflare Workers**. Секреты: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`.

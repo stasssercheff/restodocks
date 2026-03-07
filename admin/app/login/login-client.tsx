@@ -33,13 +33,10 @@ export default function LoginClient() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <div className="text-3xl font-bold text-white mb-1">Restodocks</div>
-          <div className="flex items-center justify-center gap-2 mt-1">
-            <span className="bg-amber-500 text-black text-xs font-bold px-2 py-0.5 rounded">BETA</span>
-            <span className="text-gray-400 text-sm">Admin</span>
-          </div>
+          <div className="text-gray-400 text-sm mt-1">Admin</div>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-gray-900 rounded-2xl p-6 border border-amber-900/40">
+        <form onSubmit={handleSubmit} className="bg-gray-900 rounded-2xl p-6 border border-gray-800">
           <label className="block text-sm text-gray-400 mb-2">Пароль</label>
           <input
             type="password"

@@ -1,5 +1,7 @@
 # Настройка бета-деплоя (staging → Beta)
 
+> **Полная инструкция с нуля:** [DEPLOY_FULL_GUIDE.md](DEPLOY_FULL_GUIDE.md)
+
 Основной деплой: **Cloudflare Pages** (см. [CLOUDFLARE_PAGES_DEPLOY.md](CLOUDFLARE_PAGES_DEPLOY.md)).  
 Beta смотрит ветку `staging`. Prod смотрит `main`. Не пушить в main до релиза.
 
@@ -27,7 +29,7 @@ Beta деплоится автоматически при push в `staging` — 
 
 ## 4. Admin
 
-Admin (beta-admin) — Cloudflare Workers. При push в `main` деплоится workflow **Deploy Admin to Cloudflare Workers**.  
+Admin — Cloudflare Workers. При push в `main` деплоится workflow **Deploy Admin to Cloudflare Workers**.  
 Настройка: [CLOUDFLARE_ADMIN_DEPLOY.md](CLOUDFLARE_ADMIN_DEPLOY.md).
 
 ## Миграции Supabase

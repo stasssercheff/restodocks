@@ -11,10 +11,8 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? ''
+  const supabase = createClient(url, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
   const { data: establishments, error } = await supabase
     .from('establishments')
