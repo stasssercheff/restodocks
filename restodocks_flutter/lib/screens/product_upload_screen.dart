@@ -2326,6 +2326,7 @@ ${text}
                 aiService: context.read<AiServiceSupabase>(),
                 supabase: context.read<SupabaseService>(),
               ),
+              getSupportedLanguages: () => LocalizationService.productLanguageCodes,
             );
 
             await translationManager.handleEntitySave(
