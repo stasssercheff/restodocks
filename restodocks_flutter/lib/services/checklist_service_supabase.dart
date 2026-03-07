@@ -218,34 +218,33 @@ class ChecklistServiceSupabase {
     final empIds = checklist.assignedEmployeeIds ?? [];
     final empId = empIds.isNotEmpty ? empIds.first : checklist.assignedEmployeeId;
 
-    final upd = <String, dynamic>{
-      'name': checklist.name,
-      'updated_at': now,
-      'action_config': checklist.actionConfig.toJson(),
-      'assigned_department': checklist.assignedDepartment,
-    };
-    if (checklist.assignedSection != null) upd['assigned_section'] = checklist.assignedSection;
-    if (empId != null) upd['assigned_employee_id'] = empId;
-    upd['assigned_employee_ids'] = empIds;
-    if (checklist.deadlineAt != null) upd['deadline_at'] = checklist.deadlineAt!.toUtc().toIso8601String();
-    if (checklist.scheduledForAt != null) upd['scheduled_for_at'] = checklist.scheduledForAt!.toUtc().toIso8601String();
-    if (checklist.additionalName != null) upd['additional_name'] = checklist.additionalName;
-    if (checklist.type != null) upd['type'] = checklist.type!.code;
-
-    await _updateChecklistWithRetry(checklist.id, upd);
-    await _supabase.client.from('checklist_items').delete().eq('checklist_id', checklist.id);
-    for (var i = 0; i < checklist.items.length; i++) {
-      final item = checklist.items[i];
-      final itemData = <String, dynamic>{
-        'checklist_id': checklist.id,
-        'title': item.title,
-        'sort_order': i,
-      };
-      if (item.techCardId != null) itemData['tech_card_id'] = item.techCardId;
-      if (item.targetQuantity != null) itemData['target_quantity'] = item.targetQuantity;
-      if (item.targetUnit != null) itemData['target_unit'] = item.targetUnit;
-      await _insertChecklistItem(itemData);
-    }
+    // RPC обходит RLS — работает при любых политиках
+    await _supabase.client.rpc(
+      'save_checklist',
+      params: {
+        'p_checklist_id': checklist.id,
+        'p_name': checklist.name,
+        'p_updated_at': now,
+        'p_action_config': checklist.actionConfig.toJson(),
+        'p_assigned_department': checklist.assignedDepartment,
+        'p_assigned_section': checklist.assignedSection,
+        'p_assigned_employee_id': empId,
+        'p_assigned_employee_ids': empIds,
+        'p_deadline_at': checklist.deadlineAt?.toUtc().toIso8601String(),
+        'p_scheduled_for_at': checklist.scheduledForAt?.toUtc().toIso8601String(),
+        'p_additional_name': checklist.additionalName,
+        'p_type': checklist.type?.code,
+        'p_items': checklist.items
+            .map((e) => {
+                  'title': e.title,
+                  'sort_order': e.sortOrder,
+                  'tech_card_id': e.techCardId,
+                  'target_quantity': e.targetQuantity,
+                  'target_unit': e.targetUnit,
+                })
+            .toList(),
+      },
+    );
   }
 
   Future<void> deleteChecklist(String id) async {
