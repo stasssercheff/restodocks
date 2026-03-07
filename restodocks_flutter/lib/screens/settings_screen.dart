@@ -371,30 +371,73 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showClearNomenclatureConfirm(BuildContext context, LocalizationService loc) {
-    showDialog<bool>(
+    final account = context.read<AccountManagerSupabase>();
+    final establishment = account.establishment;
+    if (establishment == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('establishment') ?? 'Не найдено заведение')),
+      );
+      return;
+    }
+    final pinController = TextEditingController();
+    final pinKey = GlobalKey<FormState>();
+    showDialog<String?>(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         title: Text(loc.t('clear_nomenclature') ?? 'Очистить номенклатуру?'),
-        content: Text(
-          loc.t('clear_nomenclature_confirm') ??
-              'Это действие удалит ВСЕ продукты из номенклатуры заведения.\n\n'
-              'Продукты можно добавить заново через загрузку.\n\n'
-              'Это действие нельзя отменить!',
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              loc.t('clear_nomenclature_enter_pin') ?? 'Введите PIN заведения для подтверждения:',
+              style: Theme.of(ctx).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 12),
+            Form(
+              key: pinKey,
+              child: TextFormField(
+                controller: pinController,
+                obscureText: true,
+                autofocus: true,
+                textCapitalization: TextCapitalization.characters,
+                decoration: InputDecoration(
+                  labelText: loc.t('company_pin') ?? 'PIN компании',
+                  hintText: loc.t('enter_company_pin') ?? 'Введите PIN компании',
+                ),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return loc.t('company_pin_required') ?? 'PIN обязателен';
+                  return null;
+                },
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
+            onPressed: () => Navigator.of(ctx).pop(null),
             child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
+            onPressed: () {
+              if (!pinKey.currentState!.validate()) return;
+              final pin = pinController.text.trim();
+              if (!establishment.verifyPinCode(pin)) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  SnackBar(content: Text(loc.t('clear_nomenclature_wrong_pin') ?? 'Неверный PIN')),
+                );
+                return;
+              }
+              Navigator.of(ctx).pop(pin);
+            },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: Text(loc.t('clear_nomenclature') ?? 'Удалить всё'),
           ),
         ],
       ),
-    ).then((confirmed) async {
-      if (confirmed != true || !context.mounted) return;
+    ).then((pinVerified) async {
+      if (pinVerified == null || !context.mounted) return;
       final store = context.read<ProductStoreSupabase>();
       final account = context.read<AccountManagerSupabase>();
       final estId = account.dataEstablishmentId;
@@ -643,12 +686,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   /// Переводит продукты, у которых нет имени на выбранном языке (в фоне).
+  /// Автоматически вызывается при смене языка в профиле.
   void _translateProductsForLanguage(BuildContext context, String targetLang) {
     final store = context.read<ProductStoreSupabase>();
     final aiService = context.read<AiServiceSupabase>();
     final scaffoldMessenger = ScaffoldMessenger.of(context);
     final loc = context.read<LocalizationService>();
     Future(() async {
+      // Сначала загружаем продукты, чтобы store.allProducts не был пустым
+      await store.loadProducts(force: true);
       final translationService = TranslationService(
         aiService: aiService,
         supabase: SupabaseService(),

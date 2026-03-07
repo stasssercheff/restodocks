@@ -1264,7 +1264,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  _tabChip(_NomTab.nomenclature, 'Номенклатура'),
+                  _tabChip(_NomTab.nomenclature, loc.t('nomenclature')),
                   const SizedBox(width: 8),
                   _tabChip(_NomTab.iiko, 'iiko'),
                 ],
