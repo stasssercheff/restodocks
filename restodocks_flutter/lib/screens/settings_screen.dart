@@ -432,6 +432,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       HomeTileId.banquetMenu: '${loc.t('menu')} — ${loc.t('banquet_catering') ?? 'Банкет / Кейтринг'}',
       HomeTileId.banquetTtk: '${loc.t('ttk_kitchen')} — ${loc.t('banquet_catering') ?? 'Банкет / Кейтринг'}',
       HomeTileId.checklists: loc.t('checklists'),
+      HomeTileId.nomenclature: loc.t('nomenclature'),
       HomeTileId.inventory: loc.t('inventory_blank'),
     };
     showDialog<void>(

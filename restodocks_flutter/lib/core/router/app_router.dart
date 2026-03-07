@@ -540,7 +540,8 @@ class AppRouter {
                 return _slideTransitionPage(state, TechCardsListScreen(department: segment));
               }
               final viewOnly = state.queryParameters['view'] == '1';
-              return _slideTransitionPage(state, TechCardEditScreen(techCardId: segment, forceViewMode: viewOnly));
+              final hallView = state.queryParameters['hall'] == '1';
+              return _slideTransitionPage(state, TechCardEditScreen(techCardId: segment, forceViewMode: viewOnly, forceHallView: hallView));
             },
           ),
 

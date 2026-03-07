@@ -353,7 +353,9 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       await store.loadNomenclature(estId);
 
       // Загружаем элементы номенклатуры (продукты + ТТК ПФ)
-      _nomenclatureItems = await store.getAllNomenclatureItems(estId, techCardService);
+      var items = await store.getAllNomenclatureItems(estId, techCardService);
+      // Фильтр по подразделению: каждый видит только свою номенклатуру
+      _nomenclatureItems = _filterByDepartment(items, widget.department);
     } catch (e) {
       print('❌ NomenclatureScreen: _ensureLoaded error: $e');
       if (mounted) {
@@ -364,6 +366,19 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     }
 
     if (mounted) setState(() => _isLoading = false);
+  }
+
+  /// Категории продуктов/ПФ для подразделений. general = без фильтра (все).
+  static const _barCategories = {'beverages', 'alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks'};
+
+  List<NomenclatureItem> _filterByDepartment(List<NomenclatureItem> items, String department) {
+    if (department == 'general') return items;
+    if (department == 'hall' || department == 'dining_room') return items; // Зал видит всё
+    if (department == 'bar') {
+      return items.where((i) => _barCategories.contains(i.category)).toList();
+    }
+    // kitchen, banquet-catering и остальные — кухонные категории (всё кроме бара)
+    return items.where((i) => !_barCategories.contains(i.category)).toList();
   }
 
   bool _iikoUploading = false;

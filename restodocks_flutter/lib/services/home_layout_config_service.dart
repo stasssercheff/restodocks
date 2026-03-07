@@ -14,6 +14,7 @@ enum HomeTileId {
   banquetMenu,
   banquetTtk,
   checklists,
+  nomenclature,
   inventory,
 }
 

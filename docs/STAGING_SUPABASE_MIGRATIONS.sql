@@ -85,6 +85,12 @@ CREATE POLICY "auth_employee_messages_insert" ON employee_direct_messages
 
 GRANT SELECT, INSERT ON employee_direct_messages TO authenticated;
 
+-- 5b. TECH_CARDS: description_for_hall, composition_for_hall (для меню зала)
+ALTER TABLE tech_cards ADD COLUMN IF NOT EXISTS description_for_hall TEXT;
+ALTER TABLE tech_cards ADD COLUMN IF NOT EXISTS composition_for_hall TEXT;
+COMMENT ON COLUMN tech_cards.description_for_hall IS 'Описание блюда для гостей (меню зала)';
+COMMENT ON COLUMN tech_cards.composition_for_hall IS 'Состав блюда для гостей (меню зала)';
+
 -- 6. EMPLOYEE: employment_status (постоянный/временный)
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS employment_status TEXT DEFAULT 'permanent';
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS employment_start_date DATE;

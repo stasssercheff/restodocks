@@ -116,13 +116,20 @@ class StaffHomeContent extends StatelessWidget {
         title: loc.t('checklists'),
         onTap: () => context.go('/checklists?department=${_deptForRoute(employee.department)}'),
       ),
+      HomeTileId.nomenclature: _Tile(
+        icon: Icons.assignment,
+        title: loc.t('nomenclature'),
+        onTap: () => context.go('/nomenclature/${_deptForRoute(employee.department)}'),
+      ),
       HomeTileId.inventory: _Tile(icon: Icons.assignment, title: loc.t('inventory_blank'), onTap: () => context.push('/inventory')),
     };
     final showChecklists = employee.department == 'kitchen' || employee.department == 'bar' || employee.department == 'dining_room';
+    final showNomenclature = employee.department == 'kitchen' || employee.department == 'bar' || employee.department == 'hall' || employee.department == 'dining_room';
     final showBanquet = employee.department == 'kitchen' && screenPref.showBanquetCatering;
     final showTtk = employee.department != 'dining_room' && employee.department != 'hall';
     final ordered = order
         .where((id) => id != HomeTileId.checklists || showChecklists)
+        .where((id) => id != HomeTileId.nomenclature || showNomenclature)
         .where((id) => (id != HomeTileId.banquetMenu && id != HomeTileId.banquetTtk) || showBanquet)
         .where((id) => id != HomeTileId.ttk || showTtk)
         .where((id) => tiles.containsKey(id))

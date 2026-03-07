@@ -420,6 +420,8 @@ TechCard _applyEdits(
   double? portionWeight,
   double? yieldGrams,
   Map<String, String>? technologyLocalized,
+  String? descriptionForHall,
+  String? compositionForHall,
   List<String>? photoUrls,
   List<TTIngredient>? ingredients,
 }) {
@@ -431,13 +433,15 @@ TechCard _applyEdits(
     portionWeight: portionWeight,
     yield: yieldGrams,
     technologyLocalized: technologyLocalized,
+    descriptionForHall: descriptionForHall,
+    compositionForHall: compositionForHall,
     photoUrls: photoUrls,
     ingredients: ingredients,
   );
 }
 
 class TechCardEditScreen extends StatefulWidget {
-  const TechCardEditScreen({super.key, required this.techCardId, this.initialFromAi, this.forceViewMode = false, this.department});
+  const TechCardEditScreen({super.key, required this.techCardId, this.initialFromAi, this.forceViewMode = false, this.department, this.forceHallView = false});
 
   /// Пусто для «новой», иначе id существующей ТТК.
   final String techCardId;
@@ -447,6 +451,8 @@ class TechCardEditScreen extends StatefulWidget {
   final bool forceViewMode;
   /// Отдел при создании: 'bar' — категории бара, иначе кухни.
   final String? department;
+  /// Показать описание и состав для зала вместо полной ТТК (меню зала).
+  final bool forceHallView;
 
   @override
   State<TechCardEditScreen> createState() => _TechCardEditScreenState();
@@ -510,6 +516,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   List<String> _selectedSections = []; // [] = Скрыто, ['all'] = Все цеха
   bool _isSemiFinished = true; // ПФ или блюдо (порция — в карточках блюд, отдельно)
   final _technologyController = TextEditingController();
+  final _descriptionForHallController = TextEditingController();
+  final _compositionForHallController = TextEditingController();
   final List<TTIngredient> _ingredients = [];
   List<TechCard> _pickerTechCards = [];
   List<TechCard> _semiFinishedProducts = [];
@@ -660,6 +668,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
             _photoUrls = tc.photoUrls ?? [];
             _pendingPhotoBytes = [];
             _technologyController.text = tc.getLocalizedTechnology(context.read<LocalizationService>().currentLanguageCode);
+            _descriptionForHallController.text = tc.descriptionForHall ?? '';
+            _compositionForHallController.text = tc.compositionForHall ?? '';
             _ingredients
               ..clear()
               ..addAll(tc.ingredients);
@@ -700,6 +710,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   void dispose() {
     _nameController.dispose();
     _technologyController.dispose();
+    _descriptionForHallController.dispose();
+    _compositionForHallController.dispose();
     super.dispose();
   }
 
@@ -794,7 +806,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           establishmentId: est.dataEstablishmentId,
           createdBy: emp.id,
         );
-        var updated = _applyEdits(created, portionWeight: _portionWeight, yieldGrams: yieldVal, technologyLocalized: techMap, ingredients: toSaveIngredients);
+        var updated = _applyEdits(created, portionWeight: _portionWeight, yieldGrams: yieldVal, technologyLocalized: techMap, descriptionForHall: _descriptionForHallController.text.trim().isEmpty ? null : _descriptionForHallController.text.trim(), compositionForHall: _compositionForHallController.text.trim().isEmpty ? null : _compositionForHallController.text.trim(), ingredients: toSaveIngredients);
         if (_pendingPhotoBytes.isNotEmpty) {
           final urls = <String>[];
           for (var i = 0; i < _pendingPhotoBytes.length; i++) {
@@ -870,7 +882,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
             if (url != null) photoUrls.add(url);
           }
         }
-        final updated = _applyEdits(tc, dishName: name, category: category, sections: _selectedSections, isSemiFinished: _isSemiFinished, portionWeight: _portionWeight, yieldGrams: yieldVal, technologyLocalized: techMap, photoUrls: photoUrls, ingredients: toSaveIngredients);
+        final updated = _applyEdits(tc, dishName: name, category: category, sections: _selectedSections, isSemiFinished: _isSemiFinished, portionWeight: _portionWeight, yieldGrams: yieldVal, technologyLocalized: techMap, descriptionForHall: _descriptionForHallController.text.trim().isEmpty ? null : _descriptionForHallController.text.trim(), compositionForHall: _compositionForHallController.text.trim().isEmpty ? null : _compositionForHallController.text.trim(), photoUrls: photoUrls, ingredients: toSaveIngredients);
         await svc.saveTechCard(updated);
         // Переводим название и технологию фоново
         final techText = _technologyController.text.trim();
@@ -1491,6 +1503,76 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     );
   }
 
+  /// Блок «Описание для зала» и «Состав для зала» — под фото, только для блюд.
+  Widget _buildHallFieldsSection(LocalizationService loc, bool effectiveCanEdit) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final maxW = screenWidth > 1000 ? 1000.0 : screenWidth;
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: SizedBox(
+        width: maxW,
+        child: Container(
+          margin: const EdgeInsets.only(top: 12),
+          decoration: BoxDecoration(
+            border: Border.all(color: Theme.of(context).colorScheme.outline),
+            color: Theme.of(context).colorScheme.surfaceContainerLowest,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  border: const Border(bottom: BorderSide(color: Colors.grey, width: 1)),
+                ),
+                child: Text(loc.t('hall_menu_info') ?? 'Для меню зала', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(loc.t('description_for_hall') ?? 'Описание для гостей', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 4),
+                    effectiveCanEdit
+                        ? TextField(
+                            controller: _descriptionForHallController,
+                            maxLines: 3,
+                            style: const TextStyle(fontSize: 13),
+                            decoration: InputDecoration(
+                              hintText: loc.t('description_for_hall_hint') ?? 'Краткое описание блюда для гостей',
+                              isDense: true,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                          )
+                        : Text(_descriptionForHallController.text.isEmpty ? '—' : _descriptionForHallController.text, style: const TextStyle(fontSize: 13, height: 1.4)),
+                    const SizedBox(height: 12),
+                    Text(loc.t('composition_for_hall') ?? 'Состав для гостей', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 4),
+                    effectiveCanEdit
+                        ? TextField(
+                            controller: _compositionForHallController,
+                            maxLines: 3,
+                            style: const TextStyle(fontSize: 13),
+                            decoration: InputDecoration(
+                              hintText: loc.t('composition_for_hall_hint') ?? 'Состав: ингредиенты для меню (например: курица, рис, соус)',
+                              isDense: true,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                          )
+                        : Text(_compositionForHallController.text.isEmpty ? '—' : _compositionForHallController.text, style: const TextStyle(fontSize: 13, height: 1.4)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   /// Миниатюра фото — квадратная, с кнопкой удаления и тапом для просмотра.
   Widget _photoThumb({
     String? url,
@@ -1661,6 +1743,58 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
       return Scaffold(
         appBar: AppBar(leading: appBarBackButton(context), title: Text(_isNew ? loc.t('create_tech_card') : loc.t('tech_cards'))),
         body: Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Text(_error!), const SizedBox(height: 16), FilledButton(onPressed: () => context.pop(), child: Text(loc.t('back')))]))),
+      );
+    }
+
+    // Режим «для зала»: описание и состав для гостей вместо полной ТТК кухни
+    if (widget.forceHallView && _techCard != null && !_techCard!.isSemiFinished) {
+      final desc = _techCard!.descriptionForHall?.trim() ?? '';
+      final comp = _techCard!.compositionForHall?.trim() ?? '';
+      final photoUrls = _techCard!.photoUrls ?? [];
+      final photoUrl = photoUrls.isNotEmpty ? photoUrls.first : null;
+      return Scaffold(
+        appBar: AppBar(
+          leading: appBarBackButton(context),
+          title: Text(_techCard!.getDisplayNameInLists(loc.currentLanguageCode)),
+        ),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (photoUrl != null) ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: AspectRatio(
+                    aspectRatio: 4 / 3,
+                    child: Image.network(photoUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.restaurant, size: 64)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+              if (desc.isNotEmpty) ...[
+                Text(loc.t('description_for_hall') ?? 'Описание', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 4),
+                Text(desc, style: const TextStyle(fontSize: 15, height: 1.5)),
+                const SizedBox(height: 16),
+              ],
+              if (comp.isNotEmpty) ...[
+                Text(loc.t('composition_for_hall') ?? 'Состав', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 4),
+                Text(comp, style: const TextStyle(fontSize: 15, height: 1.5)),
+              ],
+              if (desc.isEmpty && comp.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Text(
+                    loc.t('hall_info_empty') ?? 'Описание и состав для зала не заполнены в ТТК.',
+                    style: TextStyle(color: Colors.grey[600]),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+            ],
+          ),
+        ),
       );
     }
 
@@ -2019,6 +2153,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
             ),
             // Блок фото: ПФ — сетка до 10, блюдо — 1 фото
             _buildPhotoSection(loc, effectiveCanEdit),
+            // Описание и состав для зала (только для блюд)
+            if (!_isSemiFinished) _buildHallFieldsSection(loc, effectiveCanEdit),
             if (effectiveCanEdit)
               SafeArea(
                   top: false,

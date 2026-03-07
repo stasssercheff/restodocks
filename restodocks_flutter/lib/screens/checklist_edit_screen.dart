@@ -72,10 +72,22 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
         emps = await acc.getEmployeesForEstablishment(est.id);
       }
       if (!mounted) return;
+      // Персонал и ТТК — только по подразделению чеклиста
+      final dept = c?.assignedDepartment ?? 'kitchen';
+      final filteredEmps = emps.where((e) {
+        if (dept == 'hall') return e.department == 'hall' || e.department == 'dining_room';
+        return e.department == dept;
+      }).toList();
+      const barCats = {'beverages', 'alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks'};
+      final filteredTechs = dept == 'bar'
+          ? techs.where((t) => barCats.contains(t.category) || t.sections.contains('bar') || t.sections.contains('all')).toList()
+          : dept == 'hall' || dept == 'dining_room'
+              ? techs
+              : techs.where((t) => !barCats.contains(t.category) || t.sections.contains('all')).toList();
       setState(() {
         _checklist = c;
-        _techCards = techs;
-        _employees = emps;
+        _techCards = filteredTechs.isNotEmpty ? filteredTechs : techs;
+        _employees = filteredEmps.isNotEmpty ? filteredEmps : emps;
         _loading = false;
         if (c != null) {
           _nameController.text = c.name;
@@ -730,11 +742,13 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
               Expanded(
                 child: InkWell(
                   onTap: () async {
+                    final loc = context.read<LocalizationService>();
                     final date = await showDatePicker(
                       context: context,
                       initialDate: _deadline ?? DateTime.now(),
                       firstDate: DateTime(2020),
                       lastDate: DateTime(2030),
+                      locale: Locale(loc.currentLanguageCode == 'en' ? 'en_GB' : loc.currentLanguageCode),
                     );
                     if (date != null && mounted) {
                       setState(() {
@@ -827,11 +841,13 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
               Expanded(
                 child: InkWell(
                   onTap: () async {
+                    final loc = context.read<LocalizationService>();
                     final date = await showDatePicker(
                       context: context,
                       initialDate: _scheduledFor ?? DateTime.now(),
                       firstDate: DateTime(2020),
                       lastDate: DateTime(2030),
+                      locale: Locale(loc.currentLanguageCode == 'en' ? 'en_GB' : loc.currentLanguageCode),
                     );
                     if (date != null && mounted) {
                       setState(() {

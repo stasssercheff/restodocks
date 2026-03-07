@@ -23,63 +23,17 @@ class TimePickerField extends StatefulWidget {
 }
 
 class _TimePickerFieldState extends State<TimePickerField> {
-  late TextEditingController _hourController;
-  late TextEditingController _minController;
-  late FocusNode _hourFocus;
-  late FocusNode _minFocus;
-
   static int _parseHour(String s) => (int.tryParse(s) ?? 0).clamp(0, 23);
   static int _parseMin(String s) => (int.tryParse(s) ?? 0).clamp(0, 59);
   static String _fmt(int n) => n.toString().padLeft(2, '0');
 
-  @override
-  void initState() {
-    super.initState();
-    final parts = widget.value.trim().split(RegExp(r'[:\s.,-]'));
-    final h = parts.isNotEmpty ? _parseHour(parts[0]) : 0;
-    final m = parts.length > 1 ? _parseMin(parts[1]) : 0;
-    _hourController = TextEditingController(text: _fmt(h));
-    _minController = TextEditingController(text: _fmt(m));
-    _hourFocus = FocusNode();
-    _minFocus = FocusNode();
-  }
-
-  @override
-  void didUpdateWidget(TimePickerField oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.value != widget.value) {
-      final parts = widget.value.trim().split(RegExp(r'[:\s.,-]'));
-      final h = parts.isNotEmpty ? _parseHour(parts[0]) : 0;
-      final m = parts.length > 1 ? _parseMin(parts[1]) : 0;
-      _hourController.text = _fmt(h);
-      _minController.text = _fmt(m);
-    }
-  }
-
-  @override
-  void dispose() {
-    _hourController.dispose();
-    _minController.dispose();
-    _hourFocus.dispose();
-    _minFocus.dispose();
-    super.dispose();
-  }
-
-  void _emitFromControllers() {
-    final h = _parseHour(_hourController.text);
-    final m = _parseMin(_minController.text);
-    _hourController.text = _fmt(h);
-    _minController.text = _fmt(m);
-    widget.onChanged('${_fmt(h)}:${_fmt(m)}');
-  }
-
-  Future<void> _openMobilePicker() async {
+  Future<void> _openPicker() async {
     final parts = widget.value.trim().split(RegExp(r'[:\s.,-]'));
     final initialHour = parts.isNotEmpty ? _parseHour(parts[0]) : 0;
     final initialMin = parts.length > 1 ? _parseMin(parts[1]) : 0;
 
-    // На Android используем Material showTimePicker — он стабильнее
-    if (defaultTargetPlatform == TargetPlatform.android) {
+    // Android, desktop, web — Material showTimePicker (цифры + циферблат)
+    if (defaultTargetPlatform != TargetPlatform.iOS) {
       final picked = await showTimePicker(
         context: context,
         initialTime: TimeOfDay(hour: initialHour, minute: initialMin),
@@ -90,6 +44,7 @@ class _TimePickerFieldState extends State<TimePickerField> {
       return;
     }
 
+    // iOS — Cupertino scroll picker
     var duration = Duration(hours: initialHour, minutes: initialMin);
     Duration? result;
     await showModalBottomSheet<void>(
@@ -144,75 +99,18 @@ class _TimePickerFieldState extends State<TimePickerField> {
 
   @override
   Widget build(BuildContext context) {
-    final isPhone = defaultTargetPlatform == TargetPlatform.iOS ||
-        defaultTargetPlatform == TargetPlatform.android;
-    final isNarrow = MediaQuery.of(context).size.width < 600;
-    final useScrollPicker = isPhone || isNarrow;
-
-    if (useScrollPicker) {
-      return InkWell(
-        onTap: widget.enabled ? _openMobilePicker : null,
-        borderRadius: BorderRadius.circular(4),
-        child: InputDecorator(
-          decoration: InputDecoration(
-            labelText: widget.label,
-            border: const OutlineInputBorder(),
-            isDense: true,
-            suffixIcon: const Icon(Icons.schedule, size: 20),
-          ),
-          child: Text(widget.value.isEmpty ? 'HH:mm' : widget.value),
+    return InkWell(
+      onTap: widget.enabled ? _openPicker : null,
+      borderRadius: BorderRadius.circular(4),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: widget.label,
+          border: const OutlineInputBorder(),
+          isDense: true,
+          suffixIcon: const Icon(Icons.schedule, size: 20),
         ),
-      );
-    }
-
-    // Desktop: inline HH and MM fields
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 60,
-          child: TextField(
-            controller: _hourController,
-            focusNode: _hourFocus,
-            enabled: widget.enabled,
-            keyboardType: TextInputType.number,
-            textAlign: TextAlign.center,
-            maxLength: 2,
-            decoration: InputDecoration(
-              labelText: widget.label,
-              counterText: '',
-              border: const OutlineInputBorder(),
-              isDense: true,
-            ),
-            onChanged: (_) => _emitFromControllers(),
-            onEditingComplete: () {
-              _hourFocus.unfocus();
-              _minFocus.requestFocus();
-            },
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.only(top: 20, left: 4, right: 4),
-          child: Text(':', style: Theme.of(context).textTheme.titleMedium),
-        ),
-        SizedBox(
-          width: 60,
-          child: TextField(
-            controller: _minController,
-            focusNode: _minFocus,
-            enabled: widget.enabled,
-            keyboardType: TextInputType.number,
-            textAlign: TextAlign.center,
-            maxLength: 2,
-            decoration: const InputDecoration(
-              counterText: '',
-              border: OutlineInputBorder(),
-              isDense: true,
-            ),
-            onChanged: (_) => _emitFromControllers(),
-          ),
-        ),
-      ],
+        child: Text(widget.value.isEmpty ? 'HH:mm' : widget.value),
+      ),
     );
   }
 }

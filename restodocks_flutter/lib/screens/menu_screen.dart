@@ -178,6 +178,32 @@ class _MenuScreenState extends State<MenuScreen> {
 
   bool get _isHallMenu => widget.department == 'hall' || widget.department == 'dining_room';
 
+  /// Себестоимость видят только собственник и управляющие подразделениями.
+  bool _canSeeCost(Employee? emp) {
+    if (emp == null) return false;
+    return emp.hasRole('owner') ||
+        emp.hasRole('executive_chef') ||
+        emp.hasRole('sous_chef') ||
+        emp.hasRole('bar_manager') ||
+        emp.hasRole('floor_manager') ||
+        emp.department == 'management';
+  }
+
+  bool _hasHallContent(TechCard tc) {
+    final d = tc.descriptionForHall?.trim() ?? '';
+    final c = tc.compositionForHall?.trim() ?? '';
+    return d.isNotEmpty || c.isNotEmpty;
+  }
+
+  String _buildSubtitleText(LocalizationService loc, TechCard tc, String lang, double totalCost, String currencySym) {
+    final emp = context.read<AccountManagerSupabase>().currentEmployee;
+    final cat = _categoryLabel(tc.category, lang);
+    if (_canSeeCost(emp)) {
+      return '${cat} • ${loc.t('cost_price')}: ${totalCost.toStringAsFixed(2)} $currencySym';
+    }
+    return cat;
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
@@ -306,33 +332,36 @@ class _MenuScreenState extends State<MenuScreen> {
                 ),
               ),
               title: InkWell(
-                onTap: () => context.push('/tech-cards/${tc.id}?view=1'),
+                onTap: () => context.push('/tech-cards/${tc.id}?view=1${_isHallMenu ? '&hall=1' : ''}'),
                 child: Text(
                   tc.getDisplayNameInLists(lang),
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
               ),
               subtitle: InkWell(
-                onTap: () => context.push('/tech-cards/${tc.id}?view=1'),
+                onTap: () => context.push('/tech-cards/${tc.id}?view=1${_isHallMenu ? '&hall=1' : ''}'),
                 child: Text(
-                  '${_categoryLabel(tc.category, lang)} • ${loc.t('cost_price')}: ${totalCost.toStringAsFixed(2)} $currencySym',
+                  _buildSubtitleText(loc, tc, lang, totalCost, currencySym),
                   style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                 ),
               ),
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _MenuDishTable(
-                        loc: loc,
-                        dishName: tc.dishName,
-                        ingredients: tc.ingredients.where((i) => !i.isPlaceholder || i.hasData).toList(),
-                        technology: tc.getLocalizedTechnology(lang),
-                        currencySym: currencySym,
-                      ),
-                    ],
+                  child: _isHallMenu && _hasHallContent(tc)
+                      ? _HallDishContent(
+                          loc: loc,
+                          description: tc.descriptionForHall ?? '',
+                          composition: tc.compositionForHall ?? '',
+                        )
+                      : _MenuDishTable(
+                          loc: loc,
+                          dishName: tc.dishName,
+                          ingredients: tc.ingredients.where((i) => !i.isPlaceholder || i.hasData).toList(),
+                          technology: tc.getLocalizedTechnology(lang),
+                          currencySym: currencySym,
+                          showCost: _canSeeCost(context.read<AccountManagerSupabase>().currentEmployee),
+                        ),
                   ),
                 ),
               ],
@@ -389,6 +418,39 @@ class _HallTabChip extends StatelessWidget {
   }
 }
 
+/// Блок описания и состава для зала (вместо полной ТТК).
+class _HallDishContent extends StatelessWidget {
+  const _HallDishContent({
+    required this.loc,
+    required this.description,
+    required this.composition,
+  });
+
+  final LocalizationService loc;
+  final String description;
+  final String composition;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (description.isNotEmpty) ...[
+          Text(loc.t('description_for_hall') ?? 'Описание', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          Text(description, style: const TextStyle(fontSize: 13, height: 1.4)),
+          const SizedBox(height: 12),
+        ],
+        if (composition.isNotEmpty) ...[
+          Text(loc.t('composition_for_hall') ?? 'Состав', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          Text(composition, style: const TextStyle(fontSize: 13, height: 1.4)),
+        ],
+      ],
+    );
+  }
+}
+
 /// Таблица состава блюда (только чтение): как в ТТК.
 /// Ингредиенты-ПФ (sourceTechCardId) кликабельны — открывают карточку ТТК ПФ в просмотре.
 class _MenuDishTable extends StatelessWidget {
@@ -398,6 +460,7 @@ class _MenuDishTable extends StatelessWidget {
     required this.ingredients,
     required this.technology,
     required this.currencySym,
+    this.showCost = true,
   });
 
   final LocalizationService loc;
@@ -405,6 +468,7 @@ class _MenuDishTable extends StatelessWidget {
   final List<TTIngredient> ingredients;
   final String technology;
   final String currencySym;
+  final bool showCost;
 
   static const _cellPad = EdgeInsets.symmetric(horizontal: 6, vertical: 6);
 
@@ -433,6 +497,35 @@ class _MenuDishTable extends StatelessWidget {
   Widget build(BuildContext context) {
     final totalOutput = ingredients.fold<double>(0, (s, i) => s + i.outputWeight);
     final totalCost = ingredients.fold<double>(0, (s, i) => s + i.cost);
+    const colCount = 6;
+    final effectiveColCount = showCost ? colCount : colCount - 1;
+
+    List<Widget> headerCells() => [
+      _cell(context, loc.t('ttk_product'), bold: true),
+      _cell(context, loc.t('ttk_gross'), bold: true),
+      _cell(context, loc.t('ttk_net'), bold: true),
+      _cell(context, loc.t('ttk_cooking_method'), bold: true),
+      _cell(context, loc.t('ttk_output'), bold: true),
+      if (showCost) _cell(context, loc.t('ttk_cost'), bold: true),
+    ];
+
+    List<Widget> ingCells(TTIngredient ing) => [
+      _cell(context, ing.sourceTechCardName ?? ing.productName, techCardId: ing.sourceTechCardId),
+      _cell(context, ing.grossWeight > 0 ? ing.grossWeight.toStringAsFixed(0) : ''),
+      _cell(context, ing.netWeight > 0 ? ing.netWeight.toStringAsFixed(0) : ''),
+      _cell(context, ing.cookingProcessName ?? loc.t('dash')),
+      _cell(context, ing.outputWeight > 0 ? ing.outputWeight.toStringAsFixed(0) : ''),
+      if (showCost) _cell(context, ing.cost > 0 ? '${ing.cost.toStringAsFixed(2)} $currencySym' : ''),
+    ];
+
+    List<Widget> totalCells() => [
+      _cell(context, loc.t('ttk_total'), bold: true),
+      _cell(context, ''),
+      _cell(context, ''),
+      _cell(context, ''),
+      _cell(context, '${totalOutput.toStringAsFixed(0)} ${loc.t('gram')}', bold: true),
+      if (showCost) _cell(context, '${totalCost.toStringAsFixed(2)} $currencySym', bold: true),
+    ];
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -442,51 +535,28 @@ class _MenuDishTable extends StatelessWidget {
         children: [
           Table(
         border: TableBorder.all(width: 0.5, color: Colors.grey),
-        columnWidths: const {
-          0: FixedColumnWidth(220),
-          1: FixedColumnWidth(80),
-          2: FixedColumnWidth(80),
-          3: FixedColumnWidth(140),
-          4: FixedColumnWidth(80),
-          5: FixedColumnWidth(90),
+        columnWidths: {
+          0: const FixedColumnWidth(220),
+          1: const FixedColumnWidth(80),
+          2: const FixedColumnWidth(80),
+          3: const FixedColumnWidth(140),
+          4: const FixedColumnWidth(80),
+          if (showCost) 5: const FixedColumnWidth(90),
         },
         children: [
           TableRow(
             decoration: BoxDecoration(color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3)),
-            children: [
-              _cell(context, loc.t('ttk_product'), bold: true),
-              _cell(context, loc.t('ttk_gross'), bold: true),
-              _cell(context, loc.t('ttk_net'), bold: true),
-              _cell(context, loc.t('ttk_cooking_method'), bold: true),
-              _cell(context, loc.t('ttk_output'), bold: true),
-              _cell(context, loc.t('ttk_cost'), bold: true),
-            ],
+            children: headerCells(),
           ),
           if (ingredients.isEmpty)
             TableRow(
-              children: List.filled(6, TableCell(child: Padding(padding: _cellPad, child: Text(loc.t('dash'), style: const TextStyle(fontSize: 12))))),
+              children: List.generate(effectiveColCount, (_) => TableCell(child: Padding(padding: _cellPad, child: Text(loc.t('dash'), style: const TextStyle(fontSize: 12))))),
             )
           else
-            ...ingredients.map((ing) => TableRow(
-              children: [
-                _cell(context, ing.sourceTechCardName ?? ing.productName, techCardId: ing.sourceTechCardId),
-                _cell(context, ing.grossWeight > 0 ? ing.grossWeight.toStringAsFixed(0) : ''),
-                _cell(context, ing.netWeight > 0 ? ing.netWeight.toStringAsFixed(0) : ''),
-                _cell(context, ing.cookingProcessName ?? loc.t('dash')),
-                _cell(context, ing.outputWeight > 0 ? ing.outputWeight.toStringAsFixed(0) : ''),
-                _cell(context, ing.cost > 0 ? '${ing.cost.toStringAsFixed(2)} $currencySym' : ''),
-              ],
-            )),
+            ...ingredients.map((ing) => TableRow(children: ingCells(ing))),
           TableRow(
             decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest),
-            children: [
-              _cell(context, loc.t('ttk_total'), bold: true),
-              _cell(context, ''),
-              _cell(context, ''),
-              _cell(context, ''),
-              _cell(context, '${totalOutput.toStringAsFixed(0)} ${loc.t('gram')}', bold: true),
-              _cell(context, '${totalCost.toStringAsFixed(2)} $currencySym', bold: true),
-            ],
+            children: totalCells(),
           ),
         ],
       ),
