@@ -39,11 +39,6 @@ jobs:
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          printf '%s' "$ADMIN_PASSWORD" | npx wrangler secret put ADMIN_PASSWORD
-          [ -n "$SUPABASE_SERVICE_ROLE_KEY" ] && printf '%s' "$SUPABASE_SERVICE_ROLE_KEY" | npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY || true
-          printf '%s' "$NEXT_PUBLIC_SUPABASE_URL" | npx wrangler secret put SUPABASE_URL
+          node scripts/inject-vars.js
           npx opennextjs-cloudflare build
-          npx opennextjs-cloudflare deploy -- \
-            --var "ADMIN_PASSWORD:$ADMIN_PASSWORD" \
-            --var "SUPABASE_URL:$NEXT_PUBLIC_SUPABASE_URL" \
-            --var "SUPABASE_SERVICE_ROLE_KEY:$SUPABASE_SERVICE_ROLE_KEY"
+          npx opennextjs-cloudflare deploy
