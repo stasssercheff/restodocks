@@ -329,6 +329,9 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
   // Список элементов номенклатуры (продукты + ТТК ПФ)
   List<NomenclatureItem> _nomenclatureItems = [];
   bool _isLoading = true;
+  bool _isTranslatingProducts = false;
+  int _translatingDone = 0;
+  int _translatingTotal = 0;
 
   // Активная вкладка
   _NomTab _selectedTab = _NomTab.nomenclature;
@@ -365,7 +368,56 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       }
     }
 
-    if (mounted) setState(() => _isLoading = false);
+    if (mounted) {
+      setState(() => _isLoading = false);
+      // Автоперевод: если язык не русский и есть продукты без перевода
+      final loc = context.read<LocalizationService>();
+      if (loc.currentLanguageCode != 'ru') {
+        final needTranslate = _nomenclatureItems
+            .where((i) => i.isProduct && _needsTranslation(i))
+            .map((i) => i.product!)
+            .toList();
+        if (needTranslate.isNotEmpty) _runAutoTranslation(needTranslate);
+      }
+    }
+  }
+
+  /// Фоновый перевод продуктов (Edge Function DeepL). Показывает баннер с прогрессом.
+  Future<void> _runAutoTranslation(List<Product> list) async {
+    if (_isTranslatingProducts || !mounted) return;
+    setState(() {
+      _isTranslatingProducts = true;
+      _translatingDone = 0;
+      _translatingTotal = list.length;
+    });
+    final store = context.read<ProductStoreSupabase>();
+    final loc = context.read<LocalizationService>();
+    final targetLang = loc.currentLanguageCode;
+    int updated = 0;
+    for (var i = 0; i < list.length; i++) {
+      if (!mounted) return;
+      try {
+        final r = await store.translateProductAwait(list[i].id);
+        if (r != null && (r[targetLang] ?? '').trim().isNotEmpty) updated++;
+      } catch (_) {}
+      if (!mounted) return;
+      setState(() => _translatingDone = i + 1);
+    }
+    if (!mounted) return;
+    setState(() {
+      _isTranslatingProducts = false;
+      _translatingTotal = 0;
+    });
+    await _ensureLoaded();
+    if (mounted) {
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(updated > 0 ? '${loc.t('translate_done')} (+$updated)' : loc.t('translate_done')),
+          backgroundColor: updated > 0 ? Colors.green : null,
+        ),
+      );
+    }
   }
 
   /// Категории продуктов/ПФ для подразделений. general = без фильтра (все).
@@ -1251,6 +1303,48 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       ),
       body: Column(
         children: [
+          // ── Баннер «Переводим продукты» с прогрессом ────────────────────────
+          if (_isTranslatingProducts)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              color: Theme.of(context).colorScheme.primaryContainer,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          value: _translatingTotal > 0 ? _translatingDone / _translatingTotal : null,
+                          color: Theme.of(context).colorScheme.onPrimaryContainer,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          '${loc.t('translating_products')} $_translatingDone / $_translatingTotal',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onPrimaryContainer,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  LinearProgressIndicator(
+                    value: _translatingTotal > 0 ? _translatingDone / _translatingTotal : 0,
+                    backgroundColor: Theme.of(context).colorScheme.onPrimaryContainer.withOpacity(0.3),
+                    valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.onPrimaryContainer),
+                  ),
+                ],
+              ),
+            ),
           // ── Переключатель вкладок (FilterChip, как в Входящих) ──────────────
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -1312,6 +1406,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                               onLoadKbju: (ctx, list) => _loadKbjuForAll(ctx, list),
                               onLoadTranslations: (ctx, list) => _loadTranslationsForAll(ctx, list),
                               onVerifyWithAi: (ctx, list) => _verifyWithAi(ctx, list),
+                              isTranslating: _isTranslatingProducts,
                               onNeedsKbju: (item) => _needsKbju(item),
                               onNeedsTranslation: (item) => _needsTranslation(item),
                               onCanShowNutrition: (context) => _canShowNutrition(context),
@@ -1927,6 +2022,7 @@ class _NomenclatureTab extends StatefulWidget {
     required this.onLoadKbju,
     required this.onLoadTranslations,
     required this.onVerifyWithAi,
+    required this.isTranslating,
     required this.onNeedsKbju,
     required this.onNeedsTranslation,
     required this.onCanShowNutrition,
@@ -1950,6 +2046,7 @@ class _NomenclatureTab extends StatefulWidget {
   final void Function(BuildContext, List<Product>) onLoadKbju;
   final void Function(BuildContext, List<Product>) onLoadTranslations;
   final void Function(BuildContext, List<Product>) onVerifyWithAi;
+  final bool isTranslating;
   final bool Function(NomenclatureItem) onNeedsKbju;
   final bool Function(NomenclatureItem) onNeedsTranslation;
   final bool Function(BuildContext) onCanShowNutrition;
@@ -2022,6 +2119,12 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
                     onPressed: () => widget.onLoadKbju(context, needsKbju.where((item) => item.isProduct).map((item) => item.product!).toList()),
                     icon: const Icon(Icons.cloud_download, size: 20),
                     label: Text(widget.loc.t('load_kbju_for_all').replaceAll('%s', '${needsKbju.length}')),
+                  ),
+                if (needsTranslation.isNotEmpty && !widget.isTranslating)
+                  FilledButton.tonalIcon(
+                    onPressed: () => widget.onLoadTranslations(context, needsTranslation.where((item) => item.isProduct).map((item) => item.product!).toList()),
+                    icon: const Icon(Icons.translate, size: 20),
+                    label: Text(widget.loc.t('translate_names_for_all').replaceAll('%s', '${needsTranslation.length}')),
                   ),
               ],
             ),
@@ -2590,43 +2693,14 @@ class _LoadTranslationsProgressDialogState extends State<_LoadTranslationsProgre
   }
 
   Future<void> _run() async {
-    final translationService = TranslationService(
-      aiService: context.read<AiServiceSupabase>(),
-      supabase: context.read<SupabaseService>(),
-    );
-    final allLangs = LocalizationService.productLanguageCodes;
     for (final p in widget.list) {
       try {
-        final source = p.names?['ru'] ?? p.names?['en'] ?? p.name;
-        if (source.trim().isEmpty) {
+        if ((p.name).trim().isEmpty) {
           setState(() => _done++);
           continue;
         }
-        final missing = allLangs.where((c) => (p.names?[c] ?? '').trim().isEmpty).toList();
-        if (missing.isEmpty) {
-          setState(() => _done++);
-          continue;
-        }
-        final sourceLang = p.names?['ru'] != null && (p.names!['ru'] ?? '').trim().isNotEmpty
-            ? 'ru'
-            : (p.names?['en'] != null && (p.names!['en'] ?? '').trim().isNotEmpty ? 'en' : 'ru');
-        final merged = Map<String, String>.from(p.names ?? {});
-        for (final target in missing) {
-          if (target == sourceLang) continue;
-          final tr = await translationService.translate(
-            entityType: TranslationEntityType.product,
-            entityId: p.id ?? p.name,
-            fieldName: 'name',
-            text: source,
-            from: sourceLang,
-            to: target,
-          );
-          if (tr != null && tr.trim().isNotEmpty) merged[target] = tr;
-          await Future<void>.delayed(const Duration(milliseconds: 150));
-        }
-        if (merged.length > (p.names?.length ?? 0)) {
-          final updated = p.copyWith(names: merged);
-          await widget.store.updateProduct(updated);
+        final result = await widget.store.translateProductAwait(p.id);
+        if (result != null && result.length > (p.names?.length ?? 0)) {
           if (!mounted) return;
           setState(() => _updated++);
         }
