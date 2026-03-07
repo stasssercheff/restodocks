@@ -214,48 +214,65 @@ class ChecklistServiceSupabase {
   }
 
   Future<void> saveChecklist(Checklist checklist) async {
+    final now = DateTime.now().toUtc().toIso8601String();
+    final empIds = checklist.assignedEmployeeIds ?? [];
+    final empId = empIds.isNotEmpty ? empIds.first : checklist.assignedEmployeeId;
+
+    // Сначала пробуем RPC (обходит RLS) — если функция есть в БД
+    try {
+      await _supabase.client.rpc(
+        'save_checklist',
+        params: {
+          'p_checklist_id': checklist.id,
+          'p_name': checklist.name,
+          'p_updated_at': now,
+          'p_action_config': checklist.actionConfig.toJson(),
+          'p_assigned_department': checklist.assignedDepartment,
+          'p_assigned_section': checklist.assignedSection,
+          'p_assigned_employee_id': empId,
+          'p_assigned_employee_ids': empIds,
+          'p_deadline_at': checklist.deadlineAt?.toUtc().toIso8601String(),
+          'p_scheduled_for_at': checklist.scheduledForAt?.toUtc().toIso8601String(),
+          'p_additional_name': checklist.additionalName,
+          'p_type': checklist.type?.code,
+          'p_items': checklist.items
+              .map((e) => {
+                    'title': e.title,
+                    'sort_order': e.sortOrder,
+                    'tech_card_id': e.techCardId,
+                    'target_quantity': e.targetQuantity,
+                    'target_unit': e.targetUnit,
+                  })
+              .toList(),
+        },
+      );
+      return;
+    } catch (e) {
+      final msg = e.toString().toLowerCase();
+      if (msg.contains('function') && (msg.contains('does not exist') || msg.contains('not found'))) {
+        // RPC ещё не применён — fallback на прямой update
+      } else {
+        rethrow;
+      }
+    }
+
+    // Fallback: прямой UPDATE/DELETE/INSERT (как раньше)
     final upd = <String, dynamic>{
       'name': checklist.name,
-      'updated_at': DateTime.now().toIso8601String(),
+      'updated_at': now,
       'action_config': checklist.actionConfig.toJson(),
+      'assigned_department': checklist.assignedDepartment,
     };
-    if (checklist.assignedDepartment != null) upd['assigned_department'] = checklist.assignedDepartment;
     if (checklist.assignedSection != null) upd['assigned_section'] = checklist.assignedSection;
-    final empIds = checklist.assignedEmployeeIds;
-    final empId = empIds?.isNotEmpty == true ? empIds!.first : checklist.assignedEmployeeId;
     if (empId != null) upd['assigned_employee_id'] = empId;
-    if (empIds != null) upd['assigned_employee_ids'] = empIds ?? <String>[];
-    if (checklist.deadlineAt != null) upd['deadline_at'] = checklist.deadlineAt!.toIso8601String();
-    if (checklist.scheduledForAt != null) upd['scheduled_for_at'] = checklist.scheduledForAt!.toIso8601String();
+    upd['assigned_employee_ids'] = empIds;
+    if (checklist.deadlineAt != null) upd['deadline_at'] = checklist.deadlineAt!.toUtc().toIso8601String();
+    if (checklist.scheduledForAt != null) upd['scheduled_for_at'] = checklist.scheduledForAt!.toUtc().toIso8601String();
     if (checklist.additionalName != null) upd['additional_name'] = checklist.additionalName;
     if (checklist.type != null) upd['type'] = checklist.type!.code;
 
     await _updateChecklistWithRetry(checklist.id, upd);
-    if (checklist.deadlineAt != null || checklist.scheduledForAt != null) {
-      try {
-        await _supabase.client.rpc(
-          'update_checklist_dates',
-          params: {
-            'p_checklist_id': checklist.id,
-            'p_deadline_at': checklist.deadlineAt?.toIso8601String(),
-            'p_scheduled_for_at': checklist.scheduledForAt?.toIso8601String(),
-          },
-        );
-      } catch (_) {
-        try {
-          final datesOnly = <String, dynamic>{
-            'updated_at': DateTime.now().toIso8601String(),
-          };
-          if (checklist.deadlineAt != null) datesOnly['deadline_at'] = checklist.deadlineAt!.toIso8601String();
-          if (checklist.scheduledForAt != null) datesOnly['scheduled_for_at'] = checklist.scheduledForAt!.toIso8601String();
-          await _supabase.updateData('checklists', datesOnly, 'id', checklist.id);
-        } catch (_) {}
-      }
-    }
-    await _supabase.client
-        .from('checklist_items')
-        .delete()
-        .eq('checklist_id', checklist.id);
+    await _supabase.client.from('checklist_items').delete().eq('checklist_id', checklist.id);
     for (var i = 0; i < checklist.items.length; i++) {
       final item = checklist.items[i];
       final itemData = <String, dynamic>{
