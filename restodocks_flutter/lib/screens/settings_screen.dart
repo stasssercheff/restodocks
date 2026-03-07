@@ -949,12 +949,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Consumer<HomeButtonConfigService>(
                     builder: (_, homeBtn, __) => ListTile(
                       leading: const SizedBox(width: 24),
-                      title: Text(localization.t('central_button') ?? 'Центральная кнопка'),
-                      subtitle: Text(_homeButtonActionLabel(localization, homeBtn.action)),
+                      title: Text(localization.t('button_display_config') ?? 'Настройка кнопки'),
+                      subtitle: Text(localization.t('central_button_hint') ?? 'Выбор для отображения желаемого'),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () => _showHomeButtonPicker(context, localization, homeBtn),
                     ),
                   ),
+                Consumer<ScreenLayoutPreferenceService>(
+                  builder: (_, screenPref, __) => SwitchListTile(
+                    secondary: const Icon(Icons.restaurant_menu),
+                    title: Text(localization.t('show_banquet_catering') ?? 'Показ «банкеты и кейтринг» на экране'),
+                    subtitle: Text(localization.t('show_banquet_catering_hint') ?? 'Показывать «Меню — Банкет/Кейтринг» и «ТТК — Банкет/Кейтринг»'),
+                    value: screenPref.showBanquetCatering,
+                    onChanged: (v) => screenPref.setShowBanquetCatering(v),
+                  ),
+                ),
               ],
             ),
             Consumer<ScreenLayoutPreferenceService>(
@@ -964,15 +973,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 subtitle: Text(localization.t('show_name_translit_hint') ?? 'Отображать ФИО сотрудников латиницей'),
                 value: screenPref.showNameTranslit,
                 onChanged: (v) => screenPref.setShowNameTranslit(v),
-              ),
-            ),
-            Consumer<ScreenLayoutPreferenceService>(
-              builder: (_, screenPref, __) => SwitchListTile(
-                secondary: const Icon(Icons.restaurant_menu),
-                title: Text(localization.t('show_banquet_catering') ?? 'Банкеты и кейтринг в меню'),
-                subtitle: Text(localization.t('show_banquet_catering_hint') ?? 'Показывать «Меню — Банкет/Кейтринг» и «ТТК — Банкет/Кейтринг»'),
-                value: screenPref.showBanquetCatering,
-                onChanged: (v) => screenPref.setShowBanquetCatering(v),
               ),
             ),
             ListTile(
