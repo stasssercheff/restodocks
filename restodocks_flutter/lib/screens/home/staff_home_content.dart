@@ -74,7 +74,7 @@ class StaffHomeContent extends StatelessWidget {
       HomeTileId.messages: _Tile(
         icon: Icons.chat_bubble_outline,
         title: loc.t('inbox_tab_messages') ?? 'Сообщения',
-        onTap: () => context.go('/notifications'),
+        onTap: () => context.go('/notifications?tab=messages'),
       ),
       HomeTileId.schedule: _Tile(
         icon: Icons.calendar_month,

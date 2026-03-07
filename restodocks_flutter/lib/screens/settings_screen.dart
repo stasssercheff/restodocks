@@ -544,10 +544,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           onTap: () async {
                             final code = language['code']!;
                             await localization.setLocale(Locale(code));
-                            // Сохраняем язык в профиле сотрудника в Supabase (работает в любом браузере / инкогнито)
                             if (ctx.mounted) {
                               await ctx.read<AccountManagerSupabase>().savePreferredLanguage(code);
                               Navigator.of(ctx).pop();
+                              // Фоновая подстановка переводов продуктов для нового языка
+                              _translateProductsForLanguage(ctx, code);
                             }
                           },
                         );
@@ -561,6 +562,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
         );
       },
     );
+  }
+
+  /// Переводит продукты, у которых нет имени на выбранном языке (в фоне).
+  void _translateProductsForLanguage(BuildContext context, String targetLang) {
+    final store = context.read<ProductStoreSupabase>();
+    final aiService = context.read<AiServiceSupabase>();
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final loc = context.read<LocalizationService>();
+    Future(() async {
+      final translationService = TranslationService(
+        aiService: aiService,
+        supabase: SupabaseService(),
+      );
+      int updated = 0;
+      for (final p in store.allProducts) {
+        final names = p.names ?? {};
+        if ((names[targetLang] ?? '').trim().isNotEmpty) continue;
+        final source = (names['ru'] ?? names['en'] ?? p.name).toString().trim();
+        if (source.isEmpty) continue;
+        final sourceLang = names['ru'] != null && (names['ru'] ?? '').trim().isNotEmpty ? 'ru' : 'en';
+        if (sourceLang == targetLang) continue;
+        try {
+          final tr = await translationService.translate(
+            entityType: TranslationEntityType.product,
+            entityId: p.id ?? p.name,
+            fieldName: 'name',
+            text: source,
+            from: sourceLang,
+            to: targetLang,
+          );
+          if (tr != null && tr.trim().isNotEmpty) {
+            final merged = Map<String, String>.from(names)..[targetLang] = tr.trim();
+            await store.updateProduct(p.copyWith(names: merged));
+            updated++;
+          }
+        } catch (_) {}
+      }
+      if (updated > 0) {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(content: Text('${loc.t('translate_done')} (+$updated)')),
+        );
+      }
+    });
   }
 
   void _showCurrencyPicker(BuildContext context, LocalizationService loc) {

@@ -260,23 +260,13 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
           children: [
             Text(loc.t('order_export_language_subtitle')),
             const SizedBox(height: 16),
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
-                Expanded(
-                  child: _LangButton(
-                    flag: '🇷🇺',
-                    label: loc.t('order_export_language_ru'),
-                    onTap: () => Navigator.of(ctx).pop('ru'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _LangButton(
-                    flag: '🇬🇧',
-                    label: loc.t('order_export_language_en'),
-                    onTap: () => Navigator.of(ctx).pop('en'),
-                  ),
-                ),
+                _LangButton(flag: '🇷🇺', label: loc.t('order_export_language_ru'), onTap: () => Navigator.of(ctx).pop('ru')),
+                _LangButton(flag: '🇺🇸', label: loc.t('order_export_language_en'), onTap: () => Navigator.of(ctx).pop('en')),
+                _LangButton(flag: '🇪🇸', label: loc.t('order_export_language_es'), onTap: () => Navigator.of(ctx).pop('es')),
               ],
             ),
           ],
