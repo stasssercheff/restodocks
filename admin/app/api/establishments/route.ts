@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
-import { getAdminPassword, getSupabaseConfig } from '@/lib/admin-env'
+import { getSupabaseConfig } from '@/lib/admin-env'
 import { verifySessionToken } from '@/lib/session'
 
 export const dynamic = 'force-dynamic'
@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 export async function GET() {
   const cookieStore = await cookies()
   const session = cookieStore.get('admin_session')?.value
-  const adminPassword = await getAdminPassword()
+  const adminPassword = process.env.ADMIN_PASSWORD
   if (!session || !adminPassword || !(await verifySessionToken(session, adminPassword))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }

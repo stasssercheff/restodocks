@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAdminPassword } from '@/lib/admin-env'
 import { createSessionToken } from '@/lib/session'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   const { password } = await req.json()
-  const adminPassword = await getAdminPassword()
+  // ADMIN_PASSWORD inlined at build time (must be set during next build)
+  const adminPassword = process.env.ADMIN_PASSWORD
 
   if (!adminPassword || password !== adminPassword) {
     return NextResponse.json({ error: 'Invalid password' }, { status: 401 })
