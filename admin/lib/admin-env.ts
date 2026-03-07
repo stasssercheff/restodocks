@@ -9,17 +9,27 @@ type WorkerEnv = {
 }
 
 async function getEnv(): Promise<WorkerEnv> {
+  // Try process.env first (OpenNext may merge Worker env into it)
+  const fromProcess: WorkerEnv = {
+    ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
+    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    SUPABASE_URL: process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  }
+  if (fromProcess.ADMIN_PASSWORD) return fromProcess
+
   try {
     const { env } = await getCloudflareContext()
-    return env as WorkerEnv
-  } catch {
+    const cf = env as WorkerEnv
     return {
-      ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
-      SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
-      SUPABASE_URL: process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL,
-      NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      ...fromProcess,
+      ADMIN_PASSWORD: cf.ADMIN_PASSWORD ?? fromProcess.ADMIN_PASSWORD,
+      SUPABASE_SERVICE_ROLE_KEY: cf.SUPABASE_SERVICE_ROLE_KEY ?? fromProcess.SUPABASE_SERVICE_ROLE_KEY,
+      SUPABASE_URL: cf.SUPABASE_URL ?? cf.NEXT_PUBLIC_SUPABASE_URL ?? fromProcess.SUPABASE_URL,
     }
+  } catch {
+    return fromProcess
   }
 }
 
