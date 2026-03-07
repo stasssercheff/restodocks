@@ -6,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
@@ -372,23 +373,51 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
 
     if (mounted) {
       setState(() => _isLoading = false);
-      // Автоперевод только один раз за сессию при первой загрузке
+      // Автоперевод только один раз за сессию или не сразу после неудачного прогона
       if (!skipAutoTranslation && !_hasRunAutoTranslationThisSession) {
-        _hasRunAutoTranslationThisSession = true;
         final loc = context.read<LocalizationService>();
         if (loc.currentLanguageCode != 'ru') {
           final needTranslate = _nomenclatureItems
               .where((i) => i.isProduct && _needsTranslation(i))
               .map((i) => i.product!)
               .toList();
-          if (needTranslate.isNotEmpty) _runAutoTranslation(needTranslate);
+          if (needTranslate.isNotEmpty) {
+            final shouldSkip = await _shouldSkipAutoTranslate();
+            if (!shouldSkip && mounted) {
+              _hasRunAutoTranslationThisSession = true;
+              _runAutoTranslation(needTranslate);
+            }
+          }
         }
       }
     }
   }
 
+  static const _kAutoTranslateSkipKey = 'nomenclature_autotranslate_skip_until';
+  static const _kAutoTranslateSkipMinutes = 30;
+
+  /// Не запускать автоперевод сразу после неудачного прогона (0 обновлений).
+  Future<bool> _shouldSkipAutoTranslate() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final until = prefs.getInt(_kAutoTranslateSkipKey);
+      if (until != null && DateTime.now().millisecondsSinceEpoch < until) return true;
+    } catch (_) {}
+    return false;
+  }
+
+  /// Запомнить, что автоперевод дал 0 обновлений — не запускать снова 30 мин.
+  Future<void> _markAutoTranslateZeroUpdates() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final until = DateTime.now().add(const Duration(minutes: _kAutoTranslateSkipMinutes));
+      await prefs.setInt(_kAutoTranslateSkipKey, until.millisecondsSinceEpoch);
+    } catch (_) {}
+  }
+
   /// Фоновый перевод продуктов (Edge Function DeepL). Один прогон, честная шкала.
   /// setState не чаще чем раз в 10 продуктов — меньше мерцания.
+  /// Пауза между запросами — снизить rate limit DeepL.
   Future<void> _runAutoTranslation(List<Product> list) async {
     if (_isTranslatingProducts || !mounted) return;
     setState(() {
@@ -418,6 +447,8 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
             }
           }
         }
+        // Пауза между запросами — снизить rate limit DeepL
+        if (i < list.length - 1) await Future<void>.delayed(const Duration(milliseconds: 400));
       } catch (_) {}
       _translatingProcessed = i + 1;
       // setState: при успешных переводах, при прогрессе обработки (каждые N), в конце
@@ -436,6 +467,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     await _ensureLoaded(skipAutoTranslation: true);
     if (mounted) {
       setState(() {});
+      if (updated == 0) await _markAutoTranslateZeroUpdates();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
