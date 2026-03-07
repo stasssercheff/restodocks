@@ -248,20 +248,21 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
           children: [
             Text(loc.t('order_export_language_subtitle') ?? 'Выберите язык для файла'),
             const SizedBox(height: 16),
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.of(ctx).pop('ru'),
-                    child: const Text('🇷🇺  Русский'),
-                  ),
+                OutlinedButton(
+                  onPressed: () => Navigator.of(ctx).pop('ru'),
+                  child: Text('🇷🇺  ${loc.t('order_export_language_ru')}'),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.of(ctx).pop('en'),
-                    child: const Text('🇬🇧  English'),
-                  ),
+                OutlinedButton(
+                  onPressed: () => Navigator.of(ctx).pop('en'),
+                  child: Text('🇺🇸  ${loc.t('order_export_language_en')}'),
+                ),
+                OutlinedButton(
+                  onPressed: () => Navigator.of(ctx).pop('es'),
+                  child: Text('🇪🇸  ${loc.t('order_export_language_es')}'),
                 ),
               ],
             ),

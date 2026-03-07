@@ -11,13 +11,13 @@ struct LanguageSelectionView: View {
 
     let onLanguageSelected: () -> Void
 
-    let languages = [
-        ("en", "English", "🇺🇸"),  // Английский первый по умолчанию
-        ("ru", "Русский", "🇷🇺"),
-        ("es", "Español", "🇪🇸"),
-        ("de", "Deutsch", "🇩🇪"),
-        ("fr", "Français", "🇫🇷")
-    ]
+    /// Языки из Localizable.json — добавляя перевод для нового кода, он появится здесь
+    private var languages: [(String, String, String)] {
+        lang.supportedLanguages.map { code in
+            let info = LocalizationManager.displayInfo(for: code)
+            return (code, info.name, info.flag)
+        }
+    }
 
     var body: some View {
         ZStack {

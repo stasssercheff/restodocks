@@ -5,7 +5,8 @@ import Combine
 final class LocalizationManager: ObservableObject {
     static let shared = LocalizationManager()
 
-    private let supportedLanguages = ["ru", "en", "es", "de", "fr"]
+    /// Языки выводятся из Localizable.json. Публичный доступ для LanguageSelectionView.
+    private(set) var supportedLanguages: [String] = ["ru", "en"]
 
     // Текущий сотрудник (устанавливается при входе)
     var currentEmployeeId: String? {
@@ -57,9 +58,11 @@ final class LocalizationManager: ObservableObject {
         do {
             let data = try Data(contentsOf: url)
             let decoded = try JSONDecoder().decode([String: [String: String]].self, from: data)
+            let langCodes = Set(decoded.values.flatMap { $0.keys })
             DispatchQueue.main.async {
                 self.translations = decoded
-                print("✅ Словари успешно загружены. Ключей: \(decoded.count)")
+                self.supportedLanguages = Array(langCodes).sorted()
+                print("✅ Словари загружены. Языки: \(self.supportedLanguages.joined(separator: ", "))")
                 print("📱 Текущий язык: \(self.currentLang)")
             }
         } catch {
@@ -84,5 +87,19 @@ final class LocalizationManager: ObservableObject {
 
     func setLang(_ lang: String) {
         currentLang = lang
+    }
+
+    /// Название и флаг для отображения в UI (расширяемый список)
+    static func displayInfo(for code: String) -> (name: String, flag: String) {
+        switch code {
+        case "ru": return ("Русский", "🇷🇺")
+        case "en": return ("English", "🇺🇸")
+        case "es": return ("Español", "🇪🇸")
+        case "de": return ("Deutsch", "🇩🇪")
+        case "fr": return ("Français", "🇫🇷")
+        case "it": return ("Italiano", "🇮🇹")
+        case "pt": return ("Português", "🇵🇹")
+        default: return (code.uppercased(), "🏳️")
+        }
     }
 }

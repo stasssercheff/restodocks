@@ -8,6 +8,7 @@ import '../models/nomenclature_item.dart';
 import '../models/tech_card.dart';
 import '../models/translation.dart';
 import 'ai_service_supabase.dart';
+import 'localization_service.dart';
 import 'translation_service.dart';
 import 'translation_manager.dart';
 import 'product_store_supabase.dart';
@@ -33,6 +34,7 @@ class IntelligentProductImportService {
     _translationManager = TranslationManager(
       aiService: _aiService,
       translationService: _translationService,
+      getSupportedLanguages: () => LocalizationService.productLanguageCodes,
     );
   }
 
@@ -418,6 +420,7 @@ ${sampleTexts.take(5).join('\n')}
     final translationManager = TranslationManager(
       aiService: _aiService,
       translationService: _translationService,
+      getSupportedLanguages: () => LocalizationService.productLanguageCodes,
     );
 
     // Сохраняем переводы через TranslationManager

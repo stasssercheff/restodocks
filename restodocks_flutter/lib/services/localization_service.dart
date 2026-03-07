@@ -16,10 +16,11 @@ class LocalizationService extends ChangeNotifier {
   static const List<Locale> supportedLocales = [
     Locale('ru', 'RU'),
     Locale('en', 'US'),
+    Locale('es', 'ES'),
   ];
 
-  /// Коды языков для названий продуктов (ru, en — остальные отключены)
-  static const List<String> productLanguageCodes = ['ru', 'en'];
+  /// Коды языков (продукты, ТТК, DeepL)
+  static const List<String> productLanguageCodes = ['ru', 'en', 'es'];
 
   Locale _currentLocale = const Locale('ru', 'RU');
   Map<String, Map<String, String>> _translations = {};

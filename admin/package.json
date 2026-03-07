@@ -2,6 +2,7 @@
   "name": "restodocks-admin",
   "version": "0.1.0",
   "private": true,
+  "description": "Restodocks admin panel",
   "scripts": {
     "build": "next build",
     "dev": "next dev",

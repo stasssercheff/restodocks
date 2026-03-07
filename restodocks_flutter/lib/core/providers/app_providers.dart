@@ -70,6 +70,7 @@ class AppProviders {
           create: (context) => TranslationManager(
             aiService: context.read<AiServiceSupabase>(),
             translationService: context.read<TranslationService>(),
+            getSupportedLanguages: () => LocalizationService.productLanguageCodes,
           ),
         ),
         Provider<OrderHistoryService>(

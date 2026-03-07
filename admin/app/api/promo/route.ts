@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
+import { getAdminPassword, getSupabaseConfig } from '@/lib/admin-env'
 import { verifySessionToken } from '@/lib/session'
 
-function getServiceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? ''
-  return createClient(url, process.env.SUPABASE_SERVICE_ROLE_KEY!)
-}
+export const dynamic = 'force-dynamic'
 
 async function checkAuth(): Promise<boolean> {
   const cookieStore = await cookies()
   const session = cookieStore.get('admin_session')?.value
-  const adminPassword = process.env.ADMIN_PASSWORD
+  const adminPassword = await getAdminPassword()
   if (!session || !adminPassword) return false
   return verifySessionToken(session, adminPassword)
 }
@@ -19,7 +17,9 @@ async function checkAuth(): Promise<boolean> {
 export async function GET() {
   if (!await checkAuth()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const supabase = getServiceClient()
+  const config = await getSupabaseConfig()
+  if (!config) return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 })
+  const supabase = createClient(config.url, config.serviceRoleKey)
   const { data, error } = await supabase
     .from('promo_codes')
     .select('*, establishments:used_by_establishment_id(name)')
@@ -54,7 +54,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid expires_at: must be a valid ISO date string' }, { status: 400 })
   }
 
-  const supabase = getServiceClient()
+  const config = await getSupabaseConfig()
+  if (!config) return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 })
+  const supabase = createClient(config.url, config.serviceRoleKey)
   const { data, error } = await supabase
     .from('promo_codes')
     .insert({
@@ -80,7 +82,9 @@ export async function PATCH(req: NextRequest) {
   const patch = Object.fromEntries(
     Object.entries(updates).filter(([k]) => allowed.includes(k as typeof allowed[number]))
   )
-  const supabase = getServiceClient()
+  const config = await getSupabaseConfig()
+  if (!config) return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 })
+  const supabase = createClient(config.url, config.serviceRoleKey)
   const { error } = await supabase
     .from('promo_codes')
     .update(patch)
@@ -94,7 +98,9 @@ export async function DELETE(req: NextRequest) {
   if (!await checkAuth()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { id } = await req.json()
-  const supabase = getServiceClient()
+  const config = await getSupabaseConfig()
+  if (!config) return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 })
+  const supabase = createClient(config.url, config.serviceRoleKey)
   const { error } = await supabase
     .from('promo_codes')
     .delete()
