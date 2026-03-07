@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../services/services.dart';
 import '../../models/models.dart';
@@ -39,6 +40,7 @@ class _InboxScreenState extends State<InboxScreen> {
   _InboxTab? _selectedTab;
   _InboxDeptTab? _selectedDeptTab;
   _InboxTypeTab? _selectedTypeTab;
+  final GlobalKey<_MessagesContentState> _messagesContentKey = GlobalKey();
 
   @override
   void initState() {
@@ -166,7 +168,10 @@ class _InboxScreenState extends State<InboxScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _loadDocuments,
+            onPressed: () async {
+              await _loadDocuments();
+              if (widget.messagesOnly) _messagesContentKey.currentState?.refresh();
+            },
             tooltip: loc.t('inbox_refresh'),
           ),
         ],
@@ -384,11 +389,15 @@ class _InboxScreenState extends State<InboxScreen> {
     final est = acc.establishment;
     final missedDocs = _filteredDocuments;
     return _MessagesContent(
+      key: _messagesContentKey,
       currentEmployee: emp,
       establishmentId: est?.id ?? '',
       missedDocuments: missedDocs,
       onDownload: _downloadDocument,
-      onRefresh: _loadDocuments,
+      onRefresh: () async {
+        await _loadDocuments();
+        _messagesContentKey.currentState?.refresh();
+      },
     );
   }
 
@@ -630,7 +639,7 @@ class _MessagesContent extends StatefulWidget {
   final String establishmentId;
   final List<InboxDocument> missedDocuments;
   final Future<void> Function(InboxDocument) onDownload;
-  final VoidCallback onRefresh;
+  final Future<void> Function() onRefresh;
 
   @override
   State<_MessagesContent> createState() => _MessagesContentState();
@@ -639,12 +648,57 @@ class _MessagesContent extends StatefulWidget {
 class _MessagesContentState extends State<_MessagesContent> {
   List<Employee> _employees = [];
   List<String> _chatPartnerIds = [];
+  Map<String, int> _unreadCounts = {};
   bool _loadingEmployees = true;
+  RealtimeChannel? _realtimeChannel;
 
   @override
   void initState() {
     super.initState();
     _loadEmployees();
+    _subscribeRealtime();
+  }
+
+  /// Обновить список диалогов (вызывается по кнопке «Обновить» в AppBar).
+  Future<void> refresh() => _loadEmployees();
+
+  @override
+  void dispose() {
+    _realtimeChannel?.unsubscribe();
+    super.dispose();
+  }
+
+  void _subscribeRealtime() {
+    final emp = widget.currentEmployee;
+    if (emp == null) return;
+    final myId = emp.id;
+    final client = Supabase.instance.client;
+    _realtimeChannel = client.channel('inbox_messages').onPostgresChanges(
+      event: PostgresChangeEvent.insert,
+      schema: 'public',
+      table: 'employee_direct_messages',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'recipient_employee_id',
+        value: myId,
+      ),
+      callback: (_) {
+        if (mounted) _loadEmployees();
+      },
+    ).onPostgresChanges(
+      event: PostgresChangeEvent.update,
+      schema: 'public',
+      table: 'employee_direct_messages',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'recipient_employee_id',
+        value: myId,
+      ),
+      callback: (_) {
+        if (mounted) _loadEmployees();
+      },
+    );
+    _realtimeChannel!.subscribe();
   }
 
   Future<void> _loadEmployees() async {
@@ -656,13 +710,15 @@ class _MessagesContentState extends State<_MessagesContent> {
     }
     try {
       final acc = context.read<AccountManagerSupabase>();
-      final emps = await acc.getEmployeesForEstablishment(estId);
       final msgSvc = context.read<EmployeeMessageService>();
+      final emps = await acc.getEmployeesForEstablishment(estId);
       final partnerIds = await msgSvc.getConversationPartnerIds(emp.id, estId);
+      final unread = await msgSvc.getUnreadCountPerPartner(emp.id, estId);
       if (mounted) {
         setState(() {
           _employees = emps.where((e) => e.id != emp.id).toList();
           _chatPartnerIds = partnerIds;
+          _unreadCounts = unread;
           _loadingEmployees = false;
         });
       }
@@ -677,7 +733,7 @@ class _MessagesContentState extends State<_MessagesContent> {
 
     return RefreshIndicator(
       onRefresh: () async {
-        widget.onRefresh();
+        await widget.onRefresh();
         await _loadEmployees();
       },
       child: ListView(
@@ -716,9 +772,31 @@ class _MessagesContentState extends State<_MessagesContent> {
                           ? e.roles.map((r) => loc.roleDisplayName(r)).where((s) => s.isNotEmpty).join(', ')
                           : (e.department.isNotEmpty ? loc.departmentDisplayName(e.department) : ''),
                     ),
-                    trailing: _chatPartnerIds.contains(e.id)
-                        ? Icon(Icons.chat_bubble, size: 18, color: Theme.of(context).colorScheme.primary)
-                        : const Icon(Icons.chat_bubble_outline, size: 18),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if ((_unreadCounts[e.id] ?? 0) > 0)
+                          Container(
+                            margin: const EdgeInsets.only(right: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.error,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              '${_unreadCounts[e.id]}',
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onError,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        _chatPartnerIds.contains(e.id)
+                            ? Icon(Icons.chat_bubble, size: 18, color: Theme.of(context).colorScheme.primary)
+                            : const Icon(Icons.chat_bubble_outline, size: 18),
+                      ],
+                    ),
                     onTap: () => context.push('/inbox/chat/${e.id}'),
                   ),
                 )),

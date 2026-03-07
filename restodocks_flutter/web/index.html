@@ -26,12 +26,7 @@
             sessionStorage.setItem('restodocks_last_path', saved);
           }
         }
-        if (sessionStorage.getItem('restodocks_loaded_before') ||
-            localStorage.getItem('restodocks_last_path_persist')) {
-          var s = document.createElement('style');
-          s.textContent = '#loading-screen { display: none !important; }';
-          document.head.appendChild(s);
-        }
+        // Не скрывать loading-screen до загрузки Flutter — иначе белый экран вместо логотипа
       } catch(e) { console.log('[RD] error: '+e); }
     })();
   </script>
