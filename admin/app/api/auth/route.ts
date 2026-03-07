@@ -4,11 +4,11 @@ import { createSessionToken } from '@/lib/session'
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
-  const { password } = await req.json()
-  // ADMIN_PASSWORD inlined at build time (must be set during next build)
-  const adminPassword = process.env.ADMIN_PASSWORD
+  const body = await req.json()
+  const password = typeof body?.password === 'string' ? body.password.trim() : ''
+  const adminPassword = (process.env.ADMIN_PASSWORD ?? '').trim()
 
-  if (!adminPassword || password !== adminPassword) {
+  if (!adminPassword || !password || password !== adminPassword) {
     return NextResponse.json({ error: 'Invalid password' }, { status: 401 })
   }
 
