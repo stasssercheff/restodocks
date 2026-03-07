@@ -437,7 +437,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
             updated > 0 ? '${loc.t('translate_done')} (+$updated)' : loc.t('translate_no_changes'),
           ),
           backgroundColor: updated > 0 ? Colors.green : null,
-          duration: updated > 0 ? null : const Duration(seconds: 5),
+          duration: updated > 0 ? const Duration(seconds: 3) : const Duration(seconds: 5),
         ),
       );
     }
