@@ -363,7 +363,6 @@ class _MenuScreenState extends State<MenuScreen> {
                           showCost: _canSeeCost(context.read<AccountManagerSupabase>().currentEmployee),
                         ),
                   ),
-                ),
               ],
             ),
           );
