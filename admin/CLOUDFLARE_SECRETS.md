@@ -20,3 +20,5 @@ printf '%s' 'твой_пароль' > /tmp/admin_pw
 npx wrangler kv key put --namespace-id=3f9acc45fa9e41a585e0d9be3e34ab02 "admin_password" --path=/tmp/admin_pw --remote
 rm /tmp/admin_pw
 ```
+
+---
