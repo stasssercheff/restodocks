@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -7,6 +8,15 @@ import 'supabase_service.dart';
 
 const _keyEmployeeId = 'restodocks_employee_id';
 const _keyEstablishmentId = 'restodocks_establishment_id';
+
+const _supabaseUrl = String.fromEnvironment(
+  'SUPABASE_URL',
+  defaultValue: 'https://osglfptwbuqqmqunttha.supabase.co',
+);
+const _supabaseAnonKey = String.fromEnvironment(
+  'SUPABASE_ANON_KEY',
+  defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zZ2xmcHR3YnVxcW1xdW50dGhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUwNTk0MDQsImV4cCI6MjA4MDYzNTQwNH0.Jy7yi2TNdSrmoBdILXBGRYB_vxGtq8scCZ9eCA9vfTE',
+);
 const _keyRememberPin = 'restodocks_remember_pin';
 const _keyRememberEmail = 'restodocks_remember_email';
 const _keyRememberPassword = 'restodocks_remember_password';
@@ -649,6 +659,36 @@ class AccountManagerSupabase extends ChangeNotifier {
     return _findEmployeeByPasswordHashViaEdgeFunction(emailTrim, passwordTrimmed);
   }
 
+  /// Вызов Edge Function authenticate-employee через raw HTTP (обход Safari cross-origin
+  /// POST body issues с supabase functions.invoke — body иногда не уходит).
+  Future<({int status, Map<String, dynamic>? data})> _invokeAuthenticateEmployeeHttp(
+    Map<String, dynamic> body,
+  ) async {
+    final url = '$_supabaseUrl/functions/v1/authenticate-employee';
+    final dio = Dio(BaseOptions(
+      headers: {
+        'apikey': _supabaseAnonKey,
+        'Authorization': 'Bearer $_supabaseAnonKey',
+        'Content-Type': 'application/json',
+      },
+      validateStatus: (_) => true, // не бросать на 4xx
+    ));
+    try {
+      final resp = await dio.post(url, data: body);
+      final data = resp.data is Map<String, dynamic>
+          ? resp.data as Map<String, dynamic>
+          : (resp.data is Map ? Map<String, dynamic>.from(resp.data as Map) : null);
+      return (status: resp.statusCode ?? 0, data: data);
+    } on DioException catch (e) {
+      final status = e.response?.statusCode ?? 0;
+      final data = e.response?.data;
+      final map = data is Map<String, dynamic>
+          ? data
+          : (data is Map ? Map<String, dynamic>.from(data as Map) : null);
+      return (status: status, data: map);
+    }
+  }
+
   /// Legacy: BCrypt-проверка пароля через Edge Function authenticate-employee.
   /// password_hash никогда не покидает сервер — клиент получает только данные сотрудника.
   Future<({Employee employee, Establishment establishment})?> _findEmployeeByPasswordHashViaEdgeFunction(
@@ -656,12 +696,9 @@ class AccountManagerSupabase extends ChangeNotifier {
     String password,
   ) async {
     try {
-      print('🔐 Login: Legacy fallback — calling authenticate-employee');
+      print('🔐 Login: Legacy fallback — calling authenticate-employee (HTTP)');
 
-      final res = await _supabase.client.functions.invoke(
-        'authenticate-employee',
-        body: {'email': email, 'password': password},
-      );
+      final res = await _invokeAuthenticateEmployeeHttp({'email': email, 'password': password});
 
       if (res.status == 401) {
         lastLoginError = (lastLoginError != null ? '$lastLoginError → ' : '') + 'Legacy: 401 invalid credentials';
@@ -676,6 +713,7 @@ class AccountManagerSupabase extends ChangeNotifier {
       }
 
       final data = res.data;
+      if (data == null) return null;
       if (data is! Map<String, dynamic>) return null;
       if (data.containsKey('error')) {
         if (kDebugMode) debugPrint('🔐 Login: Legacy — error: ${data['error']}');
@@ -708,18 +746,15 @@ class AccountManagerSupabase extends ChangeNotifier {
     required Establishment company,
   }) async {
     try {
-      final res = await _supabase.client.functions.invoke(
-        'authenticate-employee',
-        body: {
-          'email': email.trim(),
-          'password': password.trim(),
-          'establishment_id': company.id,
-        },
-      );
+      final res = await _invokeAuthenticateEmployeeHttp({
+        'email': email.trim(),
+        'password': password.trim(),
+        'establishment_id': company.id,
+      });
 
       if (res.status != 200) return null;
       final data = res.data;
-      if (data is! Map<String, dynamic>) return null;
+      if (data == null || data is! Map<String, dynamic>) return null;
       if (data.containsKey('error')) return null;
 
       final empRaw = data['employee'];
