@@ -13,8 +13,9 @@ async function deleteEstablishmentCascade(supabase: ReturnType<typeof createClie
     .from('establishments')
     .select('id')
     .eq('parent_establishment_id', establishmentId)
-  if (branches?.length) {
-    for (const b of branches) {
+  const branchList = (branches ?? []) as { id: string }[]
+  if (branchList.length) {
+    for (const b of branchList) {
       await deleteEstablishmentCascade(supabase, b.id)
     }
   }
