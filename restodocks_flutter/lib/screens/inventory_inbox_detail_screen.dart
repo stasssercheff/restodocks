@@ -270,24 +270,22 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
         headerCells.add(TextCellValue('$fillLabel ${c + 1}'));
       }
 
-      // ЛИСТ 1: Продукты + ПФ с итогами + перерасчёт ПФ в брутто
+      // ЛИСТ 1: Продукты, затем ПФ отдельно, затем перерасчёт ПФ в брутто
       final sheet1 = excel['Продукты + ПФ'];
       sheet1.appendRow(headerCells);
 
-      // Сортируем по названиям в целевом языке
-      final rowsSorted = _sortedRows(rows, namesForSave);
-      var rowNum = 1;
+      final allRows = rows.map((e) => e as Map<String, dynamic>).toList();
+      final productsOnly = allRows.where((r) => !((r['productId'] as String?) ?? '').startsWith('pf_')).toList();
+      final pfRows = allRows.where((r) => ((r['productId'] as String?) ?? '').startsWith('pf_')).toList();
+
       double totalSumAll = 0;
-      for (var i = 0; i < rowsSorted.length; i++) {
-        final r = rowsSorted[i];
-        final originalName = r['productName'] as String? ?? '';
-        final name = namesForSave[originalName] ?? originalName;
-        final unit = r['unit'] as String? ?? '';
+      final productsSorted = _sortedRows(productsOnly, namesForSave);
+      var rowNum = 1;
+      for (var i = 0; i < productsSorted.length; i++) {
+        final r = productsSorted[i];
         final total = (r['total'] as num?)?.toDouble() ?? 0.0;
-        final quantities = r['quantities'] as List<dynamic>? ?? [];
         double rowSum = 0;
         if (withPrice) {
-          // Приоритет: цена из payload (пересчитана при завершении из карточки продукта)
           final priceFromPayload = (r['price'] as num?)?.toDouble();
           if (priceFromPayload != null && priceFromPayload > 0) {
             rowSum = priceFromPayload;
@@ -297,13 +295,16 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
             if (pid != null && !pid.startsWith('pf_') && !pid.startsWith('free_')) {
               final price = pricePerProduct[pid];
               if (price != null && price > 0) {
-                final totalKg = total / 1000;
-                rowSum = totalKg * price;
+                rowSum = total / 1000 * price;
                 totalSumAll += rowSum;
               }
             }
           }
         }
+        final originalName = r['productName'] as String? ?? '';
+        final name = namesForSave[originalName] ?? originalName;
+        final unit = r['unit'] as String? ?? '';
+        final quantities = r['quantities'] as List<dynamic>? ?? [];
         final rowCells = <CellValue>[
           IntCellValue(rowNum++),
           TextCellValue(name),
@@ -312,8 +313,7 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
           DoubleCellValue(total),
         ];
         for (var c = 0; c < maxCols; c++) {
-          final q = c < quantities.length ? (quantities[c] as num?)?.toDouble() ?? 0.0 : 0.0;
-          rowCells.add(DoubleCellValue(q));
+          rowCells.add(DoubleCellValue(c < quantities.length ? (quantities[c] as num?)?.toDouble() ?? 0.0 : 0.0));
         }
         sheet1.appendRow(rowCells);
       }
@@ -328,6 +328,33 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
         totalRow.add(DoubleCellValue(0));
         for (var c = 0; c < maxCols; c++) totalRow.add(TextCellValue(''));
         sheet1.appendRow(totalRow);
+      }
+
+      if (pfRows.isNotEmpty) {
+        sheet1.appendRow([]);
+        sheet1.appendRow([TextCellValue(loc.t('inventory_block_pf'))]);
+        sheet1.appendRow(headerCells);
+        rowNum = 1;
+        final pfSorted = _sortedRows(pfRows, namesForSave);
+        for (var i = 0; i < pfSorted.length; i++) {
+          final r = pfSorted[i];
+          final originalName = r['productName'] as String? ?? '';
+          final name = namesForSave[originalName] ?? originalName;
+          final unit = r['unit'] as String? ?? '';
+          final total = (r['total'] as num?)?.toDouble() ?? 0.0;
+          final quantities = r['quantities'] as List<dynamic>? ?? [];
+          final rowCells = <CellValue>[
+            IntCellValue(rowNum++),
+            TextCellValue(name),
+            TextCellValue(unit),
+            if (withPrice) TextCellValue(''),
+            DoubleCellValue(total),
+          ];
+          for (var c = 0; c < maxCols; c++) {
+            rowCells.add(DoubleCellValue(c < quantities.length ? (quantities[c] as num?)?.toDouble() ?? 0.0 : 0.0));
+          }
+          sheet1.appendRow(rowCells);
+        }
       }
 
       if (aggregated.isNotEmpty) {
@@ -442,6 +469,14 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
           rowCells.add(DoubleCellValue(c < quantities.length ? quantities[c] : 0.0));
         }
         sheet2.appendRow(rowCells);
+      }
+
+      excel.setDefaultSheet('Продукты + ПФ');
+      for (final name in excel.tables.keys.toList()) {
+        if (name != 'Продукты + ПФ' && name != 'Все продукты с ПФ' && excel.tables.keys.length > 2) {
+          excel.delete(name);
+          break;
+        }
       }
 
       final out = excel.encode();

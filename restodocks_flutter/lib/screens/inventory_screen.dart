@@ -939,17 +939,12 @@ class _InventoryScreenState extends State<InventoryScreen>
       // Продолжаем выполнение, так как сохранение в историю не критично
     }
 
-    if (mounted) {
-      setState(() {
-        _endTime = endTime;
-        _completed = true;
-      });
-    }
+    if (mounted) setState(() => _endTime = endTime);
 
-    // Выбор формата экспорта и языка сохранения
+    // Выбор формата экспорта и языка сохранения. При отмене — остаёмся в режиме редактирования.
     try {
       final result = await _showExportFormatAndLanguageDialog(context, loc);
-      if (result == null || !mounted) return;
+      if (result == null || !mounted) return; // Отмена — ячейки остаются доступны для заполнения
 
       if (result.format == 'excel') {
         final payloadForExport = _buildPayload(
@@ -975,15 +970,19 @@ class _InventoryScreenState extends State<InventoryScreen>
           );
         }
       }
+      if (mounted) {
+        setState(() => _completed = true);
+        await clearDraft();
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('${loc.t('inventory_document_saved')} (Экспорт: ${e.toString()})')),
         );
+        setState(() => _completed = true);
+        await clearDraft();
       }
     }
-    // Очистка черновика только после экспорта — сохраняем данные на экране до выгрузки
-    if (mounted) await clearDraft();
   }
 
   /// Начать новую инвентаризацию (очистить форму после завершённой).
@@ -1069,12 +1068,14 @@ class _InventoryScreenState extends State<InventoryScreen>
       }
       sheet1.appendRow(headerCells);
 
-      // Добавляем все продукты и ПФ в алфавитном порядке по наименованию
-      final rowsSorted = List<Map<String, dynamic>>.from(rows.map((e) => e as Map<String, dynamic>))
+      // 1. Только продукты (без ПФ), отсортированные по наименованию
+      final productsOnly = (rows.map((e) => e as Map<String, dynamic>))
+          .where((r) => !((r['productId'] as String?) ?? '').startsWith('pf_'))
+          .toList()
         ..sort((a, b) => ((a['productName'] as String?) ?? '').toLowerCase().compareTo(((b['productName'] as String?) ?? '').toLowerCase()));
       var rowNum = 1;
-      for (var i = 0; i < rowsSorted.length; i++) {
-        final r = rowsSorted[i];
+      for (var i = 0; i < productsOnly.length; i++) {
+        final r = productsOnly[i];
         final name = r['productName'] as String? ?? '';
         final unit = r['unit'] as String? ?? '';
         final total = r['total'] as num? ?? 0;
@@ -1094,7 +1095,39 @@ class _InventoryScreenState extends State<InventoryScreen>
         sheet1.appendRow(rowCells);
       }
 
-      // Перерасчет ПФ в брутто (объединенный - суммируем одинаковые продукты)
+      // 2. Полуфабрикаты (ПФ) — отдельная секция под списком продуктов
+      final pfRows = (rows.map((e) => e as Map<String, dynamic>))
+          .where((r) => ((r['productId'] as String?) ?? '').startsWith('pf_'))
+          .toList()
+        ..sort((a, b) => ((a['productName'] as String?) ?? '').toLowerCase().compareTo(((b['productName'] as String?) ?? '').toLowerCase()));
+      if (pfRows.isNotEmpty) {
+        sheet1.appendRow([]);
+        sheet1.appendRow([TextCellValue(loc.t('inventory_block_pf'))]);
+        sheet1.appendRow(headerCells);
+        rowNum = 1;
+        for (var i = 0; i < pfRows.length; i++) {
+          final r = pfRows[i];
+          final name = r['productName'] as String? ?? '';
+          final unit = r['unit'] as String? ?? '';
+          final total = r['total'] as num? ?? 0;
+          final price = (r['price'] as num?)?.toDouble();
+          final quantities = r['quantities'] as List<dynamic>? ?? [];
+          final rowCells = <CellValue>[
+            IntCellValue(rowNum++),
+            TextCellValue(name),
+            TextCellValue(unit),
+            DoubleCellValue(price ?? 0),
+            DoubleCellValue(total.toDouble()),
+          ];
+          for (var c = 0; c < maxCols; c++) {
+            final q = c < quantities.length ? (quantities[c] as num?)?.toDouble() ?? 0.0 : 0.0;
+            rowCells.add(DoubleCellValue(q));
+          }
+          sheet1.appendRow(rowCells);
+        }
+      }
+
+      // 3. Перерасчет ПФ в брутто (объединенный - суммируем одинаковые продукты)
       final aggregated = payload['aggregatedProducts'] as List<dynamic>? ?? [];
       if (aggregated.isNotEmpty) {
         sheet1.appendRow([]);
@@ -1218,12 +1251,14 @@ class _InventoryScreenState extends State<InventoryScreen>
       final sortedProducts = allProducts.values.toList()
         ..sort((a, b) => ((a['productName'] as String?) ?? '').toLowerCase().compareTo(((b['productName'] as String?) ?? '').toLowerCase()));
 
+      double totalSumAll = 0.0;
       for (var i = 0; i < sortedProducts.length; i++) {
         final p = sortedProducts[i];
         final name = p['productName'] as String;
         final unit = p['unit'] as String;
         final total = p['total'] as double;
         final price = (p['price'] as num?)?.toDouble() ?? 0.0;
+        totalSumAll += price;
         final quantities = p['quantities'] as List<double>;
 
         final rowCells = <CellValue>[
@@ -1238,6 +1273,27 @@ class _InventoryScreenState extends State<InventoryScreen>
           rowCells.add(DoubleCellValue(q));
         }
         sheet2.appendRow(rowCells);
+      }
+
+      // Строка «Итого» по сумме внизу листа
+      final totalLabel = loc.t('inventory_excel_total_sum') ?? 'Итого:';
+      final totalRow = <CellValue>[
+        TextCellValue(''),
+        TextCellValue(totalLabel),
+        TextCellValue(''),
+        DoubleCellValue(totalSumAll),
+        TextCellValue(''),
+      ];
+      for (var c = 0; c < maxCols; c++) totalRow.add(TextCellValue(''));
+      sheet2.appendRow(totalRow);
+
+      // Удаляем пустой лист по умолчанию, оставляем только «Продукты + ПФ» и «Все продукты с ПФ»
+      excel.setDefaultSheet('Продукты + ПФ');
+      for (final name in excel.tables.keys.toList()) {
+        if (name != 'Продукты + ПФ' && name != 'Все продукты с ПФ' && excel.tables.keys.length > 2) {
+          excel.delete(name);
+          break;
+        }
       }
 
       final out = excel.encode();
