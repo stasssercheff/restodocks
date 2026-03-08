@@ -562,7 +562,7 @@ class AccountManagerSupabase extends ChangeNotifier {
 
   /// Создание владельца через RPC (обход RLS при Confirm Email — нет сессии после signUp)
   /// [ownerAccessLevel] — 'view_only' для co-owner при >1 заведении у пригласившего
-  /// Retry при "auth user not found" — race condition между Auth signUp и видимостью в auth.users.
+  /// Retry при race condition: auth.users / f_employees_auth FK — signUp может задержать запись.
   Future<Employee> createOwnerEmployeeViaRpc({
     required String authUserId,
     required Establishment establishment,
@@ -582,8 +582,7 @@ class AccountManagerSupabase extends ChangeNotifier {
     };
     if (ownerAccessLevel != null) params['p_owner_access_level'] = ownerAccessLevel;
 
-    const maxRetries = 6;
-    const delayMs = 600;
+    const maxRetries = 12;
     Object? lastError;
     for (var attempt = 0; attempt < maxRetries; attempt++) {
       try {
@@ -595,9 +594,13 @@ class AccountManagerSupabase extends ChangeNotifier {
       } catch (e) {
         lastError = e;
         final msg = e.toString();
-        if (attempt < maxRetries - 1 &&
-            (msg.contains('auth user') && msg.contains('not found') || msg.contains('email mismatch'))) {
-          await Future<void>.delayed(Duration(milliseconds: delayMs));
+        final isRetryable = msg.contains('auth user') && msg.contains('not found') ||
+            msg.contains('email mismatch') ||
+            msg.contains('23503') ||
+            msg.contains('foreign key') ||
+            msg.contains('not present in table');
+        if (attempt < maxRetries - 1 && isRetryable) {
+          await Future<void>.delayed(Duration(milliseconds: 800 + attempt * 200));
           continue;
         }
         rethrow;
