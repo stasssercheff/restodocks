@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:restodocks/core/supabase_url_resolver_stub.dart'
+    if (dart.library.html) 'package:restodocks/core/supabase_url_resolver_web.dart' as supabase_url;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/models.dart';
@@ -9,10 +11,6 @@ import 'supabase_service.dart';
 const _keyEmployeeId = 'restodocks_employee_id';
 const _keyEstablishmentId = 'restodocks_establishment_id';
 
-const _supabaseUrl = String.fromEnvironment(
-  'SUPABASE_URL',
-  defaultValue: 'https://osglfptwbuqqmqunttha.supabase.co',
-);
 const _supabaseAnonKey = String.fromEnvironment(
   'SUPABASE_ANON_KEY',
   defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zZ2xmcHR3YnVxcW1xdW50dGhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUwNTk0MDQsImV4cCI6MjA4MDYzNTQwNH0.Jy7yi2TNdSrmoBdILXBGRYB_vxGtq8scCZ9eCA9vfTE',
@@ -664,7 +662,7 @@ class AccountManagerSupabase extends ChangeNotifier {
   Future<({int status, Map<String, dynamic>? data})> _invokeAuthenticateEmployeeHttp(
     Map<String, dynamic> body,
   ) async {
-    final url = '$_supabaseUrl/functions/v1/authenticate-employee';
+    final url = '${supabase_url.getSupabaseBaseUrl()}/functions/v1/authenticate-employee';
     final dio = Dio(BaseOptions(
       headers: {
         'apikey': _supabaseAnonKey,

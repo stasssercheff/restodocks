@@ -1,14 +1,13 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
+import 'package:restodocks/core/supabase_url_resolver_stub.dart'
+    if (dart.library.html) 'package:restodocks/core/supabase_url_resolver_web.dart' as supabase_url;
+
 import '../models/models.dart';
 import 'checklist_submission_service.dart';
 import 'supabase_service.dart';
 
-const _supabaseUrl = String.fromEnvironment(
-  'SUPABASE_URL',
-  defaultValue: 'https://osglfptwbuqqmqunttha.supabase.co',
-);
 const _supabaseAnonKey = String.fromEnvironment(
   'SUPABASE_ANON_KEY',
   defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zZ2xmcHR3YnVxcW1xdW50dGhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUwNTk0MDQsImV4cCI6MjA4MDYzNTQwNH0.Jy7yi2TNdSrmoBdILXBGRYB_vxGtq8scCZ9eCA9vfTE',
@@ -271,7 +270,7 @@ class ChecklistServiceSupabase {
       validateStatus: (_) => true,
     ));
     try {
-      final resp = await dio.post('$_supabaseUrl/functions/v1/save-checklist', data: body);
+      final resp = await dio.post('${supabase_url.getSupabaseBaseUrl()}/functions/v1/save-checklist', data: body);
       if (resp.statusCode == 200) {
         final data = resp.data is Map ? Map<String, dynamic>.from(resp.data as Map) : null;
         if (data?['ok'] == true) return;

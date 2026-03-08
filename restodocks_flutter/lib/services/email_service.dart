@@ -2,14 +2,10 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:restodocks/core/supabase_url_resolver_stub.dart'
+    if (dart.library.html) 'package:restodocks/core/supabase_url_resolver_web.dart' as supabase_url;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-// URL и ключ для прямых HTTP-вызовов (как authenticate-employee).
-// functions.invoke на web/Safari иногда даёт 403 — raw HTTP с явными headers работает стабильно.
-const _supabaseUrl = String.fromEnvironment(
-  'SUPABASE_URL',
-  defaultValue: 'https://osglfptwbuqqmqunttha.supabase.co',
-);
 const _supabaseAnonKey = String.fromEnvironment(
   'SUPABASE_ANON_KEY',
   defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zZ2xmcHR3YnVxcW1xdW50dGhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUwNTk0MDQsImV4cCI6MjA4MDYzNTQwNH0.Jy7yi2TNdSrmoBdILXBGRYB_vxGtq8scCZ9eCA9vfTE',
@@ -34,7 +30,7 @@ class EmailService {
       validateStatus: (_) => true,
     ));
     try {
-      final resp = await dio.post('$_supabaseUrl/functions/v1/send-email', data: body);
+      final resp = await dio.post('${supabase_url.getSupabaseBaseUrl()}/functions/v1/send-email', data: body);
       final data = resp.data is Map<String, dynamic>
           ? resp.data as Map<String, dynamic>
           : (resp.data is Map ? Map<String, dynamic>.from(resp.data as Map) : null);
@@ -175,11 +171,16 @@ class EmailService {
       debugPrint('EmailService: invoking send-email (HTTP), body keys=${body.keys.toList()}');
       final res = await _invokeSendEmailHttp(body);
       debugPrint('EmailService: send-email response status=${res.status} data=${res.data}');
-      if (res.status == 200) {
-        return (ok: true, error: null);
+      if (res.status != 200) {
+        final msg = res.data?['error']?.toString() ?? 'HTTP ${res.status}';
+        return (ok: false, error: msg);
       }
-      final msg = res.data?['error']?.toString() ?? 'Unknown error';
-      return (ok: false, error: msg);
+      // Даже при 200 проверяем body — функция может вернуть { error: '...' }
+      final bodyError = res.data?['error']?.toString();
+      if (bodyError != null && bodyError.isNotEmpty) {
+        return (ok: false, error: bodyError);
+      }
+      return (ok: true, error: null);
     } catch (e) {
       debugPrint('EmailService: sendOrderEmail exception: $e');
       return (ok: false, error: e.toString());
