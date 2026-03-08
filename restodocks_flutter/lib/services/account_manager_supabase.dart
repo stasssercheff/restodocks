@@ -562,6 +562,7 @@ class AccountManagerSupabase extends ChangeNotifier {
 
   /// Создание владельца через RPC (обход RLS при Confirm Email — нет сессии после signUp)
   /// [ownerAccessLevel] — 'view_only' для co-owner при >1 заведении у пригласившего
+  /// Retry при "auth user not found" — race condition между Auth signUp и видимостью в auth.users.
   Future<Employee> createOwnerEmployeeViaRpc({
     required String authUserId,
     required Establishment establishment,
@@ -580,11 +581,29 @@ class AccountManagerSupabase extends ChangeNotifier {
       'p_roles': roles,
     };
     if (ownerAccessLevel != null) params['p_owner_access_level'] = ownerAccessLevel;
-    final res = await _supabase.client.rpc('create_owner_employee', params: params);
-    final data = Map<String, dynamic>.from(res as Map);
-    data['password'] = '';
-    data['password_hash'] = '';
-    return Employee.fromJson(data);
+
+    const maxRetries = 6;
+    const delayMs = 600;
+    Object? lastError;
+    for (var attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        final res = await _supabase.client.rpc('create_owner_employee', params: params);
+        final data = Map<String, dynamic>.from(res as Map);
+        data['password'] = '';
+        data['password_hash'] = '';
+        return Employee.fromJson(data);
+      } catch (e) {
+        lastError = e;
+        final msg = e.toString();
+        if (attempt < maxRetries - 1 &&
+            (msg.contains('auth user') && msg.contains('not found') || msg.contains('email mismatch'))) {
+          await Future<void>.delayed(Duration(milliseconds: delayMs));
+          continue;
+        }
+        rethrow;
+      }
+    }
+    throw lastError ?? Exception('create_owner_employee failed');
   }
 
   /// Вход по email и паролю: Supabase Auth или legacy (Edge Function)
