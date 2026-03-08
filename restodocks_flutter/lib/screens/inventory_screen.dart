@@ -2026,29 +2026,30 @@ class _InventoryScreenState extends State<InventoryScreen>
     await saveFileBytes(fileName, bytes);
   }
 
-  /// Цена строки: из карточки продукта × итого. 100 руб/кг → 10 г = 1 руб.
-  double? _computeRowPrice(_InventoryRow r) {
+  /// Цена строки: из номенклатуры заведения (establishment_products) или карточки продукта × итого.
+  /// 100 руб/кг → 10 г = 1 руб.
+  double? _computeRowPrice(_InventoryRow r, String establishmentId, ProductStoreSupabase productStore) {
     final p = r.product;
     if (p == null) return null;
+    final estPrice = productStore.getEstablishmentPrice(p.id, establishmentId)?.$1;
     if (r.isCountedByPackage) {
-      final pp = p.packagePrice;
+      final pp = p.packagePrice ?? estPrice;
       if (pp == null) return null;
       return r.total * pp;
     }
     final u = (p.unit ?? 'g').toLowerCase();
     if (u == 'kg' || u == 'кг') {
-      final pricePerKg = p.computedPricePerKg ?? p.basePrice;
+      final pricePerKg = p.computedPricePerKg ?? p.basePrice ?? estPrice;
       if (pricePerKg == null) return null;
       return r.totalWeightGrams / 1000.0 * pricePerKg;
     }
     if (u == 'g' || u == 'г') {
-      // basePrice в карточке хранится за кг (как и при unit kg)
-      final pricePerKg = p.computedPricePerKg ?? p.basePrice;
+      final pricePerKg = p.computedPricePerKg ?? p.basePrice ?? estPrice;
       if (pricePerKg == null) return null;
       return r.totalWeightGrams / 1000.0 * pricePerKg;
     }
     // pcs, шт, ml, l и т.д. — цена за единицу × количество
-    final pricePerUnit = p.basePrice;
+    final pricePerUnit = p.basePrice ?? estPrice;
     if (pricePerUnit == null) return null;
     return r.total * pricePerUnit;
   }
@@ -2096,8 +2097,9 @@ class _InventoryScreenState extends State<InventoryScreen>
         map['unitRaw'] = r.unitOverride == 'btl' ? (lang == 'ru' ? 'бутылка' : 'bottle') : (lang == 'ru' ? 'упак.' : 'pkg');
       }
       if (r.isPf) map['pfUnit'] = r.pfUnit ?? _pfUnitPcs;
-      // Цена: из карточки продукта × итого с учётом единиц (100 руб/кг → 10 г = 1 руб)
-      final price = _computeRowPrice(r);
+      // Цена: из номенклатуры заведения или карточки × итого
+      final productStore = context.read<ProductStoreSupabase>();
+      final price = _computeRowPrice(r, establishment.id, productStore);
       if (price != null && price > 0) map['price'] = price;
       return map;
     }).toList();
