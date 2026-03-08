@@ -1605,7 +1605,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                             ),
                           )
                         : Text(_compositionForHallController.text.isEmpty ? '—' : _compositionForHallController.text, style: const TextStyle(fontSize: 13, height: 1.4)),
-                    if (_canEditSellingPrice(employee, _techCard, isSemiFinished: _isSemiFinished, category: _selectedCategory, sections: _selectedSections, department: widget.department)) ...[
+                    if (_canEditSellingPrice(context.read<AccountManagerSupabase>().currentEmployee, _techCard, isSemiFinished: _isSemiFinished, category: _selectedCategory, sections: _selectedSections, department: widget.department)) ...[
                       const SizedBox(height: 12),
                       Text(loc.t('selling_price') ?? 'Продажная цена', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
                       const SizedBox(height: 4),

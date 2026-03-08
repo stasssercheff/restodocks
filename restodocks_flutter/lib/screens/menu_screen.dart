@@ -376,7 +376,6 @@ class _MenuScreenState extends State<MenuScreen> {
                           sellingPrice: tc.sellingPrice,
                           currencySym: currencySym,
                         ),
-                  ),
                 ),
               ],
             ),
