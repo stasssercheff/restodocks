@@ -876,6 +876,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ).then((_) => customController.dispose());
   }
 
+  static const _trainingVideos = <String, String>{
+    'Чеклист создание + ТТК, отображение во входящих': 'https://youtu.be/goZ20v6DV2s',
+    'Чеклист заполнение': 'https://youtu.be/ggc8es-ivJc',
+    'Создание ТТК + просмотр': 'https://youtu.be/MixDi9UC2kg',
+    'Инвентаризация iiko с загрузкой бланка': 'https://youtu.be/JjMe-Tb04ZM',
+    'Заказ продуктов с отправкой по почте': 'https://youtu.be/e5DJHk_pSbE',
+    'Сотрудники настройка': 'https://youtu.be/bGVJtSdpid0',
+    'Смена роли собственника': 'https://youtu.be/nkk9BpyIkuQ',
+    'Инвента iiko выгрузка бланка': 'https://youtu.be/rFXg9gJ5qUw',
+    'График правка': 'https://youtu.be/sF26hjgdjO8',
+    'Сообщения': 'https://youtu.be/zgH9ITDHU4U',
+  };
+
+  void _showTrainingDialog(BuildContext context, LocalizationService loc) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('training') ?? 'Обучение'),
+        content: SizedBox(
+          width: 340,
+          child: ListView(
+            shrinkWrap: true,
+            children: _trainingVideos.entries.map((e) {
+              return ListTile(
+                leading: const Icon(Icons.play_circle_outline, color: Colors.red),
+                title: Text(e.key, style: const TextStyle(fontSize: 14)),
+                trailing: const Icon(Icons.open_in_new, size: 18),
+                dense: true,
+                onTap: () async {
+                  final uri = Uri.parse(e.value);
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  }
+                },
+              );
+            }).toList(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(MaterialLocalizations.of(ctx).closeButtonLabel),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showSupportDialog(BuildContext context, LocalizationService loc) {
     showDialog<void>(
       context: context,
@@ -1274,6 +1322,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ],
             const Divider(),
+            ListTile(
+              leading: const Icon(Icons.school),
+              title: Text(localization.t('training') ?? 'Обучение'),
+              subtitle: Text(localization.t('training_subtitle') ?? 'Видеоинструкции по работе с приложением'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _showTrainingDialog(context, localization),
+            ),
             ListTile(
               leading: const Icon(Icons.support_agent),
               title: Text(localization.t('contact_support')),

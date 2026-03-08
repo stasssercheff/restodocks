@@ -1810,9 +1810,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
       );
     }
 
-    // Режим «для зала»: описание, состав, продажная цена вместо полной ТТК. Показывается при forceHallView или когда пользователь не имеет полного доступа.
-    final showLimitedView = _techCard != null && !_techCard!.isSemiFinished &&
-        (widget.forceHallView || (widget.forceViewMode && !_canSeeFullTtkViewTechCard(employee, _techCard!)));
+    // Режим «для зала»: описание, состав, продажная цена. Только при явном forceHallView (меню зала).
+    // Повары и сотрудники кухни/бара — полная ТТК в просмотре без цен (через _TtkCookTable).
+    final showLimitedView = _techCard != null && !_techCard!.isSemiFinished && widget.forceHallView;
     if (showLimitedView) {
       final desc = _techCard!.descriptionForHall?.trim() ?? '';
       final comp = _techCard!.compositionForHall?.trim() ?? '';

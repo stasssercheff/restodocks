@@ -84,12 +84,11 @@ class _MenuScreenState extends State<MenuScreen> {
                 tc.sections.contains('bar') ||
                 tc.sections.contains('all'))).toList();
       } else {
+        // Кухня/бар: показываем ВСЕ блюда отдела в меню для сотрудников подразделения (без фильтра по цехам).
         final byDept = allTcs.where((tc) =>
             !tc.isSemiFinished &&
             (!_barCategories.contains(tc.category) || tc.sections.contains('all'))).toList();
-        tcs = emp == null
-            ? byDept
-            : byDept.where((tc) => emp.canSeeTechCard(tc.sections)).toList();
+        tcs = byDept;
       }
       if (!mounted) return;
       final currency = emp?.currency ?? acc.establishment?.defaultCurrency ?? 'RUB';
@@ -201,11 +200,48 @@ class _MenuScreenState extends State<MenuScreen> {
     if (_canSeeFullTtkView(emp, tc)) {
       return '${cat} • ${loc.t('cost_price')}: ${totalCost.toStringAsFixed(2)} $currencySym';
     }
-    final sp = tc.sellingPrice;
-    if (sp != null && sp > 0) {
-      return '$cat • ${loc.t('selling_price') ?? 'Цена'}: ${sp.toStringAsFixed(2)} $currencySym';
+    // Меню зала: показываем продажную цену, если есть
+    if (_isHallMenu) {
+      final sp = tc.sellingPrice;
+      if (sp != null && sp > 0) {
+        return '$cat • ${loc.t('selling_price') ?? 'Цена'}: ${sp.toStringAsFixed(2)} $currencySym';
+      }
     }
+    // Кухня/бар: повары и сотрудники — без цен
     return cat;
+  }
+
+  /// Контент раскрытой карточки: полная ТТК с ценой / полная ТТК без цены / описание для зала.
+  Widget _buildExpandedContent(Employee? emp, LocalizationService loc, TechCard tc, String lang, String currencySym) {
+    if (_canSeeFullTtkView(emp, tc)) {
+      return _MenuDishTable(
+        loc: loc,
+        dishName: tc.dishName,
+        ingredients: tc.ingredients.where((i) => !i.isPlaceholder || i.hasData).toList(),
+        technology: tc.getLocalizedTechnology(lang),
+        currencySym: currencySym,
+        showCost: true,
+      );
+    }
+    // Меню зала: описание, состав, продажная цена
+    if (_isHallMenu) {
+      return _HallDishContent(
+        loc: loc,
+        description: tc.descriptionForHall ?? '',
+        composition: tc.compositionForHall ?? '',
+        sellingPrice: tc.sellingPrice,
+        currencySym: currencySym,
+      );
+    }
+    // Кухня/бар: повары и сотрудники — полная ТТК (состав, технология) без цен
+    return _MenuDishTable(
+      loc: loc,
+      dishName: tc.dishName,
+      ingredients: tc.ingredients.where((i) => !i.isPlaceholder || i.hasData).toList(),
+      technology: tc.getLocalizedTechnology(lang),
+      currencySym: currencySym,
+      showCost: false,
+    );
   }
 
   @override
@@ -338,7 +374,8 @@ class _MenuScreenState extends State<MenuScreen> {
               title: InkWell(
                 onTap: () {
                   final emp = context.read<AccountManagerSupabase>().currentEmployee;
-                  final useHallView = !_canSeeFullTtkView(emp, tc);
+                  // hall=1 только для меню зала (описание, состав, цена). Кухня/бар — полная ТТК в просмотре.
+                  final useHallView = _isHallMenu && !_canSeeFullTtkView(emp, tc);
                   context.push('/tech-cards/${tc.id}?view=1${useHallView ? '&hall=1' : ''}');
                 },
                 child: Text(
@@ -349,7 +386,7 @@ class _MenuScreenState extends State<MenuScreen> {
               subtitle: InkWell(
                 onTap: () {
                   final emp = context.read<AccountManagerSupabase>().currentEmployee;
-                  final useHallView = !_canSeeFullTtkView(emp, tc);
+                  final useHallView = _isHallMenu && !_canSeeFullTtkView(emp, tc);
                   context.push('/tech-cards/${tc.id}?view=1${useHallView ? '&hall=1' : ''}');
                 },
                 child: Text(
@@ -360,22 +397,7 @@ class _MenuScreenState extends State<MenuScreen> {
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
-                  child: _canSeeFullTtkView(context.read<AccountManagerSupabase>().currentEmployee, tc)
-                      ? _MenuDishTable(
-                          loc: loc,
-                          dishName: tc.dishName,
-                          ingredients: tc.ingredients.where((i) => !i.isPlaceholder || i.hasData).toList(),
-                          technology: tc.getLocalizedTechnology(lang),
-                          currencySym: currencySym,
-                          showCost: true,
-                        )
-                      : _HallDishContent(
-                          loc: loc,
-                          description: tc.descriptionForHall ?? '',
-                          composition: tc.compositionForHall ?? '',
-                          sellingPrice: tc.sellingPrice,
-                          currencySym: currencySym,
-                        ),
+                  child: _buildExpandedContent(context.read<AccountManagerSupabase>().currentEmployee, loc, tc, lang, currencySym),
                 ),
               ],
             ),
