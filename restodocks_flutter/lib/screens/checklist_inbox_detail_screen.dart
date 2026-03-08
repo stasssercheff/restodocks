@@ -201,6 +201,7 @@ class _ChecklistInboxDetailScreenState extends State<ChecklistInboxDetailScreen>
               final displayTitle = _translatedTitles[i] ?? it.title;
               final rawPayload = (sub.payload['items'] as List<dynamic>?)?[i];
               final itemData = rawPayload is Map ? Map<String, dynamic>.from(rawPayload) : <String, dynamic>{};
+              final techCardId = itemData['techCardId']?.toString();
               final numericValue = itemData['numericValue']?.toString();
               final dropdownValue = itemData['dropdownValue']?.toString();
 
@@ -220,7 +221,26 @@ class _ChecklistInboxDetailScreenState extends State<ChecklistInboxDetailScreen>
                           : Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
-                  title: Text(displayTitle),
+                  title: techCardId != null && techCardId.isNotEmpty
+                      ? InkWell(
+                          onTap: () => context.push('/tech-cards/$techCardId'),
+                          child: Row(
+                            children: [
+                              Icon(Icons.link, size: 16, color: Theme.of(context).colorScheme.primary),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  displayTitle,
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.primary,
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : Text(displayTitle),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [

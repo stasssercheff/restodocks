@@ -330,7 +330,8 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
           SnackBar(content: Text(loc.t('save') + ' ✓')),
         );
         clearDraft();
-        context.pop();
+        // Переходим на список с refresh=1, чтобы экран создался заново и подтянул свежие данные
+        context.go('/checklists?department=${updated.assignedDepartment}&refresh=1');
       }
     } catch (e) {
       if (mounted) {

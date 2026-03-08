@@ -1,6 +1,18 @@
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
+
 import '../models/models.dart';
 import 'checklist_submission_service.dart';
 import 'supabase_service.dart';
+
+const _supabaseUrl = String.fromEnvironment(
+  'SUPABASE_URL',
+  defaultValue: 'https://osglfptwbuqqmqunttha.supabase.co',
+);
+const _supabaseAnonKey = String.fromEnvironment(
+  'SUPABASE_ANON_KEY',
+  defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zZ2xmcHR3YnVxcW1xdW50dGhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUwNTk0MDQsImV4cCI6MjA4MDYzNTQwNH0.Jy7yi2TNdSrmoBdILXBGRYB_vxGtq8scCZ9eCA9vfTE',
+);
 
 /// Сервис чеклистов-шаблонов (Supabase).
 class ChecklistServiceSupabase {
@@ -14,6 +26,8 @@ class ChecklistServiceSupabase {
     String establishmentId, {
     String department = 'kitchen',
     String? currentEmployeeId,
+    /// false = редакторы (шеф, владелец) видят все чеклисты подразделения
+    bool applyAssignmentFilter = true,
   }) async {
     try {
       final data = await _supabase.client
@@ -26,7 +40,7 @@ class ChecklistServiceSupabase {
       for (final row in data) {
         final c = Checklist.fromJson(row);
         if (c.assignedDepartment != department) continue;
-        if (currentEmployeeId != null) {
+        if (applyAssignmentFilter && currentEmployeeId != null) {
           final ids = c.assignedEmployeeIds;
           final singleId = c.assignedEmployeeId;
           final hasAssignment = (ids != null && ids.isNotEmpty) || (singleId != null && singleId.isNotEmpty);
@@ -38,16 +52,19 @@ class ChecklistServiceSupabase {
         }
         final itemsData = await _supabase.client
             .from('checklist_items')
-            .select()
+            .select('id, checklist_id, title, sort_order, tech_card_id, target_quantity, target_unit')
             .eq('checklist_id', c.id)
             .order('sort_order');
         final items = (itemsData as List).map((e) => ChecklistItem.fromJson(e)).toList();
         list.add(c.copyWith(items: items));
       }
+      if (kDebugMode) {
+        print('ChecklistService: loaded ${list.length} checklists for $establishmentId dept=$department');
+      }
       return list;
     } catch (e) {
-      print('Ошибка загрузки чеклистов: $e');
-      return [];
+      print('ChecklistService: Ошибка загрузки чеклистов: $e');
+      rethrow;
     }
   }
 
@@ -62,7 +79,7 @@ class ChecklistServiceSupabase {
       final c = Checklist.fromJson(row);
       final itemsData = await _supabase.client
           .from('checklist_items')
-          .select()
+          .select('id, checklist_id, title, sort_order, tech_card_id, target_quantity, target_unit')
           .eq('checklist_id', c.id)
           .order('sort_order');
       final items = (itemsData as List).map((e) => ChecklistItem.fromJson(e)).toList();
@@ -214,47 +231,89 @@ class ChecklistServiceSupabase {
   }
 
   Future<void> saveChecklist(Checklist checklist) async {
-    final upd = <String, dynamic>{
-      'name': checklist.name,
-      'updated_at': DateTime.now().toIso8601String(),
-    };
-    if (checklist.assignedSection != null) upd['assigned_section'] = checklist.assignedSection;
-    final empIds = checklist.assignedEmployeeIds;
-    final empId = empIds?.isNotEmpty == true ? empIds!.first : checklist.assignedEmployeeId;
-    if (empId != null) upd['assigned_employee_id'] = empId;
-    if (empIds != null && empIds.isNotEmpty) upd['assigned_employee_ids'] = empIds;
-    if (checklist.deadlineAt != null) upd['deadline_at'] = checklist.deadlineAt!.toIso8601String();
-    if (checklist.scheduledForAt != null) upd['scheduled_for_at'] = checklist.scheduledForAt!.toIso8601String();
-    if (checklist.additionalName != null) upd['additional_name'] = checklist.additionalName;
-    if (checklist.type != null) upd['type'] = checklist.type!.code;
-    upd['action_config'] = checklist.actionConfig.toJson();
+    final now = DateTime.now().toUtc().toIso8601String();
+    final empIds = checklist.assignedEmployeeIds ?? [];
+    final rawEmpId = empIds.isNotEmpty ? empIds.first : checklist.assignedEmployeeId;
+    final empId = rawEmpId != null && rawEmpId.trim().isNotEmpty ? rawEmpId : null;
+    final itemsPayload = checklist.items
+        .map((e) => {
+              'title': e.title,
+              'sort_order': e.sortOrder,
+              'tech_card_id': e.techCardId,
+              'target_quantity': e.targetQuantity,
+              'target_unit': e.targetUnit,
+            })
+        .toList();
 
-    await _updateChecklistWithRetry(checklist.id, upd);
-    if (checklist.deadlineAt != null || checklist.scheduledForAt != null) {
-      try {
-        await _supabase.client.rpc(
-          'update_checklist_dates',
-          params: {
-            'p_checklist_id': checklist.id,
-            'p_deadline_at': checklist.deadlineAt?.toIso8601String(),
-            'p_scheduled_for_at': checklist.scheduledForAt?.toIso8601String(),
-          },
-        );
-      } catch (_) {
-        try {
-          final datesOnly = <String, dynamic>{
-            'updated_at': DateTime.now().toIso8601String(),
-          };
-          if (checklist.deadlineAt != null) datesOnly['deadline_at'] = checklist.deadlineAt!.toIso8601String();
-          if (checklist.scheduledForAt != null) datesOnly['scheduled_for_at'] = checklist.scheduledForAt!.toIso8601String();
-          await _supabase.updateData('checklists', datesOnly, 'id', checklist.id);
-        } catch (_) {}
+    final body = <String, dynamic>{
+      'checklist_id': checklist.id,
+      'name': checklist.name,
+      'updated_at': now,
+      'action_config': checklist.actionConfig.toJson(),
+      'assigned_department': checklist.assignedDepartment,
+      'assigned_section': checklist.assignedSection,
+      'assigned_employee_id': empId,
+      'assigned_employee_ids': empIds,
+      'deadline_at': checklist.deadlineAt?.toUtc().toIso8601String(),
+      'scheduled_for_at': checklist.scheduledForAt?.toUtc().toIso8601String(),
+      'additional_name': checklist.additionalName,
+      'type': checklist.type?.code,
+      'items': itemsPayload,
+    };
+
+    // 1. Пробуем Edge Function (service role)
+    final dio = Dio(BaseOptions(
+      headers: {
+        'apikey': _supabaseAnonKey,
+        'Authorization': 'Bearer $_supabaseAnonKey',
+        'Content-Type': 'application/json',
+      },
+      validateStatus: (_) => true,
+    ));
+    try {
+      final resp = await dio.post('$_supabaseUrl/functions/v1/save-checklist', data: body);
+      if (resp.statusCode == 200) {
+        final data = resp.data is Map ? Map<String, dynamic>.from(resp.data as Map) : null;
+        if (data?['ok'] == true) return;
       }
-    }
-    await _supabase.client
-        .from('checklist_items')
-        .delete()
-        .eq('checklist_id', checklist.id);
+    } catch (_) { /* пробуем RPC */ }
+
+    // 2. Fallback: RPC save_checklist (anon grant)
+    try {
+      await _supabase.client.rpc('save_checklist', params: {
+        'p_checklist_id': checklist.id,
+        'p_name': checklist.name,
+        'p_updated_at': now,
+        'p_action_config': checklist.actionConfig.toJson(),
+        'p_assigned_department': checklist.assignedDepartment,
+        'p_assigned_section': checklist.assignedSection,
+        'p_assigned_employee_id': empId,
+        'p_assigned_employee_ids': empIds,
+        'p_deadline_at': checklist.deadlineAt?.toUtc().toIso8601String(),
+        'p_scheduled_for_at': checklist.scheduledForAt?.toUtc().toIso8601String(),
+        'p_additional_name': checklist.additionalName,
+        'p_type': checklist.type?.code,
+        'p_items': itemsPayload,
+      });
+      return;
+    } catch (_) { /* пробуем прямой UPDATE */ }
+
+    // 3. Fallback: прямой UPDATE + INSERT (anon policies)
+    final fullUpd = <String, dynamic>{
+      'name': checklist.name,
+      'updated_at': now,
+      'action_config': checklist.actionConfig.toJson(),
+      'assigned_department': checklist.assignedDepartment,
+      'assigned_section': checklist.assignedSection,
+      'assigned_employee_id': empId,
+      'assigned_employee_ids': empIds,
+      'deadline_at': checklist.deadlineAt?.toUtc().toIso8601String(),
+      'scheduled_for_at': checklist.scheduledForAt?.toUtc().toIso8601String(),
+      'additional_name': checklist.additionalName,
+      'type': checklist.type?.code,
+    };
+    await _updateChecklistWithRetry(checklist.id, fullUpd);
+    await _supabase.client.from('checklist_items').delete().eq('checklist_id', checklist.id);
     for (var i = 0; i < checklist.items.length; i++) {
       final item = checklist.items[i];
       final itemData = <String, dynamic>{

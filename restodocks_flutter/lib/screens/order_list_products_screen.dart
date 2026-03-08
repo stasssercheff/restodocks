@@ -28,14 +28,19 @@ class _OrderListProductsScreenState extends State<OrderListProductsScreen> {
   static String _unitLabel(String unitId, String lang) =>
       unitId == 'pkg' ? (lang == 'ru' ? 'упак.' : 'pkg') : CulinaryUnits.displayName(unitId, lang);
 
+  /// Единицы: вес, объём, штуки, упаковка, бутылка — как в карточке продукта.
   static List<String> _allowedUnitsForProduct(Product? p) {
-    const base = ['g', 'kg', 'ml', 'l'];
+    const base = [
+      'g', 'kg',           // вес
+      'ml', 'l',           // объём
+      'pcs', 'шт',         // штуки
+      'pack', 'pkg',       // упаковка (pkg — если в продукте указан packageWeightGrams)
+      'can', 'box',        // банка, коробка
+      'bottle',            // бутылка
+    ];
     final options = List<String>.from(base);
-    if (p?.gramsPerPiece != null && p!.gramsPerPiece! > 0) {
-      options.addAll(['pcs', 'шт']);
-    }
     if (p?.packageWeightGrams != null && p!.packageWeightGrams! > 0) {
-      options.add('pkg');
+      if (!options.contains('pkg')) options.add('pkg');
     }
     return options;
   }
@@ -47,10 +52,22 @@ class _OrderListProductsScreenState extends State<OrderListProductsScreen> {
     final est = acc.establishment;
     final dataEstId = est?.dataEstablishmentId;
     if (dataEstId == null) return;
-    // getNomenclatureProducts использует _allProducts — нужно загрузить и продукты, и номенклатуру
-    await store.loadProducts();
-    await store.loadNomenclature(dataEstId);
-    final products = store.getNomenclatureProducts(dataEstId);
+    // Быстрая загрузка только продуктов номенклатуры (без всего каталога)
+    List<Product> products = [];
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(child: CircularProgressIndicator()),
+    );
+    try {
+      products = await store.loadNomenclatureProductsDirect(
+        dataEstId,
+        department: _list.department,
+      );
+    } finally {
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+    }
+    if (!mounted) return;
     if (products.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${loc.t('nomenclature')}: ${loc.t('no_products')}')),
@@ -281,7 +298,6 @@ class _ProductSelectDialog extends StatefulWidget {
 
 class _ProductSelectDialogState extends State<_ProductSelectDialog> {
   String _query = '';
-  bool _translating = false;
   final _ctrl = TextEditingController();
   final _searchFocus = FocusNode();
 
@@ -291,6 +307,7 @@ class _ProductSelectDialogState extends State<_ProductSelectDialog> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _ensureTranslations());
   }
 
+  /// Переводы выполняются в фоне — список показывается сразу. Обновляем при завершении.
   Future<void> _ensureTranslations() async {
     if (!mounted) return;
     final lang = widget.lang;
@@ -302,20 +319,20 @@ class _ProductSelectDialogState extends State<_ProductSelectDialog> {
     final missing = widget.products.where(
       (p) => !(p.names?.containsKey(lang) == true && (p.names![lang]?.trim().isNotEmpty ?? false)),
     ).toList();
-    if (missing.isNotEmpty) {
-      setState(() => _translating = true);
-      for (final p in missing) {
-        if (!mounted) break;
-        try {
-          await store.translateProductAwait(p.id)
-              .timeout(const Duration(seconds: 5), onTimeout: () => null);
-        } catch (_) {}
-        if (mounted) setState(() {});
-      }
-      if (!mounted) return;
-      setState(() => _translating = false);
+    if (missing.isEmpty) {
+      _searchFocus.requestFocus();
+      return;
     }
-    _searchFocus.requestFocus();
+    // Не блокируем UI — список уже показан. Переводим в фоне.
+    for (final p in missing) {
+      if (!mounted) break;
+      try {
+        await store.translateProductAwait(p.id)
+            .timeout(const Duration(seconds: 5), onTimeout: () => null);
+      } catch (_) {}
+      if (mounted) setState(() {});
+    }
+    if (mounted) _searchFocus.requestFocus();
   }
 
   @override
@@ -328,17 +345,6 @@ class _ProductSelectDialogState extends State<_ProductSelectDialog> {
   @override
   Widget build(BuildContext context) {
     final loc = context.read<LocalizationService>();
-
-    if (_translating) {
-      return AlertDialog(
-        title: Text(loc.t('ttk_choose_product')),
-        content: const SizedBox(
-          width: 400,
-          height: 120,
-          child: Center(child: CircularProgressIndicator()),
-        ),
-      );
-    }
 
     final q = _query.trim().toLowerCase();
     final filtered = q.isEmpty

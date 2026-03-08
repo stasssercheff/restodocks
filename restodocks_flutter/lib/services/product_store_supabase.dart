@@ -699,6 +699,52 @@ class ProductStoreSupabase {
     return _allProducts.where((p) => _nomenclatureIds.contains(p.id)).toList();
   }
 
+  /// Быстрая загрузка продуктов номенклатуры без загрузки всего каталога.
+  /// Запрос к establishment_products + products по FK. Рекомендуется для списка поставщика.
+  Future<List<Product>> loadNomenclatureProductsDirect(
+    String establishmentId, {
+    String department = 'kitchen',
+  }) async {
+    try {
+      final response = await _supabase.client
+          .from('establishment_products')
+          .select('product_id, products(*)')
+          .eq('establishment_id', establishmentId)
+          .eq('department', department)
+          .limit(5000);
+      final list = response is List ? response : <dynamic>[];
+      final seen = <String>{};
+      final products = <Product>[];
+      for (final row in list) {
+        final m = row is Map ? Map<String, dynamic>.from(row as Map) : null;
+        if (m == null) continue;
+        final productJson = m['products'];
+        if (productJson is! Map) continue;
+        final pMap = Map<String, dynamic>.from(productJson as Map);
+        final id = pMap['id']?.toString();
+        if (id == null || id.isEmpty || seen.contains(id)) continue;
+        seen.add(id);
+        try {
+          products.add(Product.fromJson(pMap));
+        } catch (_) {}
+      }
+      products.sort((a, b) => a.name.compareTo(b.name));
+      // Кэшируем в _allProducts для отображения в списке (lookup по productId)
+      for (final p in products) {
+        final idx = _allProducts.indexWhere((e) => e.id == p.id);
+        if (idx >= 0) {
+          _allProducts[idx] = p;
+        } else {
+          _allProducts.add(p);
+        }
+      }
+      return products;
+    } catch (e) {
+      print('❌ ProductStore: loadNomenclatureProductsDirect failed: $e');
+      rethrow;
+    }
+  }
+
   /// Получить все элементы номенклатуры (продукты + ТТК ПФ)
   Future<List<NomenclatureItem>> getAllNomenclatureItems(String establishmentId, dynamic techCardService) async {
     final products = getNomenclatureProducts(establishmentId);

@@ -1,0 +1,13 @@
+# Edge Functions configuration for Restodocks
+# See: https://supabase.com/docs/guides/functions/function-configuration
+
+# send-email вызывается из приложения при отправке заказа на почту.
+# Сотрудники входят через authenticate-employee (legacy) — у них нет Supabase Auth JWT.
+# С verify_jwt=true шлюз Supabase возвращает 403 до вызова функции.
+# Безопасность: функция сама проверяет anon/service_role key (см. send-email/index.ts).
+[functions.send-email]
+verify_jwt = false
+
+# save-checklist — то же: legacy-логин без JWT
+[functions.save-checklist]
+verify_jwt = false

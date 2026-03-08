@@ -486,7 +486,14 @@ class AppRouter {
             path: '/checklists',
             pageBuilder: (context, state) {
               final dept = state.queryParameters['department'] ?? 'kitchen';
-              return _slideTransitionPage(state, ChecklistsScreen(department: dept));
+              final refresh = state.queryParameters['refresh'] == '1';
+              return _slideTransitionPage(
+                state,
+                ChecklistsScreen(
+                  key: refresh ? ValueKey('checklists_refresh_${DateTime.now().millisecondsSinceEpoch}') : null,
+                  department: dept,
+                ),
+              );
             },
           ),
           GoRoute(
