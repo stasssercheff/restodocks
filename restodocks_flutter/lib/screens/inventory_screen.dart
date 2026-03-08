@@ -946,22 +946,29 @@ class _InventoryScreenState extends State<InventoryScreen>
       });
     }
 
-    // Выбор формата экспорта и генерация файла
+    // Выбор формата экспорта и языка сохранения
     try {
-      final format = await _showExportFormatDialog(context, loc);
-      if (format == null || !mounted) return;
+      final result = await _showExportFormatAndLanguageDialog(context, loc);
+      if (result == null || !mounted) return;
 
-      if (format == 'excel') {
-        final bytes = _buildExcelBytes(payload, loc);
+      if (result.format == 'excel') {
+        final payloadForExport = _buildPayload(
+          establishment: establishment,
+          employee: employee,
+          endTime: endTime,
+          lang: result.lang,
+          aggregatedProducts: _aggregateProductsFromPf(result.lang),
+        );
+        final bytes = _buildExcelBytes(payloadForExport, loc);
         if (bytes != null && bytes.isNotEmpty && mounted) {
-          await _downloadExcel(bytes, payload, loc, 'xlsx');
+          await _downloadExcel(bytes, payloadForExport, loc, 'xlsx');
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(loc.t('inventory_excel_downloaded'))),
             );
           }
         }
-      } else if (format == 'csv') {
+      } else if (result.format == 'csv') {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('CSV экспорт пока не реализован')),
@@ -993,10 +1000,52 @@ class _InventoryScreenState extends State<InventoryScreen>
     _loadNomenclature();
   }
 
+  /// Вычислить стоимость для продукта по имени (используется для листа 2 при продуктах из ПФ).
+  double _computeCostForProductByName(
+    ProductStoreSupabase productStore,
+    String? establishmentId,
+    String productName,
+    double totalGrams,
+  ) {
+    if (establishmentId == null || totalGrams <= 0) return 0.0;
+    final nameLower = productName.trim().toLowerCase();
+    if (nameLower.isEmpty) return 0.0;
+    Product? product;
+    for (final p in productStore.allProducts) {
+      if (p.name.trim().toLowerCase() == nameLower) {
+        product = p;
+        break;
+      }
+      final names = p.names;
+      if (names != null) {
+        for (final v in names.values) {
+          if (v?.toString().trim().toLowerCase() == nameLower) {
+            product = p;
+            break;
+          }
+        }
+        if (product != null) break;
+      }
+    }
+    if (product == null) return 0.0;
+    final estPrice = productStore.getEstablishmentPrice(product.id, establishmentId)?.$1;
+    final pricePerKg = product.computedPricePerKg ?? product.basePrice ?? estPrice;
+    if (pricePerKg == null || pricePerKg <= 0) return 0.0;
+    return totalGrams / 1000.0 * pricePerKg;
+  }
+
   /// Создание Excel с 2 листами: 1) продукты+ПФ+перерасчет, 2) все продукты включая ПФ
   List<int>? _buildExcelBytes(Map<String, dynamic> payload, LocalizationService loc) {
     final rows = payload['rows'] as List<dynamic>? ?? [];
     final maxCols = _maxQuantityColumns;
+    ProductStoreSupabase? productStore;
+    String? establishmentId;
+    if (mounted) {
+      try {
+        productStore = context.read<ProductStoreSupabase>();
+        establishmentId = context.read<AccountManagerSupabase>().establishment?.id;
+      } catch (_) {}
+    }
     try {
       final excel = Excel.createExcel();
       final numLabel = loc.t('inventory_excel_number');
@@ -1139,6 +1188,10 @@ class _InventoryScreenState extends State<InventoryScreen>
           // Суммируем к существующему продукту
           final existing = allProducts[name]!;
           existing['total'] = (existing['total'] as double) + grossGrams;
+          final extraCost = (productStore != null && establishmentId != null)
+              ? _computeCostForProductByName(productStore, establishmentId, name, grossGrams)
+              : 0.0;
+          existing['price'] = (existing['price'] as double? ?? 0) + extraCost;
           // Для ПФ добавляем количество в первую колонку
           final quantities = existing['quantities'] as List<double>;
           if (quantities.isNotEmpty) {
@@ -1147,11 +1200,15 @@ class _InventoryScreenState extends State<InventoryScreen>
             quantities.add(grossGrams);
           }
         } else {
-          // Новый продукт только из ПФ
+          // Новый продукт только из ПФ — вычисляем стоимость по цене из номенклатуры/basePrice
+          final cost = (productStore != null && establishmentId != null)
+              ? _computeCostForProductByName(productStore, establishmentId, name, grossGrams)
+              : 0.0;
           allProducts[name] = {
             'productName': name,
             'unit': 'g', // брутто в граммах
             'total': grossGrams,
+            'price': cost,
             'quantities': [grossGrams], // в первой колонке
           };
         }
@@ -1987,27 +2044,59 @@ class _InventoryScreenState extends State<InventoryScreen>
     );
   }
 
-  Future<String?> _showExportFormatDialog(BuildContext context, LocalizationService loc) async {
-    return showDialog<String>(
+  /// Диалог: формат экспорта (Excel/CSV) + язык сохранения файла.
+  /// Возвращает (format, lang) или null при отмене.
+  Future<({String format, String lang})?> _showExportFormatAndLanguageDialog(
+    BuildContext context,
+    LocalizationService loc,
+  ) async {
+    String selectedLang = loc.currentLanguageCode;
+    return showDialog<({String format, String lang})>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Выберите формат экспорта'),
-        content: Text('Выберите формат файла для экспорта инвентаризации:'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop('excel'),
-            child: const Text('Excel (.xlsx)'),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx2, setState) => AlertDialog(
+            title: Text(loc.t('inventory_export_dialog_title') ?? 'Сохранение на устройство'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    loc.t('inventory_export_lang') ?? 'Язык сохранения:',
+                    style: Theme.of(ctx2).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: LocalizationService.productLanguageCodes.map((code) {
+                      return ChoiceChip(
+                        label: Text(loc.getLanguageName(code)),
+                        selected: selectedLang == code,
+                        onSelected: (_) => setState(() => selectedLang = code),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text(MaterialLocalizations.of(ctx2).cancelButtonLabel),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop((format: 'excel', lang: selectedLang)),
+                child: Text(loc.t('inventory_export_excel') ?? 'Сохранить Excel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop((format: 'csv', lang: selectedLang)),
+                child: const Text('CSV'),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop('csv'),
-            child: const Text('CSV (.csv)'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 

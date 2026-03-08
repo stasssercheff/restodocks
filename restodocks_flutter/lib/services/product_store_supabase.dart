@@ -438,7 +438,8 @@ class ProductStoreSupabase {
         // Добавляем в номенклатуру
         _nomenclatureIds.add(productId);
 
-        // Кэшируем цены (если есть)
+        // Кэшируем цены: establishment_products или fallback на basePrice из карточки продукта.
+        // Если в заведении несколько отделов (kitchen/bar) — не перезаписывать существующую цену на null.
         final cacheKey = '${establishmentId}_$productId';
         final price = item['price'];
         final currency = item['currency'] as String?;
@@ -446,7 +447,24 @@ class ProductStoreSupabase {
         if (price != null && price is num) {
           _priceCache[cacheKey] = (price.toDouble(), currency);
         } else {
-          _priceCache[cacheKey] = null;
+          final existing = _priceCache[cacheKey];
+          if (existing != null && existing.$1 != null) {
+            // Уже есть цена (из другого отдела) — не затирать
+          } else {
+            // Нет цены в заведении — используем basePrice из карточки продукта
+            Product? product;
+            for (final p in _allProducts) {
+              if (p.id == productId) {
+                product = p;
+                break;
+              }
+            }
+            if (product != null && product.basePrice != null && product.basePrice! > 0) {
+              _priceCache[cacheKey] = (product.basePrice!, product.currency ?? currency);
+            } else {
+              _priceCache[cacheKey] = null;
+            }
+          }
         }
 
         processedCount++;

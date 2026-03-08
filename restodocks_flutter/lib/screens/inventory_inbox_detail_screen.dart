@@ -88,18 +88,122 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
     } catch (_) {}
   }
 
-  /// Возвращает строки, отсортированные по (переведённому) названию А-Я
-  List<Map<String, dynamic>> _sortedRows(List<dynamic> rows) {
+  /// Возвращает строки, отсортированные по названию А-Я.
+  /// namesMap: оригинальное имя -> отображаемое. Если null — _translatedNames.
+  List<Map<String, dynamic>> _sortedRows(List<dynamic> rows, [Map<String, String>? namesMap]) {
+    final map = namesMap ?? _translatedNames;
     final list = rows.map((e) => e as Map<String, dynamic>).toList();
     list.sort((a, b) {
-      final nameA = (_translatedNames[(a['productName'] as String? ?? '')] ?? (a['productName'] as String? ?? '')).toLowerCase();
-      final nameB = (_translatedNames[(b['productName'] as String? ?? '')] ?? (b['productName'] as String? ?? '')).toLowerCase();
+      final nameA = (map[(a['productName'] as String? ?? '')] ?? (a['productName'] as String? ?? '')).toLowerCase();
+      final nameB = (map[(b['productName'] as String? ?? '')] ?? (b['productName'] as String? ?? '')).toLowerCase();
       return nameA.compareTo(nameB);
     });
     return list;
   }
 
-  Future<void> _saveToFile({bool withPrice = false}) async {
+  /// Названия продуктов в целевом языке для сохранения в файл.
+  Future<Map<String, String>> _getNamesInLanguage({
+    required List<dynamic> rows,
+    required List<dynamic> aggregated,
+    required String sourceLang,
+    required String targetLang,
+  }) async {
+    if (sourceLang == targetLang) return {};
+    final loc = context.read<LocalizationService>();
+    if (targetLang == loc.currentLanguageCode) return Map.from(_translatedNames);
+
+    final seen = <String>{};
+    final result = <String, String>{};
+    final docId = _doc?['id']?.toString() ?? widget.documentId;
+
+    try {
+      final translationSvc = context.read<TranslationService>();
+      for (final r in rows) {
+        final name = (r is Map ? (r['productName'] as String?) ?? '' : '').toString().trim();
+        if (name.isEmpty || seen.contains(name)) continue;
+        seen.add(name);
+        final translated = await translationSvc.translate(
+          entityType: TranslationEntityType.inventory,
+          entityId: docId,
+          fieldName: 'product_${name.toLowerCase().replaceAll(' ', '_')}',
+          text: name,
+          from: sourceLang,
+          to: targetLang,
+        );
+        if (translated != null && translated != name) result[name] = translated;
+      }
+      for (final p in aggregated) {
+        final name = (p is Map ? (p['productName'] as String?) ?? '' : '').toString().trim();
+        if (name.isEmpty || seen.contains(name)) continue;
+        seen.add(name);
+        final translated = await translationSvc.translate(
+          entityType: TranslationEntityType.inventory,
+          entityId: docId,
+          fieldName: 'product_${name.toLowerCase().replaceAll(' ', '_')}',
+          text: name,
+          from: sourceLang,
+          to: targetLang,
+        );
+        if (translated != null && translated != name) result[name] = translated;
+      }
+    } catch (_) {}
+    return result;
+  }
+
+  /// Диалог выбора языка сохранения и запуск экспорта.
+  Future<void> _showSaveLanguageAndExport({bool withPrice = false}) async {
+    final loc = context.read<LocalizationService>();
+    final payload = _doc?['payload'] as Map<String, dynamic>? ?? {};
+    final sourceLang = (payload['sourceLang'] as String?)?.trim().isNotEmpty == true
+        ? payload['sourceLang'] as String
+        : 'ru';
+    String selectedLang = loc.currentLanguageCode;
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx2, setState) => AlertDialog(
+          title: Text(loc.t('inventory_export_dialog_title') ?? 'Сохранение на устройство'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                loc.t('inventory_export_lang') ?? 'Язык сохранения:',
+                style: Theme.of(ctx2).textTheme.titleSmall,
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: LocalizationService.productLanguageCodes.map((code) {
+                  return ChoiceChip(
+                    label: Text(loc.getLanguageName(code)),
+                    selected: selectedLang == code,
+                    onSelected: (_) => setState(() => selectedLang = code),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text(MaterialLocalizations.of(ctx2).cancelButtonLabel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(selectedLang),
+              child: Text(loc.t('inventory_export_excel') ?? 'Сохранить Excel'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (result != null && mounted) {
+      await _saveToFile(withPrice: withPrice, saveLang: result);
+    }
+  }
+
+  Future<void> _saveToFile({bool withPrice = false, required String saveLang}) async {
     final doc = _doc;
     final loc = context.read<LocalizationService>();
     if (doc == null) return;
@@ -108,6 +212,11 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
     final header = payload['header'] as Map<String, dynamic>? ?? {};
     final rows = payload['rows'] as List<dynamic>? ?? [];
     final aggregated = payload['aggregatedProducts'] as List<dynamic>? ?? [];
+
+    final sourceLang = (payload['sourceLang'] as String?)?.trim().isNotEmpty == true
+        ? payload['sourceLang'] as String
+        : 'ru';
+    final namesForSave = await _getNamesInLanguage(rows: rows, aggregated: aggregated, sourceLang: sourceLang, targetLang: saveLang);
 
     Map<String, double>? pricePerProduct;
     String? establishmentId;
@@ -165,14 +274,14 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
       final sheet1 = excel['Продукты + ПФ'];
       sheet1.appendRow(headerCells);
 
-      // Сортируем и переводим названия для Excel так же, как в UI
-      final rowsSorted = _sortedRows(rows);
+      // Сортируем по названиям в целевом языке
+      final rowsSorted = _sortedRows(rows, namesForSave);
       var rowNum = 1;
       double totalSumAll = 0;
       for (var i = 0; i < rowsSorted.length; i++) {
         final r = rowsSorted[i];
         final originalName = r['productName'] as String? ?? '';
-        final name = _translatedNames[originalName] ?? originalName;
+        final name = namesForSave[originalName] ?? originalName;
         final unit = r['unit'] as String? ?? '';
         final total = (r['total'] as num?)?.toDouble() ?? 0.0;
         final quantities = r['quantities'] as List<dynamic>? ?? [];
@@ -244,14 +353,14 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
         }
         final groupedList = groupedProducts.values.toList()
           ..sort((a, b) {
-            final nameA = (_translatedNames[a['productName'] as String? ?? ''] ?? (a['productName'] as String? ?? '')).toLowerCase();
-            final nameB = (_translatedNames[b['productName'] as String? ?? ''] ?? (b['productName'] as String? ?? '')).toLowerCase();
+            final nameA = (namesForSave[a['productName'] as String? ?? ''] ?? (a['productName'] as String? ?? '')).toLowerCase();
+            final nameB = (namesForSave[b['productName'] as String? ?? ''] ?? (b['productName'] as String? ?? '')).toLowerCase();
             return nameA.compareTo(nameB);
           });
         for (var i = 0; i < groupedList.length; i++) {
           final p = groupedList[i];
           final originalName = (p['productName'] as String? ?? '');
-          final displayName = _translatedNames[originalName] ?? originalName;
+          final displayName = namesForSave[originalName] ?? originalName;
           sheet1.appendRow([
             IntCellValue(i + 1),
             TextCellValue(displayName),
@@ -312,14 +421,14 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
 
       final sortedProducts = allProducts.values.toList()
         ..sort((a, b) {
-          final nameA = (_translatedNames[a['productName'] as String? ?? ''] ?? (a['productName'] as String? ?? '')).toLowerCase();
-          final nameB = (_translatedNames[b['productName'] as String? ?? ''] ?? (b['productName'] as String? ?? '')).toLowerCase();
+          final nameA = (namesForSave[a['productName'] as String? ?? ''] ?? (a['productName'] as String? ?? '')).toLowerCase();
+          final nameB = (namesForSave[b['productName'] as String? ?? ''] ?? (b['productName'] as String? ?? '')).toLowerCase();
           return nameA.compareTo(nameB);
         });
       for (var i = 0; i < sortedProducts.length; i++) {
         final p = sortedProducts[i];
         final originalName = p['productName'] as String;
-        final name = _translatedNames[originalName] ?? originalName;
+        final name = namesForSave[originalName] ?? originalName;
         final unit = p['unit'] as String;
         final total = p['total'] as double;
         final quantities = p['quantities'] as List<double>;
@@ -395,7 +504,7 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
           PopupMenuButton<String>(
             icon: const Icon(Icons.download),
             tooltip: loc.t('download') ?? 'Сохранить',
-            onSelected: (v) => _saveToFile(withPrice: v == 'with_price'),
+            onSelected: (v) => _showSaveLanguageAndExport(withPrice: v == 'with_price'),
             itemBuilder: (_) => [
               PopupMenuItem(value: 'no_price', child: Text(loc.t('inventory_export_no_price') ?? 'Без цены')),
               PopupMenuItem(value: 'with_price', child: Text(loc.t('inventory_export_with_price') ?? 'С ценой')),
