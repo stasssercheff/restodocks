@@ -20,17 +20,7 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  // Require the Supabase anon key (or service role) — blocks unauthenticated external callers
-  const expectedAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
-  const expectedServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const providedKey = req.headers.get("apikey") || req.headers.get("Authorization")?.replace("Bearer ", "");
-  if (providedKey !== expectedAnonKey && providedKey !== expectedServiceKey) {
-    return new Response(JSON.stringify({ error: "Forbidden" }), {
-      status: 403,
-      headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
-    });
-  }
-
+  // verify_jwt=false в config (как send-email) — Cloudflare/разные билды могут передавать другой anon key
   const apiKey = Deno.env.get("RESEND_API_KEY")?.trim();
   if (!apiKey) {
     return new Response(JSON.stringify({ error: "RESEND_API_KEY not configured" }), {
