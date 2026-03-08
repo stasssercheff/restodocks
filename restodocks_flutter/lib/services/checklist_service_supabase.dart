@@ -29,15 +29,18 @@ class ChecklistServiceSupabase {
     bool applyAssignmentFilter = true,
   }) async {
     try {
+      // Один запрос с вложенными checklist_items вместо N+1
       final data = await _supabase.client
           .from('checklists')
-          .select()
+          .select('*, checklist_items(id, checklist_id, title, sort_order, tech_card_id, target_quantity, target_unit)')
           .eq('establishment_id', establishmentId)
           .order('updated_at', ascending: false);
 
       final list = <Checklist>[];
       for (final row in data) {
-        final c = Checklist.fromJson(row);
+        final map = row is Map<String, dynamic> ? Map<String, dynamic>.from(row) : row as Map<String, dynamic>;
+        final itemsRaw = map.remove('checklist_items');
+        final c = Checklist.fromJson(map);
         if (c.assignedDepartment != department) continue;
         if (applyAssignmentFilter && currentEmployeeId != null) {
           final ids = c.assignedEmployeeIds;
@@ -49,12 +52,15 @@ class ChecklistServiceSupabase {
             if (!assignedToCurrent) continue;
           }
         }
-        final itemsData = await _supabase.client
-            .from('checklist_items')
-            .select('id, checklist_id, title, sort_order, tech_card_id, target_quantity, target_unit')
-            .eq('checklist_id', c.id)
-            .order('sort_order');
-        final items = (itemsData as List).map((e) => ChecklistItem.fromJson(e)).toList();
+        final itemsList = itemsRaw is List ? itemsRaw : <dynamic>[];
+        final items = <ChecklistItem>[];
+        for (final e in itemsList) {
+          if (e is! Map) continue;
+          try {
+            items.add(ChecklistItem.fromJson(Map<String, dynamic>.from(e)));
+          } catch (_) {}
+        }
+        items.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
         list.add(c.copyWith(items: items));
       }
       if (kDebugMode) {

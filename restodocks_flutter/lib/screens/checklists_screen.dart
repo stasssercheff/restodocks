@@ -314,16 +314,22 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                                 ),
                               );
                               if (confirm == true && mounted) {
+                                final toDelete = c;
+                                setState(() => _list = _list.where((x) => x.id != toDelete.id).toList());
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text(loc.t('checklist_deleted') ?? 'Удалено')),
+                                );
                                 try {
-                                  await context.read<ChecklistServiceSupabase>().deleteChecklist(c.id);
-                                  if (mounted) _load();
+                                  await context.read<ChecklistServiceSupabase>().deleteChecklist(toDelete.id);
                                 } catch (e) {
                                   if (mounted) {
+                                    setState(() => _list = [..._list, toDelete]..sort((a, b) => b.updatedAt.compareTo(a.updatedAt)));
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))),
                                     );
                                   }
                                 }
+                                return;
                               }
                             }
                             if (mounted) _load();
