@@ -38,7 +38,7 @@ echo "   ✅ Код и конфигурация сохранены"
 # (Supabase закрыл прямой порт 5432 на db.*, используем pooler: aws-1-ap-south-1.pooler.supabase.com)
 echo ""
 echo "🗄️ ШАГ 2: Бэкап базы данных..."
-source backup_config.env 2>/dev/null || true
+[ -f backup_config.env ] && source backup_config.env 2>/dev/null || true
 
 # Строим pooler URL из пароля (пароль берём из SUPABASE_DB_URL)
 DB_PASSWORD=""
@@ -84,7 +84,7 @@ fi
 echo ""
 echo "💾 ШАГ 3: Бэкап файлового хранилища..."
 if command -v python3 >/dev/null 2>&1 && [ -f "storage_backup.py" ]; then
-    source backup_config.env 2>/dev/null || true
+    [ -f backup_config.env ] && source backup_config.env 2>/dev/null || true
     if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ] || [ "$SUPABASE_SERVICE_ROLE_KEY" = "YOUR_SERVICE_ROLE_KEY_HERE" ]; then
         echo "   ⚠️ SUPABASE_SERVICE_ROLE_KEY не задан в backup_config.env — storage пропущен"
         echo "      Получи ключ: Supabase Dashboard → Project Settings → API → service_role"
@@ -134,5 +134,5 @@ echo "   • Код, миграции, env, Vercel, Auth-чеклист"
 echo ""
 echo "💡 Восстановление: ./restore_all.sh $BACKUP_NAME  (или укажи путь к папке)"
 echo ""
-echo "🚀 ГОТОВО! Нажмите любую клавишу для выхода..."
-read -n 1 -s
+echo "🚀 ГОТОВО!"
+# read -n 1 -s  # отключено для неинтерактивного запуска

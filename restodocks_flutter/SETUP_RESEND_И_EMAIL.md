@@ -49,10 +49,15 @@ restodocks_flutter/supabase/migrations/20260220000001_password_reset_tokens.sql
 
 ## 5. Деплой Edge Functions
 
-**Автоматически:** при push в `main` с изменениями в `restodocks_flutter/supabase/functions/` GitHub Action деплоит все функции. Добавьте секрет: GitHub → Settings → Secrets → New repository secret, имя `SUPABASE_ACCESS_TOKEN`, значение — токен из https://supabase.com/dashboard/account/tokens
+**Автоматически:** при push в `main` с изменениями в `restodocks_flutter/supabase/functions/` или `restodocks_flutter/supabase/config.toml` GitHub Action деплоит все функции.
 
-**Вручную** (из корня репо):
+> **Важно:** Функция `send-email` настроена с `verify_jwt = false` в config.toml, т.к. сотрудники входят через legacy authenticate-employee без Supabase Auth JWT. Без этого отправка заказа по почте даёт 403 Forbidden. После изменения config.toml нужен повторный деплой.
+
+Добавьте секрет: GitHub → Settings → Secrets → New repository secret, имя `SUPABASE_ACCESS_TOKEN`, значение — токен из https://supabase.com/dashboard/account/tokens
+
+**Вручную** (из папки restodocks_flutter):
 ```bash
+cd restodocks_flutter
 npx supabase functions deploy --project-ref osglfptwbuqqmqunttha
 ```
 

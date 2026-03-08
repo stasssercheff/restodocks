@@ -39,6 +39,24 @@ class TechCardServiceSupabase {
     }
   }
 
+  static bool _isColumnNotFoundError(Object e) {
+    final msg = e.toString().toLowerCase();
+    return msg.contains('pgrst204') ||
+        (msg.contains('column') && (msg.contains('find') || msg.contains('found') || msg.contains('exist')));
+  }
+
+  /// Payload для tech_cards. Убираем id, section. [includeHallFields] = false при retry после PGRST204.
+  static Map<String, dynamic> _techCardPayloadForDb(TechCard techCard, {bool includeHallFields = true}) {
+    final data = Map<String, dynamic>.from(techCard.toJson());
+    data.remove('id');
+    data.remove('section');
+    if (!includeHallFields) {
+      data.remove('composition_for_hall');
+      data.remove('description_for_hall');
+    }
+    return data;
+  }
+
   /// Payload для вставки в tt_ingredients. Только колонки из схемы БД.
   /// Убираем: id, price_per_kg, cost_currency, gramsPerPiece — их нет в tt_ingredients.
   static Map<String, dynamic> _ingredientPayloadForDb(TTIngredient ingredient) {
@@ -72,10 +90,18 @@ class TechCardServiceSupabase {
       createdBy: createdBy,
     );
 
-    final techCardData = Map<String, dynamic>.from(techCard.toJson())
-      ..remove('id')
-      ..remove('section'); // старая колонка, заменена на sections
-    final response = await _supabase.insertData('tech_cards', techCardData);
+    Map<String, dynamic> techCardData = _techCardPayloadForDb(techCard);
+    dynamic response;
+    try {
+      response = await _supabase.insertData('tech_cards', techCardData);
+    } catch (e) {
+      if (_isColumnNotFoundError(e)) {
+        techCardData = _techCardPayloadForDb(techCard, includeHallFields: false);
+        response = await _supabase.insertData('tech_cards', techCardData);
+      } else {
+        rethrow;
+      }
+    }
     final createdTechCard = TechCard.fromJson(response);
 
     for (final ingredient in techCard.ingredients) {
@@ -185,32 +211,41 @@ class TechCardServiceSupabase {
     }
   }
 
-  /// Сохранение ТТК
+  /// Сохранение ТТК. При PGRST204 (колонка не найдена) повтор без composition_for_hall, description_for_hall.
   Future<void> saveTechCard(TechCard techCard) async {
+    Map<String, dynamic> payload = _techCardPayloadForDb(techCard);
     try {
-      final payload = Map<String, dynamic>.from(techCard.toJson());
-      payload.remove('section'); // старая колонка, заменена на sections
       await _supabase.updateData(
         'tech_cards',
         payload,
         'id',
         techCard.id,
       );
-
-      // Удаляем старые ингредиенты
-      await _supabase.client
-          .from('tt_ingredients')
-          .delete()
-          .eq('tech_card_id', techCard.id);
-
-      for (final ingredient in techCard.ingredients) {
-        final ingredientData = _ingredientPayloadForDb(ingredient);
-        ingredientData['tech_card_id'] = techCard.id;
-        await _supabase.insertData('tt_ingredients', ingredientData);
-      }
     } catch (e) {
-      print('Ошибка сохранения ТТК: $e');
-      rethrow;
+      if (_isColumnNotFoundError(e)) {
+        payload = _techCardPayloadForDb(techCard, includeHallFields: false);
+        await _supabase.updateData(
+          'tech_cards',
+          payload,
+          'id',
+          techCard.id,
+        );
+      } else {
+        print('Ошибка сохранения ТТК: $e');
+        rethrow;
+      }
+    }
+
+    // Удаляем старые ингредиенты
+    await _supabase.client
+        .from('tt_ingredients')
+        .delete()
+        .eq('tech_card_id', techCard.id);
+
+    for (final ingredient in techCard.ingredients) {
+      final ingredientData = _ingredientPayloadForDb(ingredient);
+      ingredientData['tech_card_id'] = techCard.id;
+      await _supabase.insertData('tt_ingredients', ingredientData);
     }
   }
 

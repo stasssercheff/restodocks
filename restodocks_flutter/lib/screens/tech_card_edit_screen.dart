@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../models/models.dart';
+import '../services/app_toast_service.dart';
 import '../services/services.dart';
 import '../utils/number_format_utils.dart';
 import '../widgets/app_bar_home_button.dart';
@@ -866,7 +867,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           } catch (_) {}
         });
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('tech_card_created'))));
+          AppToastService.show(loc.t('tech_card_created'));
           context.go('/tech-cards?refresh=1');
         }
       } else {
@@ -928,7 +929,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           } catch (_) {}
         });
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.read<LocalizationService>().t('save') + ' ✓')));
+          AppToastService.show(context.read<LocalizationService>().t('save') + ' ✓');
           context.go('/tech-cards?refresh=1');
         }
       }
@@ -953,7 +954,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     try {
       await context.read<TechCardServiceSupabase>().deleteTechCard(widget.techCardId);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('tech_card_deleted'))));
+        AppToastService.show(loc.t('tech_card_deleted'));
         context.go('/tech-cards');
       }
     } catch (e) {
@@ -1848,7 +1849,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                   TextField(
                     controller: _nameController,
                     readOnly: !effectiveCanEdit,
-                    style: TextStyle(fontSize: isMobile ? 16 : 14),
+                    style: TextStyle(fontSize: isMobile ? 12 : 14),
                     decoration: InputDecoration(
                       labelText: loc.t('ttk_name'),
                       isDense: true,
@@ -1910,12 +1911,12 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         SizedBox(
-                          width: 140,
+                          width: 320,
                           height: 56,
                           child: TextField(
                             controller: _nameController,
                             readOnly: !effectiveCanEdit,
-                            style: TextStyle(fontSize: isMobile ? 16 : 14),
+                            style: TextStyle(fontSize: 14),
                             decoration: InputDecoration(
                               labelText: loc.t('ttk_name'),
                               isDense: true,

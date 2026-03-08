@@ -9,15 +9,19 @@ CREATE INDEX IF NOT EXISTS idx_establishments_parent ON establishments(parent_es
 
 COMMENT ON COLUMN establishments.parent_establishment_id IS 'NULL = основное заведение, иначе = филиал указанного заведения';
 
--- Ограничение: родитель должен быть основным (не филиалом)
-ALTER TABLE establishments DROP CONSTRAINT IF EXISTS chk_parent_is_main;
-ALTER TABLE establishments ADD CONSTRAINT chk_parent_is_main CHECK (
-  parent_establishment_id IS NULL
-  OR EXISTS (
-    SELECT 1 FROM establishments p
-    WHERE p.id = parent_establishment_id AND p.parent_establishment_id IS NULL
-  )
-);
+-- Ограничение: родитель должен быть основным (не филиалом) — через триггер (CHECK не поддерживает подзапросы)
+CREATE OR REPLACE FUNCTION check_parent_is_main()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.parent_establishment_id IS NULL THEN RETURN NEW; END IF;
+  IF NOT EXISTS (SELECT 1 FROM establishments p WHERE p.id = NEW.parent_establishment_id AND p.parent_establishment_id IS NULL) THEN
+    RAISE EXCEPTION 'parent_establishment_id must reference a main establishment (not a branch)';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS trg_check_parent_is_main ON establishments;
+CREATE TRIGGER trg_check_parent_is_main BEFORE INSERT OR UPDATE ON establishments FOR EACH ROW EXECUTE FUNCTION check_parent_is_main();
 
 -- === 2. RPC: ID заведения для данных (филиал → родитель, основное → само) ===
 CREATE OR REPLACE FUNCTION public.get_data_establishment_id(p_establishment_id uuid)
@@ -105,7 +109,7 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.add_establishment_for_owner TO authenticated;
+GRANT EXECUTE ON FUNCTION public.add_establishment_for_owner(text, text, text, text, text, uuid) TO authenticated;
 
 -- === 4. RPC: филиалы данного заведения (для шефа — фильтр по филиалам) ===
 CREATE OR REPLACE FUNCTION public.get_branches_for_establishment(p_establishment_id uuid)

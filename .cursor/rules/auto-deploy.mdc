@@ -26,3 +26,8 @@ alwaysApply: true
 - Prod: Production branch = **main**, Preview = **None**
 - Beta: Production branch = **staging**, Preview = **None**
 - Иначе оба сайта будут обновляться вместе — см. docs/DEPLOY_RULES.md
+
+## Админка (не автодеплой)
+
+- Деплой админки — **только вручную**: GitHub → Actions → Deploy Admin to Cloudflare Workers → Run workflow
+- Автодеплой отключён, чтобы не тратить лимиты

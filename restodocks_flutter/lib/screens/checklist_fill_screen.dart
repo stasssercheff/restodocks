@@ -462,7 +462,7 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
                 children: [
                   if (it.techCardId != null)
                     InkWell(
-                      onTap: () => context.push('/tech-cards/${it.techCardId}'),
+                      onTap: () => context.push('/tech-cards/${it.techCardId}?view=1'),
                       child: Row(
                         children: [
                           Icon(Icons.link, size: 16, color: Theme.of(context).colorScheme.primary),

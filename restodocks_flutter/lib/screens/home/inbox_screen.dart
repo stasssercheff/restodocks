@@ -31,7 +31,7 @@ enum _InboxTab { checklist, order, inventory, iikoInventory, messages }
 enum _InboxDeptTab { kitchen, bar, hall }
 
 /// Типы документов для 2-го яруса вкладок (собственник)
-enum _InboxTypeTab { order, inventory, iikoInventory, messages }
+enum _InboxTypeTab { checklist, order, inventory, iikoInventory, messages }
 
 class _InboxScreenState extends State<InboxScreen> {
   late InboxService _inboxService;
@@ -61,7 +61,7 @@ class _InboxScreenState extends State<InboxScreen> {
     if (employee.hasRole('owner')) {
       setState(() {
         _selectedDeptTab = _InboxDeptTab.kitchen;
-        _selectedTypeTab = _InboxTypeTab.order;
+        _selectedTypeTab = _InboxTypeTab.checklist;
       });
     } else {
       if (tabs.isNotEmpty) {
@@ -128,18 +128,26 @@ class _InboxScreenState extends State<InboxScreen> {
         _InboxDeptTab.hall => 'hall',
       };
       final docsByDept = _documents.where((d) => d.department == dept).toList();
+      if (_selectedTypeTab == _InboxTypeTab.checklist) {
+        return docsByDept.where((d) =>
+            d.type == DocumentType.checklistSubmission ||
+            d.type == DocumentType.checklistMissedDeadline).toList();
+      }
       final docType = switch (_selectedTypeTab!) {
         _InboxTypeTab.order => DocumentType.productOrder,
         _InboxTypeTab.inventory => DocumentType.inventory,
         _InboxTypeTab.iikoInventory => DocumentType.iikoInventory,
         _InboxTypeTab.messages => DocumentType.checklistMissedDeadline,
+        _InboxTypeTab.checklist => DocumentType.checklistSubmission, // unreachable, handled above
       };
       return docsByDept.where((d) => d.type == docType).toList();
     }
     // Остальные: по типу документа
     switch (_selectedTab) {
       case _InboxTab.checklist:
-        return _documents.where((d) => d.type == DocumentType.checklistSubmission).toList();
+        return _documents.where((d) =>
+            d.type == DocumentType.checklistSubmission ||
+            d.type == DocumentType.checklistMissedDeadline).toList();
       case _InboxTab.order:
         return _documents.where((d) => d.type == DocumentType.productOrder).toList();
       case _InboxTab.inventory:
@@ -198,7 +206,9 @@ class _InboxScreenState extends State<InboxScreen> {
                             ? _buildMessagesContent(loc)
                             : _filteredDocuments.isEmpty
                                 ? _buildEmptyState(loc)
-                                : _buildDocumentsList()),
+                                : _isChecklistsTab(isOwner)
+                                    ? _buildChecklistsGroupedList(loc)
+                                    : _buildDocumentsList()),
           ),
         ],
       ),
@@ -270,6 +280,8 @@ class _InboxScreenState extends State<InboxScreen> {
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
+            _buildTypeChip(_InboxTypeTab.checklist, loc.t('inbox_tab_checklist') ?? 'Чеклисты', loc),
+            const SizedBox(width: 8),
             _buildTypeChip(_InboxTypeTab.order, loc.t('inbox_tab_order') ?? 'Заказ продуктов', loc),
             const SizedBox(width: 8),
             _buildTypeChip(_InboxTypeTab.inventory, loc.t('inbox_tab_inventory') ?? 'Инвентаризация', loc),
@@ -381,6 +393,101 @@ class _InboxScreenState extends State<InboxScreen> {
   bool _isMessagesTab(bool isOwner) {
     if (isOwner) return _selectedTypeTab == _InboxTypeTab.messages;
     return _selectedTab == _InboxTab.messages;
+  }
+
+  bool _isChecklistsTab(bool isOwner) {
+    if (isOwner) return _selectedTypeTab == _InboxTypeTab.checklist;
+    return _selectedTab == _InboxTab.checklist;
+  }
+
+  /// Чеклисты с группировкой: Просроченные, затем по цеху → дате → сотруднику
+  Widget _buildChecklistsGroupedList(LocalizationService loc) {
+    final docs = _filteredDocuments;
+    final overdue = docs.where((d) => d.type == DocumentType.checklistMissedDeadline).toList();
+    final submitted = docs.where((d) => d.type == DocumentType.checklistSubmission).toList();
+
+    final lang = loc.currentLanguageCode;
+    final noSection = loc.t('checklist_no_section') ?? 'Без цеха';
+    final overdueLabel = loc.t('checklist_overdue') ?? 'Просроченные';
+    final fmtDate = (DateTime d) => '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}';
+
+    // Группировка submitted: section -> date -> employee
+    final grouped = <String, Map<String, Map<String, List<InboxDocument>>>>{};
+    for (final doc in submitted) {
+      final sectionCode = doc.metadata?['submission']?['section']?.toString().trim() ?? '';
+      final sectionLabel = sectionCode.isEmpty
+          ? noSection
+          : (KitchenSection.fromCode(sectionCode)?.getLocalizedName(lang) ?? doc.getDepartmentName(loc));
+      final dateKey = fmtDate(doc.createdAt);
+      final empName = doc.employeeName.isNotEmpty ? doc.employeeName : (loc.t('checklist_all_employees') ?? 'Всем');
+
+      grouped.putIfAbsent(sectionLabel, () => {});
+      grouped[sectionLabel]!.putIfAbsent(dateKey, () => {});
+      grouped[sectionLabel]![dateKey]!.putIfAbsent(empName, () => []);
+      grouped[sectionLabel]![dateKey]![empName]!.add(doc);
+    }
+
+    final sectionOrder = grouped.keys.toList()
+      ..sort((a, b) {
+        if (a == noSection) return 1;
+        if (b == noSection) return -1;
+        return a.compareTo(b);
+      });
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        if (overdue.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              overdueLabel,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.error,
+              ),
+            ),
+          ),
+          ...overdue.map((doc) => _DocumentTile(document: doc, onDownload: _downloadDocument)),
+          const SizedBox(height: 24),
+        ],
+        ...sectionOrder.expand((sec) {
+          final dates = grouped[sec]!.keys.toList()..sort((a, b) => b.compareTo(a));
+          return [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                sec,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+            ),
+            ...dates.expand((dateKey) {
+              final emps = grouped[sec]![dateKey]!.keys.toList();
+              return emps.expand((emp) {
+                final list = grouped[sec]![dateKey]![emp]!;
+                return [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4, bottom: 4),
+                    child: Text(
+                      '$dateKey • $emp',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w500,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  ...list.map((doc) => _DocumentTile(document: doc, onDownload: _downloadDocument)),
+                ];
+              });
+            }),
+            const SizedBox(height: 16),
+          ];
+        }),
+      ],
+    );
   }
 
   Widget _buildMessagesContent(LocalizationService loc) {

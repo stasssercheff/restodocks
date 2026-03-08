@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/models.dart';
+import '../services/app_toast_service.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
 import '../widgets/order_export_sheet.dart';
@@ -31,13 +32,14 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
       unitId == 'pkg' ? (lang == 'ru' ? 'упак.' : 'pkg') : CulinaryUnits.displayName(unitId, lang);
 
   static List<String> _allowedUnitsForProduct(Product? p) {
-    const base = ['g', 'kg', 'ml', 'l'];
+    const base = [
+      'g', 'kg', 'ml', 'l',
+      'pcs', 'pack', 'can', 'box', 'bunch', 'slice', 'clove',
+      'tbsp', 'tsp', 'cup', 'oz', 'lb',
+    ];
     final options = List<String>.from(base);
-    if (p?.gramsPerPiece != null && p!.gramsPerPiece! > 0) {
-      options.addAll(['pcs', 'шт']);
-    }
     if (p?.packageWeightGrams != null && p!.packageWeightGrams! > 0) {
-      options.add('pkg');
+      if (!options.contains('pkg')) options.add('pkg');
     }
     return options;
   }
@@ -171,7 +173,7 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
         );
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${loc.t('order_list_save_with_quantities')} ✓')));
+      AppToastService.show('${loc.t('order_list_save_with_quantities')} ✓');
       _commentCtrl.clear();
       // pop вместо go, чтобы разрешить await в OrderListsScreen и сразу показать новый заказ
       if (context.canPop()) context.pop();
