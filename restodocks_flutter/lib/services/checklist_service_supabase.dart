@@ -263,7 +263,41 @@ class ChecklistServiceSupabase {
       return;
     } catch (e) {
       print('ChecklistService: RPC save_checklist failed: $e');
-      rethrow;
+      // Fallback: прямой UPDATE + пункты (для legacy/anon когда RPC недоступен)
+      try {
+        final fullUpd = <String, dynamic>{
+          'name': checklist.name,
+          'updated_at': now,
+          'action_config': checklist.actionConfig.toJson(),
+          'assigned_department': checklist.assignedDepartment,
+          'assigned_section': checklist.assignedSection,
+          'assigned_employee_id': empId,
+          'assigned_employee_ids': empIds,
+          'deadline_at': checklist.deadlineAt?.toUtc().toIso8601String(),
+          'scheduled_for_at': checklist.scheduledForAt?.toUtc().toIso8601String(),
+          'additional_name': checklist.additionalName,
+          'type': checklist.type?.code,
+        };
+        await _updateChecklistWithRetry(checklist.id, fullUpd);
+        await _supabase.client.from('checklist_items').delete().eq('checklist_id', checklist.id);
+        for (var i = 0; i < checklist.items.length; i++) {
+          final item = checklist.items[i];
+          final itemData = <String, dynamic>{
+            'checklist_id': checklist.id,
+            'title': item.title,
+            'sort_order': i,
+          };
+          if (item.techCardId != null) itemData['tech_card_id'] = item.techCardId;
+          if (item.targetQuantity != null) itemData['target_quantity'] = item.targetQuantity;
+          if (item.targetUnit != null) itemData['target_unit'] = item.targetUnit;
+          await _insertChecklistItem(itemData);
+        }
+        if (kDebugMode) print('ChecklistService: fallback save OK');
+        return;
+      } catch (fallbackErr) {
+        print('ChecklistService: fallback save also failed: $fallbackErr');
+        rethrow;
+      }
     }
   }
 
