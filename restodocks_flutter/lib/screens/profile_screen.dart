@@ -424,7 +424,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ListTile(
           leading: const Icon(Icons.date_range),
           title: Text(localization.t('salary_for_period') ?? 'Зарплата за период'),
-          subtitle: Text(localization.t('salary_period_hint') ?? 'За какой период считать часы и сумму'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => _showSalaryPeriodPicker(context, employee, establishment, localization),
         ),
