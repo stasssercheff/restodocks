@@ -533,17 +533,9 @@ class AccountManagerSupabase extends ChangeNotifier {
     }
   }
 
-  /// URL для редиректа после подтверждения email. Web: Uri.base.origin; мобильные: production URL.
-  static String? _getEmailRedirectUrl() {
-    if (kIsWeb) {
-      try {
-        final u = Uri.base;
-        if (u.host.isNotEmpty && u.scheme.startsWith('http')) {
-          return u.origin;
-        }
-      } catch (_) {}
-    }
-    return 'https://www.restodocks.com';
+  /// URL для редиректа после подтверждения. Всегда production — Supabase требует точного совпадения с Redirect URLs.
+  static String _getEmailRedirectUrl() {
+    return 'https://restodocks.com';
   }
 
   /// Регистрация владельца в Supabase Auth (employees.id = auth.users.id — создаём auth первым)
