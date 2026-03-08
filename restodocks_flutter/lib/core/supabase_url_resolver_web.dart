@@ -1,20 +1,13 @@
 const _defaultSupabaseUrl = 'https://osglfptwbuqqmqunttha.supabase.co';
 
-/// URL Supabase. На restodocks.com и restodocks.pages.dev — через proxy (/supabase-auth),
-/// запросы same-origin, как работало на Vercel. На localhost — прямой envUrl.
+/// URL Supabase. Прямой URL — proxy /supabase-auth давал 405 на Cloudflare Pages.
+/// Домены restodocks.com, restodocks.pages.dev должны быть в Supabase Auth → Redirect URLs.
 String resolveSupabaseUrl(String envUrl) {
-  final base = Uri.base;
-  if (base.host.contains('restodocks.com') || base.host.contains('restodocks.pages.dev')) {
-    return '${base.origin}/supabase-auth';
-  }
-  return envUrl;
+  final url = envUrl.trim();
+  return url.isNotEmpty ? url : _defaultSupabaseUrl;
 }
 
-/// URL для Edge Functions (EmailService, AccountManager и т.д.) — тот же, что у Supabase client.
+/// URL для Edge Functions — прямой Supabase, тот же что у client.
 String getSupabaseBaseUrl() {
-  final base = Uri.base;
-  if (base.host.contains('restodocks.com') || base.host.contains('restodocks.pages.dev')) {
-    return '${base.origin}/supabase-auth';
-  }
   return _defaultSupabaseUrl;
 }

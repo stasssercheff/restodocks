@@ -40,9 +40,6 @@ fi
 
 echo "/*    /index.html   200" > build/web/_redirects
 
-# Pages Functions: supabase-auth proxy (как на Vercel — запросы same-origin, без CORS)
-[ -d "../functions" ] && cp -r ../functions build/web/ || true
-
 # Pages Functions: только /supabase-auth/* — остальное статика
 cat > build/web/_routes.json << 'EOF'
 {"version":1,"include":["/supabase-auth/*"],"exclude":[]}
