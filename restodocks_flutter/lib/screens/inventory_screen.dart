@@ -81,8 +81,8 @@ class _InventoryRow {
   /// Продукт заведён по упаковке: есть вес упаковки.
   bool get hasPackage => product?.packageWeightGrams != null && product!.packageWeightGrams! > 0;
 
-  /// Текущая единица — упаковка.
-  bool get isCountedByPackage => unitOverride == 'pkg';
+  /// Текущая единица — упаковка или бутылка (пересчёт: кол-во × грамм/мл в упаковке).
+  bool get isCountedByPackage => unitOverride == 'pkg' || unitOverride == 'btl';
 
   /// Вес одной упаковки в граммах.
   double get packageWeightGrams => product?.packageWeightGrams ?? 1.0;
@@ -93,6 +93,7 @@ class _InventoryRow {
       final u = pfUnit ?? _pfUnitPcs;
       return u == _pfUnitGrams ? (lang == 'ru' ? 'гр' : 'g') : (lang == 'ru' ? 'порц.' : 'pcs');
     }
+    if (unitOverride == 'btl') return lang == 'ru' ? 'бутылка' : 'bottle';
     if (isCountedByPackage) return lang == 'ru' ? 'упак.' : 'pkg';
     return CulinaryUnits.displayName(unit.toLowerCase(), lang);
   }
@@ -102,7 +103,8 @@ class _InventoryRow {
       !isPf && !isCountedByPackage && (unit.toLowerCase() == 'kg' || unit == 'кг');
 
   String unitDisplayForBlank(String lang) {
-    if (isCountedByPackage) return lang == 'ru' ? 'упак.' : 'pkg';
+    if (unitOverride == 'btl') return lang == 'ru' ? 'мл' : 'ml';
+    if (isCountedByPackage) return lang == 'ru' ? 'г' : 'g';
     return isWeightInKg ? (lang == 'ru' ? 'гр' : 'g') : unitDisplay(lang);
   }
 
@@ -1088,16 +1090,20 @@ class _InventoryScreenState extends State<InventoryScreen>
         }
       }
 
-      // ЛИСТ 2: Все продукты включая данные из ПФ
+      // ЛИСТ 2 (Итого): только продукты (без ПФ). ПФ развёрнуты в брутто по ТТК.
       final sheet2 = excel['Все продукты с ПФ'];
       sheet2.appendRow(headerCells); // Тот же заголовок
 
-      // Собираем все продукты (из основной номенклатуры + из перерасчета ПФ)
+      // Собираем только продукты (без ПФ). ПФ учитываются через aggregated (брутто по ТТК).
       final allProducts = <String, Map<String, dynamic>>{};
 
-      // Добавляем продукты из основной таблицы
+      // Добавляем только продукты из номенклатуры (не ПФ, не свободные строки)
       for (var i = 0; i < rows.length; i++) {
         final r = rows[i] as Map<String, dynamic>;
+        final productId = r['productId'] as String? ?? '';
+        // Пропускаем только ПФ (pf_xxx) — они развёрнуты в брутто через aggregated
+        if (productId.startsWith('pf_')) continue;
+
         final name = r['productName'] as String? ?? '';
         final unit = r['unit'] as String? ?? '';
         final total = r['total'] as num? ?? 0;
@@ -1124,7 +1130,7 @@ class _InventoryScreenState extends State<InventoryScreen>
         }
       }
 
-      // Добавляем продукты из перерасчета ПФ (в брутто граммах)
+      // Добавляем продукты из перерасчета ПФ (развёрнуты в брутто по ТТК)
       for (final p in aggregated) {
         final name = (p['productName'] as String? ?? '').trim();
         final grossGrams = (p['grossGrams'] as num?)?.toDouble() ?? 0.0;
@@ -1817,7 +1823,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                         ),
                       )
                     : _ProductUnitDropdown(
-                        value: row.isCountedByPackage ? 'pkg' : row.unit,
+                        value: row.isCountedByPackage ? (row.unitOverride ?? 'pkg') : row.unit,
                         lang: loc.currentLanguageCode,
                         product: row.product,
                         onChanged: (v) => _setProductUnit(actualIndex, v),
@@ -2076,7 +2082,7 @@ class _InventoryScreenState extends State<InventoryScreen>
       final map = <String, dynamic>{
         'productId': id,
         'productName': r.productName(lang),
-        'unit': r.isCountedByPackage ? (lang == 'ru' ? 'г' : 'g') : r.unitDisplayForBlank(lang),
+        'unit': r.isCountedByPackage ? (r.unitOverride == 'btl' ? (lang == 'ru' ? 'мл' : 'ml') : (lang == 'ru' ? 'г' : 'g')) : r.unitDisplayForBlank(lang),
         'quantities': r.isCountedByPackage
             ? r.quantities.map((q) => q * r.packageWeightGrams).toList()
             : r.isWeightInKg
@@ -2087,7 +2093,7 @@ class _InventoryScreenState extends State<InventoryScreen>
       if (r.isCountedByPackage) {
         map['packageCount'] = r.total;
         map['packageWeightGrams'] = r.packageWeightGrams;
-        map['unitRaw'] = lang == 'ru' ? 'упак.' : 'pkg';
+        map['unitRaw'] = r.unitOverride == 'btl' ? (lang == 'ru' ? 'бутылка' : 'bottle') : (lang == 'ru' ? 'упак.' : 'pkg');
       }
       if (r.isPf) map['pfUnit'] = r.pfUnit ?? _pfUnitPcs;
       // Цена: из карточки продукта × итого с учётом единиц (100 руб/кг → 10 г = 1 руб)
@@ -2273,7 +2279,10 @@ class _ProductUnitDropdown extends StatelessWidget {
       options.addAll(['pcs', 'шт']);
     }
     final hasPkg = p?.packageWeightGrams != null && p!.packageWeightGrams! > 0;
-    if (hasPkg) options.add('pkg');
+    if (hasPkg) {
+      options.add('pkg');
+      options.add('btl');
+    }
     return options;
   }
 
@@ -2293,7 +2302,9 @@ class _ProductUnitDropdown extends StatelessWidget {
           child: Text(
             u == 'pkg'
                 ? (lang == 'ru' ? 'упак.' : 'pkg')
-                : CulinaryUnits.displayName(u, lang),
+                : u == 'btl'
+                    ? (lang == 'ru' ? 'бутылка' : 'bottle')
+                    : CulinaryUnits.displayName(u, lang),
             style: theme.textTheme.bodySmall,
             overflow: TextOverflow.ellipsis,
           ),
