@@ -734,7 +734,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     final costSym = est?.currencySymbol ?? Establishment.currencySymbolFor(est?.defaultCurrency ?? 'VND');
     final groups = _groupByCategory(techCards);
     final costLabel = showCost
-        ? (isDishesTab ? loc.t('cost_price') : '$costSym/${loc.t('kg')}')
+        ? (isDishesTab ? '$costSym/прц' : '$costSym/${loc.t('kg')}')
         : '—';
 
     return RefreshIndicator(
