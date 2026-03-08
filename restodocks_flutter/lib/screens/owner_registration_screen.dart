@@ -82,7 +82,7 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
 
       // Отправка письма владельцу
       final emailService = EmailService();
-      emailService.sendRegistrationEmail(
+      final emailResult = await emailService.sendRegistrationEmail(
         isOwner: true,
         to: email,
         companyName: estab.name,
@@ -92,16 +92,33 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
 
       if (!mounted) return;
       if (signUpResult.hasSession) {
-        // Редко: session сразу (confirm отключён) — создаём employee
         final result = await accSupabase.completePendingOwnerRegistration();
         if (result != null) {
           await accountManager.login(result.employee, result.establishment);
           context.go('/home');
+          if (!emailResult.ok && mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Регистрация прошла. Письмо не отправилось: ${emailResult.error ?? "ошибка"}'),
+                backgroundColor: Colors.orange,
+                duration: const Duration(seconds: 6),
+              ),
+            );
+          }
         } else {
           context.go('/confirm-email?email=${Uri.encodeComponent(email)}');
         }
       } else {
         context.go('/confirm-email?email=${Uri.encodeComponent(email)}');
+        if (!emailResult.ok && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Регистрация прошла. Письмо не отправилось: ${emailResult.error ?? "ошибка"}'),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 6),
+            ),
+          );
+        }
       }
     } catch (e) {
       if (!mounted) return;

@@ -13,6 +13,9 @@ CREATE TABLE IF NOT EXISTS public.pending_owner_registrations (
 
 ALTER TABLE pending_owner_registrations ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "anon_insert_pending_owner" ON pending_owner_registrations;
+DROP POLICY IF EXISTS "authenticated_select_own_pending" ON pending_owner_registrations;
+
 -- anon может вставить (после signUp, до confirm)
 CREATE POLICY "anon_insert_pending_owner" ON pending_owner_registrations
   FOR INSERT TO anon WITH CHECK (true);
