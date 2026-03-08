@@ -261,7 +261,7 @@ class ChecklistServiceSupabase {
       'items': itemsPayload,
     };
 
-    // Edge Function с service role — обходит RLS и права RPC (работает при legacy-логине)
+    // 1. Пробуем Edge Function (service role)
     final dio = Dio(BaseOptions(
       headers: {
         'apikey': _supabaseAnonKey,
@@ -271,22 +271,60 @@ class ChecklistServiceSupabase {
       validateStatus: (_) => true,
     ));
     try {
-      if (kDebugMode) print('ChecklistService: calling save-checklist Edge Function for ${checklist.id}');
       final resp = await dio.post('$_supabaseUrl/functions/v1/save-checklist', data: body);
       if (resp.statusCode == 200) {
         final data = resp.data is Map ? Map<String, dynamic>.from(resp.data as Map) : null;
-        if (data?['ok'] == true) {
-          if (kDebugMode) print('ChecklistService: save-checklist OK');
-          return;
-        }
+        if (data?['ok'] == true) return;
       }
-      final err = resp.data is Map ? (resp.data as Map)['error'] : resp.data;
-      throw Exception('save-checklist: ${resp.statusCode} — $err');
-    } on DioException catch (e) {
-      final status = e.response?.statusCode ?? 0;
-      final errData = e.response?.data;
-      final errMsg = errData is Map ? (errData as Map)['error'] : errData;
-      throw Exception('save-checklist failed: $status — $errMsg');
+    } catch (_) { /* пробуем RPC */ }
+
+    // 2. Fallback: RPC save_checklist (anon grant)
+    try {
+      await _supabase.client.rpc('save_checklist', params: {
+        'p_checklist_id': checklist.id,
+        'p_name': checklist.name,
+        'p_updated_at': now,
+        'p_action_config': checklist.actionConfig.toJson(),
+        'p_assigned_department': checklist.assignedDepartment,
+        'p_assigned_section': checklist.assignedSection,
+        'p_assigned_employee_id': empId,
+        'p_assigned_employee_ids': empIds,
+        'p_deadline_at': checklist.deadlineAt?.toUtc().toIso8601String(),
+        'p_scheduled_for_at': checklist.scheduledForAt?.toUtc().toIso8601String(),
+        'p_additional_name': checklist.additionalName,
+        'p_type': checklist.type?.code,
+        'p_items': itemsPayload,
+      });
+      return;
+    } catch (_) { /* пробуем прямой UPDATE */ }
+
+    // 3. Fallback: прямой UPDATE + INSERT (anon policies)
+    final fullUpd = <String, dynamic>{
+      'name': checklist.name,
+      'updated_at': now,
+      'action_config': checklist.actionConfig.toJson(),
+      'assigned_department': checklist.assignedDepartment,
+      'assigned_section': checklist.assignedSection,
+      'assigned_employee_id': empId,
+      'assigned_employee_ids': empIds,
+      'deadline_at': checklist.deadlineAt?.toUtc().toIso8601String(),
+      'scheduled_for_at': checklist.scheduledForAt?.toUtc().toIso8601String(),
+      'additional_name': checklist.additionalName,
+      'type': checklist.type?.code,
+    };
+    await _updateChecklistWithRetry(checklist.id, fullUpd);
+    await _supabase.client.from('checklist_items').delete().eq('checklist_id', checklist.id);
+    for (var i = 0; i < checklist.items.length; i++) {
+      final item = checklist.items[i];
+      final itemData = <String, dynamic>{
+        'checklist_id': checklist.id,
+        'title': item.title,
+        'sort_order': i,
+      };
+      if (item.techCardId != null) itemData['tech_card_id'] = item.techCardId;
+      if (item.targetQuantity != null) itemData['target_quantity'] = item.targetQuantity;
+      if (item.targetUnit != null) itemData['target_unit'] = item.targetUnit;
+      await _insertChecklistItem(itemData);
     }
   }
 
