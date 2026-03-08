@@ -27,14 +27,14 @@ class TranslationManager {
     required String sourceLanguage,
     String? userId,
   }) async {
-    debugPrint('TranslationManager: Processing save for $entityType:$entityId');
+    if (kDebugMode) debugPrint('TranslationManager: Processing save for $entityType:$entityId');
 
     // Определяем язык оригинала если не указан
     final detectedLanguage = sourceLanguage.isNotEmpty
         ? sourceLanguage
         : await _detectLanguage(textFields.values.join(' '));
 
-    debugPrint('TranslationManager: Detected language: $detectedLanguage');
+    if (kDebugMode) debugPrint('TranslationManager: Detected language: $detectedLanguage');
 
     // Переводим на все поддерживаемые языки
     for (final fieldName in textFields.keys) {
@@ -61,7 +61,7 @@ class TranslationManager {
       }
     }
 
-    debugPrint('TranslationManager: Translation processing completed');
+    if (kDebugMode) debugPrint('TranslationManager: Translation processing completed');
   }
 
   /// Получить локализованный текст для сущности

@@ -104,6 +104,9 @@ class ChecklistServiceSupabase {
     ChecklistActionConfig? actionConfig,
     String assignedDepartment = 'kitchen',
   }) async {
+    if (name.trim().isEmpty) {
+      throw ArgumentError('createChecklist: name не может быть пустым. Сначала заполните форму и нажмите Сохранить.');
+    }
     final now = DateTime.now();
     final data = <String, dynamic>{
       'establishment_id': establishmentId,

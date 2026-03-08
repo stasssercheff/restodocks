@@ -14,11 +14,13 @@ import '../widgets/time_picker_field.dart';
 
 /// Редактирование чеклиста-шаблона. Сохранить, создать по аналогии, удалить.
 class ChecklistEditScreen extends StatefulWidget {
-  const ChecklistEditScreen({super.key, required this.checklistId, this.viewOnly = false});
+  const ChecklistEditScreen({super.key, required this.checklistId, this.viewOnly = false, this.initialDepartment = 'kitchen'});
 
   final String checklistId;
   /// Режим только просмотра (например по ссылке из входящих «чеклист не выполнен»).
   final bool viewOnly;
+  /// Для checklistId='new' — подразделение при создании.
+  final String initialDepartment;
 
   @override
   State<ChecklistEditScreen> createState() => _ChecklistEditScreenState();
@@ -54,6 +56,8 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
   /// Тумблер «указать время» для «На когда» (по умолчанию выключен — только дата).
   bool _scheduledForWithTime = false;
 
+  bool get _isNew => widget.checklistId == 'new';
+
   Future<void> _load() async {
     setState(() {
       _loading = true;
@@ -62,9 +66,25 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
     try {
       final acc = context.read<AccountManagerSupabase>();
       final est = acc.establishment;
+      final emp = acc.currentEmployee;
       final svc = context.read<ChecklistServiceSupabase>();
       final techSvc = context.read<TechCardServiceSupabase>();
-      final c = await svc.getChecklistById(widget.checklistId);
+      Checklist? c;
+      if (!_isNew) {
+        c = await svc.getChecklistById(widget.checklistId);
+      } else if (est != null && emp != null) {
+        final now = DateTime.now();
+        c = Checklist(
+          id: 'new',
+          establishmentId: est.id,
+          createdBy: emp.id,
+          name: '',
+          items: [],
+          createdAt: now,
+          updatedAt: now,
+          assignedDepartment: widget.initialDepartment,
+        );
+      }
       List<TechCard> techs = [];
       List<Employee> emps = [];
       if (est != null) {
@@ -73,7 +93,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
       }
       if (!mounted) return;
       // Персонал и ТТК — только по подразделению чеклиста
-      final dept = c?.assignedDepartment ?? 'kitchen';
+      final dept = c?.assignedDepartment ?? widget.initialDepartment;
       final filteredEmps = emps.where((e) {
         if (dept == 'hall') return e.department == 'hall' || e.department == 'dining_room';
         return e.department == dept;
@@ -283,34 +303,66 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
     final scheduledForVal = _scheduledForEnabled && _scheduledFor != null
         ? (_scheduledForWithTime ? _scheduledFor : DateTime.utc(_scheduledFor!.year, _scheduledFor!.month, _scheduledFor!.day))
         : null;
-    final updated = c.copyWith(
-      name: name,
-      additionalName: null,
-      type: _type,
-      actionConfig: actionConfig,
-      assignedSection: c.assignedSection,
-      assignedEmployeeIds: empIds,
-      assignedEmployeeId: empIds?.length == 1 ? empIds!.first : null,
-      deadlineAt: deadlineVal,
-      scheduledForAt: scheduledForVal,
-      items: _items
-          .map((e) => ChecklistItem(
-                id: e.id,
-                checklistId: c.id,
-                title: e.title,
-                sortOrder: e.sortOrder,
-                techCardId: e.techCardId,
-                targetQuantity: e.targetQuantity,
-                targetUnit: e.targetUnit,
-              ))
-          .toList(),
-    );
+    final itemsForSave = _items
+        .map((e) => ChecklistItem.template(
+              title: e.title,
+              sortOrder: e.sortOrder,
+              techCardId: e.techCardId,
+              targetQuantity: e.targetQuantity,
+              targetUnit: e.targetUnit,
+            ))
+        .toList();
     try {
       final svc = context.read<ChecklistServiceSupabase>();
       final translationManager = context.read<TranslationManager>();
       final loc = context.read<LocalizationService>();
       final emp = context.read<AccountManagerSupabase>().currentEmployee;
-      await svc.saveChecklist(updated);
+      final String savedId;
+      final String dept;
+      if (_isNew) {
+        final created = await svc.createChecklist(
+          establishmentId: c.establishmentId,
+          createdBy: c.createdBy,
+          name: name,
+          items: itemsForSave,
+          assignedSection: c.assignedSection,
+          assignedEmployeeId: empIds?.length == 1 ? empIds!.first : null,
+          assignedEmployeeIds: empIds,
+          deadlineAt: deadlineVal,
+          scheduledForAt: scheduledForVal,
+          type: _type,
+          actionConfig: actionConfig,
+          assignedDepartment: c.assignedDepartment,
+        );
+        savedId = created.id;
+        dept = created.assignedDepartment;
+      } else {
+        final updated = c.copyWith(
+          name: name,
+          additionalName: null,
+          type: _type,
+          actionConfig: actionConfig,
+          assignedSection: c.assignedSection,
+          assignedEmployeeIds: empIds,
+          assignedEmployeeId: empIds?.length == 1 ? empIds!.first : null,
+          deadlineAt: deadlineVal,
+          scheduledForAt: scheduledForVal,
+          items: _items
+              .map((e) => ChecklistItem(
+                    id: e.id,
+                    checklistId: c.id,
+                    title: e.title,
+                    sortOrder: e.sortOrder,
+                    techCardId: e.techCardId,
+                    targetQuantity: e.targetQuantity,
+                    targetUnit: e.targetUnit,
+                  ))
+              .toList(),
+        );
+        await svc.saveChecklist(updated);
+        savedId = updated.id;
+        dept = updated.assignedDepartment;
+      }
       // Переводим название и пункты чеклиста фоново
       final sourceLang = loc.currentLanguageCode;
       final fieldsToTranslate = <String, String>{'name': name};
@@ -320,7 +372,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
       }
       translationManager.handleEntitySave(
         entityType: TranslationEntityType.checklist,
-        entityId: updated.id,
+        entityId: savedId,
         textFields: fieldsToTranslate,
         sourceLanguage: sourceLang,
         userId: emp?.id,
@@ -330,8 +382,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
           SnackBar(content: Text(loc.t('save') + ' ✓')),
         );
         clearDraft();
-        // Переходим на список с refresh=1, чтобы экран создался заново и подтянул свежие данные
-        context.go('/checklists?department=${updated.assignedDepartment}&refresh=1');
+        context.go('/checklists?department=$dept&refresh=1');
       }
     } catch (e) {
       if (mounted) {
@@ -346,7 +397,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
 
   Future<void> _duplicate() async {
     final c = _checklist;
-    if (c == null) return;
+    if (c == null || _isNew) return;
     final emp = context.read<AccountManagerSupabase>().currentEmployee;
     if (emp == null) return;
     try {
@@ -368,6 +419,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
   }
 
   Future<void> _delete() async {
+    if (_isNew) return;
     final loc = context.read<LocalizationService>();
     final ok = await showDialog<bool>(
       context: context,

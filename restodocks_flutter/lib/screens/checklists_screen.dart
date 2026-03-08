@@ -40,10 +40,12 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
     });
     try {
       final svc = context.read<ChecklistServiceSupabase>();
+      final canEdit = emp.canEditChecklistsAndTechCards;
       final list = await svc.getChecklistsForEstablishment(
         est.id,
         department: widget.department,
         currentEmployeeId: emp.id,
+        applyAssignmentFilter: !canEdit,
       );
       if (mounted) setState(() {
         _list = list;
@@ -74,27 +76,8 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
     final est = acc.establishment;
     final emp = acc.currentEmployee;
     if (est == null || emp == null) return;
-    try {
-      final svc = context.read<ChecklistServiceSupabase>();
-      final created = await svc.createChecklist(
-        establishmentId: est.id,
-        createdBy: emp.id,
-        name: '',
-        type: ChecklistType.tasks,
-        assignedDepartment: widget.department,
-      );
-      if (mounted) {
-        await _load();
-        await context.push('/checklists/${created.id}');
-        if (mounted) await _load();
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.read<LocalizationService>().t('error_with_message').replaceAll('%s', e.toString()))),
-        );
-      }
-    }
+    await context.push('/checklists/new?department=${widget.department}');
+    if (mounted) await _load();
   }
 
   @override
