@@ -79,8 +79,6 @@ class ManagementHomeContent extends StatelessWidget {
         _Tile(icon: Icons.chat_bubble_outline, title: loc.t('inbox_tab_messages') ?? 'Сообщения', onTap: () => context.go('/notifications?tab=messages')),
         _Tile(icon: Icons.inbox, title: loc.t('inbox'), onTap: () => context.go('/inbox')),
         _Tile(icon: Icons.people, title: loc.t('employees'), onTap: () => context.go('/employees')),
-        if (isChef || roles.contains('sous_chef'))
-          _Tile(icon: Icons.how_to_reg, title: loc.t('shift_confirmation'), onTap: () => context.go('/shift-confirmation')),
         // Чеклисты: кухня или шеф/су-шеф (у шефа часто отдел «Управление» — иначе плитки нет)
         if (employee.department == 'kitchen' || isChef || roles.contains('sous_chef') || employee.department == 'bar' || employee.department == 'dining_room')
           _Tile(icon: Icons.checklist, title: loc.t('checklists'), onTap: () => context.go('/checklists?department=${_deptForRoute(employee.department)}')),
@@ -107,6 +105,13 @@ class ManagementHomeContent extends StatelessWidget {
         if (isGeneral) ...[
           _Tile(icon: Icons.savings, title: '${loc.t('expenses')} (${loc.t('pro')})', onTap: () => context.go('/expenses')),
         ],
+        // ФЗП подразделения для руководителей: шеф/су-шеф (кухня), менеджер зала (зал), барменеджер (бар)
+        if ((isChef || roles.contains('sous_chef')) && !isGeneral)
+          _Tile(icon: Icons.payments, title: loc.t('salary_tab_fzp') ?? 'ФЗП', subtitle: loc.t('salary_period_hint'), onTap: () => context.go('/expenses/salary?department=kitchen')),
+        if (roles.contains('floor_manager') && !isGeneral)
+          _Tile(icon: Icons.payments, title: loc.t('salary_tab_fzp') ?? 'ФЗП', subtitle: loc.t('salary_period_hint'), onTap: () => context.go('/expenses/salary?department=hall')),
+        if (isBarManager && !isGeneral)
+          _Tile(icon: Icons.payments, title: loc.t('salary_tab_fzp') ?? 'ФЗП', subtitle: loc.t('salary_period_hint'), onTap: () => context.go('/expenses/salary?department=bar')),
       ],
     );
   }

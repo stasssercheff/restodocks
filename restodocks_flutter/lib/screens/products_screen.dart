@@ -862,15 +862,9 @@ class _ProductListItem extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: ListTile(
         title: Text(product.getLocalizedName(loc.currentLanguageCode)),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-            if (product.calories != null)
-              Text('${product.calories!.round()} ${loc.t('kcal')}'),
-            if (product.category != 'manual')
-              Text(product.category, style: theme.textTheme.bodySmall),
-          ],
-        ),
+        subtitle: product.category != 'manual'
+            ? Text(product.category, style: theme.textTheme.bodySmall)
+            : null,
         trailing: IconButton(
           icon: const Icon(Icons.add_circle_outline),
           tooltip: loc.t('add_to_nomenclature'),
@@ -1085,21 +1079,6 @@ class _ProductDetailsDialogState extends State<_ProductDetailsDialog> {
               Text('${loc.t('category')}: ${widget.product.category}'),
 
               const SizedBox(height: 16),
-
-            // КБЖУ
-            if (widget.product.calories != null || widget.product.protein != null) ...[
-              Text(loc.t('nutrition_facts'), style: theme.textTheme.titleSmall),
-              const SizedBox(height: 8),
-              if (widget.product.calories != null)
-                Text('${loc.t('calories')}: ${widget.product.calories!.round()} ${loc.t('kcal')}'),
-              if (widget.product.protein != null)
-                Text('${loc.t('protein')}: ${widget.product.protein!.toStringAsFixed(1)} г'),
-              if (widget.product.fat != null)
-                Text('${loc.t('fat')}: ${widget.product.fat!.toStringAsFixed(1)} г'),
-              if (widget.product.carbs != null)
-                Text('${loc.t('carbs')}: ${widget.product.carbs!.toStringAsFixed(1)} г'),
-              const SizedBox(height: 16),
-            ],
 
             // Установка цены
             Text(loc.t('price'), style: theme.textTheme.titleSmall),
@@ -1409,8 +1388,7 @@ class _SmartDuplicatesDialogState extends State<_SmartDuplicatesDialog> {
                                   ),
                                 ),
                                 subtitle: Text(
-                                  "Цена: ${product.basePrice ?? "не указана"} ${product.currency ?? ""} • "
-                                  "${product.calories != null ? "${product.calories!.round()} ккал" : "без КБЖУ"}",
+                                  "Цена: ${product.basePrice ?? "не указана"} ${product.currency ?? ""}",
                                   style: theme.textTheme.bodySmall,
                                 ),
                                 dense: true,

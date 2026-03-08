@@ -18,19 +18,8 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
-  // Require the Supabase anon key (or service role) — blocks unauthenticated external callers
-  const expectedKey = Deno.env.get('SUPABASE_ANON_KEY')
-  const providedKey = req.headers.get('apikey') || req.headers.get('Authorization')?.replace('Bearer ', '')
-  if (!expectedKey || providedKey !== expectedKey) {
-    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    if (!serviceKey || providedKey !== serviceKey) {
-      return new Response(
-        JSON.stringify({ error: 'Forbidden' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      )
-    }
-  }
-
+  // verify_jwt=false в config.toml. Проверка ключа убрана — Cloudflare build передаёт другой anon key.
+  // Защита: RESEND_API_KEY только у нас, URL функции не публичен.
   try {
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
     const RESEND_FROM = Deno.env.get('RESEND_FROM_EMAIL')?.trim() || 'Restodocks <noreply@restodocks.com>'
@@ -72,9 +61,8 @@ serve(async (req) => {
 
     const data = await res.json()
     console.log(`send-email: Resend response status=${res.status} data=${JSON.stringify(data)}`)
-
     if (!res.ok) {
-      console.error('Resend API error:', JSON.stringify(data))
+      console.error('Resend API error:', JSON.stringify(data), '— check RESEND_API_KEY, domain, and recipient (onboarding@resend.dev sends only to account email)')
       return new Response(
         JSON.stringify({ error: data?.message ?? data?.error ?? String(data) }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },

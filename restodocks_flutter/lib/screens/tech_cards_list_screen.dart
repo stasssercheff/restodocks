@@ -45,6 +45,28 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     super.dispose();
   }
 
+  /// Порядок категорий для отображения: кухня/банкет и бар
+  static const _kitchenCategoryOrder = ['sauce', 'vegetables', 'salad', 'meat', 'seafood', 'side', 'subside', 'bakery', 'dessert', 'decor', 'soup', 'misc', 'beverages', 'banquet', 'catering'];
+  static const _barCategoryOrder = ['alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks', 'sauce', 'vegetables', 'salad', 'bakery', 'dessert', 'decor', 'misc', 'beverages'];
+
+  List<({String category, List<TechCard> cards})> _groupByCategory(List<TechCard> cards) {
+    final order = (widget.department == 'bar') ? _barCategoryOrder : _kitchenCategoryOrder;
+    final grouped = <String, List<TechCard>>{};
+    for (final tc in cards) {
+      final cat = tc.category.isNotEmpty ? tc.category : 'misc';
+      grouped.putIfAbsent(cat, () => []).add(tc);
+    }
+    final result = <({String category, List<TechCard> cards})>[];
+    for (final cat in order) {
+      final list = grouped.remove(cat);
+      if (list != null && list.isNotEmpty) result.add((category: cat, cards: list));
+    }
+    for (final e in grouped.entries) {
+      result.add((category: e.key, cards: e.value));
+    }
+    return result;
+  }
+
   String _categoryLabel(String c, LocalizationService loc) {
     final lang = loc.currentLanguageCode;
     final Map<String, Map<String, String>> categoryTranslations = {
@@ -75,12 +97,15 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
 
   double _calculateCostPerKg(TechCard tc) {
     if (tc.ingredients.isEmpty || tc.yield <= 0) return 0.0;
-
-    // Суммируем стоимости всех ингредиентов
     final totalCost = tc.ingredients.fold<double>(0, (sum, ing) => sum + ing.cost);
-
-    // Стоимость за кг = общая стоимость / выход в кг
     return (totalCost / tc.yield) * 1000;
+  }
+
+  /// Себестоимость за порцию (для блюд): totalCost * portionWeight / yield.
+  double _calculateCostPerPortion(TechCard tc) {
+    if (tc.ingredients.isEmpty || tc.yield <= 0 || tc.portionWeight <= 0) return 0.0;
+    final totalCost = tc.ingredients.fold<double>(0, (sum, ing) => sum + ing.cost);
+    return totalCost * tc.portionWeight / tc.yield;
   }
 
   Future<void> _load() async {
@@ -88,7 +113,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     final est = acc.establishment;
     final emp = acc.currentEmployee;
     if (est == null) {
-      setState(() { _loading = false; _error = 'Нет заведения'; });
+        setState(() { _loading = false; _error = 'no_establishment'; });
       return;
     }
     setState(() { _loading = true; _error = null; });
@@ -107,12 +132,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       } else if (widget.department == 'hall') {
         list = []; // Зал не имеет своих ТТК
       } else {
+        // Кухня: повара и сотрудники подразделения видят все ТТК (блюда и ПФ) в режиме просмотра
         list = all.where((tc) =>
             tc.category != 'beverages' ||
             tc.sections.contains('all')).toList();
-        if (emp != null && !emp.hasRole('owner') && !emp.hasRole('executive_chef') && !emp.hasRole('sous_chef')) {
-          list = list.where((tc) => emp.canSeeTechCard(tc.sections)).toList();
-        }
       }
       if (mounted) {
         setState(() { _list = list; _loading = false; });
@@ -370,13 +393,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(loc.t('ttk_branch_display') ?? 'Отображение ТТК по филиалам'),
+        title: Text(loc.t('ttk_branch_display')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
               leading: const Icon(Icons.store),
-              title: Text(loc.t('main_establishment') ?? 'Основное'),
+              title: Text(loc.t('main_establishment_short')),
               trailing: branchFilter.selectedBranchId == null
                   ? const Icon(Icons.check, color: Colors.green)
                   : null,
@@ -402,11 +425,22 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     );
   }
 
+  /// Себестоимость видят только руководство: собственник, шеф, су-шеф, барменеджер.
+  bool _canSeeCost(AccountManagerSupabase acc) {
+    final emp = acc.currentEmployee;
+    if (emp == null) return false;
+    return emp.hasRole('owner') ||
+        emp.hasRole('executive_chef') ||
+        emp.hasRole('sous_chef') ||
+        emp.hasRole('bar_manager');
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
     final accountManager = context.watch<AccountManagerSupabase>();
     final canEdit = accountManager.currentEmployee?.canEditChecklistsAndTechCards ?? false;
+    final showCost = _canSeeCost(accountManager);
 
     return Scaffold(
       appBar: AppBar(
@@ -529,7 +563,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       ),
       body: Stack(
         children: [
-          _buildBody(loc, canEdit),
+          _buildBody(loc, canEdit, showCost),
           if (_loadingExcel)
             ColoredBox(
               color: Theme.of(context).colorScheme.surface.withOpacity(0.7),
@@ -561,16 +595,17 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     );
   }
 
-  Widget _buildBody(LocalizationService loc, bool canEdit) {
+  Widget _buildBody(LocalizationService loc, bool canEdit, bool showCost) {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
+      final errorText = _error == 'no_establishment' ? loc.t('no_establishment') : _error!;
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(_error!, textAlign: TextAlign.center),
+              Text(errorText, textAlign: TextAlign.center),
               const SizedBox(height: 16),
               FilledButton(onPressed: _load, child: Text(loc.t('refresh'))),
             ],
@@ -626,7 +661,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                   builder: (_, branchFilter, __) {
                     final selId = branchFilter.selectedBranchId;
                     final label = selId == null
-                        ? (loc.t('main_establishment') ?? 'Основное')
+                        ? loc.t('main_establishment_short')
                         : branches.where((b) => b.id == selId).map((b) => b.name).firstOrNull ?? selId;
                     return Padding(
                       padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
@@ -679,8 +714,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           Expanded(
             child: TabBarView(
               children: [
-                _buildTechCardsTable(semiFinishedCards, loc, canEdit),
-                _buildTechCardsTable(dishCards, loc, canEdit),
+                _buildTechCardsTable(semiFinishedCards, loc, canEdit, showCost, isDishesTab: false),
+                _buildTechCardsTable(dishCards, loc, canEdit, showCost, isDishesTab: true),
               ],
             ),
           ),
@@ -689,19 +724,24 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     );
   }
 
-  /// Компактная таблица с шапкой: влезает в экран телефона, без горизонтального скролла.
-  Widget _buildTechCardsTable(List<TechCard> techCards, LocalizationService loc, bool canEdit) {
+  /// Компактная таблица с шапкой и группировкой по категориям.
+  /// isDishesTab: для блюд — себестоимость за порцию, для ПФ — стоимость за кг.
+  Widget _buildTechCardsTable(List<TechCard> techCards, LocalizationService loc, bool canEdit, bool showCost, {bool isDishesTab = false}) {
     final lang = loc.currentLanguageCode;
     const colCatWidth = 76.0;
-    const colCostWidth = 48.0;
+    const colCostWidth = 56.0; // шире для себестоимости (десятичные)
     const colActionsWidth = 62.0; // «Просмотр» целиком
     final est = context.read<AccountManagerSupabase>().establishment;
     final costSym = est?.currencySymbol ?? Establishment.currencySymbolFor(est?.defaultCurrency ?? 'VND');
+    final groups = _groupByCategory(techCards);
+    final costLabel = showCost
+        ? (isDishesTab ? loc.t('ttk_col_cost_per_portion').replaceFirst('%s', costSym) : '$costSym/${loc.t('kg')}')
+        : '—';
+
     return RefreshIndicator(
       onRefresh: _load,
       child: CustomScrollView(
         slivers: [
-          // Липкая шапка таблицы
           SliverPersistentHeader(
             pinned: true,
             delegate: _TableHeaderDelegate(
@@ -712,99 +752,144 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
               onColor: Theme.of(context).colorScheme.onPrimaryContainer,
               labelName: loc.t('ttk_col_name'),
               labelCat: loc.t('column_category'),
-              labelCost: '$costSym/${loc.t('kg')}',
+              labelCost: costLabel,
               labelView: loc.t('ttk_col_view'),
             ),
           ),
-          SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, i) {
-                final tc = techCards[i];
-                final selected = _selectedTechCards.contains(tc.id);
-                final name = tc.getDisplayNameInLists(lang);
-                final cat = _categoryLabel(tc.category, loc);
-                final cost = NumberFormatUtils.formatInt(_calculateCostPerKg(tc));
-                return Material(
-                  color: selected
-                      ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.5)
-                      : null,
-                  child: InkWell(
-                    onTap: () {
-                      if (_selectionMode) {
-                        _toggleTechCardSelection(tc.id);
-                      } else {
-                        context.push('/tech-cards/${tc.id}');
-                      }
-                    },
-                    onLongPress: canEdit && !_selectionMode
-                        ? () => context.push('/tech-cards/${tc.id}?view=1')
-                        : null,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              name,
-                              style: const TextStyle(fontSize: 14),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          SizedBox(
-                            width: colCatWidth,
-                            child: Text(
-                              cat.length > 6 ? '${cat.substring(0, 5)}…' : cat,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                          SizedBox(
-                            width: colCostWidth,
-                            child: Text(
-                              cost,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                          SizedBox(
-                            width: colActionsWidth,
-                            child: _selectionMode
-                                ? Checkbox(
-                                  value: selected,
-                                  onChanged: (_) => _toggleTechCardSelection(tc.id),
-                                )
-                                : (canEdit
-                                    ? IconButton(
-                                        icon: const Icon(Icons.visibility_outlined, size: 20),
-                                        tooltip: loc.t('ttk_view'),
-                                        onPressed: () => context.push('/tech-cards/${tc.id}?view=1'),
-                                        style: IconButton.styleFrom(
-                                          minimumSize: const Size(36, 36),
-                                          padding: EdgeInsets.zero,
-                                        ),
-                                      )
-                                    : const SizedBox.shrink()),
-                          ),
-                        ],
-                      ),
-                    ),
+          ...groups.expand((g) => [
+            SliverToBoxAdapter(
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                child: Text(
+                  _categoryLabel(g.category, loc),
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
-                );
-              },
-              childCount: techCards.length,
+                ),
+              ),
             ),
-          ),
+            SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, i) => _buildTechCardRow(
+                  techCards: g.cards,
+                  index: i,
+                  lang: lang,
+                  loc: loc,
+                  canEdit: canEdit,
+                  showCost: showCost,
+                  isDishesTab: isDishesTab,
+                  colCatWidth: colCatWidth,
+                  colCostWidth: colCostWidth,
+                  colActionsWidth: colActionsWidth,
+                  costSym: costSym,
+                ),
+                childCount: g.cards.length,
+              ),
+            ),
+          ]),
           const SliverPadding(padding: EdgeInsets.only(bottom: 80)),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTechCardRow({
+    required List<TechCard> techCards,
+    required int index,
+    required String lang,
+    required LocalizationService loc,
+    required bool canEdit,
+    required bool showCost,
+    required bool isDishesTab,
+    required double colCatWidth,
+    required double colCostWidth,
+    required double colActionsWidth,
+    required String costSym,
+  }) {
+    final tc = techCards[index];
+    final selected = _selectedTechCards.contains(tc.id);
+    final name = tc.getDisplayNameInLists(lang);
+    final cat = _categoryLabel(tc.category, loc);
+    final cost = showCost
+        ? (isDishesTab
+            ? '${NumberFormatUtils.formatDecimal(_calculateCostPerPortion(tc))} $costSym'
+            : NumberFormatUtils.formatInt(_calculateCostPerKg(tc)))
+        : '—';
+    return Material(
+      color: selected
+          ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.5)
+          : null,
+      child: InkWell(
+        onTap: () {
+          if (_selectionMode) {
+            _toggleTechCardSelection(tc.id);
+          } else {
+            final path = canEdit ? '/tech-cards/${tc.id}' : '/tech-cards/${tc.id}?view=1';
+            context.push(path);
+          }
+        },
+        onLongPress: canEdit && !_selectionMode
+            ? () => context.push('/tech-cards/${tc.id}?view=1')
+            : null,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  name,
+                  style: const TextStyle(fontSize: 14),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              SizedBox(
+                width: colCatWidth,
+                child: Text(
+                  cat.length > 6 ? '${cat.substring(0, 5)}…' : cat,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              SizedBox(
+                width: colCostWidth,
+                child: Text(
+                  cost,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              SizedBox(
+                width: colActionsWidth,
+                child: _selectionMode
+                    ? Checkbox(
+                        value: selected,
+                        onChanged: (_) => _toggleTechCardSelection(tc.id),
+                      )
+                    : IconButton(
+                        icon: const Icon(Icons.visibility_outlined, size: 20),
+                        tooltip: loc.t('ttk_view'),
+                        onPressed: () => context.push('/tech-cards/${tc.id}?view=1'),
+                        style: IconButton.styleFrom(
+                          minimumSize: const Size(36, 36),
+                          padding: EdgeInsets.zero,
+                        ),
+                      ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

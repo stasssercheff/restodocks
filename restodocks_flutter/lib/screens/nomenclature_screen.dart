@@ -1122,17 +1122,8 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
 
     final hideCategory = p.category == 'misc' || p.category == 'manual' || p.category == 'imported';
 
-    // Проверяем подписку для отображения КБЖУ
-    final account = context.read<AccountManagerSupabase>();
-    final hasPro = account.currentEmployee?.hasProSubscription ?? false;
-
-    if (!hasPro) {
-      return hideCategory ? priceText : '${_categoryLabel(p.category)} · $priceText';
-    }
-
-    return hideCategory
-        ? '${p.calories?.round() ?? 0} ${loc.t('kcal')} · $priceText'
-        : '${_categoryLabel(p.category)} · ${p.calories?.round() ?? 0} ${loc.t('kcal')} · $priceText';
+    // КБЖУ и глютен/лактоза скрыты
+    return hideCategory ? priceText : '${_categoryLabel(p.category)} · $priceText';
   }
 
   String _currencySymbol(String currency) => Establishment.currencySymbolFor(currency);
@@ -2210,19 +2201,13 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
             ],
           ),
         ),
-        if (needsKbju.isNotEmpty || needsTranslation.isNotEmpty || widget.items.isNotEmpty)
+        if ((needsTranslation.isNotEmpty && !widget.isTranslating) || widget.items.isNotEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
-                if (needsKbju.isNotEmpty && widget.onCanShowNutrition(context))
-                  FilledButton.tonalIcon(
-                    onPressed: () => widget.onLoadKbju(context, needsKbju.where((item) => item.isProduct).map((item) => item.product!).toList()),
-                    icon: const Icon(Icons.cloud_download, size: 20),
-                    label: Text(widget.loc.t('load_kbju_for_all').replaceAll('%s', '${needsKbju.length}')),
-                  ),
                 if (needsTranslation.isNotEmpty && !widget.isTranslating)
                   FilledButton.tonalIcon(
                     onPressed: () => widget.onLoadTranslations(context, needsTranslation.where((item) => item.isProduct).map((item) => item.product!).toList()),
@@ -2729,13 +2714,6 @@ class _VerifyProductsResultsDialog extends StatelessWidget {
                             const SizedBox(height: 2),
                             Text('${loc.t('price')}: ${p.basePrice != null ? NumberFormatUtils.formatDecimal(p.basePrice!) : '—'} → ${NumberFormatUtils.formatDecimal(r.suggestedPrice!)}', style: Theme.of(context).textTheme.bodySmall),
                           ],
-                          if (r.suggestedCalories != null || r.suggestedProtein != null || r.suggestedFat != null || r.suggestedCarbs != null) ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              'КБЖУ: ${p.calories?.round() ?? 0}/${p.protein?.round() ?? 0}/${p.fat?.round() ?? 0}/${p.carbs?.round() ?? 0} → ${(NutritionApiService.saneCaloriesForProduct(p.getLocalizedName(loc.currentLanguageCode), r.suggestedCalories) ?? r.suggestedCalories)?.round() ?? 0}/${r.suggestedProtein?.round() ?? 0}/${r.suggestedFat?.round() ?? 0}/${r.suggestedCarbs?.round() ?? 0}',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          ],
                           const SizedBox(height: 8),
                           Align(
                             alignment: Alignment.centerRight,
@@ -3033,16 +3011,6 @@ class _CatalogTab extends StatelessWidget {
                   PopupMenuItem(value: _CatalogSort.priceDesc, child: Text(loc.t('sort_price_desc'))),
                 ],
               ),
-              FilterChip(
-                label: Text(loc.t('filter_gluten_free'), style: const TextStyle(fontSize: 11)),
-                selected: filterGlutenFree,
-                onSelected: onFilterGlutenChanged,
-              ),
-              FilterChip(
-                label: Text(loc.t('filter_lactose_free'), style: const TextStyle(fontSize: 11)),
-                selected: filterLactoseFree,
-                onSelected: onFilterLactoseChanged,
-              ),
             ],
           ),
         ),
@@ -3055,19 +3023,18 @@ class _CatalogTab extends StatelessWidget {
               label: Text(loc.t('add_all_to_nomenclature').replaceAll('%s', '${notInNom.length}')),
             ),
           ),
-        if (needsKbju.isNotEmpty || needsTranslation.isNotEmpty)
+        if (needsTranslation.isNotEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
-                if (needsKbju.isNotEmpty)
-                  FilledButton.tonalIcon(
-                    onPressed: () => _loadKbjuForAll(context, needsKbju),
-                    icon: const Icon(Icons.cloud_download, size: 20),
-                    label: Text(loc.t('load_kbju_for_all').replaceAll('%s', '${needsKbju.length}')),
-                  ),
+                FilledButton.tonalIcon(
+                  onPressed: () => _loadTranslationsForAll(context, needsTranslation),
+                  icon: const Icon(Icons.translate, size: 20),
+                  label: Text(loc.t('translate_names_for_all').replaceAll('%s', '${needsTranslation.length}')),
+                ),
               ],
             ),
           ),
@@ -3131,9 +3098,8 @@ class _CatalogTab extends StatelessWidget {
                             subtitle: Text(
                               () {
                                 final cat = _categoryLabel(p.category);
-                                final kcal = '${p.calories?.round() ?? 0} ккал';
                                 final unit = _unitDisplay(p.unit, loc.currentLanguageCode);
-                                return cat.isEmpty ? '$kcal · $unit' : '$cat · $kcal · $unit';
+                                return cat.isEmpty ? unit : '$cat · $unit';
                               }(),
                               style: Theme.of(context).textTheme.bodySmall,
                             ),
@@ -3145,13 +3111,6 @@ class _CatalogTab extends StatelessWidget {
                                   tooltip: loc.t('edit_product'),
                                   onPressed: () => _showEditProduct(context, p),
                                 ),
-                                if ((p.calories == null || p.calories == 0) &&
-                                    (p.protein == null && p.fat == null && p.carbs == null))
-                                  IconButton(
-                                    icon: const Icon(Icons.cloud_download),
-                                    tooltip: loc.t('load_kbju_from_web'),
-                                    onPressed: () => _fetchKbju(context, p),
-                                  ),
                                 if (inNom)
                                   Chip(
                                     label: Text(loc.t('nomenclature'), style: const TextStyle(fontSize: 11)),

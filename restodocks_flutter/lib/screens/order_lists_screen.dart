@@ -27,6 +27,8 @@ class _OrderListsScreenState extends State<OrderListsScreen> {
   bool _loading = true;
   String? _establishmentId;
   _OrderTab _selectedTab = _OrderTab.orders;
+  final TextEditingController _orderSearchController = TextEditingController();
+  String _orderSearchQuery = '';
 
   /// Поставщики — шаблоны (нет savedAt)
   List<OrderList> get _suppliers =>
@@ -75,6 +77,18 @@ class _OrderListsScreenState extends State<OrderListsScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
+  @override
+  void dispose() {
+    _orderSearchController.dispose();
+    super.dispose();
+  }
+
+  List<OrderList> get _filteredOrders {
+    if (_orderSearchQuery.isEmpty) return _savedOrders;
+    final q = _orderSearchQuery.trim().toLowerCase();
+    return _savedOrders.where((o) => o.name.toLowerCase().contains(q)).toList();
+  }
+
   Future<void> _deleteList(OrderList list) async {
     final estId = _establishmentId;
     if (estId == null) return;
@@ -103,7 +117,9 @@ class _OrderListsScreenState extends State<OrderListsScreen> {
                 ? const Center(child: CircularProgressIndicator())
                 : _selectedTab == _OrderTab.orders
                     ? _OrderListsTab(
-                        orders: _savedOrders,
+                        orders: _filteredOrders,
+                        searchController: _orderSearchController,
+                        onSearchChanged: (v) => setState(() => _orderSearchQuery = v.trim().toLowerCase()),
                         onTap: (order) async {
                           await context.push('/product-order/${order.id}?department=${widget.department}');
                           if (mounted) _load();
@@ -336,6 +352,17 @@ class _SuppliersTab extends StatelessWidget {
 }
 
 // ────────────────────────────────────────────────────────────────
+// Helper for grouped order list items
+// ────────────────────────────────────────────────────────────────
+
+class _OrderListItem {
+  const _OrderListItem({required this.isHeader, this.headerLabel, this.order});
+  final bool isHeader;
+  final String? headerLabel;
+  final OrderList? order;
+}
+
+// ────────────────────────────────────────────────────────────────
 // Вкладка «Списки заказа»
 // ────────────────────────────────────────────────────────────────
 
@@ -346,6 +373,8 @@ class _OrderListsTab extends StatelessWidget {
     required this.onDelete,
     required this.onCreate,
     required this.loc,
+    required this.searchController,
+    required this.onSearchChanged,
   });
 
   final List<OrderList> orders;
@@ -353,11 +382,41 @@ class _OrderListsTab extends StatelessWidget {
   final void Function(OrderList) onDelete;
   final VoidCallback onCreate;
   final LocalizationService loc;
+  final TextEditingController searchController;
+  final void Function(String) onSearchChanged;
 
   @override
   Widget build(BuildContext context) {
+    // Group orders by supplierName, build flat list (header, item, item, header, item...)
+    final supplierGroups = <String, List<OrderList>>{};
+    for (final o in orders) {
+      final key = o.supplierName.trim().isEmpty ? '—' : o.supplierName;
+      supplierGroups.putIfAbsent(key, () => []).add(o);
+    }
+    final supplierNames = supplierGroups.keys.toList()..sort((a, b) => a.compareTo(b));
+    final flatItems = <_OrderListItem>[];
+    for (final supplier in supplierNames) {
+      flatItems.add(_OrderListItem(isHeader: true, headerLabel: supplier, order: null));
+      for (final order in supplierGroups[supplier]!) {
+        flatItems.add(_OrderListItem(isHeader: false, headerLabel: null, order: order));
+      }
+    }
+
     return Column(
       children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          child: TextField(
+            controller: searchController,
+            decoration: InputDecoration(
+              hintText: loc.t('order_search_hint'),
+              prefixIcon: const Icon(Icons.search),
+              border: const OutlineInputBorder(),
+              isDense: true,
+            ),
+            onChanged: onSearchChanged,
+          ),
+        ),
         Expanded(
           child: orders.isEmpty
               ? Center(
@@ -392,9 +451,22 @@ class _OrderListsTab extends StatelessWidget {
                 )
               : ListView.builder(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                  itemCount: orders.length,
+                  itemCount: flatItems.length,
                   itemBuilder: (_, i) {
-                    final order = orders[i];
+                    final item = flatItems[i];
+                    if (item.isHeader) {
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 12, bottom: 6),
+                        child: Text(
+                          item.headerLabel!,
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                        ),
+                      );
+                    }
+                    final order = item.order!;
                     final dateStr = order.savedAt != null
                         ? DateFormat('dd.MM.yyyy HH:mm')
                             .format(order.savedAt!)

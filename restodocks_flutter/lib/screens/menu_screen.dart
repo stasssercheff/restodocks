@@ -18,8 +18,10 @@ class MenuScreen extends StatefulWidget {
   State<MenuScreen> createState() => _MenuScreenState();
 }
 
-/// Категории, относящиеся к бару (напитки).
-const _barCategories = {'beverages'};
+/// Категории, относящиеся к бару (напитки, коктейли и т.д.).
+const _barCategories = {'beverages', 'alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks'};
+
+bool _isBarDish(TechCard tc) => _barCategories.contains(tc.category) || tc.sections.contains('bar');
 
 class _MenuScreenState extends State<MenuScreen> {
   List<TechCard> _dishes = [];
@@ -57,7 +59,7 @@ class _MenuScreenState extends State<MenuScreen> {
       final acc = context.read<AccountManagerSupabase>();
       final est = acc.establishment;
       if (est == null) {
-        setState(() { _loading = false; _error = 'Нет заведения'; });
+        setState(() { _loading = false; _error = 'no_establishment'; });
         return;
       }
       final productStore = context.read<ProductStoreSupabase>();
@@ -82,12 +84,11 @@ class _MenuScreenState extends State<MenuScreen> {
                 tc.sections.contains('bar') ||
                 tc.sections.contains('all'))).toList();
       } else {
+        // Кухня/бар: показываем ВСЕ блюда отдела в меню для сотрудников подразделения (без фильтра по цехам).
         final byDept = allTcs.where((tc) =>
             !tc.isSemiFinished &&
             (!_barCategories.contains(tc.category) || tc.sections.contains('all'))).toList();
-        tcs = emp == null
-            ? byDept
-            : byDept.where((tc) => emp.canSeeTechCard(tc.sections)).toList();
+        tcs = byDept;
       }
       if (!mounted) return;
       final currency = emp?.currency ?? acc.establishment?.defaultCurrency ?? 'RUB';
@@ -178,15 +179,13 @@ class _MenuScreenState extends State<MenuScreen> {
 
   bool get _isHallMenu => widget.department == 'hall' || widget.department == 'dining_room';
 
-  /// Себестоимость видят только собственник и управляющие подразделениями.
-  bool _canSeeCost(Employee? emp) {
+  /// Полный вид ТТК (себестоимость, состав, технология): только руководство — собственник, шеф, су-шеф (кухня), барменеджер (бар).
+  bool _canSeeFullTtkView(Employee? emp, TechCard tc) {
     if (emp == null) return false;
-    return emp.hasRole('owner') ||
-        emp.hasRole('executive_chef') ||
-        emp.hasRole('sous_chef') ||
-        emp.hasRole('bar_manager') ||
-        emp.hasRole('floor_manager') ||
-        emp.department == 'management';
+    if (emp.hasRole('owner')) return true;
+    if ((emp.hasRole('executive_chef') || emp.hasRole('sous_chef')) && !_isBarDish(tc)) return true;
+    if (emp.hasRole('bar_manager') && _isBarDish(tc)) return true;
+    return false;
   }
 
   bool _hasHallContent(TechCard tc) {
@@ -198,10 +197,51 @@ class _MenuScreenState extends State<MenuScreen> {
   String _buildSubtitleText(LocalizationService loc, TechCard tc, String lang, double totalCost, String currencySym) {
     final emp = context.read<AccountManagerSupabase>().currentEmployee;
     final cat = _categoryLabel(tc.category, lang);
-    if (_canSeeCost(emp)) {
+    if (_canSeeFullTtkView(emp, tc)) {
       return '${cat} • ${loc.t('cost_price')}: ${totalCost.toStringAsFixed(2)} $currencySym';
     }
+    // Меню зала: показываем продажную цену, если есть
+    if (_isHallMenu) {
+      final sp = tc.sellingPrice;
+      if (sp != null && sp > 0) {
+        return '$cat • ${loc.t('selling_price')}: ${sp.toStringAsFixed(2)} $currencySym';
+      }
+    }
+    // Кухня/бар: повары и сотрудники — без цен
     return cat;
+  }
+
+  /// Контент раскрытой карточки: полная ТТК с ценой / полная ТТК без цены / описание для зала.
+  Widget _buildExpandedContent(Employee? emp, LocalizationService loc, TechCard tc, String lang, String currencySym) {
+    if (_canSeeFullTtkView(emp, tc)) {
+      return _MenuDishTable(
+        loc: loc,
+        dishName: tc.dishName,
+        ingredients: tc.ingredients.where((i) => !i.isPlaceholder || i.hasData).toList(),
+        technology: tc.getLocalizedTechnology(lang),
+        currencySym: currencySym,
+        showCost: true,
+      );
+    }
+    // Меню зала: описание, состав, продажная цена
+    if (_isHallMenu) {
+      return _HallDishContent(
+        loc: loc,
+        description: tc.descriptionForHall ?? '',
+        composition: tc.compositionForHall ?? '',
+        sellingPrice: tc.sellingPrice,
+        currencySym: currencySym,
+      );
+    }
+    // Кухня/бар: повары и сотрудники — полная ТТК (состав, технология) без цен
+    return _MenuDishTable(
+      loc: loc,
+      dishName: tc.dishName,
+      ingredients: tc.ingredients.where((i) => !i.isPlaceholder || i.hasData).toList(),
+      technology: tc.getLocalizedTechnology(lang),
+      currencySym: currencySym,
+      showCost: false,
+    );
   }
 
   @override
@@ -225,7 +265,7 @@ class _MenuScreenState extends State<MenuScreen> {
                     children: [
                       Expanded(
                         child: _HallTabChip(
-                          label: loc.t('dept_bar') ?? 'Бар',
+                          label: loc.t('dept_bar'),
                           selected: _hallTab == 'bar',
                           onTap: () => setState(() => _hallTab = 'bar'),
                         ),
@@ -233,7 +273,7 @@ class _MenuScreenState extends State<MenuScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: _HallTabChip(
-                          label: loc.t('dept_kitchen') ?? 'Кухня',
+                          label: loc.t('dept_kitchen'),
                           selected: _hallTab == 'kitchen',
                           onTap: () => setState(() => _hallTab = 'kitchen'),
                         ),
@@ -261,13 +301,14 @@ class _MenuScreenState extends State<MenuScreen> {
   Widget _buildBody(LocalizationService loc, String currencySym) {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
+      final errorText = _error == 'no_establishment' ? loc.t('no_establishment') : _error!;
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(_error!, textAlign: TextAlign.center),
+              Text(errorText, textAlign: TextAlign.center),
               const SizedBox(height: 16),
               FilledButton(onPressed: _load, child: Text(loc.t('refresh'))),
             ],
@@ -288,7 +329,7 @@ class _MenuScreenState extends State<MenuScreen> {
               Text(loc.t('menu'), style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 8),
               Text(
-                'Нет блюд в меню. Добавьте ТТК с типом «Блюдо» в разделе ТТК.',
+                loc.t('menu_empty_dishes'),
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
                 textAlign: TextAlign.center,
               ),
@@ -332,14 +373,23 @@ class _MenuScreenState extends State<MenuScreen> {
                 ),
               ),
               title: InkWell(
-                onTap: () => context.push('/tech-cards/${tc.id}?view=1${_isHallMenu ? '&hall=1' : ''}'),
+                onTap: () {
+                  final emp = context.read<AccountManagerSupabase>().currentEmployee;
+                  // hall=1 только для меню зала (описание, состав, цена). Кухня/бар — полная ТТК в просмотре.
+                  final useHallView = _isHallMenu && !_canSeeFullTtkView(emp, tc);
+                  context.push('/tech-cards/${tc.id}?view=1${useHallView ? '&hall=1' : ''}');
+                },
                 child: Text(
                   tc.getDisplayNameInLists(lang),
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
               ),
               subtitle: InkWell(
-                onTap: () => context.push('/tech-cards/${tc.id}?view=1${_isHallMenu ? '&hall=1' : ''}'),
+                onTap: () {
+                  final emp = context.read<AccountManagerSupabase>().currentEmployee;
+                  final useHallView = _isHallMenu && !_canSeeFullTtkView(emp, tc);
+                  context.push('/tech-cards/${tc.id}?view=1${useHallView ? '&hall=1' : ''}');
+                },
                 child: Text(
                   _buildSubtitleText(loc, tc, lang, totalCost, currencySym),
                   style: TextStyle(fontSize: 13, color: Colors.grey[600]),
@@ -348,21 +398,8 @@ class _MenuScreenState extends State<MenuScreen> {
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
-                  child: _isHallMenu && _hasHallContent(tc)
-                      ? _HallDishContent(
-                          loc: loc,
-                          description: tc.descriptionForHall ?? '',
-                          composition: tc.compositionForHall ?? '',
-                        )
-                      : _MenuDishTable(
-                          loc: loc,
-                          dishName: tc.dishName,
-                          ingredients: tc.ingredients.where((i) => !i.isPlaceholder || i.hasData).toList(),
-                          technology: tc.getLocalizedTechnology(lang),
-                          currencySym: currencySym,
-                          showCost: _canSeeCost(context.read<AccountManagerSupabase>().currentEmployee),
-                        ),
-                  ),
+                  child: _buildExpandedContent(context.read<AccountManagerSupabase>().currentEmployee, loc, tc, lang, currencySym),
+                ),
               ],
             ),
           );
@@ -417,17 +454,21 @@ class _HallTabChip extends StatelessWidget {
   }
 }
 
-/// Блок описания и состава для зала (вместо полной ТТК).
+/// Блок описания, состава и продажной цены для зала (вместо полной ТТК).
 class _HallDishContent extends StatelessWidget {
   const _HallDishContent({
     required this.loc,
     required this.description,
     required this.composition,
+    this.sellingPrice,
+    this.currencySym = '',
   });
 
   final LocalizationService loc;
   final String description;
   final String composition;
+  final double? sellingPrice;
+  final String currencySym;
 
   @override
   Widget build(BuildContext context) {
@@ -435,15 +476,21 @@ class _HallDishContent extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (description.isNotEmpty) ...[
-          Text(loc.t('description_for_hall') ?? 'Описание', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+          Text(loc.t('description_for_hall'), style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
           Text(description, style: const TextStyle(fontSize: 13, height: 1.4)),
           const SizedBox(height: 12),
         ],
         if (composition.isNotEmpty) ...[
-          Text(loc.t('composition_for_hall') ?? 'Состав', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+          Text(loc.t('composition_for_hall'), style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
           Text(composition, style: const TextStyle(fontSize: 13, height: 1.4)),
+          const SizedBox(height: 12),
+        ],
+        if (sellingPrice != null && sellingPrice! > 0) ...[
+          Text(loc.t('selling_price'), style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          Text('${sellingPrice!.toStringAsFixed(2)} $currencySym', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.primary)),
         ],
       ],
     );

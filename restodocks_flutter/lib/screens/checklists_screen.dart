@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../models/models.dart';
+import '../services/app_toast_service.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
 
@@ -19,9 +20,12 @@ class ChecklistsScreen extends StatefulWidget {
 
 class _ChecklistsScreenState extends State<ChecklistsScreen> {
   List<Checklist> _list = [];
+  List<Employee> _employees = [];
   bool _loading = true;
   String? _error;
   final ScrollController _scrollController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   Future<void> _load() async {
     final acc = context.read<AccountManagerSupabase>();
@@ -40,6 +44,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
     });
     try {
       final svc = context.read<ChecklistServiceSupabase>();
+      final acc = context.read<AccountManagerSupabase>();
       final canEdit = emp.canEditChecklistsAndTechCards;
       final list = await svc.getChecklistsForEstablishment(
         est.id,
@@ -47,8 +52,10 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
         currentEmployeeId: emp.id,
         applyAssignmentFilter: !canEdit,
       );
+      final emps = await acc.getEmployeesForEstablishment(est.id);
       if (mounted) setState(() {
         _list = list;
+        _employees = emps;
         _loading = false;
       });
     } catch (e) {
@@ -68,6 +75,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
   @override
   void dispose() {
     _scrollController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -139,7 +147,24 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
           ),
         ],
       ),
-      body: _body(loc, canEdit, canAccessChecklists, _scrollController),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: loc.t('checklist_search_hint'),
+                prefixIcon: const Icon(Icons.search),
+                border: const OutlineInputBorder(),
+                isDense: true,
+              ),
+              onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
+            ),
+          ),
+          Expanded(child: _body(loc, canEdit, canAccessChecklists, _scrollController)),
+        ],
+      ),
       floatingActionButton: canAccessChecklists
           ? FloatingActionButton(
               onPressed: _loading ? null : _createNew,
@@ -148,6 +173,90 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
             )
           : null,
     );
+  }
+
+  List<Checklist> get _filteredList {
+    if (_searchQuery.isEmpty) return _list;
+    return _list.where((c) {
+      final name = (c.name.trim().isNotEmpty ? c.name : c.additionalName ?? '').toLowerCase();
+      return name.contains(_searchQuery);
+    }).toList();
+  }
+
+  /// Build grouped list: section → deadline → employee. Returns list of (isHeader, headerLevel, label, checklist?).
+  List<({bool isHeader, int level, String label, Checklist? checklist})> _buildGroupedItems(
+    LocalizationService loc,
+  ) {
+    final lang = loc.currentLanguageCode;
+    final fmtDate = (DateTime d) => '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}';
+    final formatDateTime = (DateTime d) {
+      final utc = d.toUtc();
+      final hasTime = utc.hour != 0 || utc.minute != 0;
+      final local = d.toLocal();
+      return hasTime ? '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')} ${fmtDate(local)}' : fmtDate(utc);
+    };
+    final noSection = loc.t('checklist_no_section') ?? 'Без цеха';
+    final noDeadline = loc.t('checklist_no_deadline') ?? 'Без срока';
+    final allEmployees = loc.t('checklist_all_employees') ?? 'Всем';
+
+    final empMap = {for (final e in _employees) e.id: e.fullName};
+
+    // Group: section -> deadline -> employee -> [Checklist]
+    final grouped = <String, Map<String, Map<String, List<Checklist>>>>{};
+    for (final c in _filteredList) {
+      final sectionKey = c.assignedSection?.isNotEmpty == true ? c.assignedSection! : '';
+      final sectionLabel = sectionKey.isNotEmpty
+          ? (KitchenSection.fromCode(sectionKey)?.getLocalizedName(lang) ?? sectionKey)
+          : noSection;
+
+      final deadlineDt = c.deadlineAt ?? c.scheduledForAt;
+      final deadlineKey = deadlineDt?.toIso8601String() ?? '';
+      final deadlineLabel = deadlineDt != null ? formatDateTime(deadlineDt) : noDeadline;
+
+      final empIds = c.assignedEmployeeIds ?? (c.assignedEmployeeId != null ? [c.assignedEmployeeId!] : <String>[]);
+      final empKey = empIds.isNotEmpty ? empIds.first : '';
+      final empLabel = empKey.isNotEmpty ? (empMap[empKey] ?? empKey) : allEmployees;
+
+      grouped.putIfAbsent(sectionLabel, () => {});
+      grouped[sectionLabel]!.putIfAbsent(deadlineLabel, () => {});
+      grouped[sectionLabel]![deadlineLabel]!.putIfAbsent(empLabel, () => []);
+      grouped[sectionLabel]![deadlineLabel]![empLabel]!.add(c);
+    }
+
+    // Sort sections: "Без цеха" last, rest alphabetically
+    final sectionOrder = grouped.keys.toList()
+      ..sort((a, b) {
+        if (a == noSection) return 1;
+        if (b == noSection) return -1;
+        return a.compareTo(b);
+      });
+
+    final result = <({bool isHeader, int level, String label, Checklist? checklist})>[];
+    for (final sec in sectionOrder) {
+      result.add((isHeader: true, level: 0, label: sec, checklist: null));
+      final deadlines = grouped[sec]!.keys.toList()
+        ..sort((a, b) {
+          if (a == noDeadline) return 1;
+          if (b == noDeadline) return -1;
+          return a.compareTo(b);
+        });
+      for (final dl in deadlines) {
+        result.add((isHeader: true, level: 1, label: dl, checklist: null));
+        final employees = grouped[sec]![dl]!.keys.toList()
+          ..sort((a, b) {
+            if (a == allEmployees) return 1;
+            if (b == allEmployees) return -1;
+            return a.compareTo(b);
+          });
+        for (final emp in employees) {
+          result.add((isHeader: true, level: 2, label: emp, checklist: null));
+          for (final c in grouped[sec]![dl]![emp]!) {
+            result.add((isHeader: false, level: 3, label: '', checklist: c));
+          }
+        }
+      }
+    }
+    return result;
   }
 
   Widget _body(LocalizationService loc, bool canEdit, bool canAccessChecklists, ScrollController scrollController) {
@@ -207,14 +316,42 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
         ),
       );
     }
+    final grouped = _buildGroupedItems(loc);
+    if (grouped.isEmpty) {
+      return Center(
+        child: Text(
+          loc.t('no_checklists') ?? 'Нет результатов',
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.grey[600]),
+        ),
+      );
+    }
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView.builder(
         controller: scrollController,
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-        itemCount: _list.length,
+        itemCount: grouped.length,
         itemBuilder: (context, i) {
-          final c = _list[i];
+          final item = grouped[i];
+          if (item.isHeader) {
+            final fontSize = item.level == 0 ? 16.0 : item.level == 1 ? 14.0 : 12.0;
+            final fontWeight = item.level == 0 ? FontWeight.bold : item.level == 1 ? FontWeight.w600 : FontWeight.w500;
+            return Padding(
+              padding: EdgeInsets.only(
+                top: i > 0 ? (item.level == 0 ? 16 : item.level == 1 ? 12 : 8) : 0,
+                bottom: 4,
+              ),
+              child: Text(
+                item.label,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontSize: fontSize,
+                      fontWeight: fontWeight,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+              ),
+            );
+          }
+          final c = item.checklist!;
           final lang = loc.currentLanguageCode;
           final sectionLabel = c.assignedSection != null
               ? (KitchenSection.fromCode(c.assignedSection!)?.getLocalizedName(lang) ?? c.assignedSection)
@@ -316,9 +453,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                               if (confirm == true && mounted) {
                                 final toDelete = c;
                                 setState(() => _list = _list.where((x) => x.id != toDelete.id).toList());
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text(loc.t('checklist_deleted') ?? 'Удалено')),
-                                );
+                                AppToastService.show(loc.t('checklist_deleted') ?? 'Удалено');
                                 try {
                                   await context.read<ChecklistServiceSupabase>().deleteChecklist(toDelete.id);
                                 } catch (e) {

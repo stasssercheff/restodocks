@@ -298,6 +298,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       final employees = await acc.getEmployeesForEstablishment(est.id);
       final model = await loadSchedule(est.id);
       if (mounted) {
+        final loc = context.read<LocalizationService>();
         setState(() {
           final raw = employees ?? [];
           _employees = _dedupeEmployeesById(raw);
@@ -329,7 +330,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             // Создаем слоты только для сотрудников с должностью (собственник без должности не в графике)
             final slots = scheduleableEmployees.map((e) => ScheduleSlot(
                   id: const Uuid().v4(),
-                  name: e.fullName.trim().isEmpty ? 'Сотрудник' : e.fullName.trim(),
+                  name: e.fullName.trim().isEmpty ? loc.t('employee_label') : e.fullName.trim(),
                   sectionId: _getSectionIdForEmployee(e, _model.sections),
                   employeeId: e.id,
                 )).toList();
@@ -372,7 +373,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                 .where((e) => !existingEmployeeIds.contains(e.id))
                 .map((e) => ScheduleSlot(
                       id: const Uuid().v4(),
-                      name: e.fullName.trim().isEmpty ? 'Сотрудник' : e.fullName.trim(),
+                      name: e.fullName.trim().isEmpty ? loc.t('employee_label') : e.fullName.trim(),
                       sectionId: _getSectionIdForEmployee(e, _model.sections),
                       employeeId: e.id,
                     ))
@@ -514,15 +515,15 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             if (mounted) {
               if (ok) {
                 setState(() => _model = updatedModel);
-                scaffoldMessenger.showSnackBar(const SnackBar(content: Text('График вставлен в выбранный диапазон')));
+                scaffoldMessenger.showSnackBar(SnackBar(content: Text(loc.t('schedule_pasted'))));
               } else {
-                scaffoldMessenger.showSnackBar(const SnackBar(content: Text('Ошибка: не удалось сохранить график')));
+                scaffoldMessenger.showSnackBar(SnackBar(content: Text(loc.t('schedule_save_error'))));
               }
             }
           } catch (e, st) {
             debugPrint('Schedule copy save error: $e\n$st');
             if (mounted) {
-              scaffoldMessenger.showSnackBar(SnackBar(content: Text('Ошибка сохранения: $e')));
+              scaffoldMessenger.showSnackBar(SnackBar(content: Text(loc.t('save_error').replaceFirst('%s', e.toString()))));
             }
           }
         },
@@ -792,7 +793,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             IconButton(
               icon: const Icon(Icons.copy),
               onPressed: _showCopyRangeDialog,
-              tooltip: 'Копировать диапазон',
+              tooltip: loc.t('schedule_copy_range'),
             ),
         ],
       ),
@@ -1143,20 +1144,21 @@ class _CopyRangeDialogState extends State<_CopyRangeDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = widget.loc;
     return AlertDialog(
-      title: Text('Копировать диапазон графика'),
+      title: Text(loc.t('schedule_copy_range')),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Выберите диапазон для копирования:', style: Theme.of(context).textTheme.titleSmall),
+            Text(loc.t('schedule_select_range_copy'), style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
             Row(
               children: [
                 Expanded(
                   child: _DatePickerButton(
-                    label: 'От',
+                    label: loc.t('from_label'),
                     selectedDate: _sourceStart,
                     dates: widget.dates,
                     initialDate: _today,
@@ -1166,7 +1168,7 @@ class _CopyRangeDialogState extends State<_CopyRangeDialog> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: _DatePickerButton(
-                    label: 'До',
+                    label: loc.t('to_label'),
                     selectedDate: _sourceEnd,
                     dates: widget.dates,
                     initialDate: _today,
@@ -1176,13 +1178,13 @@ class _CopyRangeDialogState extends State<_CopyRangeDialog> {
               ],
             ),
             const SizedBox(height: 16),
-            Text('Выберите диапазон для вставки:', style: Theme.of(context).textTheme.titleSmall),
+            Text(loc.t('schedule_select_range_paste'), style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
             Row(
               children: [
                 Expanded(
                   child: _DatePickerButton(
-                    label: 'От',
+                    label: loc.t('from_label'),
                     selectedDate: _targetStart,
                     dates: widget.dates,
                     initialDate: _today,
@@ -1192,7 +1194,7 @@ class _CopyRangeDialogState extends State<_CopyRangeDialog> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: _DatePickerButton(
-                    label: 'До',
+                    label: loc.t('to_label'),
                     selectedDate: _targetEnd,
                     dates: widget.dates,
                     initialDate: _today,
@@ -1202,7 +1204,7 @@ class _CopyRangeDialogState extends State<_CopyRangeDialog> {
               ],
             ),
             const SizedBox(height: 16),
-            Text('Выберите сотрудников:', style: Theme.of(context).textTheme.titleSmall),
+            Text(loc.t('schedule_select_employees'), style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -1230,7 +1232,7 @@ class _CopyRangeDialogState extends State<_CopyRangeDialog> {
         ),
         FilledButton(
           onPressed: _canCopy ? () async { await _copy(); } : null,
-          child: const Text('Копировать'),
+          child: Text(loc.t('copy_btn')),
         ),
       ],
     );
@@ -1330,10 +1332,11 @@ class _DatePickerDialogState extends State<_DatePickerDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = context.read<LocalizationService>();
     final dates = widget.dates;
     final initialDate = widget.initialDate;
     return AlertDialog(
-      title: const Text('Выберите дату'),
+      title: Text(loc.t('select_date')),
       content: SizedBox(
         width: double.maxFinite,
         height: 300,

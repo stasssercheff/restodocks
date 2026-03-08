@@ -94,4 +94,4 @@ Prod и Admin Demo используют один Supabase (osglfptwbuqqmqunttha)
 
 ## 7. GitHub Actions
 
-При push в `main` (с изменениями в `admin/`) автоматически запускается **Deploy Admin to Cloudflare Workers**. Секреты: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`.
+Деплой админки — **только вручную**: GitHub → Actions → Deploy Admin to Cloudflare Workers → Run workflow. Автодеплой отключён, чтобы не тратить лимиты.

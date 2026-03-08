@@ -59,6 +59,7 @@ void main() async {
   await OwnerViewPreferenceService().initialize();
   await TtkBranchFilterService().initialize();
   await ScreenLayoutPreferenceService().initialize();
+  AppToastService.init(AppRouter.rootNavigatorKey);
   runApp(const RestodocksApp());
 }
 

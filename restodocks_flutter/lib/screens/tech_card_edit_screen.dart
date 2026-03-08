@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../models/models.dart';
+import '../services/app_toast_service.dart';
 import '../services/services.dart';
 import '../utils/number_format_utils.dart';
 import '../widgets/app_bar_home_button.dart';
@@ -411,6 +412,30 @@ class _EditableCostCellState extends State<_EditableCostCell> {
   }
 }
 
+/// Категории бара (для определения права на продажную цену).
+const _barCategoriesForEdit = {'beverages', 'alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks'};
+
+bool _isBarDishTechCard(TechCard tc) =>
+    _barCategoriesForEdit.contains(tc.category) || tc.sections.contains('bar');
+
+bool _canSeeFullTtkViewTechCard(Employee? emp, TechCard tc) {
+  if (emp == null) return false;
+  if (emp.hasRole('owner')) return true;
+  if ((emp.hasRole('executive_chef') || emp.hasRole('sous_chef')) && !_isBarDishTechCard(tc)) return true;
+  if (emp.hasRole('bar_manager') && _isBarDishTechCard(tc)) return true;
+  return false;
+}
+
+bool _canEditSellingPrice(Employee? emp, TechCard? tc, {bool isSemiFinished = false, String? category, List<String>? sections, String? department}) {
+  if (emp == null || isSemiFinished) return false;
+  if (tc != null) return _canSeeFullTtkViewTechCard(emp, tc);
+  final isBar = department == 'bar' || (category != null && _barCategoriesForEdit.contains(category)) || (sections?.contains('bar') ?? false);
+  if (emp.hasRole('owner')) return true;
+  if ((emp.hasRole('executive_chef') || emp.hasRole('sous_chef')) && !isBar) return true;
+  if (emp.hasRole('bar_manager') && isBar) return true;
+  return false;
+}
+
 TechCard _applyEdits(
   TechCard t, {
   String? dishName,
@@ -422,6 +447,7 @@ TechCard _applyEdits(
   Map<String, String>? technologyLocalized,
   String? descriptionForHall,
   String? compositionForHall,
+  double? sellingPrice,
   List<String>? photoUrls,
   List<TTIngredient>? ingredients,
 }) {
@@ -435,6 +461,7 @@ TechCard _applyEdits(
     technologyLocalized: technologyLocalized,
     descriptionForHall: descriptionForHall,
     compositionForHall: compositionForHall,
+    sellingPrice: sellingPrice,
     photoUrls: photoUrls,
     ingredients: ingredients,
   );
@@ -518,6 +545,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   final _technologyController = TextEditingController();
   final _descriptionForHallController = TextEditingController();
   final _compositionForHallController = TextEditingController();
+  final _sellingPriceController = TextEditingController();
   final List<TTIngredient> _ingredients = [];
   List<TechCard> _pickerTechCards = [];
   List<TechCard> _semiFinishedProducts = [];
@@ -530,6 +558,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   bool get _isNew => widget.techCardId.isEmpty || widget.techCardId == 'new';
   /// Макс. фото: ПФ — 10, блюдо — 1
   int get _maxPhotos => _isSemiFinished ? 10 : 1;
+
+  double? _parseSellingPrice() {
+    final s = _sellingPriceController.text.trim();
+    if (s.isEmpty) return null;
+    final v = double.tryParse(s.replaceAll(',', '.'));
+    return (v != null && v >= 0) ? v : null;
+  }
 
   String _categoryLabel(String c, String lang) {
     final Map<String, Map<String, String>> categoryTranslations = {
@@ -670,6 +705,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
             _technologyController.text = tc.getLocalizedTechnology(context.read<LocalizationService>().currentLanguageCode);
             _descriptionForHallController.text = tc.descriptionForHall ?? '';
             _compositionForHallController.text = tc.compositionForHall ?? '';
+            _sellingPriceController.text = tc.sellingPrice != null && tc.sellingPrice! > 0
+                ? tc.sellingPrice!.toStringAsFixed(2)
+                : '';
             _ingredients
               ..clear()
               ..addAll(tc.ingredients);
@@ -712,6 +750,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     _technologyController.dispose();
     _descriptionForHallController.dispose();
     _compositionForHallController.dispose();
+    _sellingPriceController.dispose();
     super.dispose();
   }
 
@@ -806,7 +845,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           establishmentId: est.dataEstablishmentId,
           createdBy: emp.id,
         );
-        var updated = _applyEdits(created, portionWeight: _portionWeight, yieldGrams: yieldVal, technologyLocalized: techMap, descriptionForHall: _descriptionForHallController.text.trim().isEmpty ? null : _descriptionForHallController.text.trim(), compositionForHall: _compositionForHallController.text.trim().isEmpty ? null : _compositionForHallController.text.trim(), ingredients: toSaveIngredients);
+        final sellingPrice = _parseSellingPrice();
+        var updated = _applyEdits(created, portionWeight: _portionWeight, yieldGrams: yieldVal, technologyLocalized: techMap, descriptionForHall: _descriptionForHallController.text.trim().isEmpty ? null : _descriptionForHallController.text.trim(), compositionForHall: _compositionForHallController.text.trim().isEmpty ? null : _compositionForHallController.text.trim(), sellingPrice: sellingPrice, ingredients: toSaveIngredients);
         if (_pendingPhotoBytes.isNotEmpty) {
           final urls = <String>[];
           for (var i = 0; i < _pendingPhotoBytes.length; i++) {
@@ -866,7 +906,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           } catch (_) {}
         });
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('tech_card_created'))));
+          AppToastService.show(loc.t('tech_card_created'));
           context.go('/tech-cards?refresh=1');
         }
       } else {
@@ -882,7 +922,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
             if (url != null) photoUrls.add(url);
           }
         }
-        final updated = _applyEdits(tc, dishName: name, category: category, sections: _selectedSections, isSemiFinished: _isSemiFinished, portionWeight: _portionWeight, yieldGrams: yieldVal, technologyLocalized: techMap, descriptionForHall: _descriptionForHallController.text.trim().isEmpty ? null : _descriptionForHallController.text.trim(), compositionForHall: _compositionForHallController.text.trim().isEmpty ? null : _compositionForHallController.text.trim(), photoUrls: photoUrls, ingredients: toSaveIngredients);
+        final sellingPrice = _parseSellingPrice();
+        final updated = _applyEdits(tc, dishName: name, category: category, sections: _selectedSections, isSemiFinished: _isSemiFinished, portionWeight: _portionWeight, yieldGrams: yieldVal, technologyLocalized: techMap, descriptionForHall: _descriptionForHallController.text.trim().isEmpty ? null : _descriptionForHallController.text.trim(), compositionForHall: _compositionForHallController.text.trim().isEmpty ? null : _compositionForHallController.text.trim(), sellingPrice: sellingPrice, photoUrls: photoUrls, ingredients: toSaveIngredients);
         await svc.saveTechCard(updated);
         // Переводим название и технологию фоново
         final techText = _technologyController.text.trim();
@@ -928,7 +969,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           } catch (_) {}
         });
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.read<LocalizationService>().t('save') + ' ✓')));
+          AppToastService.show(context.read<LocalizationService>().t('save') + ' ✓');
           context.go('/tech-cards?refresh=1');
         }
       }
@@ -953,7 +994,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     try {
       await context.read<TechCardServiceSupabase>().deleteTechCard(widget.techCardId);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('tech_card_deleted'))));
+        AppToastService.show(loc.t('tech_card_deleted'));
         context.go('/tech-cards');
       }
     } catch (e) {
@@ -1563,6 +1604,28 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                             ),
                           )
                         : Text(_compositionForHallController.text.isEmpty ? '—' : _compositionForHallController.text, style: const TextStyle(fontSize: 13, height: 1.4)),
+                    if (_canEditSellingPrice(context.read<AccountManagerSupabase>().currentEmployee, _techCard, isSemiFinished: _isSemiFinished, category: _selectedCategory, sections: _selectedSections, department: widget.department)) ...[
+                      const SizedBox(height: 12),
+                      Text(loc.t('selling_price') ?? 'Продажная цена', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                      const SizedBox(height: 4),
+                      TextField(
+                        controller: _sellingPriceController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        style: const TextStyle(fontSize: 13),
+                        decoration: InputDecoration(
+                          hintText: '0.00',
+                          suffixText: context.read<AccountManagerSupabase>().establishment?.currencySymbol ?? '',
+                          isDense: true,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ] else if (_techCard != null && !_isSemiFinished && _techCard!.sellingPrice != null && _techCard!.sellingPrice! > 0) ...[
+                      const SizedBox(height: 12),
+                      Text(loc.t('selling_price') ?? 'Продажная цена', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                      const SizedBox(height: 4),
+                      Text('${_techCard!.sellingPrice!.toStringAsFixed(2)} ${context.read<AccountManagerSupabase>().establishment?.currencySymbol ?? ''}', style: const TextStyle(fontSize: 13, height: 1.4)),
+                    ],
                   ],
                 ),
               ),
@@ -1746,12 +1809,16 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
       );
     }
 
-    // Режим «для зала»: описание и состав для гостей вместо полной ТТК кухни
-    if (widget.forceHallView && _techCard != null && !_techCard!.isSemiFinished) {
+    // Режим «для зала»: описание, состав, продажная цена. Только при явном forceHallView (меню зала).
+    // Повары и сотрудники кухни/бара — полная ТТК в просмотре без цен (через _TtkCookTable).
+    final showLimitedView = _techCard != null && !_techCard!.isSemiFinished && widget.forceHallView;
+    if (showLimitedView) {
       final desc = _techCard!.descriptionForHall?.trim() ?? '';
       final comp = _techCard!.compositionForHall?.trim() ?? '';
       final photoUrls = _techCard!.photoUrls ?? [];
       final photoUrl = photoUrls.isNotEmpty ? photoUrls.first : null;
+      final sellingPrice = _techCard!.sellingPrice;
+      final currencySym = context.read<AccountManagerSupabase>().establishment?.currencySymbol ?? '';
       return Scaffold(
         appBar: AppBar(
           leading: appBarBackButton(context),
@@ -1782,8 +1849,15 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                 Text(loc.t('composition_for_hall') ?? 'Состав', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
                 Text(comp, style: const TextStyle(fontSize: 15, height: 1.5)),
+                const SizedBox(height: 16),
               ],
-              if (desc.isEmpty && comp.isEmpty)
+              if (sellingPrice != null && sellingPrice > 0) ...[
+                Text(loc.t('selling_price') ?? 'Цена', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 4),
+                Text('${sellingPrice.toStringAsFixed(2)} $currencySym', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.primary)),
+                const SizedBox(height: 16),
+              ],
+              if (desc.isEmpty && comp.isEmpty && (sellingPrice == null || sellingPrice <= 0))
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 24),
                   child: Text(
@@ -1848,7 +1922,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                   TextField(
                     controller: _nameController,
                     readOnly: !effectiveCanEdit,
-                    style: TextStyle(fontSize: isMobile ? 16 : 14),
+                    style: TextStyle(fontSize: isMobile ? 12 : 14),
                     decoration: InputDecoration(
                       labelText: loc.t('ttk_name'),
                       isDense: true,
@@ -1910,12 +1984,12 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         SizedBox(
-                          width: 140,
+                          width: 320,
                           height: 56,
                           child: TextField(
                             controller: _nameController,
                             readOnly: !effectiveCanEdit,
-                            style: TextStyle(fontSize: isMobile ? 16 : 14),
+                            style: TextStyle(fontSize: 14),
                             decoration: InputDecoration(
                               labelText: loc.t('ttk_name'),
                               isDense: true,
@@ -2792,54 +2866,7 @@ class _TtkTableState extends State<_TtkTable> {
       ),
     );
 
-    // Панель с КБЖУ для PRO подписки
-    if (hasProSubscription && (totalCalories > 0 || totalProtein > 0 || totalFat > 0 || totalCarbs > 0)) {
-      return Column(
-        children: [
-          table,
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.blue.shade50,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.blue.shade200),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.restaurant, color: Colors.blue.shade700),
-                    const SizedBox(width: 8),
-                    Text(
-                      loc.t('ttk_nutrition_title'),
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue.shade700,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    _nutritionChip(loc.t('ttk_calories'), '${totalCalories.round()} ${loc.t('kcal')}', Colors.orange),
-                    const SizedBox(width: 12),
-                    _nutritionChip(loc.t('ttk_protein'), '${totalProtein.toStringAsFixed(1)} ${loc.t('gram')}', Colors.red),
-                    const SizedBox(width: 12),
-                    _nutritionChip(loc.t('ttk_fat'), '${totalFat.toStringAsFixed(1)} ${loc.t('gram')}', Colors.yellow.shade700),
-                    const SizedBox(width: 12),
-                    _nutritionChip(loc.t('ttk_carbs'), '${totalCarbs.toStringAsFixed(1)} ${loc.t('gram')}', Colors.green),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      );
-    }
-
+    // КБЖУ скрыто
     return table;
   }
 
@@ -3562,7 +3589,7 @@ class _ProductPickerState extends State<_ProductPicker> {
                 onTap: () => _askWeight(p, loc),
                 child: ListTile(
                   title: Text(_getDisplayName(p, lang)),
-                  subtitle: Text('${p.calories?.round() ?? 0} ${loc.t('kcal')} · ${CulinaryUnits.displayName((p.unit ?? 'g').trim().toLowerCase(), loc.currentLanguageCode)}'),
+                  subtitle: Text(CulinaryUnits.displayName((p.unit ?? 'g').trim().toLowerCase(), loc.currentLanguageCode)),
                 ),
               );
             },
@@ -3969,12 +3996,12 @@ class _SectionPicker extends StatelessWidget {
   });
 
   String get _displayLabel {
-    if (selected.isEmpty) return 'Скрыто';
-    if (selected.contains('all')) return 'Все цеха';
+    if (selected.isEmpty) return loc.t('ttk_section_hidden_short');
+    if (selected.contains('all')) return loc.t('ttk_section_all');
     if (selected.length == 1) {
       return availableSections[selected.first] ?? selected.first;
     }
-    return '${selected.length} цеха';
+    return loc.t('ttk_sections_count').replaceFirst('%s', '${selected.length}');
   }
 
   @override
@@ -3984,7 +4011,7 @@ class _SectionPicker extends StatelessWidget {
     if (!canEdit) {
       return InputDecorator(
         decoration: InputDecoration(
-          labelText: 'Цех',
+          labelText: loc.t('ttk_section_label'),
           isDense: true,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
         ),
@@ -4018,7 +4045,7 @@ class _SectionPicker extends StatelessWidget {
       onTap: () => _showPicker(context),
       child: InputDecorator(
         decoration: InputDecoration(
-          labelText: 'Цех',
+          labelText: loc.t('ttk_section_label'),
           isDense: true,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
           suffixIcon: const Icon(Icons.arrow_drop_down),
@@ -4113,6 +4140,7 @@ class _SectionPickerDialogState extends State<_SectionPickerDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final loc = context.watch<LocalizationService>();
     final isHidden = _selected.isEmpty;
     final isAll = _selected.contains('all');
 
@@ -4129,14 +4157,13 @@ class _SectionPickerDialogState extends State<_SectionPickerDialog> {
               Row(children: [
                 Icon(Icons.store, color: theme.colorScheme.primary, size: 22),
                 const SizedBox(width: 10),
-                Text('Выбор цеха',
+                Text(loc.t('ttk_section_select'),
                     style: theme.textTheme.titleMedium
                         ?.copyWith(fontWeight: FontWeight.w700)),
               ]),
               const SizedBox(height: 4),
               Text(
-                'ТТК будет видна только поварам выбранных цехов. '
-                'Если ничего не выбрано — видят только шеф-повар и су-шеф.',
+                loc.t('ttk_section_hint'),
                 style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
               ),
@@ -4166,8 +4193,8 @@ class _SectionPickerDialogState extends State<_SectionPickerDialog> {
                   Expanded(
                     child: Text(
                       isHidden
-                          ? 'Скрыто — виден только шеф-повару и су-шефу'
-                          : 'Снимите все цеха чтобы скрыть ТТК',
+                          ? loc.t('ttk_section_hidden')
+                          : loc.t('ttk_section_uncheck_hint'),
                       style: TextStyle(
                         fontSize: 12,
                         color: isHidden
@@ -4192,7 +4219,7 @@ class _SectionPickerDialogState extends State<_SectionPickerDialog> {
 
               // Все цеха
               _CheckItem(
-                label: 'Все цеха',
+                label: loc.t('ttk_section_all'),
                 checked: isAll,
                 onTap: () => _toggle('all'),
                 theme: theme,
@@ -4206,12 +4233,12 @@ class _SectionPickerDialogState extends State<_SectionPickerDialog> {
                 children: [
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(null),
-                    child: const Text('Отмена'),
+                    child: Text(loc.t('cancel')),
                   ),
                   const SizedBox(width: 8),
                   FilledButton(
                     onPressed: () => Navigator.of(context).pop(_selected),
-                    child: const Text('Сохранить'),
+                    child: Text(loc.t('save')),
                   ),
                 ],
               ),

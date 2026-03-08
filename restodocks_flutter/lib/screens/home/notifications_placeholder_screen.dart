@@ -44,14 +44,14 @@ class _NotificationsScreenState extends State<NotificationsScreen>
           IconButton(
             icon: const Icon(Icons.filter_list),
             onPressed: _showDateFilter,
-            tooltip: 'Фильтр по датам',
+            tooltip: loc.t('filter_by_dates'),
           ),
         ],
         bottom: TabBar(
           controller: _tabController,
           tabs: [
-            Tab(text: '📦 Заказы'),
-            Tab(text: '📋 Инвентаризации'),
+            Tab(text: '📦 ${loc.t('tab_orders')}'),
+            Tab(text: '📋 ${loc.t('tab_inventories')}'),
           ],
         ),
       ),
@@ -155,19 +155,19 @@ class _OrderHistoryTabState extends State<_OrderHistoryTab> {
             Icon(Icons.shopping_cart, size: 80, color: Colors.grey.shade400),
             const SizedBox(height: 16),
             Text(
-              'История заказов',
+              loc.t('order_history'),
               style: theme.textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
             Text(
-              'Отправленные заказы будут отображаться здесь',
+              loc.t('order_history_empty'),
               style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey),
               textAlign: TextAlign.center,
             ),
             if (widget.dateFilter != null) ...[
               const SizedBox(height: 16),
               Text(
-                'Фильтр: ${DateFormat('dd.MM.yyyy').format(widget.dateFilter!.start)} - ${DateFormat('dd.MM.yyyy').format(widget.dateFilter!.end)}',
+                loc.t('filter_date_range').replaceFirst('%s', DateFormat('dd.MM.yyyy').format(widget.dateFilter!.start)).replaceFirst('%s', DateFormat('dd.MM.yyyy').format(widget.dateFilter!.end)),
                 style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.primary),
               ),
             ],
@@ -183,7 +183,7 @@ class _OrderHistoryTabState extends State<_OrderHistoryTab> {
         final order = _orders[index];
         final createdAt = DateTime.parse(order['created_at']);
         final status = order['status'] ?? 'sent';
-        final employeeName = order['employees']?['full_name'] ?? 'Неизвестно';
+        final employeeName = order['employees']?['full_name'] ?? loc.t('unknown');
 
         return Card(
           margin: const EdgeInsets.only(bottom: 8),
@@ -192,8 +192,8 @@ class _OrderHistoryTabState extends State<_OrderHistoryTab> {
               Icons.shopping_cart,
               color: _getStatusColor(status),
             ),
-            title: Text('Заказ от ${DateFormat('dd.MM.yyyy HH:mm').format(createdAt)}'),
-            subtitle: Text('Сотрудник: $employeeName\nСтатус: ${_getStatusText(status)}'),
+            title: Text(loc.t('order_from').replaceFirst('%s', DateFormat('dd.MM.yyyy HH:mm').format(createdAt))),
+            subtitle: Text('${loc.t('employee_label')}: $employeeName\n${loc.t('status_label')}: ${_getStatusText(loc, status)}'),
             trailing: Icon(Icons.chevron_right),
             onTap: () => _showOrderDetails(context, order),
           ),
@@ -212,33 +212,34 @@ class _OrderHistoryTabState extends State<_OrderHistoryTab> {
     }
   }
 
-  String _getStatusText(String status) {
+  String _getStatusText(LocalizationService loc, String status) {
     switch (status) {
-      case 'sent': return 'Отправлен';
-      case 'processing': return 'В обработке';
-      case 'completed': return 'Завершен';
-      case 'cancelled': return 'Отменен';
+      case 'sent': return loc.t('status_sent');
+      case 'processing': return loc.t('status_processing');
+      case 'completed': return loc.t('status_completed');
+      case 'cancelled': return loc.t('status_cancelled');
       default: return status;
     }
   }
 
   void _showOrderDetails(BuildContext context, Map<String, dynamic> order) {
+    final loc = context.read<LocalizationService>();
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Детали заказа'),
+        title: Text(loc.t('order_details')),
         content: SingleChildScrollView(
           child: Text(
-            'Заказ ID: ${order['id']}\n'
-            'Дата: ${DateFormat('dd.MM.yyyy HH:mm').format(DateTime.parse(order['created_at']))}\n'
-            'Статус: ${_getStatusText(order['status'] ?? 'sent')}\n\n'
-            'Данные заказа:\n${order['order_data'] != null ? order['order_data'].toString() : 'Нет данных'}',
+            '${loc.t('order_id_label')}: ${order['id']}\n'
+            '${loc.t('date_label')}: ${DateFormat('dd.MM.yyyy HH:mm').format(DateTime.parse(order['created_at']))}\n'
+            '${loc.t('status_label')}: ${_getStatusText(loc, order['status'] ?? 'sent')}\n\n'
+            '${loc.t('order_data_label')}:\n${order['order_data'] != null ? order['order_data'].toString() : loc.t('no_data')}',
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Закрыть'),
+            child: Text(loc.t('close')),
           ),
         ],
       ),
@@ -319,19 +320,19 @@ class _InventoryHistoryTabState extends State<_InventoryHistoryTab> {
             Icon(Icons.inventory, size: 80, color: Colors.grey.shade400),
             const SizedBox(height: 16),
             Text(
-              'История инвентаризаций',
+              loc.t('inventory_history'),
               style: theme.textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
             Text(
-              'Заполненные инвентаризационные бланки будут отображаться здесь',
+              loc.t('inventory_history_empty'),
               style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey),
               textAlign: TextAlign.center,
             ),
             if (widget.dateFilter != null) ...[
               const SizedBox(height: 16),
               Text(
-                'Фильтр: ${DateFormat('dd.MM.yyyy').format(widget.dateFilter!.start)} - ${DateFormat('dd.MM.yyyy').format(widget.dateFilter!.end)}',
+                loc.t('filter_date_range').replaceFirst('%s', DateFormat('dd.MM.yyyy').format(widget.dateFilter!.start)).replaceFirst('%s', DateFormat('dd.MM.yyyy').format(widget.dateFilter!.end)),
                 style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.primary),
               ),
             ],
@@ -347,7 +348,7 @@ class _InventoryHistoryTabState extends State<_InventoryHistoryTab> {
         final inventory = _inventories[index];
         final date = DateTime.parse(inventory['date']);
         final status = inventory['status'] ?? 'completed';
-        final employeeName = inventory['employees']?['full_name'] ?? 'Неизвестно';
+        final employeeName = inventory['employees']?['full_name'] ?? loc.t('unknown');
         final totalItems = inventory['total_items'] ?? 0;
 
         return Card(
@@ -357,8 +358,8 @@ class _InventoryHistoryTabState extends State<_InventoryHistoryTab> {
               Icons.inventory,
               color: _getStatusColor(status),
             ),
-            title: Text('Инвентаризация ${DateFormat('dd.MM.yyyy').format(date)}'),
-            subtitle: Text('Сотрудник: $employeeName\nПозиций: $totalItems\nСтатус: ${_getStatusText(status)}'),
+            title: Text(loc.t('inventory_title').replaceFirst('%s', DateFormat('dd.MM.yyyy').format(date))),
+            subtitle: Text('${loc.t('employee_label')}: $employeeName\n${loc.t('items_count')}: $totalItems\n${loc.t('status_label')}: ${_getInventoryStatusText(loc, status)}'),
             trailing: Icon(Icons.chevron_right),
             onTap: () => _showInventoryDetails(context, inventory),
           ),
@@ -376,16 +377,17 @@ class _InventoryHistoryTabState extends State<_InventoryHistoryTab> {
     }
   }
 
-  String _getStatusText(String status) {
+  String _getInventoryStatusText(LocalizationService loc, String status) {
     switch (status) {
-      case 'draft': return 'Черновик';
-      case 'completed': return 'Завершена';
-      case 'sent': return 'Отправлена';
+      case 'draft': return loc.t('status_draft');
+      case 'completed': return loc.t('status_inventory_completed');
+      case 'sent': return loc.t('status_inventory_sent');
       default: return status;
     }
   }
 
   void _showInventoryDetails(BuildContext context, Map<String, dynamic> inventory) {
+    final loc = context.read<LocalizationService>();
     final date = DateTime.parse(inventory['date']);
     final startTime = inventory['start_time'];
     final endTime = inventory['end_time'];
@@ -393,25 +395,25 @@ class _InventoryHistoryTabState extends State<_InventoryHistoryTab> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Детали инвентаризации'),
+        title: Text(loc.t('inventory_details')),
         content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Дата: ${DateFormat('dd.MM.yyyy').format(date)}'),
-              if (startTime != null) Text('Начало: $startTime'),
-              if (endTime != null) Text('Окончание: $endTime'),
-              Text('Позиций: ${inventory['total_items'] ?? 0}'),
-              Text('Статус: ${_getStatusText(inventory['status'] ?? 'completed')}'),
+              Text('${loc.t('date_label')}: ${DateFormat('dd.MM.yyyy').format(date)}'),
+              if (startTime != null) Text('${loc.t('start_label')}: $startTime'),
+              if (endTime != null) Text('${loc.t('end_label')}: $endTime'),
+              Text('${loc.t('items_count')}: ${inventory['total_items'] ?? 0}'),
+              Text('${loc.t('status_label')}: ${_getInventoryStatusText(loc, inventory['status'] ?? 'completed')}'),
               if (inventory['notes'] != null && inventory['notes'].isNotEmpty)
-                Text('Примечания: ${inventory['notes']}'),
+                Text('${loc.t('notes_label')}: ${inventory['notes']}'),
               const SizedBox(height: 16),
-              const Text('Данные:', style: TextStyle(fontWeight: FontWeight.bold)),
+              Text(loc.t('data_label'), style: const TextStyle(fontWeight: FontWeight.bold)),
               Text(
                 inventory['inventory_data'] != null
                     ? inventory['inventory_data'].toString()
-                    : 'Нет данных',
+                    : loc.t('no_data'),
                 style: const TextStyle(fontSize: 12),
               ),
             ],
@@ -420,7 +422,7 @@ class _InventoryHistoryTabState extends State<_InventoryHistoryTab> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Закрыть'),
+            child: Text(loc.t('close')),
           ),
         ],
       ),

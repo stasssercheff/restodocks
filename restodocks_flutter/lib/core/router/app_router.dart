@@ -37,6 +37,7 @@ import '../../models/order_list.dart';
 import '../../services/ai_service.dart';
 import '../../services/services.dart';
 import '../../widgets/app_shell.dart';
+import '../../widgets/message_notification_listener.dart';
 
 /// Emails владельцев платформы — единственные кто видит /admin
 const _platformAdminEmails = <String>{
@@ -105,7 +106,11 @@ Page<void> _slideTransitionPage(GoRouterState state, Widget child) {
 class AppRouter {
   static bool _webLocationCorrected = false;
 
+  /// Key for root navigator — used by AppToastService to insert overlay.
+  static final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
+
   static final GoRouter router = GoRouter(
+    navigatorKey: rootNavigatorKey,
     initialLocation: _getInitialLocation(),
     redirect: (context, state) async {
       final loc = state.matchedLocation;
@@ -252,7 +257,9 @@ class AppRouter {
 
       // Shell — все рабочие экраны с нижней навигационной панелью
       ShellRoute(
-        builder: (context, state, child) => AppShell(child: child),
+        builder: (context, state, child) => AppShell(
+          child: MessageNotificationListener(child: child),
+        ),
         routes: [
           // Главный экран
           GoRoute(
@@ -368,7 +375,10 @@ class AppRouter {
           ),
           GoRoute(
             path: '/expenses/salary',
-            pageBuilder: (context, state) => _slideTransitionPage(state, const SalaryExpenseScreen()),
+            pageBuilder: (context, state) {
+              final department = state.queryParameters['department']; // kitchen|bar|hall для ФЗП по подразделению
+              return _slideTransitionPage(state, SalaryExpenseScreen(departmentFilter: department));
+            },
           ),
           GoRoute(
             path: '/department/:id',

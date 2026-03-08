@@ -1,12 +1,7 @@
-# Admin на Cloudflare Workers — деплой при push в main
+# Admin на Cloudflare Workers — только ручной деплой (не тратить лимиты)
 name: Deploy Admin to Cloudflare Workers
 
 on:
-  push:
-    branches: [staging, main]
-    paths:
-      - 'admin/**'
-      - '.github/workflows/deploy-cloudflare-admin.yml'
   workflow_dispatch:
 
 jobs:

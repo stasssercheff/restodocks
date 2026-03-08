@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../models/models.dart';
 import '../models/translation.dart';
+import '../services/app_toast_service.dart';
 import '../services/screen_layout_preference_service.dart';
 import '../services/services.dart';
 import '../utils/translit_utils.dart';
@@ -378,9 +379,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
         userId: emp?.id,
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('save') + ' ✓')),
-        );
+        AppToastService.show(loc.t('save') + ' ✓');
         clearDraft();
         context.go('/checklists?department=$dept&refresh=1');
       }
@@ -404,9 +403,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
       final svc = context.read<ChecklistServiceSupabase>();
       final created = await svc.duplicateChecklist(c, emp.id);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.read<LocalizationService>().t('checklist_created_duplicate'))),
-        );
+        AppToastService.show(context.read<LocalizationService>().t('checklist_created_duplicate'));
         context.pushReplacement('/checklists/${created.id}');
       }
     } catch (e) {
