@@ -45,6 +45,28 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     super.dispose();
   }
 
+  /// Порядок категорий для отображения: кухня/банкет и бар
+  static const _kitchenCategoryOrder = ['sauce', 'vegetables', 'salad', 'meat', 'seafood', 'side', 'subside', 'bakery', 'dessert', 'decor', 'soup', 'misc', 'beverages', 'banquet', 'catering'];
+  static const _barCategoryOrder = ['alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks', 'sauce', 'vegetables', 'salad', 'bakery', 'dessert', 'decor', 'misc', 'beverages'];
+
+  List<({String category, List<TechCard> cards})> _groupByCategory(List<TechCard> cards) {
+    final order = (widget.department == 'bar') ? _barCategoryOrder : _kitchenCategoryOrder;
+    final grouped = <String, List<TechCard>>{};
+    for (final tc in cards) {
+      final cat = tc.category.isNotEmpty ? tc.category : 'misc';
+      grouped.putIfAbsent(cat, () => []).add(tc);
+    }
+    final result = <({String category, List<TechCard> cards})>[];
+    for (final cat in order) {
+      final list = grouped.remove(cat);
+      if (list != null && list.isNotEmpty) result.add((category: cat, cards: list));
+    }
+    for (final e in grouped.entries) {
+      result.add((category: e.key, cards: e.value));
+    }
+    return result;
+  }
+
   String _categoryLabel(String c, LocalizationService loc) {
     final lang = loc.currentLanguageCode;
     final Map<String, Map<String, String>> categoryTranslations = {
@@ -107,12 +129,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       } else if (widget.department == 'hall') {
         list = []; // Зал не имеет своих ТТК
       } else {
+        // Кухня: повара и сотрудники подразделения видят все ТТК (блюда и ПФ) в режиме просмотра
         list = all.where((tc) =>
             tc.category != 'beverages' ||
             tc.sections.contains('all')).toList();
-        if (emp != null && !emp.hasRole('owner') && !emp.hasRole('executive_chef') && !emp.hasRole('sous_chef')) {
-          list = list.where((tc) => emp.canSeeTechCard(tc.sections)).toList();
-        }
       }
       if (mounted) {
         setState(() { _list = list; _loading = false; });
@@ -689,7 +709,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     );
   }
 
-  /// Компактная таблица с шапкой: влезает в экран телефона, без горизонтального скролла.
+  /// Компактная таблица с шапкой и группировкой по категориям.
   Widget _buildTechCardsTable(List<TechCard> techCards, LocalizationService loc, bool canEdit) {
     final lang = loc.currentLanguageCode;
     const colCatWidth = 76.0;
@@ -697,11 +717,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     const colActionsWidth = 62.0; // «Просмотр» целиком
     final est = context.read<AccountManagerSupabase>().establishment;
     final costSym = est?.currencySymbol ?? Establishment.currencySymbolFor(est?.defaultCurrency ?? 'VND');
+    final groups = _groupByCategory(techCards);
+
     return RefreshIndicator(
       onRefresh: _load,
       child: CustomScrollView(
         slivers: [
-          // Липкая шапка таблицы
           SliverPersistentHeader(
             pinned: true,
             delegate: _TableHeaderDelegate(
@@ -716,95 +737,132 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
               labelView: loc.t('ttk_col_view'),
             ),
           ),
-          SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, i) {
-                final tc = techCards[i];
-                final selected = _selectedTechCards.contains(tc.id);
-                final name = tc.getDisplayNameInLists(lang);
-                final cat = _categoryLabel(tc.category, loc);
-                final cost = NumberFormatUtils.formatInt(_calculateCostPerKg(tc));
-                return Material(
-                  color: selected
-                      ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.5)
-                      : null,
-                  child: InkWell(
-                    onTap: () {
-                      if (_selectionMode) {
-                        _toggleTechCardSelection(tc.id);
-                      } else {
-                        context.push('/tech-cards/${tc.id}');
-                      }
-                    },
-                    onLongPress: canEdit && !_selectionMode
-                        ? () => context.push('/tech-cards/${tc.id}?view=1')
-                        : null,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              name,
-                              style: const TextStyle(fontSize: 14),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          SizedBox(
-                            width: colCatWidth,
-                            child: Text(
-                              cat.length > 6 ? '${cat.substring(0, 5)}…' : cat,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                          SizedBox(
-                            width: colCostWidth,
-                            child: Text(
-                              cost,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                          SizedBox(
-                            width: colActionsWidth,
-                            child: _selectionMode
-                                ? Checkbox(
-                                  value: selected,
-                                  onChanged: (_) => _toggleTechCardSelection(tc.id),
-                                )
-                                : (canEdit
-                                    ? IconButton(
-                                        icon: const Icon(Icons.visibility_outlined, size: 20),
-                                        tooltip: loc.t('ttk_view'),
-                                        onPressed: () => context.push('/tech-cards/${tc.id}?view=1'),
-                                        style: IconButton.styleFrom(
-                                          minimumSize: const Size(36, 36),
-                                          padding: EdgeInsets.zero,
-                                        ),
-                                      )
-                                    : const SizedBox.shrink()),
-                          ),
-                        ],
-                      ),
-                    ),
+          ...groups.expand((g) => [
+            SliverToBoxAdapter(
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                child: Text(
+                  _categoryLabel(g.category, loc),
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
-                );
-              },
-              childCount: techCards.length,
+                ),
+              ),
             ),
-          ),
+            SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, i) => _buildTechCardRow(
+                  techCards: g.cards,
+                  index: i,
+                  lang: lang,
+                  loc: loc,
+                  canEdit: canEdit,
+                  colCatWidth: colCatWidth,
+                  colCostWidth: colCostWidth,
+                  colActionsWidth: colActionsWidth,
+                  costSym: costSym,
+                ),
+                childCount: g.cards.length,
+              ),
+            ),
+          ]),
           const SliverPadding(padding: EdgeInsets.only(bottom: 80)),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTechCardRow({
+    required List<TechCard> techCards,
+    required int index,
+    required String lang,
+    required LocalizationService loc,
+    required bool canEdit,
+    required double colCatWidth,
+    required double colCostWidth,
+    required double colActionsWidth,
+    required String costSym,
+  }) {
+    final tc = techCards[index];
+    final selected = _selectedTechCards.contains(tc.id);
+    final name = tc.getDisplayNameInLists(lang);
+    final cat = _categoryLabel(tc.category, loc);
+    final cost = NumberFormatUtils.formatInt(_calculateCostPerKg(tc));
+    return Material(
+      color: selected
+          ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.5)
+          : null,
+      child: InkWell(
+        onTap: () {
+          if (_selectionMode) {
+            _toggleTechCardSelection(tc.id);
+          } else {
+            final path = canEdit ? '/tech-cards/${tc.id}' : '/tech-cards/${tc.id}?view=1';
+            context.push(path);
+          }
+        },
+        onLongPress: canEdit && !_selectionMode
+            ? () => context.push('/tech-cards/${tc.id}?view=1')
+            : null,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  name,
+                  style: const TextStyle(fontSize: 14),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              SizedBox(
+                width: colCatWidth,
+                child: Text(
+                  cat.length > 6 ? '${cat.substring(0, 5)}…' : cat,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              SizedBox(
+                width: colCostWidth,
+                child: Text(
+                  cost,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              SizedBox(
+                width: colActionsWidth,
+                child: _selectionMode
+                    ? Checkbox(
+                        value: selected,
+                        onChanged: (_) => _toggleTechCardSelection(tc.id),
+                      )
+                    : IconButton(
+                        icon: const Icon(Icons.visibility_outlined, size: 20),
+                        tooltip: loc.t('ttk_view'),
+                        onPressed: () => context.push('/tech-cards/${tc.id}?view=1'),
+                        style: IconButton.styleFrom(
+                          minimumSize: const Size(36, 36),
+                          padding: EdgeInsets.zero,
+                        ),
+                      ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
