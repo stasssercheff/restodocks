@@ -28,6 +28,20 @@ class ProfileService {
     }
   }
 
+  /// Рассчитывает зарплату сотрудника за произвольный период (с учетом графика).
+  static Future<double> calculateSalaryForPeriod(Employee employee, String establishmentId, DateTime periodStart, DateTime periodEnd) async {
+    try {
+      final schedule = await loadSchedule(establishmentId);
+      final shiftsOrHours = _shiftsOrHoursFromSchedule(employee, schedule, periodStart, periodEnd);
+      if (employee.paymentType == 'hourly') {
+        return (employee.hourlyRate ?? 0) * shiftsOrHours;
+      }
+      return (employee.ratePerShift ?? 0) * shiftsOrHours;
+    } catch (e) {
+      return 0.0;
+    }
+  }
+
   /// Рассчитывает зарплату сотрудника за текущий календарный месяц (с учетом графика)
   static Future<double> calculateCurrentMonthSalary(Employee employee, String establishmentId) async {
     try {

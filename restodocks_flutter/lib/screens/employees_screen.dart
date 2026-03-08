@@ -40,10 +40,6 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
 
   bool _canToggleScheduleEdit(Employee? current) => _canToggleDataAccess(current);
 
-  bool _canConfirmShifts(Employee? current) {
-    return current?.canEditSchedule ?? false;
-  }
-
   Future<void> _load() async {
     final acc = context.read<AccountManagerSupabase>();
     final current = acc.currentEmployee;
@@ -91,11 +87,11 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loading ? null : _load, tooltip: loc.t('refresh')),
         ],
       ),
-      body: _buildBody(loc, theme, canEdit, canConfirmShifts: _canConfirmShifts(acc.currentEmployee)),
+      body: _buildBody(loc, theme, canEdit),
     );
   }
 
-  Widget _buildBody(LocalizationService loc, ThemeData theme, bool canEdit, {bool canConfirmShifts = false}) {
+  Widget _buildBody(LocalizationService loc, ThemeData theme, bool canEdit) {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
       return Center(
@@ -146,17 +142,6 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        if (canConfirmShifts)
-          Card(
-            margin: const EdgeInsets.only(bottom: 12),
-            child: ListTile(
-              leading: Icon(Icons.how_to_reg, color: theme.colorScheme.primary),
-              title: Text(loc.t('shift_confirmation')),
-              subtitle: Text(loc.t('shift_confirmation_hint')),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => context.push('/shift-confirmation'),
-            ),
-          ),
         _EmployeeTableHeader(loc: loc, canEdit: canEdit),
         const SizedBox(height: 4),
         ...List.generate(_list.length, (i) => _EmployeeCard(

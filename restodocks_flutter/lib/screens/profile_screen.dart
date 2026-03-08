@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -418,7 +419,68 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ? ProfileService.formatSalary(_currentMonthSalary!, currencySymbol)
                   : localization.t('salary_unavailable')),
         ),
+
+        // Зарплата за выбранный период
+        ListTile(
+          leading: const Icon(Icons.date_range),
+          title: Text(localization.t('salary_for_period') ?? 'Зарплата за период'),
+          subtitle: Text(localization.t('salary_period_hint') ?? 'За какой период считать часы и сумму'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => _showSalaryPeriodPicker(context, employee, establishment, localization),
+        ),
       ],
+    );
+  }
+
+  Future<void> _showSalaryPeriodPicker(BuildContext context, Employee employee, Establishment establishment, LocalizationService loc) async {
+    final now = DateTime.now();
+    final range = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+      initialDateRange: DateTimeRange(
+        start: DateTime(now.year, now.month, 1),
+        end: now,
+      ),
+      helpText: loc.t('salary_period') ?? 'Период',
+    );
+    if (range == null || !context.mounted) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => const Center(child: CircularProgressIndicator()),
+    );
+    final amount = await ProfileService.calculateSalaryForPeriod(
+      employee,
+      establishment.id,
+      DateTime(range.start.year, range.start.month, range.start.day),
+      DateTime(range.end.year, range.end.month, range.end.day),
+    );
+    if (!context.mounted) return;
+    Navigator.of(context).pop(); // close loading
+    final df = DateFormat('dd.MM.yyyy');
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('salary_for_period') ?? 'Зарплата за период'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${df.format(range.start)} — ${df.format(range.end)}', style: Theme.of(context).textTheme.bodyMedium),
+            const SizedBox(height: 12),
+            Text(
+              ProfileService.formatSalary(amount, establishment.currencySymbol),
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(loc.t('close') ?? 'Закрыть'),
+          ),
+        ],
+      ),
     );
   }
 

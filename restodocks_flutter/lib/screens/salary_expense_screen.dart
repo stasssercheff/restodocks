@@ -39,10 +39,13 @@ class _EmployeeAdjustment {
 /// ФЗП: список сотрудников с оплатой за смену/час. Часы/смены подтягиваются из графика.
 /// Собственник без должности не отображается. Toggle — включать ли в итог.
 /// [embedInScaffold] = false: только контент (для вкладки в экране «Расходы»).
+/// [departmentFilter] = kitchen|bar|hall — показывать только сотрудников подразделения (для руководителей).
 class SalaryExpenseScreen extends StatefulWidget {
-  const SalaryExpenseScreen({super.key, this.embedInScaffold = true});
+  const SalaryExpenseScreen({super.key, this.embedInScaffold = true, this.departmentFilter});
 
   final bool embedInScaffold;
+  /// Фильтр по подразделению для руководителя: kitchen (кухня+руководство), bar (бар), hall (зал).
+  final String? departmentFilter;
 
   @override
   State<SalaryExpenseScreen> createState() => _SalaryExpenseScreenState();
@@ -93,7 +96,21 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
       final schedule = await loadSchedule(estab.id);
 
       // Только сотрудники с должностью (positionRole != null). Собственник без должности не показываем.
-      final withPosition = list.where((e) => e.isActive && e.positionRole != null).toList();
+      var withPosition = list.where((e) => e.isActive && e.positionRole != null).toList();
+
+      // Фильтр по подразделению для руководителя: только сотрудники подразделения + руководство
+      final deptFilter = widget.departmentFilter;
+      if (deptFilter != null && deptFilter.isNotEmpty) {
+        withPosition = withPosition.where((e) {
+          if (deptFilter == 'kitchen') {
+            return e.department == 'kitchen' ||
+                (e.department == 'management' && (e.hasRole('executive_chef') || e.hasRole('sous_chef')));
+          }
+          if (deptFilter == 'bar') return e.department == 'bar';
+          if (deptFilter == 'hall') return e.department == 'dining_room' || e.department == 'hall';
+          return true;
+        }).toList();
+      }
 
       setState(() {
         _employees = withPosition;

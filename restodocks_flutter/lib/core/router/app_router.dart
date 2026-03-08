@@ -375,7 +375,10 @@ class AppRouter {
           ),
           GoRoute(
             path: '/expenses/salary',
-            pageBuilder: (context, state) => _slideTransitionPage(state, const SalaryExpenseScreen()),
+            pageBuilder: (context, state) {
+              final department = state.queryParameters['department']; // kitchen|bar|hall для ФЗП по подразделению
+              return _slideTransitionPage(state, SalaryExpenseScreen(departmentFilter: department));
+            },
           ),
           GoRoute(
             path: '/department/:id',

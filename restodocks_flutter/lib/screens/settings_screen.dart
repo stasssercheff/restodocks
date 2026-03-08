@@ -183,97 +183,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ).then((_) => emailController.dispose());
   }
 
-  /// Одно окно «Настройки про»: статус подписки, ввод промокода, настройка кнопки «Домой»
-  void _showProSettingsDialog(BuildContext context, LocalizationService loc, AccountManagerSupabase accountManager, HomeButtonConfigService homeBtn) {
-    final hasPro = accountManager.hasProSubscription;
-    final establishment = accountManager.establishment;
-    final codeController = TextEditingController();
-
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx2, setState) {
-          return AlertDialog(
-            title: Text(loc.t('pro_settings')),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Статус подписки
-                  Text(
-                    '${loc.t('subscription_status')}: ${hasPro ? loc.t('active') : loc.t('inactive')}',
-                    style: Theme.of(ctx2).textTheme.titleSmall,
-                  ),
-                  if (hasPro && establishment?.subscriptionPlan != null)
-                    Text('${loc.t('subscription_plan')}: ${establishment!.subscriptionPlan}'),
-                  const SizedBox(height: 16),
-
-                  // Ввод промокода (если нет Pro)
-                  if (!hasPro) ...[
-                    Text(loc.t('activation_code'), style: Theme.of(ctx2).textTheme.titleSmall),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: codeController,
-                      decoration: InputDecoration(
-                        hintText: loc.t('enter_activation_code'),
-                        border: const OutlineInputBorder(),
-                        filled: true,
-                      ),
-                      textCapitalization: TextCapitalization.characters,
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-
-                  // Настройка кнопки «Домой» (только для Pro)
-                  if (hasPro) ...[
-                    Text(loc.t('home_button_config'), style: Theme.of(ctx2).textTheme.titleSmall),
-                    const SizedBox(height: 8),
-                    ...HomeButtonAction.values.map((action) => ListTile(
-                      dense: true,
-                      title: Text(_homeButtonActionLabel(loc, action)),
-                      trailing: homeBtn.action == action ? const Icon(Icons.check, color: Colors.green, size: 20) : null,
-                      onTap: () async {
-                        await homeBtn.setAction(action);
-                        if (ctx2.mounted) setState(() {});
-                      },
-                    )),
-                  ],
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx2).pop(),
-                child: Text(MaterialLocalizations.of(ctx2).cancelButtonLabel),
-              ),
-              if (!hasPro)
-                FilledButton(
-                  onPressed: () async {
-                    final code = codeController.text.trim();
-                    if (code.isEmpty) return;
-                    // TODO: логика активации кода
-                    if (ctx2.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('${loc.t('code_activated')}: $code')),
-                      );
-                      Navigator.of(ctx2).pop();
-                    }
-                  },
-                  child: Text(loc.t('activate')),
-                )
-              else
-                FilledButton(
-                  onPressed: () => Navigator.of(ctx2).pop(),
-                  child: Text(MaterialLocalizations.of(ctx2).okButtonLabel),
-                ),
-            ],
-          );
-        },
-      ),
-    ).then((_) => codeController.dispose());
-  }
-
   /// Выбор должности (owner — дополнительная роль, не должность; «Без должности» = только собственник)
   void _showRolePicker(
     BuildContext context,
@@ -1236,22 +1145,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onTap: () => _showClearNomenclatureConfirm(context, localization),
               ),
             ],
-            // Настройки про — одна кнопка: статус, промокод, кнопка «Домой»
-            Consumer2<HomeButtonConfigService, AccountManagerSupabase>(
-              builder: (_, homeBtn, account, __) {
-                final isPro = account.hasProSubscription;
-                final subtitle = isPro
-                    ? '${localization.t('active')} • ${_homeButtonActionLabel(localization, homeBtn.action)}'
-                    : localization.t('pro_required_hint');
-                return ListTile(
-                  leading: const Icon(Icons.star),
-                  title: Text(localization.t('pro_settings')),
-                  subtitle: Text(subtitle),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => _showProSettingsDialog(context, localization, accountManager, homeBtn),
-                );
-              },
-            ),
             if (currentEmployee.hasRole('owner')) ...[
               // 1. Должность — добавляемая должность для собственника (не «собственник»)
               ListTile(
