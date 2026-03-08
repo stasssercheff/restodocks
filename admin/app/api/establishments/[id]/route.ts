@@ -7,7 +7,10 @@ import { verifySessionToken } from '@/lib/session'
 export const dynamic = 'force-dynamic'
 
 /** Каскадное удаление заведения и всех связанных данных (админ, service_role) */
-async function deleteEstablishmentCascade(supabase: ReturnType<typeof createClient>, establishmentId: string) {
+async function deleteEstablishmentCascade(
+  supabase: Pick<ReturnType<typeof createClient>, 'from'>,
+  establishmentId: string
+) {
   // 1. Удаляем филиалы рекурсивно
   const { data: branches } = await supabase
     .from('establishments')
@@ -21,7 +24,8 @@ async function deleteEstablishmentCascade(supabase: ReturnType<typeof createClie
   }
 
   // 2. Данные заведения
-  const empIds = (await supabase.from('employees').select('id').eq('establishment_id', establishmentId)).data?.map(e => e.id) ?? []
+  const empData = (await supabase.from('employees').select('id').eq('establishment_id', establishmentId)).data as { id: string }[] | null
+  const empIds = empData?.map(e => e.id) ?? []
   if (empIds.length) {
     await supabase.from('password_reset_tokens').delete().in('employee_id', empIds)
     await supabase.from('employee_direct_messages').delete().or(`sender_employee_id.in.(${empIds.join(',')}),recipient_employee_id.in.(${empIds.join(',')})`)
@@ -34,13 +38,13 @@ async function deleteEstablishmentCascade(supabase: ReturnType<typeof createClie
   await supabase.from('establishment_order_list_data').delete().eq('establishment_id', establishmentId)
   await supabase.from('product_price_history').delete().eq('establishment_id', establishmentId)
   await supabase.from('establishment_products').delete().eq('establishment_id', establishmentId)
-  const { data: techCards } = await supabase.from('tech_cards').select('id').eq('establishment_id', establishmentId)
+  const techCards = (await supabase.from('tech_cards').select('id').eq('establishment_id', establishmentId)).data as { id: string }[] | null
   const tcIds = techCards?.map(t => t.id) ?? []
   if (tcIds.length) {
     await supabase.from('tt_ingredients').delete().in('tech_card_id', tcIds)
   }
   await supabase.from('tech_cards').delete().eq('establishment_id', establishmentId)
-  const { data: checklists } = await supabase.from('checklists').select('id').eq('establishment_id', establishmentId)
+  const checklists = (await supabase.from('checklists').select('id').eq('establishment_id', establishmentId)).data as { id: string }[] | null
   const clIds = checklists?.map(c => c.id) ?? []
   if (clIds.length) {
     await supabase.from('checklist_items').delete().in('checklist_id', clIds)
@@ -53,7 +57,8 @@ async function deleteEstablishmentCascade(supabase: ReturnType<typeof createClie
   try {
     await supabase.from('iiko_products').delete().eq('establishment_id', establishmentId)
   } catch { /* table may not exist */ }
-  await supabase.from('establishments').update({ owner_id: null }).eq('id', establishmentId)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase types incomplete for establishments
+  await (supabase.from('establishments') as any).update({ owner_id: null }).eq('id', establishmentId)
   await supabase.from('employees').delete().eq('establishment_id', establishmentId)
   await supabase.from('establishments').delete().eq('id', establishmentId)
 }
