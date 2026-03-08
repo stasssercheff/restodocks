@@ -8,6 +8,7 @@ import '../services/services.dart';
 import '../services/home_layout_config_service.dart';
 import '../services/screen_layout_preference_service.dart';
 import '../widgets/app_bar_home_button.dart';
+import '../widgets/long_operation_progress_dialog.dart';
 
 const _adminEmails = <String>{'stasssercheff@gmail.com'};
 bool _isPlatformAdminEmail(String email) => _adminEmails.contains(email.toLowerCase().trim());
@@ -22,6 +23,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   List<Establishment> _ownerEstablishments = [];
+  int _maxEstablishmentsPerOwner = 5;
   bool _loadingEstablishments = false;
 
   @override
@@ -35,9 +37,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (accountManager.currentEmployee?.hasRole('owner') != true) return;
     setState(() => _loadingEstablishments = true);
     try {
-      final list = await accountManager.getEstablishmentsForOwner();
+      final results = await Future.wait([
+        accountManager.getEstablishmentsForOwner(),
+        accountManager.getMaxEstablishmentsPerOwner(),
+      ]);
       if (mounted) setState(() {
-        _ownerEstablishments = list;
+        _ownerEstablishments = results[0] as List<Establishment>;
+        _maxEstablishmentsPerOwner = results[1] as int;
         _loadingEstablishments = false;
       });
     } catch (_) {
@@ -279,6 +285,142 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  void _showDeleteEstablishmentConfirm(BuildContext context, LocalizationService loc, Establishment establishment) {
+    final account = context.read<AccountManagerSupabase>();
+    final ownerEmail = account.currentEmployee?.email ?? '';
+    final pinController = TextEditingController();
+    final emailController = TextEditingController(text: ownerEmail);
+    final formKey = GlobalKey<FormState>();
+    showDialog<String?>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('delete_establishment') ?? 'Удалить заведение?'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                '${establishment.name}\n\n${loc.t('delete_establishment_enter_pin_email') ?? 'Введите PIN и email для подтверждения:'}',
+                style: Theme.of(ctx).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 12),
+              Form(
+                key: formKey,
+                child: Column(
+                  children: [
+                    TextFormField(
+                      controller: pinController,
+                      obscureText: true,
+                      autofocus: true,
+                      textCapitalization: TextCapitalization.characters,
+                      decoration: InputDecoration(
+                        labelText: loc.t('company_pin') ?? 'PIN компании',
+                        hintText: loc.t('enter_company_pin') ?? 'Введите PIN компании',
+                      ),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return loc.t('company_pin_required') ?? 'PIN обязателен';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      autocorrect: false,
+                      decoration: InputDecoration(
+                        labelText: loc.t('email'),
+                        hintText: loc.t('enter_email') ?? 'Введите email',
+                      ),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return loc.t('email_required') ?? 'Email обязателен';
+                        return null;
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null),
+            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (!formKey.currentState!.validate()) return;
+              final pin = pinController.text.trim();
+              final email = emailController.text.trim();
+              if (!establishment.verifyPinCode(pin)) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  SnackBar(content: Text(loc.t('delete_establishment_wrong_pin') ?? 'Неверный PIN')),
+                );
+                return;
+              }
+              Navigator.of(ctx).pop('$pin|$email');
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: Text(loc.t('delete_establishment') ?? 'Удалить'),
+          ),
+        ],
+      ),
+    ).then((result) async {
+      pinController.dispose();
+      emailController.dispose();
+      if (result == null || !context.mounted) return;
+      final parts = result.split('|');
+      if (parts.length != 2) return;
+      final pin = parts[0];
+      final email = parts[1];
+      final accountManager = context.read<AccountManagerSupabase>();
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          content: Row(
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(width: 16),
+              Text(loc.t('delete_establishment_progress') ?? 'Удаление заведения...'),
+            ],
+          ),
+        ),
+      );
+      try {
+        await accountManager.deleteEstablishment(
+          establishmentId: establishment.id,
+          pinCode: pin,
+          email: email,
+        );
+        if (context.mounted && Navigator.of(context).canPop()) Navigator.of(context).pop();
+        if (context.mounted) {
+          final remaining = await accountManager.getEstablishmentsForOwner();
+          if (remaining.isEmpty) {
+            await accountManager.logout();
+            if (context.mounted) context.go('/login');
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(loc.t('delete_establishment_done') ?? 'Заведение удалено'), backgroundColor: Colors.green),
+            );
+            setState(() => _ownerEstablishments = remaining);
+            if (context.mounted) context.go('/home');
+          }
+        }
+      } catch (e) {
+        if (context.mounted && Navigator.of(context).canPop()) Navigator.of(context).pop();
+        if (context.mounted) {
+          final msg = e.toString();
+          String snack = loc.t('delete_establishment_wrong_pin') ?? 'Неверный PIN';
+          if (msg.contains('Email') || msg.contains('email')) snack = loc.t('delete_establishment_wrong_email') ?? 'Email не совпадает';
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(snack), backgroundColor: Colors.red));
+        }
+      }
+    });
+  }
+
   void _showClearNomenclatureConfirm(BuildContext context, LocalizationService loc) {
     final account = context.read<AccountManagerSupabase>();
     final establishment = account.establishment;
@@ -361,14 +503,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (ctx) => AlertDialog(
-          content: Row(
-            children: [
-              const CircularProgressIndicator(),
-              const SizedBox(width: 16),
-              Text(loc.t('clear_nomenclature_progress') ?? 'Очищаем номенклатуру...'),
-            ],
-          ),
+        builder: (ctx) => LongOperationProgressDialog(
+          message: loc.t('clear_nomenclature_progress') ?? 'Очищаем номенклатуру...',
+          hint: loc.t('clear_nomenclature_progress_hint') ?? 'При большом объёме данных может занять несколько минут. Не обновляйте страницу.',
         ),
       );
       try {
@@ -1060,13 +1197,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 }),
                 const SizedBox(height: 8),
               ],
-              if (!accountManager.isViewOnlyOwner)
+              if (!accountManager.isViewOnlyOwner) ...[
                 ListTile(
                   leading: const Icon(Icons.add_business),
                   title: Text(localization.t('add_establishment') ?? 'Добавить заведение'),
+                  subtitle: Text(
+                    (localization.t('establishments_counter') ?? '{current} из {max}')
+                        .replaceAll('{current}', '${(_ownerEstablishments.length - 1).clamp(0, _maxEstablishmentsPerOwner)}')
+                        .replaceAll('{max}', '$_maxEstablishmentsPerOwner'),
+                  ),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () => context.push('/add-establishment'),
+                  onTap: (_ownerEstablishments.length - 1) >= _maxEstablishmentsPerOwner
+                      ? null
+                      : () => context.push('/add-establishment'),
                 ),
+                ListTile(
+                  leading: const Icon(Icons.delete_forever, color: Colors.red),
+                  title: Text(
+                    localization.t('delete_establishment') ?? 'Удалить заведение',
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                  subtitle: Text(localization.t('delete_establishment_hint') ?? 'Удалить заведение и все связанные данные безвозвратно'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: establishment != null ? () => _showDeleteEstablishmentConfirm(context, localization, establishment!) : null,
+                ),
+              ],
               const Divider(),
             ],
             ExpansionTile(

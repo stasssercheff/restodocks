@@ -30,6 +30,7 @@ import '../models/nomenclature_item.dart';
 import '../models/translation.dart';
 import '../services/account_manager.dart';
 import '../widgets/app_bar_home_button.dart';
+import '../widgets/long_operation_progress_dialog.dart';
 import '../services/account_manager_supabase.dart';
 import '../services/product_store.dart';
 import '../services/product_store_supabase.dart';
@@ -3866,18 +3867,13 @@ class _NomenclatureSkeletonItem extends StatelessWidget {
           return;
         }
 
-        // Показываем индикатор загрузки
+        // Показываем индикатор загрузки с таймером
         showDialog(
           context: context,
           barrierDismissible: false,
-          builder: (ctx) => const AlertDialog(
-            content: Row(
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(width: 16),
-                Text('Очищаем номенклатуру...'),
-              ],
-            ),
+          builder: (ctx) => LongOperationProgressDialog(
+            message: loc.t('clear_nomenclature_progress') ?? 'Очищаем номенклатуру...',
+            hint: loc.t('clear_nomenclature_progress_hint') ?? 'При большом объёме данных может занять несколько минут. Не обновляйте страницу.',
           ),
         );
 

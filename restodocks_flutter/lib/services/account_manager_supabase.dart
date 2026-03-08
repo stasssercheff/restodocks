@@ -174,6 +174,24 @@ class AccountManagerSupabase extends ChangeNotifier {
     await _secureStorage.remove(_keyEstablishmentId);
   }
 
+  /// Максимум дополнительных заведений на владельца (из platform_config)
+  Future<int> getMaxEstablishmentsPerOwner() async {
+    try {
+      final v = await _supabase.client.rpc(
+        'get_platform_config',
+        params: {'p_key': 'max_establishments_per_owner'},
+      );
+      if (v == null) return 999;
+      if (v is int) return v > 0 ? v : 999;
+      if (v is double) return v.toInt() > 0 ? v.toInt() : 999;
+      final s = v.toString();
+      final n = int.tryParse(s);
+      return (n != null && n > 0) ? n : 999;
+    } catch (_) {
+      return 999;
+    }
+  }
+
   /// Список заведений владельца (owner_id = auth.uid)
   Future<List<Establishment>> getEstablishmentsForOwner() async {
     try {
@@ -947,6 +965,34 @@ class AccountManagerSupabase extends ChangeNotifier {
 
   bool _isSchemaColumnError(Object e) {
     return e.toString().toLowerCase().contains('can_edit_own_schedule');
+  }
+
+  /// Удалить заведение (владелец). Проверяет PIN и email.
+  Future<void> deleteEstablishment({
+    required String establishmentId,
+    required String pinCode,
+    required String email,
+  }) async {
+    await _supabase.client.rpc(
+      'delete_establishment_by_owner',
+      params: {
+        'p_establishment_id': establishmentId,
+        'p_pin_code': pinCode.trim().toUpperCase(),
+        'p_email': email.trim(),
+      },
+    );
+    // Обновить локальное состояние
+    if (_establishment?.id == establishmentId) {
+      _establishment = null;
+      final list = await getEstablishmentsForOwner();
+      if (list.isNotEmpty) {
+        _establishment = list.first;
+        await _secureStorage.set(_keyEstablishmentId, _establishment!.id);
+      } else {
+        await _secureStorage.remove(_keyEstablishmentId);
+      }
+    }
+    notifyListeners();
   }
 
   /// Обновить данные заведения

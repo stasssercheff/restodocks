@@ -39,7 +39,7 @@ function isValidNow(startsAt: string | null, expiresAt: string | null) {
 
 export default function AdminClient() {
   const router = useRouter()
-  const [tab, setTab] = useState<'establishments' | 'promo'>('establishments')
+  const [tab, setTab] = useState<'establishments' | 'promo' | 'settings'>('establishments')
 
   async function logout() {
     await fetch('/api/auth', { method: 'DELETE' })
@@ -63,6 +63,7 @@ export default function AdminClient() {
           {([
             { key: 'establishments', label: 'Заведения' },
             { key: 'promo', label: 'Промокоды' },
+            { key: 'settings', label: 'Настройки' },
           ] as const).map(t => (
             <button
               key={t.key}
@@ -80,7 +81,9 @@ export default function AdminClient() {
       </div>
 
       <main className="max-w-6xl mx-auto px-3 py-4 sm:px-6 sm:py-8">
-        {tab === 'establishments' ? <EstablishmentsTab /> : <PromoTab />}
+        {tab === 'establishments' && <EstablishmentsTab />}
+        {tab === 'promo' && <PromoTab />}
+        {tab === 'settings' && <PlatformSettingsTab />}
       </main>
     </div>
   )
@@ -88,11 +91,14 @@ export default function AdminClient() {
 
 // ─── Establishments Tab ───────────────────────────────────────────────────────
 
+const CONFIRM_DELETE_TEXT = 'УДАЛИТЬ'
+
 function EstablishmentsTab() {
   const [data, setData] = useState<Establishment[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -129,6 +135,27 @@ function EstablishmentsTab() {
 
   const total = data.length
   const totalEmployees = data.reduce((s, e) => s + e.employee_count, 0)
+
+  async function handleDelete(row: Establishment) {
+    if (!confirm(`Удалить заведение «${row.name}»?\n\nБудут удалены все данные: номенклатура, ТТК, чеклисты, сотрудники и т.д. Действие необратимо.`)) return
+    const typed = prompt(`Для подтверждения введите "${CONFIRM_DELETE_TEXT}":`)
+    if (typed?.trim() !== CONFIRM_DELETE_TEXT) {
+      if (typed !== null) alert('Отменено: текст не совпадает.')
+      return
+    }
+    setDeleting(row.id)
+    try {
+      const res = await fetch(`/api/establishments/${row.id}`, { method: 'DELETE' })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || 'Ошибка удаления')
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Ошибка удаления')
+      await load()
+    } finally {
+      setDeleting(null)
+    }
+  }
 
   return (
     <>
@@ -173,6 +200,7 @@ function EstablishmentsTab() {
                   <th className="px-4 py-3 text-center">Сотр.</th>
                   <th className="px-4 py-3 text-left">Дата</th>
                   <th className="px-4 py-3 text-left">IP регистрации</th>
+                  <th className="px-4 py-3 text-right w-20"></th>
                 </tr>
               </thead>
               <tbody>
@@ -186,6 +214,16 @@ function EstablishmentsTab() {
                     </td>
                     <td className="px-4 py-3 text-gray-500 text-xs">{formatDate(row.created_at)}</td>
                     <td className="px-4 py-3 text-gray-400 text-xs font-mono">{regInfo(row)}</td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => handleDelete(row)}
+                        disabled={deleting === row.id}
+                        className="text-red-400 hover:text-red-300 text-xs disabled:opacity-50"
+                        title="Удалить заведение"
+                      >
+                        {deleting === row.id ? '...' : '🗑'}
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -198,8 +236,18 @@ function EstablishmentsTab() {
               <div key={row.id} className="bg-gray-900 rounded-xl border border-gray-800 p-4">
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <span className="font-medium text-white text-sm">{row.name}</span>
-                  <span className="bg-gray-800 px-2 py-0.5 rounded text-xs font-mono text-gray-400 shrink-0">
-                    {row.employee_count} сотр.
+                  <span className="flex items-center gap-2 shrink-0">
+                    <span className="bg-gray-800 px-2 py-0.5 rounded text-xs font-mono text-gray-400">
+                      {row.employee_count} сотр.
+                    </span>
+                    <button
+                      onClick={() => handleDelete(row)}
+                      disabled={deleting === row.id}
+                      className="text-red-400 hover:text-red-300 text-sm disabled:opacity-50"
+                      title="Удалить заведение"
+                    >
+                      {deleting === row.id ? '...' : '🗑'}
+                    </button>
                   </span>
                 </div>
                 <div className="text-gray-400 text-xs">{row.owner_name}</div>
@@ -566,6 +614,81 @@ function PromoTab() {
           </div>
         </>
       )}
+    </>
+  )
+}
+
+// ─── Platform Settings Tab ────────────────────────────────────────────────────
+
+function PlatformSettingsTab() {
+  const [maxEstablishments, setMaxEstablishments] = useState<number>(5)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    const res = await fetch('/api/platform-config')
+    const data = await res.json()
+    if (!res.ok) {
+      setError(data?.error || 'Ошибка загрузки')
+    } else {
+      setMaxEstablishments(data.max_establishments_per_owner ?? 5)
+    }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  async function save() {
+    setSaving(true)
+    setError(null)
+    const res = await fetch('/api/platform-config', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ max_establishments_per_owner: maxEstablishments }),
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      setError(data?.error || 'Ошибка сохранения')
+    }
+    setSaving(false)
+  }
+
+  if (loading) return <div className="p-12 text-center text-gray-500">Загрузка...</div>
+
+  return (
+    <>
+      {error && (
+        <div className="mb-4 p-4 bg-red-900/30 border border-red-700 rounded-lg text-red-200 text-sm">
+          {error}
+        </div>
+      )}
+      <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 max-w-md">
+        <h2 className="text-base font-medium text-white mb-4">Лимит заведений на одного владельца</h2>
+        <p className="text-gray-400 text-sm mb-4">
+          Максимум дополнительных заведений (первое не в счёт). Владелец может добавить до этого числа дополнительных заведений.
+        </p>
+        <div className="flex items-center gap-3">
+          <input
+            type="number"
+            min={0}
+            max={999}
+            value={maxEstablishments}
+            onChange={e => setMaxEstablishments(Math.max(0, Math.min(999, parseInt(e.target.value, 10) || 0)))}
+            className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white w-24 focus:outline-none focus:border-indigo-500"
+          />
+          <span className="text-gray-400 text-sm">дополнительных заведений</span>
+        </div>
+        <button
+          onClick={save}
+          disabled={saving}
+          className="mt-4 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 px-4 py-2 rounded-lg font-medium text-sm"
+        >
+          {saving ? 'Сохранение...' : 'Сохранить'}
+        </button>
+      </div>
     </>
   )
 }
