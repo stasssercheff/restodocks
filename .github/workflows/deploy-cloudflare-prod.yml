@@ -6,6 +6,7 @@ name: Deploy Prod to Cloudflare Pages
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -63,11 +64,23 @@ jobs:
       - name: Copy Pages Functions (supabase-auth proxy for restodocks.com)
         run: cp -r functions restodocks_flutter/build/web/
 
+      - name: Setup Node (for wrangler/npx)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Verify build output
+        run: |
+          ls -la restodocks_flutter/build/web/ | head -20
+          [ -d restodocks_flutter/build/web/functions ] || echo "WARN: functions dir missing"
+
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "3.95.0"
+          packageManager: npm
           command: pages deploy restodocks_flutter/build/web --project-name=restodocks
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
