@@ -46,8 +46,7 @@ class EmailService {
   }
 
   /// Отправить письмо при регистрации (владелец или сотрудник).
-  /// Не бросает исключения — ошибки логируются.
-  /// Пароль намеренно не передаётся — пользователь использует тот, что указал при регистрации.
+  /// Прямой HTTP (как sendOrderEmail) — обход 403 от functions.invoke на web.
   Future<void> sendRegistrationEmail({
     required bool isOwner,
     required String to,
@@ -56,21 +55,30 @@ class EmailService {
     String? pinCode,
   }) async {
     try {
-      final res = await _client.functions.invoke(
-        'send-registration-email',
-        body: {
-          'type': isOwner ? 'owner' : 'employee',
-          'to': to,
-          'companyName': companyName,
-          'email': email,
-          if (pinCode != null) 'pinCode': pinCode,
+      final dio = Dio(BaseOptions(
+        headers: {
+          'apikey': _supabaseAnonKey,
+          'Authorization': 'Bearer $_supabaseAnonKey',
+          'Content-Type': 'application/json',
         },
+        validateStatus: (_) => true,
+      ));
+      final body = {
+        'type': isOwner ? 'owner' : 'employee',
+        'to': to.trim(),
+        'companyName': companyName,
+        'email': email,
+        if (pinCode != null) 'pinCode': pinCode,
+      };
+      final resp = await dio.post(
+        '${supabase_url.getSupabaseBaseUrl()}/functions/v1/send-registration-email',
+        data: body,
       );
-      if (res.status != 200) {
-        print('EmailService: send-registration-email failed: ${res.status} ${res.data}');
+      if (resp.statusCode != 200) {
+        debugPrint('EmailService: send-registration-email HTTP ${resp.statusCode} ${resp.data}');
       }
     } catch (e) {
-      print('EmailService: send-registration-email error: $e');
+      debugPrint('EmailService: send-registration-email error: $e');
     }
   }
 
