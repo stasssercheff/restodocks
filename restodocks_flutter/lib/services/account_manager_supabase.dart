@@ -582,8 +582,10 @@ class AccountManagerSupabase extends ChangeNotifier {
     };
     if (ownerAccessLevel != null) params['p_owner_access_level'] = ownerAccessLevel;
 
-    const maxRetries = 12;
+    const maxRetries = 15;
+    const initialDelayMs = 4000; // Auth может задерживать запись в auth.users
     Object? lastError;
+    await Future<void>.delayed(const Duration(milliseconds: initialDelayMs));
     for (var attempt = 0; attempt < maxRetries; attempt++) {
       try {
         final res = await _supabase.client.rpc('create_owner_employee', params: params);
