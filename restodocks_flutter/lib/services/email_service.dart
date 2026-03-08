@@ -1,7 +1,15 @@
 import 'dart:convert';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:restodocks/core/supabase_url_resolver_stub.dart'
+    if (dart.library.html) 'package:restodocks/core/supabase_url_resolver_web.dart' as supabase_url;
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+const _supabaseAnonKey = String.fromEnvironment(
+  'SUPABASE_ANON_KEY',
+  defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zZ2xmcHR3YnVxcW1xdW50dGhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUwNTk0MDQsImV4cCI6MjA4MDYzNTQwNH0.Jy7yi2TNdSrmoBdILXBGRYB_vxGtq8scCZ9eCA9vfTE',
+);
 
 /// Сервис отправки писем через Edge Functions (Resend).
 class EmailService {
@@ -10,6 +18,32 @@ class EmailService {
   EmailService._internal();
 
   SupabaseClient get _client => Supabase.instance.client;
+
+  /// Прямой HTTP POST к Edge Function send-email (обходит 403 от functions.invoke на web).
+  Future<({int status, Map<String, dynamic>? data})> _invokeSendEmailHttp(Map<String, dynamic> body) async {
+    final dio = Dio(BaseOptions(
+      headers: {
+        'apikey': _supabaseAnonKey,
+        'Authorization': 'Bearer $_supabaseAnonKey',
+        'Content-Type': 'application/json',
+      },
+      validateStatus: (_) => true,
+    ));
+    try {
+      final resp = await dio.post('${supabase_url.getSupabaseBaseUrl()}/functions/v1/send-email', data: body);
+      final data = resp.data is Map<String, dynamic>
+          ? resp.data as Map<String, dynamic>
+          : (resp.data is Map ? Map<String, dynamic>.from(resp.data as Map) : null);
+      return (status: resp.statusCode ?? 0, data: data);
+    } on DioException catch (e) {
+      final status = e.response?.statusCode ?? 0;
+      final data = e.response?.data;
+      final map = data is Map<String, dynamic>
+          ? data
+          : (data is Map ? Map<String, dynamic>.from(data as Map) : null);
+      return (status: status, data: map);
+    }
+  }
 
   /// Отправить письмо при регистрации (владелец или сотрудник).
   /// Не бросает исключения — ошибки логируются.
@@ -94,13 +128,13 @@ class EmailService {
   <div style="margin-top:16px;padding:16px;background:#f5f5f5;border-radius:8px;white-space:pre-wrap">$message</div>
 </div>
 ''';
-      final res = await _client.functions.invoke('send-email', body: {
+      final res = await _invokeSendEmailHttp({
         'to': supportEmail,
         'subject': '[Поддержка] $category — $subject',
         'html': html,
       });
       if (res.status == 200) return (ok: true, error: null);
-      final msg = (res.data as Map?)?['error']?.toString() ?? 'Unknown error';
+      final msg = res.data?['error']?.toString() ?? 'Unknown error';
       return (ok: false, error: msg);
     } catch (e) {
       return (ok: false, error: e.toString());
@@ -134,14 +168,19 @@ class EmailService {
       } else {
         debugPrint('EmailService: no PDF attachment (pdfBytes=${pdfBytes?.length ?? 'null'})');
       }
-      debugPrint('EmailService: invoking send-email, body keys=${body.keys.toList()}');
-      final res = await _client.functions.invoke('send-email', body: body);
+      debugPrint('EmailService: invoking send-email (HTTP), body keys=${body.keys.toList()}');
+      final res = await _invokeSendEmailHttp(body);
       debugPrint('EmailService: send-email response status=${res.status} data=${res.data}');
-      if (res.status == 200) {
-        return (ok: true, error: null);
+      if (res.status != 200) {
+        final msg = res.data?['error']?.toString() ?? 'HTTP ${res.status}';
+        return (ok: false, error: msg);
       }
-      final msg = (res.data as Map?)?['error']?.toString() ?? 'Unknown error';
-      return (ok: false, error: msg);
+      // Даже при 200 проверяем body — функция может вернуть { error: '...' }
+      final bodyError = res.data?['error']?.toString();
+      if (bodyError != null && bodyError.isNotEmpty) {
+        return (ok: false, error: bodyError);
+      }
+      return (ok: true, error: null);
     } catch (e) {
       debugPrint('EmailService: sendOrderEmail exception: $e');
       return (ok: false, error: e.toString());

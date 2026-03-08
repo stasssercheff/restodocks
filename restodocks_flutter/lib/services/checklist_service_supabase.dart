@@ -1,14 +1,13 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
+import 'package:restodocks/core/supabase_url_resolver_stub.dart'
+    if (dart.library.html) 'package:restodocks/core/supabase_url_resolver_web.dart' as supabase_url;
+
 import '../models/models.dart';
 import 'checklist_submission_service.dart';
 import 'supabase_service.dart';
 
-const _supabaseUrl = String.fromEnvironment(
-  'SUPABASE_URL',
-  defaultValue: 'https://osglfptwbuqqmqunttha.supabase.co',
-);
 const _supabaseAnonKey = String.fromEnvironment(
   'SUPABASE_ANON_KEY',
   defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zZ2xmcHR3YnVxcW1xdW50dGhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUwNTk0MDQsImV4cCI6MjA4MDYzNTQwNH0.Jy7yi2TNdSrmoBdILXBGRYB_vxGtq8scCZ9eCA9vfTE',
@@ -30,15 +29,18 @@ class ChecklistServiceSupabase {
     bool applyAssignmentFilter = true,
   }) async {
     try {
+      // Один запрос с вложенными checklist_items вместо N+1
       final data = await _supabase.client
           .from('checklists')
-          .select()
+          .select('*, checklist_items(id, checklist_id, title, sort_order, tech_card_id, target_quantity, target_unit)')
           .eq('establishment_id', establishmentId)
           .order('updated_at', ascending: false);
 
       final list = <Checklist>[];
       for (final row in data) {
-        final c = Checklist.fromJson(row);
+        final map = row is Map<String, dynamic> ? Map<String, dynamic>.from(row) : row as Map<String, dynamic>;
+        final itemsRaw = map.remove('checklist_items');
+        final c = Checklist.fromJson(map);
         if (c.assignedDepartment != department) continue;
         if (applyAssignmentFilter && currentEmployeeId != null) {
           final ids = c.assignedEmployeeIds;
@@ -50,12 +52,15 @@ class ChecklistServiceSupabase {
             if (!assignedToCurrent) continue;
           }
         }
-        final itemsData = await _supabase.client
-            .from('checklist_items')
-            .select('id, checklist_id, title, sort_order, tech_card_id, target_quantity, target_unit')
-            .eq('checklist_id', c.id)
-            .order('sort_order');
-        final items = (itemsData as List).map((e) => ChecklistItem.fromJson(e)).toList();
+        final itemsList = itemsRaw is List ? itemsRaw : <dynamic>[];
+        final items = <ChecklistItem>[];
+        for (final e in itemsList) {
+          if (e is! Map) continue;
+          try {
+            items.add(ChecklistItem.fromJson(Map<String, dynamic>.from(e)));
+          } catch (_) {}
+        }
+        items.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
         list.add(c.copyWith(items: items));
       }
       if (kDebugMode) {
@@ -105,6 +110,9 @@ class ChecklistServiceSupabase {
     ChecklistActionConfig? actionConfig,
     String assignedDepartment = 'kitchen',
   }) async {
+    if (name.trim().isEmpty) {
+      throw ArgumentError('createChecklist: name не может быть пустым. Сначала заполните форму и нажмите Сохранить.');
+    }
     final now = DateTime.now();
     final data = <String, dynamic>{
       'establishment_id': establishmentId,
@@ -271,7 +279,7 @@ class ChecklistServiceSupabase {
       validateStatus: (_) => true,
     ));
     try {
-      final resp = await dio.post('$_supabaseUrl/functions/v1/save-checklist', data: body);
+      final resp = await dio.post('${supabase_url.getSupabaseBaseUrl()}/functions/v1/save-checklist', data: body);
       if (resp.statusCode == 200) {
         final data = resp.data is Map ? Map<String, dynamic>.from(resp.data as Map) : null;
         if (data?['ok'] == true) return;
