@@ -560,9 +560,47 @@ class AccountManagerSupabase extends ChangeNotifier {
     return (userId: uid, hasSession: hasSession);
   }
 
-  /// Создание владельца через RPC (обход RLS при Confirm Email — нет сессии после signUp)
-  /// [ownerAccessLevel] — 'view_only' для co-owner при >1 заведении у пригласившего
-  /// Retry при race condition: auth.users / f_employees_auth FK — signUp может задержать запись.
+  /// Сохранить pending owner — employee создастся после confirm (когда user в auth.users).
+  Future<void> savePendingOwnerRegistration({
+    required String authUserId,
+    required Establishment establishment,
+    required String fullName,
+    String? surname,
+    required String email,
+    required List<String> roles,
+  }) async {
+    await _supabase.client.rpc(
+      'save_pending_owner_registration',
+      params: {
+        'p_auth_user_id': authUserId,
+        'p_establishment_id': establishment.id,
+        'p_full_name': fullName,
+        'p_surname': surname ?? '',
+        'p_email': email,
+        'p_roles': roles,
+      },
+    );
+  }
+
+  /// Завершить регистрацию владельца (authenticated, после confirm). Возвращает null если pending нет.
+  Future<({Employee employee, Establishment establishment})?> completePendingOwnerRegistration() async {
+    if (!_supabase.isAuthenticated) return null;
+    final res = await _supabase.client.rpc('complete_pending_owner_registration');
+    if (res == null) return null;
+    final m = Map<String, dynamic>.from(res as Map);
+    final emp = m['employee'];
+    final est = m['establishment'];
+    if (emp == null || est == null) return null;
+    final empData = Map<String, dynamic>.from(emp);
+    empData['password'] = '';
+    empData['password_hash'] = '';
+    return (
+      employee: Employee.fromJson(empData),
+      establishment: Establishment.fromJson(Map<String, dynamic>.from(est)),
+    );
+  }
+
+  /// Создание владельца через RPC — только для co-owner (create_employee_for_company), не для первичной регистрации.
   Future<Employee> createOwnerEmployeeViaRpc({
     required String authUserId,
     required Establishment establishment,
@@ -581,34 +619,11 @@ class AccountManagerSupabase extends ChangeNotifier {
       'p_roles': roles,
     };
     if (ownerAccessLevel != null) params['p_owner_access_level'] = ownerAccessLevel;
-
-    const maxRetries = 15;
-    const initialDelayMs = 4000; // Auth может задерживать запись в auth.users
-    Object? lastError;
-    await Future<void>.delayed(const Duration(milliseconds: initialDelayMs));
-    for (var attempt = 0; attempt < maxRetries; attempt++) {
-      try {
-        final res = await _supabase.client.rpc('create_owner_employee', params: params);
-        final data = Map<String, dynamic>.from(res as Map);
-        data['password'] = '';
-        data['password_hash'] = '';
-        return Employee.fromJson(data);
-      } catch (e) {
-        lastError = e;
-        final msg = e.toString();
-        final isRetryable = msg.contains('auth user') && msg.contains('not found') ||
-            msg.contains('email mismatch') ||
-            msg.contains('23503') ||
-            msg.contains('foreign key') ||
-            msg.contains('not present in table');
-        if (attempt < maxRetries - 1 && isRetryable) {
-          await Future<void>.delayed(Duration(milliseconds: 800 + attempt * 200));
-          continue;
-        }
-        rethrow;
-      }
-    }
-    throw lastError ?? Exception('create_owner_employee failed');
+    final res = await _supabase.client.rpc('create_owner_employee', params: params);
+    final data = Map<String, dynamic>.from(res as Map);
+    data['password'] = '';
+    data['password_hash'] = '';
+    return Employee.fromJson(data);
   }
 
   /// Вход по email и паролю: Supabase Auth или legacy (Edge Function)
@@ -1062,14 +1077,26 @@ class AccountManagerSupabase extends ChangeNotifier {
       final authUserId = _supabase.currentUser?.id;
       if (authUserId == null) return false;
 
-      final list = await _supabase.client
+      var list = await _supabase.client
           .from('employees')
           .select()
           .eq('id', authUserId)
           .eq('is_active', true)
           .limit(1);
 
-      if (list == null || (list as List).isEmpty) return false;
+      if (list == null || (list as List).isEmpty) {
+        final completed = await completePendingOwnerRegistration();
+        if (completed != null) {
+          _currentEmployee = completed.employee;
+          _establishment = completed.establishment;
+          onPreferredLanguageLoaded?.call(_currentEmployee!.preferredLanguage);
+          await _secureStorage.set(_keyEmployeeId, _currentEmployee!.id);
+          await _secureStorage.set(_keyEstablishmentId, _establishment!.id);
+          notifyListeners();
+          return true;
+        }
+        return false;
+      }
 
       final employeeData = Map<String, dynamic>.from((list as List).first);
       employeeData['password'] = employeeData['password_hash'] ?? '';

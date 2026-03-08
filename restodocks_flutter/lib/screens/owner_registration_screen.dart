@@ -64,14 +64,14 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
       }
 
       final password = _passwordController.text;
-      // 1. Supabase Auth (employees.id = auth.users.id)
+      // 1. Supabase Auth
       final accSupabase = accountManager as AccountManagerSupabase;
       final signUpResult = await accSupabase.signUpWithEmailForOwner(email, password);
       final authUserId = signUpResult.userId;
       if (authUserId == null) throw Exception('Не удалось создать учётную запись');
 
-      // 2. Создаём владельца через RPC (работает без сессии при Confirm Email)
-      final employee = await accSupabase.createOwnerEmployeeViaRpc(
+      // 2. Сохраняем pending — employee создадим после confirm (когда user в auth.users)
+      await accSupabase.savePendingOwnerRegistration(
         authUserId: authUserId,
         establishment: estab,
         fullName: _nameController.text.trim(),
@@ -92,10 +92,15 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
 
       if (!mounted) return;
       if (signUpResult.hasSession) {
-        await accountManager.login(employee, estab);
-        context.go('/home');
+        // Редко: session сразу (confirm отключён) — создаём employee
+        final result = await accSupabase.completePendingOwnerRegistration();
+        if (result != null) {
+          await accountManager.login(result.employee, result.establishment);
+          context.go('/home');
+        } else {
+          context.go('/confirm-email?email=${Uri.encodeComponent(email)}');
+        }
       } else {
-        // Confirm Email включён — переход на экран «Подтвердите учётную запись»
         context.go('/confirm-email?email=${Uri.encodeComponent(email)}');
       }
     } catch (e) {
