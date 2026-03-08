@@ -970,17 +970,12 @@ class _InventoryScreenState extends State<InventoryScreen>
           );
         }
       }
-      if (mounted) {
-        setState(() => _completed = true);
-        await clearDraft();
-      }
+      // Не устанавливаем _completed и не очищаем черновик — можно довнести и сохранить снова
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('${loc.t('inventory_document_saved')} (Экспорт: ${e.toString()})')),
         );
-        setState(() => _completed = true);
-        await clearDraft();
       }
     }
   }
@@ -1670,25 +1665,23 @@ class _InventoryScreenState extends State<InventoryScreen>
           children: [
             Expanded(
               child: FilledButton(
-                onPressed: _completed ? null : () => _complete(context),
+                onPressed: () => _complete(context),
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 10),
                 ),
                 child: Text(loc.t('inventory_complete')),
               ),
             ),
-            if (_completed) ...[
-              const SizedBox(width: 12),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: _startNewInventory,
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                  ),
-                  child: Text(loc.t('inventory_new')),
+            const SizedBox(width: 12),
+            Expanded(
+              child: OutlinedButton(
+                onPressed: _startNewInventory,
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
                 ),
+                child: Text(loc.t('inventory_new')),
               ),
-            ],
+            ),
           ],
         ),
       ),
@@ -3032,9 +3025,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
       // Отправляем шефу во входящие
       await _sendToChef(bytes, fileName);
 
-      // Очищаем черновик после успешного сохранения (localStorage + сервер)
-      await clearDraft();
-      _clearServerDraft();
+      // Не очищаем черновик — можно довнести и сохранить снова
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
