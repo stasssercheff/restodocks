@@ -1276,10 +1276,10 @@ class _InventoryScreenState extends State<InventoryScreen>
       }
 
       // Строка «Итого» по сумме внизу листа
-      final totalLabel = loc.t('inventory_excel_total_sum') ?? 'Итого:';
+      final totalSumLabel = loc.t('inventory_excel_total_sum') ?? 'Итого:';
       final totalRow = <CellValue>[
         TextCellValue(''),
-        TextCellValue(totalLabel),
+        TextCellValue(totalSumLabel),
         TextCellValue(''),
         DoubleCellValue(totalSumAll),
         TextCellValue(''),
