@@ -422,11 +422,22 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     );
   }
 
+  /// Себестоимость видят только руководство: собственник, шеф, су-шеф, барменеджер.
+  bool _canSeeCost(AccountManagerSupabase acc) {
+    final emp = acc.currentEmployee;
+    if (emp == null) return false;
+    return emp.hasRole('owner') ||
+        emp.hasRole('executive_chef') ||
+        emp.hasRole('sous_chef') ||
+        emp.hasRole('bar_manager');
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
     final accountManager = context.watch<AccountManagerSupabase>();
     final canEdit = accountManager.currentEmployee?.canEditChecklistsAndTechCards ?? false;
+    final showCost = _canSeeCost(accountManager);
 
     return Scaffold(
       appBar: AppBar(
@@ -549,7 +560,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       ),
       body: Stack(
         children: [
-          _buildBody(loc, canEdit),
+          _buildBody(loc, canEdit, showCost),
           if (_loadingExcel)
             ColoredBox(
               color: Theme.of(context).colorScheme.surface.withOpacity(0.7),
@@ -581,7 +592,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     );
   }
 
-  Widget _buildBody(LocalizationService loc, bool canEdit) {
+  Widget _buildBody(LocalizationService loc, bool canEdit, bool showCost) {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
       return Center(
@@ -699,8 +710,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           Expanded(
             child: TabBarView(
               children: [
-                _buildTechCardsTable(semiFinishedCards, loc, canEdit),
-                _buildTechCardsTable(dishCards, loc, canEdit),
+                _buildTechCardsTable(semiFinishedCards, loc, canEdit, showCost),
+                _buildTechCardsTable(dishCards, loc, canEdit, showCost),
               ],
             ),
           ),
@@ -710,7 +721,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   }
 
   /// Компактная таблица с шапкой и группировкой по категориям.
-  Widget _buildTechCardsTable(List<TechCard> techCards, LocalizationService loc, bool canEdit) {
+  Widget _buildTechCardsTable(List<TechCard> techCards, LocalizationService loc, bool canEdit, bool showCost) {
     final lang = loc.currentLanguageCode;
     const colCatWidth = 76.0;
     const colCostWidth = 48.0;
@@ -733,7 +744,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
               onColor: Theme.of(context).colorScheme.onPrimaryContainer,
               labelName: loc.t('ttk_col_name'),
               labelCat: loc.t('column_category'),
-              labelCost: '$costSym/${loc.t('kg')}',
+              labelCost: showCost ? '$costSym/${loc.t('kg')}' : '—',
               labelView: loc.t('ttk_col_view'),
             ),
           ),
@@ -760,6 +771,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                   lang: lang,
                   loc: loc,
                   canEdit: canEdit,
+                  showCost: showCost,
                   colCatWidth: colCatWidth,
                   colCostWidth: colCostWidth,
                   colActionsWidth: colActionsWidth,
@@ -781,6 +793,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     required String lang,
     required LocalizationService loc,
     required bool canEdit,
+    required bool showCost,
     required double colCatWidth,
     required double colCostWidth,
     required double colActionsWidth,
@@ -790,7 +803,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     final selected = _selectedTechCards.contains(tc.id);
     final name = tc.getDisplayNameInLists(lang);
     final cat = _categoryLabel(tc.category, loc);
-    final cost = NumberFormatUtils.formatInt(_calculateCostPerKg(tc));
+    final cost = showCost ? NumberFormatUtils.formatInt(_calculateCostPerKg(tc)) : '—';
     return Material(
       color: selected
           ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.5)

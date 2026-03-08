@@ -179,11 +179,11 @@ class _MenuScreenState extends State<MenuScreen> {
 
   bool get _isHallMenu => widget.department == 'hall' || widget.department == 'dining_room';
 
-  /// Полный вид ТТК (себестоимость, состав, технология): только собственник, шеф (кухня), барменеджер (бар).
+  /// Полный вид ТТК (себестоимость, состав, технология): только руководство — собственник, шеф, су-шеф (кухня), барменеджер (бар).
   bool _canSeeFullTtkView(Employee? emp, TechCard tc) {
     if (emp == null) return false;
     if (emp.hasRole('owner')) return true;
-    if (emp.hasRole('executive_chef') && !_isBarDish(tc)) return true;
+    if ((emp.hasRole('executive_chef') || emp.hasRole('sous_chef')) && !_isBarDish(tc)) return true;
     if (emp.hasRole('bar_manager') && _isBarDish(tc)) return true;
     return false;
   }

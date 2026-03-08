@@ -421,7 +421,7 @@ bool _isBarDishTechCard(TechCard tc) =>
 bool _canSeeFullTtkViewTechCard(Employee? emp, TechCard tc) {
   if (emp == null) return false;
   if (emp.hasRole('owner')) return true;
-  if (emp.hasRole('executive_chef') && !_isBarDishTechCard(tc)) return true;
+  if ((emp.hasRole('executive_chef') || emp.hasRole('sous_chef')) && !_isBarDishTechCard(tc)) return true;
   if (emp.hasRole('bar_manager') && _isBarDishTechCard(tc)) return true;
   return false;
 }
@@ -429,10 +429,9 @@ bool _canSeeFullTtkViewTechCard(Employee? emp, TechCard tc) {
 bool _canEditSellingPrice(Employee? emp, TechCard? tc, {bool isSemiFinished = false, String? category, List<String>? sections, String? department}) {
   if (emp == null || isSemiFinished) return false;
   if (tc != null) return _canSeeFullTtkViewTechCard(emp, tc);
-  // Новая ТТК: определяем по category/department
   final isBar = department == 'bar' || (category != null && _barCategoriesForEdit.contains(category)) || (sections?.contains('bar') ?? false);
   if (emp.hasRole('owner')) return true;
-  if (emp.hasRole('executive_chef') && !isBar) return true;
+  if ((emp.hasRole('executive_chef') || emp.hasRole('sous_chef')) && !isBar) return true;
   if (emp.hasRole('bar_manager') && isBar) return true;
   return false;
 }
