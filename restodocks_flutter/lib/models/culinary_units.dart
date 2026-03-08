@@ -55,6 +55,8 @@ class CulinaryUnits {
     'упаковка': 500,
     'pack': 500,
     'package': 500,
+    'бутылка': 700, // условно 0.7л
+    'bottle': 700,
     'пучок': 30,
     'bunch': 30,
     'зубчик': 5,
@@ -71,6 +73,7 @@ class CulinaryUnits {
     (id: 'kg', ru: 'кг', en: 'kg'),
     (id: 'mg', ru: 'мг', en: 'mg'),
     (id: 'pcs', ru: 'штуки', en: 'pcs'),
+    (id: 'шт', ru: 'штуки', en: 'pcs'),
     (id: 'lb', ru: 'фунт', en: 'lb'),
     (id: 'oz', ru: 'унция', en: 'oz'),
     (id: 'ml', ru: 'мл', en: 'ml'),
@@ -87,6 +90,7 @@ class CulinaryUnits {
     (id: 'pack', ru: 'упак.', en: 'pack'),
     (id: 'can', ru: 'банка', en: 'can'),
     (id: 'box', ru: 'коробка', en: 'box'),
+    (id: 'bottle', ru: 'бутылка', en: 'bottle'),
   ];
 
   /// Конвертировать значение в граммы
