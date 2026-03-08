@@ -89,30 +89,53 @@ class ManagementHomeContent extends StatelessWidget {
         _Tile(icon: Icons.shopping_cart, title: loc.t('product_order'), onTap: () => context.go('/product-order?department=${_deptForRoute(employee.department)}')),
         _Tile(icon: Icons.assignment, title: loc.t('inventory_blank'), onTap: () => context.push('/inventory')),
         if ((isChef || roles.contains('sous_chef')) && screenPref.showBanquetCatering) ...[
-          Padding(
-            padding: const EdgeInsets.only(top: 16, bottom: 8),
-            child: Text(
-              loc.t('banquet_catering') ?? 'Банкет / Кейтринг',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-            ),
-          ),
-          _Tile(icon: Icons.restaurant_menu, title: loc.t('menu'), onTap: () => context.go('/menu/banquet-catering')),
-          _Tile(icon: Icons.description, title: loc.t('ttk_kitchen'), onTap: () => context.go('/tech-cards/banquet-catering')),
+          const SizedBox(height: 8),
+          _ExpandableBanquetSection(loc: loc),
         ],
         if (isGeneral) ...[
           _Tile(icon: Icons.savings, title: '${loc.t('expenses')} (${loc.t('pro')})', onTap: () => context.go('/expenses')),
         ],
         // ФЗП подразделения для руководителей: шеф/су-шеф (кухня), менеджер зала (зал), барменеджер (бар)
         if ((isChef || roles.contains('sous_chef')) && !isGeneral)
-          _Tile(icon: Icons.payments, title: loc.t('salary_tab_fzp') ?? 'ФЗП', subtitle: loc.t('salary_period_hint'), onTap: () => context.go('/expenses/salary?department=kitchen')),
+          _Tile(icon: Icons.payments, title: loc.t('salary_tab_fzp') ?? 'ФЗП', onTap: () => context.go('/expenses/salary?department=kitchen')),
         if (roles.contains('floor_manager') && !isGeneral)
-          _Tile(icon: Icons.payments, title: loc.t('salary_tab_fzp') ?? 'ФЗП', subtitle: loc.t('salary_period_hint'), onTap: () => context.go('/expenses/salary?department=hall')),
+          _Tile(icon: Icons.payments, title: loc.t('salary_tab_fzp') ?? 'ФЗП', onTap: () => context.go('/expenses/salary?department=hall')),
         if (isBarManager && !isGeneral)
-          _Tile(icon: Icons.payments, title: loc.t('salary_tab_fzp') ?? 'ФЗП', subtitle: loc.t('salary_period_hint'), onTap: () => context.go('/expenses/salary?department=bar')),
+          _Tile(icon: Icons.payments, title: loc.t('salary_tab_fzp') ?? 'ФЗП', onTap: () => context.go('/expenses/salary?department=bar')),
       ],
+    );
+  }
+}
+
+/// Выдвижная секция «Банкет / Кейтринг» — кнопка в стиле остальных, внутри Меню и ТТК.
+class _ExpandableBanquetSection extends StatelessWidget {
+  const _ExpandableBanquetSection({required this.loc});
+
+  final LocalizationService loc;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ExpansionTile(
+        leading: const Icon(Icons.celebration),
+        title: Text(loc.t('banquet_catering') ?? 'Банкет / Кейтринг'),
+        trailing: const Icon(Icons.chevron_right),
+        children: [
+          ListTile(
+            leading: const Icon(Icons.restaurant_menu),
+            title: Text(loc.t('menu')),
+            trailing: const Icon(Icons.chevron_right, size: 20),
+            onTap: () => context.go('/menu/banquet-catering'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.description),
+            title: Text(loc.t('ttk_kitchen')),
+            trailing: const Icon(Icons.chevron_right, size: 20),
+            onTap: () => context.go('/tech-cards/banquet-catering'),
+          ),
+        ],
+      ),
     );
   }
 }

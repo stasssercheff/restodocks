@@ -55,15 +55,46 @@ class OwnerHomeContent extends StatelessWidget {
 
         if (screenPref.showBanquetCatering) ...[
           const SizedBox(height: 16),
-          _SectionTitle(title: loc.t('banquet_catering') ?? 'Банкет / Кейтринг'),
-          _Tile(icon: Icons.restaurant_menu, title: loc.t('menu'), onTap: () => context.go('/menu/banquet-catering')),
-          _Tile(icon: Icons.description, title: loc.t('ttk_kitchen'), onTap: () => context.go('/tech-cards/banquet-catering')),
+          _ExpandableBanquetSection(loc: loc),
         ],
         const SizedBox(height: 16),
         _SectionTitle(title: '${loc.t('expenses')} (${loc.t('pro')})'),
-        _Tile(icon: Icons.payments, title: loc.t('expenses'), subtitle: loc.t('salary_period_hint'), onTap: () => context.go('/expenses')),
+        _Tile(icon: Icons.payments, title: loc.t('expenses'), onTap: () => context.go('/expenses')),
         // Аренда, Закупка, Свой вариант — временно скрыты
       ],
+    );
+  }
+}
+
+/// Выдвижная секция «Банкет / Кейтринг» — кнопка в стиле остальных, внутри Меню и ТТК.
+class _ExpandableBanquetSection extends StatelessWidget {
+  const _ExpandableBanquetSection({required this.loc});
+
+  final LocalizationService loc;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ExpansionTile(
+        leading: const Icon(Icons.celebration),
+        title: Text(loc.t('banquet_catering') ?? 'Банкет / Кейтринг'),
+        trailing: const Icon(Icons.chevron_right),
+        children: [
+          ListTile(
+            leading: const Icon(Icons.restaurant_menu),
+            title: Text(loc.t('menu')),
+            trailing: const Icon(Icons.chevron_right, size: 20),
+            onTap: () => context.go('/menu/banquet-catering'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.description),
+            title: Text(loc.t('ttk_kitchen')),
+            trailing: const Icon(Icons.chevron_right, size: 20),
+            onTap: () => context.go('/tech-cards/banquet-catering'),
+          ),
+        ],
+      ),
     );
   }
 }
