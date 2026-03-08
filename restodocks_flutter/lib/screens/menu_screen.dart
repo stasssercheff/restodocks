@@ -18,8 +18,10 @@ class MenuScreen extends StatefulWidget {
   State<MenuScreen> createState() => _MenuScreenState();
 }
 
-/// Категории, относящиеся к бару (напитки).
-const _barCategories = {'beverages'};
+/// Категории, относящиеся к бару (напитки, коктейли и т.д.).
+const _barCategories = {'beverages', 'alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks'};
+
+bool _isBarDish(TechCard tc) => _barCategories.contains(tc.category) || tc.sections.contains('bar');
 
 class _MenuScreenState extends State<MenuScreen> {
   List<TechCard> _dishes = [];
@@ -178,15 +180,13 @@ class _MenuScreenState extends State<MenuScreen> {
 
   bool get _isHallMenu => widget.department == 'hall' || widget.department == 'dining_room';
 
-  /// Себестоимость видят только собственник и управляющие подразделениями.
-  bool _canSeeCost(Employee? emp) {
+  /// Полный вид ТТК (себестоимость, состав, технология): только собственник, шеф (кухня), барменеджер (бар).
+  bool _canSeeFullTtkView(Employee? emp, TechCard tc) {
     if (emp == null) return false;
-    return emp.hasRole('owner') ||
-        emp.hasRole('executive_chef') ||
-        emp.hasRole('sous_chef') ||
-        emp.hasRole('bar_manager') ||
-        emp.hasRole('floor_manager') ||
-        emp.department == 'management';
+    if (emp.hasRole('owner')) return true;
+    if (emp.hasRole('executive_chef') && !_isBarDish(tc)) return true;
+    if (emp.hasRole('bar_manager') && _isBarDish(tc)) return true;
+    return false;
   }
 
   bool _hasHallContent(TechCard tc) {
@@ -198,8 +198,12 @@ class _MenuScreenState extends State<MenuScreen> {
   String _buildSubtitleText(LocalizationService loc, TechCard tc, String lang, double totalCost, String currencySym) {
     final emp = context.read<AccountManagerSupabase>().currentEmployee;
     final cat = _categoryLabel(tc.category, lang);
-    if (_canSeeCost(emp)) {
+    if (_canSeeFullTtkView(emp, tc)) {
       return '${cat} • ${loc.t('cost_price')}: ${totalCost.toStringAsFixed(2)} $currencySym';
+    }
+    final sp = tc.sellingPrice;
+    if (sp != null && sp > 0) {
+      return '$cat • ${loc.t('selling_price') ?? 'Цена'}: ${sp.toStringAsFixed(2)} $currencySym';
     }
     return cat;
   }
@@ -332,14 +336,22 @@ class _MenuScreenState extends State<MenuScreen> {
                 ),
               ),
               title: InkWell(
-                onTap: () => context.push('/tech-cards/${tc.id}?view=1${_isHallMenu ? '&hall=1' : ''}'),
+                onTap: () {
+                  final emp = context.read<AccountManagerSupabase>().currentEmployee;
+                  final useHallView = !_canSeeFullTtkView(emp, tc);
+                  context.push('/tech-cards/${tc.id}?view=1${useHallView ? '&hall=1' : ''}');
+                },
                 child: Text(
                   tc.getDisplayNameInLists(lang),
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
               ),
               subtitle: InkWell(
-                onTap: () => context.push('/tech-cards/${tc.id}?view=1${_isHallMenu ? '&hall=1' : ''}'),
+                onTap: () {
+                  final emp = context.read<AccountManagerSupabase>().currentEmployee;
+                  final useHallView = !_canSeeFullTtkView(emp, tc);
+                  context.push('/tech-cards/${tc.id}?view=1${useHallView ? '&hall=1' : ''}');
+                },
                 child: Text(
                   _buildSubtitleText(loc, tc, lang, totalCost, currencySym),
                   style: TextStyle(fontSize: 13, color: Colors.grey[600]),
@@ -348,21 +360,24 @@ class _MenuScreenState extends State<MenuScreen> {
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
-                  child: _isHallMenu && _hasHallContent(tc)
-                      ? _HallDishContent(
-                          loc: loc,
-                          description: tc.descriptionForHall ?? '',
-                          composition: tc.compositionForHall ?? '',
-                        )
-                      : _MenuDishTable(
+                  child: _canSeeFullTtkView(context.read<AccountManagerSupabase>().currentEmployee, tc)
+                      ? _MenuDishTable(
                           loc: loc,
                           dishName: tc.dishName,
                           ingredients: tc.ingredients.where((i) => !i.isPlaceholder || i.hasData).toList(),
                           technology: tc.getLocalizedTechnology(lang),
                           currencySym: currencySym,
-                          showCost: _canSeeCost(context.read<AccountManagerSupabase>().currentEmployee),
+                          showCost: true,
+                        )
+                      : _HallDishContent(
+                          loc: loc,
+                          description: tc.descriptionForHall ?? '',
+                          composition: tc.compositionForHall ?? '',
+                          sellingPrice: tc.sellingPrice,
+                          currencySym: currencySym,
                         ),
                   ),
+                ),
               ],
             ),
           );
@@ -417,17 +432,21 @@ class _HallTabChip extends StatelessWidget {
   }
 }
 
-/// Блок описания и состава для зала (вместо полной ТТК).
+/// Блок описания, состава и продажной цены для зала (вместо полной ТТК).
 class _HallDishContent extends StatelessWidget {
   const _HallDishContent({
     required this.loc,
     required this.description,
     required this.composition,
+    this.sellingPrice,
+    this.currencySym = '',
   });
 
   final LocalizationService loc;
   final String description;
   final String composition;
+  final double? sellingPrice;
+  final String currencySym;
 
   @override
   Widget build(BuildContext context) {
@@ -444,6 +463,12 @@ class _HallDishContent extends StatelessWidget {
           Text(loc.t('composition_for_hall') ?? 'Состав', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
           Text(composition, style: const TextStyle(fontSize: 13, height: 1.4)),
+          const SizedBox(height: 12),
+        ],
+        if (sellingPrice != null && sellingPrice! > 0) ...[
+          Text(loc.t('selling_price') ?? 'Цена', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          Text('${sellingPrice!.toStringAsFixed(2)} $currencySym', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.primary)),
         ],
       ],
     );

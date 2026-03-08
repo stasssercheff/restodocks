@@ -412,6 +412,31 @@ class _EditableCostCellState extends State<_EditableCostCell> {
   }
 }
 
+/// Категории бара (для определения права на продажную цену).
+const _barCategoriesForEdit = {'beverages', 'alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks'};
+
+bool _isBarDishTechCard(TechCard tc) =>
+    _barCategoriesForEdit.contains(tc.category) || tc.sections.contains('bar');
+
+bool _canSeeFullTtkViewTechCard(Employee? emp, TechCard tc) {
+  if (emp == null) return false;
+  if (emp.hasRole('owner')) return true;
+  if (emp.hasRole('executive_chef') && !_isBarDishTechCard(tc)) return true;
+  if (emp.hasRole('bar_manager') && _isBarDishTechCard(tc)) return true;
+  return false;
+}
+
+bool _canEditSellingPrice(Employee? emp, TechCard? tc, {bool isSemiFinished = false, String? category, List<String>? sections, String? department}) {
+  if (emp == null || isSemiFinished) return false;
+  if (tc != null) return _canSeeFullTtkViewTechCard(emp, tc);
+  // Новая ТТК: определяем по category/department
+  final isBar = department == 'bar' || (category != null && _barCategoriesForEdit.contains(category)) || (sections?.contains('bar') ?? false);
+  if (emp.hasRole('owner')) return true;
+  if (emp.hasRole('executive_chef') && !isBar) return true;
+  if (emp.hasRole('bar_manager') && isBar) return true;
+  return false;
+}
+
 TechCard _applyEdits(
   TechCard t, {
   String? dishName,
@@ -423,6 +448,7 @@ TechCard _applyEdits(
   Map<String, String>? technologyLocalized,
   String? descriptionForHall,
   String? compositionForHall,
+  double? sellingPrice,
   List<String>? photoUrls,
   List<TTIngredient>? ingredients,
 }) {
@@ -436,6 +462,7 @@ TechCard _applyEdits(
     technologyLocalized: technologyLocalized,
     descriptionForHall: descriptionForHall,
     compositionForHall: compositionForHall,
+    sellingPrice: sellingPrice,
     photoUrls: photoUrls,
     ingredients: ingredients,
   );
@@ -519,6 +546,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   final _technologyController = TextEditingController();
   final _descriptionForHallController = TextEditingController();
   final _compositionForHallController = TextEditingController();
+  final _sellingPriceController = TextEditingController();
   final List<TTIngredient> _ingredients = [];
   List<TechCard> _pickerTechCards = [];
   List<TechCard> _semiFinishedProducts = [];
@@ -531,6 +559,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   bool get _isNew => widget.techCardId.isEmpty || widget.techCardId == 'new';
   /// Макс. фото: ПФ — 10, блюдо — 1
   int get _maxPhotos => _isSemiFinished ? 10 : 1;
+
+  double? _parseSellingPrice() {
+    final s = _sellingPriceController.text.trim();
+    if (s.isEmpty) return null;
+    final v = double.tryParse(s.replaceAll(',', '.'));
+    return (v != null && v >= 0) ? v : null;
+  }
 
   String _categoryLabel(String c, String lang) {
     final Map<String, Map<String, String>> categoryTranslations = {
@@ -671,6 +706,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
             _technologyController.text = tc.getLocalizedTechnology(context.read<LocalizationService>().currentLanguageCode);
             _descriptionForHallController.text = tc.descriptionForHall ?? '';
             _compositionForHallController.text = tc.compositionForHall ?? '';
+            _sellingPriceController.text = tc.sellingPrice != null && tc.sellingPrice! > 0
+                ? tc.sellingPrice!.toStringAsFixed(2)
+                : '';
             _ingredients
               ..clear()
               ..addAll(tc.ingredients);
@@ -713,6 +751,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     _technologyController.dispose();
     _descriptionForHallController.dispose();
     _compositionForHallController.dispose();
+    _sellingPriceController.dispose();
     super.dispose();
   }
 
@@ -807,7 +846,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           establishmentId: est.dataEstablishmentId,
           createdBy: emp.id,
         );
-        var updated = _applyEdits(created, portionWeight: _portionWeight, yieldGrams: yieldVal, technologyLocalized: techMap, descriptionForHall: _descriptionForHallController.text.trim().isEmpty ? null : _descriptionForHallController.text.trim(), compositionForHall: _compositionForHallController.text.trim().isEmpty ? null : _compositionForHallController.text.trim(), ingredients: toSaveIngredients);
+        final sellingPrice = _parseSellingPrice();
+        var updated = _applyEdits(created, portionWeight: _portionWeight, yieldGrams: yieldVal, technologyLocalized: techMap, descriptionForHall: _descriptionForHallController.text.trim().isEmpty ? null : _descriptionForHallController.text.trim(), compositionForHall: _compositionForHallController.text.trim().isEmpty ? null : _compositionForHallController.text.trim(), sellingPrice: sellingPrice, ingredients: toSaveIngredients);
         if (_pendingPhotoBytes.isNotEmpty) {
           final urls = <String>[];
           for (var i = 0; i < _pendingPhotoBytes.length; i++) {
@@ -883,7 +923,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
             if (url != null) photoUrls.add(url);
           }
         }
-        final updated = _applyEdits(tc, dishName: name, category: category, sections: _selectedSections, isSemiFinished: _isSemiFinished, portionWeight: _portionWeight, yieldGrams: yieldVal, technologyLocalized: techMap, descriptionForHall: _descriptionForHallController.text.trim().isEmpty ? null : _descriptionForHallController.text.trim(), compositionForHall: _compositionForHallController.text.trim().isEmpty ? null : _compositionForHallController.text.trim(), photoUrls: photoUrls, ingredients: toSaveIngredients);
+        final sellingPrice = _parseSellingPrice();
+        final updated = _applyEdits(tc, dishName: name, category: category, sections: _selectedSections, isSemiFinished: _isSemiFinished, portionWeight: _portionWeight, yieldGrams: yieldVal, technologyLocalized: techMap, descriptionForHall: _descriptionForHallController.text.trim().isEmpty ? null : _descriptionForHallController.text.trim(), compositionForHall: _compositionForHallController.text.trim().isEmpty ? null : _compositionForHallController.text.trim(), sellingPrice: sellingPrice, photoUrls: photoUrls, ingredients: toSaveIngredients);
         await svc.saveTechCard(updated);
         // Переводим название и технологию фоново
         final techText = _technologyController.text.trim();
@@ -1564,6 +1605,28 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                             ),
                           )
                         : Text(_compositionForHallController.text.isEmpty ? '—' : _compositionForHallController.text, style: const TextStyle(fontSize: 13, height: 1.4)),
+                    if (_canEditSellingPrice(employee, _techCard, isSemiFinished: _isSemiFinished, category: _selectedCategory, sections: _selectedSections, department: widget.department)) ...[
+                      const SizedBox(height: 12),
+                      Text(loc.t('selling_price') ?? 'Продажная цена', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                      const SizedBox(height: 4),
+                      TextField(
+                        controller: _sellingPriceController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        style: const TextStyle(fontSize: 13),
+                        decoration: InputDecoration(
+                          hintText: '0.00',
+                          suffixText: context.read<AccountManagerSupabase>().establishment?.currencySymbol ?? '',
+                          isDense: true,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ] else if (_techCard != null && !_isSemiFinished && _techCard!.sellingPrice != null && _techCard!.sellingPrice! > 0) ...[
+                      const SizedBox(height: 12),
+                      Text(loc.t('selling_price') ?? 'Продажная цена', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                      const SizedBox(height: 4),
+                      Text('${_techCard!.sellingPrice!.toStringAsFixed(2)} ${context.read<AccountManagerSupabase>().establishment?.currencySymbol ?? ''}', style: const TextStyle(fontSize: 13, height: 1.4)),
+                    ],
                   ],
                 ),
               ),
@@ -1747,12 +1810,16 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
       );
     }
 
-    // Режим «для зала»: описание и состав для гостей вместо полной ТТК кухни
-    if (widget.forceHallView && _techCard != null && !_techCard!.isSemiFinished) {
+    // Режим «для зала»: описание, состав, продажная цена вместо полной ТТК. Показывается при forceHallView или когда пользователь не имеет полного доступа.
+    final showLimitedView = _techCard != null && !_techCard!.isSemiFinished &&
+        (widget.forceHallView || (widget.forceViewMode && !_canSeeFullTtkViewTechCard(employee, _techCard!)));
+    if (showLimitedView) {
       final desc = _techCard!.descriptionForHall?.trim() ?? '';
       final comp = _techCard!.compositionForHall?.trim() ?? '';
       final photoUrls = _techCard!.photoUrls ?? [];
       final photoUrl = photoUrls.isNotEmpty ? photoUrls.first : null;
+      final sellingPrice = _techCard!.sellingPrice;
+      final currencySym = context.read<AccountManagerSupabase>().establishment?.currencySymbol ?? '';
       return Scaffold(
         appBar: AppBar(
           leading: appBarBackButton(context),
@@ -1783,8 +1850,15 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                 Text(loc.t('composition_for_hall') ?? 'Состав', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
                 Text(comp, style: const TextStyle(fontSize: 15, height: 1.5)),
+                const SizedBox(height: 16),
               ],
-              if (desc.isEmpty && comp.isEmpty)
+              if (sellingPrice != null && sellingPrice > 0) ...[
+                Text(loc.t('selling_price') ?? 'Цена', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 4),
+                Text('${sellingPrice.toStringAsFixed(2)} $currencySym', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.primary)),
+                const SizedBox(height: 16),
+              ],
+              if (desc.isEmpty && comp.isEmpty && (sellingPrice == null || sellingPrice <= 0))
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 24),
                   child: Text(

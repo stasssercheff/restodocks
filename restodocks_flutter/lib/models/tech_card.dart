@@ -17,6 +17,8 @@ class TechCard extends Equatable {
   /// Описание и состав для меню зала (гостям), не кухонная ТТК.
   final String? descriptionForHall;
   final String? compositionForHall;
+  /// Продажная стоимость. Устанавливается шефом (кухня) и барменеджером (бар).
+  final double? sellingPrice;
   /// URL фото: блюдо — до 1, ПФ — до 10. Storage bucket tech_card_photos.
   final List<String>? photoUrls;
   final List<TTIngredient> ingredients;
@@ -37,6 +39,7 @@ class TechCard extends Equatable {
     this.technologyLocalized,
     this.descriptionForHall,
     this.compositionForHall,
+    this.sellingPrice,
     this.photoUrls,
     required this.ingredients,
     required this.establishmentId,
@@ -66,6 +69,7 @@ class TechCard extends Equatable {
       ),
       descriptionForHall: json['description_for_hall'] as String?,
       compositionForHall: json['composition_for_hall'] as String?,
+      sellingPrice: (json['selling_price'] as num?)?.toDouble(),
       photoUrls: (json['photo_urls'] as List<dynamic>?)?.map((e) => e.toString()).where((s) => s.isNotEmpty).toList(),
       ingredients: const [], // Загружается отдельно через сервис
       establishmentId: json['establishment_id'] as String,
@@ -89,6 +93,7 @@ class TechCard extends Equatable {
       'technology_localized': technologyLocalized,
       'description_for_hall': descriptionForHall,
       'composition_for_hall': compositionForHall,
+      'selling_price': sellingPrice,
       'photo_urls': photoUrls ?? [],
       'establishment_id': establishmentId,
       'created_by': createdBy,
@@ -113,6 +118,7 @@ class TechCard extends Equatable {
     Map<String, String>? technologyLocalized,
     String? descriptionForHall,
     String? compositionForHall,
+    double? sellingPrice,
     List<String>? photoUrls,
     List<TTIngredient>? ingredients,
     String? establishmentId,
@@ -132,6 +138,7 @@ class TechCard extends Equatable {
       technologyLocalized: technologyLocalized ?? this.technologyLocalized,
       descriptionForHall: descriptionForHall ?? this.descriptionForHall,
       compositionForHall: compositionForHall ?? this.compositionForHall,
+      sellingPrice: sellingPrice ?? this.sellingPrice,
       photoUrls: photoUrls ?? this.photoUrls,
       ingredients: ingredients ?? this.ingredients,
       establishmentId: establishmentId ?? this.establishmentId,
@@ -283,6 +290,7 @@ class TechCard extends Equatable {
     technologyLocalized,
     descriptionForHall,
     compositionForHall,
+    sellingPrice,
     photoUrls,
     ingredients,
     establishmentId,
@@ -328,6 +336,7 @@ class TechCard extends Equatable {
       technologyLocalized: null,
       descriptionForHall: null,
       compositionForHall: null,
+      sellingPrice: null,
       photoUrls: null,
       ingredients: [],
       establishmentId: establishmentId,

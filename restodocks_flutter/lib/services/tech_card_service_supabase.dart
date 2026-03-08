@@ -53,6 +53,7 @@ class TechCardServiceSupabase {
     if (!includeHallFields) {
       data.remove('composition_for_hall');
       data.remove('description_for_hall');
+      data.remove('selling_price');
     }
     return data;
   }
