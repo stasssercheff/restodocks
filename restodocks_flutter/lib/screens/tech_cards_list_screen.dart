@@ -113,7 +113,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     final est = acc.establishment;
     final emp = acc.currentEmployee;
     if (est == null) {
-      setState(() { _loading = false; _error = 'Нет заведения'; });
+        setState(() { _loading = false; _error = 'no_establishment'; });
       return;
     }
     setState(() { _loading = true; _error = null; });
@@ -393,13 +393,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(loc.t('ttk_branch_display') ?? 'Отображение ТТК по филиалам'),
+        title: Text(loc.t('ttk_branch_display')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
               leading: const Icon(Icons.store),
-              title: Text(loc.t('main_establishment') ?? 'Основное'),
+              title: Text(loc.t('main_establishment_short')),
               trailing: branchFilter.selectedBranchId == null
                   ? const Icon(Icons.check, color: Colors.green)
                   : null,
@@ -598,13 +598,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   Widget _buildBody(LocalizationService loc, bool canEdit, bool showCost) {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
+      final errorText = _error == 'no_establishment' ? loc.t('no_establishment') : _error!;
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(_error!, textAlign: TextAlign.center),
+              Text(errorText, textAlign: TextAlign.center),
               const SizedBox(height: 16),
               FilledButton(onPressed: _load, child: Text(loc.t('refresh'))),
             ],
@@ -660,7 +661,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                   builder: (_, branchFilter, __) {
                     final selId = branchFilter.selectedBranchId;
                     final label = selId == null
-                        ? (loc.t('main_establishment') ?? 'Основное')
+                        ? loc.t('main_establishment_short')
                         : branches.where((b) => b.id == selId).map((b) => b.name).firstOrNull ?? selId;
                     return Padding(
                       padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
@@ -734,7 +735,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     final costSym = est?.currencySymbol ?? Establishment.currencySymbolFor(est?.defaultCurrency ?? 'VND');
     final groups = _groupByCategory(techCards);
     final costLabel = showCost
-        ? (isDishesTab ? '$costSym/прц' : '$costSym/${loc.t('kg')}')
+        ? (isDishesTab ? loc.t('ttk_col_cost_per_portion').replaceFirst('%s', costSym) : '$costSym/${loc.t('kg')}')
         : '—';
 
     return RefreshIndicator(

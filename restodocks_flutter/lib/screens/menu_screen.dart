@@ -59,7 +59,7 @@ class _MenuScreenState extends State<MenuScreen> {
       final acc = context.read<AccountManagerSupabase>();
       final est = acc.establishment;
       if (est == null) {
-        setState(() { _loading = false; _error = 'Нет заведения'; });
+        setState(() { _loading = false; _error = 'no_establishment'; });
         return;
       }
       final productStore = context.read<ProductStoreSupabase>();
@@ -204,7 +204,7 @@ class _MenuScreenState extends State<MenuScreen> {
     if (_isHallMenu) {
       final sp = tc.sellingPrice;
       if (sp != null && sp > 0) {
-        return '$cat • ${loc.t('selling_price') ?? 'Цена'}: ${sp.toStringAsFixed(2)} $currencySym';
+        return '$cat • ${loc.t('selling_price')}: ${sp.toStringAsFixed(2)} $currencySym';
       }
     }
     // Кухня/бар: повары и сотрудники — без цен
@@ -265,7 +265,7 @@ class _MenuScreenState extends State<MenuScreen> {
                     children: [
                       Expanded(
                         child: _HallTabChip(
-                          label: loc.t('dept_bar') ?? 'Бар',
+                          label: loc.t('dept_bar'),
                           selected: _hallTab == 'bar',
                           onTap: () => setState(() => _hallTab = 'bar'),
                         ),
@@ -273,7 +273,7 @@ class _MenuScreenState extends State<MenuScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: _HallTabChip(
-                          label: loc.t('dept_kitchen') ?? 'Кухня',
+                          label: loc.t('dept_kitchen'),
                           selected: _hallTab == 'kitchen',
                           onTap: () => setState(() => _hallTab = 'kitchen'),
                         ),
@@ -301,13 +301,14 @@ class _MenuScreenState extends State<MenuScreen> {
   Widget _buildBody(LocalizationService loc, String currencySym) {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
+      final errorText = _error == 'no_establishment' ? loc.t('no_establishment') : _error!;
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(_error!, textAlign: TextAlign.center),
+              Text(errorText, textAlign: TextAlign.center),
               const SizedBox(height: 16),
               FilledButton(onPressed: _load, child: Text(loc.t('refresh'))),
             ],
@@ -328,7 +329,7 @@ class _MenuScreenState extends State<MenuScreen> {
               Text(loc.t('menu'), style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 8),
               Text(
-                'Нет блюд в меню. Добавьте ТТК с типом «Блюдо» в разделе ТТК.',
+                loc.t('menu_empty_dishes'),
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
                 textAlign: TextAlign.center,
               ),
@@ -475,19 +476,19 @@ class _HallDishContent extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (description.isNotEmpty) ...[
-          Text(loc.t('description_for_hall') ?? 'Описание', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+          Text(loc.t('description_for_hall'), style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
           Text(description, style: const TextStyle(fontSize: 13, height: 1.4)),
           const SizedBox(height: 12),
         ],
         if (composition.isNotEmpty) ...[
-          Text(loc.t('composition_for_hall') ?? 'Состав', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+          Text(loc.t('composition_for_hall'), style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
           Text(composition, style: const TextStyle(fontSize: 13, height: 1.4)),
           const SizedBox(height: 12),
         ],
         if (sellingPrice != null && sellingPrice! > 0) ...[
-          Text(loc.t('selling_price') ?? 'Цена', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+          Text(loc.t('selling_price'), style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
           Text('${sellingPrice!.toStringAsFixed(2)} $currencySym', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.primary)),
         ],

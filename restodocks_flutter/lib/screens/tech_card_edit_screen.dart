@@ -2866,54 +2866,7 @@ class _TtkTableState extends State<_TtkTable> {
       ),
     );
 
-    // Панель с КБЖУ для PRO подписки
-    if (hasProSubscription && (totalCalories > 0 || totalProtein > 0 || totalFat > 0 || totalCarbs > 0)) {
-      return Column(
-        children: [
-          table,
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.blue.shade50,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.blue.shade200),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.restaurant, color: Colors.blue.shade700),
-                    const SizedBox(width: 8),
-                    Text(
-                      loc.t('ttk_nutrition_title'),
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue.shade700,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    _nutritionChip(loc.t('ttk_calories'), '${totalCalories.round()} ${loc.t('kcal')}', Colors.orange),
-                    const SizedBox(width: 12),
-                    _nutritionChip(loc.t('ttk_protein'), '${totalProtein.toStringAsFixed(1)} ${loc.t('gram')}', Colors.red),
-                    const SizedBox(width: 12),
-                    _nutritionChip(loc.t('ttk_fat'), '${totalFat.toStringAsFixed(1)} ${loc.t('gram')}', Colors.yellow.shade700),
-                    const SizedBox(width: 12),
-                    _nutritionChip(loc.t('ttk_carbs'), '${totalCarbs.toStringAsFixed(1)} ${loc.t('gram')}', Colors.green),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      );
-    }
-
+    // КБЖУ скрыто
     return table;
   }
 
@@ -3636,7 +3589,7 @@ class _ProductPickerState extends State<_ProductPicker> {
                 onTap: () => _askWeight(p, loc),
                 child: ListTile(
                   title: Text(_getDisplayName(p, lang)),
-                  subtitle: Text('${p.calories?.round() ?? 0} ${loc.t('kcal')} · ${CulinaryUnits.displayName((p.unit ?? 'g').trim().toLowerCase(), loc.currentLanguageCode)}'),
+                  subtitle: Text(CulinaryUnits.displayName((p.unit ?? 'g').trim().toLowerCase(), loc.currentLanguageCode)),
                 ),
               );
             },
@@ -4043,12 +3996,12 @@ class _SectionPicker extends StatelessWidget {
   });
 
   String get _displayLabel {
-    if (selected.isEmpty) return 'Скрыто';
-    if (selected.contains('all')) return 'Все цеха';
+    if (selected.isEmpty) return loc.t('ttk_section_hidden_short');
+    if (selected.contains('all')) return loc.t('ttk_section_all');
     if (selected.length == 1) {
       return availableSections[selected.first] ?? selected.first;
     }
-    return '${selected.length} цеха';
+    return loc.t('ttk_sections_count').replaceFirst('%s', '${selected.length}');
   }
 
   @override
@@ -4058,7 +4011,7 @@ class _SectionPicker extends StatelessWidget {
     if (!canEdit) {
       return InputDecorator(
         decoration: InputDecoration(
-          labelText: 'Цех',
+          labelText: loc.t('ttk_section_label'),
           isDense: true,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
         ),
@@ -4092,7 +4045,7 @@ class _SectionPicker extends StatelessWidget {
       onTap: () => _showPicker(context),
       child: InputDecorator(
         decoration: InputDecoration(
-          labelText: 'Цех',
+          labelText: loc.t('ttk_section_label'),
           isDense: true,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
           suffixIcon: const Icon(Icons.arrow_drop_down),
@@ -4187,6 +4140,7 @@ class _SectionPickerDialogState extends State<_SectionPickerDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final loc = context.watch<LocalizationService>();
     final isHidden = _selected.isEmpty;
     final isAll = _selected.contains('all');
 
@@ -4203,14 +4157,13 @@ class _SectionPickerDialogState extends State<_SectionPickerDialog> {
               Row(children: [
                 Icon(Icons.store, color: theme.colorScheme.primary, size: 22),
                 const SizedBox(width: 10),
-                Text('Выбор цеха',
+                Text(loc.t('ttk_section_select'),
                     style: theme.textTheme.titleMedium
                         ?.copyWith(fontWeight: FontWeight.w700)),
               ]),
               const SizedBox(height: 4),
               Text(
-                'ТТК будет видна только поварам выбранных цехов. '
-                'Если ничего не выбрано — видят только шеф-повар и су-шеф.',
+                loc.t('ttk_section_hint'),
                 style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
               ),
@@ -4240,8 +4193,8 @@ class _SectionPickerDialogState extends State<_SectionPickerDialog> {
                   Expanded(
                     child: Text(
                       isHidden
-                          ? 'Скрыто — виден только шеф-повару и су-шефу'
-                          : 'Снимите все цеха чтобы скрыть ТТК',
+                          ? loc.t('ttk_section_hidden')
+                          : loc.t('ttk_section_uncheck_hint'),
                       style: TextStyle(
                         fontSize: 12,
                         color: isHidden
@@ -4266,7 +4219,7 @@ class _SectionPickerDialogState extends State<_SectionPickerDialog> {
 
               // Все цеха
               _CheckItem(
-                label: 'Все цеха',
+                label: loc.t('ttk_section_all'),
                 checked: isAll,
                 onTap: () => _toggle('all'),
                 theme: theme,
@@ -4280,12 +4233,12 @@ class _SectionPickerDialogState extends State<_SectionPickerDialog> {
                 children: [
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(null),
-                    child: const Text('Отмена'),
+                    child: Text(loc.t('cancel')),
                   ),
                   const SizedBox(width: 8),
                   FilledButton(
                     onPressed: () => Navigator.of(context).pop(_selected),
-                    child: const Text('Сохранить'),
+                    child: Text(loc.t('save')),
                   ),
                 ],
               ),

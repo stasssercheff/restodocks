@@ -420,6 +420,27 @@ EN_RU = {
     "Foie Gras": "Фуа-гра",
 }
 
+# ─── EN→ES translations (языки в системе: ru, en, es) ─────────────────────────
+EN_ES = {
+    "Tomato": "Tomate", "Potato": "Patata", "Onion": "Cebolla", "Carrot": "Zanahoria",
+    "Cucumber": "Pepino", "Bell Pepper": "Pimiento", "Broccoli": "Brócoli", "Spinach": "Espinaca",
+    "Lettuce": "Lechuga", "Cabbage": "Repollo", "Garlic": "Ajo", "Ginger": "Jengibre",
+    "Eggplant": "Berenjena", "Zucchini": "Calabacín", "Celery": "Apio", "Radish": "Rábano",
+    "Beetroot": "Remolacha", "Asparagus": "Espárrago", "Artichoke": "Alcachofa",
+    "Cauliflower": "Coliflor", "Apple": "Manzana", "Banana": "Plátano", "Orange": "Naranja",
+    "Lemon": "Limón", "Grape": "Uva", "Strawberry": "Fresa", "Blueberry": "Arándano",
+    "Raspberry": "Frambuesa", "Pineapple": "Piña", "Mango": "Mango", "Peach": "Melocotón",
+    "Pear": "Pera", "Plum": "Ciruela", "Cherry": "Cereza", "Chicken Breast": "Pechuga de pollo",
+    "Chicken Thigh": "Muslo de pollo", "Beef Tenderloin": "Solomillo de ternera",
+    "Beef Ground": "Carne molida", "Pork Tenderloin": "Lomo de cerdo",
+    "Lamb Chop": "Chuletas de cordero", "Turkey Breast": "Pechuga de pavo",
+    "Salmon": "Salmón", "Tuna": "Atún", "Cod": "Bacalao", "Milk": "Leche",
+    "Cheese Cheddar": "Queso cheddar", "Yogurt Plain": "Yogur natural", "Butter": "Mantequilla",
+    "Cream": "Crema", "Rice": "Arroz", "Olive Oil": "Aceite de oliva", "Salt": "Sal",
+    "Sugar": "Azúcar", "Honey": "Miel", "Egg": "Huevo", "Chicken Egg": "Huevo de gallina",
+}
+# Fallback: если нет в EN_ES, оставляем английское название (валидно для es)
+
 # ─── Russian translations for categories of world_products entries ────────────
 CATEGORY_RU = {
     "vegetables": "Овощи", "fruits": "Фрукты", "meat": "Мясо",
@@ -432,14 +453,15 @@ CATEGORY_RU = {
 }
 
 def make_product(p):
-    """Convert world_products entry to Supabase product row."""
+    """Convert world_products entry to Supabase product row. names: ru, en, es."""
     en_name = p["name"]
     ru_name = EN_RU.get(en_name, en_name)  # fallback to en name if no translation
+    es_name = EN_ES.get(en_name, en_name)  # fallback to en if no ES translation
 
     return {
         "id": str(uuid.uuid4()),
         "name": ru_name,  # primary name in Russian
-        "names": {"ru": ru_name, "en": en_name},
+        "names": {"ru": ru_name, "en": en_name, "es": es_name},
         "category": p.get("category", "misc"),
         "unit": "g" if p.get("unit") in ("g", "gram", "гр", "г") else "kg",
         "calories": p.get("calories", 0),
@@ -548,10 +570,11 @@ def main():
         seen_in_batch.add(en)
         en_orig = p.get("en", p["name"])
         ru_orig = p["name"]
+        es_orig = EN_ES.get(en_orig, en_orig)  # es for extra_products
         new_products.append({
             "id": str(uuid.uuid4()),
             "name": ru_orig,
-            "names": {"ru": ru_orig, "en": en_orig},
+            "names": {"ru": ru_orig, "en": en_orig, "es": es_orig},
             "category": p.get("category", "misc"),
             "unit": "g" if p.get("unit") in ("g", "gram", "гр", "г") else "kg",
             "calories": p.get("calories", 0),
