@@ -97,12 +97,15 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
 
   double _calculateCostPerKg(TechCard tc) {
     if (tc.ingredients.isEmpty || tc.yield <= 0) return 0.0;
-
-    // Суммируем стоимости всех ингредиентов
     final totalCost = tc.ingredients.fold<double>(0, (sum, ing) => sum + ing.cost);
-
-    // Стоимость за кг = общая стоимость / выход в кг
     return (totalCost / tc.yield) * 1000;
+  }
+
+  /// Себестоимость за порцию (для блюд): totalCost * portionWeight / yield.
+  double _calculateCostPerPortion(TechCard tc) {
+    if (tc.ingredients.isEmpty || tc.yield <= 0 || tc.portionWeight <= 0) return 0.0;
+    final totalCost = tc.ingredients.fold<double>(0, (sum, ing) => sum + ing.cost);
+    return totalCost * tc.portionWeight / tc.yield;
   }
 
   Future<void> _load() async {
@@ -710,8 +713,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           Expanded(
             child: TabBarView(
               children: [
-                _buildTechCardsTable(semiFinishedCards, loc, canEdit, showCost),
-                _buildTechCardsTable(dishCards, loc, canEdit, showCost),
+                _buildTechCardsTable(semiFinishedCards, loc, canEdit, showCost, isDishesTab: false),
+                _buildTechCardsTable(dishCards, loc, canEdit, showCost, isDishesTab: true),
               ],
             ),
           ),
@@ -721,14 +724,18 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   }
 
   /// Компактная таблица с шапкой и группировкой по категориям.
-  Widget _buildTechCardsTable(List<TechCard> techCards, LocalizationService loc, bool canEdit, bool showCost) {
+  /// isDishesTab: для блюд — себестоимость за порцию, для ПФ — стоимость за кг.
+  Widget _buildTechCardsTable(List<TechCard> techCards, LocalizationService loc, bool canEdit, bool showCost, {bool isDishesTab = false}) {
     final lang = loc.currentLanguageCode;
     const colCatWidth = 76.0;
-    const colCostWidth = 48.0;
+    const colCostWidth = 56.0; // шире для себестоимости (десятичные)
     const colActionsWidth = 62.0; // «Просмотр» целиком
     final est = context.read<AccountManagerSupabase>().establishment;
     final costSym = est?.currencySymbol ?? Establishment.currencySymbolFor(est?.defaultCurrency ?? 'VND');
     final groups = _groupByCategory(techCards);
+    final costLabel = showCost
+        ? (isDishesTab ? loc.t('cost_price') : '$costSym/${loc.t('kg')}')
+        : '—';
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -744,7 +751,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
               onColor: Theme.of(context).colorScheme.onPrimaryContainer,
               labelName: loc.t('ttk_col_name'),
               labelCat: loc.t('column_category'),
-              labelCost: showCost ? '$costSym/${loc.t('kg')}' : '—',
+              labelCost: costLabel,
               labelView: loc.t('ttk_col_view'),
             ),
           ),
@@ -772,6 +779,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                   loc: loc,
                   canEdit: canEdit,
                   showCost: showCost,
+                  isDishesTab: isDishesTab,
                   colCatWidth: colCatWidth,
                   colCostWidth: colCostWidth,
                   colActionsWidth: colActionsWidth,
@@ -794,6 +802,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     required LocalizationService loc,
     required bool canEdit,
     required bool showCost,
+    required bool isDishesTab,
     required double colCatWidth,
     required double colCostWidth,
     required double colActionsWidth,
@@ -803,7 +812,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     final selected = _selectedTechCards.contains(tc.id);
     final name = tc.getDisplayNameInLists(lang);
     final cat = _categoryLabel(tc.category, loc);
-    final cost = showCost ? NumberFormatUtils.formatInt(_calculateCostPerKg(tc)) : '—';
+    final cost = showCost
+        ? (isDishesTab
+            ? '${NumberFormatUtils.formatDecimal(_calculateCostPerPortion(tc))} $costSym'
+            : NumberFormatUtils.formatInt(_calculateCostPerKg(tc)))
+        : '—';
     return Material(
       color: selected
           ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.5)
