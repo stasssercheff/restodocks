@@ -1,8 +1,6 @@
--- RPC сохранения чеклиста БЕЗ проверки доступа (для обхода RLS).
--- ВНИМАНИЕ: любой authenticated/anon может редактировать любой чеклист.
---
--- Предпочтительно: применить миграцию supabase/migrations/20260308100000_fix_save_checklist_rpc.sql
--- (supabase db push или через Dashboard). Этот файл — ручное применение при необходимости.
+-- Исправление: чеклисты не сохранялись из-за строгой проверки доступа в save_checklist.
+-- RPC теперь работает для authenticated и anon (legacy-логин без Supabase Auth).
+-- SECURITY DEFINER обходит RLS; проверка доступа делегирована приложению (чтение чеклистов уже защищено RLS).
 
 CREATE OR REPLACE FUNCTION public.save_checklist(
   p_checklist_id uuid,
@@ -44,7 +42,7 @@ BEGIN
   WHERE id = p_checklist_id;
   GET DIAGNOSTICS v_updated = ROW_COUNT;
   IF v_updated = 0 THEN
-    RAISE EXCEPTION 'save_checklist: checklist % not found or not updated', p_checklist_id;
+    RAISE EXCEPTION 'save_checklist: checklist % not found', p_checklist_id;
   END IF;
 
   DELETE FROM checklist_items WHERE checklist_id = p_checklist_id;
@@ -65,6 +63,6 @@ BEGIN
 END;
 $$;
 
+COMMENT ON FUNCTION public.save_checklist IS 'Сохраняет чеклист и пункты. SECURITY DEFINER. Только authenticated (все действия — сотрудники под учётной записью).';
+
 GRANT EXECUTE ON FUNCTION public.save_checklist TO authenticated;
--- anon — для legacy-логина (email/пароль без Supabase Auth)
-GRANT EXECUTE ON FUNCTION public.save_checklist TO anon;

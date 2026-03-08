@@ -14,10 +14,12 @@ CREATE INDEX IF NOT EXISTS idx_employee_direct_messages_created ON employee_dire
 
 ALTER TABLE employee_direct_messages ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "auth_employee_messages_select" ON employee_direct_messages;
 CREATE POLICY "auth_employee_messages_select" ON employee_direct_messages
   FOR SELECT TO authenticated
   USING (sender_employee_id = auth.uid() OR recipient_employee_id = auth.uid());
 
+DROP POLICY IF EXISTS "auth_employee_messages_insert" ON employee_direct_messages;
 CREATE POLICY "auth_employee_messages_insert" ON employee_direct_messages
   FOR INSERT TO authenticated
   WITH CHECK (

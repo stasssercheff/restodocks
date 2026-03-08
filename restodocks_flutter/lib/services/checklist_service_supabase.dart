@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../models/models.dart';
 import 'checklist_submission_service.dart';
 import 'supabase_service.dart';
@@ -14,6 +16,8 @@ class ChecklistServiceSupabase {
     String establishmentId, {
     String department = 'kitchen',
     String? currentEmployeeId,
+    /// false = редакторы (шеф, владелец) видят все чеклисты подразделения
+    bool applyAssignmentFilter = true,
   }) async {
     try {
       final data = await _supabase.client
@@ -26,7 +30,7 @@ class ChecklistServiceSupabase {
       for (final row in data) {
         final c = Checklist.fromJson(row);
         if (c.assignedDepartment != department) continue;
-        if (currentEmployeeId != null) {
+        if (applyAssignmentFilter && currentEmployeeId != null) {
           final ids = c.assignedEmployeeIds;
           final singleId = c.assignedEmployeeId;
           final hasAssignment = (ids != null && ids.isNotEmpty) || (singleId != null && singleId.isNotEmpty);
@@ -44,10 +48,13 @@ class ChecklistServiceSupabase {
         final items = (itemsData as List).map((e) => ChecklistItem.fromJson(e)).toList();
         list.add(c.copyWith(items: items));
       }
+      if (kDebugMode) {
+        print('ChecklistService: loaded ${list.length} checklists for $establishmentId dept=$department');
+      }
       return list;
     } catch (e) {
-      print('Ошибка загрузки чеклистов: $e');
-      return [];
+      print('ChecklistService: Ошибка загрузки чеклистов: $e');
+      rethrow;
     }
   }
 
@@ -216,7 +223,8 @@ class ChecklistServiceSupabase {
   Future<void> saveChecklist(Checklist checklist) async {
     final now = DateTime.now().toUtc().toIso8601String();
     final empIds = checklist.assignedEmployeeIds ?? [];
-    final empId = empIds.isNotEmpty ? empIds.first : checklist.assignedEmployeeId;
+    final rawEmpId = empIds.isNotEmpty ? empIds.first : checklist.assignedEmployeeId;
+    final empId = rawEmpId != null && rawEmpId.trim().isNotEmpty ? rawEmpId : null;
     final itemsPayload = checklist.items
         .map((e) => {
               'title': e.title,
@@ -228,6 +236,9 @@ class ChecklistServiceSupabase {
         .toList();
 
     try {
+      if (kDebugMode) {
+        print('ChecklistService: calling RPC save_checklist for ${checklist.id}');
+      }
       await _supabase.client.rpc(
         'save_checklist',
         params: {
@@ -246,6 +257,9 @@ class ChecklistServiceSupabase {
           'p_items': itemsPayload,
         },
       );
+      if (kDebugMode) {
+        print('ChecklistService: RPC save_checklist OK');
+      }
       return;
     } catch (e) {
       print('ChecklistService: RPC save_checklist failed: $e');
