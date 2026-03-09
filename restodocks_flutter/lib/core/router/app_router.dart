@@ -31,6 +31,7 @@ import '../../screens/order_create_screen.dart';
 import '../../screens/accept_co_owner_invitation_screen.dart';
 import '../../screens/register_co_owner_screen.dart';
 import '../../screens/add_establishment_screen.dart';
+import '../../screens/auth_confirm_click_screen.dart';
 import '../../screens/auth_confirm_screen.dart';
 import '../../screens/confirm_email_screen.dart';
 import '../../screens/admin_screen.dart';
@@ -217,6 +218,17 @@ class AppRouter {
       GoRoute(
         path: '/auth/confirm',
         pageBuilder: (context, state) => _slideTransitionPage(state, const AuthConfirmScreen()),
+      ),
+      // Прокладка: ссылка в письме → нажать кнопку → редирект на Supabase (защита от prefetch)
+      GoRoute(
+        path: '/auth/confirm-click',
+        pageBuilder: (context, state) {
+          final r = state.queryParameters['r'] ?? '';
+          return _slideTransitionPage(
+            state,
+            AuthConfirmClickScreen(redirectParam: r),
+          );
+        },
       ),
 
       // Инвентаризация — без нижней панели

@@ -17,6 +17,7 @@ class AuthConfirmScreen extends StatefulWidget {
 
 class _AuthConfirmScreenState extends State<AuthConfirmScreen> {
   String _status = '';
+  bool _showLoginButton = false;
 
   @override
   void initState() {
@@ -26,6 +27,19 @@ class _AuthConfirmScreenState extends State<AuthConfirmScreen> {
 
   Future<void> _processCallback() async {
     if (!mounted) return;
+
+    // Supabase при ошибке редиректит с #error=access_denied&error_code=otp_expired
+    final fragment = Uri.base.fragment;
+    if (fragment.contains('error=') &&
+        (fragment.contains('otp_expired') || fragment.contains('access_denied'))) {
+      setState(() {
+        _status = 'Ссылка истекла или уже использована. Войдите, используя email и пароль.';
+        _showLoginButton = true;
+      });
+      clear_hash.clearHashFromUrl();
+      return;
+    }
+
     setState(() => _status = 'Вход в аккаунт...');
 
     final account = context.read<AccountManagerSupabase>();
@@ -57,23 +71,35 @@ class _AuthConfirmScreenState extends State<AuthConfirmScreen> {
       return;
     }
 
-    setState(() => _status = 'Сессия не восстановлена. Переход на вход...');
-    await Future.delayed(const Duration(milliseconds: 800));
-    if (!mounted) return;
-    context.go('/login');
+    setState(() {
+      _status = 'Сессия не восстановлена.';
+      _showLoginButton = true;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const CircularProgressIndicator(),
-            const SizedBox(height: 24),
-            Text(_status, style: Theme.of(context).textTheme.bodyLarge),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (!_showLoginButton) const CircularProgressIndicator(),
+              if (_showLoginButton)
+                Icon(Icons.info_outline, size: 48, color: Theme.of(context).colorScheme.primary),
+              const SizedBox(height: 24),
+              Text(_status, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyLarge),
+              if (_showLoginButton) ...[
+                const SizedBox(height: 24),
+                FilledButton(
+                  onPressed: () => context.go('/login'),
+                  child: const Text('Войти'),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );

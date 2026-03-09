@@ -4,6 +4,15 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const REDIRECT_URL = "https://restodocks.com/auth/confirm";
+// Прокладка: prefetch почтового клиента не исчерпывает одноразовый токен Supabase
+const CONFIRM_CLICK_URL = "https://restodocks.com/auth/confirm-click";
+
+function base64urlEncode(s: string): string {
+  const bytes = new TextEncoder().encode(s);
+  let binary = "";
+  bytes.forEach((b) => (binary += String.fromCharCode(b)));
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
 
 function corsHeaders(origin: string | null) {
   return {
@@ -83,11 +92,11 @@ Deno.serve(async (req: Request) => {
             headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
           });
         }
+        const wrappedHref = `${CONFIRM_CLICK_URL}?r=${base64urlEncode(link)}`;
         const html = `
 <p>Здравствуйте!</p>
 <p>Подтвердите email для завершения регистрации.</p>
-<p><a href="${escapeHtml(link)}" style="color:#2754C5;text-decoration:underline">Подтвердить</a></p>
-<p style="font-size:12px;color:#666;word-break:break-all">${escapeHtml(link)}</p>
+<p><a href="${escapeHtml(wrappedHref)}" style="color:#2754C5;text-decoration:none">Подтвердить</a></p>
 <p>С уважением,<br>Команда Restodocks</p>
         `.trim();
         const res = await fetch("https://api.resend.com/emails", {
@@ -198,11 +207,12 @@ Deno.serve(async (req: Request) => {
         }
         if (link) {
           console.log("[send-registration-email] OK: confirmation link added for", to);
-          // Без отображения полной ссылки — длинные URL в теле письма усиливают спам-оценку
+          // Ссылка через прокладку — prefetch (Apple Mail, Outlook) не расходует одноразовый токен
+          const wrappedHref = `${CONFIRM_CLICK_URL}?r=${base64urlEncode(link)}`;
           confirmationBlock = `
 <hr style="margin:20px 0;border:none;border-top:1px solid #eee"/>
 <p>Для завершения регистрации перейдите по ссылке:</p>
-<p><a href="${escapeHtml(link)}" style="color:#2754C5;text-decoration:none">Завершить регистрацию</a></p>
+<p><a href="${escapeHtml(wrappedHref)}" style="color:#2754C5;text-decoration:none">Завершить регистрацию</a></p>
 `;
         } else {
           console.error("send-registration-email: generateLink failed for", to);
