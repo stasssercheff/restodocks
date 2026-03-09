@@ -42,7 +42,8 @@ void main() async {
     url: supabaseUrl,
     anonKey: _supabaseAnonKey,
     authOptions: const FlutterAuthClientOptions(
-      detectSessionInUri: true, // автоматический вход при переходе по ссылке подтверждения
+      detectSessionInUri: true,
+      authFlowType: AuthFlowType.implicit, // сессия из hash при переходе по ссылке подтверждения
     ),
   );
   await AccountManagerSupabase().initialize();

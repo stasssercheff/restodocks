@@ -45,11 +45,11 @@ class _AuthConfirmScreenState extends State<AuthConfirmScreen> {
 
     final account = context.read<AccountManagerSupabase>();
 
-    // Даём Supabase время обработать hash (#access_token=...); getSession() подтягивает сессию
-    await Future.delayed(const Duration(milliseconds: 500));
-    if (!mounted) return;
-    await Supabase.instance.client.auth.getSession();
-    await Future.delayed(const Duration(milliseconds: 300));
+    // Явно восстанавливаем сессию из hash (#access_token=...&refresh_token=...)
+    try {
+      await Supabase.instance.client.auth.getSessionFromUrl(Uri.base);
+    } catch (_) {}
+    await Future.delayed(const Duration(milliseconds: 400));
     if (!mounted) return;
 
     await account.initialize();
@@ -64,9 +64,11 @@ class _AuthConfirmScreenState extends State<AuthConfirmScreen> {
 
     // Повторная попытка — сессия может восстанавливаться с задержкой
     for (int i = 0; i < 3 && mounted; i++) {
-      await Future.delayed(const Duration(milliseconds: 800));
+      await Future.delayed(const Duration(milliseconds: 600));
       if (!mounted) return;
-      await Supabase.instance.client.auth.getSession();
+      try {
+        await Supabase.instance.client.auth.getSessionFromUrl(Uri.base);
+      } catch (_) {}
       await account.initialize();
       if (!mounted) return;
       if (account.isLoggedInSync) {
