@@ -1,4 +1,7 @@
+import 'dart:typed_data';
+
 import 'package:excel/excel.dart' hide TextSpan;
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -6,6 +9,9 @@ import 'package:provider/provider.dart';
 import '../models/inbox_document.dart';
 import '../models/translation.dart';
 import '../services/inventory_download.dart';
+import '../services/iiko_product_store.dart';
+import '../services/iiko_xlsx_patcher.dart';
+import '../services/iiko_xlsx_sanitizer.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
 
@@ -89,6 +95,7 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
 
   LocalizationService get _loc => context.read<LocalizationService>();
 
+  /// Стандартный бланк: можно выбрать язык сохранения.
   Future<void> _mergeStandardAndSave(List<InboxDocument> docs) async {
     setState(() => _loading = true);
 
@@ -314,9 +321,11 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
     }
   }
 
+  /// iiko: выбор бланка из загруженных, мини-превью, данные в «Итого»/«Остаток фактический».
   Future<void> _mergeIikoAndSave(List<InboxDocument> docs) async {
     setState(() => _loading = true);
 
+    // Суммируем по коду, сохраняем оригинальные имена и единицы (тот же язык, те же коды)
     final merged = <String, Map<String, dynamic>>{};
     Map<String, dynamic>? firstHeader;
 
@@ -338,43 +347,252 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
       }
     }
 
-    setState(() => _loading = false);
-
-    final excel = Excel.createExcel();
-    final sheet = excel['Объединённая iiko'];
-    sheet.appendRow([
-      TextCellValue('Код'),
-      TextCellValue('Наименование'),
-      TextCellValue('Ед.изм.'),
-      TextCellValue('Итого'),
-    ]);
-
-    final sorted = merged.values.toList();
-    sorted.sort((a, b) => ((a['name'] ?? '') as String).compareTo((b['name'] ?? '') as String));
-
-    for (final r in sorted) {
-      final total = (r['total'] as num?)?.toDouble() ?? 0.0;
-      if (total <= 0) continue;
-      sheet.appendRow([
-        TextCellValue(r['code']?.toString() ?? ''),
-        TextCellValue(r['name']?.toString() ?? ''),
-        TextCellValue(r['unit']?.toString() ?? ''),
-        DoubleCellValue(total),
-      ]);
+    final qtyByCode = <String, double>{};
+    for (final e in merged.entries) {
+      final total = (e.value['total'] as num?)?.toDouble() ?? 0.0;
+      if (total > 0 && e.key.isNotEmpty) qtyByCode[e.key] = total;
     }
 
-    excel.setDefaultSheet('Объединённая iiko');
-    final out = excel.encode();
-    if (out != null && out.isNotEmpty) {
-      final dateStr = firstHeader?['date']?.toString() ?? DateTime.now().toIso8601String().substring(0, 10);
-      final dateLabel = dateStr.replaceAll(RegExp(r'[T:]'), '-').substring(0, 10);
-      await saveFileBytes('inventory_iiko_merged_$dateLabel.xlsx', out);
+    final iikoStore = context.read<IikoProductStore>();
+    await iikoStore.restoreBlankFromStorage();
+    setState(() => _loading = false);
+
+    // Выбор бланка: загруженный или выбор файла
+    final selected = await _showIikoBlankChoiceDialog(iikoStore);
+    if (selected == null || !mounted) return;
+
+    setState(() => _loading = true);
+
+    Uint8List outBytes;
+    if (selected.$1 != null) {
+      outBytes = IikoXlsxPatcher.patch(
+        origBytes: selected.$1!,
+        defaultQtyCol: selected.$2,
+        sheetQtyCols: selected.$3 ?? const {},
+        qtyByCode: qtyByCode,
+      );
+    } else {
+      // Fallback: простой Excel
+      final excel = Excel.createExcel();
+      final sheet = excel['Объединённая iiko'];
+      sheet.appendRow([
+        TextCellValue('Код'),
+        TextCellValue('Наименование'),
+        TextCellValue('Ед.изм.'),
+        TextCellValue('Итого'),
+      ]);
+      final sorted = merged.values.toList();
+      sorted.sort((a, b) => ((a['name'] ?? '') as String).compareTo((b['name'] ?? '') as String));
+      for (final r in sorted) {
+        final total = (r['total'] as num?)?.toDouble() ?? 0.0;
+        if (total <= 0) continue;
+        sheet.appendRow([
+          TextCellValue(r['code']?.toString() ?? ''),
+          TextCellValue(r['name']?.toString() ?? ''),
+          TextCellValue(r['unit']?.toString() ?? ''),
+          DoubleCellValue(total),
+        ]);
+      }
+      excel.setDefaultSheet('Объединённая iiko');
+      final encoded = excel.encode();
+      outBytes = encoded != null ? Uint8List.fromList(encoded) : Uint8List(0);
+    }
+
+    final dateStr = firstHeader?['date']?.toString() ?? DateTime.now().toIso8601String().substring(0, 10);
+    final dateLabel = dateStr.replaceAll(RegExp(r'[T:]'), '-').substring(0, 10);
+    final fileName = 'Инвентаризация_iiko_merged_$dateLabel.xlsx';
+
+    setState(() => _loading = false);
+
+    if (outBytes.isNotEmpty) {
+      await saveFileBytes(fileName, outBytes);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(_loc.t('inventory_excel_downloaded') ?? 'Файл сохранён')),
         );
         Navigator.of(context).pop(true);
       }
+    }
+  }
+
+  /// Диалог выбора бланка iiko с мини-превью. Возвращает (bytes, qtyCol, sheetQtyCols) или null.
+  Future<(Uint8List?, int, Map<String, int>?)?> _showIikoBlankChoiceDialog(IikoProductStore iikoStore) async {
+    final loc = _loc;
+    final blanks = <({String label, Uint8List bytes, int qtyCol, Map<String, int> sheetQtyCols})>[];
+
+    if (iikoStore.originalBlankBytes != null) {
+      blanks.add((
+        label: loc.t('inventory_merge_blank_establishment') ?? 'Бланк заведения',
+        bytes: iikoStore.originalBlankBytes!,
+        qtyCol: iikoStore.originalQuantityColumnIndex ?? 5,
+        sheetQtyCols: iikoStore.sheetQtyColumns,
+      ));
+    }
+
+    final result = await showDialog<(Uint8List, int, Map<String, int>)>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx2, setState) => AlertDialog(
+          title: Text(loc.t('inventory_merge_blank_choice') ?? 'Выберите бланк'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  loc.t('inventory_merge_blank_hint') ?? 'Данные будут записаны в колонку «Итого»/«Остаток фактический» выбранного бланка.',
+                  style: Theme.of(ctx2).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 16),
+                ...blanks.map((b) => _buildBlankPreviewTile(
+                  label: b.label,
+                  bytes: b.bytes,
+                  onSelect: () => Navigator.of(ctx).pop((b.bytes, b.qtyCol, b.sheetQtyCols)),
+                )),
+                const SizedBox(height: 8),
+                ListTile(
+                  leading: const Icon(Icons.folder_open),
+                  title: Text(loc.t('inventory_merge_blank_pick') ?? 'Выбрать файл...'),
+                  onTap: () async {
+                    if (!ctx.mounted) return;
+                    final r = await FilePicker.platform.pickFiles(
+                      type: FileType.custom,
+                      allowedExtensions: ['xlsx', 'xls'],
+                      withData: true,
+                    );
+                    if (r != null && r.files.isNotEmpty) {
+                      final bytes = r.files.single.bytes;
+                      if (bytes != null && bytes.isNotEmpty && ctx.mounted) {
+                        final san = IikoXlsxSanitizer.sanitizeForExcelPackage(Uint8List.fromList(bytes));
+                        final detected = _detectQtyColumn(san);
+                        if (!ctx.mounted) return;
+                        Navigator.of(ctx).pop((
+                          san,
+                          detected.$1,
+                          detected.$2,
+                        ));
+                      }
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result != null) return (result.$1, result.$2, result.$3);
+    return null;
+  }
+
+  /// Мини-превью бланка: имена листов + первые строки первого листа.
+  Widget _buildBlankPreviewTile({
+    required String label,
+    required Uint8List bytes,
+    required VoidCallback onSelect,
+  }) {
+    final preview = _buildXlsxPreview(bytes);
+    return Card(
+      child: InkWell(
+        onTap: onSelect,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.table_chart, color: Theme.of(context).colorScheme.primary),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600))),
+                ],
+              ),
+              if (preview != null) ...[
+                const SizedBox(height: 8),
+                Container(
+                  constraints: const BoxConstraints(maxHeight: 100),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  padding: const EdgeInsets.all(8),
+                  child: SingleChildScrollView(
+                    child: Text(
+                      preview,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            fontFamily: 'monospace',
+                            fontSize: 11,
+                          ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Парсит xlsx и возвращает текст для превью (первые 6 строк первого листа).
+  String? _buildXlsxPreview(Uint8List bytes) {
+    try {
+      final san = IikoXlsxSanitizer.sanitizeForExcelPackage(bytes);
+      final excel = Excel.decodeBytes(san.toList());
+      final names = excel.tables.keys.toList();
+      if (names.isEmpty) return null;
+      final sheet = excel.tables[names.first];
+      if (sheet == null) return null;
+      final sb = StringBuffer();
+      sb.writeln('Листы: ${names.take(3).join(", ")}${names.length > 3 ? "..." : ""}');
+      for (var r = 0; r < sheet.maxRows && r < 6; r++) {
+        final cells = <String>[];
+        for (var c = 0; c < (sheet.maxColumns > 8 ? 8 : sheet.maxColumns); c++) {
+          final v = sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r)).value;
+          final s = (v == null ? '' : (v is TextCellValue ? v.value : v.toString()).toString()).trim();
+          cells.add(s.isEmpty ? '—' : (s.length > 12 ? '${s.substring(0, 12)}…' : s));
+        }
+        sb.writeln(cells.join(' | '));
+      }
+      return sb.toString();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Определяет индекс колонки «Остаток фактический» / «Итого» и sheetQtyCols.
+  (int, Map<String, int>) _detectQtyColumn(Uint8List bytes) {
+    try {
+      final excel = Excel.decodeBytes(bytes.toList());
+      final sheetQtyCols = <String, int>{};
+      var defaultQtyCol = 5;
+      const qtyKeywords = ['остаток фактический', 'остаток', 'итого', 'количество', 'кол-во', 'qty'];
+
+      for (final sName in excel.tables.keys) {
+        final sheet = excel.tables[sName];
+        if (sheet == null) continue;
+        for (var r = 0; r < sheet.maxRows && r < 15; r++) {
+          for (var c = 0; c < sheet.maxColumns; c++) {
+            final v = sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r)).value;
+            final s = (v is TextCellValue ? v.value : v?.toString() ?? '').toString().toLowerCase().trim();
+            if (qtyKeywords.any((k) => s.contains(k) || s == k)) {
+              sheetQtyCols[sName] = c;
+              if (defaultQtyCol == 5) defaultQtyCol = c;
+              break;
+            }
+          }
+        }
+      }
+      return (defaultQtyCol, sheetQtyCols);
+    } catch (_) {
+      return (5, {});
     }
   }
 
@@ -422,11 +640,24 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
               children: [
                 Padding(
                   padding: const EdgeInsets.all(16),
-                  child: Text(
-                    loc.t('inventory_merge_hint') ?? 'Выберите бланки по дате и времени сохранения. Итоговые количества будут суммированы.',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        loc.t('inventory_merge_hint') ?? 'Выберите бланки по дате и времени сохранения. Итоговые количества будут суммированы.',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        loc.t('inventory_merge_iiko_hint') ?? 'iiko: сохраняется в том же бланке, тот же язык, те же коды. Стандарт: можно выбрать язык сохранения.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              fontStyle: FontStyle.italic,
+                            ),
+                      ),
+                    ],
                   ),
                 ),
                 CheckboxListTile(
