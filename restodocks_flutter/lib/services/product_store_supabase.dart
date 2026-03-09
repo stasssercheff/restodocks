@@ -412,28 +412,16 @@ class ProductStoreSupabase {
 
   /// Обработка ответа с данными номенклатуры
   Future<void> _processNomenclatureResponse(List<dynamic> response, String establishmentId) async {
-    print('🔍 ProductStore: Processing response with ${response.length} items');
-    print('🔍 ProductStore: First item raw: ${response.isNotEmpty ? response.first : 'no items'}');
-    print('🔍 ProductStore: First item keys: ${response.isNotEmpty ? response.first.keys.toList() : 'no items'}');
-
     int processedCount = 0;
 
     for (final item in response) {
       try {
-        print('🔍 ProductStore: Processing item: $item');
-        print('🔍 ProductStore: Item type: ${item.runtimeType}');
-        print('🔍 ProductStore: Item keys: ${item.keys.toList()}');
-
         // Пробуем разные варианты названий полей
         final productId = item['product_id'] as String? ??
                          item['id'] as String? ??
                          item['productId'] as String?;
 
-        if (productId == null || productId.isEmpty) {
-          print('⚠️ ProductStore: Skipping item with null/empty product_id/id/productId');
-          print('⚠️ ProductStore: Available keys: ${item.keys.toList()}');
-          continue;
-        }
+        if (productId == null || productId.isEmpty) continue;
 
         // Добавляем в номенклатуру
         _nomenclatureIds.add(productId);
@@ -469,8 +457,8 @@ class ProductStoreSupabase {
 
         processedCount++;
       } catch (e) {
-        print('⚠️ ProductStore: Error processing item: $e, item: $item');
-        continue; // Продолжаем с другими элементами
+        // Пропускаем проблемный элемент, продолжаем с остальными
+        continue;
       }
     }
 

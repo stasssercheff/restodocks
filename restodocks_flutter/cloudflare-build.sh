@@ -29,8 +29,8 @@ flutter --version
 echo "==> flutter pub get"
 flutter pub get
 
-echo "==> flutter build web (--no-web-resources-cdn, --no-source-maps)"
-flutter build web --release --no-web-resources-cdn --no-source-maps \
+echo "==> flutter build web (--no-web-resources-cdn, with source maps to avoid 404 parse error)"
+flutter build web --release --no-web-resources-cdn \
   --dart-define=SUPABASE_URL="$SUPABASE_URL" \
   --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
 

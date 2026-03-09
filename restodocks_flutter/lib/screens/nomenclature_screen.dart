@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -3877,8 +3878,14 @@ class _NomenclatureSkeletonItem extends StatelessWidget {
           ),
         );
 
-        // Очищаем номенклатуру
-        await store.clearAllNomenclature(estId);
+        // Очищаем номенклатуру (с таймаутом, чтобы не зависать навсегда)
+        await store.clearAllNomenclature(estId).timeout(
+          const Duration(minutes: 3),
+          onTimeout: () => throw TimeoutException(
+            loc.t('clear_nomenclature_timeout') ??
+                'Операция заняла слишком много времени (3 мин). Обновите страницу — данные могли уже удалиться.',
+          ),
+        );
 
         // Закрываем диалог загрузки
         if (Navigator.of(context).canPop()) {
@@ -3901,9 +3908,12 @@ class _NomenclatureSkeletonItem extends StatelessWidget {
           Navigator.of(context).pop();
         }
 
+        final message = e is TimeoutException
+            ? (e.message ?? loc.t('clear_nomenclature_timeout'))
+            : 'Ошибка очистки: $e';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Ошибка очистки: $e'),
+            content: Text(message ?? 'Ошибка'),
             backgroundColor: Colors.red,
           ),
         );

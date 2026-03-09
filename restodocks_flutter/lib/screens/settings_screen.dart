@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -509,7 +511,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       );
       try {
-        await store.clearAllNomenclature(estId);
+        await store.clearAllNomenclature(estId).timeout(
+          const Duration(minutes: 3),
+          onTimeout: () => throw TimeoutException(
+            loc.t('clear_nomenclature_timeout') ??
+                'Операция заняла слишком много времени (3 мин). Обновите страницу — данные могли уже удалиться.',
+          ),
+        );
         if (context.mounted && Navigator.of(context).canPop()) {
           Navigator.of(context).pop();
         }
@@ -526,9 +534,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Navigator.of(context).pop();
         }
         if (context.mounted) {
+          final message = e is TimeoutException
+              ? (e.message ?? loc.t('clear_nomenclature_timeout'))
+              : '${loc.t('error') ?? 'Ошибка'}: $e';
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('${loc.t('error') ?? 'Ошибка'}: $e'),
+              content: Text(message ?? 'Ошибка'),
               backgroundColor: Colors.red,
             ),
           );
