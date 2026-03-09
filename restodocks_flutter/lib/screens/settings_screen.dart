@@ -520,8 +520,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 'Операция заняла слишком много времени (2 мин). Обновите страницу — данные могли уже удалиться.',
           ),
         );
-        if (context.mounted && Navigator.of(context).canPop()) {
-          Navigator.of(context).pop();
+        if (context.mounted) {
+          final nav = Navigator.of(context, rootNavigator: true);
+          if (nav.canPop()) nav.pop();
         }
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -532,8 +533,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           );
         }
       } catch (e) {
-        if (context.mounted && Navigator.of(context).canPop()) {
-          Navigator.of(context).pop();
+        if (context.mounted) {
+          final nav = Navigator.of(context, rootNavigator: true);
+          if (nav.canPop()) nav.pop();
         }
         if (context.mounted) {
           final message = e is TimeoutException

@@ -3888,12 +3888,10 @@ class _NomenclatureSkeletonItem extends StatelessWidget {
           ),
         );
 
-        // Закрываем диалог загрузки
-        if (Navigator.of(context).canPop()) {
-          Navigator.of(context).pop();
+        if (mounted) {
+          final nav = Navigator.of(context, rootNavigator: true);
+          if (nav.canPop()) nav.pop();
         }
-
-        // Данные будут перезагружены автоматически при следующем взаимодействии
 
         // Показываем успех
         ScaffoldMessenger.of(context).showSnackBar(
@@ -3904,11 +3902,10 @@ class _NomenclatureSkeletonItem extends StatelessWidget {
         );
 
       } catch (e) {
-        // Закрываем диалог загрузки
-        if (Navigator.of(context).canPop()) {
-          Navigator.of(context).pop();
+        if (mounted) {
+          final nav = Navigator.of(context, rootNavigator: true);
+          if (nav.canPop()) nav.pop();
         }
-
         final message = e is TimeoutException
             ? (e.message ?? loc.t('clear_nomenclature_timeout'))
             : 'Ошибка очистки: $e';
