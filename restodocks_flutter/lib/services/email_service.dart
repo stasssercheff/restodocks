@@ -46,14 +46,14 @@ class EmailService {
   }
 
   /// Отправить письмо при регистрации (владелец или сотрудник).
-  /// Прямой HTTP (как sendOrderEmail) — обход 403 от functions.invoke на web.
-  /// Возвращает (ok, error) — если !ok, error содержит причину.
+  /// [passwordForConfirmation] — если передан и Confirm Email включён, в письмо добавляется ссылка подтверждения.
   Future<({bool ok, String? error})> sendRegistrationEmail({
     required bool isOwner,
     required String to,
     required String companyName,
     required String email,
     String? pinCode,
+    String? passwordForConfirmation,
   }) async {
     try {
       final dio = Dio(BaseOptions(
@@ -70,10 +70,68 @@ class EmailService {
         'companyName': companyName,
         'email': email,
         if (pinCode != null) 'pinCode': pinCode,
+        if (passwordForConfirmation != null && passwordForConfirmation.isNotEmpty)
+          'password': passwordForConfirmation,
       };
       final resp = await dio.post(
         '${supabase_url.getSupabaseBaseUrl()}/functions/v1/send-registration-email',
         data: body,
+      );
+      if (resp.statusCode == 200) return (ok: true, error: null);
+      final data = resp.data;
+      final msg = data is Map ? (data['error'] ?? data['message'] ?? resp.statusCode) : resp.statusCode;
+      return (ok: false, error: msg.toString());
+    } catch (e) {
+      return (ok: false, error: e.toString());
+    }
+  }
+
+  /// Запросить ссылку подтверждения (по кнопке «Отправить ссылку»).
+  /// Не требует пароль — использует magiclink.
+  Future<({bool ok, String? error})> sendConfirmationLinkRequest(String to) async {
+    try {
+      final dio = Dio(BaseOptions(
+        headers: {
+          'apikey': _supabaseAnonKey,
+          'Authorization': 'Bearer $_supabaseAnonKey',
+          'Content-Type': 'application/json',
+        },
+        validateStatus: (_) => true,
+      ));
+      final resp = await dio.post(
+        '${supabase_url.getSupabaseBaseUrl()}/functions/v1/send-registration-email',
+        data: {'type': 'confirmation_only', 'to': to.trim()},
+      );
+      if (resp.statusCode == 200) return (ok: true, error: null);
+      final data = resp.data;
+      final msg = data is Map ? (data['error'] ?? data['message'] ?? resp.statusCode) : resp.statusCode;
+      return (ok: false, error: msg.toString());
+    } catch (e) {
+      return (ok: false, error: e.toString());
+    }
+  }
+
+  /// Отправить только письмо с ссылкой подтверждения (для co-owner и др.).
+  Future<({bool ok, String? error})> sendConfirmationEmail({
+    required String to,
+    required String password,
+  }) async {
+    try {
+      final dio = Dio(BaseOptions(
+        headers: {
+          'apikey': _supabaseAnonKey,
+          'Authorization': 'Bearer $_supabaseAnonKey',
+          'Content-Type': 'application/json',
+        },
+        validateStatus: (_) => true,
+      ));
+      final resp = await dio.post(
+        '${supabase_url.getSupabaseBaseUrl()}/functions/v1/send-registration-email',
+        data: {
+          'type': 'confirmation_only',
+          'to': to.trim(),
+          'password': password,
+        },
       );
       if (resp.statusCode == 200) return (ok: true, error: null);
       final data = resp.data;

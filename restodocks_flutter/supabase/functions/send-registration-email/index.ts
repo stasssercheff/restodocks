@@ -99,6 +99,7 @@ Deno.serve(async (req: Request) => {
 <p><a href="${escapeHtml(wrappedHref)}" style="color:#2754C5;text-decoration:none">Подтвердить</a></p>
 <p>С уважением,<br>Команда Restodocks</p>
         `.trim();
+        const text = `Здравствуйте!\n\nПодтвердите email для завершения регистрации.\n${wrappedHref}\n\nС уважением,\nКоманда Restodocks`;
         const res = await fetch("https://api.resend.com/emails", {
           method: "POST",
           headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
@@ -107,6 +108,7 @@ Deno.serve(async (req: Request) => {
             to: [to.trim()],
             subject: "Подтвердите регистрацию — Restodocks",
             html,
+            text,
           }),
         });
         const data = await res.json();
@@ -172,57 +174,9 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    let confirmationBlock = "";
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    if (supabaseUrl && serviceKey && to?.trim()) {
-      try {
-        const supabase = createClient(supabaseUrl, serviceKey);
-        // signup — для только что созданного пользователя; magiclink — fallback (только email)
-        let link: string | null = null;
-        if (password && typeof password === "string" && password.length > 0) {
-          const r1 = await supabase.auth.admin.generateLink({
-            type: "signup",
-            email: to.trim(),
-            password,
-            options: { redirectTo: REDIRECT_URL },
-          });
-          if (!r1.error && r1.data?.properties?.action_link) {
-            link = r1.data.properties.action_link;
-          } else if (r1.error) {
-            console.error("[send-registration-email] signup generateLink:", r1.error.message);
-          }
-        }
-        if (!link) {
-          const r2 = await supabase.auth.admin.generateLink({
-            type: "magiclink",
-            email: to.trim(),
-            options: { redirectTo: REDIRECT_URL },
-          });
-          if (!r2.error && r2.data?.properties?.action_link) {
-            link = r2.data.properties.action_link;
-          } else if (r2.error) {
-            console.error("[send-registration-email] magiclink generateLink:", r2.error.message);
-          }
-        }
-        if (link) {
-          console.log("[send-registration-email] OK: confirmation link added for", to);
-          // Ссылка через прокладку — prefetch (Apple Mail, Outlook) не расходует одноразовый токен
-          const wrappedHref = `${CONFIRM_CLICK_URL}?r=${base64urlEncode(link)}`;
-          confirmationBlock = `
-<hr style="margin:20px 0;border:none;border-top:1px solid #eee"/>
-<p>Для завершения регистрации перейдите по ссылке:</p>
-<p><a href="${escapeHtml(wrappedHref)}" style="color:#2754C5;text-decoration:none">Завершить регистрацию</a></p>
-`;
-        } else {
-          console.error("send-registration-email: generateLink failed for", to);
-        }
-      } catch (e) {
-        console.error("send-registration-email: confirmation link error:", e);
-      }
-    } else if (!serviceKey) {
-      console.error("send-registration-email: SUPABASE_SERVICE_ROLE_KEY not set");
-    }
+    // Ссылку подтверждения НЕ добавляем в основное письмо — это вызывает спам.
+    // Пользователь запрашивает её кнопкой «Отправить ссылку» на экране подтверждения.
+    const confirmationBlock = "";
 
     let subject: string;
     let html: string;
@@ -252,13 +206,23 @@ ${confirmationBlock}
       `.trim();
     }
 
+    const text = html
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<[^>]+>/g, "")
+      .replace(/&nbsp;/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ from, to: [to], subject, html }),
+      body: JSON.stringify({ from, to: [to], subject, html, text }),
     });
 
     const data = await res.json();
