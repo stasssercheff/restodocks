@@ -263,6 +263,7 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
                 _LangButton(flag: '🇷🇺', label: loc.t('order_export_language_ru'), onTap: () => Navigator.of(ctx).pop('ru')),
                 _LangButton(flag: '🇺🇸', label: loc.t('order_export_language_en'), onTap: () => Navigator.of(ctx).pop('en')),
                 _LangButton(flag: '🇪🇸', label: loc.t('order_export_language_es'), onTap: () => Navigator.of(ctx).pop('es')),
+                _LangButton(flag: '🇹🇷', label: loc.t('order_export_language_tr') ?? 'Türkçe', onTap: () => Navigator.of(ctx).pop('tr')),
               ],
             ),
           ],

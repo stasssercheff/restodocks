@@ -17,10 +17,11 @@ class LocalizationService extends ChangeNotifier {
     Locale('ru', 'RU'),
     Locale('en', 'US'),
     Locale('es', 'ES'),
+    Locale('tr', 'TR'),
   ];
 
   /// Коды языков (продукты, ТТК, DeepL)
-  static const List<String> productLanguageCodes = ['ru', 'en', 'es'];
+  static const List<String> productLanguageCodes = ['ru', 'en', 'es', 'tr'];
 
   Locale _currentLocale = const Locale('ru', 'RU');
   Map<String, Map<String, String>> _translations = {};
@@ -93,6 +94,7 @@ class LocalizationService extends ChangeNotifier {
     var translation = _translations[currentLanguageCode]?[key] ??
         _translations['en']?[key] ??
         _translations['ru']?[key] ??
+        _translations['tr']?[key] ??
         key;
 
     // Замена аргументов в переводе
@@ -132,6 +134,7 @@ class LocalizationService extends ChangeNotifier {
     var translation = _translations[languageCode]?[key] ??
         _translations['en']?[key] ??
         _translations['ru']?[key] ??
+        _translations['tr']?[key] ??
         key;
 
     if (args != null) {
@@ -155,6 +158,8 @@ class LocalizationService extends ChangeNotifier {
         return 'English';
       case 'es':
         return 'Español';
+      case 'tr':
+        return 'Türkçe';
       case 'de':
         return 'Deutsch';
       case 'fr':
@@ -183,6 +188,8 @@ class LocalizationService extends ChangeNotifier {
         return '🇺🇸';
       case 'es':
         return '🇪🇸';
+      case 'tr':
+        return '🇹🇷';
       case 'de':
         return '🇩🇪';
       case 'fr':

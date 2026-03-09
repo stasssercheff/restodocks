@@ -58,16 +58,16 @@ enum KitchenSection {
   final String displayName;
 
   static const _translations = <String, Map<String, String>>{
-    'hot_kitchen':  {'ru': 'Горячий цех',    'en': 'Hot Kitchen',   'es': 'Cocina caliente', 'de': 'Warme Küche',    'fr': 'Cuisine chaude'},
-    'cold_kitchen': {'ru': 'Холодный цех',   'en': 'Cold Kitchen',  'es': 'Cocina fría',     'de': 'Kalte Küche',    'fr': 'Cuisine froide'},
-    'grill':        {'ru': 'Гриль',          'en': 'Grill',         'es': 'Parrilla',        'de': 'Grill',          'fr': 'Grill'},
-    'pizza':        {'ru': 'Пицца',          'en': 'Pizza',         'es': 'Pizza',           'de': 'Pizza',          'fr': 'Pizza'},
-    'sushi':        {'ru': 'Суши',           'en': 'Sushi',         'es': 'Sushi',           'de': 'Sushi',          'fr': 'Sushi'},
-    'prep':         {'ru': 'Заготовки',      'en': 'Prep',          'es': 'Preparación',     'de': 'Vorbereitung',   'fr': 'Préparation'},
-    'pastry':       {'ru': 'Кондитерский',   'en': 'Pastry',        'es': 'Pastelería',      'de': 'Konditorei',     'fr': 'Pâtisserie'},
-    'bakery':       {'ru': 'Пекарня',        'en': 'Bakery',        'es': 'Panadería',       'de': 'Bäckerei',       'fr': 'Boulangerie'},
-    'cleaning':     {'ru': 'Уборка',         'en': 'Cleaning',      'es': 'Limpieza',        'de': 'Reinigung',      'fr': 'Nettoyage'},
-    'banquet_catering': {'ru': 'Банкет / Кейтринг', 'en': 'Banquet / Catering', 'es': 'Banquete / Catering', 'de': 'Bankett / Catering', 'fr': 'Banquet / Traiteur'},
+    'hot_kitchen':  {'ru': 'Горячий цех',    'en': 'Hot Kitchen',   'es': 'Cocina caliente', 'de': 'Warme Küche',    'fr': 'Cuisine chaude', 'tr': 'Sıcak mutfak'},
+    'cold_kitchen': {'ru': 'Холодный цех',   'en': 'Cold Kitchen',  'es': 'Cocina fría',     'de': 'Kalte Küche',    'fr': 'Cuisine froide', 'tr': 'Soğuk mutfak'},
+    'grill':        {'ru': 'Гриль',          'en': 'Grill',         'es': 'Parrilla',        'de': 'Grill',          'fr': 'Grill',         'tr': 'Izgara'},
+    'pizza':        {'ru': 'Пицца',          'en': 'Pizza',         'es': 'Pizza',           'de': 'Pizza',          'fr': 'Pizza',         'tr': 'Pizza'},
+    'sushi':        {'ru': 'Суши',           'en': 'Sushi',         'es': 'Sushi',           'de': 'Sushi',          'fr': 'Sushi',         'tr': 'Suşi'},
+    'prep':         {'ru': 'Заготовки',      'en': 'Prep',          'es': 'Preparación',     'de': 'Vorbereitung',   'fr': 'Préparation',   'tr': 'Hazırlık'},
+    'pastry':       {'ru': 'Кондитерский',   'en': 'Pastry',        'es': 'Pastelería',      'de': 'Konditorei',     'fr': 'Pâtisserie',    'tr': 'Tatlıcı'},
+    'bakery':       {'ru': 'Пекарня',        'en': 'Bakery',        'es': 'Panadería',       'de': 'Bäckerei',       'fr': 'Boulangerie',   'tr': 'Fırın'},
+    'cleaning':     {'ru': 'Уборка',         'en': 'Cleaning',      'es': 'Limpieza',        'de': 'Reinigung',      'fr': 'Nettoyage',     'tr': 'Temizlik'},
+    'banquet_catering': {'ru': 'Банкет / Кейтринг', 'en': 'Banquet / Catering', 'es': 'Banquete / Catering', 'de': 'Bankett / Catering', 'fr': 'Banquet / Traiteur', 'tr': 'Banket / Catering'},
   };
 
   String getLocalizedName(String lang) =>

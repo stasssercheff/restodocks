@@ -198,7 +198,7 @@ class ScheduleExportWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final dates = _dates;
-    final localeStr = exportLang == 'ru' ? 'ru_RU' : (exportLang == 'es' ? 'es_ES' : 'en_US');
+    final localeStr = exportLang == 'ru' ? 'ru_RU' : (exportLang == 'es' ? 'es_ES' : (exportLang == 'tr' ? 'tr_TR' : 'en_US'));
     final weekdays = List.generate(7, (i) {
       final d = DateTime.utc(2024, 1, 1).add(Duration(days: i));
       return DateFormat('EEE', localeStr).format(d);
