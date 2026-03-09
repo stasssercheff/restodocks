@@ -198,12 +198,11 @@ Deno.serve(async (req: Request) => {
         }
         if (link) {
           console.log("[send-registration-email] OK: confirmation link added for", to);
+          // Без отображения полной ссылки — длинные URL в теле письма усиливают спам-оценку
           confirmationBlock = `
 <hr style="margin:20px 0;border:none;border-top:1px solid #eee"/>
-<p><strong>Подтвердите email:</strong></p>
-<p>Нажмите ссылку для подтверждения учётной записи:</p>
-<p><a href="${escapeHtml(link)}" style="color:#2754C5;text-decoration:underline">Подтвердить</a></p>
-<p style="font-size:12px;color:#666;word-break:break-all">${escapeHtml(link)}</p>
+<p>Для завершения регистрации перейдите по ссылке:</p>
+<p><a href="${escapeHtml(link)}" style="color:#2754C5;text-decoration:none">Завершить регистрацию</a></p>
 `;
         } else {
           console.error("send-registration-email: generateLink failed for", to);
