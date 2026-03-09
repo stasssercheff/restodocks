@@ -26,6 +26,8 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   String? _errorMessage;
   bool _rememberCredentials = true;
+  bool _isUnconfirmedEmail = false;
+  bool _isSendingLink = false;
 
   @override
   void initState() {
@@ -158,14 +160,37 @@ class _LoginScreenState extends State<LoginScreen> {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.red.shade50,
+            color: _isUnconfirmedEmail ? Colors.orange.shade50 : Colors.red.shade50,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.red.shade200),
+            border: Border.all(color: _isUnconfirmedEmail ? Colors.orange.shade200 : Colors.red.shade200),
           ),
-          child: SelectableText(
-            _errorMessage!,
-            style: TextStyle(color: Colors.red.shade700, fontSize: 13),
-            maxLines: 8,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SelectableText(
+                _errorMessage!,
+                style: TextStyle(
+                  color: _isUnconfirmedEmail ? Colors.orange.shade900 : Colors.red.shade700,
+                  fontSize: 13,
+                ),
+                maxLines: 8,
+              ),
+              if (_isUnconfirmedEmail) ...[
+                const SizedBox(height: 12),
+                TextButton.icon(
+                  onPressed: _isSendingLink ? null : _resendConfirmationLink,
+                  icon: _isSendingLink
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.email_outlined, size: 18),
+                  label: Text(loc.t('send_confirmation_link')),
+                ),
+              ],
+            ],
           ),
         ),
       const SizedBox(height: 24),
@@ -197,6 +222,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
+      _isUnconfirmedEmail = false;
     });
 
     try {
@@ -211,10 +237,16 @@ class _LoginScreenState extends State<LoginScreen> {
       if (result == null) {
         if (mounted) {
           final am = context.read<AccountManagerSupabase>();
-          final detail = am.lastLoginError;
-          setState(() => _errorMessage = detail != null
-              ? '${loc.t('invalid_email_or_password')}\n\n$detail'
-              : loc.t('invalid_email_or_password'));
+          final detail = am.lastLoginError ?? '';
+          final unconfirmed = _isUnconfirmedError(detail);
+          setState(() {
+            _isUnconfirmedEmail = unconfirmed;
+            _errorMessage = unconfirmed
+                ? loc.t('email_not_confirmed_resend_prompt')
+                : (detail.isNotEmpty
+                    ? '${loc.t('invalid_email_or_password')}\n\n$detail'
+                    : loc.t('invalid_email_or_password'));
+          });
         }
         return;
       }
@@ -240,7 +272,18 @@ class _LoginScreenState extends State<LoginScreen> {
       final loc = context.read<LocalizationService>();
       final errStr = e.toString();
       if (errStr.contains('employee_not_found')) {
-        setState(() => _errorMessage = loc.t('employee_not_found_use_fix_script'));
+        setState(() {
+          _errorMessage = loc.t('employee_not_found_use_fix_script');
+          _isUnconfirmedEmail = false;
+        });
+        return;
+      }
+      final unconfirmed = _isUnconfirmedError(errStr);
+      if (unconfirmed) {
+        setState(() {
+          _isUnconfirmedEmail = true;
+          _errorMessage = loc.t('email_not_confirmed_resend_prompt');
+        });
         return;
       }
       final fallback = loc.t('invalid_email_or_password');
@@ -250,6 +293,7 @@ class _LoginScreenState extends State<LoginScreen> {
         confirmEmailMsg: loc.t('confirm_email_then_login'),
       );
       setState(() {
+        _isUnconfirmedEmail = false;
         _errorMessage = (msg == fallback) ? msg : loc.t('login_error', args: {'error': msg});
       });
     } finally {
@@ -314,6 +358,34 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       },
     );
+  }
+
+  bool _isUnconfirmedError(String text) {
+    final s = text.toLowerCase();
+    return s.contains('not confirmed') || s.contains('email_not_confirmed');
+  }
+
+  Future<void> _resendConfirmationLink() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty) return;
+
+    setState(() => _isSendingLink = true);
+    try {
+      final result = await EmailService().sendConfirmationLinkRequest(email);
+      if (!mounted) return;
+      final loc = context.read<LocalizationService>();
+      if (result.ok) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.t('confirmation_link_sent'))),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.t('confirmation_link_error'))),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSendingLink = false);
+    }
   }
 
   /// Безопасное преобразование ошибки в строку (избегаем JSNull на Web)

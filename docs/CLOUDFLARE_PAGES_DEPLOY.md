@@ -30,6 +30,8 @@ Prod и Beta используют **один** проект Supabase (osglfptwbu
 
 **Admin** — см. [CLOUDFLARE_ADMIN_DEPLOY.md](CLOUDFLARE_ADMIN_DEPLOY.md).
 
+**5xx на http и SEO** — см. [CLOUDFLARE_HTTP_HTTPS_REDIRECT.md](CLOUDFLARE_HTTP_HTTPS_REDIRECT.md).
+
 ### 2. Supabase Auth: Redirect URLs
 
 Supabase → проект osglfptwbuqqmqunttha → **Authentication** → **URL Configuration** → **Redirect URLs**. Добавьте:

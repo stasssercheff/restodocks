@@ -143,8 +143,12 @@ class AppRouter {
       final account = context.read<AccountManagerSupabase>();
       if (!account.isLoggedInSync) await account.initialize();
       if (!account.isLoggedInSync) {
-        // Сохраняем URL для возврата после входа
-        final redirect = loc.isNotEmpty && loc != '/' ? Uri.encodeComponent(loc) : null;
+        // Сохраняем полный URL (path + query) для возврата после входа — иначе теряются token_hash и type для auth/confirm
+        final uri = state.uri;
+        final fullLoc = (uri.path.isNotEmpty && uri.path != '/')
+            ? (uri.hasQuery ? '${uri.path}?${uri.query}' : uri.path)
+            : loc;
+        final redirect = fullLoc.isNotEmpty && fullLoc != '/' ? Uri.encodeComponent(fullLoc) : null;
         return redirect != null ? '/login?redirect=$redirect' : '/login';
       }
       // Web: сохраняем путь для F5 fallback

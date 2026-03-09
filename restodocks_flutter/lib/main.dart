@@ -27,9 +27,9 @@ const String _supabaseAnonKey = String.fromEnvironment(
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Кэшируем путь из URL до любых изменений (Supabase, роутер)
+  // Критично: кэшировать путь+query до ВСЕГО остального — иначе теряются token_hash/type для auth/confirm-click
   if (kIsWeb) initial_loc.getInitialLocation();
-  url_strategy.initUrlStrategy();
+  url_strategy.initUrlStrategy(); // после кэша — PathUrlStrategy не должен менять текущий URL
   FlutterError.onError = (details) {
     debugPrint('FlutterError: ${details.exception}');
     debugPrint('Stack: ${details.stack}');

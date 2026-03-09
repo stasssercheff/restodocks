@@ -13,7 +13,8 @@
         console.log('[RD] pathname='+p+' href='+location.href+' ls='+localStorage.getItem('restodocks_last_path_persist'));
         if (p && p !== '/' && p !== '/splash') {
           if (p.endsWith('/') && p.length > 1) p = p.slice(0, -1);
-          if (location.search && p.indexOf('?') === -1) p += location.search;
+          // Критично: для auth/confirm и любого пути — всегда добавлять query (token_hash, type)
+          if (location.search && p.indexOf('?') === -1) p = p + location.search;
           sessionStorage.setItem('restodocks_last_path', p);
           localStorage.setItem('restodocks_last_path_persist', p);
           document.documentElement.dataset.initialPath = p;

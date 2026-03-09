@@ -71,6 +71,7 @@ String _pathFromWindow() {
     if (path.endsWith('/') && path.length > 1) path = path.substring(0, path.length - 1);
     final search = html.window.location.search ?? '';
     if (path.isNotEmpty && path != '/') {
+      // Всегда сохранять query — критично для /auth/confirm-click?token_hash=...&type=...
       return search.isNotEmpty ? '$path$search' : path;
     }
     final hash = html.window.location.hash ?? '';
@@ -113,11 +114,11 @@ String getInitialLocation() {
         html.window.sessionStorage[_sessionStorageKey] = fromWindow;
       } catch (_) {}
     } else {
-      // Pathname == '/' (редкий случай на некоторых конфигурациях).
-      // Берём из localStorage (переживает hard refresh), потом sessionStorage, потом dataset.
-      _cachedInitialPath = _pathFromSessionStorage()
-          ?? _pathFromDataset()
-          ?? '/';
+      // Pathname == '/' (редкий случай). Не использовать /login* — там нет token_hash для auth/confirm.
+      final fromStorage = _pathFromSessionStorage() ?? _pathFromDataset();
+      _cachedInitialPath = (fromStorage != null && !fromStorage.startsWith('/login'))
+          ? fromStorage
+          : '/';
     }
   }
   return _cachedInitialPath!;

@@ -9,8 +9,7 @@ import '../core/redirect_to_url_stub.dart'
     if (dart.library.html) '../core/redirect_to_url_web.dart' as redirect_impl;
 import '../services/services.dart';
 
-/// Страница-прокладка: ссылка в письме ведёт сюда (prefetch не тратит токен).
-/// Пользователь нажимает кнопку — вызываем verifyOtp или редирект на Supabase.
+/// Ссылка в письме ведёт сюда. Сразу вызываем verifyOTP (одноразовый токен), при успехе — /home.
 class AuthConfirmClickScreen extends StatefulWidget {
   const AuthConfirmClickScreen({
     super.key,
@@ -38,52 +37,56 @@ class _AuthConfirmClickScreenState extends State<AuthConfirmClickScreen> {
   @override
   void initState() {
     super.initState();
-    if (!_hasTokenHash && widget.redirectParam.isEmpty) {
+    if (_hasTokenHash) {
+      _performVerify();
+    } else if (widget.redirectParam.isNotEmpty) {
+      _handleLegacyRedirect();
+    } else {
       _error = 'Неверная ссылка. Войдите по паролю.';
     }
   }
 
-  Future<void> _onContinue() async {
-    if (_loading) return;
-    if (_hasTokenHash) {
-      final account = context.read<AccountManagerSupabase>();
-      final router = GoRouter.of(context);
-      setState(() => _loading = true);
-      try {
-        final otpType = widget.otpType == 'signup' ? OtpType.signup : OtpType.magiclink;
-        final res = await Supabase.instance.client.auth.verifyOTP(
-          tokenHash: widget.tokenHash,
-          type: otpType,
-        );
-        if (res.session != null) {
-          await account.initialize(forceRetryFromAuth: true);
-          if (!mounted) return;
-          if (account.isLoggedInSync) {
-            router.go('/home');
-            return;
-          }
+  Future<void> _performVerify() async {
+    if (!_hasTokenHash) return;
+    final account = context.read<AccountManagerSupabase>();
+    final router = GoRouter.of(context);
+    setState(() => _loading = true);
+    try {
+      final otpType = widget.otpType == 'signup' ? OtpType.signup : OtpType.magiclink;
+      final res = await Supabase.instance.client.auth.verifyOTP(
+        tokenHash: widget.tokenHash,
+        type: otpType,
+      );
+      if (res.session != null) {
+        await account.initialize(forceRetryFromAuth: true);
+        if (!mounted) return;
+        if (account.isLoggedInSync) {
+          router.go('/home');
+          return;
         }
-      } catch (e) {
-        setState(() {
-          _error = 'Ошибка: ${e.toString().split('\n').first}. Войдите по паролю.';
-          _loading = false;
-        });
-        return;
+        await Future.delayed(const Duration(milliseconds: 800));
+        if (!mounted) return;
+        await account.initialize(forceRetryFromAuth: true);
+        if (!mounted) return;
+        if (account.isLoggedInSync) {
+          router.go('/home');
+          return;
+        }
       }
-      setState(() => _loading = false);
+    } catch (_) {
       if (!mounted) return;
-      // Сессия есть, но профиль не загрузился — пробуем ещё раз с задержкой
-      await Future.delayed(const Duration(milliseconds: 800));
-      if (!mounted) return;
-      await account.initialize(forceRetryFromAuth: true);
-      if (!mounted) return;
-      if (account.isLoggedInSync) {
-        router.go('/home');
-        return;
-      }
-      router.go('/login');
+      setState(() {
+        _error = 'Ссылка истекла или уже использована. Войдите по паролю.';
+        _loading = false;
+      });
       return;
     }
+    if (!mounted) return;
+    setState(() => _loading = false);
+    router.go('/login');
+  }
+
+  void _handleLegacyRedirect() {
     if (widget.redirectParam.isEmpty) {
       context.go('/login');
       return;
@@ -130,29 +133,9 @@ class _AuthConfirmClickScreenState extends State<AuthConfirmClickScreen> {
                     child: const Text('Войти'),
                   ),
                 ] else ...[
-                  Text(
-                    'Для завершения регистрации нажмите кнопку:',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
+                  const CircularProgressIndicator(),
                   const SizedBox(height: 24),
-                  FilledButton.icon(
-                    onPressed: _loading ? null : () => _onContinue(),
-                    icon: _loading
-                        ? SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Theme.of(context).colorScheme.onPrimary),
-                          )
-                        : const Icon(Icons.check_circle_outline),
-                    label: Text(_loading ? 'Вход...' : 'Завершить регистрацию'),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Ссылка одноразовая. Если письмо открывали ранее — войдите по паролю.',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
-                  ),
+                  Text('Вход...', style: Theme.of(context).textTheme.bodyLarge),
                 ],
               ],
             ),

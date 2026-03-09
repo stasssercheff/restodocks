@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../services/services.dart';
@@ -72,12 +71,6 @@ class ConfirmEmailScreen extends StatelessWidget {
                   fontStyle: FontStyle.italic,
                 ),
                 textAlign: TextAlign.center,
-              ),
-              const Spacer(),
-              OutlinedButton(
-                onPressed: () => context.go('/login'),
-                style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
-                child: Text(loc.t('go_to_login')),
               ),
             ],
           ),
