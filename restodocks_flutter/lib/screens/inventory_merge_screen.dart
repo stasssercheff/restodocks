@@ -356,7 +356,7 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
     await iikoStore.restoreBlankFromStorage();
     setState(() => _loading = false);
 
-    // Выбор бланка: загруженный или выбор файла
+    // Выбор бланка: если 1 версия — выгрузка сразу; если несколько — диалог с мини-превью
     final selected = await _showIikoBlankChoiceDialog(iikoStore);
     if (selected == null || !mounted) return;
 
@@ -414,8 +414,8 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
     }
   }
 
-  /// Диалог выбора бланка iiko: последние загруженные за 3 месяца, мини-превью.
-  /// Без выбора языка — сохранение идёт исключительно по загруженным наименованиям на том же языке.
+  /// Выбор бланка iiko: если 1 версия — без диалога, выгрузка сразу; если несколько — диалог с мини-превью.
+  /// Без выбора языка — сохранение исключительно по загруженным наименованиям на том же языке.
   Future<(Uint8List?, int, Map<String, int>?)?> _showIikoBlankChoiceDialog(IikoProductStore iikoStore) async {
     final loc = _loc;
     final account = context.read<AccountManagerSupabase>();
@@ -455,6 +455,12 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
         SnackBar(content: Text(loc.t('inventory_merge_blank_empty') ?? 'Нет загруженных бланков за последние 3 месяца. Загрузите бланк в номенклатуре.')),
       );
       return null;
+    }
+
+    // Если 1 бланк — выбор не нужен, выгрузка сразу из него
+    if (blanks.length == 1) {
+      final b = blanks.single;
+      return (b.bytes, b.qtyCol, b.sheetQtyCols);
     }
 
     final result = await showDialog<(Uint8List, int, Map<String, int>)>(
