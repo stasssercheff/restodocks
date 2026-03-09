@@ -464,9 +464,12 @@ class AccountManagerSupabase extends ChangeNotifier {
     }
 
     // Обычный сотрудник: RLS требует id = auth.uid(), при Confirm Email сессии нет — через RPC.
-    // Владелец добавляет (authenticated) → create_employee_for_company.
-    // Саморегистрация (anon) → create_employee_self_register.
-    final rpcName = _supabase.isAuthenticated ? 'create_employee_for_company' : 'create_employee_self_register';
+    // Владелец добавляет другого человека → create_employee_for_company (caller = owner).
+    // Саморегистрация (RegisterScreen с PIN): auth.uid() == p_auth_user_id → create_employee_self_register.
+    final isSelfRegistration = _supabase.currentUser?.id == authUserId;
+    final rpcName = (_supabase.isAuthenticated && !isSelfRegistration)
+        ? 'create_employee_for_company'
+        : 'create_employee_self_register';
     final params = <String, dynamic>{
       'p_auth_user_id': authUserId,
       'p_establishment_id': company.id,
