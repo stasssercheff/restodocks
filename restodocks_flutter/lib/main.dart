@@ -50,11 +50,14 @@ void main() async {
   if (kIsWeb) {
     final uri = Uri.base;
     final hasTokens = uri.fragment.contains('access_token') || uri.query.contains('access_token');
-    if (uri.path.startsWith('/auth/confirm') && hasTokens) {
+    if (hasTokens) {
       try {
+        if (kDebugMode) debugPrint('[Auth] getSessionFromUrl path=${uri.path} hasFragment=${uri.fragment.isNotEmpty}');
         await Supabase.instance.client.auth.getSessionFromUrl(uri);
-        await Future.delayed(const Duration(milliseconds: 300)); // дать Supabase записать сессию
-      } catch (_) {}
+        await Future.delayed(const Duration(milliseconds: 500));
+      } catch (e) {
+        if (kDebugMode) debugPrint('[Auth] getSessionFromUrl error: $e');
+      }
     }
   }
   await AccountManagerSupabase().initialize();

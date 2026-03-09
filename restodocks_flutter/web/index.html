@@ -21,7 +21,7 @@
         } else {
           var saved = localStorage.getItem('restodocks_last_path_persist');
           console.log('[RD] pathname=/ → localStorage saved='+saved);
-          if (saved && saved !== '/' && saved !== '/splash') {
+          if (saved && saved !== '/' && saved !== '/splash' && saved.indexOf('/login') !== 0) {
             document.documentElement.dataset.initialPath = saved;
             sessionStorage.setItem('restodocks_last_path', saved);
           }
