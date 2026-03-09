@@ -180,4 +180,47 @@ class InboxService {
     if (department == 'all') return documents;
     return documents.where((doc) => doc.department == department).toList();
   }
+
+  /// Уведомления об удалении сотрудников (видят owner, executive_chef, sous_chef, bar_manager, floor_manager)
+  Future<List<EmployeeDeletionNotification>> getDeletionNotifications(String establishmentId) async {
+    try {
+      final res = await _supabase.client
+          .from('employee_deletion_notifications')
+          .select()
+          .eq('establishment_id', establishmentId)
+          .order('created_at', ascending: false)
+          .limit(100);
+      final list = res as List<dynamic>? ?? [];
+      return list.map((r) {
+        final m = Map<String, dynamic>.from(r as Map);
+        return EmployeeDeletionNotification(
+          id: m['id']?.toString() ?? '',
+          deletedEmployeeName: m['deleted_employee_name']?.toString() ?? '—',
+          deletedEmployeeEmail: m['deleted_employee_email']?.toString(),
+          deletedByName: m['deleted_by_name']?.toString() ?? '—',
+          createdAt: DateTime.tryParse(m['created_at']?.toString() ?? '') ?? DateTime.now(),
+        );
+      }).toList();
+    } catch (e) {
+      print('Error loading deletion notifications: $e');
+      return [];
+    }
+  }
+}
+
+/// Уведомление об удалении сотрудника
+class EmployeeDeletionNotification {
+  final String id;
+  final String deletedEmployeeName;
+  final String? deletedEmployeeEmail;
+  final String deletedByName;
+  final DateTime createdAt;
+
+  EmployeeDeletionNotification({
+    required this.id,
+    required this.deletedEmployeeName,
+    this.deletedEmployeeEmail,
+    required this.deletedByName,
+    required this.createdAt,
+  });
 }

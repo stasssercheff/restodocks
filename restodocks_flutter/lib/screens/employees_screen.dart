@@ -157,41 +157,92 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
 
   void _deleteEmployee(BuildContext context, Employee employee) async {
     final loc = context.read<LocalizationService>();
-    final confirmed = await showDialog<bool>(
+    final acc = context.read<AccountManagerSupabase>();
+    final establishment = acc.establishment;
+    if (establishment == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('establishment') ?? 'Заведение не найдено')),
+      );
+      return;
+    }
+
+    final pinController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    final result = await showDialog<String?>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(loc.t('delete_employee') ?? 'Удалить сотрудника'),
-        content: Text('Вы уверены, что хотите удалить сотрудника "${employee.fullName}"? Это действие нельзя отменить.'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                '${loc.t('delete_employee_confirm') ?? 'Вы уверены, что хотите удалить сотрудника'} "${employee.fullName}"? '
+                '${loc.t('delete_employee_pin_hint') ?? 'Введите PIN компании для подтверждения:'}',
+                style: Theme.of(ctx).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 12),
+              Form(
+                key: formKey,
+                child: TextFormField(
+                  controller: pinController,
+                  obscureText: true,
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.characters,
+                  decoration: InputDecoration(
+                    labelText: loc.t('company_pin') ?? 'PIN компании',
+                    hintText: loc.t('enter_company_pin') ?? 'Введите PIN компании',
+                  ),
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return loc.t('company_pin_required') ?? 'PIN обязателен';
+                    return null;
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
+            onPressed: () => Navigator.of(ctx).pop(null),
             child: Text(loc.t('cancel') ?? 'Отмена'),
           ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+          ElevatedButton(
+            onPressed: () {
+              if (!formKey.currentState!.validate()) return;
+              Navigator.of(ctx).pop(pinController.text.trim());
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: Text(loc.t('delete') ?? 'Удалить'),
           ),
         ],
       ),
     );
 
-    if (confirmed == true) {
-      try {
-        final acc = context.read<AccountManagerSupabase>();
-        await acc.deleteEmployee(employee.id);
-        await _load();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Сотрудник "${employee.fullName}" удален')),
-          );
+    pinController.dispose();
+    if (result == null || !mounted) return;
+
+    try {
+      await acc.deleteEmployeeWithPin(employeeId: employee.id, pinCode: result);
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${loc.t('employee_deleted') ?? 'Сотрудник'} "${employee.fullName}" ${loc.t('deleted') ?? 'удалён'}. ${loc.t('email_can_reuse') ?? 'Email можно использовать для новой регистрации.'}')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        final msg = e.toString();
+        String snack = msg;
+        if (msg.toLowerCase().contains('invalid') && msg.toLowerCase().contains('pin')) {
+          snack = loc.t('delete_establishment_wrong_pin') ?? 'Неверный PIN';
+        } else if (msg.toLowerCase().contains('owner')) {
+          snack = loc.t('cannot_delete_owner') ?? 'Нельзя удалить владельца';
         }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Ошибка удаления: $e')),
-          );
-        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(snack), backgroundColor: Colors.red),
+        );
       }
     }
   }

@@ -996,7 +996,8 @@ class AccountManagerSupabase extends ChangeNotifier {
     }
   }
 
-  /// Удаление сотрудника
+  /// Удаление сотрудника (прямой DELETE — оставляет auth.users, email нельзя переиспользовать)
+  @Deprecated('Use deleteEmployeeWithPin for full deletion and email reuse')
   Future<void> deleteEmployee(String employeeId) async {
     try {
       print('🗑️ AccountManager: Deleting employee $employeeId...');
@@ -1008,6 +1009,27 @@ class AccountManagerSupabase extends ChangeNotifier {
     } catch (e) {
       print('❌ AccountManager: Failed to delete employee: $e');
       rethrow;
+    }
+  }
+
+  /// Удаление сотрудника с подтверждением PIN. Удаляет employees + auth.users (email можно переиспользовать).
+  /// Создаёт уведомление для руководителей.
+  Future<void> deleteEmployeeWithPin({
+    required String employeeId,
+    required String pinCode,
+  }) async {
+    final res = await _supabase.client.functions.invoke(
+      'delete-employee',
+      body: {
+        'employee_id': employeeId,
+        'pin_code': pinCode.trim().toUpperCase(),
+      },
+    );
+    if (res.status != 200) {
+      final err = (res.data is Map && (res.data as Map)['error'] != null)
+          ? (res.data as Map)['error'].toString()
+          : 'HTTP ${res.status}';
+      throw Exception(err);
     }
   }
 

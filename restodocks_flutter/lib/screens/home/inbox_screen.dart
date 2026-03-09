@@ -25,17 +25,18 @@ class InboxScreen extends StatefulWidget {
 }
 
 /// Типы вкладок во входящих (для сотрудников)
-enum _InboxTab { checklist, order, inventory, iikoInventory, messages }
+enum _InboxTab { checklist, order, inventory, iikoInventory, messages, notifications }
 
 /// Вкладки по подразделениям (для собственника)
 enum _InboxDeptTab { kitchen, bar, hall }
 
 /// Типы документов для 2-го яруса вкладок (собственник)
-enum _InboxTypeTab { checklist, order, inventory, iikoInventory, messages }
+enum _InboxTypeTab { checklist, order, inventory, iikoInventory, messages, notifications }
 
 class _InboxScreenState extends State<InboxScreen> {
   late InboxService _inboxService;
   List<InboxDocument> _documents = [];
+  List<EmployeeDeletionNotification> _deletionNotifications = [];
   bool _loading = true;
   _InboxTab? _selectedTab;
   _InboxDeptTab? _selectedDeptTab;
@@ -70,6 +71,12 @@ class _InboxScreenState extends State<InboxScreen> {
     }
   }
 
+  bool _canSeeNotifications(Employee employee) {
+    return employee.roles.any((r) =>
+        r == 'owner' || r == 'executive_chef' || r == 'sous_chef' ||
+        r == 'bar_manager' || r == 'floor_manager');
+  }
+
   /// Входящие: только документы (заказы, чеклисты, инвентаризации). Без диалогов.
   List<_InboxTab> _visibleTabs(Employee employee) {
     final isChef = employee.roles.contains('executive_chef');
@@ -87,6 +94,7 @@ class _InboxScreenState extends State<InboxScreen> {
         tabs.add(_InboxTab.iikoInventory);
       }
     }
+    if (_canSeeNotifications(employee)) tabs.add(_InboxTab.notifications);
     return tabs;
   }
 
@@ -102,9 +110,14 @@ class _InboxScreenState extends State<InboxScreen> {
     try {
       final currentEmployee = accountManager.currentEmployee;
       final documents = await _inboxService.getInboxDocuments(establishment.id, currentEmployee);
+      List<EmployeeDeletionNotification> notifications = [];
+      if (currentEmployee != null && _canSeeNotifications(currentEmployee)) {
+        notifications = await _inboxService.getDeletionNotifications(establishment.id);
+      }
       if (mounted) {
         setState(() {
           _documents = documents;
+          _deletionNotifications = notifications;
           _loading = false;
         });
       }
@@ -156,6 +169,8 @@ class _InboxScreenState extends State<InboxScreen> {
         return _documents.where((d) => d.type == DocumentType.iikoInventory).toList();
       case _InboxTab.messages:
         return _documents.where((d) => d.type == DocumentType.checklistMissedDeadline).toList();
+      case _InboxTab.notifications:
+        return []; // Notifications shown via _deletionNotifications
       case null:
         return [];
     }
@@ -200,15 +215,17 @@ class _InboxScreenState extends State<InboxScreen> {
                 ? _buildMessagesContent(loc)
                 : (_loading
                     ? const Center(child: CircularProgressIndicator())
-                    : (isOwner ? (_selectedDeptTab == null || _selectedTypeTab == null) : _selectedTab == null)
-                        ? _buildEmptyState(loc)
-                        : _isMessagesTab(isOwner)
-                            ? _buildMessagesContent(loc)
-                            : _filteredDocuments.isEmpty
-                                ? _buildEmptyState(loc)
-                                : _isChecklistsTab(isOwner)
-                                    ? _buildChecklistsGroupedList(loc)
-                                    : _buildDocumentsList()),
+                    : _isNotificationsTab(isOwner)
+                        ? _buildDeletionNotificationsList(loc)
+                        : (isOwner ? (_selectedDeptTab == null || _selectedTypeTab == null) : _selectedTab == null)
+                            ? _buildEmptyState(loc)
+                            : _isMessagesTab(isOwner)
+                                ? _buildMessagesContent(loc)
+                                : _filteredDocuments.isEmpty
+                                    ? _buildEmptyState(loc)
+                                    : _isChecklistsTab(isOwner)
+                                        ? _buildChecklistsGroupedList(loc)
+                                        : _buildDocumentsList()),
           ),
         ],
       ),
@@ -289,6 +306,8 @@ class _InboxScreenState extends State<InboxScreen> {
               const SizedBox(width: 8),
               _buildTypeChip(_InboxTypeTab.iikoInventory, loc.t('iiko_inventory_title') ?? 'Инвентаризация iiko', loc),
             ],
+            const SizedBox(width: 8),
+            _buildTypeChip(_InboxTypeTab.notifications, loc.t('inbox_tab_notifications') ?? 'Уведомления', loc),
           ],
         ),
       ),
@@ -321,6 +340,8 @@ class _InboxScreenState extends State<InboxScreen> {
         return loc.t('iiko_inventory_title') ?? 'Инвентаризация iiko';
       case _InboxTab.messages:
         return loc.t('inbox_tab_messages') ?? 'Сообщения';
+      case _InboxTab.notifications:
+        return loc.t('inbox_tab_notifications') ?? 'Уведомления';
     }
   }
 
@@ -393,6 +414,55 @@ class _InboxScreenState extends State<InboxScreen> {
   bool _isMessagesTab(bool isOwner) {
     if (isOwner) return _selectedTypeTab == _InboxTypeTab.messages;
     return _selectedTab == _InboxTab.messages;
+  }
+
+  bool _isNotificationsTab(bool isOwner) {
+    if (isOwner) return _selectedTypeTab == _InboxTypeTab.notifications;
+    return _selectedTab == _InboxTab.notifications;
+  }
+
+  Widget _buildDeletionNotificationsList(LocalizationService loc) {
+    if (_deletionNotifications.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.notifications_none, size: 64, color: Theme.of(context).colorScheme.outline),
+            const SizedBox(height: 16),
+            Text(
+              loc.t('inbox_notifications_empty') ?? 'Нет уведомлений об удалении',
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: _deletionNotifications.length,
+      itemBuilder: (context, i) {
+        final n = _deletionNotifications[i];
+        final dateStr = DateFormat('dd.MM.yyyy HH:mm').format(n.createdAt.toLocal());
+        return Card(
+          margin: const EdgeInsets.only(bottom: 8),
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: Theme.of(context).colorScheme.errorContainer,
+              child: Icon(Icons.person_remove, color: Theme.of(context).colorScheme.onErrorContainer),
+            ),
+            title: Text(
+              '${n.deletedEmployeeName} ${loc.t('employee_deleted_by') ?? 'удалён (удалил:'} ${n.deletedByName})',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+            ),
+            subtitle: Text(
+              (n.deletedEmployeeEmail != null ? '${n.deletedEmployeeEmail} • ' : '') + dateStr,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   bool _isChecklistsTab(bool isOwner) {
