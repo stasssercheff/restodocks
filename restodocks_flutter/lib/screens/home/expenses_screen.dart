@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
+import '../../services/inventory_download.dart';
 import '../../services/services.dart';
 import '../../utils/number_format_utils.dart';
 import '../../widgets/app_bar_home_button.dart';
@@ -81,13 +82,23 @@ class _ProductOrdersTab extends StatefulWidget {
 }
 
 class _ProductOrdersTabState extends State<_ProductOrdersTab> {
-  List<Map<String, dynamic>> _orders = [];
+  List<Map<String, dynamic>> _allOrders = [];
   bool _loading = true;
   String? _error;
+
+  /// Диапазон дат: начало и конец (включительно).
+  late DateTime _dateStart;
+  late DateTime _dateEnd;
+
+  /// Выбранные поставщики (пусто = все).
+  Set<String> _selectedSupplierNames = {};
 
   @override
   void initState() {
     super.initState();
+    final now = DateTime.now();
+    _dateStart = DateTime(now.year, now.month, 1);
+    _dateEnd = DateTime(now.year, now.month + 1, 0);
     _load();
   }
 
@@ -107,18 +118,10 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
         return;
       }
       final docs = await OrderDocumentService().listForEstablishment(establishmentId);
-      final now = DateTime.now();
-      final monthStart = DateTime(now.year, now.month, 1);
-      final monthEnd = DateTime(now.year, now.month + 1, 0);
-      final forMonth = docs.where((d) {
-        final createdAt = DateTime.tryParse(d['created_at']?.toString() ?? '');
-        if (createdAt == null) return false;
-        return !createdAt.isBefore(monthStart) && !createdAt.isAfter(monthEnd);
-      }).toList();
 
       if (mounted) {
         setState(() {
-          _orders = forMonth;
+          _allOrders = docs;
           _loading = false;
         });
       }
@@ -129,6 +132,264 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
           _error = e.toString();
         });
       }
+    }
+  }
+
+  List<Map<String, dynamic>> get _filteredOrders {
+    final dayStart = DateTime(_dateStart.year, _dateStart.month, _dateStart.day);
+    final dayEnd = DateTime(_dateEnd.year, _dateEnd.month, _dateEnd.day, 23, 59, 59);
+    return _allOrders.where((d) {
+      final createdAt = DateTime.tryParse(d['created_at']?.toString() ?? '');
+      if (createdAt == null) return false;
+      if (createdAt.isBefore(dayStart) || createdAt.isAfter(dayEnd)) return false;
+      if (_selectedSupplierNames.isNotEmpty) {
+        final payload = d['payload'] as Map<String, dynamic>? ?? {};
+        final header = payload['header'] as Map<String, dynamic>? ?? {};
+        final supplier = (header['supplierName'] as String? ?? '').trim();
+        if (!_selectedSupplierNames.contains(supplier)) return false;
+      }
+      return true;
+    }).toList();
+  }
+
+  Set<String> get _uniqueSupplierNames {
+    final names = <String>{};
+    for (final d in _allOrders) {
+      final payload = d['payload'] as Map<String, dynamic>? ?? {};
+      final header = payload['header'] as Map<String, dynamic>? ?? {};
+      final s = (header['supplierName'] as String? ?? '').trim();
+      if (s.isNotEmpty) names.add(s);
+    }
+    return names;
+  }
+
+  Future<void> _showDateRangePicker(LocalizationService loc) async {
+    final range = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+      initialDateRange: DateTimeRange(start: _dateStart, end: _dateEnd),
+      helpText: loc.t('expenses_orders_date_range') ?? 'Диапазон дат',
+    );
+    if (range != null && mounted) {
+      setState(() {
+        _dateStart = DateTime(range.start.year, range.start.month, range.start.day);
+        _dateEnd = DateTime(range.end.year, range.end.month, range.end.day);
+      });
+    }
+  }
+
+  Future<void> _showSupplierFilter(LocalizationService loc) async {
+    final suppliers = _uniqueSupplierNames.toList()..sort();
+    var showAll = _selectedSupplierNames.isEmpty;
+    var selected = Set<String>.from(_selectedSupplierNames);
+    if (showAll) selected = Set.from(suppliers);
+
+    final result = await showDialog<Set<String>>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              title: Text(loc.t('expenses_orders_filter_suppliers') ?? 'Выбор поставщиков'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CheckboxListTile(
+                      title: Text(loc.t('expenses_orders_all_suppliers') ?? 'Все поставщики'),
+                      value: showAll,
+                      onChanged: (v) {
+                        setDialogState(() {
+                          showAll = v ?? true;
+                          if (showAll) selected = {};
+                        });
+                      },
+                    ),
+                    const Divider(),
+                    ...suppliers.map((s) => CheckboxListTile(
+                      title: Text(s, overflow: TextOverflow.ellipsis),
+                      value: showAll || selected.contains(s),
+                      tristate: false,
+                      onChanged: showAll ? null : (v) {
+                        setDialogState(() {
+                          if (v == true) {
+                            selected.add(s);
+                          } else {
+                            selected.remove(s);
+                          }
+                        });
+                      },
+                    )),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(null),
+                  child: Text(loc.t('cancel') ?? 'Отмена'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(ctx).pop(showAll ? {} : selected),
+                  child: Text(loc.t('apply') ?? 'Применить'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    if (result != null && mounted) {
+      setState(() => _selectedSupplierNames = result);
+    }
+  }
+
+  /// Диалог выбора поставщиков для экспорта (не меняет состояние фильтра).
+  Future<Set<String>?> _showSupplierPickerForExport(LocalizationService loc) async {
+    final suppliers = _uniqueSupplierNames.toList()..sort();
+    var showAll = true;
+    var selected = <String>{};
+
+    return showDialog<Set<String>>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              title: Text(loc.t('expenses_orders_export_suppliers') ?? 'Поставщики для выгрузки'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CheckboxListTile(
+                      title: Text(loc.t('expenses_orders_all_suppliers') ?? 'Все поставщики'),
+                      value: showAll,
+                      onChanged: (v) {
+                        setDialogState(() {
+                          showAll = v ?? true;
+                          if (showAll) selected = {};
+                        });
+                      },
+                    ),
+                    const Divider(),
+                    ...suppliers.map((s) => CheckboxListTile(
+                      title: Text(s, overflow: TextOverflow.ellipsis),
+                      value: showAll || selected.contains(s),
+                      tristate: false,
+                      onChanged: showAll ? null : (v) {
+                        setDialogState(() {
+                          if (v == true) {
+                            selected.add(s);
+                          } else {
+                            selected.remove(s);
+                          }
+                        });
+                      },
+                    )),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(null),
+                  child: Text(loc.t('cancel') ?? 'Отмена'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(ctx).pop(showAll ? {} : selected),
+                  child: Text(loc.t('apply') ?? 'Применить'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _exportProductOrders() async {
+    if (_allOrders.isEmpty) return;
+    final loc = context.read<LocalizationService>();
+    final account = context.read<AccountManagerSupabase>();
+    final currency = account.establishment?.defaultCurrency ?? 'VND';
+    final dateFormat = DateFormat('dd.MM.yyyy');
+
+    // 1. Выбор диапазона дат
+    final range = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+      initialDateRange: DateTimeRange(start: _dateStart, end: _dateEnd),
+      helpText: loc.t('expenses_orders_export_date_range') ?? 'Диапазон дат для выгрузки',
+    );
+    if (range == null || !mounted) return;
+    final exportStart = DateTime(range.start.year, range.start.month, range.start.day);
+    final exportEnd = DateTime(range.end.year, range.end.month, range.end.day);
+
+    // 2. Выбор поставщиков
+    final exportSuppliers = await _showSupplierPickerForExport(loc);
+    if (exportSuppliers == null || !mounted) return;
+
+    // 3. Выбор языка
+    final selectedLang = await showDialog<String>(
+      context: context,
+      builder: (ctx) => _ProductOrdersExportLanguageDialog(loc: loc),
+    );
+    if (selectedLang == null || !mounted) return;
+
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => Center(
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: 16),
+                Text(loc.t('expenses_orders_export_loading') ?? 'Выгрузка...'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      final t = (String key) => loc.tForLanguage(selectedLang, key);
+      final bytes = await OrderListExportService.buildProductOrdersExpenseExcelBytes(
+        orders: _allOrders,
+        dateStart: exportStart,
+        dateEnd: exportEnd,
+        selectedSupplierNames: exportSuppliers,
+        t: t,
+        currency: currency,
+      );
+      final fileName = 'product_orders_${dateFormat.format(exportStart)}_${dateFormat.format(exportEnd)}.xlsx';
+      await saveFileBytes(fileName, bytes);
+
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            (loc.t('expenses_orders_export_saved') ?? 'Выгружено') + ': $fileName',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            loc.t('expenses_orders_export_error') ?? 'Ошибка выгрузки: $e',
+          ),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
     }
   }
 
@@ -160,14 +421,17 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
       );
     }
 
+    final filteredOrders = _filteredOrders;
     double totalSum = 0;
-    for (final order in _orders) {
+    for (final order in filteredOrders) {
       final payload = order['payload'] as Map<String, dynamic>? ?? {};
       final grand = (payload['grandTotal'] as num?)?.toDouble();
       if (grand != null) totalSum += grand;
     }
 
-    if (_orders.isEmpty) {
+    final dateFormat = DateFormat('dd.MM.yyyy');
+
+    if (_allOrders.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -179,11 +443,6 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
               style: Theme.of(context).textTheme.bodyLarge,
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 8),
-            Text(
-              '${loc.t('salary_period') ?? 'Период'}: ${DateFormat('MMMM yyyy').format(DateTime.now())}',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
-            ),
           ],
         ),
       );
@@ -194,19 +453,118 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: Text(
-              '${DateFormat('MMMM yyyy').format(DateTime.now())}',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          InkWell(
+                            onTap: () => _showDateRangePicker(loc),
+                            borderRadius: BorderRadius.circular(8),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.date_range, color: Theme.of(context).colorScheme.primary),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          loc.t('expenses_orders_date_range') ?? 'Диапазон дат',
+                                          style: Theme.of(context).textTheme.titleSmall,
+                                        ),
+                                        Text(
+                                          '${dateFormat.format(_dateStart)} — ${dateFormat.format(_dateEnd)}',
+                                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const Icon(Icons.chevron_right),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          InkWell(
+                            onTap: () => _showSupplierFilter(loc),
+                            borderRadius: BorderRadius.circular(8),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.store_outlined, color: Theme.of(context).colorScheme.primary),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          loc.t('order_tab_suppliers') ?? 'Поставщики',
+                                          style: Theme.of(context).textTheme.titleSmall,
+                                        ),
+                                        Text(
+                                          _selectedSupplierNames.isEmpty
+                                              ? (loc.t('expenses_orders_all_suppliers') ?? 'Все')
+                                              : '${_selectedSupplierNames.length} ${loc.t('expenses_orders_selected') ?? 'выбрано'}',
+                                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const Icon(Icons.chevron_right),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton.filled(
+                      icon: const Icon(Icons.download),
+                      onPressed: _exportProductOrders,
+                      tooltip: loc.t('expenses_orders_export_btn') ?? 'Выгрузить Excel',
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
           Expanded(
-            child: ListView.builder(
+            child: filteredOrders.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.filter_list_off, size: 48, color: Theme.of(context).colorScheme.outline),
+                        const SizedBox(height: 16),
+                        Text(
+                          loc.t('expenses_orders_empty_filter') ?? 'Нет заказов за выбранный период и поставщиков',
+                          style: Theme.of(context).textTheme.bodyLarge,
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _orders.length,
+              itemCount: filteredOrders.length,
               itemBuilder: (_, i) {
-                final order = _orders[i];
+                final order = filteredOrders[i];
                 final payload = order['payload'] as Map<String, dynamic>? ?? {};
                 final header = payload['header'] as Map<String, dynamic>? ?? {};
                 final createdAt = DateTime.tryParse(order['created_at']?.toString() ?? '') ?? DateTime.now();
@@ -259,6 +617,54 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
                 ],
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Диалог выбора языка для выгрузки заказов продуктов.
+class _ProductOrdersExportLanguageDialog extends StatelessWidget {
+  const _ProductOrdersExportLanguageDialog({required this.loc});
+
+  final LocalizationService loc;
+
+  @override
+  Widget build(BuildContext context) {
+    String selectedLang = loc.currentLanguageCode;
+    return StatefulBuilder(
+      builder: (context, setState) => AlertDialog(
+        title: Text(loc.t('expenses_orders_export_dialog_title') ?? 'Выгрузить заказы продуктов'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              loc.t('salary_export_lang') ?? 'Язык сохранения:',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: ['ru', 'en', 'es'].map((code) {
+                return ChoiceChip(
+                  label: Text(loc.getLanguageName(code)),
+                  selected: selectedLang == code,
+                  onSelected: (_) => setState(() => selectedLang = code),
+                );
+              }).toList(),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(selectedLang),
+            child: Text(loc.t('expenses_orders_export_btn') ?? 'Выгрузить'),
           ),
         ],
       ),

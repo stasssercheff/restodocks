@@ -323,6 +323,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   items: [
                     _deptItem(loc, 'kitchen', loc.t('kitchen')),
+                    _deptItem(loc, 'bar', loc.t('bar')),
+                    _deptItem(loc, 'dining_room', loc.t('dining_room')),
                     _deptItem(loc, 'management', loc.t('management')),
                   ],
                   onChanged: (v) {

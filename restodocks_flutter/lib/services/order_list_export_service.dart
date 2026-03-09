@@ -491,6 +491,83 @@ class OrderListExportService {
     return 'https://t.me/$path?text=${Uri.encodeComponent(message)}';
   }
 
+  /// Построить Excel для раздела «Расходы → Заказы продуктов».
+  /// [orders] — документы заказов (order_documents), [dateStart]/[dateEnd] — период, [selectedSupplierNames] — пусто = все.
+  static Future<Uint8List> buildProductOrdersExpenseExcelBytes({
+    required List<Map<String, dynamic>> orders,
+    required DateTime dateStart,
+    required DateTime dateEnd,
+    required Set<String> selectedSupplierNames,
+    required String Function(String) t,
+    required String currency,
+  }) async {
+    final dayStart = DateTime(dateStart.year, dateStart.month, dateStart.day);
+    final dayEnd = DateTime(dateEnd.year, dateEnd.month, dateEnd.day, 23, 59, 59);
+    final filtered = orders.where((d) {
+      final createdAt = DateTime.tryParse(d['created_at']?.toString() ?? '');
+      if (createdAt == null) return false;
+      if (createdAt.isBefore(dayStart) || createdAt.isAfter(dayEnd)) return false;
+      if (selectedSupplierNames.isNotEmpty) {
+        final payload = d['payload'] as Map<String, dynamic>? ?? {};
+        final header = payload['header'] as Map<String, dynamic>? ?? {};
+        final supplier = (header['supplierName'] as String? ?? '').trim();
+        if (!selectedSupplierNames.contains(supplier)) return false;
+      }
+      return true;
+    }).toList();
+
+    final excel = Excel.createExcel();
+    final sheet = excel[excel.getDefaultSheet()!];
+    final dateFormat = DateFormat('dd.MM.yyyy');
+
+    sheet.appendRow([TextCellValue(t('expenses_tab_product_orders'))]);
+    sheet.appendRow([TextCellValue('${t('expenses_orders_date_range')}: ${dateFormat.format(dateStart)} — ${dateFormat.format(dateEnd)}')]);
+    if (selectedSupplierNames.isNotEmpty) {
+      sheet.appendRow([TextCellValue('${t('order_tab_suppliers')}: ${selectedSupplierNames.join(', ')}')]);
+    }
+    sheet.appendRow([]);
+
+    sheet.appendRow([
+      TextCellValue(t('order_export_no')),
+      TextCellValue(t('order_export_date_time')),
+      TextCellValue(t('order_list_supplier') ?? t('order_export_to')),
+      TextCellValue(t('inbox_header_employee')),
+      TextCellValue((t('order_list_line_total_currency') ?? 'Сумма %s').replaceFirst('%s', currency)),
+    ]);
+
+    double grandTotal = 0;
+    for (var i = 0; i < filtered.length; i++) {
+      final doc = filtered[i];
+      final payload = doc['payload'] as Map<String, dynamic>? ?? {};
+      final header = payload['header'] as Map<String, dynamic>? ?? {};
+      final createdAt = DateTime.tryParse(doc['created_at']?.toString() ?? '') ?? DateTime.now();
+      final dateStr = DateFormat('dd.MM.yyyy HH:mm').format(createdAt);
+      final supplier = header['supplierName'] ?? '—';
+      final employee = header['employeeName'] ?? '—';
+      final total = (payload['grandTotal'] as num?)?.toDouble() ?? 0;
+      grandTotal += total;
+      sheet.appendRow([
+        IntCellValue(i + 1),
+        TextCellValue(dateStr),
+        TextCellValue(supplier.toString()),
+        TextCellValue(employee.toString()),
+        TextCellValue(NumberFormatUtils.formatSum(total, currency)),
+      ]);
+    }
+
+    sheet.appendRow([]);
+    sheet.appendRow([
+      TextCellValue(''),
+      TextCellValue(''),
+      TextCellValue(''),
+      TextCellValue(t('order_list_grand_total')),
+      TextCellValue(NumberFormatUtils.formatSum(grandTotal, currency)),
+    ]);
+
+    final out = excel.encode();
+    return Uint8List.fromList(out ?? []);
+  }
+
   /// URL для Email: mailto:EMAIL?subject=...&body=...
   static String? mailToUrl(String? email, String subject, String body) {
     final e = email?.trim();
