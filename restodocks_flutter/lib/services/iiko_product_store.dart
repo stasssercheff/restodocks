@@ -161,6 +161,7 @@ class IikoProductStore extends ChangeNotifier {
   }
 
   /// Загружает байты бланка в Supabase Storage и сохраняет метаданные.
+  /// Сохраняет также в iiko_blank_versions для выбора при объединении (последние 3 месяца).
   Future<void> _uploadBlankToServer(
       String establishmentId, Uint8List bytes, int? qtyCol) async {
     try {
@@ -187,9 +188,77 @@ class IikoProductStore extends ChangeNotifier {
         },
         onConflict: 'establishment_id',
       );
-      debugPrint('IikoProductStore: blank uploaded to Supabase Storage ($storagePath)');
+      // Сохраняем версию для выбора при объединении (последние 3 месяца)
+      final ts = DateTime.now().millisecondsSinceEpoch;
+      final versionPath = '$establishmentId/versions/$ts.xlsx';
+      await _supabase.storage
+          .from(_kStorageBucket)
+          .uploadBinary(
+            versionPath,
+            bytes,
+            fileOptions: const FileOptions(
+              contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+              upsert: false,
+            ),
+          );
+      await _supabase.from('iiko_blank_versions').insert({
+        'establishment_id': establishmentId,
+        'storage_path': versionPath,
+        'qty_col_index': qtyCol ?? 5,
+        'sheet_names': sheetNames.isEmpty ? null : sheetNames,
+        'sheet_qty_cols': sheetQtyColumns.isEmpty ? null : sheetQtyColumns,
+      }).select('id');
+      debugPrint('IikoProductStore: blank uploaded to Supabase Storage ($storagePath, version $versionPath)');
     } catch (e) {
       debugPrint('IikoProductStore._uploadBlankToServer error: $e');
+    }
+  }
+
+
+  /// Список бланков за последние 3 месяца для выбора при объединении.
+  /// Возвращает [{storage_path, qty_col_index, sheet_names, sheet_qty_cols, uploaded_at}].
+  Future<List<Map<String, dynamic>>> listBlanksForMerge(String establishmentId) async {
+    final result = <Map<String, dynamic>>[];
+    try {
+      final since = DateTime.now().subtract(const Duration(days: 90));
+      final rows = await _supabase
+          .from('iiko_blank_versions')
+          .select('storage_path, qty_col_index, sheet_names, sheet_qty_cols, uploaded_at')
+          .eq('establishment_id', establishmentId)
+          .gte('uploaded_at', since.toIso8601String())
+          .order('uploaded_at', ascending: false)
+          .limit(20);
+      for (final r in rows as List) {
+        final m = r as Map<String, dynamic>;
+        result.add(Map<String, dynamic>.from(m));
+      }
+      // Если нет версий — добавляем текущий бланк из meta (для старых заведений)
+      if (result.isEmpty) {
+        final meta = await _supabase
+            .from('iiko_blank_meta')
+            .select('storage_path, qty_col_index, sheet_names, sheet_qty_cols, uploaded_at')
+            .eq('establishment_id', establishmentId)
+            .maybeSingle();
+        if (meta != null) {
+          result.add(Map<String, dynamic>.from(meta as Map));
+        }
+      }
+    } catch (e) {
+      debugPrint('IikoProductStore.listBlanksForMerge error: $e');
+    }
+    return result;
+  }
+
+  /// Скачивает байты бланка по пути из Storage.
+  Future<Uint8List?> downloadBlankByPath(String storagePath) async {
+    try {
+      final bytes = await _supabase.storage
+          .from(_kStorageBucket)
+          .download(storagePath);
+      return Uint8List.fromList(bytes);
+    } catch (e) {
+      debugPrint('IikoProductStore.downloadBlankByPath error: $e');
+      return null;
     }
   }
 

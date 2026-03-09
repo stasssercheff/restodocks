@@ -1,7 +1,6 @@
 import 'dart:typed_data';
 
 import 'package:excel/excel.dart' hide TextSpan;
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -415,76 +414,77 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
     }
   }
 
-  /// Диалог выбора бланка iiko с мини-превью. Возвращает (bytes, qtyCol, sheetQtyCols) или null.
+  /// Диалог выбора бланка iiko: последние загруженные за 3 месяца, мини-превью.
+  /// Без выбора языка — сохранение идёт исключительно по загруженным наименованиям на том же языке.
   Future<(Uint8List?, int, Map<String, int>?)?> _showIikoBlankChoiceDialog(IikoProductStore iikoStore) async {
     final loc = _loc;
+    final account = context.read<AccountManagerSupabase>();
+    final estId = account.establishment?.id;
+    if (estId == null) return null;
+
+    setState(() => _loading = true);
+    final metaList = await iikoStore.listBlanksForMerge(estId);
     final blanks = <({String label, Uint8List bytes, int qtyCol, Map<String, int> sheetQtyCols})>[];
 
-    if (iikoStore.originalBlankBytes != null) {
-      blanks.add((
-        label: loc.t('inventory_merge_blank_establishment') ?? 'Бланк заведения',
-        bytes: iikoStore.originalBlankBytes!,
-        qtyCol: iikoStore.originalQuantityColumnIndex ?? 5,
-        sheetQtyCols: iikoStore.sheetQtyColumns,
-      ));
+    for (var i = 0; i < metaList.length; i++) {
+      final m = metaList[i];
+      final path = m['storage_path'] as String?;
+      if (path == null || path.isEmpty) continue;
+      final bytes = await iikoStore.downloadBlankByPath(path);
+      if (bytes == null || bytes.isEmpty || !mounted) continue;
+      final qtyCol = (m['qty_col_index'] as num?)?.toInt() ?? 5;
+      final sheetQtyColsRaw = m['sheet_qty_cols'];
+      Map<String, int> sheetQtyCols = {};
+      if (sheetQtyColsRaw is Map) {
+        sheetQtyCols = Map<String, int>.from(
+          (sheetQtyColsRaw as Map).map((k, v) => MapEntry(k.toString(), (v as num?)?.toInt() ?? 5)),
+        );
+      }
+      final uploadedAt = m['uploaded_at']?.toString();
+      final dt = uploadedAt != null
+          ? (DateTime.tryParse(uploadedAt)?.toLocal() ?? DateTime.now())
+          : DateTime.now();
+      final label = DateFormat('dd.MM.yyyy HH:mm').format(dt);
+      blanks.add((label: label, bytes: bytes, qtyCol: qtyCol, sheetQtyCols: sheetQtyCols));
+    }
+    setState(() => _loading = false);
+
+    if (!mounted) return null;
+    if (blanks.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('inventory_merge_blank_empty') ?? 'Нет загруженных бланков за последние 3 месяца. Загрузите бланк в номенклатуре.')),
+      );
+      return null;
     }
 
     final result = await showDialog<(Uint8List, int, Map<String, int>)>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx2, setState) => AlertDialog(
-          title: Text(loc.t('inventory_merge_blank_choice') ?? 'Выберите бланк'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  loc.t('inventory_merge_blank_hint') ?? 'Данные будут записаны в колонку «Итого»/«Остаток фактический» выбранного бланка.',
-                  style: Theme.of(ctx2).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 16),
-                ...blanks.map((b) => _buildBlankPreviewTile(
-                  label: b.label,
-                  bytes: b.bytes,
-                  onSelect: () => Navigator.of(ctx).pop((b.bytes, b.qtyCol, b.sheetQtyCols)),
-                )),
-                const SizedBox(height: 8),
-                ListTile(
-                  leading: const Icon(Icons.folder_open),
-                  title: Text(loc.t('inventory_merge_blank_pick') ?? 'Выбрать файл...'),
-                  onTap: () async {
-                    if (!ctx.mounted) return;
-                    final r = await FilePicker.platform.pickFiles(
-                      type: FileType.custom,
-                      allowedExtensions: ['xlsx', 'xls'],
-                      withData: true,
-                    );
-                    if (r != null && r.files.isNotEmpty) {
-                      final bytes = r.files.single.bytes;
-                      if (bytes != null && bytes.isNotEmpty && ctx.mounted) {
-                        final san = IikoXlsxSanitizer.sanitizeForExcelPackage(Uint8List.fromList(bytes));
-                        final detected = _detectQtyColumn(san);
-                        if (!ctx.mounted) return;
-                        Navigator.of(ctx).pop((
-                          san,
-                          detected.$1,
-                          detected.$2,
-                        ));
-                      }
-                    }
-                  },
-                ),
-              ],
-            ),
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('inventory_merge_blank_choice') ?? 'Выберите бланк'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                loc.t('inventory_merge_blank_hint') ?? 'Данные будут записаны в колонку «Итого»/«Остаток фактический» выбранного бланка. Сохранение исключительно по загруженным наименованиям на том же языке.',
+                style: Theme.of(ctx).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 16),
+              ...blanks.map((b) => _buildBlankPreviewTile(
+                label: b.label,
+                bytes: b.bytes,
+                onSelect: () => Navigator.of(ctx).pop((b.bytes, b.qtyCol, b.sheetQtyCols)),
+              )),
+            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
-            ),
-          ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+          ),
+        ],
       ),
     );
 
@@ -567,34 +567,6 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
     }
   }
 
-  /// Определяет индекс колонки «Остаток фактический» / «Итого» и sheetQtyCols.
-  (int, Map<String, int>) _detectQtyColumn(Uint8List bytes) {
-    try {
-      final excel = Excel.decodeBytes(bytes.toList());
-      final sheetQtyCols = <String, int>{};
-      var defaultQtyCol = 5;
-      const qtyKeywords = ['остаток фактический', 'остаток', 'итого', 'количество', 'кол-во', 'qty'];
-
-      for (final sName in excel.tables.keys) {
-        final sheet = excel.tables[sName];
-        if (sheet == null) continue;
-        for (var r = 0; r < sheet.maxRows && r < 15; r++) {
-          for (var c = 0; c < sheet.maxColumns; c++) {
-            final v = sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r)).value;
-            final s = (v is TextCellValue ? v.value : v?.toString() ?? '').toString().toLowerCase().trim();
-            if (qtyKeywords.any((k) => s.contains(k) || s == k)) {
-              sheetQtyCols[sName] = c;
-              if (defaultQtyCol == 5) defaultQtyCol = c;
-              break;
-            }
-          }
-        }
-      }
-      return (defaultQtyCol, sheetQtyCols);
-    } catch (_) {
-      return (5, {});
-    }
-  }
 
   @override
   Widget build(BuildContext context) {

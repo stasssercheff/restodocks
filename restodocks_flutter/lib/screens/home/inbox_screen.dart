@@ -131,12 +131,23 @@ class _InboxScreenState extends State<InboxScreen> {
     }
   }
 
-  /// Бланки инвентаризации (стандарт + iiko) для объединения
-  List<InboxDocument> get _mergeableDocuments {
-    return _documents
-        .where((d) =>
-            d.type == DocumentType.inventory || d.type == DocumentType.iikoInventory)
-        .toList();
+  /// Кнопка объединения только на вкладках «Инвентаризация стандарт» и «Инвентаризация iiko».
+  bool _isInventoryMergeTabSelected(bool isOwner) {
+    if (isOwner) {
+      return _selectedTypeTab == _InboxTypeTab.inventory ||
+          _selectedTypeTab == _InboxTypeTab.iikoInventory;
+    }
+    return _selectedTab == _InboxTab.inventory ||
+        _selectedTab == _InboxTab.iikoInventory;
+  }
+
+  /// Бланки для объединения: только того типа, что выбрана на вкладке (инвентаризация стандарт или iiko).
+  List<InboxDocument> get _mergeableDocumentsForCurrentTab {
+    if (_isInventoryMergeTabSelected(
+        context.read<AccountManagerSupabase>().currentEmployee?.hasRole('owner') ?? false)) {
+      return _filteredDocuments;
+    }
+    return [];
   }
 
   List<InboxDocument> get _filteredDocuments {
@@ -204,7 +215,8 @@ class _InboxScreenState extends State<InboxScreen> {
         title: Text(widget.messagesOnly ? (loc.t('inbox_tab_messages') ?? 'Сообщения') : loc.t('inbox')),
         actions: [
           if (!widget.messagesOnly &&
-              _mergeableDocuments.isNotEmpty &&
+              _isInventoryMergeTabSelected(isOwner) &&
+              _mergeableDocumentsForCurrentTab.isNotEmpty &&
               (employee?.hasRole('executive_chef') == true ||
                   employee?.hasRole('sous_chef') == true ||
                   employee?.hasRole('owner') == true ||
@@ -216,7 +228,7 @@ class _InboxScreenState extends State<InboxScreen> {
               onPressed: () async {
                 final result = await context.push<bool>(
                   '/inbox/merge',
-                  extra: _mergeableDocuments,
+                  extra: _mergeableDocumentsForCurrentTab,
                 );
                 if (result == true && mounted) await _loadDocuments();
               },
