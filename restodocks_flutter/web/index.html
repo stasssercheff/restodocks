@@ -13,16 +13,18 @@
         console.log('[RD] pathname='+p+' href='+location.href+' ls='+localStorage.getItem('restodocks_last_path_persist'));
         if (p && p !== '/' && p !== '/splash') {
           if (p.endsWith('/') && p.length > 1) p = p.slice(0, -1);
-          // Критично: для auth/confirm и любого пути — всегда добавлять query (token_hash, type)
           if (location.search && p.indexOf('?') === -1) p = p + location.search;
-          sessionStorage.setItem('restodocks_last_path', p);
-          localStorage.setItem('restodocks_last_path_persist', p);
+          var skipSave = p.indexOf('/login') === 0 || p.indexOf('/confirm-email') === 0 || p.indexOf('/auth/confirm') === 0;
+          if (!skipSave) {
+            sessionStorage.setItem('restodocks_last_path', p);
+            localStorage.setItem('restodocks_last_path_persist', p);
+          }
           document.documentElement.dataset.initialPath = p;
           console.log('[RD] saved path: '+p);
         } else {
           var saved = localStorage.getItem('restodocks_last_path_persist');
           console.log('[RD] pathname=/ → localStorage saved='+saved);
-          if (saved && saved !== '/' && saved !== '/splash' && saved.indexOf('/login') !== 0) {
+          if (saved && saved !== '/' && saved !== '/splash' && saved.indexOf('/login') !== 0 && saved.indexOf('/confirm-email') !== 0 && saved.indexOf('/auth/confirm') !== 0) {
             document.documentElement.dataset.initialPath = saved;
             sessionStorage.setItem('restodocks_last_path', saved);
           }

@@ -22,8 +22,12 @@ void _registerBeforeUnload() {
         if (path.endsWith('/') && path.length > 1) path = path.substring(0, path.length - 1);
         final search = html.window.location.search ?? '';
         if (search.isNotEmpty) path = '$path$search';
-        html.window.sessionStorage[_sessionStorageKey] = path;
-        html.window.localStorage[_localStorageKey] = path; // persist через hard refresh
+        // Не сохранять промежуточные страницы — иначе restodocks.com/ перенаправит туда
+        final skipSave = path.startsWith('/login') || path.startsWith('/confirm-email') || path.startsWith('/auth/confirm');
+        if (!skipSave) {
+          html.window.sessionStorage[_sessionStorageKey] = path;
+          html.window.localStorage[_localStorageKey] = path;
+        }
       }
     });
   } catch (_) {}
@@ -32,7 +36,9 @@ void _registerBeforeUnload() {
 /// Сохраняет путь в sessionStorage + localStorage для fallback при F5.
 void savePathForRefresh(String path) {
   try {
-    if (path.isNotEmpty && path != '/' && path != '/splash') {
+    if (path.isEmpty || path == '/' || path == '/splash') return;
+    final skip = path.startsWith('/login') || path.startsWith('/confirm-email') || path.startsWith('/auth/confirm');
+    if (!skip) {
       html.window.sessionStorage[_sessionStorageKey] = path;
       html.window.localStorage[_localStorageKey] = path;
     }
@@ -114,11 +120,13 @@ String getInitialLocation() {
         html.window.sessionStorage[_sessionStorageKey] = fromWindow;
       } catch (_) {}
     } else {
-      // Pathname == '/' (редкий случай). Не использовать /login* — там нет token_hash для auth/confirm.
+      // Pathname == '/'. Не восстанавливать промежуточные страницы: /login, /confirm-email, /auth/confirm.
       final fromStorage = _pathFromSessionStorage() ?? _pathFromDataset();
-      _cachedInitialPath = (fromStorage != null && !fromStorage.startsWith('/login'))
-          ? fromStorage
-          : '/';
+      final isRestorable = fromStorage != null &&
+          !fromStorage.startsWith('/login') &&
+          !fromStorage.startsWith('/confirm-email') &&
+          !fromStorage.startsWith('/auth/confirm');
+      _cachedInitialPath = isRestorable ? fromStorage : '/';
     }
   }
   return _cachedInitialPath!;
