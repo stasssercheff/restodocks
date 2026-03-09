@@ -9,10 +9,13 @@ class LongOperationProgressDialog extends StatefulWidget {
     super.key,
     required this.message,
     this.hint,
+    this.productCount,
   });
 
   final String message;
   final String? hint;
+  /// Если задано — показываем "message (N)"
+  final int? productCount;
 
   @override
   State<LongOperationProgressDialog> createState() => _LongOperationProgressDialogState();
@@ -47,6 +50,9 @@ class _LongOperationProgressDialogState extends State<LongOperationProgressDialo
   @override
   Widget build(BuildContext context) {
     final elapsed = DateTime.now().difference(_startTime);
+    final effectiveMessage = widget.productCount != null
+        ? '${widget.message} (${widget.productCount})'
+        : widget.message;
     return AlertDialog(
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -64,7 +70,7 @@ class _LongOperationProgressDialogState extends State<LongOperationProgressDialo
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(widget.message),
+                    Text(effectiveMessage),
                     const SizedBox(height: 4),
                     Text(
                       _formatElapsed(elapsed),

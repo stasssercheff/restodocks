@@ -502,20 +502,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
         }
         return;
       }
+      final count = store.getNomenclatureProducts(estId).length;
       showDialog(
         context: context,
         barrierDismissible: false,
         builder: (ctx) => LongOperationProgressDialog(
-          message: loc.t('clear_nomenclature_progress') ?? 'Очищаем номенклатуру...',
-          hint: loc.t('clear_nomenclature_progress_hint') ?? 'При большом объёме данных может занять несколько минут. Не обновляйте страницу.',
+          message: loc.t('clear_nomenclature_progress') ?? 'Очищаем номенклатуру',
+          hint: null,
+          productCount: count > 0 ? count : null,
         ),
       );
       try {
         await store.clearAllNomenclature(estId).timeout(
-          const Duration(minutes: 3),
+          const Duration(minutes: 2),
           onTimeout: () => throw TimeoutException(
             loc.t('clear_nomenclature_timeout') ??
-                'Операция заняла слишком много времени (3 мин). Обновите страницу — данные могли уже удалиться.',
+                'Операция заняла слишком много времени (2 мин). Обновите страницу — данные могли уже удалиться.',
           ),
         );
         if (context.mounted && Navigator.of(context).canPop()) {
