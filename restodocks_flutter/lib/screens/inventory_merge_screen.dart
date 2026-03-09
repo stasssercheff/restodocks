@@ -447,15 +447,19 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
       final label = DateFormat('dd.MM.yyyy HH:mm').format(dt);
       blanks.add((label: label, bytes: bytes, qtyCol: qtyCol, sheetQtyCols: sheetQtyCols));
     }
+    // Если нет версий за 3 месяца — используем загруженный бланк (originalBlankBytes)
+    if (blanks.isEmpty && iikoStore.originalBlankBytes != null) {
+      blanks.add((
+        label: loc.t('inventory_merge_blank_loaded') ?? 'Загруженный бланк',
+        bytes: iikoStore.originalBlankBytes!,
+        qtyCol: iikoStore.originalQuantityColumnIndex ?? 5,
+        sheetQtyCols: iikoStore.sheetQtyColumns,
+      ));
+    }
     setState(() => _loading = false);
 
     if (!mounted) return null;
-    if (blanks.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.t('inventory_merge_blank_empty') ?? 'Нет загруженных бланков за последние 3 месяца. Загрузите бланк в номенклатуре.')),
-      );
-      return null;
-    }
+    if (blanks.isEmpty) return null; // Без сообщения — просто отмена
 
     // Если 1 бланк — выбор не нужен, выгрузка сразу из него
     if (blanks.length == 1) {
