@@ -593,6 +593,34 @@ class AccountManagerSupabase extends ChangeNotifier {
     );
   }
 
+  /// Fallback: создать employee для auth user через fix_owner_without_employee (когда complete_pending не сработал).
+  Future<({Employee employee, Establishment establishment})?> _tryFixOwnerWithoutEmployee() async {
+    if (!_supabase.isAuthenticated) return null;
+    final email = _supabase.currentUser?.email?.trim();
+    if (email == null || email.isEmpty) return null;
+    try {
+      final res = await _supabase.client.rpc('fix_owner_without_employee', params: {'p_email': email});
+      if (res == null) return null;
+      final empData = Map<String, dynamic>.from(res as Map);
+      empData['password'] = '';
+      empData['password_hash'] = '';
+      final employee = Employee.fromJson(empData);
+      final estData = await _supabase.client
+          .from('establishments')
+          .select()
+          .eq('id', employee.establishmentId)
+          .limit(1)
+          .single();
+      return (
+        employee: employee,
+        establishment: Establishment.fromJson(estData),
+      );
+    } catch (e) {
+      if (kDebugMode) debugPrint('🔐 fix_owner_without_employee fallback: $e');
+      return null;
+    }
+  }
+
   /// Создание владельца через RPC — только для co-owner (create_employee_for_company), не для первичной регистрации.
   Future<Employee> createOwnerEmployeeViaRpc({
     required String authUserId,
@@ -1078,7 +1106,10 @@ class AccountManagerSupabase extends ChangeNotifier {
           .limit(1);
 
       if (list == null || (list as List).isEmpty) {
-        final completed = await completePendingOwnerRegistration();
+        var completed = await completePendingOwnerRegistration();
+        if (completed == null) {
+          completed = await _tryFixOwnerWithoutEmployee();
+        }
         if (completed != null) {
           _currentEmployee = completed.employee;
           _establishment = completed.establishment;
