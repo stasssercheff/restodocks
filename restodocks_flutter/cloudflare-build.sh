@@ -29,6 +29,9 @@ flutter --version
 echo "==> flutter pub get"
 flutter pub get
 
+echo "==> Generating PWA icons"
+dart run flutter_launcher_icons
+
 echo "==> flutter build web (--no-web-resources-cdn, with source maps to avoid 404 parse error)"
 flutter build web --release --no-web-resources-cdn \
   --dart-define=SUPABASE_URL="$SUPABASE_URL" \
