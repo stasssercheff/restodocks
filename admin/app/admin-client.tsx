@@ -99,6 +99,7 @@ function EstablishmentsTab() {
   const [search, setSearch] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [refreshingGeo, setRefreshingGeo] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -136,6 +137,22 @@ function EstablishmentsTab() {
   const total = data.length
   const totalEmployees = data.reduce((s, e) => s + e.employee_count, 0)
 
+  async function handleRefreshGeo() {
+    setRefreshingGeo(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/establishments/refresh-geo', { method: 'POST' })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || 'Ошибка')
+      await load()
+      alert(`Обновлено: ${json.updated ?? 0} из ${json.total ?? 0}${json.errors?.length ? `\nОшибки: ${json.errors.length}` : ''}`)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Ошибка обновления гео')
+    } finally {
+      setRefreshingGeo(false)
+    }
+  }
+
   async function handleDelete(row: Establishment) {
     if (!confirm(`Удалить заведение «${row.name}»?\n\nБудут удалены все данные: номенклатура, ТТК, чеклисты, сотрудники и т.д. Действие необратимо.`)) return
     const typed = prompt(`Для подтверждения введите "${CONFIRM_DELETE_TEXT}":`)
@@ -170,14 +187,22 @@ function EstablishmentsTab() {
         <StatCard label="Подписок" value="—" dimmed />
       </div>
 
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2 mb-4 flex-wrap">
         <input
           type="text"
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Поиск..."
-          className="bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 flex-1 text-sm"
+          className="bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 flex-1 min-w-0 text-sm"
         />
+        <button
+          onClick={handleRefreshGeo}
+          disabled={refreshingGeo}
+          className="text-gray-500 hover:text-white transition px-3 py-2 rounded-lg border border-gray-800 text-sm shrink-0 disabled:opacity-50"
+          title="Обновить страну и город по IP для заведений с registration_ip"
+        >
+          {refreshingGeo ? '…' : '🌐 Обновить гео по IP'}
+        </button>
         <button onClick={load} className="text-gray-500 hover:text-white transition px-3 py-2 rounded-lg border border-gray-800 text-sm shrink-0">
           ↻
         </button>

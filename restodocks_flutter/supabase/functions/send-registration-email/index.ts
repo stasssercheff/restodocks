@@ -1,5 +1,9 @@
 // Edge Function: письма при регистрации (владелец / сотрудник)
+// Если передан password — добавляем ссылку подтверждения email (через generateLink + Resend)
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const REDIRECT_URL = "https://restodocks.com";
 
 function corsHeaders(origin: string | null) {
   return {
@@ -33,14 +37,86 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body = (await req.json()) as {
-      type: "owner" | "employee" | "registration_confirmed";
+      type: "owner" | "employee" | "registration_confirmed" | "confirmation_only";
       to: string;
       companyName?: string;
       email?: string;
       pinCode?: string;
+      password?: string;
     };
 
-    const { type, to, companyName, email, pinCode } = body;
+    const { type, to, companyName, email, pinCode, password } = body;
+
+    // Только ссылка подтверждения (для co-owner и др.)
+    if (type === "confirmation_only" && to) {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL");
+      const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      if (!supabaseUrl || !serviceKey) {
+        return new Response(JSON.stringify({ error: "Service not configured" }), {
+          status: 500,
+          headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+        });
+      }
+      try {
+        const supabase = createClient(supabaseUrl, serviceKey);
+        let link: string | null = null;
+        if (password && typeof password === "string" && password.length > 0) {
+          const r1 = await supabase.auth.admin.generateLink({
+            type: "signup",
+            email: to.trim(),
+            password,
+            options: { redirectTo: REDIRECT_URL },
+          });
+          if (!r1.error && r1.data?.properties?.action_link) link = r1.data.properties.action_link;
+        }
+        if (!link) {
+          const r2 = await supabase.auth.admin.generateLink({
+            type: "magiclink",
+            email: to.trim(),
+            options: { redirectTo: REDIRECT_URL },
+          });
+          if (!r2.error && r2.data?.properties?.action_link) link = r2.data.properties.action_link;
+        }
+        if (!link) {
+          return new Response(JSON.stringify({ error: "Could not generate confirmation link" }), {
+            status: 400,
+            headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+          });
+        }
+        const html = `
+<p>Здравствуйте!</p>
+<p>Подтвердите email для завершения регистрации.</p>
+<p><a href="${escapeHtml(link)}" style="color:#2754C5;text-decoration:underline">Подтвердить</a></p>
+<p style="font-size:12px;color:#666;word-break:break-all">${escapeHtml(link)}</p>
+<p>С уважением,<br>Команда Restodocks</p>
+        `.trim();
+        const res = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            from,
+            to: [to.trim()],
+            subject: "Подтвердите регистрацию — Restodocks",
+            html,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          return new Response(JSON.stringify({ error: data?.message || res.statusText }), {
+            status: res.status,
+            headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+          });
+        }
+        return new Response(JSON.stringify({ id: data?.id, ok: true }), {
+          headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+        });
+      } catch (e) {
+        return new Response(JSON.stringify({ error: String(e) }), {
+          status: 500,
+          headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+        });
+      }
+    }
 
     // Письмо о завершении регистрации (после подтверждения email)
     if (type === "registration_confirmed") {
@@ -87,6 +163,49 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    let confirmationBlock = "";
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (supabaseUrl && serviceKey && to?.trim()) {
+      try {
+        const supabase = createClient(supabaseUrl, serviceKey);
+        // signup — для только что созданного пользователя; magiclink — fallback (только email)
+        let link: string | null = null;
+        if (password && typeof password === "string" && password.length > 0) {
+          const r1 = await supabase.auth.admin.generateLink({
+            type: "signup",
+            email: to.trim(),
+            password,
+            options: { redirectTo: REDIRECT_URL },
+          });
+          if (!r1.error && r1.data?.properties?.action_link) link = r1.data.properties.action_link;
+        }
+        if (!link) {
+          const r2 = await supabase.auth.admin.generateLink({
+            type: "magiclink",
+            email: to.trim(),
+            options: { redirectTo: REDIRECT_URL },
+          });
+          if (!r2.error && r2.data?.properties?.action_link) link = r2.data.properties.action_link;
+        }
+        if (link) {
+          confirmationBlock = `
+<hr style="margin:20px 0;border:none;border-top:1px solid #eee"/>
+<p><strong>Подтвердите email:</strong></p>
+<p>Нажмите ссылку для подтверждения учётной записи:</p>
+<p><a href="${escapeHtml(link)}" style="color:#2754C5;text-decoration:underline">Подтвердить</a></p>
+<p style="font-size:12px;color:#666;word-break:break-all">${escapeHtml(link)}</p>
+`;
+        } else {
+          console.error("send-registration-email: generateLink failed for", to);
+        }
+      } catch (e) {
+        console.error("send-registration-email: confirmation link error:", e);
+      }
+    } else if (!serviceKey) {
+      console.error("send-registration-email: SUPABASE_SERVICE_ROLE_KEY not set");
+    }
+
     let subject: string;
     let html: string;
 
@@ -100,6 +219,7 @@ Deno.serve(async (req: Request) => {
 <p>Ваш логин: <strong>${escapeHtml(email)}</strong></p>
 <p>Для входа используйте пароль, который вы указали при регистрации. Если вы забыли пароль — воспользуйтесь функцией восстановления в приложении.</p>
 <p><strong>Инструкция:</strong><br>Передайте PIN-код персоналу. Им потребуется ввести его один раз при регистрации в приложении для синхронизации с базой данных вашего заведения.</p>
+${confirmationBlock}
 <p>С уважением,<br>Команда Restodocks</p>
       `.trim();
     } else {
@@ -109,6 +229,7 @@ Deno.serve(async (req: Request) => {
 <p>Ваша учетная запись успешно привязана к системе управления заведением <strong>${escapeHtml(companyName)}</strong>.</p>
 <p>Ваш логин: <strong>${escapeHtml(email)}</strong></p>
 <p>Для входа используйте пароль, который вы указали при регистрации. Если вы забыли пароль — воспользуйтесь функцией восстановления в приложении.</p>
+${confirmationBlock}
 <p>С уважением,<br>Команда Restodocks</p>
       `.trim();
     }
