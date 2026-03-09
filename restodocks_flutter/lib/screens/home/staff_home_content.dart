@@ -103,8 +103,8 @@ class StaffHomeContent extends StatelessWidget {
     final showBanquet = (employee.department == 'kitchen' || employee.department == 'bar') && screenPref.showBanquetCatering;
     // ТТК: кухня, бар, зал — у каждого подразделения свои
     final showTtk = employee.department == 'kitchen' || employee.department == 'bar' || employee.department == 'hall' || employee.department == 'dining_room';
-    // Меню: только кухня и бар (у зала нет меню)
-    final showMenu = employee.department == 'kitchen' || employee.department == 'bar';
+    // Меню: кухня, бар и зал (зал видит stop/go с подсветкой)
+    final showMenu = employee.department == 'kitchen' || employee.department == 'bar' || employee.department == 'hall' || employee.department == 'dining_room';
     final ordered = <Widget>[];
     for (final id in order) {
       if (id == HomeTileId.checklists && !showChecklists) continue;

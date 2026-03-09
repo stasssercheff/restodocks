@@ -35,3 +35,4 @@ export 'employee_message_service.dart';
 export 'inventory_history_service.dart';
 export 'email_service.dart';
 export 'app_toast_service.dart';
+export 'menu_stop_go_service.dart';

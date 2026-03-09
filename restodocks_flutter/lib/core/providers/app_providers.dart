@@ -88,6 +88,9 @@ class AppProviders {
         Provider<EmployeeMessageService>(
           create: (_) => EmployeeMessageService(),
         ),
+        Provider<MenuStopGoService>(
+          create: (_) => MenuStopGoService(),
+        ),
         ChangeNotifierProvider<IikoProductStore>(
           create: (_) => IikoProductStore(),
         ),

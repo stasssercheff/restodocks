@@ -31,6 +31,8 @@ class _MenuScreenState extends State<MenuScreen> {
   String? _error;
   /// Для зала: выбранная вкладка (bar | kitchen).
   String _hallTab = 'bar';
+  /// Stop/Go статусы: ключ 'techCardId_department', значение 'stop' | 'go'.
+  Map<String, String> _stopGoMap = {};
 
   String _categoryLabel(String c, String lang) {
     final Map<String, Map<String, String>> categoryTranslations = {
@@ -64,7 +66,9 @@ class _MenuScreenState extends State<MenuScreen> {
       }
       final productStore = context.read<ProductStoreSupabase>();
       final techCardService = context.read<TechCardServiceSupabase>();
+      final stopGoSvc = context.read<MenuStopGoService>();
       await productStore.loadProducts();
+      final stopGoMap = await stopGoSvc.loadStopGoMap(est.dataEstablishmentId);
       await productStore.loadNomenclature(est.dataEstablishmentId);
       final emp = acc.currentEmployee;
       final allTcs = await techCardService.getTechCardsForEstablishment(est.dataEstablishmentId);
@@ -112,6 +116,7 @@ class _MenuScreenState extends State<MenuScreen> {
           _dishes = enriched;
           _dishesBar = barOnly;
           _dishesKitchen = kitchenOnly;
+          _stopGoMap = stopGoMap;
           _loading = false;
         });
         // Фоновый перевод для ТТК без локализованного названия
@@ -184,6 +189,13 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   bool get _isHallMenu => widget.department == 'hall' || widget.department == 'dining_room';
+
+  /// Редактирование stop/go: кухня и бар (не зал, не банкет).
+  bool get _canEditStopGo =>
+      widget.department == 'kitchen' || widget.department == 'bar';
+
+  /// Подразделение блюда для stop/go: bar или kitchen.
+  String _dishDepartment(TechCard tc) => _isBarDish(tc) ? 'bar' : 'kitchen';
 
   /// Полный вид ТТК (себестоимость, состав, технология): только руководство — собственник, шеф, су-шеф (кухня), барменеджер (бар).
   bool _canSeeFullTtkView(Employee? emp, TechCard tc) {
@@ -354,11 +366,22 @@ class _MenuScreenState extends State<MenuScreen> {
           final tc = dishesToShow[index];
           final totalCost = tc.totalCost;
           final lang = loc.currentLanguageCode;
+          final dishDept = _dishDepartment(tc);
+          final stopGoSvc = context.read<MenuStopGoService>();
+          final status = stopGoSvc.getStatus(_stopGoMap, tc.id, dishDept);
           final photoUrls = tc.photoUrls ?? [];
           final photoUrl = photoUrls.isNotEmpty ? photoUrls.first : null;
           final fallbackIcon = Icon(
             tc.isSemiFinished ? Icons.inventory_2 : Icons.restaurant,
             color: Theme.of(context).colorScheme.primary,
+          );
+          final titleStyle = TextStyle(
+            fontWeight: FontWeight.w600,
+            color: _isHallMenu && status != null
+                ? (status == 'stop'
+                    ? Colors.red.shade700
+                    : Colors.green.shade700)
+                : null,
           );
           return Card(
             margin: const EdgeInsets.only(bottom: 12),
@@ -381,25 +404,58 @@ class _MenuScreenState extends State<MenuScreen> {
               title: InkWell(
                 onTap: () {
                   final emp = context.read<AccountManagerSupabase>().currentEmployee;
-                  // hall=1 только для меню зала (описание, состав, цена). Кухня/бар — полная ТТК в просмотре.
                   final useHallView = _isHallMenu && !_canSeeFullTtkView(emp, tc);
                   context.push('/tech-cards/${tc.id}?view=1${useHallView ? '&hall=1' : ''}');
                 },
                 child: Text(
                   tc.getDisplayNameInLists(lang),
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  style: titleStyle,
                 ),
               ),
-              subtitle: InkWell(
-                onTap: () {
-                  final emp = context.read<AccountManagerSupabase>().currentEmployee;
-                  final useHallView = _isHallMenu && !_canSeeFullTtkView(emp, tc);
-                  context.push('/tech-cards/${tc.id}?view=1${useHallView ? '&hall=1' : ''}');
-                },
-                child: Text(
-                  _buildSubtitleText(loc, tc, lang, totalCost, currencySym),
-                  style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-                ),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  InkWell(
+                    onTap: () {
+                      final emp = context.read<AccountManagerSupabase>().currentEmployee;
+                      final useHallView = _isHallMenu && !_canSeeFullTtkView(emp, tc);
+                      context.push('/tech-cards/${tc.id}?view=1${useHallView ? '&hall=1' : ''}');
+                    },
+                    child: Text(
+                      _buildSubtitleText(loc, tc, lang, totalCost, currencySym),
+                      style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                    ),
+                  ),
+                  if (_canEditStopGo) ...[
+                    const SizedBox(height: 6),
+                    _StopGoChips(
+                      currentStatus: status,
+                      onSelect: (s) async {
+                        final est = context.read<AccountManagerSupabase>().establishment;
+                        if (est == null) return;
+                        try {
+                          await stopGoSvc.setStatus(
+                            establishmentId: est.dataEstablishmentId,
+                            techCardId: tc.id,
+                            department: dishDept,
+                            status: s,
+                          );
+                          if (mounted) {
+                            setState(() {
+                              final k = '${tc.id}_$dishDept';
+                              if (s == null) {
+                                _stopGoMap.remove(k);
+                              } else {
+                                _stopGoMap[k] = s;
+                              }
+                            });
+                          }
+                        } catch (_) {}
+                      },
+                    ),
+                  ],
+                ],
               ),
               children: [
                 Padding(
@@ -419,6 +475,39 @@ class _MenuScreenState extends State<MenuScreen> {
       context: ctx,
       barrierColor: Colors.black87,
       builder: (_) => _MenuPhotoViewer(urls: urls),
+    );
+  }
+}
+
+/// Чипсы Stop / Go для редактирования в меню кухни/бара.
+class _StopGoChips extends StatelessWidget {
+  const _StopGoChips({required this.currentStatus, required this.onSelect});
+
+  final String? currentStatus;
+  final void Function(String? status) onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = context.watch<LocalizationService>();
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        FilterChip(
+          label: Text(loc.t('stop_list')),
+          selected: currentStatus == 'stop',
+          onSelected: (_) => onSelect(currentStatus == 'stop' ? null : 'stop'),
+          visualDensity: VisualDensity.compact,
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        const SizedBox(width: 8),
+        FilterChip(
+          label: Text(loc.t('go_list')),
+          selected: currentStatus == 'go',
+          onSelected: (_) => onSelect(currentStatus == 'go' ? null : 'go'),
+          visualDensity: VisualDensity.compact,
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+      ],
     );
   }
 }
