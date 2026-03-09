@@ -477,8 +477,8 @@ class AccountManagerSupabase extends ChangeNotifier {
       'p_section': section ?? '',
       'p_roles': roles,
     };
-    if (rpcName == 'create_employee_for_company' && ownerAccessLevel != null) {
-      params['p_owner_access_level'] = ownerAccessLevel;
+    if (rpcName == 'create_employee_for_company') {
+      params['p_owner_access_level'] = ownerAccessLevel ?? 'full';
     }
     final res = await _supabase.client.rpc(rpcName, params: params);
     final data = Map<String, dynamic>.from(res as Map);
