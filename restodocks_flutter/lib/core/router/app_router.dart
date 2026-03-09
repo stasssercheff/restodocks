@@ -31,6 +31,7 @@ import '../../screens/order_create_screen.dart';
 import '../../screens/accept_co_owner_invitation_screen.dart';
 import '../../screens/register_co_owner_screen.dart';
 import '../../screens/add_establishment_screen.dart';
+import '../../screens/auth_confirm_screen.dart';
 import '../../screens/confirm_email_screen.dart';
 import '../../screens/admin_screen.dart';
 import '../../models/order_list.dart';
@@ -51,7 +52,8 @@ bool _isPublicPath(String loc) {
   if (loc == '/' || loc == '/splash') return true;
   if (loc.startsWith('/login') || loc.startsWith('/register') || loc.startsWith('/register-co-owner') ||
       loc.startsWith('/forgot-password') || loc.startsWith('/reset-password') ||
-      loc.startsWith('/accept-co-owner-invitation') || loc.startsWith('/confirm-email')) return true;
+      loc.startsWith('/accept-co-owner-invitation') || loc.startsWith('/confirm-email') ||
+      loc.startsWith('/auth/confirm')) return true;
   return false;
 }
 
@@ -210,6 +212,11 @@ class AppRouter {
           final email = state.queryParameters['email'] ?? '';
           return _slideTransitionPage(state, ConfirmEmailScreen(email: email));
         },
+      ),
+      // Редирект Supabase после подтверждения email — восстанавливаем сессию и ведём в /home
+      GoRoute(
+        path: '/auth/confirm',
+        pageBuilder: (context, state) => _slideTransitionPage(state, const AuthConfirmScreen()),
       ),
 
       // Инвентаризация — без нижней панели

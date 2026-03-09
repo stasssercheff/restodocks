@@ -3,7 +3,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const REDIRECT_URL = "https://restodocks.com";
+const REDIRECT_URL = "https://restodocks.com/auth/confirm";
 
 function corsHeaders(origin: string | null) {
   return {
@@ -178,7 +178,11 @@ Deno.serve(async (req: Request) => {
             password,
             options: { redirectTo: REDIRECT_URL },
           });
-          if (!r1.error && r1.data?.properties?.action_link) link = r1.data.properties.action_link;
+          if (!r1.error && r1.data?.properties?.action_link) {
+            link = r1.data.properties.action_link;
+          } else if (r1.error) {
+            console.error("[send-registration-email] signup generateLink:", r1.error.message);
+          }
         }
         if (!link) {
           const r2 = await supabase.auth.admin.generateLink({
@@ -186,9 +190,14 @@ Deno.serve(async (req: Request) => {
             email: to.trim(),
             options: { redirectTo: REDIRECT_URL },
           });
-          if (!r2.error && r2.data?.properties?.action_link) link = r2.data.properties.action_link;
+          if (!r2.error && r2.data?.properties?.action_link) {
+            link = r2.data.properties.action_link;
+          } else if (r2.error) {
+            console.error("[send-registration-email] magiclink generateLink:", r2.error.message);
+          }
         }
         if (link) {
+          console.log("[send-registration-email] OK: confirmation link added for", to);
           confirmationBlock = `
 <hr style="margin:20px 0;border:none;border-top:1px solid #eee"/>
 <p><strong>Подтвердите email:</strong></p>

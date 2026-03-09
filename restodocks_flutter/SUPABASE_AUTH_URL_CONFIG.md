@@ -21,6 +21,7 @@
 В поле **Redirect URLs** добавьте все домены, где размещено приложение (каждый с новой строки):
 
 ```
+https://restodocks.com/auth/confirm
 https://restodocks.pages.dev
 https://restodocks.pages.dev/**
 https://restodocks.pages.dev/
