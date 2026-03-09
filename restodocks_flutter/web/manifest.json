@@ -5,7 +5,7 @@
     "display": "fullscreen",
     "background_color": "#AD292C",
     "theme_color": "#AD292C",
-    "description": "A new Flutter project.",
+    "description": "Restodocks — учёт инвентаря и закупок для ресторанов",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
