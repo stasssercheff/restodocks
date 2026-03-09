@@ -952,7 +952,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     'Загрузка продуктов изменение цены': 'https://youtu.be/p9I1rsNgXpU',
     'Загрузка продуктов в номенклатуру файл': 'https://youtu.be/po5_brrXdVw',
     'Загрузка продуктов в номенклатуру текст': 'https://youtu.be/66Q9iUyuqso',
-    'Загрузка продуктов текст из таблицы': 'https://youtu.be/egbXElcA2pE',
+    'Загрузка продуктов текст из таблицы': 'https://youtu.be/tYsFlIll954',
   };
 
   void _showTrainingDialog(BuildContext context, LocalizationService loc) {
