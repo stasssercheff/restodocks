@@ -116,10 +116,12 @@ class AppRouter {
     navigatorKey: rootNavigatorKey,
     initialLocation: _getInitialLocation(),
     redirect: (context, state) async {
+      // Web: Uri.base — фактический URL страницы (при переходе по ссылке из письма)
+      if (kIsWeb && Uri.base.path.startsWith('/auth/confirm')) {
+        return null;
+      }
       final loc = state.matchedLocation;
-      // Path без query (go_router 9.x: state.uri может отсутствовать в части сборок)
       final path = Uri.tryParse(loc.startsWith('/') ? loc : '/$loc')?.path ?? loc.split('?').first;
-      // /auth/confirm* — всегда публично (подтверждение email, verifyOTP)
       if (path.startsWith('/auth/confirm')) {
         if (kIsWeb && path.isNotEmpty) initial_loc.savePathForRefresh(loc);
         return null;
