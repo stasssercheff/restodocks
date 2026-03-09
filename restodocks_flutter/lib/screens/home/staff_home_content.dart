@@ -82,8 +82,6 @@ class StaffHomeContent extends StatelessWidget {
         title: employee.department == 'bar' ? loc.t('ttk_bar') : loc.t('ttk_kitchen'),
         onTap: () => context.go('/tech-cards/${_deptForRoute(employee.department)}'),
       ),
-<｜tool▁sep｜>path
-/Users/masurfsker/Documents/Restodocks/Restodocks/restodocks_flutter/lib/screens/home/staff_home_content.dart
       HomeTileId.checklists: _Tile(
         icon: Icons.checklist,
         title: loc.t('checklists'),

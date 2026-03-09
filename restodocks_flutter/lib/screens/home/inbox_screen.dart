@@ -146,12 +146,16 @@ class _InboxScreenState extends State<InboxScreen> {
             d.type == DocumentType.checklistSubmission ||
             d.type == DocumentType.checklistMissedDeadline).toList();
       }
+      if (_selectedTypeTab == _InboxTypeTab.notifications) {
+        return []; // Notifications shown separately
+      }
       final docType = switch (_selectedTypeTab!) {
         _InboxTypeTab.order => DocumentType.productOrder,
         _InboxTypeTab.inventory => DocumentType.inventory,
         _InboxTypeTab.iikoInventory => DocumentType.iikoInventory,
         _InboxTypeTab.messages => DocumentType.checklistMissedDeadline,
         _InboxTypeTab.checklist => DocumentType.checklistSubmission, // unreachable, handled above
+        _InboxTypeTab.notifications => DocumentType.checklistMissedDeadline, // unreachable, handled above
       };
       return docsByDept.where((d) => d.type == docType).toList();
     }

@@ -515,200 +515,131 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
                           ),
                         ),
                         Expanded(
-                          child: LayoutBuilder(
-                            builder: (context, constraints) {
-                              final isWide = constraints.maxWidth >= 700;
-                              final cardMargin = isWide ? 6.0 : 12.0;
-                              final cardPadding = isWide ? 10.0 : 16.0;
-                              final gap = isWide ? 4.0 : 8.0;
-                              final gapLarge = isWide ? 6.0 : 12.0;
-                              return ListView.builder(
-                                padding: const EdgeInsets.all(16),
-                                itemCount: _employees!.length,
-                                itemBuilder: (context, i) {
-                                  final e = _employees![i];
-                                  final isHourly = e.paymentType == 'hourly';
-                                  final rate = isHourly ? (e.hourlyRate ?? 0) : (e.ratePerShift ?? 0);
-                                  final val = _shiftsOrHoursFromSchedule(e);
-                                  final base = _baseForEmployee(e);
-                                  final adjTotal = _adjustmentsTotal(e.id);
-                                  final total = base + adjTotal;
-                                  final label = isHourly ? loc.t('hourly_rate') : loc.t('rate_per_shift');
-                                  final unitLabel = isHourly ? loc.t('salary_hours') : loc.t('salary_shifts');
-                                  final included = _includeInTotal[e.id] ?? true;
-                                  final adjustments = _adjustments[e.id] ?? [];
-                                  final expanded = _adjustmentsExpanded[e.id] ?? false;
+                          child: ListView.builder(
+                            padding: const EdgeInsets.all(16),
+                            itemCount: _employees!.length,
+                            itemBuilder: (context, i) {
+                              final e = _employees![i];
+                              final isHourly = e.paymentType == 'hourly';
+                              final rate = isHourly ? (e.hourlyRate ?? 0) : (e.ratePerShift ?? 0);
+                              final val = _shiftsOrHoursFromSchedule(e);
+                              final base = _baseForEmployee(e);
+                              final adjTotal = _adjustmentsTotal(e.id);
+                              final total = base + adjTotal;
+                              final label = isHourly ? loc.t('hourly_rate') : loc.t('rate_per_shift');
+                              final unitLabel = isHourly ? loc.t('salary_hours') : loc.t('salary_shifts');
+                              final included = _includeInTotal[e.id] ?? true;
+                              final adjustments = _adjustments[e.id] ?? [];
+                              final expanded = _adjustmentsExpanded[e.id] ?? false;
 
-                                  return Card(
-                                    margin: EdgeInsets.only(bottom: cardMargin),
-                                    child: Padding(
-                                      padding: EdgeInsets.all(cardPadding),
-                                      child: Row(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Padding(
-                                            padding: EdgeInsets.only(right: isWide ? 8 : 12, top: 4),
-                                            child: Switch(
-                                              value: included,
-                                              onChanged: (v) => setState(() => _includeInTotal[e.id] = v),
+                              return Card(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      // Toggle слева
+                                      Padding(
+                                        padding: const EdgeInsets.only(right: 12, top: 4),
+                                        child: Switch(
+                                          value: included,
+                                          onChanged: (v) => setState(() => _includeInTotal[e.id] = v),
+                                        ),
+                                      ),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(e.fullName, style: theme.textTheme.titleMedium),
+                                            Builder(
+                                              builder: (_) {
+                                                final roleCode = e.positionRole ?? e.roles.firstOrNull ?? '';
+                                                if (roleCode.isEmpty) return const SizedBox.shrink();
+                                                return Padding(
+                                                  padding: const EdgeInsets.only(top: 2),
+                                                  child: Text(
+                                                    loc.roleDisplayName(roleCode),
+                                                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                                                  ),
+                                                );
+                                              },
                                             ),
-                                          ),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                            const SizedBox(height: 12),
+                                            Row(
                                               children: [
-                                                if (isWide)
-                                                  Row(
-                                                    children: [
-                                                      Text(e.fullName, style: theme.textTheme.titleSmall),
-                                                      Builder(
-                                                        builder: (_) {
-                                                          final roleCode = e.positionRole ?? e.roles.firstOrNull ?? '';
-                                                          if (roleCode.isEmpty) return const SizedBox.shrink();
-                                                          return Padding(
-                                                            padding: const EdgeInsets.only(left: 8),
-                                                            child: Text(
-                                                              loc.roleDisplayName(roleCode),
-                                                              style: theme.textTheme.bodySmall?.copyWith(
-                                                                color: theme.colorScheme.onSurfaceVariant,
-                                                              ),
-                                                            ),
-                                                          );
-                                                        },
-                                                      ),
-                                                      const Spacer(),
-                                                      SizedBox(
-                                                        width: 70,
-                                                        child: Text(
-                                                          '${val.toStringAsFixed(isHourly ? 1 : 0)} $unitLabel',
-                                                          style: theme.textTheme.bodySmall?.copyWith(
-                                                            fontWeight: FontWeight.w600,
-                                                          ),
-                                                          overflow: TextOverflow.ellipsis,
-                                                        ),
-                                                      ),
-                                                      const SizedBox(width: 8),
-                                                      SizedBox(
-                                                        width: 85,
-                                                        child: Text(
-                                                          '${base.toStringAsFixed(0)} $currency',
-                                                          style: theme.textTheme.bodySmall?.copyWith(
-                                                            color: theme.colorScheme.onSurfaceVariant,
-                                                          ),
-                                                          overflow: TextOverflow.ellipsis,
-                                                        ),
-                                                      ),
-                                                      const SizedBox(width: 8),
-                                                      SizedBox(
-                                                        width: 85,
-                                                        child: Text(
-                                                          '${total.toStringAsFixed(0)} $currency',
-                                                          style: theme.textTheme.titleSmall?.copyWith(
-                                                            color: theme.colorScheme.primary,
-                                                            fontWeight: FontWeight.bold,
-                                                          ),
-                                                          overflow: TextOverflow.ellipsis,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  )
-                                                else ...[
-                                                  Text(e.fullName, style: theme.textTheme.titleMedium),
-                                                  Builder(
-                                                    builder: (_) {
-                                                      final roleCode = e.positionRole ?? e.roles.firstOrNull ?? '';
-                                                      if (roleCode.isEmpty) return const SizedBox.shrink();
-                                                      return Padding(
-                                                        padding: const EdgeInsets.only(top: 2),
-                                                        child: Text(
-                                                          loc.roleDisplayName(roleCode),
-                                                          style: theme.textTheme.bodySmall?.copyWith(
-                                                            color: theme.colorScheme.onSurfaceVariant,
-                                                          ),
-                                                        ),
-                                                      );
-                                                    },
-                                                  ),
-                                                  SizedBox(height: gapLarge),
-                                                  Row(
-                                                    children: [
-                                                      Expanded(
-                                                        flex: 2,
-                                                        child: Text('$label: $rate $currency',
-                                                            style: theme.textTheme.bodyMedium),
-                                                      ),
-                                                      Expanded(
-                                                        child: Text(
-                                                          '${val.toStringAsFixed(isHourly ? 1 : 0)} $unitLabel',
-                                                          style: theme.textTheme.bodyMedium?.copyWith(
-                                                            fontWeight: FontWeight.w600,
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  SizedBox(height: gap),
-                                                  Text(
-                                                    '${loc.t('ttk_total')}: ${base.toStringAsFixed(0)} $currency',
+                                                Expanded(
+                                                  flex: 2,
+                                                  child: Text('$label: $rate $currency', style: theme.textTheme.bodyMedium),
+                                                ),
+                                                Expanded(
+                                                  child: Text(
+                                                    '${val.toStringAsFixed(isHourly ? 1 : 0)} $unitLabel',
                                                     style: theme.textTheme.bodyMedium?.copyWith(
-                                                      color: theme.colorScheme.onSurfaceVariant,
-                                                    ),
-                                                  ),
-                                                  SizedBox(height: gap),
-                                                ],
-                                                // Панель удержаний и поощрений
-                                                InkWell(
-                                                  borderRadius: BorderRadius.circular(8),
-                                                  onTap: () => setState(() => _adjustmentsExpanded[e.id] = !expanded),
-                                                  child: Padding(
-                                                    padding: EdgeInsets.symmetric(vertical: isWide ? 2 : 4),
-                                                    child: Row(
-                                                      children: [
-                                                        Icon(
-                                                          Icons.tune,
-                                                          size: isWide ? 14 : 16,
-                                                          color: theme.colorScheme.primary,
-                                                        ),
-                                                        SizedBox(width: isWide ? 4 : 6),
-                                                        Text(
-                                                          loc.t('salary_deductions_bonuses') ?? 'Удержания и поощрения',
-                                                          style: theme.textTheme.bodySmall?.copyWith(
-                                                            color: theme.colorScheme.primary,
-                                                            fontWeight: FontWeight.w600,
-                                                            fontSize: isWide ? 12 : null,
-                                                          ),
-                                                        ),
-                                                        if (adjustments.isNotEmpty) ...[
-                                                          SizedBox(width: isWide ? 4 : 6),
-                                                          Container(
-                                                            padding: EdgeInsets.symmetric(
-                                                              horizontal: isWide ? 4 : 6,
-                                                              vertical: isWide ? 1 : 2,
-                                                            ),
-                                                            decoration: BoxDecoration(
-                                                              color: theme.colorScheme.primaryContainer,
-                                                              borderRadius: BorderRadius.circular(10),
-                                                            ),
-                                                            child: Text(
-                                                              '${adjustments.length}',
-                                                              style: theme.textTheme.labelSmall?.copyWith(
-                                                                color: theme.colorScheme.onPrimaryContainer,
-                                                              ),
-                                                            ),
-                                                          ),
-                                                        ],
-                                                        const Spacer(),
-                                                        Icon(
-                                                          expanded ? Icons.expand_less : Icons.expand_more,
-                                                          size: isWide ? 16 : 18,
-                                                          color: theme.colorScheme.primary,
-                                                        ),
-                                                      ],
+                                                      fontWeight: FontWeight.w600,
                                                     ),
                                                   ),
                                                 ),
-                                                if (expanded) ...[
-                                                  SizedBox(height: gap),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 8),
+                                            // Базовая сумма
+                                            Text(
+                                              '${loc.t('ttk_total')}: ${base.toStringAsFixed(0)} $currency',
+                                              style: theme.textTheme.bodyMedium?.copyWith(
+                                                color: theme.colorScheme.onSurfaceVariant,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 8),
+                                            // Панель удержаний и поощрений
+                                            InkWell(
+                                              borderRadius: BorderRadius.circular(8),
+                                              onTap: () => setState(() => _adjustmentsExpanded[e.id] = !expanded),
+                                              child: Padding(
+                                                padding: const EdgeInsets.symmetric(vertical: 4),
+                                                child: Row(
+                                                  children: [
+                                                    Icon(
+                                                      Icons.tune,
+                                                      size: 16,
+                                                      color: theme.colorScheme.primary,
+                                                    ),
+                                                    const SizedBox(width: 6),
+                                                    Text(
+                                                      loc.t('salary_deductions_bonuses') ?? 'Удержания и поощрения',
+                                                      style: theme.textTheme.bodySmall?.copyWith(
+                                                        color: theme.colorScheme.primary,
+                                                        fontWeight: FontWeight.w600,
+                                                      ),
+                                                    ),
+                                                    if (adjustments.isNotEmpty) ...[
+                                                      const SizedBox(width: 6),
+                                                      Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                        decoration: BoxDecoration(
+                                                          color: theme.colorScheme.primaryContainer,
+                                                          borderRadius: BorderRadius.circular(10),
+                                                        ),
+                                                        child: Text(
+                                                          '${adjustments.length}',
+                                                          style: theme.textTheme.labelSmall?.copyWith(
+                                                            color: theme.colorScheme.onPrimaryContainer,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                    const Spacer(),
+                                                    Icon(
+                                                      expanded ? Icons.expand_less : Icons.expand_more,
+                                                      size: 18,
+                                                      color: theme.colorScheme.primary,
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                            if (expanded) ...[
+                                              const SizedBox(height: 8),
                                               Container(
                                                 decoration: BoxDecoration(
                                                   color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
@@ -792,27 +723,26 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
                                                   ],
                                                 ),
                                               ),
-                                                if (adjustments.isNotEmpty) ...[
-                                                  SizedBox(height: gap),
-                                                  Text(
-                                                    'Корректировка: ${adjTotal >= 0 ? '+' : ''}${adjTotal.toStringAsFixed(0)} $currency',
-                                                    style: theme.textTheme.bodySmall?.copyWith(
-                                                      color: adjTotal >= 0 ? Colors.green : Colors.red,
-                                                      fontWeight: FontWeight.w600,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ],
-                                              if (!isWide) ...[
-                                                SizedBox(height: gap),
+                                              if (adjustments.isNotEmpty) ...[
+                                                const SizedBox(height: 6),
                                                 Text(
-                                                  '${loc.t('salary_payable') ?? 'К выплате'}: ${total.toStringAsFixed(0)} $currency',
-                                                  style: theme.textTheme.titleSmall?.copyWith(
-                                                    color: theme.colorScheme.primary,
-                                                    fontWeight: FontWeight.bold,
+                                                  'Корректировка: ${adjTotal >= 0 ? '+' : ''}${adjTotal.toStringAsFixed(0)} $currency',
+                                                  style: theme.textTheme.bodySmall?.copyWith(
+                                                    color: adjTotal >= 0 ? Colors.green : Colors.red,
+                                                    fontWeight: FontWeight.w600,
                                                   ),
                                                 ),
                                               ],
+                                            ],
+                                            const SizedBox(height: 8),
+                                            // Итоговая сумма
+                                            Text(
+                                              '${loc.t('salary_payable') ?? 'К выплате'}: ${total.toStringAsFixed(0)} $currency',
+                                              style: theme.textTheme.titleSmall?.copyWith(
+                                                color: theme.colorScheme.primary,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
                                           ],
                                         ),
                                       ),
