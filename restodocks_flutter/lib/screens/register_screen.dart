@@ -173,19 +173,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
       );
 
       final emailService = EmailService();
-      emailService.sendRegistrationEmail(
+      await emailService.sendRegistrationEmail(
         isOwner: false,
         to: email,
         companyName: establishment.name,
         email: email,
       );
+      // Отдельное письмо со ссылкой подтверждения — сразу после регистрации
+      if (!hasSession) {
+        await emailService.sendConfirmationLinkRequest(email);
+      }
 
       if (!mounted) return;
       if (hasSession) {
         await accountManager.login(employee, establishment);
         context.go('/home');
       } else {
-        // Confirm Email — экран «Подтвердите учётную запись»
         context.go('/confirm-email?email=${Uri.encodeComponent(email)}');
       }
     } catch (e) {

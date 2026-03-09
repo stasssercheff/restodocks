@@ -80,7 +80,7 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
         roles: roles,
       );
 
-      // Отправка письма владельцу
+      // Письмо с PIN (без ссылки — чтобы не падало в спам)
       final emailService = EmailService();
       final emailResult = await emailService.sendRegistrationEmail(
         isOwner: true,
@@ -89,6 +89,10 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
         email: email,
         pinCode: estab.pinCode,
       );
+      // Отдельное письмо со ссылкой подтверждения — сразу после регистрации
+      if (!signUpResult.hasSession) {
+        await emailService.sendConfirmationEmail(to: email, password: password);
+      }
 
       if (!mounted) return;
       if (signUpResult.hasSession) {
