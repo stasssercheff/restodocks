@@ -117,7 +117,13 @@ class AppRouter {
     initialLocation: _getInitialLocation(),
     redirect: (context, state) async {
       final loc = state.matchedLocation;
-      // Web: если роутер показал корень/splash — восстанавливаем исходный путь (F5, getCurrentBrowserPath уже /splash)
+      final path = state.uri.path;
+      // /auth/confirm* — всегда публично (подтверждение email, verifyOTP)
+      if (path.startsWith('/auth/confirm')) {
+        if (kIsWeb && path.isNotEmpty) initial_loc.savePathForRefresh(loc);
+        return null;
+      }
+      // Web: если роутер показал корень/splash — восстанавливаем исходный путь
       if (kIsWeb && (loc == '/' || loc == '/splash')) {
         final target = initial_loc.getCachedInitialPath() ?? initial_loc.getCurrentBrowserPath();
         if (kDebugMode) debugPrint('[Restodocks] redirect: loc=$loc, target=$target');

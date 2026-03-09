@@ -65,13 +65,22 @@ class _AuthConfirmClickScreenState extends State<AuthConfirmClickScreen> {
         }
       } catch (e) {
         setState(() {
-          _error = 'Ссылка истекла или уже использована. Войдите по паролю.';
+          _error = 'Ошибка: ${e.toString().split('\n').first}. Войдите по паролю.';
           _loading = false;
         });
         return;
       }
       setState(() => _loading = false);
       if (!mounted) return;
+      // Сессия есть, но профиль не загрузился — пробуем ещё раз с задержкой
+      await Future.delayed(const Duration(milliseconds: 800));
+      if (!mounted) return;
+      await account.initialize(forceRetryFromAuth: true);
+      if (!mounted) return;
+      if (account.isLoggedInSync) {
+        router.go('/home');
+        return;
+      }
       router.go('/login');
       return;
     }
