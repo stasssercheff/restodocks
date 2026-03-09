@@ -93,4 +93,19 @@ class InventoryDocumentService {
       return null;
     }
   }
+
+  /// Получить несколько документов по id (для объединения бланков).
+  Future<List<Map<String, dynamic>>> getByIds(List<String> ids) async {
+    if (ids.isEmpty) return [];
+    try {
+      final data = await _supabase.client
+          .from(_table)
+          .select()
+          .inFilter('id', ids);
+      return (data as List).map((e) => Map<String, dynamic>.from(e as Map<String, dynamic>)).toList();
+    } catch (e) {
+      print('Ошибка загрузки документов инвентаризации: $e');
+      return [];
+    }
+  }
 }

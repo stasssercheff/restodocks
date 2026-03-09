@@ -82,13 +82,15 @@ class _InboxScreenState extends State<InboxScreen> {
     final isChef = employee.roles.contains('executive_chef');
     final isSousChef = employee.roles.contains('sous_chef');
     final isOwner = employee.roles.contains('owner');
+    final isBarManager = employee.roles.contains('bar_manager');
+    final isFloorManager = employee.roles.contains('floor_manager');
     final hasDocs = employee.hasInboxDocuments;
 
     final tabs = <_InboxTab>[];
     if (hasDocs) {
       if (isChef || isSousChef) tabs.add(_InboxTab.checklist);
       if (isChef || isSousChef) tabs.add(_InboxTab.order);
-      if (isChef || isOwner) tabs.add(_InboxTab.inventory);
+      if (isChef || isOwner || isBarManager || isFloorManager) tabs.add(_InboxTab.inventory);
       if ((isChef || isOwner) &&
           _documents.any((d) => d.type == DocumentType.iikoInventory)) {
         tabs.add(_InboxTab.iikoInventory);
@@ -127,6 +129,14 @@ class _InboxScreenState extends State<InboxScreen> {
         setState(() => _loading = false);
       }
     }
+  }
+
+  /// Бланки инвентаризации (стандарт + iiko) для объединения
+  List<InboxDocument> get _mergeableDocuments {
+    return _documents
+        .where((d) =>
+            d.type == DocumentType.inventory || d.type == DocumentType.iikoInventory)
+        .toList();
   }
 
   List<InboxDocument> get _filteredDocuments {
@@ -193,6 +203,24 @@ class _InboxScreenState extends State<InboxScreen> {
         leading: widget.embedded ? null : appBarBackButton(context),
         title: Text(widget.messagesOnly ? (loc.t('inbox_tab_messages') ?? 'Сообщения') : loc.t('inbox')),
         actions: [
+          if (!widget.messagesOnly &&
+              _mergeableDocuments.isNotEmpty &&
+              (employee?.hasRole('executive_chef') == true ||
+                  employee?.hasRole('sous_chef') == true ||
+                  employee?.hasRole('owner') == true ||
+                  employee?.hasRole('bar_manager') == true ||
+                  employee?.hasRole('floor_manager') == true))
+            IconButton(
+              icon: const Icon(Icons.merge),
+              tooltip: loc.t('inventory_merge_title') ?? 'Объединить бланки',
+              onPressed: () async {
+                final result = await context.push<bool>(
+                  '/inbox/merge',
+                  extra: _mergeableDocuments,
+                );
+                if (result == true && mounted) await _loadDocuments();
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () async {

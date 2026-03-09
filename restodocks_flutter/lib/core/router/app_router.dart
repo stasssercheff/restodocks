@@ -16,6 +16,7 @@ import '../../screens/inventory_screen.dart';
 import '../../screens/order_inbox_detail_screen.dart';
 import '../../screens/checklist_inbox_detail_screen.dart';
 import '../../screens/iiko_inventory_inbox_detail_screen.dart';
+import '../../screens/inventory_merge_screen.dart';
 import '../../screens/home/expenses_screen.dart';
 import '../../screens/home/department_placeholder_screen.dart';
 import '../../screens/supabase_test_screen.dart';
@@ -378,6 +379,26 @@ class AppRouter {
                 pageBuilder: (context, state) {
                   final employeeId = state.pathParameters['employeeId'] ?? '';
                   return _slideTransitionPage(state, EmployeeChatScreen(otherEmployeeId: employeeId));
+                },
+              ),
+              GoRoute(
+                path: 'merge',
+                pageBuilder: (context, state) {
+                  final extra = state.extra;
+                  List<InboxDocument> typed = [];
+                  if (extra is List) {
+                    typed = extra
+                        .where((e) => e is InboxDocument)
+                        .cast<InboxDocument>()
+                        .where((d) =>
+                            d.type == DocumentType.inventory ||
+                            d.type == DocumentType.iikoInventory)
+                        .toList();
+                  }
+                  return _slideTransitionPage(
+                    state,
+                    InventoryMergeScreen(documents: typed),
+                  );
                 },
               ),
             ],

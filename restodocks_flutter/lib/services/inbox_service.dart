@@ -24,6 +24,26 @@ class InboxService {
         rawList = await docService.listForEstablishment(establishmentId);
       } else if (currentEmployee.hasRole('executive_chef') || currentEmployee.hasRole('sous_chef')) {
         rawList = await docService.listForChef(currentEmployee.id);
+      } else if (currentEmployee.hasRole('bar_manager')) {
+        rawList = await docService.listForEstablishment(establishmentId);
+        rawList = rawList.where((d) {
+          final p = d['payload'] as Map<String, dynamic>?;
+          final h = p?['header'] as Map<String, dynamic>?;
+          final isIiko = p?['type'] == 'iiko_inventory';
+          if (isIiko) return false; // iiko — кухня, барменеджер не видит
+          final dept = (h?['department'] ?? '').toString();
+          return dept == 'bar' || dept == 'Bar';
+        }).toList();
+      } else if (currentEmployee.hasRole('floor_manager')) {
+        rawList = await docService.listForEstablishment(establishmentId);
+        rawList = rawList.where((d) {
+          final p = d['payload'] as Map<String, dynamic>?;
+          final h = p?['header'] as Map<String, dynamic>?;
+          final isIiko = p?['type'] == 'iiko_inventory';
+          if (isIiko) return false;
+          final dept = (h?['department'] ?? '').toString().toLowerCase();
+          return dept == 'hall' || dept == 'dining_room' || dept == 'зал';
+        }).toList();
       } else {
         rawList = [];
       }
