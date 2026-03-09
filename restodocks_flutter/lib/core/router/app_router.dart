@@ -144,10 +144,7 @@ class AppRouter {
       if (!account.isLoggedInSync) await account.initialize();
       if (!account.isLoggedInSync) {
         // Сохраняем полный URL (path + query) для возврата после входа — иначе теряются token_hash и type для auth/confirm
-        final uri = state.uri;
-        final fullLoc = (uri.path.isNotEmpty && uri.path != '/')
-            ? (uri.hasQuery ? '${uri.path}?${uri.query}' : uri.path)
-            : loc;
+        final fullLoc = state.location; // location включает path и query
         final redirect = fullLoc.isNotEmpty && fullLoc != '/' ? Uri.encodeComponent(fullLoc) : null;
         return redirect != null ? '/login?redirect=$redirect' : '/login';
       }
