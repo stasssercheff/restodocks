@@ -72,7 +72,7 @@ class _AuthConfirmClickScreenState extends State<AuthConfirmClickScreen> {
       }
       setState(() => _loading = false);
       if (!mounted) return;
-      context.go('/login');
+      router.go('/login');
       return;
     }
     if (widget.redirectParam.isEmpty) {
