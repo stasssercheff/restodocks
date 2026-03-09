@@ -949,6 +949,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     'График правка': 'https://youtu.be/sF26hjgdjO8',
     'Сообщения': 'https://youtu.be/zgH9ITDHU4U',
     'Расчет выплаты за период + выгрузка': 'https://youtu.be/tO4ihTk8bDM',
+    'Загрузка продуктов изменение цены': 'https://youtu.be/p9I1rsNgXpU',
+    'Загрузка продуктов в номенклатуру файл': 'https://youtu.be/po5_brrXdVw',
+    'Загрузка продуктов в номенклатуру текст': 'https://youtu.be/66Q9iUyuqso',
+    'Загрузка продуктов текст из таблицы': 'https://youtu.be/egbXElcA2pE',
   };
 
   void _showTrainingDialog(BuildContext context, LocalizationService loc) {
