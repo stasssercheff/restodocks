@@ -26,6 +26,42 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  /// Переводы названий чеклистов: checklistId -> переведённое название
+  final Map<String, String> _translatedNames = {};
+
+  Future<void> _loadTranslations() async {
+    if (!mounted) return;
+    final loc = context.read<LocalizationService>();
+    final targetLang = loc.currentLanguageCode;
+    const sourceLang = 'ru';
+    if (targetLang == sourceLang) return;
+
+    try {
+      final translationSvc = context.read<TranslationService>();
+      for (final c in _list) {
+        final text = c.name.trim().isNotEmpty ? c.name : (c.additionalName?.trim().isNotEmpty == true ? c.additionalName! : '');
+        if (text.isEmpty) continue;
+        final translated = await translationSvc.translate(
+          entityType: TranslationEntityType.checklist,
+          entityId: c.id,
+          fieldName: 'checklist_name',
+          text: text,
+          from: sourceLang,
+          to: targetLang,
+        );
+        if (translated != null && translated != text && mounted) {
+          setState(() => _translatedNames[c.id] = translated);
+        }
+      }
+    } catch (_) {}
+  }
+
+  String _displayName(Checklist c, LocalizationService loc) {
+    final base = c.name.trim().isNotEmpty
+        ? c.name
+        : (c.additionalName?.trim().isNotEmpty == true ? c.additionalName! : (loc.t('checklist_no_name') ?? 'Без названия'));
+    return _translatedNames[c.id] ?? base;
+  }
 
   Future<void> _load() async {
     final acc = context.read<AccountManagerSupabase>();
@@ -41,6 +77,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
     setState(() {
       _loading = true;
       _error = null;
+      _translatedNames.clear();
     });
     try {
       final svc = context.read<ChecklistServiceSupabase>();
@@ -53,11 +90,14 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
         applyAssignmentFilter: !canEdit,
       );
       final emps = await acc.getEmployeesForEstablishment(est.id);
-      if (mounted) setState(() {
-        _list = list;
-        _employees = emps;
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _list = list;
+          _employees = emps;
+          _loading = false;
+        });
+        _loadTranslations();
+      }
     } catch (e) {
       if (mounted) setState(() {
         _error = e.toString();
@@ -386,7 +426,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                   ],
                 ],
               ),
-              title: Text((c.name.trim().isNotEmpty ? c.name : c.additionalName?.trim().isNotEmpty == true ? c.additionalName! : (loc.t('checklist_no_name') ?? 'Без названия'))),
+              title: Text(_displayName(c, loc)),
               subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
@@ -436,7 +476,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                                 context: context,
                                 builder: (ctx) => AlertDialog(
                                   title: Text(loc.t('checklist_delete_confirm') ?? 'Удалить чеклист?'),
-                                  content: Text(c.name.trim().isNotEmpty ? c.name : (c.additionalName ?? loc.t('checklist_no_name') ?? 'Без названия')),
+                                  content: Text(_displayName(c, loc)),
                                   actions: [
                                     TextButton(
                                       onPressed: () => Navigator.of(ctx).pop(false),

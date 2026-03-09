@@ -38,6 +38,7 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
   Timer? _serverAutoSaveTimer;
   // Переведённые заголовки пунктов: оригинал -> перевод
   final Map<String, String> _translatedTitles = {};
+  String? _translatedChecklistName;
 
   void saveNow() => saveImmediately();
 
@@ -129,7 +130,7 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
     }
   }
 
-  /// Переводим title каждого пункта через TranslationService (кешируется).
+  /// Переводим название чеклиста и title каждого пункта через TranslationService (кешируется).
   Future<void> _translateTitles(Checklist checklist) async {
     if (!mounted) return;
     final loc = context.read<LocalizationService>();
@@ -138,6 +139,24 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
 
     final translationSvc = context.read<TranslationService>();
     final updated = <String, String>{};
+
+    // Перевод названия чеклиста
+    final nameText = checklist.name.trim();
+    if (nameText.isNotEmpty) {
+      try {
+        final translated = await translationSvc.translate(
+          entityType: TranslationEntityType.checklist,
+          entityId: checklist.id,
+          fieldName: 'checklist_name',
+          text: nameText,
+          from: 'ru',
+          to: targetLang,
+        );
+        if (translated != null && translated != nameText && mounted) {
+          setState(() => _translatedChecklistName = translated);
+        }
+      } catch (_) {}
+    }
 
     for (final item in checklist.items) {
       final title = item.title.trim();
@@ -339,7 +358,7 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text(c.name),
+        title: Text(_translatedChecklistName ?? c.name),
       ),
       body: Column(
         children: [
