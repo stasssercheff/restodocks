@@ -5,36 +5,11 @@ import 'package:provider/provider.dart';
 import '../services/services.dart';
 
 /// Промежуточный экран после регистрации: «Подтвердите учётную запись».
-/// Письмо с PIN приходит без ссылки (чтобы не падало в спам). Ссылку можно запросить кнопкой.
-class ConfirmEmailScreen extends StatefulWidget {
+/// Письмо с PIN и письмо со ссылкой отправляются автоматически после регистрации.
+class ConfirmEmailScreen extends StatelessWidget {
   const ConfirmEmailScreen({super.key, required this.email});
 
   final String email;
-
-  @override
-  State<ConfirmEmailScreen> createState() => _ConfirmEmailScreenState();
-}
-
-class _ConfirmEmailScreenState extends State<ConfirmEmailScreen> {
-  bool _sending = false;
-
-  Future<void> _sendLink() async {
-    if (_sending) return;
-    setState(() => _sending = true);
-    final result = await EmailService().sendConfirmationLinkRequest(widget.email);
-    if (!mounted) return;
-    setState(() => _sending = false);
-    final loc = context.read<LocalizationService>();
-    if (result.ok) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.t('confirm_link_sent') ?? 'Ссылка отправлена. Проверьте почту.')),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result.error ?? 'Ошибка отправки'), backgroundColor: Colors.red),
-      );
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -64,18 +39,11 @@ class _ConfirmEmailScreenState extends State<ConfirmEmailScreen> {
               ),
               const SizedBox(height: 16),
               Text(
-                loc.t('confirm_email_hint').replaceAll('{email}', widget.email),
+                loc.t('confirm_email_hint').replaceAll('{email}', email),
                 style: Theme.of(context).textTheme.bodyLarge,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
-              FilledButton.icon(
-                onPressed: _sending ? null : _sendLink,
-                icon: _sending ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.send),
-                label: Text(_sending ? (loc.t('sending') ?? 'Отправка...') : (loc.t('send_confirm_link') ?? 'Отправить ссылку подтверждения')),
-                style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
-              ),
-              const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -95,6 +63,15 @@ class _ConfirmEmailScreenState extends State<ConfirmEmailScreen> {
                     Text('3. ${loc.t('confirm_email_step3')}', style: Theme.of(context).textTheme.bodyMedium),
                   ],
                 ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                loc.t('confirm_email_check_spam') ?? 'Если письмо со ссылкой не пришло — проверьте папку «Спам».',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontStyle: FontStyle.italic,
+                ),
+                textAlign: TextAlign.center,
               ),
               const Spacer(),
               OutlinedButton(

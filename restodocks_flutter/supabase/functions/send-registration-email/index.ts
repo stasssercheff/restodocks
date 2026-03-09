@@ -95,18 +95,19 @@ Deno.serve(async (req: Request) => {
         const wrappedHref = `${CONFIRM_CLICK_URL}?r=${base64urlEncode(link)}`;
         const html = `
 <p>Здравствуйте!</p>
-<p>Подтвердите email для завершения регистрации.</p>
-<p><a href="${escapeHtml(wrappedHref)}" style="color:#2754C5;text-decoration:none">Подтвердить</a></p>
-<p>С уважением,<br>Команда Restodocks</p>
+<p>Завершите регистрацию в Restodocks — перейдите по ссылке:</p>
+<p><a href="${escapeHtml(wrappedHref)}" style="color:#2754C5;text-decoration:none">Завершить регистрацию</a></p>
+<p>С уважением,<br>Restodocks</p>
         `.trim();
-        const text = `Здравствуйте!\n\nПодтвердите email для завершения регистрации.\n${wrappedHref}\n\nС уважением,\nКоманда Restodocks`;
+        // Без полной ссылки в text — длинные URL усиливают спам-оценку
+        const text = `Здравствуйте!\n\nЗавершите регистрацию в Restodocks — откройте письмо в браузере и нажмите ссылку.\n\nС уважением,\nRestodocks`;
         const res = await fetch("https://api.resend.com/emails", {
           method: "POST",
           headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
           body: JSON.stringify({
             from,
             to: [to.trim()],
-            subject: "Подтвердите регистрацию — Restodocks",
+            subject: "Restodocks: завершите регистрацию",
             html,
             text,
           }),

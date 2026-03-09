@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/clear_hash_stub.dart'
     if (dart.library.html) '../core/clear_hash_web.dart' as clear_hash;
@@ -44,8 +45,11 @@ class _AuthConfirmScreenState extends State<AuthConfirmScreen> {
 
     final account = context.read<AccountManagerSupabase>();
 
-    // Даём Supabase время обработать hash (#access_token=...) при detectSessionInUri
-    await Future.delayed(const Duration(milliseconds: 200));
+    // Даём Supabase время обработать hash (#access_token=...); getSession() подтягивает сессию
+    await Future.delayed(const Duration(milliseconds: 500));
+    if (!mounted) return;
+    await Supabase.instance.client.auth.getSession();
+    await Future.delayed(const Duration(milliseconds: 300));
     if (!mounted) return;
 
     await account.initialize();
@@ -58,17 +62,19 @@ class _AuthConfirmScreenState extends State<AuthConfirmScreen> {
       return;
     }
 
-    // Повторная попытка — иногда сессия восстанавливается с задержкой
-    await Future.delayed(const Duration(milliseconds: 500));
-    if (!mounted) return;
-    await account.initialize();
-
-    if (!mounted) return;
-    if (account.isLoggedInSync) {
-      clear_hash.clearHashFromUrl();
+    // Повторная попытка — сессия может восстанавливаться с задержкой
+    for (int i = 0; i < 3 && mounted; i++) {
+      await Future.delayed(const Duration(milliseconds: 800));
       if (!mounted) return;
-      context.go('/home');
-      return;
+      await Supabase.instance.client.auth.getSession();
+      await account.initialize();
+      if (!mounted) return;
+      if (account.isLoggedInSync) {
+        clear_hash.clearHashFromUrl();
+        if (!mounted) return;
+        context.go('/home');
+        return;
+      }
     }
 
     setState(() {
