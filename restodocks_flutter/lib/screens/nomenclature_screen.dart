@@ -3888,7 +3888,7 @@ class _NomenclatureSkeletonItem extends StatelessWidget {
           ),
         );
 
-        if (mounted) {
+        if (context.mounted) {
           final nav = Navigator.of(context, rootNavigator: true);
           if (nav.canPop()) nav.pop();
         }
@@ -3902,7 +3902,7 @@ class _NomenclatureSkeletonItem extends StatelessWidget {
         );
 
       } catch (e) {
-        if (mounted) {
+        if (context.mounted) {
           final nav = Navigator.of(context, rootNavigator: true);
           if (nav.canPop()) nav.pop();
         }
