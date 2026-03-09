@@ -58,19 +58,18 @@ class _AuthConfirmClickScreenState extends State<AuthConfirmClickScreen> {
         type: otpType,
       );
       if (res.session != null) {
-        await account.initialize(forceRetryFromAuth: true);
-        if (!mounted) return;
-        if (account.isLoggedInSync) {
-          router.go('/home');
-          return;
-        }
-        await Future.delayed(const Duration(milliseconds: 800));
-        if (!mounted) return;
-        await account.initialize(forceRetryFromAuth: true);
-        if (!mounted) return;
-        if (account.isLoggedInSync) {
-          router.go('/home');
-          return;
+        // Retry до 4 раз: complete_pending_owner и загрузка employee могут занять время
+        for (var i = 0; i < 4; i++) {
+          if (!mounted) return;
+          await account.initialize(forceRetryFromAuth: true);
+          if (!mounted) return;
+          if (account.isLoggedInSync) {
+            router.go('/home');
+            return;
+          }
+          if (i < 3) {
+            await Future.delayed(Duration(milliseconds: 400 * (i + 2))); // 800, 1200, 1600 ms
+          }
         }
       }
     } catch (_) {
