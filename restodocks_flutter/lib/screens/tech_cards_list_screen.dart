@@ -50,7 +50,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   static const _barCategoryOrder = ['alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks', 'sauce', 'vegetables', 'salad', 'bakery', 'dessert', 'decor', 'misc', 'beverages'];
 
   List<({String category, List<TechCard> cards})> _groupByCategory(List<TechCard> cards) {
-    final order = (widget.department == 'bar') ? _barCategoryOrder : _kitchenCategoryOrder;
+    final order = (widget.department == 'bar' || widget.department == 'banquet-catering-bar') ? _barCategoryOrder : _kitchenCategoryOrder;
     final grouped = <String, List<TechCard>>{};
     for (final tc in cards) {
       final cat = tc.category.isNotEmpty ? tc.category : 'misc';
@@ -124,6 +124,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       if (widget.department == 'banquet-catering') {
         list = all.where((tc) =>
             tc.category == 'banquet' || tc.category == 'catering').toList();
+      } else if (widget.department == 'banquet-catering-bar') {
+        const barCategories = {'beverages', 'alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks'};
+        list = all.where((tc) =>
+            (tc.category == 'banquet' || tc.category == 'catering') &&
+            (tc.sections.contains('bar') || tc.sections.contains('all') || barCategories.contains(tc.category))).toList();
       } else if (widget.department == 'bar') {
         list = all.where((tc) =>
             tc.category == 'beverages' ||

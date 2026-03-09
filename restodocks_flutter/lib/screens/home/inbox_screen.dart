@@ -495,10 +495,12 @@ class _InboxScreenState extends State<InboxScreen> {
     final emp = acc.currentEmployee;
     final est = acc.establishment;
     final missedDocs = _filteredDocuments;
+    final restrictToChefOnly = emp != null && !emp.hasRole('owner') && !emp.effectiveDataAccess;
     return _MessagesContent(
       key: _messagesContentKey,
       currentEmployee: emp,
       establishmentId: est?.id ?? '',
+      restrictToChefOnly: restrictToChefOnly,
       missedDocuments: missedDocs,
       onDownload: _downloadDocument,
       onRefresh: () async {
@@ -738,6 +740,7 @@ class _MessagesContent extends StatefulWidget {
     super.key,
     required this.currentEmployee,
     required this.establishmentId,
+    required this.restrictToChefOnly,
     required this.missedDocuments,
     required this.onDownload,
     required this.onRefresh,
@@ -745,6 +748,8 @@ class _MessagesContent extends StatefulWidget {
 
   final Employee? currentEmployee;
   final String establishmentId;
+  /// true — показывать только диалоги с шефом/су-шефом (для сотрудников без доступа к данным)
+  final bool restrictToChefOnly;
   final List<InboxDocument> missedDocuments;
   final Future<void> Function(InboxDocument) onDownload;
   final Future<void> Function() onRefresh;
@@ -819,12 +824,22 @@ class _MessagesContentState extends State<_MessagesContent> {
     try {
       final acc = context.read<AccountManagerSupabase>();
       final msgSvc = context.read<EmployeeMessageService>();
-      final emps = await acc.getEmployeesForEstablishment(estId);
-      final partnerIds = await msgSvc.getConversationPartnerIds(emp.id, estId);
+      var emps = await acc.getEmployeesForEstablishment(estId);
+      emps = emps.where((e) => e.id != emp.id).toList();
+      if (widget.restrictToChefOnly) {
+        emps = emps
+            .where((e) => e.roles.contains('executive_chef') || e.roles.contains('sous_chef'))
+            .toList();
+      }
+      var partnerIds = await msgSvc.getConversationPartnerIds(emp.id, estId);
+      if (widget.restrictToChefOnly && emps.isNotEmpty) {
+        final chefIds = emps.map((e) => e.id).toSet();
+        partnerIds = partnerIds.where((id) => chefIds.contains(id)).toList();
+      }
       final unread = await msgSvc.getUnreadCountPerPartner(emp.id, estId);
       if (mounted) {
         setState(() {
-          _employees = emps.where((e) => e.id != emp.id).toList();
+          _employees = emps;
           _chatPartnerIds = partnerIds;
           _unreadCounts = unread;
           _loadingEmployees = false;

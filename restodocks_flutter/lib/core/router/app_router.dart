@@ -584,7 +584,7 @@ class AppRouter {
             path: '/tech-cards/:segment',
             pageBuilder: (context, state) {
               final segment = state.pathParameters['segment'] ?? '';
-              const knownDepartments = ['kitchen', 'bar', 'dining_room', 'banquet-catering'];
+              const knownDepartments = ['kitchen', 'bar', 'dining_room', 'banquet-catering', 'banquet-catering-bar'];
               if (knownDepartments.contains(segment)) {
                 return _slideTransitionPage(state, TechCardsListScreen(department: segment));
               }

@@ -69,12 +69,18 @@ class _MenuScreenState extends State<MenuScreen> {
       final emp = acc.currentEmployee;
       final allTcs = await techCardService.getTechCardsForEstablishment(est.dataEstablishmentId);
       // Банкет/кейтеринг: только блюда с категорией banquet или catering
+      // banquet-catering-bar: банкет/кейтеринг только барные (напитки, коктейли)
       // Зал: все блюда (отображаем вкладки Бар/Кухня)
       List<TechCard> tcs;
       if (widget.department == 'banquet-catering') {
         tcs = allTcs.where((tc) =>
             !tc.isSemiFinished &&
             (tc.category == 'banquet' || tc.category == 'catering')).toList();
+      } else if (widget.department == 'banquet-catering-bar') {
+        tcs = allTcs.where((tc) =>
+            !tc.isSemiFinished &&
+            (tc.category == 'banquet' || tc.category == 'catering') &&
+            (tc.sections.contains('bar') || tc.sections.contains('all'))).toList();
       } else if (widget.department == 'hall' || widget.department == 'dining_room') {
         tcs = allTcs.where((tc) => !tc.isSemiFinished).toList();
       } else if (widget.department == 'bar') {

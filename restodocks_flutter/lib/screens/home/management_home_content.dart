@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../services/services.dart';
 import '../../services/screen_layout_preference_service.dart';
 import '../../models/models.dart';
+import 'expandable_banquet_section.dart';
 
 /// Домашняя страница менеджмента (шеф, барменеджер, менеджер зала, управляющий).
 /// Каждый видит только данные своего отдела.
@@ -27,32 +28,7 @@ class ManagementHomeContent extends StatelessWidget {
 
     // Без доступа к данным
     if (!employee.hasRole('owner') && !employee.effectiveDataAccess) {
-      // Сотрудник в цехе (кухня): только график общий и сообщения
-      if (employee.department == 'kitchen') {
-        return ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            _Tile(
-              icon: Icons.calendar_month,
-              title: loc.t('schedule'),
-              onTap: () => context.go('/schedule/${_deptForRoute(employee.department)}'),
-            ),
-            _Tile(
-              icon: Icons.chat_bubble_outline,
-              title: loc.t('inbox_tab_messages') ?? 'Сообщения',
-              onTap: () => context.go('/notifications?tab=messages'),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(top: 16),
-              child: Text(
-                loc.t('data_access_required_hint') ?? 'Доступ к остальным разделам выдаёт руководитель.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
-              ),
-            ),
-          ],
-        );
-      }
-      // Менеджмент не кухня: только личный график
+      // Все отделы: только личный график и сообщения (диалог с шефом)
       return ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -60,6 +36,11 @@ class ManagementHomeContent extends StatelessWidget {
             icon: Icons.calendar_month,
             title: loc.t('personal_schedule'),
             onTap: () => context.go('/schedule?personal=1'),
+          ),
+          _Tile(
+            icon: Icons.chat_bubble_outline,
+            title: loc.t('inbox_tab_messages') ?? 'Сообщения',
+            onTap: () => context.go('/notifications?tab=messages'),
           ),
           Padding(
             padding: const EdgeInsets.only(top: 16),
@@ -90,7 +71,11 @@ class ManagementHomeContent extends StatelessWidget {
         _Tile(icon: Icons.assignment, title: loc.t('inventory_blank'), onTap: () => context.push('/inventory')),
         if ((isChef || roles.contains('sous_chef')) && screenPref.showBanquetCatering) ...[
           const SizedBox(height: 8),
-          _ExpandableBanquetSection(loc: loc),
+          ExpandableBanquetSection(loc: loc, department: 'kitchen'),
+        ],
+        if (isBarManager && screenPref.showBanquetCatering) ...[
+          const SizedBox(height: 8),
+          ExpandableBanquetSection(loc: loc, department: 'bar'),
         ],
         if (isGeneral) ...[
           _Tile(icon: Icons.savings, title: '${loc.t('expenses')} (${loc.t('pro')})', onTap: () => context.go('/expenses')),
@@ -103,39 +88,6 @@ class ManagementHomeContent extends StatelessWidget {
         if (isBarManager && !isGeneral)
           _Tile(icon: Icons.payments, title: loc.t('salary_tab_fzp') ?? 'ФЗП', onTap: () => context.go('/expenses/salary?department=bar')),
       ],
-    );
-  }
-}
-
-/// Выдвижная секция «Банкет / Кейтринг» — кнопка в стиле остальных, внутри Меню и ТТК.
-class _ExpandableBanquetSection extends StatelessWidget {
-  const _ExpandableBanquetSection({required this.loc});
-
-  final LocalizationService loc;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ExpansionTile(
-        leading: const Icon(Icons.celebration),
-        title: Text(loc.t('banquet_catering') ?? 'Банкет / Кейтринг'),
-        trailing: const Icon(Icons.chevron_right),
-        children: [
-          ListTile(
-            leading: const Icon(Icons.restaurant_menu),
-            title: Text(loc.t('menu')),
-            trailing: const Icon(Icons.chevron_right, size: 20),
-            onTap: () => context.go('/menu/banquet-catering'),
-          ),
-          ListTile(
-            leading: const Icon(Icons.description),
-            title: Text(loc.t('ttk_kitchen')),
-            trailing: const Icon(Icons.chevron_right, size: 20),
-            onTap: () => context.go('/tech-cards/banquet-catering'),
-          ),
-        ],
-      ),
     );
   }
 }

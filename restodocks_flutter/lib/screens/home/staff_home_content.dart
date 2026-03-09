@@ -6,6 +6,7 @@ import '../../services/services.dart';
 import '../../services/home_layout_config_service.dart';
 import '../../services/screen_layout_preference_service.dart';
 import '../../models/models.dart';
+import 'expandable_banquet_section.dart';
 
 /// Домашняя страница сотрудника (кухня/бар/зал): график, меню, ТТК, чеклисты.
 class StaffHomeContent extends StatelessWidget {
@@ -22,32 +23,7 @@ class StaffHomeContent extends StatelessWidget {
 
     // Без доступа к данным (в т.ч. временный с истёкшим периодом)
     if (!employee.hasRole('owner') && !employee.effectiveDataAccess) {
-      // Сотрудник в цехе (кухня): только график общий и сообщения
-      if (employee.department == 'kitchen') {
-        return ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            _Tile(
-              icon: Icons.calendar_month,
-              title: loc.t('schedule'),
-              onTap: () => context.go('/schedule/${_deptForRoute(employee.department)}'),
-            ),
-            _Tile(
-              icon: Icons.chat_bubble_outline,
-              title: loc.t('inbox_tab_messages') ?? 'Сообщения',
-              onTap: () => context.go('/notifications?tab=messages'),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(top: 16),
-              child: Text(
-                loc.t('data_access_required_hint') ?? 'Доступ к остальным разделам выдаёт руководитель.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
-              ),
-            ),
-          ],
-        );
-      }
-      // Бар/зал: только личный график
+      // Все отделы: только личный график и сообщения (диалог с шефом)
       return ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -55,6 +31,11 @@ class StaffHomeContent extends StatelessWidget {
             icon: Icons.calendar_month,
             title: loc.t('personal_schedule'),
             onTap: () => context.go('/schedule?personal=1'),
+          ),
+          _Tile(
+            icon: Icons.chat_bubble_outline,
+            title: loc.t('inbox_tab_messages') ?? 'Сообщения',
+            onTap: () => context.go('/notifications?tab=messages'),
           ),
           Padding(
             padding: const EdgeInsets.only(top: 16),
@@ -101,16 +82,8 @@ class StaffHomeContent extends StatelessWidget {
         title: employee.department == 'bar' ? loc.t('ttk_bar') : loc.t('ttk_kitchen'),
         onTap: () => context.go('/tech-cards/${_deptForRoute(employee.department)}'),
       ),
-      HomeTileId.banquetMenu: _Tile(
-        icon: Icons.restaurant_menu,
-        title: '${loc.t('menu')} — ${loc.t('banquet_catering') ?? 'Банкет / Кейтринг'}',
-        onTap: () => context.go('/menu/banquet-catering'),
-      ),
-      HomeTileId.banquetTtk: _Tile(
-        icon: Icons.description,
-        title: '${loc.t('ttk_kitchen')} — ${loc.t('banquet_catering') ?? 'Банкет / Кейтринг'}',
-        onTap: () => context.go('/tech-cards/banquet-catering'),
-      ),
+<｜tool▁sep｜>path
+/Users/masurfsker/Documents/Restodocks/Restodocks/restodocks_flutter/lib/screens/home/staff_home_content.dart
       HomeTileId.checklists: _Tile(
         icon: Icons.checklist,
         title: loc.t('checklists'),
@@ -125,16 +98,21 @@ class StaffHomeContent extends StatelessWidget {
     };
     final showChecklists = employee.department == 'kitchen' || employee.department == 'bar' || employee.department == 'dining_room';
     final showNomenclature = employee.department == 'kitchen' || employee.department == 'bar' || employee.department == 'hall' || employee.department == 'dining_room';
-    final showBanquet = employee.department == 'kitchen' && screenPref.showBanquetCatering;
+    final showBanquet = (employee.department == 'kitchen' || employee.department == 'bar') && screenPref.showBanquetCatering;
     final showTtk = employee.department != 'dining_room' && employee.department != 'hall';
-    final ordered = order
-        .where((id) => id != HomeTileId.checklists || showChecklists)
-        .where((id) => id != HomeTileId.nomenclature || showNomenclature)
-        .where((id) => (id != HomeTileId.banquetMenu && id != HomeTileId.banquetTtk) || showBanquet)
-        .where((id) => id != HomeTileId.ttk || showTtk)
-        .where((id) => tiles.containsKey(id))
-        .map((id) => tiles[id]!)
-        .toList();
+    final ordered = <Widget>[];
+    for (final id in order) {
+      if (id == HomeTileId.checklists && !showChecklists) continue;
+      if (id == HomeTileId.nomenclature && !showNomenclature) continue;
+      if ((id == HomeTileId.banquetMenu || id == HomeTileId.banquetTtk) && !showBanquet) continue;
+      if (id == HomeTileId.banquetTtk) continue;
+      if (id == HomeTileId.ttk && !showTtk) continue;
+      if (id == HomeTileId.banquetMenu && showBanquet) {
+        ordered.add(ExpandableBanquetSection(loc: loc, department: employee.department == 'bar' ? 'bar' : 'kitchen'));
+        continue;
+      }
+      if (tiles.containsKey(id)) ordered.add(tiles[id]!);
+    }
     return ListView(
       padding: const EdgeInsets.all(16),
       children: ordered,
