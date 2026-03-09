@@ -117,7 +117,8 @@ class AppRouter {
     initialLocation: _getInitialLocation(),
     redirect: (context, state) async {
       final loc = state.matchedLocation;
-      final path = state.uri.path;
+      // Path без query (go_router 9.x: state.uri может отсутствовать в части сборок)
+      final path = Uri.tryParse(loc.startsWith('/') ? loc : '/$loc')?.path ?? loc.split('?').first;
       // /auth/confirm* — всегда публично (подтверждение email, verifyOTP)
       if (path.startsWith('/auth/confirm')) {
         if (kIsWeb && path.isNotEmpty) initial_loc.savePathForRefresh(loc);
