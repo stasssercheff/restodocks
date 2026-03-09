@@ -933,6 +933,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     'Инвента iiko выгрузка бланка': 'https://youtu.be/rFXg9gJ5qUw',
     'График правка': 'https://youtu.be/sF26hjgdjO8',
     'Сообщения': 'https://youtu.be/zgH9ITDHU4U',
+    'Расчет выплаты за период + выгрузка': 'https://youtu.be/tO4ihTk8bDM',
   };
 
   void _showTrainingDialog(BuildContext context, LocalizationService loc) {
