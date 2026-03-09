@@ -2,18 +2,28 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/redirect_to_url_stub.dart'
     if (dart.library.html) '../core/redirect_to_url_web.dart' as redirect_impl;
+import '../services/services.dart';
 
-/// Страница-прокладка: ссылка в письме ведёт сюда, чтобы prefetch почтового клиента
-/// не исчерпывал одноразовый токен Supabase. Пользователь нажимает кнопку — только
-/// тогда происходит редирект на Supabase verify.
+/// Страница-прокладка: ссылка в письме ведёт сюда (prefetch не тратит токен).
+/// Пользователь нажимает кнопку — вызываем verifyOtp или редирект на Supabase.
 class AuthConfirmClickScreen extends StatefulWidget {
-  const AuthConfirmClickScreen({super.key, required this.redirectParam});
+  const AuthConfirmClickScreen({
+    super.key,
+    required this.redirectParam,
+    this.tokenHash = '',
+    this.otpType = '',
+  });
 
-  /// Base64url-encoded Supabase verify URL (query param r)
+  /// Legacy: Base64url-encoded Supabase verify URL (query param r)
   final String redirectParam;
+  /// token_hash + type → verifyOtp (предпочтительный способ)
+  final String tokenHash;
+  final String otpType;
 
   @override
   State<AuthConfirmClickScreen> createState() => _AuthConfirmClickScreenState();
@@ -21,24 +31,54 @@ class AuthConfirmClickScreen extends StatefulWidget {
 
 class _AuthConfirmClickScreenState extends State<AuthConfirmClickScreen> {
   String? _error;
+  bool _loading = false;
+
+  bool get _hasTokenHash => widget.tokenHash.isNotEmpty && widget.otpType.isNotEmpty;
 
   @override
   void initState() {
     super.initState();
-    if (widget.redirectParam.isEmpty) {
+    if (!_hasTokenHash && widget.redirectParam.isEmpty) {
       _error = 'Неверная ссылка. Войдите по паролю.';
     }
   }
 
-  void _onContinue() {
+  Future<void> _onContinue() async {
+    if (_loading) return;
+    if (_hasTokenHash) {
+      setState(() => _loading = true);
+      try {
+        final otpType = widget.otpType == 'signup' ? OtpType.signup : OtpType.magiclink;
+        final res = await Supabase.instance.client.auth.verifyOtp(
+          tokenHash: widget.tokenHash,
+          type: otpType,
+        );
+        if (res.session != null) {
+          await context.read<AccountManagerSupabase>().initialize(forceRetryFromAuth: true);
+          if (!mounted) return;
+          if (context.read<AccountManagerSupabase>().isLoggedInSync) {
+            context.go('/home');
+            return;
+          }
+        }
+      } catch (e) {
+        setState(() {
+          _error = 'Ссылка истекла или уже использована. Войдите по паролю.';
+          _loading = false;
+        });
+        return;
+      }
+      setState(() => _loading = false);
+      if (!mounted) return;
+      context.go('/login');
+      return;
+    }
     if (widget.redirectParam.isEmpty) {
       context.go('/login');
       return;
     }
     try {
-      String encoded = widget.redirectParam
-          .replaceAll('-', '+')
-          .replaceAll('_', '/');
+      String encoded = widget.redirectParam.replaceAll('-', '+').replaceAll('_', '/');
       switch (encoded.length % 4) {
         case 2:
           encoded += '==';
@@ -86,9 +126,15 @@ class _AuthConfirmClickScreenState extends State<AuthConfirmClickScreen> {
                   ),
                   const SizedBox(height: 24),
                   FilledButton.icon(
-                    onPressed: _onContinue,
-                    icon: const Icon(Icons.check_circle_outline),
-                    label: const Text('Завершить регистрацию'),
+                    onPressed: _loading ? null : () => _onContinue(),
+                    icon: _loading
+                        ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Theme.of(context).colorScheme.onPrimary),
+                          )
+                        : const Icon(Icons.check_circle_outline),
+                    label: Text(_loading ? 'Вход...' : 'Завершить регистрацию'),
                   ),
                   const SizedBox(height: 16),
                   Text(

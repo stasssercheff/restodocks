@@ -18,20 +18,10 @@ class ExpensesScreen extends StatefulWidget {
   State<ExpensesScreen> createState() => _ExpensesScreenState();
 }
 
-class _ExpensesScreenState extends State<ExpensesScreen> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+enum _ExpensesTab { fzp, productOrders }
 
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
+class _ExpensesScreenState extends State<ExpensesScreen> {
+  _ExpensesTab _selectedTab = _ExpensesTab.fzp;
 
   @override
   Widget build(BuildContext context) {
@@ -41,21 +31,44 @@ class _ExpensesScreenState extends State<ExpensesScreen> with SingleTickerProvid
       appBar: AppBar(
         leading: appBarBackButton(context),
         title: Text(loc.t('expenses') ?? 'Расходы'),
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: [
-            Tab(text: loc.t('salary_tab_fzp') ?? 'ФЗП'),
-            Tab(text: loc.t('expenses_tab_product_orders') ?? 'Заказы продуктов'),
-          ],
-        ),
       ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
-          const SalaryExpenseScreen(embedInScaffold: false),
-          const _ProductOrdersTab(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              border: Border(
+                bottom: BorderSide(color: Theme.of(context).dividerColor, width: 1),
+              ),
+            ),
+            child: Row(
+              children: [
+                _buildTabChip(_ExpensesTab.fzp, loc.t('salary_tab_fzp') ?? 'ФЗП', loc),
+                const SizedBox(width: 8),
+                _buildTabChip(_ExpensesTab.productOrders, loc.t('expenses_tab_product_orders') ?? 'Заказы продуктов', loc),
+              ],
+            ),
+          ),
+          Expanded(
+            child: _selectedTab == _ExpensesTab.fzp
+                ? const SalaryExpenseScreen(embedInScaffold: false)
+                : const _ProductOrdersTab(),
+          ),
         ],
       ),
+    );
+  }
+
+  Widget _buildTabChip(_ExpensesTab tab, String label, LocalizationService loc) {
+    final isSelected = _selectedTab == tab;
+    return FilterChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (_) => setState(() => _selectedTab = tab),
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      selectedColor: Theme.of(context).colorScheme.primaryContainer,
+      checkmarkColor: Theme.of(context).colorScheme.onPrimaryContainer,
     );
   }
 }

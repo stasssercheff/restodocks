@@ -6,7 +6,8 @@ import 'inventory_download.dart';
 
 /// Экспорт ФЗП в Excel: таблица по сотрудникам + итоги по подразделениям.
 class SalaryExportService {
-  static const List<String> _departmentOrder = ['kitchen', 'bar', 'dining_room', 'hall', 'management'];
+  /// Подразделения: управление (шеф, сушеф, барменеджер, менеджер зала) внутри своих отделов, не отдельно.
+  static const List<String> _departmentOrder = ['kitchen', 'bar', 'dining_room', 'hall'];
 
   /// Строит Excel и сохраняет файл. Возвращает имя файла.
   static Future<String> buildAndSaveExcel({
@@ -53,11 +54,10 @@ class SalaryExportService {
     ]);
 
     final deptNames = {
-      'kitchen': t('department_kitchen') ?? 'Кухня',
-      'bar': t('bar') ?? 'Бар',
-      'dining_room': t('department_dining_room') ?? 'Зал',
-      'hall': t('dining_room') ?? 'Зал',
-      'management': t('department_management') ?? 'Управление',
+      'kitchen': t('department_kitchen'),
+      'bar': t('bar'),
+      'dining_room': t('department_dining_room'),
+      'hall': t('dining_room'),
     };
 
     final calcModeHourly = t('payroll_mode_hourly') ?? 'За час';
@@ -70,12 +70,18 @@ class SalaryExportService {
       final deptEmps = employees.where((e) {
         if (e.department == deptCode) return true;
         if (deptCode == 'kitchen' &&
-            (e.department == 'management') &&
+            e.department == 'management' &&
             (e.hasRole('executive_chef') || e.hasRole('sous_chef'))) {
           return true;
         }
+        if (deptCode == 'bar' &&
+            e.department == 'management' &&
+            e.hasRole('bar_manager')) {
+          return true;
+        }
         if ((deptCode == 'hall' || deptCode == 'dining_room') &&
-            (e.department == 'hall' || e.department == 'dining_room')) {
+            (e.department == 'hall' || e.department == 'dining_room' ||
+                (e.department == 'management' && e.hasRole('floor_manager')))) {
           return true;
         }
         return false;

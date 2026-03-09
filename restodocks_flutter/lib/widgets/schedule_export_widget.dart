@@ -117,7 +117,7 @@ class ScheduleExportWidget extends StatelessWidget {
 
     switch (department) {
       case 'kitchen':
-        addSection('management', _t('management'));
+        addSection('management', _t('role_executive_chef')); // шеф/сушеф — в рамках кухни, без отдельного «Управление»
         for (final s in schedule.sections) {
           if (_kitchenSectionIds.contains(s.id)) {
             final label = _t(s.nameKey) != s.nameKey ? _t(s.nameKey) : s.id;
@@ -126,11 +126,11 @@ class ScheduleExportWidget extends StatelessWidget {
         }
         break;
       case 'bar':
-        addSection('management', _t('management'));
+        addSection('management', _t('role_bar_manager'));
         addSection('bar', _t('employees'));
         break;
       case 'hall':
-        addSection('management', _t('management'));
+        addSection('management', _t('role_floor_manager'));
         addSection('hall', _t('employees'));
         break;
       default:
@@ -214,169 +214,191 @@ class ScheduleExportWidget extends StatelessWidget {
 
     bool isWeekend(DateTime d) => d.weekday == 6 || d.weekday == 7;
 
-    final leftCells = <Widget>[];
-    leftCells.add(
-      _leftCell(theme, Text(_deptTitle(), style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: headerFg)), decoration: BoxDecoration(color: headerBg)),
-    );
-    leftCells.add(
-      _leftCell(theme, Text(_t('schedule_date'), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: headerFg)), decoration: BoxDecoration(color: headerBg)),
-    );
-    leftCells.add(
-      _leftCell(theme, Text(_t('schedule_day'), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: headerFg)), decoration: BoxDecoration(color: headerBg)),
-    );
-
-    for (final block in _blocks()) {
-      leftCells.add(
-        _leftCell(
-          theme,
-          Text(block.sectionLabel, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: sectionFg)),
-          decoration: BoxDecoration(color: sectionBg, border: Border(bottom: BorderSide(color: borderColor))),
-        ),
-      );
-      for (final slot in block.slots) {
-        final position = _slotPosition(slot);
-        leftCells.add(
-          _leftCell(
-            theme,
-            Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(_slotDisplayName(slot), style: const TextStyle(fontSize: 11), overflow: TextOverflow.ellipsis, maxLines: 1),
-                if (position != null && position.isNotEmpty)
-                  Text(position, style: TextStyle(fontSize: 9, color: theme.colorScheme.onSurfaceVariant), overflow: TextOverflow.ellipsis, maxLines: 1),
-              ],
-            ),
-            decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3), border: Border(bottom: BorderSide(color: borderColor))),
-          ),
-        );
-      }
-    }
-
-    final dateColumns = <Widget>[];
-    for (final d in dates) {
-      final weekend = isWeekend(d);
-      final headerCellBg = weekend ? weekendHeaderBg : headerBg;
-      final headerCellFg = weekend ? weekendHeaderFg : headerFg;
-
-      final columnChildren = <Widget>[
-        _rightCell(theme, Text(DateFormat('dd.MM', localeStr).format(d), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: headerCellFg)), bg: headerCellBg),
-        _rightCell(theme, Text(weekdays[d.weekday - 1], style: TextStyle(fontSize: 10, color: headerCellFg)), bg: headerCellBg),
-      ];
-
-      for (final block in _blocks()) {
-        columnChildren.add(_rightCell(theme, const SizedBox.shrink(), bg: sectionBg));
-        for (final slot in block.slots) {
-          final val = _cellValue(slot.id, d);
-          final isShift = val == '1';
-          final isDayOff = val == '0';
-          final timeRange = isShift ? schedule.getTimeRange(slot.id, d) : null;
-          String timeDisplay = '';
-          if (timeRange != null) {
-            final parts = timeRange.split('|');
-            if (parts.length >= 2) timeDisplay = '${parts[0]}–${parts[1]}';
-          }
-          final bg = isShift ? Colors.green.shade100 : isDayOff ? Colors.amber.shade100 : null;
-          final displayText = isDayOff ? '0' : (isShift && timeDisplay.isNotEmpty ? timeDisplay : (val ?? '—'));
-          columnChildren.add(
-            _rightCell(
-              theme,
-              Text(
-                displayText,
-                style: TextStyle(fontSize: timeDisplay.isNotEmpty && isShift ? 8 : 11, fontWeight: FontWeight.w600),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              bg: bg,
-            ),
-          );
-        }
-      }
-
-      dateColumns.add(
-        Column(
-          mainAxisSize: MainAxisSize.min,
-          children: columnChildren,
-        ),
-      );
-    }
-
-    final totalWidth = 120.0 + dates.length * _dayCellWidth;
-    final totalHeight = leftCells.length * _rowHeight + 16;
+    final blocks = _blocks();
+    final rowCount = 3 + blocks.fold<int>(0, (s, b) => s + 1 + b.slots.length);
+    final totalWidth = _slotColumnWidth + dates.length * _dayCellWidth;
+    final totalHeight = rowCount * _rowHeight + 16;
     return RepaintBoundary(
       key: boundaryKey,
       child: Material(
         color: theme.colorScheme.surface,
         child: Padding(
           padding: const EdgeInsets.all(8),
-          child: OverflowBox(
-            minWidth: totalWidth,
-            maxWidth: totalWidth,
-            minHeight: totalHeight + 16,
-            maxHeight: totalHeight + 16,
-            alignment: Alignment.topLeft,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(
-                  width: _slotColumnWidth,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: leftCells,
+          child: SizedBox(
+            width: totalWidth,
+            height: totalHeight,
+            child: Table(
+                columnWidths: {
+                  0: const FixedColumnWidth(_slotColumnWidth),
+                  for (var i = 1; i <= dates.length; i++) i: const FixedColumnWidth(_dayCellWidth),
+                },
+                defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+                border: TableBorder.all(color: borderColor, width: 1),
+                children: [
+                  TableRow(
+                    children: [
+                      TableCell(
+                        child: Container(
+                          width: _slotColumnWidth,
+                          height: _rowHeight,
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(color: headerBg),
+                          alignment: Alignment.centerLeft,
+                          child: Text(_deptTitle(), style: TextStyle(fontWeight: FontWeight.bold, color: headerFg, fontSize: 14)),
+                        ),
+                      ),
+                      ...dates.map((d) {
+                        final weekend = isWeekend(d);
+                        return TableCell(
+                          child: Container(
+                            width: _dayCellWidth,
+                            height: _rowHeight,
+                            padding: const EdgeInsets.all(2),
+                            decoration: BoxDecoration(color: weekend ? weekendHeaderBg : headerBg),
+                            alignment: Alignment.center,
+                            child: Text(DateFormat('dd.MM', localeStr).format(d), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: weekend ? weekendHeaderFg : headerFg)),
+                          ),
+                        );
+                      }),
+                    ],
                   ),
-                ),
-                ...dateColumns,
-              ],
-            ),
+                  TableRow(
+                    children: [
+                      TableCell(
+                        child: Container(
+                          width: _slotColumnWidth,
+                          height: _rowHeight,
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(color: headerBg),
+                          alignment: Alignment.centerLeft,
+                          child: Text(_t('schedule_date'), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: headerFg)),
+                        ),
+                      ),
+                      ...dates.map((d) {
+                        final weekend = isWeekend(d);
+                        return TableCell(
+                          child: Container(
+                            width: _dayCellWidth,
+                            height: _rowHeight,
+                            padding: const EdgeInsets.all(2),
+                            decoration: BoxDecoration(color: weekend ? weekendHeaderBg : headerBg),
+                            alignment: Alignment.center,
+                            child: Text(weekdays[d.weekday - 1], style: TextStyle(fontSize: 10, color: weekend ? weekendHeaderFg : headerFg)),
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                  TableRow(
+                    children: [
+                      TableCell(
+                        child: Container(
+                          width: _slotColumnWidth,
+                          height: _rowHeight,
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(color: headerBg),
+                          alignment: Alignment.centerLeft,
+                          child: Text(_t('schedule_day'), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: headerFg)),
+                        ),
+                      ),
+                      ...List.generate(dates.length, (i) {
+                        final d = dates[i];
+                        final weekend = isWeekend(d);
+                        return TableCell(
+                          child: Container(
+                            width: _dayCellWidth,
+                            height: _rowHeight,
+                            padding: const EdgeInsets.all(2),
+                            decoration: BoxDecoration(color: weekend ? weekendHeaderBg : headerBg),
+                            alignment: Alignment.center,
+                            child: const SizedBox.shrink(),
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                  ...blocks.expand((block) {
+                    return [
+                      TableRow(
+                        children: [
+                          TableCell(
+                            child: Container(
+                              width: _slotColumnWidth,
+                              height: _rowHeight,
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(color: sectionBg),
+                              alignment: Alignment.centerLeft,
+                              child: Text(block.sectionLabel, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: sectionFg)),
+                            ),
+                          ),
+                          ...List.generate(dates.length, (_) => TableCell(
+                            child: Container(
+                              width: _dayCellWidth,
+                              height: _rowHeight,
+                              decoration: BoxDecoration(color: sectionBg),
+                              child: const SizedBox.shrink(),
+                            ),
+                          )),
+                        ],
+                      ),
+                      ...block.slots.map((slot) {
+                        return TableRow(
+                          children: [
+                            TableCell(
+                              child: Container(
+                                width: _slotColumnWidth,
+                                height: _rowHeight,
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3)),
+                                alignment: Alignment.centerLeft,
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(_slotDisplayName(slot), style: const TextStyle(fontSize: 11), overflow: TextOverflow.ellipsis, maxLines: 1),
+                                    if (_slotPosition(slot) != null && _slotPosition(slot)!.isNotEmpty)
+                                      Text(_slotPosition(slot)!, style: TextStyle(fontSize: 9, color: theme.colorScheme.onSurfaceVariant), overflow: TextOverflow.ellipsis, maxLines: 1),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            ...dates.map((d) {
+                              final val = _cellValue(slot.id, d);
+                              final isShift = val == '1';
+                              final isDayOff = val == '0';
+                              final timeRange = isShift ? schedule.getTimeRange(slot.id, d) : null;
+                              String timeDisplay = '';
+                              if (timeRange != null) {
+                                final parts = timeRange.split('|');
+                                if (parts.length >= 2) timeDisplay = '${parts[0]}–${parts[1]}';
+                              }
+                              final bg = isShift ? Colors.green.shade100 : isDayOff ? Colors.amber.shade100 : theme.colorScheme.surface;
+                              final displayText = isDayOff ? '0' : (isShift && timeDisplay.isNotEmpty ? timeDisplay : (val ?? '—'));
+                              return TableCell(
+                                child: Container(
+                                  width: _dayCellWidth,
+                                  height: _rowHeight,
+                                  padding: const EdgeInsets.all(2),
+                                  decoration: BoxDecoration(color: bg),
+                                  alignment: Alignment.center,
+                                  child: Text(displayText, style: TextStyle(fontSize: timeDisplay.isNotEmpty && isShift ? 8 : 11, fontWeight: FontWeight.w600), textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
+                                ),
+                              );
+                            }),
+                          ],
+                        );
+                      }),
+                    ];
+                  }),
+                ],
+              ),
           ),
         ),
       ),
     );
   }
 
-  Widget _leftCell(ThemeData theme, Widget child, {BoxDecoration? decoration}) {
-    final borderColor = theme.dividerColor;
-    return Container(
-      height: _rowHeight,
-      width: _slotColumnWidth,
-      decoration: decoration?.copyWith(
-        border: Border(
-          left: BorderSide(color: borderColor),
-          right: BorderSide(color: borderColor),
-          bottom: BorderSide(color: borderColor),
-        ),
-      ) ??
-          BoxDecoration(
-            border: Border(
-              left: BorderSide(color: borderColor),
-              right: BorderSide(color: borderColor),
-              bottom: BorderSide(color: borderColor),
-            ),
-          ),
-      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-      alignment: Alignment.centerLeft,
-      child: child,
-    );
-  }
-
-  Widget _rightCell(ThemeData theme, Widget child, {Color? bg}) {
-    return Container(
-      width: _dayCellWidth,
-      height: _rowHeight,
-      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
-      decoration: BoxDecoration(
-        color: bg,
-        border: Border(
-          right: BorderSide(color: theme.dividerColor),
-          bottom: BorderSide(color: theme.dividerColor),
-        ),
-      ),
-      alignment: Alignment.center,
-      child: child,
-    );
-  }
 }
 
 /// Захват виджета в PNG.
@@ -385,7 +407,6 @@ Future<Uint8List?> captureWidgetToPng(GlobalKey boundaryKey) async {
     final ro = boundaryKey.currentContext?.findRenderObject();
     if (ro is! RenderRepaintBoundary) return null;
     final boundary = ro;
-    if (boundary == null) return null;
     final image = await boundary.toImage(pixelRatio: 2.0);
     final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
     return byteData?.buffer.asUint8List();

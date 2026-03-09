@@ -219,14 +219,16 @@ class AppRouter {
         path: '/auth/confirm',
         pageBuilder: (context, state) => _slideTransitionPage(state, const AuthConfirmScreen()),
       ),
-      // Прокладка: ссылка в письме → нажать кнопку → редирект на Supabase (защита от prefetch)
+      // Прокладка: ссылка в письме → нажать кнопку → verifyOtp или редирект на Supabase
       GoRoute(
         path: '/auth/confirm-click',
         pageBuilder: (context, state) {
           final r = state.queryParameters['r'] ?? '';
+          final tokenHash = state.queryParameters['token_hash'] ?? '';
+          final type = state.queryParameters['type'] ?? '';
           return _slideTransitionPage(
             state,
-            AuthConfirmClickScreen(redirectParam: r),
+            AuthConfirmClickScreen(redirectParam: r, tokenHash: tokenHash, otpType: type),
           );
         },
       ),

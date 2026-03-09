@@ -4,14 +4,18 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const REDIRECT_URL = "https://restodocks.com/auth/confirm";
-// Прокладка: prefetch почтового клиента не исчерпывает одноразовый токен Supabase
+// Прокладка: prefetch почтового клиента не исчерпывает одноразовый токен Supabase.
+// Ссылка с token_hash — клиент вызовет verifyOtp (без редиректа Supabase с hash).
 const CONFIRM_CLICK_URL = "https://restodocks.com/auth/confirm-click";
 
-function base64urlEncode(s: string): string {
-  const bytes = new TextEncoder().encode(s);
-  let binary = "";
-  bytes.forEach((b) => (binary += String.fromCharCode(b)));
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+function extractTokenHashFromActionLink(actionLink: string): { token_hash: string; type: string } | null {
+  try {
+    const u = new URL(actionLink);
+    const token = u.searchParams.get("token");
+    const type = u.searchParams.get("type") || "magiclink";
+    if (token && (type === "signup" || type === "magiclink")) return { token_hash: token, type };
+  } catch (_) {}
+  return null;
 }
 
 function corsHeaders(origin: string | null) {
@@ -92,7 +96,10 @@ Deno.serve(async (req: Request) => {
             headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
           });
         }
-        const wrappedHref = `${CONFIRM_CLICK_URL}?r=${base64urlEncode(link)}`;
+        const extracted = extractTokenHashFromActionLink(link);
+        const wrappedHref = extracted
+          ? `${CONFIRM_CLICK_URL}?token_hash=${encodeURIComponent(extracted.token_hash)}&type=${encodeURIComponent(extracted.type)}`
+          : `${CONFIRM_CLICK_URL}?r=${btoa(link).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")}`;
         const html = `
 <p>Здравствуйте!</p>
 <p>Завершите регистрацию в Restodocks — перейдите по ссылке:</p>

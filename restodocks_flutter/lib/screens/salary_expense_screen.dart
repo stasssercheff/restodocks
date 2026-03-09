@@ -103,7 +103,7 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
       // Только сотрудники с должностью (positionRole != null). Собственник без должности не показываем.
       var withPosition = list.where((e) => e.isActive && e.positionRole != null).toList();
 
-      // Фильтр по подразделению для руководителя: только сотрудники подразделения + руководство
+      // Фильтр по подразделению для руководителя: шеф/сушеф (кухня), барменеджер (бар), менеджер зала (зал)
       final deptFilter = widget.departmentFilter;
       if (deptFilter != null && deptFilter.isNotEmpty) {
         withPosition = withPosition.where((e) {
@@ -111,8 +111,13 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
             return e.department == 'kitchen' ||
                 (e.department == 'management' && (e.hasRole('executive_chef') || e.hasRole('sous_chef')));
           }
-          if (deptFilter == 'bar') return e.department == 'bar';
-          if (deptFilter == 'hall') return e.department == 'dining_room' || e.department == 'hall';
+          if (deptFilter == 'bar') {
+            return e.department == 'bar' || (e.department == 'management' && e.hasRole('bar_manager'));
+          }
+          if (deptFilter == 'hall') {
+            return e.department == 'dining_room' || e.department == 'hall' ||
+                (e.department == 'management' && e.hasRole('floor_manager'));
+          }
           return true;
         }).toList();
       }
@@ -288,6 +293,19 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
         accountManager.currentEmployee?.currencySymbol ??
         Establishment.currencySymbolFor(accountManager.establishment?.defaultCurrency ?? 'VND');
 
+    // 1. Сначала выбор диапазона дат
+    final range = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+      initialDateRange: DateTimeRange(start: _periodStart, end: _periodEnd),
+      helpText: loc.t('salary_period'),
+    );
+    if (range == null || !mounted) return;
+    final exportPeriodStart = DateTime(range.start.year, range.start.month, range.start.day);
+    final exportPeriodEnd = DateTime(range.end.year, range.end.month, range.end.day);
+
+    // 2. Затем выбор языка
     final selectedLang = await showDialog<String>(
       context: context,
       builder: (ctx) => _ExportLanguageDialog(loc: loc),
@@ -322,8 +340,8 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
       final fileName = await SalaryExportService.buildAndSaveExcel(
         employees: _employees!,
         schedule: _schedule!,
-        periodStart: _periodStart,
-        periodEnd: _periodEnd,
+        periodStart: exportPeriodStart,
+        periodEnd: exportPeriodEnd,
         includeInTotal: _includeInTotal,
         shiftsOrHoursFn: _shiftsOrHoursFromSchedule,
         totalForEmployeeFn: _totalForEmployee,
@@ -333,7 +351,10 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
       );
 
       final pngFiles = <String>[];
-      for (final dept in ['kitchen', 'bar', 'hall']) {
+      final departmentsToExport = widget.departmentFilter != null
+          ? [widget.departmentFilter!]
+          : ['kitchen', 'bar', 'hall'];
+      for (final dept in departmentsToExport) {
         final boundaryKey = GlobalKey();
         final pngBytes = await _captureSchedulePng(
           context: context,
@@ -341,18 +362,14 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
           employees: _employees!,
           department: dept,
           boundaryKey: boundaryKey,
-          periodStart: _periodStart,
-          periodEnd: _periodEnd,
+          periodStart: exportPeriodStart,
+          periodEnd: exportPeriodEnd,
           exportLang: selectedLang,
         );
         if (pngBytes != null && pngBytes.isNotEmpty) {
-          final deptName = dept == 'kitchen'
-              ? 'kitchen'
-              : dept == 'bar'
-                  ? 'bar'
-                  : 'hall';
+          final deptName = dept == 'kitchen' ? 'kitchen' : dept == 'bar' ? 'bar' : 'hall';
           final pngName =
-              'schedule_${deptName}_${dateFormat.format(_periodStart)}_${dateFormat.format(_periodEnd)}.png';
+              'schedule_${deptName}_${dateFormat.format(exportPeriodStart)}_${dateFormat.format(exportPeriodEnd)}.png';
           await saveFileBytes(pngName, pngBytes);
           pngFiles.add(pngName);
         }
@@ -453,34 +470,48 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
                   ? Center(child: Text(loc.t('employees_empty_hint')))
                   : Column(
                       children: [
-                        // Период вверху
-                        InkWell(
-                          onTap: () => _showPeriodPicker(context, loc),
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(16),
-                            color: theme.colorScheme.surfaceContainerHighest,
-                            child: Row(
-                              children: [
-                                Icon(Icons.calendar_month, color: theme.colorScheme.primary),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                        // Период вверху + кнопка выгрузки
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          color: theme.colorScheme.surfaceContainerHighest,
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: InkWell(
+                                  onTap: () => _showPeriodPicker(context, loc),
+                                  child: Row(
                                     children: [
-                                      Text(loc.t('salary_period'), style: theme.textTheme.titleSmall),
-                                      Text(
-                                        '${dateFormat.format(_periodStart)} — ${dateFormat.format(_periodEnd)}',
-                                        style: theme.textTheme.bodyMedium?.copyWith(
-                                          fontWeight: FontWeight.w600,
+                                      Icon(Icons.calendar_month, color: theme.colorScheme.primary),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(loc.t('salary_period'), style: theme.textTheme.titleSmall),
+                                            Text(
+                                              '${dateFormat.format(_periodStart)} — ${dateFormat.format(_periodEnd)}',
+                                              style: theme.textTheme.bodyMedium?.copyWith(
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
+                                      const Icon(Icons.chevron_right),
                                     ],
                                   ),
                                 ),
-                                const Icon(Icons.chevron_right),
+                              ),
+                              if (!_loading && _error == null && _employees != null && _employees!.isNotEmpty) ...[
+                                const SizedBox(width: 8),
+                                IconButton.filled(
+                                  icon: const Icon(Icons.download),
+                                  onPressed: () => _exportPayroll(context),
+                                  tooltip: loc.t('salary_export_btn') ?? 'Выгрузить',
+                                ),
                               ],
-                            ),
+                            ],
                           ),
                         ),
                         Expanded(
