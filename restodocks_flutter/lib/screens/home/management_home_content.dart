@@ -25,6 +25,14 @@ class ManagementHomeContent extends StatelessWidget {
     final isChef = roles.contains('executive_chef');
     final isBarManager = roles.contains('bar_manager');
     final isGeneral = roles.contains('general_manager');
+    final isFloorManager = roles.contains('floor_manager');
+    final dept = _deptForRoute(employee.department);
+    // ТТК: кухня, бар, зал — у каждого подразделения свои
+    final showTtk = dept == 'kitchen' || dept == 'bar' || dept == 'hall';
+    // Меню: только кухня и бар (у зала нет меню)
+    final showMenu = dept == 'kitchen' || dept == 'bar';
+    // Номенклатура: шеф, барменеджер, менеджер зала, управляющий — своя подразделения
+    final showNomenclature = (isChef || roles.contains('sous_chef') || isBarManager || isFloorManager || isGeneral) && showTtk;
 
     // Без доступа к данным
     if (!employee.hasRole('owner') && !employee.effectiveDataAccess) {
@@ -63,10 +71,16 @@ class ManagementHomeContent extends StatelessWidget {
         // Чеклисты: кухня или шеф/су-шеф (у шефа часто отдел «Управление» — иначе плитки нет)
         if (employee.department == 'kitchen' || isChef || roles.contains('sous_chef') || employee.department == 'bar' || employee.department == 'dining_room')
           _Tile(icon: Icons.checklist, title: loc.t('checklists'), onTap: () => context.go('/checklists?department=${_deptForRoute(employee.department)}')),
-        if (employee.department != 'dining_room' && employee.department != 'hall')
-          _Tile(icon: Icons.description, title: isBarManager ? loc.t('ttk_bar') : loc.t('ttk_kitchen'), onTap: () => context.go('/tech-cards/${_deptForRoute(employee.department)}')),
-        if (isChef)
-          _Tile(icon: Icons.assignment, title: loc.t('nomenclature'), onTap: () => context.go('/nomenclature/${_deptForRoute(employee.department)}')),
+        if (showMenu)
+          _Tile(icon: Icons.restaurant_menu, title: loc.t('menu'), onTap: () => context.go('/menu/$dept')),
+        if (showTtk)
+          _Tile(
+            icon: Icons.description,
+            title: dept == 'bar' ? loc.t('ttk_bar') : (dept == 'hall' ? loc.t('ttk_hall') : loc.t('ttk_kitchen')),
+            onTap: () => context.go('/tech-cards/$dept'),
+          ),
+        if (showNomenclature)
+          _Tile(icon: Icons.assignment, title: loc.t('nomenclature'), onTap: () => context.go('/nomenclature/$dept')),
         _Tile(icon: Icons.shopping_cart, title: loc.t('product_order'), onTap: () => context.go('/product-order?department=${_deptForRoute(employee.department)}')),
         _Tile(icon: Icons.assignment, title: loc.t('inventory_blank'), onTap: () => context.push('/inventory')),
         if ((isChef || roles.contains('sous_chef')) && screenPref.showBanquetCatering) ...[

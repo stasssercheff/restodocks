@@ -223,15 +223,34 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     pinController.dispose();
     if (result == null || !mounted) return;
 
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        content: Row(
+          children: [
+            const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(width: 16),
+            Expanded(child: Text(loc.t('delete_employee_progress') ?? 'Удаление сотрудника...')),
+          ],
+        ),
+      ),
+    );
     try {
       await acc.deleteEmployeeWithPin(employeeId: employee.id, pinCode: result);
+      if (mounted && Navigator.of(context).canPop()) Navigator.of(context).pop();
       await _load();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${loc.t('employee_deleted') ?? 'Сотрудник'} "${employee.fullName}" ${loc.t('deleted') ?? 'удалён'}. ${loc.t('email_can_reuse') ?? 'Email можно использовать для новой регистрации.'}')),
+          SnackBar(content: Text(loc.t('employee_deleted_success') ?? 'Сотрудник удалён'), backgroundColor: Colors.green),
         );
       }
     } catch (e) {
+      if (mounted && Navigator.of(context).canPop()) Navigator.of(context).pop();
       if (mounted) {
         final msg = e.toString();
         String snack = msg;

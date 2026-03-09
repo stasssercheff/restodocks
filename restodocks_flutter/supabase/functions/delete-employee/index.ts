@@ -148,9 +148,11 @@ Deno.serve(async (req: Request) => {
 
     // 7. Удаляем связанные данные и сотрудника (FK: employees.id = auth.users.id)
     await supabase.from("password_reset_tokens").delete().eq("employee_id", targetEmp.id);
-    await supabase.from("employee_direct_messages").or(
-      `sender_employee_id.eq.${targetEmp.id},recipient_employee_id.eq.${targetEmp.id}`
-    ).delete();
+    // employee_direct_messages: удаляем где сотрудник отправитель или получатель
+    await supabase.from("employee_direct_messages").delete().eq("sender_employee_id", targetEmp.id);
+    await supabase.from("employee_direct_messages").delete().eq("recipient_employee_id", targetEmp.id);
+    // co_owner_invitations.invited_by — без ON DELETE, удаляем вручную
+    await supabase.from("co_owner_invitations").delete().eq("invited_by", targetEmp.id);
     const { error: delEmpErr } = await supabase.from("employees").delete().eq("id", targetEmp.id);
 
     if (delEmpErr) {

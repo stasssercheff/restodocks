@@ -43,12 +43,15 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                 bottom: BorderSide(color: Theme.of(context).dividerColor, width: 1),
               ),
             ),
-            child: Row(
-              children: [
-                _buildTabChip(_ExpensesTab.fzp, loc.t('salary_tab_fzp') ?? 'ФЗП', loc),
-                const SizedBox(width: 8),
-                _buildTabChip(_ExpensesTab.productOrders, loc.t('expenses_tab_product_orders') ?? 'Заказы продуктов', loc),
-              ],
+            child: Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildTabChip(_ExpensesTab.fzp, loc.t('salary_tab_fzp') ?? 'ФЗП', loc),
+                  const SizedBox(width: 8),
+                  _buildTabChip(_ExpensesTab.productOrders, loc.t('expenses_tab_product_orders') ?? 'Заказы продуктов', loc),
+                ],
+              ),
             ),
           ),
           Expanded(

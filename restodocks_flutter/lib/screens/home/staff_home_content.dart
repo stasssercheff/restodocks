@@ -79,7 +79,11 @@ class StaffHomeContent extends StatelessWidget {
       ),
       HomeTileId.ttk: _Tile(
         icon: Icons.description,
-        title: employee.department == 'bar' ? loc.t('ttk_bar') : loc.t('ttk_kitchen'),
+        title: employee.department == 'bar'
+            ? loc.t('ttk_bar')
+            : (employee.department == 'hall' || employee.department == 'dining_room')
+                ? loc.t('ttk_hall')
+                : loc.t('ttk_kitchen'),
         onTap: () => context.go('/tech-cards/${_deptForRoute(employee.department)}'),
       ),
       HomeTileId.checklists: _Tile(
@@ -97,10 +101,14 @@ class StaffHomeContent extends StatelessWidget {
     final showChecklists = employee.department == 'kitchen' || employee.department == 'bar' || employee.department == 'dining_room';
     final showNomenclature = employee.department == 'kitchen' || employee.department == 'bar' || employee.department == 'hall' || employee.department == 'dining_room';
     final showBanquet = (employee.department == 'kitchen' || employee.department == 'bar') && screenPref.showBanquetCatering;
-    final showTtk = employee.department != 'dining_room' && employee.department != 'hall';
+    // ТТК: кухня, бар, зал — у каждого подразделения свои
+    final showTtk = employee.department == 'kitchen' || employee.department == 'bar' || employee.department == 'hall' || employee.department == 'dining_room';
+    // Меню: только кухня и бар (у зала нет меню)
+    final showMenu = employee.department == 'kitchen' || employee.department == 'bar';
     final ordered = <Widget>[];
     for (final id in order) {
       if (id == HomeTileId.checklists && !showChecklists) continue;
+      if (id == HomeTileId.menu && !showMenu) continue;
       if (id == HomeTileId.nomenclature && !showNomenclature) continue;
       if ((id == HomeTileId.banquetMenu || id == HomeTileId.banquetTtk) && !showBanquet) continue;
       if (id == HomeTileId.banquetTtk) continue;

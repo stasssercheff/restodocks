@@ -41,6 +41,430 @@ class _EmployeeAdjustment {
   }
 }
 
+class _SalaryTableHeader extends StatelessWidget {
+  const _SalaryTableHeader({required this.loc});
+
+  final LocalizationService loc;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.labelSmall?.copyWith(
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
+      fontWeight: FontWeight.w600,
+      letterSpacing: 0.5,
+    );
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          const SizedBox(width: 48),
+          Expanded(flex: 4, child: Text(loc.t('full_name') ?? 'Сотрудник', style: style)),
+          const SizedBox(width: 8),
+          Expanded(flex: 2, child: Text(loc.t('rate') ?? 'Ставка', style: style)),
+          const SizedBox(width: 8),
+          Expanded(flex: 1, child: Text(loc.t('salary_hours') ?? 'Часы', style: style)),
+          const SizedBox(width: 8),
+          Expanded(flex: 2, child: Text(loc.t('ttk_total') ?? 'База', style: style)),
+          const SizedBox(width: 8),
+          Expanded(flex: 2, child: Text('', style: style)),
+          const SizedBox(width: 8),
+          Expanded(flex: 2, child: Text(loc.t('salary_payable') ?? 'К выплате', style: style)),
+        ],
+      ),
+    );
+  }
+}
+
+class _SalaryEmployeeCard extends StatelessWidget {
+  const _SalaryEmployeeCard({
+    required this.employee,
+    required this.loc,
+    required this.theme,
+    required this.currency,
+    required this.periodStart,
+    required this.periodEnd,
+    required this.isDesktop,
+    required this.included,
+    required this.adjustments,
+    required this.expanded,
+    required this.onIncludeChanged,
+    required this.onToggleExpand,
+    required this.onRemoveAdjustment,
+    required this.onAddAdjustment,
+    required this.shiftsOrHours,
+    required this.base,
+    required this.adjTotal,
+  });
+
+  final Employee employee;
+  final LocalizationService loc;
+  final ThemeData theme;
+  final String currency;
+  final DateTime periodStart;
+  final DateTime periodEnd;
+  final bool isDesktop;
+  final bool included;
+  final List<_EmployeeAdjustment> adjustments;
+  final bool expanded;
+  final ValueChanged<bool> onIncludeChanged;
+  final VoidCallback onToggleExpand;
+  final ValueChanged<int> onRemoveAdjustment;
+  final VoidCallback onAddAdjustment;
+  final double shiftsOrHours;
+  final double base;
+  final double adjTotal;
+
+  @override
+  Widget build(BuildContext context) {
+    return isDesktop ? _buildDesktop(context) : _buildMobile(context);
+  }
+
+  Widget _buildDesktop(BuildContext context) {
+    final isHourly = employee.paymentType == 'hourly';
+    final rate = isHourly ? (employee.hourlyRate ?? 0) : (employee.ratePerShift ?? 0);
+    final total = base + adjTotal;
+    final roleCode = employee.positionRole ?? employee.roles.firstOrNull ?? '';
+    final roleStr = roleCode.isEmpty ? '' : loc.roleDisplayName(roleCode);
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 6),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 48,
+                  child: Switch(
+                    value: included,
+                    onChanged: onIncludeChanged,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 4,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        employee.fullName,
+                        style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (roleStr.isNotEmpty)
+                        Text(
+                          roleStr,
+                          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    '$rate $currency',
+                    style: theme.textTheme.bodySmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 1,
+                  child: Text(
+                    shiftsOrHours.toStringAsFixed(isHourly ? 1 : 0),
+                    style: theme.textTheme.bodySmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    '${base.toStringAsFixed(0)} $currency',
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 2,
+                  child: InkWell(
+                    onTap: onToggleExpand,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.tune, size: 14, color: theme.colorScheme.primary),
+                          if (adjustments.isNotEmpty) ...[
+                            const SizedBox(width: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primaryContainer,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                '${adjustments.length}',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: theme.colorScheme.onPrimaryContainer,
+                                ),
+                              ),
+                            ),
+                          ],
+                          const SizedBox(width: 4),
+                          Icon(
+                            expanded ? Icons.expand_less : Icons.expand_more,
+                            size: 18,
+                            color: theme.colorScheme.primary,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    '${total.toStringAsFixed(0)} $currency',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (expanded) _buildAdjustmentsPanel(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobile(BuildContext context) {
+    final isHourly = employee.paymentType == 'hourly';
+    final rate = isHourly ? (employee.hourlyRate ?? 0) : (employee.ratePerShift ?? 0);
+    final total = base + adjTotal;
+    final label = isHourly ? loc.t('hourly_rate') : loc.t('rate_per_shift');
+    final unitLabel = isHourly ? loc.t('salary_hours') : loc.t('salary_shifts');
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(right: 12, top: 4),
+              child: Switch(
+                value: included,
+                onChanged: onIncludeChanged,
+              ),
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(employee.fullName, style: theme.textTheme.titleMedium),
+                  Builder(
+                    builder: (_) {
+                      final roleCode = employee.positionRole ?? employee.roles.firstOrNull ?? '';
+                      if (roleCode.isEmpty) return const SizedBox.shrink();
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          loc.roleDisplayName(roleCode),
+                          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: Text('$label: $rate $currency', style: theme.textTheme.bodyMedium),
+                      ),
+                      Expanded(
+                        child: Text(
+                          '${shiftsOrHours.toStringAsFixed(isHourly ? 1 : 0)} $unitLabel',
+                          style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${loc.t('ttk_total')}: ${base.toStringAsFixed(0)} $currency',
+                    style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                  const SizedBox(height: 8),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: onToggleExpand,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          Icon(Icons.tune, size: 16, color: theme.colorScheme.primary),
+                          const SizedBox(width: 6),
+                          Text(
+                            loc.t('salary_deductions_bonuses') ?? 'Удержания и поощрения',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          if (adjustments.isNotEmpty) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primaryContainer,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                '${adjustments.length}',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: theme.colorScheme.onPrimaryContainer,
+                                ),
+                              ),
+                            ),
+                          ],
+                          const Spacer(),
+                          Icon(
+                            expanded ? Icons.expand_less : Icons.expand_more,
+                            size: 18,
+                            color: theme.colorScheme.primary,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (expanded) _buildAdjustmentsPanel(),
+                  if (adjustments.isNotEmpty && expanded) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      'Корректировка: ${adjTotal >= 0 ? '+' : ''}${adjTotal.toStringAsFixed(0)} $currency',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: adjTotal >= 0 ? Colors.green : Colors.red,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  Text(
+                    '${loc.t('salary_payable') ?? 'К выплате'}: ${(base + adjTotal).toStringAsFixed(0)} $currency',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAdjustmentsPanel() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (adjustments.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text(
+                loc.t('salary_no_adjustments') ?? 'Нет записей',
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              ),
+            ),
+          ...adjustments.asMap().entries.map((entry) {
+            final idx = entry.key;
+            final adj = entry.value;
+            final isPositive = adj.type == _AdjustmentType.bonus;
+            return ListTile(
+              dense: true,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+              leading: CircleAvatar(
+                radius: 14,
+                backgroundColor: isPositive
+                    ? Colors.green.withOpacity(0.15)
+                    : Colors.red.withOpacity(0.15),
+                child: Icon(
+                  isPositive ? Icons.add : Icons.remove,
+                  size: 14,
+                  color: isPositive ? Colors.green : Colors.red,
+                ),
+              ),
+              title: Text(adj.typeName, style: theme.textTheme.bodySmall),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    adj.label(currency),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: isPositive ? Colors.green : Colors.red,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  InkWell(
+                    onTap: () => onRemoveAdjustment(idx),
+                    child: Icon(Icons.close, size: 16, color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            );
+          }),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+            child: OutlinedButton.icon(
+              onPressed: onAddAdjustment,
+              icon: const Icon(Icons.add, size: 16),
+              label: Text(loc.t('salary_add_adjustment') ?? 'Добавить'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                minimumSize: const Size(0, 32),
+                textStyle: theme.textTheme.bodySmall,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// ФЗП: список сотрудников с оплатой за смену/час. Часы/смены подтягиваются из графика.
 /// Собственник без должности не отображается. Toggle — включать ли в итог.
 /// [embedInScaffold] = false: только контент (для вкладки в экране «Расходы»).
@@ -515,240 +939,41 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
                           ),
                         ),
                         Expanded(
-                          child: ListView.builder(
-                            padding: const EdgeInsets.all(16),
-                            itemCount: _employees!.length,
-                            itemBuilder: (context, i) {
-                              final e = _employees![i];
-                              final isHourly = e.paymentType == 'hourly';
-                              final rate = isHourly ? (e.hourlyRate ?? 0) : (e.ratePerShift ?? 0);
-                              final val = _shiftsOrHoursFromSchedule(e);
-                              final base = _baseForEmployee(e);
-                              final adjTotal = _adjustmentsTotal(e.id);
-                              final total = base + adjTotal;
-                              final label = isHourly ? loc.t('hourly_rate') : loc.t('rate_per_shift');
-                              final unitLabel = isHourly ? loc.t('salary_hours') : loc.t('salary_shifts');
-                              final included = _includeInTotal[e.id] ?? true;
-                              final adjustments = _adjustments[e.id] ?? [];
-                              final expanded = _adjustmentsExpanded[e.id] ?? false;
-
-                              return Card(
-                                margin: const EdgeInsets.only(bottom: 12),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(16),
-                                  child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      // Toggle слева
-                                      Padding(
-                                        padding: const EdgeInsets.only(right: 12, top: 4),
-                                        child: Switch(
-                                          value: included,
-                                          onChanged: (v) => setState(() => _includeInTotal[e.id] = v),
-                                        ),
-                                      ),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(e.fullName, style: theme.textTheme.titleMedium),
-                                            Builder(
-                                              builder: (_) {
-                                                final roleCode = e.positionRole ?? e.roles.firstOrNull ?? '';
-                                                if (roleCode.isEmpty) return const SizedBox.shrink();
-                                                return Padding(
-                                                  padding: const EdgeInsets.only(top: 2),
-                                                  child: Text(
-                                                    loc.roleDisplayName(roleCode),
-                                                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                                                  ),
-                                                );
-                                              },
-                                            ),
-                                            const SizedBox(height: 12),
-                                            Row(
-                                              children: [
-                                                Expanded(
-                                                  flex: 2,
-                                                  child: Text('$label: $rate $currency', style: theme.textTheme.bodyMedium),
-                                                ),
-                                                Expanded(
-                                                  child: Text(
-                                                    '${val.toStringAsFixed(isHourly ? 1 : 0)} $unitLabel',
-                                                    style: theme.textTheme.bodyMedium?.copyWith(
-                                                      fontWeight: FontWeight.w600,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 8),
-                                            // Базовая сумма
-                                            Text(
-                                              '${loc.t('ttk_total')}: ${base.toStringAsFixed(0)} $currency',
-                                              style: theme.textTheme.bodyMedium?.copyWith(
-                                                color: theme.colorScheme.onSurfaceVariant,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 8),
-                                            // Панель удержаний и поощрений
-                                            InkWell(
-                                              borderRadius: BorderRadius.circular(8),
-                                              onTap: () => setState(() => _adjustmentsExpanded[e.id] = !expanded),
-                                              child: Padding(
-                                                padding: const EdgeInsets.symmetric(vertical: 4),
-                                                child: Row(
-                                                  children: [
-                                                    Icon(
-                                                      Icons.tune,
-                                                      size: 16,
-                                                      color: theme.colorScheme.primary,
-                                                    ),
-                                                    const SizedBox(width: 6),
-                                                    Text(
-                                                      loc.t('salary_deductions_bonuses') ?? 'Удержания и поощрения',
-                                                      style: theme.textTheme.bodySmall?.copyWith(
-                                                        color: theme.colorScheme.primary,
-                                                        fontWeight: FontWeight.w600,
-                                                      ),
-                                                    ),
-                                                    if (adjustments.isNotEmpty) ...[
-                                                      const SizedBox(width: 6),
-                                                      Container(
-                                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                        decoration: BoxDecoration(
-                                                          color: theme.colorScheme.primaryContainer,
-                                                          borderRadius: BorderRadius.circular(10),
-                                                        ),
-                                                        child: Text(
-                                                          '${adjustments.length}',
-                                                          style: theme.textTheme.labelSmall?.copyWith(
-                                                            color: theme.colorScheme.onPrimaryContainer,
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ],
-                                                    const Spacer(),
-                                                    Icon(
-                                                      expanded ? Icons.expand_less : Icons.expand_more,
-                                                      size: 18,
-                                                      color: theme.colorScheme.primary,
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-                                            if (expanded) ...[
-                                              const SizedBox(height: 8),
-                                              Container(
-                                                decoration: BoxDecoration(
-                                                  color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                                                  borderRadius: BorderRadius.circular(8),
-                                                  border: Border.all(
-                                                    color: theme.colorScheme.outlineVariant,
-                                                  ),
-                                                ),
-                                                child: Column(
-                                                  children: [
-                                                    if (adjustments.isEmpty)
-                                                      Padding(
-                                                        padding: const EdgeInsets.all(12),
-                                                        child: Text(
-                                                          loc.t('salary_no_adjustments') ?? 'Нет записей',
-                                                          style: theme.textTheme.bodySmall?.copyWith(
-                                                            color: theme.colorScheme.onSurfaceVariant,
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ...adjustments.asMap().entries.map((entry) {
-                                                      final idx = entry.key;
-                                                      final adj = entry.value;
-                                                      final isPositive = adj.type == _AdjustmentType.bonus;
-                                                      return ListTile(
-                                                        dense: true,
-                                                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-                                                        leading: CircleAvatar(
-                                                          radius: 14,
-                                                          backgroundColor: isPositive
-                                                              ? Colors.green.withOpacity(0.15)
-                                                              : Colors.red.withOpacity(0.15),
-                                                          child: Icon(
-                                                            isPositive ? Icons.add : Icons.remove,
-                                                            size: 14,
-                                                            color: isPositive ? Colors.green : Colors.red,
-                                                          ),
-                                                        ),
-                                                        title: Text(adj.typeName, style: theme.textTheme.bodySmall),
-                                                        trailing: Row(
-                                                          mainAxisSize: MainAxisSize.min,
-                                                          children: [
-                                                            Text(
-                                                              adj.label(currency),
-                                                              style: theme.textTheme.bodySmall?.copyWith(
-                                                                color: isPositive ? Colors.green : Colors.red,
-                                                                fontWeight: FontWeight.w600,
-                                                              ),
-                                                            ),
-                                                            const SizedBox(width: 4),
-                                                            InkWell(
-                                                              onTap: () => setState(() {
-                                                                _adjustments[e.id]!.removeAt(idx);
-                                                                if (_adjustments[e.id]!.isEmpty) {
-                                                                  _adjustments.remove(e.id);
-                                                                }
-                                                              }),
-                                                              child: Icon(
-                                                                Icons.close,
-                                                                size: 16,
-                                                                color: theme.colorScheme.onSurfaceVariant,
-                                                              ),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                      );
-                                                    }),
-                                                    Padding(
-                                                      padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
-                                                      child: OutlinedButton.icon(
-                                                        onPressed: () => _showAddAdjustmentDialog(context, e, currency),
-                                                        icon: const Icon(Icons.add, size: 16),
-                                                        label: Text(loc.t('salary_add_adjustment') ?? 'Добавить'),
-                                                        style: OutlinedButton.styleFrom(
-                                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                                          minimumSize: const Size(0, 32),
-                                                          textStyle: theme.textTheme.bodySmall,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                              if (adjustments.isNotEmpty) ...[
-                                                const SizedBox(height: 6),
-                                                Text(
-                                                  'Корректировка: ${adjTotal >= 0 ? '+' : ''}${adjTotal.toStringAsFixed(0)} $currency',
-                                                  style: theme.textTheme.bodySmall?.copyWith(
-                                                    color: adjTotal >= 0 ? Colors.green : Colors.red,
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                              ],
-                                            ],
-                                            const SizedBox(height: 8),
-                                            // Итоговая сумма
-                                            Text(
-                                              '${loc.t('salary_payable') ?? 'К выплате'}: ${total.toStringAsFixed(0)} $currency',
-                                              style: theme.textTheme.titleSmall?.copyWith(
-                                                color: theme.colorScheme.primary,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              final isDesktop = constraints.maxWidth >= 600;
+                              return ListView.builder(
+                                padding: const EdgeInsets.all(16),
+                                itemCount: _employees!.length + (isDesktop ? 1 : 0),
+                                itemBuilder: (context, i) {
+                                  if (isDesktop && i == 0) {
+                                    return _SalaryTableHeader(loc: loc);
+                                  }
+                                  final idx = isDesktop ? i - 1 : i;
+                                  final e = _employees![idx];
+                                  return _SalaryEmployeeCard(
+                                    employee: e,
+                                    loc: loc,
+                                    theme: theme,
+                                    currency: currency,
+                                    periodStart: _periodStart,
+                                    periodEnd: _periodEnd,
+                                    isDesktop: isDesktop,
+                                    included: _includeInTotal[e.id] ?? true,
+                                    adjustments: _adjustments[e.id] ?? [],
+                                    expanded: _adjustmentsExpanded[e.id] ?? false,
+                                    onIncludeChanged: (v) => setState(() => _includeInTotal[e.id] = v),
+                                    onToggleExpand: () => setState(() => _adjustmentsExpanded[e.id] = !(_adjustmentsExpanded[e.id] ?? false)),
+                                    onRemoveAdjustment: (adjustmentIndex) => setState(() {
+                                      _adjustments[e.id]!.removeAt(adjustmentIndex);
+                                      if (_adjustments[e.id]!.isEmpty) _adjustments.remove(e.id);
+                                    }),
+                                    onAddAdjustment: () => _showAddAdjustmentDialog(context, e, currency),
+                                    shiftsOrHours: _shiftsOrHoursFromSchedule(e),
+                                    base: _baseForEmployee(e),
+                                    adjTotal: _adjustmentsTotal(e.id),
+                                  );
+                                },
                               );
                             },
                           ),
