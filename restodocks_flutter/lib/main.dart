@@ -46,6 +46,16 @@ void main() async {
       authFlowType: AuthFlowType.implicit, // сессия из hash при переходе по ссылке подтверждения
     ),
   );
+  // Сразу обрабатываем токены из hash (Supabase redirect после confirm) — до роутера и AccountManager
+  if (kIsWeb) {
+    final uri = Uri.base;
+    if ((uri.path == '/auth/confirm' || uri.path == '/auth/confirm/') &&
+        uri.fragment.contains('access_token')) {
+      try {
+        await Supabase.instance.client.auth.getSessionFromUrl(uri);
+      } catch (_) {}
+    }
+  }
   await AccountManagerSupabase().initialize();
   await LocalizationService.initialize();
 

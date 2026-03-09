@@ -18,10 +18,18 @@
 - Для входа с restodocks.com в адресной строке Site URL должен быть без www.
 
 ### 3. Добавьте Redirect URLs
-В поле **Redirect URLs** добавьте все домены, где размещено приложение (каждый с новой строки):
+В поле **Redirect URLs** добавьте **все** URL, на которые может вести ссылка из письма или редирект Supabase. Без точного совпадения Supabase отклонит редирект.
 
+**Обязательно для подтверждения email (письмо со ссылкой):**
 ```
 https://restodocks.com/auth/confirm
+https://restodocks.com/auth/confirm-click
+https://restodocks.pages.dev/auth/confirm
+https://restodocks.pages.dev/auth/confirm-click
+```
+
+**Остальные (по необходимости):**
+```
 https://restodocks.pages.dev
 https://restodocks.pages.dev/**
 https://restodocks.pages.dev/
@@ -41,6 +49,8 @@ http://localhost:8080
 http://127.0.0.1:3000
 http://127.0.0.1:8080
 ```
+
+Сейчас в коде и в письмах используется только prod: ссылка в письме ведёт на `https://restodocks.com/auth/confirm-click`. Если позже будете слать для beta ссылку на `restodocks.pages.dev`, добавленные выше URL для pages.dev должны быть в списке.
 
 **Важно при переносе хостинга:** каждый новый домен (Vercel, Netlify, Cloudflare Pages и т.д.) нужно добавить сюда. Иначе Auth может давать «неверный пароль» или другие ошибки.
 
