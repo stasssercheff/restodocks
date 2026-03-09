@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -5,8 +7,11 @@ import 'package:provider/provider.dart';
 
 import '../models/models.dart';
 import '../services/schedule_storage_service.dart';
+import '../services/salary_export_service.dart';
+import '../services/inventory_download.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
+import '../widgets/schedule_export_widget.dart';
 
 enum _AdjustmentType { bonus, fine, advance }
 
@@ -270,6 +275,132 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
               child: Text(loc.t('salary_add_adjustment') ?? 'Добавить'),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _exportPayroll(BuildContext context) async {
+    if (_employees == null || _employees!.isEmpty || _schedule == null) return;
+    final loc = context.read<LocalizationService>();
+    final accountManager = context.read<AccountManagerSupabase>();
+    final currency = accountManager.establishment?.currencySymbol ??
+        accountManager.currentEmployee?.currencySymbol ??
+        Establishment.currencySymbolFor(accountManager.establishment?.defaultCurrency ?? 'VND');
+
+    final selectedLang = await showDialog<String>(
+      context: context,
+      builder: (ctx) => _ExportLanguageDialog(loc: loc),
+    );
+    if (selectedLang == null || !mounted) return;
+
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Выгрузка...'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      final t = (String key) => loc.tForLanguage(selectedLang, key);
+      final dateFormat = DateFormat('dd.MM.yyyy');
+
+      final fileName = await SalaryExportService.buildAndSaveExcel(
+        employees: _employees!,
+        schedule: _schedule!,
+        periodStart: _periodStart,
+        periodEnd: _periodEnd,
+        includeInTotal: _includeInTotal,
+        shiftsOrHoursFn: _shiftsOrHoursFromSchedule,
+        totalForEmployeeFn: _totalForEmployee,
+        currency: currency,
+        t: t,
+        lang: selectedLang,
+      );
+
+      final pngFiles = <String>[];
+      for (final dept in ['kitchen', 'bar', 'hall']) {
+        final boundaryKey = GlobalKey();
+        final pngBytes = await _captureSchedulePng(
+          context: context,
+          schedule: _schedule!,
+          employees: _employees!,
+          department: dept,
+          boundaryKey: boundaryKey,
+          periodStart: _periodStart,
+          periodEnd: _periodEnd,
+          exportLang: selectedLang,
+        );
+        if (pngBytes != null && pngBytes.isNotEmpty) {
+          final deptName = dept == 'kitchen'
+              ? 'kitchen'
+              : dept == 'bar'
+                  ? 'bar'
+                  : 'hall';
+          final pngName =
+              'schedule_${deptName}_${dateFormat.format(_periodStart)}_${dateFormat.format(_periodEnd)}.png';
+          await saveFileBytes(pngName, pngBytes);
+          pngFiles.add(pngName);
+        }
+      }
+
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            loc.t('salary_export_saved') ?? 'Выгружено: $fileName${pngFiles.isNotEmpty ? ' + ${pngFiles.length} график(ов)' : ''}',
+          ),
+        ),
+      );
+    } catch (e, st) {
+      debugPrint('Salary export error: $e\n$st');
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text(loc.t('salary_export_error') ?? 'Ошибка выгрузки: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    }
+  }
+
+  Future<Uint8List?> _captureSchedulePng({
+    required BuildContext context,
+    required ScheduleModel schedule,
+    required List<Employee> employees,
+    required String department,
+    required GlobalKey boundaryKey,
+    required DateTime periodStart,
+    required DateTime periodEnd,
+    required String exportLang,
+  }) async {
+    final loc = context.read<LocalizationService>();
+    return Navigator.of(context).push<Uint8List?>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (ctx) => _ScheduleCapturePage(
+          schedule: schedule,
+          employees: employees,
+          department: department,
+          boundaryKey: boundaryKey,
+          loc: loc,
+          periodStart: periodStart,
+          periodEnd: periodEnd,
+          exportLang: exportLang,
         ),
       ),
     );
@@ -625,10 +756,127 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
         appBar: AppBar(
           leading: appBarBackButton(context),
           title: Text(loc.t('salary_expenses')),
+          actions: [
+            if (!_loading && _error == null && _employees != null && _employees!.isNotEmpty)
+              IconButton(
+                icon: const Icon(Icons.download),
+                onPressed: () => _exportPayroll(context),
+                tooltip: loc.t('salary_export_btn') ?? 'Выгрузить',
+              ),
+          ],
         ),
         body: body,
       );
     }
     return body;
+  }
+}
+
+class _ExportLanguageDialog extends StatelessWidget {
+  const _ExportLanguageDialog({required this.loc});
+
+  final LocalizationService loc;
+
+  @override
+  Widget build(BuildContext context) {
+    String selectedLang = loc.currentLanguageCode;
+    return StatefulBuilder(
+      builder: (context, setState) => AlertDialog(
+        title: Text(loc.t('salary_export_dialog_title') ?? 'Выгрузить ФЗП'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              loc.t('salary_export_lang') ?? 'Язык сохранения:',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: ['ru', 'en', 'es'].map((code) {
+                return ChoiceChip(
+                  label: Text(loc.getLanguageName(code)),
+                  selected: selectedLang == code,
+                  onSelected: (_) => setState(() => selectedLang = code),
+                );
+              }).toList(),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(selectedLang),
+            child: Text(loc.t('salary_export_btn') ?? 'Выгрузить'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ScheduleCapturePage extends StatefulWidget {
+  const _ScheduleCapturePage({
+    required this.schedule,
+    required this.employees,
+    required this.department,
+    required this.boundaryKey,
+    required this.loc,
+    required this.periodStart,
+    required this.periodEnd,
+    required this.exportLang,
+  });
+
+  final ScheduleModel schedule;
+  final List<Employee> employees;
+  final String department;
+  final GlobalKey boundaryKey;
+  final LocalizationService loc;
+  final DateTime periodStart;
+  final DateTime periodEnd;
+  final String exportLang;
+
+  @override
+  State<_ScheduleCapturePage> createState() => _ScheduleCapturePageState();
+}
+
+class _ScheduleCapturePageState extends State<_ScheduleCapturePage> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _captureAndPop());
+  }
+
+  Future<void> _captureAndPop() async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (!mounted) return;
+    final bytes = await captureWidgetToPng(widget.boundaryKey);
+    if (!mounted) return;
+    Navigator.of(context).pop(bytes);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Colors.white,
+      child: SizedBox(
+        width: 1200,
+        height: 800,
+        child: ScheduleExportWidget(
+          schedule: widget.schedule,
+          employees: widget.employees,
+          department: widget.department,
+          periodStart: widget.periodStart,
+          periodEnd: widget.periodEnd,
+          loc: widget.loc,
+          boundaryKey: widget.boundaryKey,
+          exportLang: widget.exportLang,
+        ),
+      ),
+    );
   }
 }

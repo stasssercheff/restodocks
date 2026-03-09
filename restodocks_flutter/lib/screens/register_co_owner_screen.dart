@@ -70,6 +70,7 @@ class _RegisterCoOwnerScreenState extends State<RegisterCoOwnerScreen> {
       if (signUpResult.userId == null) throw Exception('Не удалось создать учётную запись');
 
       if (!signUpResult.hasSession) {
+        await EmailService().sendConfirmationEmail(to: email, password: password);
         if (!mounted) return;
         context.go('/confirm-email?email=${Uri.encodeComponent(email)}');
         return;

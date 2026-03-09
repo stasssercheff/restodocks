@@ -45,14 +45,14 @@ class _AuthConfirmScreenState extends State<AuthConfirmScreen> {
 
     final account = context.read<AccountManagerSupabase>();
 
-    // Явно восстанавливаем сессию из hash (#access_token=...&refresh_token=...)
+    // Явно восстанавливаем сессию из hash/query (#access_token=... или ?access_token=...)
     try {
       await Supabase.instance.client.auth.getSessionFromUrl(Uri.base);
     } catch (_) {}
     await Future.delayed(const Duration(milliseconds: 400));
     if (!mounted) return;
 
-    await account.initialize();
+    await account.initialize(forceRetryFromAuth: true);
     if (!mounted) return;
 
     if (account.isLoggedInSync) {
@@ -69,7 +69,7 @@ class _AuthConfirmScreenState extends State<AuthConfirmScreen> {
       try {
         await Supabase.instance.client.auth.getSessionFromUrl(Uri.base);
       } catch (_) {}
-      await account.initialize();
+      await account.initialize(forceRetryFromAuth: true);
       if (!mounted) return;
       if (account.isLoggedInSync) {
         clear_hash.clearHashFromUrl();

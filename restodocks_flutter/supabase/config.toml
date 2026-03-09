@@ -15,3 +15,7 @@ verify_jwt = false
 # send-registration-email: как send-email, anon key с Cloudflare может не совпадать
 [functions.send-registration-email]
 verify_jwt = false
+
+# auth-send-email: Auth Hook, вызывается Supabase Auth
+[functions.auth-send-email]
+verify_jwt = false

@@ -46,13 +46,14 @@ void main() async {
       authFlowType: AuthFlowType.implicit, // сессия из hash при переходе по ссылке подтверждения
     ),
   );
-  // Сразу обрабатываем токены из hash (Supabase redirect после confirm) — до роутера и AccountManager
+  // Сразу обрабатываем токены из URL (Supabase redirect после confirm) — до роутера и AccountManager
   if (kIsWeb) {
     final uri = Uri.base;
-    if ((uri.path == '/auth/confirm' || uri.path == '/auth/confirm/') &&
-        uri.fragment.contains('access_token')) {
+    final hasTokens = uri.fragment.contains('access_token') || uri.query.contains('access_token');
+    if (uri.path.startsWith('/auth/confirm') && hasTokens) {
       try {
         await Supabase.instance.client.auth.getSessionFromUrl(uri);
+        await Future.delayed(const Duration(milliseconds: 300)); // дать Supabase записать сессию
       } catch (_) {}
     }
   }

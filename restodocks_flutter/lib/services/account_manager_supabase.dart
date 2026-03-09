@@ -68,9 +68,10 @@ class AccountManagerSupabase extends ChangeNotifier {
   /// Инициализация сервиса
   /// Supabase восстанавливает сессию из localStorage при Supabase.initialize() в main().
   /// При F5/hard refresh Auth может восстанавливаться асинхронно — делаем retry.
-  Future<void> initialize() async {
+  /// [forceRetryFromAuth] — true при переходе по ссылке confirm (getSessionFromUrl уже вызван).
+  Future<void> initialize({bool forceRetryFromAuth = false}) async {
+    if (forceRetryFromAuth) _initialized = false;
     // Если уже инициализирован и авторизован — не повторяем дорогую инициализацию.
-    // Это предотвращает лишние задержки при повторных вызовах из GoRouter redirect.
     if (_initialized && isLoggedInSync) return;
     print('🔐 AccountManager: Starting initialization...');
     await _secureStorage.initialize();
