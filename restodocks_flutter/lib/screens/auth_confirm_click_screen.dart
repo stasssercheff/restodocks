@@ -46,18 +46,20 @@ class _AuthConfirmClickScreenState extends State<AuthConfirmClickScreen> {
   Future<void> _onContinue() async {
     if (_loading) return;
     if (_hasTokenHash) {
+      final account = context.read<AccountManagerSupabase>();
+      final router = GoRouter.of(context);
       setState(() => _loading = true);
       try {
         final otpType = widget.otpType == 'signup' ? OtpType.signup : OtpType.magiclink;
-        final res = await Supabase.instance.client.auth.verifyOtp(
+        final res = await Supabase.instance.client.auth.verifyOTP(
           tokenHash: widget.tokenHash,
           type: otpType,
         );
         if (res.session != null) {
-          await context.read<AccountManagerSupabase>().initialize(forceRetryFromAuth: true);
+          await account.initialize(forceRetryFromAuth: true);
           if (!mounted) return;
-          if (context.read<AccountManagerSupabase>().isLoggedInSync) {
-            context.go('/home');
+          if (account.isLoggedInSync) {
+            router.go('/home');
             return;
           }
         }
