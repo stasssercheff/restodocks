@@ -16,8 +16,10 @@ class AiServiceSupabase implements AiService {
   SupabaseClient get _client => Supabase.instance.client;
 
   /// Последняя ошибка парсинга списка продуктов (для диагностики, когда ИИ не распознал данные).
-  /// Хранит пользовательское сообщение, а не сырой JSON.
   static String? lastParseProductListError;
+
+  /// Причина пустого результата при парсинге PDF ТТК (empty_text, ai_error, ai_no_cards и т.д.).
+  static String? lastParseTechCardPdfReason;
 
   /// Преобразует сырую ошибку API (JSON, 429 и т.д.) в понятное пользователю сообщение.
   static String _sanitizeAiError(String raw) {
@@ -210,10 +212,15 @@ class AiServiceSupabase implements AiService {
 
   @override
   Future<List<TechCardRecognitionResult>> parseTechCardsFromPdf(Uint8List pdfBytes) async {
+    lastParseTechCardPdfReason = null;
     try {
       final pdfBase64 = base64Encode(pdfBytes);
       final data = await invoke('ai-parse-tech-cards-pdf', {'pdfBase64': pdfBase64});
-      if (data == null) return [];
+      if (data == null) {
+        lastParseTechCardPdfReason = 'invoke_null';
+        return [];
+      }
+      lastParseTechCardPdfReason = data['reason'] as String?;
       final raw = data['cards'];
       if (raw is! List) return [];
       final list = <TechCardRecognitionResult>[];
@@ -225,8 +232,10 @@ class AiServiceSupabase implements AiService {
           list.add(card);
         }
       }
+      if (list.isNotEmpty) lastParseTechCardPdfReason = null;
       return list;
-    } catch (_) {
+    } catch (e) {
+      lastParseTechCardPdfReason = 'catch: $e';
       return [];
     }
   }
