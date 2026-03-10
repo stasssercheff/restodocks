@@ -1,8 +1,6 @@
 // Supabase Edge Function: распознавание ТТК из PDF
-// Извлекает текст через unpdf, парсит через ИИ
+// Динамический импорт unpdf/AI — ускоряет cold start, warm-запрос возвращается сразу
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { extractText, getDocumentProxy } from "npm:unpdf@0.4.1";
-import { chatText } from "../_shared/ai_provider.ts";
 
 function corsHeaders(origin: string | null) {
   return {
@@ -43,6 +41,13 @@ Deno.serve(async (req: Request) => {
         headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
       });
     }
+    // Быстрый warm — без загрузки unpdf/AI (прогревает контейнер)
+    if (pdfBase64 === "warm") {
+      return new Response(JSON.stringify({ cards: [], reason: "warm" }), {
+        status: 200,
+        headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+      });
+    }
 
     const hasProvider = Deno.env.get("GROQ_API_KEY")?.trim() ||
       Deno.env.get("GEMINI_API_KEY")?.trim() ||
@@ -55,14 +60,16 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Decode base64 to Uint8Array
+    // Динамический импорт — грузим только при реальном запросе
+    const { extractText, getDocumentProxy } = await import("npm:unpdf@0.4.1");
+    const { chatText } = await import("../_shared/ai_provider.ts");
+
     const binary = atob(pdfBase64);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) {
       bytes[i] = binary.charCodeAt(i);
     }
 
-    // Extract text
     let text: string;
     try {
       const pdf = await getDocumentProxy(bytes);
