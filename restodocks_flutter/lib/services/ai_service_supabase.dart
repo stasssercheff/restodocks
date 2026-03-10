@@ -226,7 +226,7 @@ class AiServiceSupabase implements AiService {
   List<List<String>> _csvToRows(Uint8List bytes) {
     try {
       final s = utf8.decode(bytes);
-      final decoded = const CsvToListConverter().convert(s);
+      final decoded = CsvToListConverter().convert(s);
       final rows = <List<String>>[];
       for (final row in decoded) {
         if (row is! List) continue;
