@@ -219,6 +219,23 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
     };
   }
 
+  /// Метаданные объединения для сохранения во входящих
+  Map<String, dynamic> _buildMergeMetadata(List<InboxDocument> sourceDocs) {
+    final account = context.read<AccountManagerSupabase>();
+    final merger = account.currentEmployee;
+    return {
+      'mergedBy': merger?.fullName ?? '—',
+      'mergedById': merger?.id ?? '',
+      'mergedAt': DateTime.now().toUtc().toIso8601String(),
+      'sourceDocuments': sourceDocs.map((d) => {
+        'id': d.id,
+        'employeeName': d.employeeName,
+        'createdAt': d.createdAt.toUtc().toIso8601String(),
+        'title': d.title,
+      }).toList(),
+    };
+  }
+
   Future<void> _saveStandardExcel(Map<String, dynamic> payload, {required String saveLang}) async {
     final loc = _loc;
     final header = payload['header'] as Map<String, dynamic>? ?? {};

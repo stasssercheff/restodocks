@@ -189,15 +189,39 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
           continue;
         }
 
+        // Подтягиваем КБЖУ: AI дал — используем, иначе fallback на Open Food Facts
+        double? calories = verification?.suggestedCalories;
+        double? protein;
+        double? fat;
+        double? carbs;
+        bool? containsGluten;
+        bool? containsLactose;
+        final hasFullKbjuFromAi = (calories != null && calories > 0);
+        if (!hasFullKbjuFromAi) {
+          try {
+            final nutrition = await NutritionApiService.fetchNutrition(normalizedName);
+            if (nutrition != null && nutrition.hasData) {
+              calories = calories ?? nutrition.calories;
+              protein = nutrition.protein;
+              fat = nutrition.fat;
+              carbs = nutrition.carbs;
+              containsGluten = nutrition.containsGluten;
+              containsLactose = nutrition.containsLactose;
+            }
+          } catch (_) {}
+        }
+
         final product = Product(
           id: const Uuid().v4(),
           name: normalizedName,
           category: verification?.suggestedCategory ?? 'manual',
           names: names,
-          calories: verification?.suggestedCalories,
-          protein: null,
-          fat: null,
-          carbs: null,
+          calories: calories,
+          protein: protein,
+          fat: fat,
+          carbs: carbs,
+          containsGluten: containsGluten,
+          containsLactose: containsLactose,
           unit: verification?.suggestedUnit ?? 'g',
           basePrice: verification?.suggestedPrice ?? item.price,
           currency: (verification?.suggestedPrice ?? item.price) != null ? defCur : null,
@@ -1668,15 +1692,35 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     final sourceName = result.name.trim();
     final sourceLang = loc.currentLanguageCode;
     final names = <String, String>{sourceLang: sourceName};
+    // Подтягиваем КБЖУ из Open Food Facts
+    double? calories;
+    double? protein;
+    double? fat;
+    double? carbs;
+    bool? containsGluten;
+    bool? containsLactose;
+    try {
+      final nutrition = await NutritionApiService.fetchNutrition(sourceName);
+      if (nutrition != null && nutrition.hasData) {
+        calories = nutrition.calories;
+        protein = nutrition.protein;
+        fat = nutrition.fat;
+        carbs = nutrition.carbs;
+        containsGluten = nutrition.containsGluten;
+        containsLactose = nutrition.containsLactose;
+      }
+    } catch (_) {}
     final product = Product(
       id: const Uuid().v4(),
       name: sourceName,
       category: result.category,
       names: names,
-      calories: null,
-      protein: null,
-      fat: null,
-      carbs: null,
+      calories: calories,
+      protein: protein,
+      fat: fat,
+      carbs: carbs,
+      containsGluten: containsGluten,
+      containsLactose: containsLactose,
       unit: result.unit,
       basePrice: null,
       currency: null,

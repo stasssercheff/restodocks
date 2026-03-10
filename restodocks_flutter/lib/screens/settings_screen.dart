@@ -100,14 +100,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
     switch (action) {
       case HomeButtonAction.inbox:
         return loc.t('inbox');
+      case HomeButtonAction.messages:
+        return loc.t('inbox_tab_messages') ?? 'Сообщения';
       case HomeButtonAction.schedule:
         return loc.t('schedule');
-      case HomeButtonAction.checklists:
-        return loc.t('checklists');
-      case HomeButtonAction.ttk:
-        return loc.t('tech_cards');
       case HomeButtonAction.productOrder:
         return loc.t('product_order');
+      case HomeButtonAction.menu:
+        return loc.t('menu');
+      case HomeButtonAction.ttk:
+        return loc.t('tech_cards');
+      case HomeButtonAction.checklists:
+        return loc.t('checklists');
+      case HomeButtonAction.nomenclature:
+        return loc.t('nomenclature');
+      case HomeButtonAction.inventory:
+        return loc.t('inventory_blank');
+      case HomeButtonAction.expenses:
+        return loc.t('expenses');
     }
   }
 
@@ -608,7 +618,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       HomeTileId.messages: loc.t('inbox_tab_messages') ?? 'Сообщения',
       HomeTileId.schedule: loc.t('schedule'),
       HomeTileId.productOrder: loc.t('product_order'),
-      HomeTileId.suppliers: loc.t('order_tab_suppliers') ?? 'Поставщики',
       HomeTileId.menu: loc.t('menu'),
       HomeTileId.ttk: emp.department == 'bar' ? loc.t('ttk_bar') : loc.t('ttk_kitchen'),
       HomeTileId.banquetMenu: '${loc.t('menu')} — ${loc.t('banquet_catering') ?? 'Банкет / Кейтринг'}',
@@ -663,24 +672,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showHomeButtonPicker(BuildContext context, LocalizationService loc, HomeButtonConfigService homeBtn) {
+    final accountManager = context.read<AccountManagerSupabase>();
+    final emp = accountManager.currentEmployee;
+    final actions = homeButtonActionsFor(emp);
+    final effective = homeBtn.effectiveAction(emp);
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(loc.t('home_button_config')),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: HomeButtonAction.values.map((action) {
-            final selected = homeBtn.action == action;
-            return ListTile(
-              leading: Icon(action.icon, color: selected ? Theme.of(ctx).colorScheme.primary : null),
-              title: Text(_homeButtonActionLabel(loc, action)),
-              trailing: selected ? const Icon(Icons.check, color: Colors.green) : null,
-              onTap: () async {
-                await homeBtn.setAction(action);
-                if (ctx.mounted) Navigator.of(ctx).pop();
-              },
-            );
-          }).toList(),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: actions.map((action) {
+              final selected = effective == action;
+              return ListTile(
+                leading: Icon(action.icon, color: selected ? Theme.of(ctx).colorScheme.primary : null),
+                title: Text(_homeButtonActionLabel(loc, action)),
+                trailing: selected ? const Icon(Icons.check, color: Colors.green) : null,
+                onTap: () async {
+                  await homeBtn.setAction(action);
+                  if (ctx.mounted) Navigator.of(ctx).pop();
+                },
+              );
+            }).toList(),
+          ),
         ),
       ),
     );
@@ -748,10 +763,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   /// Переводит продукты, у которых нет имени на выбранном языке (в фоне).
   /// Использует Edge Function auto-translate-product (DeepL) — работает на web.
+  /// Уведомления «Переводы обновлены» показываются только если включена настройка.
   void _translateProductsForLanguage(BuildContext context, String targetLang) {
     final store = context.read<ProductStoreSupabase>();
+    final screenPref = context.read<ScreenLayoutPreferenceService>();
     final scaffoldMessenger = ScaffoldMessenger.of(context);
     final loc = context.read<LocalizationService>();
+    final showNotif = screenPref.showTranslationNotifications;
 
     final needTranslation = <Product>[];
     Future(() async {
@@ -764,22 +782,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
       if (needTranslation.isEmpty) return;
 
-      scaffoldMessenger.showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-              ),
-              const SizedBox(width: 12),
-              Text(loc.t('translating_products')),
-            ],
+      if (showNotif) {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                ),
+                const SizedBox(width: 12),
+                Text(loc.t('translating_products')),
+              ],
+            ),
+            duration: const Duration(hours: 1),
           ),
-          duration: const Duration(hours: 1),
-        ),
-      );
+        );
+      }
 
       int updated = 0;
       for (final p in needTranslation) {
@@ -791,13 +811,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
         } catch (_) {}
       }
 
-      scaffoldMessenger.removeCurrentSnackBar();
-      scaffoldMessenger.showSnackBar(
-        SnackBar(
-          content: Text(updated > 0 ? '${loc.t('translate_done')} (+$updated)' : loc.t('translate_done')),
-          backgroundColor: updated > 0 ? Colors.green : null,
-        ),
-      );
+      if (showNotif) {
+        scaffoldMessenger.removeCurrentSnackBar();
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text(updated > 0 ? '${loc.t('translate_done')} (+$updated)' : loc.t('translate_done')),
+            backgroundColor: updated > 0 ? Colors.green : null,
+          ),
+        );
+      }
     });
   }
 
@@ -1330,6 +1352,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const Divider(),
             ],
             ExpansionTile(
+              initiallyExpanded: true,
               leading: const Icon(Icons.dashboard_customize),
               title: Text(localization.t('home_layout_config') ?? 'Настройка домашнего экрана'),
               children: [
@@ -1339,9 +1362,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => _showHomeLayoutConfig(context, localization),
                 ),
-                if (currentEmployee.hasRole('owner'))
-                  Consumer<HomeButtonConfigService>(
-                    builder: (_, homeBtn, __) => ListTile(
+                Consumer<HomeButtonConfigService>(
+                  builder: (_, homeBtn, __) => ListTile(
                       leading: const SizedBox(width: 24),
                       title: Text(localization.t('button_display_config') ?? 'Настройка кнопки'),
                       subtitle: Text(localization.t('central_button_hint') ?? 'Выбор для отображения желаемого'),
@@ -1369,8 +1391,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onChanged: (v) => screenPref.setShowNameTranslit(v),
               ),
             ),
+            Consumer<ScreenLayoutPreferenceService>(
+              builder: (_, screenPref, __) => SwitchListTile(
+                secondary: const Icon(Icons.notifications_active_outlined),
+                title: Text(localization.t('show_translation_notifications') ?? 'Уведомления о переводах'),
+                subtitle: Text(localization.t('show_translation_notifications_hint') ?? 'Плашка «Переводы обновлены» при смене языка'),
+                value: screenPref.showTranslationNotifications,
+                onChanged: (v) => screenPref.setShowTranslationNotifications(v),
+              ),
+            ),
             ExpansionTile(
-              initiallyExpanded: true,
+              initiallyExpanded: false,
               leading: const Icon(Icons.notifications),
               title: Text(localization.t('notification_settings') ?? 'Уведомления'),
               subtitle: Text(localization.t('notification_settings_hint') ?? 'Вид уведомлений и какие включены'),

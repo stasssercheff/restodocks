@@ -100,9 +100,32 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
         } else {
           final cur = item.currency ?? defCur;
           print('💾 ImportReview: creating new product "${item.displayName}"');
+          double? calories;
+          double? protein;
+          double? fat;
+          double? carbs;
+          bool? containsGluten;
+          bool? containsLactose;
+          try {
+            final nutrition = await NutritionApiService.fetchNutrition(item.displayName);
+            if (nutrition != null && nutrition.hasData) {
+              calories = nutrition.calories;
+              protein = nutrition.protein;
+              fat = nutrition.fat;
+              carbs = nutrition.carbs;
+              containsGluten = nutrition.containsGluten;
+              containsLactose = nutrition.containsLactose;
+            }
+          } catch (_) {}
           final product = Product.create(
             name: item.displayName,
             category: 'imported',
+            calories: calories,
+            protein: protein,
+            fat: fat,
+            carbs: carbs,
+            containsGluten: containsGluten,
+            containsLactose: containsLactose,
             basePrice: item.displayPrice ?? 0.0,
             currency: item.displayPrice != null ? cur : null,
           );

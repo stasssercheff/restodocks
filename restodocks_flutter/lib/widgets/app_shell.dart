@@ -23,7 +23,7 @@ class AppShell extends StatelessWidget {
 
     final isOwner = currentEmployee.hasRole('owner');
     final homeBtnConfig = context.watch<HomeButtonConfigService>();
-    final middleAction = homeBtnConfig.action;
+    final middleAction = homeBtnConfig.effectiveAction(currentEmployee);
     final noDataAccess = !isOwner && !currentEmployee.effectiveDataAccess;
     final isKitchenNoData = noDataAccess && currentEmployee.department == 'kitchen';
     final middleLabel = noDataAccess
@@ -31,13 +31,13 @@ class AppShell extends StatelessWidget {
         : _labelForAction(loc, middleAction, currentEmployee);
 
     final location = GoRouterState.of(context).matchedLocation;
-    final selectedIndex = _indexForLocation(location, middleAction, noDataAccess, isKitchenNoData);
+    final selectedIndex = _indexForLocation(location, middleAction, noDataAccess, isKitchenNoData, currentEmployee);
 
     return Scaffold(
       body: child,
       bottomNavigationBar: NavigationBar(
         selectedIndex: selectedIndex,
-        onDestinationSelected: (i) => _onTap(context, i, middleAction, noDataAccess, isKitchenNoData, currentEmployee),
+        onDestinationSelected: (i) => _onTap(context, i, middleAction, noDataAccess, isKitchenNoData, currentEmployee, selectedIndex),
         destinations: [
           NavigationDestination(
             icon: const Icon(Icons.home_outlined),
@@ -62,25 +62,33 @@ class AppShell extends StatelessWidget {
   String _labelForAction(LocalizationService loc, HomeButtonAction action, Employee? employee) {
     switch (action) {
       case HomeButtonAction.inbox:
-        return (employee?.hasInboxDocuments ?? true)
-            ? loc.t('inbox')
-            : (loc.t('inbox_tab_messages') ?? 'Сообщения');
+        return loc.t('inbox');
+      case HomeButtonAction.messages:
+        return loc.t('inbox_tab_messages') ?? 'Сообщения';
       case HomeButtonAction.schedule:
         return loc.t('schedule');
-      case HomeButtonAction.checklists:
-        return loc.t('checklists');
-      case HomeButtonAction.ttk:
-        return loc.t('tech_cards');
       case HomeButtonAction.productOrder:
         return loc.t('product_order');
+      case HomeButtonAction.menu:
+        return loc.t('menu');
+      case HomeButtonAction.ttk:
+        return loc.t('tech_cards');
+      case HomeButtonAction.checklists:
+        return loc.t('checklists');
+      case HomeButtonAction.nomenclature:
+        return loc.t('nomenclature');
+      case HomeButtonAction.inventory:
+        return loc.t('inventory_blank');
+      case HomeButtonAction.expenses:
+        return loc.t('expenses');
     }
   }
 
-  int _indexForLocation(String location, HomeButtonAction action, bool noDataAccess, [bool isKitchenNoData = false]) {
+  int _indexForLocation(String location, HomeButtonAction action, bool noDataAccess, [bool isKitchenNoData = false, Employee? employee]) {
     if (location == '/home' || location == '/') return 0;
     if (location.startsWith('/personal-cabinet') || location.startsWith('/profile') || location.startsWith('/settings')) return 2;
 
-    final middleRoute = noDataAccess ? '/schedule' : action.route;
+    final middleRoute = noDataAccess ? '/schedule' : action.routeFor(employee);
     if (location.startsWith(middleRoute)) return 1;
 
     // Дополнительные маршруты для средней вкладки
@@ -90,23 +98,24 @@ class AppShell extends StatelessWidget {
         location.startsWith('/checklists') ||
         location.startsWith('/tech-cards') ||
         location.startsWith('/product-order') ||
-        location.startsWith('/inventory')) {
+        location.startsWith('/inventory') ||
+        location.startsWith('/menu') ||
+        location.startsWith('/nomenclature') ||
+        location.startsWith('/expenses')) {
       return 1;
     }
     return 0;
   }
 
-  void _onTap(BuildContext context, int index, HomeButtonAction action, bool noDataAccess, bool isKitchenNoData, Employee? employee) {
-    final location = GoRouterState.of(context).matchedLocation;
-    final currentIndex = _indexForLocation(location, action, noDataAccess, isKitchenNoData);
+  void _onTap(BuildContext context, int index, HomeButtonAction action, bool noDataAccess, bool isKitchenNoData, Employee? employee, int currentIndex) {
 
     // Если переходим на вкладку с меньшим индексом — анимируем как «назад» (вправо)
     final isBackward = index < currentIndex;
     final extra = isBackward ? {'back': true} : null;
 
-    String middleRoute = action.route;
-    if (!noDataAccess && action == HomeButtonAction.inbox) {
-      middleRoute = (employee?.hasInboxDocuments ?? true) ? '/inbox' : '/notifications?tab=messages';
+    String middleRoute = action.routeFor(employee);
+    if (!noDataAccess && action == HomeButtonAction.inbox && (employee?.hasInboxDocuments ?? true) == false) {
+      middleRoute = '/notifications?tab=messages';
     } else if (noDataAccess) {
       middleRoute = isKitchenNoData ? '/schedule' : '/schedule?personal=1';
     }

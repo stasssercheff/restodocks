@@ -5,7 +5,7 @@
     "display": "fullscreen",
     "background_color": "#AD292C",
     "theme_color": "#AD292C",
-    "description": "Restodocks — учёт инвентаря и закупок для ресторанов",
+    "description": "RestoDocks — Умная система управления ресторанным бизнесом",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

@@ -1,30 +1,53 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../models/models.dart';
+
 const _keyHomeButton = 'restodocks_home_button_action';
+
+/// Подразделение для роута (dining_room -> hall, management -> kitchen)
+String _deptForRoute(String? d) =>
+    d == 'dining_room' ? 'hall' : (d == 'management' ? 'kitchen' : (d ?? 'kitchen'));
 
 /// Действия для средней кнопки на главном экране
 enum HomeButtonAction {
   inbox,
+  messages,
   schedule,
-  checklists,
-  ttk,
   productOrder,
+  menu,
+  ttk,
+  checklists,
+  nomenclature,
+  inventory,
+  expenses,
 }
 
 extension HomeButtonActionExt on HomeButtonAction {
-  String get route {
+  String routeFor(Employee? emp) {
+    final dept = _deptForRoute(emp?.department);
+    final isOwner = emp?.hasRole('owner') ?? false;
     switch (this) {
       case HomeButtonAction.inbox:
-        return '/notifications';
+        return '/inbox';
+      case HomeButtonAction.messages:
+        return '/notifications?tab=messages';
       case HomeButtonAction.schedule:
-        return '/schedule';
-      case HomeButtonAction.checklists:
-        return '/checklists';
-      case HomeButtonAction.ttk:
-        return '/tech-cards';
+        return isOwner ? '/schedule/all' : '/schedule/$dept';
       case HomeButtonAction.productOrder:
-        return '/product-order';
+        return '/product-order?department=$dept';
+      case HomeButtonAction.menu:
+        return '/menu/$dept';
+      case HomeButtonAction.ttk:
+        return '/tech-cards/$dept';
+      case HomeButtonAction.checklists:
+        return '/checklists?department=$dept';
+      case HomeButtonAction.nomenclature:
+        return '/nomenclature/$dept';
+      case HomeButtonAction.inventory:
+        return '/inventory';
+      case HomeButtonAction.expenses:
+        return '/expenses';
     }
   }
 
@@ -32,14 +55,24 @@ extension HomeButtonActionExt on HomeButtonAction {
     switch (this) {
       case HomeButtonAction.inbox:
         return Icons.inbox;
+      case HomeButtonAction.messages:
+        return Icons.chat_bubble;
       case HomeButtonAction.schedule:
         return Icons.calendar_month;
-      case HomeButtonAction.checklists:
-        return Icons.checklist;
-      case HomeButtonAction.ttk:
-        return Icons.menu_book;
       case HomeButtonAction.productOrder:
         return Icons.shopping_cart;
+      case HomeButtonAction.menu:
+        return Icons.restaurant_menu;
+      case HomeButtonAction.ttk:
+        return Icons.description;
+      case HomeButtonAction.checklists:
+        return Icons.checklist;
+      case HomeButtonAction.nomenclature:
+        return Icons.assignment;
+      case HomeButtonAction.inventory:
+        return Icons.assignment;
+      case HomeButtonAction.expenses:
+        return Icons.payments;
     }
   }
 
@@ -47,46 +80,71 @@ extension HomeButtonActionExt on HomeButtonAction {
     switch (this) {
       case HomeButtonAction.inbox:
         return Icons.inbox_outlined;
+      case HomeButtonAction.messages:
+        return Icons.chat_bubble_outlined;
       case HomeButtonAction.schedule:
         return Icons.calendar_month_outlined;
-      case HomeButtonAction.checklists:
-        return Icons.checklist_outlined;
-      case HomeButtonAction.ttk:
-        return Icons.menu_book_outlined;
       case HomeButtonAction.productOrder:
         return Icons.shopping_cart_outlined;
+      case HomeButtonAction.menu:
+        return Icons.restaurant_menu_outlined;
+      case HomeButtonAction.ttk:
+        return Icons.description_outlined;
+      case HomeButtonAction.checklists:
+        return Icons.checklist_outlined;
+      case HomeButtonAction.nomenclature:
+        return Icons.assignment_outlined;
+      case HomeButtonAction.inventory:
+        return Icons.assignment_outlined;
+      case HomeButtonAction.expenses:
+        return Icons.payments_outlined;
     }
   }
 
   String get storageKey {
-    switch (this) {
-      case HomeButtonAction.inbox:
-        return 'inbox';
-      case HomeButtonAction.schedule:
-        return 'schedule';
-      case HomeButtonAction.checklists:
-        return 'checklists';
-      case HomeButtonAction.ttk:
-        return 'ttk';
-      case HomeButtonAction.productOrder:
-        return 'product_order';
-    }
+    return name;
   }
 
   static HomeButtonAction fromStorageKey(String key) {
-    switch (key) {
-      case 'inbox':
-        return HomeButtonAction.inbox;
-      case 'checklists':
-        return HomeButtonAction.checklists;
-      case 'ttk':
-        return HomeButtonAction.ttk;
-      case 'product_order':
-        return HomeButtonAction.productOrder;
-      default:
-        return HomeButtonAction.schedule;
-    }
+    return HomeButtonAction.values.where((a) => a.storageKey == key).firstOrNull ?? HomeButtonAction.schedule;
   }
+}
+
+/// Доступные действия для роли
+List<HomeButtonAction> homeButtonActionsFor(Employee? emp) {
+  if (emp == null) return [HomeButtonAction.schedule];
+  final isOwner = emp.hasRole('owner');
+  final isChef = emp.hasRole('executive_chef') || emp.hasRole('sous_chef');
+  final isManagement = emp.department == 'management' || isChef ||
+      emp.hasRole('bar_manager') || emp.hasRole('floor_manager') || emp.hasRole('general_manager');
+  final isLineStaff = !isOwner && !isManagement;
+
+  if (isOwner) {
+    return [HomeButtonAction.inbox, HomeButtonAction.messages, HomeButtonAction.schedule, HomeButtonAction.menu];
+  }
+  if (isChef || isManagement) {
+    return [
+      HomeButtonAction.inbox,
+      HomeButtonAction.messages,
+      HomeButtonAction.schedule,
+      HomeButtonAction.productOrder,
+      HomeButtonAction.menu,
+      HomeButtonAction.ttk,
+      HomeButtonAction.checklists,
+      HomeButtonAction.nomenclature,
+      HomeButtonAction.inventory,
+      HomeButtonAction.expenses,
+    ];
+  }
+  // Линейный сотрудник
+  return [
+    HomeButtonAction.messages,
+    HomeButtonAction.schedule,
+    HomeButtonAction.productOrder,
+    HomeButtonAction.menu,
+    HomeButtonAction.ttk,
+    HomeButtonAction.checklists,
+  ];
 }
 
 /// Сервис настройки средней кнопки на главном экране
@@ -98,6 +156,12 @@ class HomeButtonConfigService extends ChangeNotifier {
   HomeButtonAction _action = HomeButtonAction.schedule;
 
   HomeButtonAction get action => _action;
+
+  /// Действие с учётом допустимых для роли (если сохранённое недоступно — первое из списка)
+  HomeButtonAction effectiveAction(Employee? emp) {
+    final allowed = homeButtonActionsFor(emp);
+    return allowed.contains(_action) ? _action : (allowed.firstOrNull ?? HomeButtonAction.schedule);
+  }
 
   Future<void> initialize() async {
     try {

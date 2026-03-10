@@ -1,8 +1,6 @@
-// Supabase Edge Function: распознавание ТТК по фото карточки (vision) или по таблице (текст)
+// Supabase Edge Function: распознавание ТТК по таблице (Excel, текст). Фото отключены.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { chatText } from "../_shared/ai_provider.ts";
-
-const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
 
 function corsHeaders(origin: string | null) {
   return {
@@ -28,101 +26,19 @@ Deno.serve(async (req: Request) => {
     const imageBase64 = body.imageBase64;
     const rows = body.rows;
 
-    const apiKey = Deno.env.get("OPENAI_API_KEY");
-    const hasTextProvider = Deno.env.get("GIGACHAT_AUTH_KEY")?.trim() || apiKey;
+    const hasTextProvider = Deno.env.get("GROQ_API_KEY")?.trim() || Deno.env.get("GEMINI_API_KEY")?.trim() || Deno.env.get("GIGACHAT_AUTH_KEY")?.trim() || Deno.env.get("OPENAI_API_KEY")?.trim();
 
     if (imageBase64 && typeof imageBase64 === "string") {
-      if (!apiKey) {
-        return new Response(JSON.stringify({ error: "OPENAI_API_KEY required for image recognition" }), {
-          status: 500,
-          headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
-        });
-      }
-      const imageUrl = imageBase64.startsWith("data:") ? imageBase64 : `data:image/jpeg;base64,${imageBase64}`;
-      const systemPrompt = `You are a tech card (recipe card) parser. The app table has EXACT columns in this order:
-1) Dish name | 2) Product/ingredient name | 3) Gross (g) | 4) Waste % | 5) Net (g) | 6) Cooking method | 7) Cooking loss % | 8) Output | 9) Price per kg | 10) Cost | 11) Technology
-Extract from the image so each value goes into the correct column. Return ONLY valid JSON, no markdown.
-
-Schema:
-- dishName: string (column 1 - name of dish or semi-finished)
-- technologyText: string (column 11 - full technology text)
-- isSemiFinished: boolean (true = semi-finished, false = finished dish)
-- ingredients: array of objects, one per ingredient row. Each object:
-  - productName: string (column 2)
-  - grossGrams: number (column 3, in grams)
-  - primaryWastePct: number (column 4, 0-100, percent waste)
-  - netGrams: number (column 5, in grams)
-  - cookingMethod: string (column 6, e.g. "Жарка", "Варка")
-  - cookingLossPct: number (column 7, 0-100, percent cooking loss/shrinkage, optional)
-  - unit: string (e.g. "g", "kg", "pcs", "шт")
-
-If a number is missing in the image use null. Use exact numbers from the image.`;
-
-      const res = await fetch(OPENAI_URL, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "gpt-4o",
-          messages: [
-            { role: "system", content: systemPrompt },
-            {
-              role: "user",
-              content: [
-                { type: "text", text: "Extract the tech card data from this image." },
-                { type: "image_url", image_url: { url: imageUrl } },
-              ],
-            },
-          ],
-          max_tokens: 2048,
-        }),
-      });
-
-      if (!res.ok) {
-        const err = await res.text();
-        return new Response(JSON.stringify({ error: `OpenAI: ${res.status} ${err}` }), {
-          status: 502,
-          headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
-        });
-      }
-
-      const data = await res.json() as { choices?: { message?: { content?: string } }[] };
-      const content = data.choices?.[0]?.message?.content?.trim();
-      if (!content) {
-        return new Response(JSON.stringify({ error: "Empty response", dishName: null, technologyText: null, ingredients: [] }), {
-          status: 200,
-          headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
-        });
-      }
-
-      const parsed = JSON.parse(content) as Record<string, unknown>;
-      const ingredients = Array.isArray(parsed.ingredients)
-        ? (parsed.ingredients as Record<string, unknown>[]).map((i) => ({
-            productName: String(i.productName ?? ""),
-            grossGrams: i.grossGrams != null ? Number(i.grossGrams) : undefined,
-            netGrams: i.netGrams != null ? Number(i.netGrams) : undefined,
-            unit: i.unit != null ? String(i.unit) : undefined,
-            cookingMethod: i.cookingMethod != null ? String(i.cookingMethod) : undefined,
-            primaryWastePct: i.primaryWastePct != null ? Number(i.primaryWastePct) : undefined,
-            cookingLossPct: i.cookingLossPct != null ? Number(i.cookingLossPct) : undefined,
-          }))
-        : [];
-
-      return new Response(JSON.stringify({
-        dishName: parsed.dishName != null ? String(parsed.dishName) : null,
-        technologyText: parsed.technologyText != null ? String(parsed.technologyText) : null,
-        ingredients,
-        isSemiFinished: typeof parsed.isSemiFinished === "boolean" ? parsed.isSemiFinished : undefined,
-      }), {
+      // Фото отключены: тяжело грузить с телефона, жрут лимиты vision API.
+      return new Response(JSON.stringify({ error: "PHOTO_DISABLED", message: "Photo upload is disabled. Please use Excel (.xlsx) file." }), {
+        status: 400,
         headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
       });
     }
 
     if (rows && Array.isArray(rows)) {
       if (!hasTextProvider) {
-        return new Response(JSON.stringify({ error: "GIGACHAT_AUTH_KEY or OPENAI_API_KEY required" }), {
+        return new Response(JSON.stringify({ error: "GROQ_API_KEY, GEMINI_API_KEY, GIGACHAT_AUTH_KEY or OPENAI_API_KEY required" }), {
           status: 500,
           headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
         });
@@ -171,7 +87,7 @@ No markdown.`;
       });
     }
 
-    return new Response(JSON.stringify({ error: "imageBase64 or rows required" }), {
+    return new Response(JSON.stringify({ error: "rows required (Excel file). Photo upload is disabled." }), {
       status: 400,
       headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
     });

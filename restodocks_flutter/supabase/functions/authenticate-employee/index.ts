@@ -88,12 +88,13 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Ищем сотрудников по email
+    // Ищем сотрудников по email (limit 5 — один email редко в >5 заведениях)
     let query = supabase
       .from("employees")
-      .select("id, email, full_name, surname, roles, establishment_id, department, section, is_active, password_hash, preferred_language, data_access_enabled, can_edit_own_schedule, created_at")
+      .select("id, email, full_name, surname, roles, establishment_id, department, section, is_active, password_hash, preferred_language, data_access_enabled, can_edit_own_schedule")
       .ilike("email", email)
-      .eq("is_active", true);
+      .eq("is_active", true)
+      .limit(5);
 
     if (establishmentId) {
       query = query.eq("establishment_id", establishmentId);
