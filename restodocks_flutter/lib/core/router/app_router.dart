@@ -40,7 +40,7 @@ import '../../models/order_list.dart';
 import '../../services/ai_service.dart';
 import '../../services/services.dart';
 import '../../widgets/app_shell.dart';
-import '../../widgets/message_notification_listener.dart';
+import '../../widgets/inbox_notification_listener.dart';
 
 /// Emails владельцев платформы — единственные кто видит /admin
 const _platformAdminEmails = <String>{
@@ -290,7 +290,7 @@ class AppRouter {
       // Shell — все рабочие экраны с нижней навигационной панелью
       ShellRoute(
         builder: (context, state, child) => AppShell(
-          child: MessageNotificationListener(child: child),
+          child: InboxNotificationListener(child: child),
         ),
         routes: [
           // Главный экран

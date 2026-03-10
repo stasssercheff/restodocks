@@ -35,6 +35,9 @@ class AppProviders {
         ChangeNotifierProvider<ScreenLayoutPreferenceService>(
           create: (_) => ScreenLayoutPreferenceService(),
         ),
+        ChangeNotifierProvider<NotificationPreferencesService>(
+          create: (_) => NotificationPreferencesService(),
+        ),
         // Используем Supabase версии сервисов
         ChangeNotifierProvider<AccountManagerSupabase>(
           create: (_) => AccountManagerSupabase(),
@@ -103,6 +106,7 @@ class AppProviders {
             if (accountManager.isLoggedInSync) {
               await context.read<ProductStoreSupabase>().loadProducts();
               await context.read<HomeLayoutConfigService>().loadForEmployee(accountManager.currentEmployee?.id);
+              await context.read<NotificationPreferencesService>().load(accountManager.currentEmployee?.id);
             }
           },
           initialData: null,

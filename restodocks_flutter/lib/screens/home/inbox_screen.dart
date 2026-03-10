@@ -37,6 +37,7 @@ class _InboxScreenState extends State<InboxScreen> {
   late InboxService _inboxService;
   List<InboxDocument> _documents = [];
   List<EmployeeDeletionNotification> _deletionNotifications = [];
+  int _unreadMessagesCount = 0;
   bool _loading = true;
   _InboxTab? _selectedTab;
   _InboxDeptTab? _selectedDeptTab;
@@ -62,7 +63,7 @@ class _InboxScreenState extends State<InboxScreen> {
     if (employee.hasRole('owner')) {
       setState(() {
         _selectedDeptTab = _InboxDeptTab.kitchen;
-        _selectedTypeTab = _InboxTypeTab.checklist;
+        _selectedTypeTab = _InboxTypeTab.messages; // Сообщения по умолчанию
       });
     } else {
       if (tabs.isNotEmpty) {
@@ -77,26 +78,30 @@ class _InboxScreenState extends State<InboxScreen> {
         r == 'bar_manager' || r == 'floor_manager');
   }
 
-  /// Входящие: только документы (заказы, чеклисты, инвентаризации). Без диалогов.
+  /// Входящие по ролям: собственник/управление — Сообщения, Заказы, Инвентаризация, iiko, Уведомления; линейные — Сообщения, Заказы, Уведомления.
   List<_InboxTab> _visibleTabs(Employee employee) {
-    final isChef = employee.roles.contains('executive_chef');
-    final isSousChef = employee.roles.contains('sous_chef');
-    final isOwner = employee.roles.contains('owner');
-    final isBarManager = employee.roles.contains('bar_manager');
-    final isFloorManager = employee.roles.contains('floor_manager');
+    final isOwner = employee.hasRole('owner');
+    final isManagement = employee.hasRole('executive_chef') || employee.hasRole('sous_chef') ||
+        employee.hasRole('bar_manager') || employee.hasRole('floor_manager') ||
+        employee.department == 'management';
     final hasDocs = employee.hasInboxDocuments;
 
     final tabs = <_InboxTab>[];
+    tabs.add(_InboxTab.messages); // Сообщения — всегда первая
     if (hasDocs) {
-      if (isChef || isSousChef) tabs.add(_InboxTab.checklist);
-      if (isChef || isSousChef) tabs.add(_InboxTab.order);
-      if (isChef || isOwner || isBarManager || isFloorManager) tabs.add(_InboxTab.inventory);
-      if ((isChef || isOwner) &&
-          _documents.any((d) => d.type == DocumentType.iikoInventory)) {
-        tabs.add(_InboxTab.iikoInventory);
+      tabs.add(_InboxTab.order);
+      if (isOwner || isManagement) {
+        tabs.add(_InboxTab.inventory);
+        if ((employee.hasRole('executive_chef') || employee.hasRole('owner')) &&
+            _documents.any((d) => d.type == DocumentType.iikoInventory)) {
+          tabs.add(_InboxTab.iikoInventory);
+        }
       }
     }
     if (_canSeeNotifications(employee)) tabs.add(_InboxTab.notifications);
+    if (hasDocs && (employee.hasRole('executive_chef') || employee.hasRole('sous_chef') || isOwner || isManagement)) {
+      tabs.add(_InboxTab.checklist); // Чеклисты — после остальных
+    }
     return tabs;
   }
 
@@ -116,10 +121,17 @@ class _InboxScreenState extends State<InboxScreen> {
       if (currentEmployee != null && _canSeeNotifications(currentEmployee)) {
         notifications = await _inboxService.getDeletionNotifications(establishment.id);
       }
+      int unreadMessages = 0;
+      if (currentEmployee != null) {
+        final unreadMap = await context.read<EmployeeMessageService>().getUnreadCountPerPartner(
+          currentEmployee.id, establishment.id);
+        unreadMessages = unreadMap.values.fold(0, (a, b) => a + b);
+      }
       if (mounted) {
         setState(() {
           _documents = documents;
           _deletionNotifications = notifications;
+          _unreadMessagesCount = unreadMessages;
           _loading = false;
         });
       }
@@ -303,10 +315,98 @@ class _InboxScreenState extends State<InboxScreen> {
     );
   }
 
+  int _getCountForDeptTab(_InboxDeptTab dept) {
+    final deptStr = switch (dept) {
+      _InboxDeptTab.kitchen => 'kitchen',
+      _InboxDeptTab.bar => 'bar',
+      _InboxDeptTab.hall => 'hall',
+    };
+    return _documents.where((d) => d.department == deptStr).length;
+  }
+
+  int _getCountForOwnerTypeTab(_InboxTypeTab tab) {
+    if (_selectedDeptTab == null) return 0;
+    final deptStr = switch (_selectedDeptTab!) {
+      _InboxDeptTab.kitchen => 'kitchen',
+      _InboxDeptTab.bar => 'bar',
+      _InboxDeptTab.hall => 'hall',
+    };
+    final docsByDept = _documents.where((d) => d.department == deptStr);
+    switch (tab) {
+      case _InboxTypeTab.messages:
+        return _unreadMessagesCount;
+      case _InboxTypeTab.order:
+        return docsByDept.where((d) => d.type == DocumentType.productOrder).length;
+      case _InboxTypeTab.inventory:
+        return docsByDept.where((d) => d.type == DocumentType.inventory).length;
+      case _InboxTypeTab.iikoInventory:
+        return docsByDept.where((d) => d.type == DocumentType.iikoInventory).length;
+      case _InboxTypeTab.notifications:
+        return _deletionNotifications.length;
+      case _InboxTypeTab.checklist:
+        return docsByDept.where((d) =>
+            d.type == DocumentType.checklistSubmission ||
+            d.type == DocumentType.checklistMissedDeadline).length;
+    }
+  }
+
+  int _getCountForTab(_InboxTab tab) {
+    switch (tab) {
+      case _InboxTab.messages:
+        return _unreadMessagesCount;
+      case _InboxTab.order:
+        return _documents.where((d) => d.type == DocumentType.productOrder).length;
+      case _InboxTab.inventory:
+        return _documents.where((d) => d.type == DocumentType.inventory).length;
+      case _InboxTab.iikoInventory:
+        return _documents.where((d) => d.type == DocumentType.iikoInventory).length;
+      case _InboxTab.notifications:
+        return _deletionNotifications.length;
+      case _InboxTab.checklist:
+        return _documents.where((d) =>
+            d.type == DocumentType.checklistSubmission ||
+            d.type == DocumentType.checklistMissedDeadline).length;
+    }
+  }
+
+  Widget _buildCountBadge(int count) {
+    if (count <= 0) return const SizedBox.shrink();
+    final n = count > 99 ? '99+' : '$count';
+    return Container(
+      margin: const EdgeInsets.only(left: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.error,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.onError.withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+      alignment: Alignment.center,
+      child: Text(
+        n,
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.onError,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
   Widget _buildDeptChip(_InboxDeptTab tab, String label, LocalizationService loc) {
     final isSelected = _selectedDeptTab == tab;
+    final count = _getCountForDeptTab(tab);
     return FilterChip(
-      label: Text(label),
+      label: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label),
+          _buildCountBadge(count),
+        ],
+      ),
       selected: isSelected,
       onSelected: (_) {
         setState(() {
@@ -324,6 +424,7 @@ class _InboxScreenState extends State<InboxScreen> {
     );
   }
 
+  /// Типы вкладок для собственника: Сообщения, Заказы, Инвентаризация, iiko (только кухня), Уведомления, Чеклисты.
   Widget _buildTypeFilterForOwner(LocalizationService loc) {
     final isBarOrHall = _selectedDeptTab == _InboxDeptTab.bar || _selectedDeptTab == _InboxDeptTab.hall;
     return Container(
@@ -341,9 +442,9 @@ class _InboxScreenState extends State<InboxScreen> {
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
-            _buildTypeChip(_InboxTypeTab.checklist, loc.t('inbox_tab_checklist') ?? 'Чеклисты', loc),
+            _buildTypeChip(_InboxTypeTab.messages, loc.t('inbox_tab_messages') ?? 'Сообщения', loc),
             const SizedBox(width: 8),
-            _buildTypeChip(_InboxTypeTab.order, loc.t('inbox_tab_order') ?? 'Заказ продуктов', loc),
+            _buildTypeChip(_InboxTypeTab.order, loc.t('inbox_tab_order') ?? 'Заказы', loc),
             const SizedBox(width: 8),
             _buildTypeChip(_InboxTypeTab.inventory, loc.t('inbox_tab_inventory') ?? 'Инвентаризация', loc),
             if (!isBarOrHall) ...[
@@ -352,6 +453,8 @@ class _InboxScreenState extends State<InboxScreen> {
             ],
             const SizedBox(width: 8),
             _buildTypeChip(_InboxTypeTab.notifications, loc.t('inbox_tab_notifications') ?? 'Уведомления', loc),
+            const SizedBox(width: 8),
+            _buildTypeChip(_InboxTypeTab.checklist, loc.t('inbox_tab_checklist') ?? 'Чеклисты', loc),
           ],
         ),
       ),
@@ -360,8 +463,15 @@ class _InboxScreenState extends State<InboxScreen> {
 
   Widget _buildTypeChip(_InboxTypeTab tab, String label, LocalizationService loc) {
     final isSelected = _selectedTypeTab == tab;
+    final count = _getCountForOwnerTypeTab(tab);
     return FilterChip(
-      label: Text(label),
+      label: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label),
+          _buildCountBadge(count),
+        ],
+      ),
       selected: isSelected,
       onSelected: (_) {
         setState(() => _selectedTypeTab = tab);
@@ -412,10 +522,17 @@ class _InboxScreenState extends State<InboxScreen> {
 
   Widget _buildTabChip(_InboxTab tab, LocalizationService loc) {
     final isSelected = _selectedTab == tab;
+    final count = _getCountForTab(tab);
     return Container(
       margin: const EdgeInsets.only(right: 8),
       child: FilterChip(
-        label: Text(_tabLabel(tab, loc)),
+        label: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(_tabLabel(tab, loc)),
+            _buildCountBadge(count),
+          ],
+        ),
         selected: isSelected,
         onSelected: (selected) {
           setState(() => _selectedTab = tab);

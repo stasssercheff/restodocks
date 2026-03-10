@@ -990,6 +990,91 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Widget _buildNotificationSettings(
+    BuildContext context, LocalizationService loc, Employee emp, AccountManagerSupabase accountManager) {
+    final prefs = context.watch<NotificationPreferencesService>();
+    final empId = emp.id;
+    final isOwner = emp.hasRole('owner');
+    final isManagement = emp.department == 'management' ||
+        emp.hasRole('executive_chef') || emp.hasRole('sous_chef') ||
+        emp.hasRole('bar_manager') || emp.hasRole('floor_manager');
+    final isLineStaff = !isOwner && !isManagement;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            loc.t('notification_display_type') ?? 'Вид уведомлений',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...NotificationDisplayType.values.map((t) {
+            final label = switch (t) {
+              NotificationDisplayType.banner => loc.t('notification_banner') ?? 'Плашка сверху',
+              NotificationDisplayType.modal => loc.t('notification_modal') ?? 'Окошко в центре',
+              NotificationDisplayType.disabled => loc.t('notification_disabled') ?? 'Отключены',
+            };
+            return RadioListTile<NotificationDisplayType>(
+              title: Text(label),
+              value: t,
+              groupValue: prefs.displayType,
+              onChanged: (v) async {
+                if (v != null) await prefs.setDisplayType(v, empId);
+              },
+            );
+          }),
+          if (prefs.displayType != NotificationDisplayType.disabled) ...[
+            const SizedBox(height: 16),
+            Text(
+              loc.t('notification_categories') ?? 'Какие уведомления включены',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            SwitchListTile(
+              title: Text(loc.t('inbox_tab_messages') ?? 'Сообщения'),
+              value: prefs.messages,
+              onChanged: (v) => prefs.setMessages(v, empId),
+            ),
+            SwitchListTile(
+              title: Text(loc.t('inbox_tab_order') ?? 'Заказы'),
+              value: prefs.orders,
+              onChanged: (v) => prefs.setOrders(v, empId),
+            ),
+            if (isOwner || isManagement) ...[
+              SwitchListTile(
+                title: Text(loc.t('inbox_tab_inventory') ?? 'Инвентаризация'),
+                value: prefs.inventory,
+                onChanged: (v) => prefs.setInventory(v, empId),
+              ),
+              SwitchListTile(
+                title: Text(loc.t('iiko_inventory_title') ?? 'Инвентаризация iiko'),
+                value: prefs.iikoInventory,
+                onChanged: (v) => prefs.setIikoInventory(v, empId),
+              ),
+            ],
+            SwitchListTile(
+              title: Text(loc.t('inbox_tab_notifications') ?? 'Уведомления'),
+              subtitle: Text(
+                isLineStaff
+                    ? (loc.t('notification_checklist_assigned') ?? 'Чеклисты, назначенные на вас')
+                    : (loc.t('notification_schedule_changes') ?? 'Изменения штатного расписания'),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              value: prefs.notifications,
+              onChanged: (v) => prefs.setNotifications(v, empId),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   void _showSupportDialog(BuildContext context, LocalizationService loc) {
     showDialog<void>(
       context: context,
@@ -1283,6 +1368,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 value: screenPref.showNameTranslit,
                 onChanged: (v) => screenPref.setShowNameTranslit(v),
               ),
+            ),
+            ExpansionTile(
+              leading: const Icon(Icons.notifications),
+              title: Text(localization.t('notification_settings') ?? 'Уведомления'),
+              subtitle: Text(localization.t('notification_settings_hint') ?? 'Вид уведомлений и какие включены'),
+              children: [
+                _buildNotificationSettings(context, localization, currentEmployee, accountManager),
+              ],
             ),
             ListTile(
               leading: const Icon(Icons.language),
