@@ -224,6 +224,9 @@ class _IikoInventoryInboxDetailScreenState
             totalRows: rows.length,
             filledRows: filledCount,
           ),
+          // Метаданные объединения
+          if ((payload['mergeMetadata'] as Map?)?['mergedBy'] != null)
+            _MergeMetadataPanel(meta: payload['mergeMetadata'] as Map<String, dynamic>),
           // Вкладки листов (если > 1)
           if (hasSheets)
             _InboxSheetTabBar(
@@ -301,6 +304,76 @@ class _InboxSheetTabBar extends StatelessWidget {
             );
           }).toList(),
         ),
+      ),
+    );
+  }
+}
+
+// ── Метаданные объединения ───────────────────────────────────────────────────
+class _MergeMetadataPanel extends StatelessWidget {
+  const _MergeMetadataPanel({required this.meta});
+
+  final Map<String, dynamic> meta;
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = context.watch<LocalizationService>();
+    final theme = Theme.of(context);
+    final mergedBy = meta['mergedBy']?.toString() ?? '—';
+    final mergedAtRaw = meta['mergedAt']?.toString() ?? '';
+    String mergedAtStr = mergedAtRaw;
+    try {
+      final dt = DateTime.parse(mergedAtRaw).toLocal();
+      mergedAtStr = '${dt.day.toString().padLeft(2, '0')}.${dt.month.toString().padLeft(2, '0')}.${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    } catch (_) {}
+    final sources = (meta['sourceDocuments'] as List<dynamic>?) ?? [];
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: theme.dividerColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.merge_type, size: 18, color: theme.colorScheme.primary),
+              const SizedBox(width: 6),
+              Text(
+                loc.t('inventory_merge_merged_by') ?? 'Объединено',
+                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text('$mergedBy — $mergedAtStr', style: theme.textTheme.bodyMedium),
+          if (sources.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              loc.t('inventory_merge_source_blanks') ?? 'Исходные бланки',
+              style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            ...sources.map<Widget>((s) {
+              final m = s is Map ? Map<String, dynamic>.from(s as Map) : <String, dynamic>{};
+              final emp = m['employeeName']?.toString() ?? '—';
+              final createdRaw = m['createdAt']?.toString() ?? '';
+              String createdStr = createdRaw;
+              try {
+                final dt = DateTime.parse(createdRaw).toLocal();
+                createdStr = '${dt.day.toString().padLeft(2, '0')}.${dt.month.toString().padLeft(2, '0')}.${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+              } catch (_) {}
+              return Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text('• $emp — $createdStr', style: theme.textTheme.bodySmall),
+              );
+            }),
+          ],
+        ],
       ),
     );
   }

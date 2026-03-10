@@ -1,4 +1,4 @@
-import 'package:excel/excel.dart' hide TextSpan;
+import 'package:excel/excel.dart' hide TextSpan, Border;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -556,6 +556,10 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _buildHeader(loc, header),
+            if ((payload['mergeMetadata'] as Map?)?['mergedBy'] != null) ...[
+              const SizedBox(height: 16),
+              _buildMergeMetadata(loc, payload['mergeMetadata'] as Map<String, dynamic>),
+            ],
             const SizedBox(height: 24),
             Text(
               loc.t('inventory_item_name'),
@@ -565,6 +569,64 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
             _buildTable(theme, loc, sortedRows),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildMergeMetadata(LocalizationService loc, Map<String, dynamic> meta) {
+    final mergedBy = meta['mergedBy']?.toString() ?? '—';
+    final mergedAtRaw = meta['mergedAt']?.toString() ?? '';
+    String mergedAtStr = mergedAtRaw;
+    try {
+      final dt = DateTime.parse(mergedAtRaw).toLocal();
+      mergedAtStr = '${dt.day.toString().padLeft(2, '0')}.${dt.month.toString().padLeft(2, '0')}.${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    } catch (_) {}
+    final sources = (meta['sourceDocuments'] as List<dynamic>?) ?? [];
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: theme.dividerColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.merge_type, size: 18, color: theme.colorScheme.primary),
+              const SizedBox(width: 6),
+              Text(
+                loc.t('inventory_merge_merged_by') ?? 'Объединено',
+                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text('$mergedBy — $mergedAtStr', style: theme.textTheme.bodyMedium),
+          if (sources.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              loc.t('inventory_merge_source_blanks') ?? 'Исходные бланки',
+              style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            ...sources.map<Widget>((s) {
+              final m = s is Map ? Map<String, dynamic>.from(s as Map) : <String, dynamic>{};
+              final emp = m['employeeName']?.toString() ?? '—';
+              final createdRaw = m['createdAt']?.toString() ?? '';
+              String createdStr = createdRaw;
+              try {
+                final dt = DateTime.parse(createdRaw).toLocal();
+                createdStr = '${dt.day.toString().padLeft(2, '0')}.${dt.month.toString().padLeft(2, '0')}.${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+              } catch (_) {}
+              return Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text('• $emp — $createdStr', style: theme.textTheme.bodySmall),
+              );
+            }),
+          ],
+        ],
       ),
     );
   }
