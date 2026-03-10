@@ -2269,6 +2269,8 @@ ${text}
         double? protein = verification?.suggestedProtein;
         double? fat = verification?.suggestedFat;
         double? carbs = verification?.suggestedCarbs;
+        bool? containsGluten;
+        bool? containsLactose;
 
         // Если AI дал данные, используем их приоритетно
         final hasValidNutritionFromAI = (calories != null && calories > 0) ||
@@ -2287,6 +2289,8 @@ ${text}
               protein = protein ?? nutritionResult.protein;
               fat = fat ?? nutritionResult.fat;
               carbs = carbs ?? nutritionResult.carbs;
+              containsGluten = nutritionResult.containsGluten ?? containsGluten;
+              containsLactose = nutritionResult.containsLactose ?? containsLactose;
               print('DEBUG: Used Nutrition API fallback for "${normalizedName}": calories=$calories');
             }
           } catch (nutritionError) {
@@ -2305,6 +2309,8 @@ ${text}
             protein: protein,
             fat: fat,
             carbs: carbs,
+            containsGluten: containsGluten,
+            containsLactose: containsLactose,
             unit: verification?.suggestedUnit ?? 'g',
             basePrice: verification?.suggestedPrice ?? item.price,
             currency: (verification?.suggestedPrice ?? item.price) != null ? defCur : null,

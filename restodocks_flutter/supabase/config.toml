@@ -12,6 +12,10 @@ verify_jwt = false
 [functions.save-checklist]
 verify_jwt = false
 
+# authenticate-employee — legacy-логин, сотрудники без Supabase Auth JWT
+[functions.authenticate-employee]
+verify_jwt = false
+
 # send-registration-email: как send-email, anon key с Cloudflare может не совпадать
 [functions.send-registration-email]
 verify_jwt = false

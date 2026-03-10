@@ -217,6 +217,7 @@ class IikoProductStore extends ChangeNotifier {
 
   /// Список бланков за последние 3 месяца для выбора при объединении.
   /// Возвращает [{storage_path, qty_col_index, sheet_names, sheet_qty_cols, uploaded_at}].
+  /// Если таблицы iiko_blank_versions нет — fallback на iiko_blank_meta.
   Future<List<Map<String, dynamic>>> listBlanksForMerge(String establishmentId) async {
     final result = <Map<String, dynamic>>[];
     try {
@@ -232,8 +233,13 @@ class IikoProductStore extends ChangeNotifier {
         final m = r as Map<String, dynamic>;
         result.add(Map<String, dynamic>.from(m));
       }
-      // Если нет версий — добавляем текущий бланк из meta (для старых заведений)
-      if (result.isEmpty) {
+    } catch (e) {
+      debugPrint('IikoProductStore.listBlanksForMerge (versions) error: $e');
+      // Таблица iiko_blank_versions может отсутствовать до применения миграции
+    }
+    // Если нет версий — добавляем текущий бланк из meta
+    if (result.isEmpty) {
+      try {
         final meta = await _supabase
             .from('iiko_blank_meta')
             .select('storage_path, qty_col_index, sheet_names, sheet_qty_cols, uploaded_at')
@@ -242,9 +248,9 @@ class IikoProductStore extends ChangeNotifier {
         if (meta != null) {
           result.add(Map<String, dynamic>.from(meta as Map));
         }
+      } catch (e) {
+        debugPrint('IikoProductStore.listBlanksForMerge (meta) error: $e');
       }
-    } catch (e) {
-      debugPrint('IikoProductStore.listBlanksForMerge error: $e');
     }
     return result;
   }

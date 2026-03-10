@@ -380,15 +380,11 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
         await saveFileBytes('order_${supplier}_$dateStr.xlsx', bytes);
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('inventory_excel_downloaded') ?? 'Файл сохранён')),
-        );
+        AppToastService.show(loc.t('inventory_excel_downloaded') ?? 'Файл сохранён', duration: const Duration(seconds: 3));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e')),
-        );
+        AppToastService.show('Ошибка: $e', duration: const Duration(seconds: 4));
       }
     }
   }

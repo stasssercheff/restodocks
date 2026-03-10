@@ -353,7 +353,9 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
     }
 
     final iikoStore = context.read<IikoProductStore>();
-    await iikoStore.restoreBlankFromStorage();
+    final account = context.read<AccountManagerSupabase>();
+    final estId = account.establishment?.id;
+    await iikoStore.restoreBlankFromStorage(establishmentId: estId);
     setState(() => _loading = false);
 
     // Выбор бланка: если 1 версия — выгрузка сразу; если несколько — диалог с мини-превью

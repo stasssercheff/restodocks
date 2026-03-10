@@ -414,15 +414,12 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
             return fmtDate(utc);
           };
           final isOverdue = _isOverdue(c);
-          final datePartsData = <(String, bool)>[
-            if (c.scheduledForAt != null) ('${loc.t('checklist_scheduled_for') ?? 'На когда'}: ${formatDateTime(c.scheduledForAt!)}', false),
-            if (c.deadlineAt != null) ('${loc.t('checklist_complete_by') ?? 'Завершить до'}: ${formatDateTime(c.deadlineAt!)}', isOverdue),
+          final datePartsData = <String>[
+            if (c.scheduledForAt != null) '${loc.t('checklist_scheduled_for') ?? 'На когда'}: ${formatDateTime(c.scheduledForAt!)}',
+            if (c.deadlineAt != null) '${loc.t('checklist_complete_by') ?? 'Завершить до'}: ${formatDateTime(c.deadlineAt!)}',
           ];
           return Card(
             margin: const EdgeInsets.only(bottom: 8),
-            color: isOverdue
-                ? Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.25)
-                : null,
             shape: isOverdue
                 ? RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -464,38 +461,27 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                       spacing: 8,
                       runSpacing: 4,
                       children: [
-                        ...datePartsData.map((p) {
-                          final (text, overdue) = p;
-                          return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: overdue
-                                  ? Theme.of(context).colorScheme.error.withValues(alpha: 0.2)
-                                  : Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.6),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              text,
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                color: overdue ? Theme.of(context).colorScheme.error : null,
-                              ),
-                            ),
-                          );
-                        }),
+                        ...datePartsData.map((text) => Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.6),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            text,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                        )),
                         if (isOverdue)
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.error.withValues(alpha: 0.3),
+                              color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.6),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
                               loc.t('checklist_overdue') ?? 'Просрочен',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: Theme.of(context).colorScheme.error,
-                              ),
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
                             ),
                           ),
                       ],

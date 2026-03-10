@@ -866,17 +866,13 @@ class _InboxScreenState extends State<InboxScreen> {
     try {
       await _inboxService.downloadDocument(document);
       if (mounted) {
-          final loc = context.read<LocalizationService>();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(loc.t('inbox_doc_saved').replaceFirst('%s', document.title))),
-          );
-        }
+        final loc = context.read<LocalizationService>();
+        AppToastService.show(loc.t('inbox_doc_saved').replaceFirst('%s', document.title), duration: const Duration(seconds: 3));
+      }
     } catch (e) {
       if (mounted) {
         final loc = context.read<LocalizationService>();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('inbox_doc_save_error').replaceFirst('%s', '$e'))),
-        );
+        AppToastService.show(loc.t('inbox_doc_save_error').replaceFirst('%s', '$e'), duration: const Duration(seconds: 4));
       }
     }
   }

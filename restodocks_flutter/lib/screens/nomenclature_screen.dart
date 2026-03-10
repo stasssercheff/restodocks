@@ -3180,6 +3180,8 @@ class _CatalogTab extends StatelessWidget {
         protein: result.protein ?? p.protein,
         fat: result.fat ?? p.fat,
         carbs: result.carbs ?? p.carbs,
+        containsGluten: result.containsGluten ?? p.containsGluten,
+        containsLactose: result.containsLactose ?? p.containsLactose,
       );
       await store.updateProduct(updated);
       onRefresh();
@@ -3247,6 +3249,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
   late final TextEditingController _packageWeightController;
   late final TextEditingController _gramsPerPieceController;
   bool _checkingName = false;
+  bool _fetchingKbju = false;
   late final TextEditingController _caloriesController;
   late final TextEditingController _proteinController;
   late final TextEditingController _fatController;
@@ -3334,6 +3337,61 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
     return double.tryParse(s);
   }
 
+  /// Объединить значение: пусто → брать new; иначе перезапись только при расхождении >10%
+  double? _mergeKbjuField(double? current, double? newVal) {
+    if (newVal == null) return current;
+    if (current == null || current == 0) return newVal;
+    final denom = current > newVal ? current : newVal;
+    if (denom < 0.01) return newVal;
+    final diffPct = (current - newVal).abs() / denom;
+    return diffPct > 0.10 ? newVal : current;
+  }
+
+  /// Подтянуть КБЖУ и аллергены из Open Food Facts
+  Future<void> _fetchKbjuFromOff() async {
+    final name = _nameController.text.trim();
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(widget.loc.t('product_name_required') ?? 'Введите название')),
+      );
+      return;
+    }
+    setState(() => _fetchingKbju = true);
+    try {
+      final result = await NutritionApiService.fetchNutrition(name);
+      if (!mounted) return;
+      if (result == null || !result.hasData) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(widget.loc.t('kbju_not_found') ?? 'КБЖУ не найдено')),
+        );
+        return;
+      }
+      setState(() {
+        _caloriesController.text = (result.calories ?? 0).toStringAsFixed(0);
+        _proteinController.text = (result.protein ?? 0).toStringAsFixed(1);
+        _fatController.text = (result.fat ?? 0).toStringAsFixed(1);
+        _carbsController.text = (result.carbs ?? 0).toStringAsFixed(1);
+        if (result.containsGluten != null) _containsGluten = result.containsGluten!;
+        if (result.containsLactose != null) _containsLactose = result.containsLactose!;
+      });
+      final fmt = widget.loc.t('kbju_result_format') ?? '%s ккал, Б:%s Ж:%s У:%s';
+      final msg = fmt
+          .replaceFirst('%s', '${result.calories?.round() ?? 0}')
+          .replaceFirst('%s', '${result.protein?.toStringAsFixed(1) ?? 0}')
+          .replaceFirst('%s', '${result.fat?.toStringAsFixed(1) ?? 0}')
+          .replaceFirst('%s', '${result.carbs?.toStringAsFixed(1) ?? 0}');
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(widget.loc.t('error_with_message')?.replaceAll('%s', e.toString()) ?? e.toString())),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _fetchingKbju = false);
+    }
+  }
+
   /// ИИ проверяет название на опечатки и предлагает исправление
   Future<void> _checkNameWithAi() async {
     final name = _nameController.text.trim();
@@ -3378,6 +3436,35 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(widget.loc.t('product_name_required'))));
       return;
     }
+    double? calories = _parseNum(_caloriesController.text);
+    double? protein = _parseNum(_proteinController.text);
+    double? fat = _parseNum(_fatController.text);
+    double? carbs = _parseNum(_carbsController.text);
+    bool containsGluten = _containsGluten;
+    bool containsLactose = _containsLactose;
+
+    // Автоподгрузка недостающих КБЖУ из Open Food Facts
+    // Пустые поля — заполняем. Заполненные — перезаписываем только при расхождении >10%
+    final hasEmptyKbju = (calories == null || calories == 0) ||
+        (protein == null || protein == 0) ||
+        (fat == null || fat == 0) ||
+        (carbs == null || carbs == 0);
+    if (hasEmptyKbju && widget.isCreate) {
+      setState(() => _fetchingKbju = true);
+      try {
+        final result = await NutritionApiService.fetchNutrition(name);
+        if (result != null && result.hasData) {
+          calories = _mergeKbjuField(calories, result.calories);
+          protein = _mergeKbjuField(protein, result.protein);
+          fat = _mergeKbjuField(fat, result.fat);
+          carbs = _mergeKbjuField(carbs, result.carbs);
+          if (result.containsGluten != null) containsGluten = result.containsGluten!;
+          if (result.containsLactose != null) containsLactose = result.containsLactose!;
+        }
+      } catch (_) {}
+      if (mounted) setState(() => _fetchingKbju = false);
+    }
+
     final curLang = widget.loc.currentLanguageCode;
     final allLangs = LocalizationService.productLanguageCodes;
     final merged = Map<String, String>.from(widget.product.names ?? {});
@@ -3404,12 +3491,12 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
       clearGramsPerPiece: !CulinaryUnits.isCountable(_unit),
       unit: _unit,
       primaryWastePct: _parseNum(_wastePctController.text)?.clamp(0.0, 99.9),
-      calories: _parseNum(_caloriesController.text),
-      protein: _parseNum(_proteinController.text),
-      fat: _parseNum(_fatController.text),
-      carbs: _parseNum(_carbsController.text),
-      containsGluten: _containsGluten,
-      containsLactose: _containsLactose,
+      calories: calories,
+      protein: protein,
+      fat: fat,
+      carbs: carbs,
+      containsGluten: containsGluten,
+      containsLactose: containsLactose,
     );
     try {
       if (widget.isCreate) {
@@ -3497,6 +3584,85 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 ),
               ],
+              const SizedBox(height: 16),
+              // КБЖУ и подтягивание из Open Food Facts
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(widget.loc.t('nutrition') ?? 'КБЖУ', style: Theme.of(context).textTheme.titleSmall),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: _caloriesController,
+                                decoration: InputDecoration(
+                                  labelText: widget.loc.t('calories') ?? 'ккал',
+                                  border: const OutlineInputBorder(),
+                                  isDense: true,
+                                ),
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextFormField(
+                                controller: _proteinController,
+                                decoration: InputDecoration(
+                                  labelText: 'Б',
+                                  border: const OutlineInputBorder(),
+                                  isDense: true,
+                                ),
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextFormField(
+                                controller: _fatController,
+                                decoration: InputDecoration(
+                                  labelText: 'Ж',
+                                  border: const OutlineInputBorder(),
+                                  isDense: true,
+                                ),
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextFormField(
+                                controller: _carbsController,
+                                decoration: InputDecoration(
+                                  labelText: 'У',
+                                  border: const OutlineInputBorder(),
+                                  isDense: true,
+                                ),
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    height: 48,
+                    child: FilledButton.icon(
+                      onPressed: _fetchingKbju ? null : _fetchKbjuFromOff,
+                      icon: _fetchingKbju
+                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(Icons.cloud_download_outlined, size: 18),
+                      label: Text(widget.loc.t('kbju_fetch') ?? 'Подтянуть'),
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 16),
               // Переключатель: цена за кг/ед vs цена за упаковку
               Row(

@@ -452,22 +452,44 @@ CATEGORY_RU = {
     "processed_meat": "Колбасные изделия", "poultry": "Птица",
 }
 
+# Категории с глютеном: зерновые, выпечка
+_GLUTEN_CATEGORIES = {"grains", "bakery"}
+# Категории с лактозой: молочные
+_LACTOSE_CATEGORIES = {"dairy"}
+
+
+def _allergens_from_category(category):
+    cat = (category or "misc").lower()
+    return (
+        cat in _GLUTEN_CATEGORIES,
+        cat in _LACTOSE_CATEGORIES,
+    )
+
+
 def make_product(p):
-    """Convert world_products entry to Supabase product row. names: ru, en, es."""
+    """Convert world_products entry to Supabase product row. names: ru, en, es.
+    contains_gluten/contains_lactose derived from category or from p if present."""
     en_name = p["name"]
     ru_name = EN_RU.get(en_name, en_name)  # fallback to en name if no translation
     es_name = EN_ES.get(en_name, en_name)  # fallback to en if no ES translation
+
+    cat = p.get("category", "misc")
+    gluten_default, lactose_default = _allergens_from_category(cat)
+    contains_gluten = p.get("containsGluten", p.get("contains_gluten", gluten_default))
+    contains_lactose = p.get("containsLactose", p.get("contains_lactose", lactose_default))
 
     return {
         "id": str(uuid.uuid4()),
         "name": ru_name,  # primary name in Russian
         "names": {"ru": ru_name, "en": en_name, "es": es_name},
-        "category": p.get("category", "misc"),
+        "category": cat,
         "unit": "g" if p.get("unit") in ("g", "gram", "гр", "г") else "kg",
         "calories": p.get("calories", 0),
         "protein": p.get("protein", 0),
         "fat": p.get("fat", 0),
         "carbs": p.get("carbs", 0),
+        "contains_gluten": bool(contains_gluten),
+        "contains_lactose": bool(contains_lactose),
     }
 
 def fetch_existing_names():
@@ -571,16 +593,23 @@ def main():
         en_orig = p.get("en", p["name"])
         ru_orig = p["name"]
         es_orig = EN_ES.get(en_orig, en_orig)  # es for extra_products
+        cat = p.get("category", "misc")
+        gluten_default, lactose_default = _allergens_from_category(cat)
+        contains_gluten = p.get("containsGluten", p.get("contains_gluten", gluten_default))
+        contains_lactose = p.get("containsLactose", p.get("contains_lactose", lactose_default))
+
         new_products.append({
             "id": str(uuid.uuid4()),
             "name": ru_orig,
             "names": {"ru": ru_orig, "en": en_orig, "es": es_orig},
-            "category": p.get("category", "misc"),
+            "category": cat,
             "unit": "g" if p.get("unit") in ("g", "gram", "гр", "г") else "kg",
             "calories": p.get("calories", 0),
             "protein": p.get("protein", 0),
             "fat": p.get("fat", 0),
             "carbs": p.get("carbs", 0),
+            "contains_gluten": bool(contains_gluten),
+            "contains_lactose": bool(contains_lactose),
         })
 
     print(f"   Новых для добавления: {len(new_products)}")

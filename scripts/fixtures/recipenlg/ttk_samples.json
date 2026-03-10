@@ -1,0 +1,221 @@
+[
+  {
+    "dishName": "pork chop noodle soup",
+    "technologyText": "Season pork chops with salt and pepper. Heat oil in a dutch oven. Add chops and cook 4 minutes per side. Add broth, vegetables, thyme. Simmer 90 minutes. Add pasta.",
+    "ingredients": [
+      {
+        "productName": "bone in pork chops",
+        "grossGrams": 3.0,
+        "netGrams": null,
+        "unit": null,
+        "cookingMethod": null,
+        "primaryWastePct": null,
+        "cookingLossPct": null
+      },
+      {
+        "productName": "salt",
+        "grossGrams": null,
+        "netGrams": null,
+        "unit": null,
+        "cookingMethod": null,
+        "primaryWastePct": null,
+        "cookingLossPct": null
+      },
+      {
+        "productName": "pepper",
+        "grossGrams": null,
+        "netGrams": null,
+        "unit": null,
+        "cookingMethod": null,
+        "primaryWastePct": null,
+        "cookingLossPct": null
+      },
+      {
+        "productName": "vegetable oil",
+        "grossGrams": null,
+        "netGrams": null,
+        "unit": "tablespoon",
+        "cookingMethod": null,
+        "primaryWastePct": null,
+        "cookingLossPct": null
+      },
+      {
+        "productName": "chicken broth",
+        "grossGrams": null,
+        "netGrams": null,
+        "unit": "cup",
+        "cookingMethod": null,
+        "primaryWastePct": null,
+        "cookingLossPct": null
+      },
+      {
+        "productName": "vegetable broth",
+        "grossGrams": null,
+        "netGrams": null,
+        "unit": "cup",
+        "cookingMethod": null,
+        "primaryWastePct": null,
+        "cookingLossPct": null
+      },
+      {
+        "productName": "red onion",
+        "grossGrams": 1.0,
+        "netGrams": null,
+        "unit": null,
+        "cookingMethod": null,
+        "primaryWastePct": null,
+        "cookingLossPct": null
+      },
+      {
+        "productName": "carrots",
+        "grossGrams": 4.0,
+        "netGrams": null,
+        "unit": null,
+        "cookingMethod": null,
+        "primaryWastePct": null,
+        "cookingLossPct": null
+      },
+      {
+        "productName": "garlic",
+        "grossGrams": null,
+        "netGrams": null,
+        "unit": "clove",
+        "cookingMethod": null,
+        "primaryWastePct": null,
+        "cookingLossPct": null
+      }
+    ],
+    "isSemiFinished": null
+  },
+  {
+    "dishName": "No-Bake Nut Cookies",
+    "technologyText": "Mix brown sugar, nuts, milk and butter. Stir over medium heat. Boil 5 minutes. Stir in vanilla and cereal. Drop into clusters. Let stand until firm.",
+    "ingredients": [
+      {
+        "productName": "c. firmly packed brown sugar",
+        "grossGrams": 1.0,
+        "netGrams": null,
+        "unit": null,
+        "cookingMethod": null,
+        "primaryWastePct": null,
+        "cookingLossPct": null
+      },
+      {
+        "productName": "1/2 c. evaporated milk",
+        "grossGrams": null,
+        "netGrams": null,
+        "unit": null,
+        "cookingMethod": null,
+        "primaryWastePct": null,
+        "cookingLossPct": null
+      },
+      {
+        "productName": "1/2 tsp. vanilla",
+        "grossGrams": null,
+        "netGrams": null,
+        "unit": null,
+        "cookingMethod": null,
+        "primaryWastePct": null,
+        "cookingLossPct": null
+      },
+      {
+        "productName": "1/2 c. broken nuts",
+        "grossGrams": null,
+        "netGrams": null,
+        "unit": null,
+        "cookingMethod": null,
+        "primaryWastePct": null,
+        "cookingLossPct": null
+      },
+      {
+        "productName": "Tbsp. butter",
+        "grossGrams": 2.0,
+        "netGrams": null,
+        "unit": null,
+        "cookingMethod": null,
+        "primaryWastePct": null,
+        "cookingLossPct": null
+      },
+      {
+        "productName": "1/2 c. bite size shredded rice biscuits",
+        "grossGrams": 3.0,
+        "netGrams": null,
+        "unit": null,
+        "cookingMethod": null,
+        "primaryWastePct": null,
+        "cookingLossPct": null
+      }
+    ],
+    "isSemiFinished": null
+  },
+  {
+    "dishName": "Greek Salad",
+    "technologyText": "Dice cucumbers and tomatoes. Slice onion. Cut feta into cubes. Mix all with olives. Dress with olive oil and oregano.",
+    "ingredients": [
+      {
+        "productName": "cucumbers",
+        "grossGrams": 2.0,
+        "netGrams": null,
+        "unit": null,
+        "cookingMethod": null,
+        "primaryWastePct": null,
+        "cookingLossPct": null
+      },
+      {
+        "productName": "tomatoes",
+        "grossGrams": 4.0,
+        "netGrams": null,
+        "unit": null,
+        "cookingMethod": null,
+        "primaryWastePct": null,
+        "cookingLossPct": null
+      },
+      {
+        "productName": "red onion",
+        "grossGrams": 1.0,
+        "netGrams": null,
+        "unit": null,
+        "cookingMethod": null,
+        "primaryWastePct": null,
+        "cookingLossPct": null
+      },
+      {
+        "productName": "feta cheese",
+        "grossGrams": 200.0,
+        "netGrams": null,
+        "unit": "g",
+        "cookingMethod": null,
+        "primaryWastePct": null,
+        "cookingLossPct": null
+      },
+      {
+        "productName": "olives",
+        "grossGrams": 100.0,
+        "netGrams": null,
+        "unit": "g",
+        "cookingMethod": null,
+        "primaryWastePct": null,
+        "cookingLossPct": null
+      },
+      {
+        "productName": "olive oil",
+        "grossGrams": null,
+        "netGrams": null,
+        "unit": null,
+        "cookingMethod": null,
+        "primaryWastePct": null,
+        "cookingLossPct": null
+      },
+      {
+        "productName": "oregano",
+        "grossGrams": null,
+        "netGrams": null,
+        "unit": null,
+        "cookingMethod": null,
+        "primaryWastePct": null,
+        "cookingLossPct": null
+      }
+    ],
+    "isSemiFinished": null
+  }
+]

@@ -182,27 +182,21 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
       if (mounted) {
         if (orderDoc == null) {
           // Заказ сохранён локально, но входящие не созданы — показываем предупреждение, но не блокируем
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(loc.t('order_save_inbox_warning') ?? '${loc.t('order_list_save_with_quantities')} ✓ (входящие: ошибка — нет получателей)'),
-              duration: const Duration(seconds: 5),
-            ),
+          AppToastService.show(
+            loc.t('order_save_inbox_warning') ?? '${loc.t('order_list_save_with_quantities')} ✓ (входящие: ошибка — нет получателей)',
+            duration: const Duration(seconds: 5),
           );
           setState(() => _saving = false);
           if (context.canPop()) context.pop();
           return;
         }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${loc.t('order_list_save_with_quantities')} ✓')),
-        );
+        AppToastService.show('${loc.t('order_list_save_with_quantities')} ✓', duration: const Duration(seconds: 3));
         // pop вместо go, чтобы разрешить await в OrderListsScreen и сразу показать новый заказ
         if (context.canPop()) context.pop();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${context.read<LocalizationService>().t('error_short')}: $e')),
-        );
+        AppToastService.show('${context.read<LocalizationService>().t('error_short')}: $e', duration: const Duration(seconds: 4));
         setState(() => _saving = false);
       }
     }
@@ -307,20 +301,13 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
         itemsSourceLang: loc.currentLanguageCode,
         onSaved: (msg) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+            AppToastService.show(msg, duration: const Duration(seconds: 3));
           }
         },
         onExportToInbox: () async {
           final ok = await _saveOrderToInbox();
           if (mounted && !ok) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  '${loc.t('error_short')}: ${loc.t('order_save_inbox_error')}',
-                ),
-                backgroundColor: Theme.of(context).colorScheme.error,
-              ),
-            );
+            AppToastService.show('${loc.t('error_short')}: ${loc.t('order_save_inbox_error')}', duration: const Duration(seconds: 4));
           }
         },
       ),

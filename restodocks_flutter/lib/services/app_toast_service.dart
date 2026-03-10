@@ -1,16 +1,19 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../core/theme/app_theme.dart';
 
-/// Toast overlay — компактное светлокрасное окошко. Скрывается по тапу.
-/// Use for success/delete messages. Keep SnackBar for errors that need user attention.
-/// showBanner — плашка сверху экрана (для входящих уведомлений).
+/// Toast overlay — компактное светлокрасное окошко. Скрывается по тапу в любое место.
+/// show — модальное окошко в центре (для сохранений, отправок, feedback).
+/// showBanner — плашка сверху (для входящих уведомлений).
 class AppToastService {
   AppToastService._();
 
   static GlobalKey<NavigatorState>? _navigatorKey;
   static OverlayEntry? _entry;
   static VoidCallback? _pendingOnTap;
+  static Timer? _autoHideTimer;
 
   /// Call from MaterialApp build — pass the navigator key so we can access the overlay.
   static void init(GlobalKey<NavigatorState> navigatorKey) {
@@ -84,11 +87,16 @@ class AppToastService {
     overlay.insert(_entry!);
   }
 
-  static void show(String message, {VoidCallback? onTap}) {
+  /// Окошко в центре экрана. Тап в любое место — закрыть. Опционально автоскрытие через [duration].
+  static void show(String message, {VoidCallback? onTap, Duration? duration}) {
     hide();
     final overlay = _navigatorKey?.currentState?.overlay;
     if (overlay == null) return;
     _pendingOnTap = onTap;
+    _autoHideTimer?.cancel();
+    if (duration != null && duration > Duration.zero) {
+      _autoHideTimer = Timer(duration, hide);
+    }
 
     _entry = OverlayEntry(
       builder: (context) {
@@ -144,6 +152,8 @@ class AppToastService {
   }
 
   static void hide() {
+    _autoHideTimer?.cancel();
+    _autoHideTimer = null;
     _entry?.remove();
     _entry = null;
     _pendingOnTap = null;

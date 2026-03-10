@@ -1370,6 +1370,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             ExpansionTile(
+              initiallyExpanded: true,
               leading: const Icon(Icons.notifications),
               title: Text(localization.t('notification_settings') ?? 'Уведомления'),
               subtitle: Text(localization.t('notification_settings_hint') ?? 'Вид уведомлений и какие включены'),

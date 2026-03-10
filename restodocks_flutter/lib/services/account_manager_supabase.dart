@@ -741,9 +741,13 @@ class AccountManagerSupabase extends ChangeNotifier {
 
   /// Вызов Edge Function authenticate-employee через raw HTTP (обход Safari cross-origin
   /// POST body issues с supabase functions.invoke — body иногда не уходит).
+  /// Retry при 5xx и сетевых ошибках (EarlyDrop и др.).
   Future<({int status, Map<String, dynamic>? data})> _invokeAuthenticateEmployeeHttp(
     Map<String, dynamic> body,
   ) async {
+    const maxRetries = 3;
+    const retryDelays = [400, 800, 1600]; // ms, exponential backoff
+
     final url = '${supabase_url.getSupabaseBaseUrl()}/functions/v1/authenticate-employee';
     final dio = Dio(BaseOptions(
       headers: {
@@ -753,20 +757,43 @@ class AccountManagerSupabase extends ChangeNotifier {
       },
       validateStatus: (_) => true, // не бросать на 4xx
     ));
-    try {
-      final resp = await dio.post(url, data: body);
-      final data = resp.data is Map<String, dynamic>
-          ? resp.data as Map<String, dynamic>
-          : (resp.data is Map ? Map<String, dynamic>.from(resp.data as Map) : null);
-      return (status: resp.statusCode ?? 0, data: data);
-    } on DioException catch (e) {
-      final status = e.response?.statusCode ?? 0;
-      final data = e.response?.data;
-      final map = data is Map<String, dynamic>
-          ? data
-          : (data is Map ? Map<String, dynamic>.from(data as Map) : null);
-      return (status: status, data: map);
+
+    ({int status, Map<String, dynamic>? data}) lastResult = (status: 0, data: null);
+
+    for (var attempt = 0; attempt < maxRetries; attempt++) {
+      if (attempt > 0) {
+        await Future<void>.delayed(Duration(milliseconds: retryDelays[attempt - 1]));
+        if (kDebugMode) debugPrint('🔐 authenticate-employee retry $attempt/$maxRetries');
+      }
+      try {
+        final resp = await dio.post(url, data: body);
+        final data = resp.data is Map<String, dynamic>
+            ? resp.data as Map<String, dynamic>
+            : (resp.data is Map ? Map<String, dynamic>.from(resp.data as Map) : null);
+        lastResult = (status: resp.statusCode ?? 0, data: data);
+
+        // 4xx (в т.ч. 401 invalid_credentials) — не retry
+        if (resp.statusCode != null && resp.statusCode! >= 400 && resp.statusCode! < 500) {
+          return lastResult;
+        }
+        // 2xx — успех
+        if (resp.statusCode != null && resp.statusCode! >= 200 && resp.statusCode! < 300) {
+          return lastResult;
+        }
+        // 5xx — retry
+      } on DioException catch (e) {
+        final status = e.response?.statusCode ?? 0;
+        final data = e.response?.data;
+        final map = data is Map<String, dynamic>
+            ? data
+            : (data is Map ? Map<String, dynamic>.from(data as Map) : null);
+        lastResult = (status: status, data: map);
+        // 4xx — не retry
+        if (status >= 400 && status < 500) return lastResult;
+        // сеть/5xx — retry (последняя попытка вернёт этот результат)
+      }
     }
+    return lastResult;
   }
 
   /// Legacy: BCrypt-проверка пароля через Edge Function authenticate-employee.

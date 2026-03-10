@@ -2,18 +2,22 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
-/// Результат поиска КБЖУ
+/// Результат поиска КБЖУ и аллергенов
 class NutritionResult {
   final double? calories;
   final double? protein;
   final double? fat;
   final double? carbs;
+  final bool? containsGluten;
+  final bool? containsLactose;
 
   const NutritionResult({
     this.calories,
     this.protein,
     this.fat,
     this.carbs,
+    this.containsGluten,
+    this.containsLactose,
   });
 
   bool get hasData =>
@@ -98,6 +102,12 @@ class NutritionApiService {
 
         if (kcal != null && (kcal < _minSaneKcal || kcal > _maxSaneKcal)) continue;
 
+        final tags = (map['allergens_tags'] as List<dynamic>?)?.cast<String>() ?? [];
+        final containsGluten = tags.any((t) =>
+            t.contains('gluten') || t.contains('wheat') || t.contains('cereals'));
+        final containsLactose = tags.any((t) =>
+            t.contains('milk') || t.contains('lactose'));
+
         final score = _matchScore(searchLower, name, kcal ?? 0);
         if (score > bestScore) {
           bestScore = score;
@@ -106,6 +116,8 @@ class NutritionApiService {
             protein: protein,
             fat: fat,
             carbs: carbs,
+            containsGluten: tags.isNotEmpty ? containsGluten : null,
+            containsLactose: tags.isNotEmpty ? containsLactose : null,
           );
         }
       }

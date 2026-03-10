@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show debugPrint, kDebugMode, kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -25,6 +26,7 @@ class EmployeeChatScreen extends StatefulWidget {
 class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  late final FocusNode _inputFocusNode;
   List<EmployeeDirectMessage> _messages = [];
   Employee? _otherEmployee;
   bool _loading = true;
@@ -35,6 +37,18 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
   @override
   void initState() {
     super.initState();
+    _inputFocusNode = FocusNode(
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent &&
+            event.logicalKey == LogicalKeyboardKey.enter &&
+            (HardwareKeyboard.instance.isControlPressed ||
+                HardwareKeyboard.instance.isMetaPressed)) {
+          _send();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _load();
       _subscribeRealtime();
@@ -46,6 +60,7 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
     _realtimeChannel?.unsubscribe();
     _controller.dispose();
     _scrollController.dispose();
+    _inputFocusNode.dispose();
     super.dispose();
   }
 
@@ -169,9 +184,7 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _sending = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${context.read<LocalizationService>().t('photo_upload_error') ?? 'Ошибка'}: $e')),
-        );
+        AppToastService.show('${context.read<LocalizationService>().t('photo_upload_error') ?? 'Ошибка'}: $e', duration: const Duration(seconds: 4));
       }
     }
   }
@@ -199,9 +212,7 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _sending = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${context.read<LocalizationService>().t('error_short') ?? 'Ошибка'}: $e')),
-        );
+        AppToastService.show('${context.read<LocalizationService>().t('error_short') ?? 'Ошибка'}: $e', duration: const Duration(seconds: 4));
       }
     }
   }
@@ -284,6 +295,7 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
                   Expanded(
                     child: TextField(
                       controller: _controller,
+                      focusNode: _inputFocusNode,
                       decoration: InputDecoration(
                         hintText: loc.t('chat_type_message') ?? 'Сообщение...',
                         border: const OutlineInputBorder(),
@@ -291,7 +303,7 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
                       ),
                       textCapitalization: TextCapitalization.sentences,
                       maxLines: null,
-                      onSubmitted: (_) => _send(),
+                      onSubmitted: (_) {},
                     ),
                   ),
                   const SizedBox(width: 8),
