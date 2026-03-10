@@ -215,7 +215,12 @@ class AiServiceSupabase implements AiService {
     lastParseTechCardPdfReason = null;
     try {
       final pdfBase64 = base64Encode(pdfBytes);
-      final data = await invoke('ai-parse-tech-cards-pdf', {'pdfBase64': pdfBase64});
+      var data = await invoke('ai-parse-tech-cards-pdf', {'pdfBase64': pdfBase64});
+      // Retry on 503 (cold start) — до 2 повторов с паузой
+      for (var retry = 0; data == null && retry < 2; retry++) {
+        await Future<void>.delayed(Duration(seconds: retry == 0 ? 8 : 12));
+        data = await invoke('ai-parse-tech-cards-pdf', {'pdfBase64': pdfBase64});
+      }
       if (data == null) {
         lastParseTechCardPdfReason = 'invoke_null';
         return [];

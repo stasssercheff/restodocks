@@ -32,6 +32,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   List<TechCard> _list = [];
   bool _loading = true;
   bool _loadingExcel = false;
+  bool _loadingTtkIsPdf = false;
   String? _error;
   Set<String> _selectedTechCards = {}; // ID выбранных карточек
   bool _selectionMode = false;
@@ -301,7 +302,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     }
     final uBytes = Uint8List.fromList(bytes);
     final isPdf = (file.extension?.toLowerCase() ?? '').contains('pdf');
-    setState(() => _loadingExcel = true);
+    setState(() { _loadingExcel = true; _loadingTtkIsPdf = isPdf; });
     try {
       List<TechCardRecognitionResult> list;
       if (isPdf) {
@@ -347,7 +348,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     if (reason == 'ai_empty_response' || reason == 'ai_no_cards') {
       return loc.t('ai_tech_card_pdf_format_hint');
     }
-    if (reason == 'invoke_null') return 'Сервер не ответил. Проверьте подключение.';
+    if (reason == 'invoke_null') return 'Сервер не ответил (503). Подождите 10–30 сек и попробуйте снова.';
     return loc.t('ai_tech_card_pdf_format_hint');
   }
 
@@ -601,7 +602,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                       children: [
                         const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2)),
                         const SizedBox(height: 16),
-                        Text(loc.t('loading_excel')),
+                        Text(_loadingTtkIsPdf ? loc.t('loading_ttk_pdf') : loc.t('loading_excel')),
                       ],
                     ),
                   ),
