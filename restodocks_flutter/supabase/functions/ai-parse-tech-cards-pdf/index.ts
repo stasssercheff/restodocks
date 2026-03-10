@@ -12,27 +12,16 @@ function corsHeaders(origin: string | null) {
   };
 }
 
-const PDF_SYSTEM_PROMPT = `You are a tech card (recipe/semi-finished product) parser. The input is raw text extracted from a PDF (e.g. Shama.Book, iiko, other ТТК formats).
+const PDF_SYSTEM_PROMPT = `Ты парсер технологических карт (ТТК, рецептов, полуфабрикатов). На входе — сырой текст из PDF.
 
-Typical structure:
-- Header: "Технологическая карта № XXXX от DD.MM.YYYY" or similar
-- Dish/ПФ name: next line after header or in "Наименование" column
-- Table: № | Наименование сырья и п/ф | Нетто/Брутто | Расход на 1 | Расход на 10 | Выход
-- Ingredient rows: number, product name, gross g, net g, etc.
-- "Выход на 1 порцию: X г", "Выход на 10 порций: X г"
-- "Информация о пищевой ценности: Белки; Жиры; Углеводы; Калорийность"
-- Technology block: "Технологический процесс изготовления..."
+КРИТИЧНО: Если в тексте есть хоть какая-то ТТК (название блюда/ПФ, ингредиенты, технология) — ты ОБЯЗАН извлечь хотя бы одну карточку. Подстраивайся под ЛЮБОЙ формат: Shama.Book, iiko, ГОСТ, собственные шаблоны ресторанов. Не требуй точного соответствия образцу.
 
-How to split cards: each PDF page may have one tech card, or multiple. Look for new "Технологическая карта №" or new dish name to start a new card.
+Структура бывает разной: название в заголовке или отдельной строке; таблица с колонками № / Наименование / Продукт / Сырьё / Брутто / Нетто / Расход; числа в граммах или порциях. Извлекай что есть. Для grossGrams/netGrams бери любые подходящие числа (брутто, нетто, расход на порцию). ingredientType: "product" — сырьё; "semi_finished" — ПФ. isSemiFinished: true если в названии "ПФ".
 
-For each ingredient, set ingredientType: "product" if purchased (сырьё, смесь, мука, масло — e.g. "смесь РИКО"); "semi_finished" if ПФ (крем, бисквит собственного производства).
+Верни ТОЛЬКО валидный JSON, без markdown и обёрток:
+{ "cards": [ { "dishName": string, "technologyText": string|null, "isSemiFinished": boolean|null, "ingredients": [ { "productName": string, "grossGrams": number|null, "netGrams": number|null, "primaryWastePct": number|null, "cookingMethod": string|null, "cookingLossPct": number|null, "unit": string|null, "ingredientType": "product"|"semi_finished"|null } ] } ] }
 
-Extract: dishName, isSemiFinished (true if "ПФ" in name), ingredients (productName, grossGrams, netGrams, primaryWastePct, cookingLossPct, ingredientType; unit default "g"), technologyText.
-
-Return ONLY valid JSON, no markdown:
-{ "cards": [ { "dishName": string, "technologyText": string | null, "isSemiFinished": boolean | null, "ingredients": [ { "productName": string, "grossGrams": number | null, "netGrams": number | null, "primaryWastePct": number | null, "cookingMethod": string | null, "cookingLossPct": number | null, "unit": string | null, "ingredientType": "product" | "semi_finished" | null } ] }, ... ] }
-
-Return ALL cards found. If no cards, return { "cards": [] }.`;
+Если нет ни одной карточки: { "cards": [] }`;
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -80,46 +69,85 @@ Deno.serve(async (req: Request) => {
       const result = await extractText(pdf, { mergePages: true });
       text = result.text ?? "";
     } catch (e) {
-      return new Response(JSON.stringify({ error: `PDF extraction failed: ${e}` }), {
-        status: 400,
+      return new Response(JSON.stringify({ cards: [], reason: `extraction_failed: ${e}` }), {
+        status: 200,
         headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
       });
     }
 
     if (!text.trim()) {
-      return new Response(JSON.stringify({ cards: [] }), {
+      return new Response(JSON.stringify({ cards: [], reason: "empty_text" }), {
         status: 200,
         headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
       });
     }
 
-    const content = await chatText({
-      messages: [
-        { role: "system", content: PDF_SYSTEM_PROMPT },
-        { role: "user", content: `PDF extracted text:\n\n${text}` },
-      ],
-      maxTokens: 16384,
-    });
+    let content: string;
+    try {
+      content = await chatText({
+        messages: [
+          { role: "system", content: PDF_SYSTEM_PROMPT },
+          { role: "user", content: `PDF extracted text:\n\n${text}` },
+        ],
+        maxTokens: 16384,
+      }) ?? "";
+    } catch (aiErr) {
+      return new Response(JSON.stringify({ cards: [], reason: `ai_error: ${aiErr}` }), {
+        status: 200,
+        headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+      });
+    }
 
     if (!content?.trim()) {
-      return new Response(JSON.stringify({ cards: [] }), {
+      return new Response(JSON.stringify({ cards: [], reason: "ai_empty_response" }), {
         status: 200,
         headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
       });
     }
 
-    let parsed: { cards?: unknown[] };
-    try {
-      const cleaned = content.replace(/^```\w*\n?|\n?```$/g, "").trim();
-      parsed = JSON.parse(cleaned) as { cards?: unknown[] };
-    } catch {
-      return new Response(JSON.stringify({ cards: [] }), {
-        status: 200,
-        headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
-      });
+    let parsed: { cards?: unknown[] } | null = null;
+    const cleanContent = content.replace(/^```\w*\n?|\n?```$/g, "").trim();
+    const jsonCandidates = [
+      cleanContent,
+      content,
+      content.match(/\{[\s\S]*"cards"[\s\S]*\}/)?.[0] ?? "",
+      content.match(/\{[\s\S]*"cards"\s*:\s*\[[\s\S]*\]\s*[\},]/)?.[0]?.replace(/,\s*$/, "}") ?? "",
+    ];
+    for (const candidate of jsonCandidates) {
+      if (!candidate || candidate.length < 10) continue;
+      try {
+        parsed = JSON.parse(candidate) as { cards?: unknown[] };
+        if (Array.isArray(parsed.cards)) break;
+      } catch {
+        /* try next */
+      }
     }
 
-    const cards = Array.isArray(parsed.cards) ? parsed.cards : [];
+    // Retry with simpler prompt if first attempt returned no cards
+    if ((!parsed || !Array.isArray(parsed.cards) || parsed.cards.length === 0) && text.length > 100) {
+      try {
+        const simpleContent = await chatText({
+          messages: [
+            { role: "system", content: "Extract tech card from text. Return JSON: { \"cards\": [ { \"dishName\": string, \"technologyText\": string|null, \"isSemiFinished\": boolean|null, \"ingredients\": [ { \"productName\": string, \"grossGrams\": number|null, \"netGrams\": number|null } ] } ] }. No markdown." },
+            { role: "user", content: text },
+          ],
+          maxTokens: 8192,
+        });
+        if (simpleContent?.trim()) {
+          const simpleCleaned = simpleContent.replace(/^```\w*\n?|\n?```$/g, "").trim();
+          const simpleParsed = JSON.parse(simpleCleaned) as { cards?: unknown[] };
+          if (Array.isArray(simpleParsed.cards) && simpleParsed.cards.length > 0) {
+            parsed = simpleParsed;
+          }
+        }
+      } catch {
+        /* keep original parsed */
+      }
+    }
+
+    const cards = parsed && Array.isArray(parsed.cards) ? parsed.cards : [];
+    const reasonIfEmpty = cards.length === 0 ? "ai_no_cards" : undefined;
+
     const normalized = cards.map((card) => {
       const c = card as Record<string, unknown>;
       const ingredients = Array.isArray(c.ingredients)
@@ -146,13 +174,14 @@ Deno.serve(async (req: Request) => {
       };
     });
 
-    return new Response(JSON.stringify({ cards: normalized }), {
+    const payload = reasonIfEmpty ? { cards: normalized, reason: reasonIfEmpty } : { cards: normalized };
+    return new Response(JSON.stringify(payload), {
       status: 200,
       headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
     });
   } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), {
-      status: 500,
+    return new Response(JSON.stringify({ cards: [], reason: `error: ${e}` }), {
+      status: 200,
       headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
     });
   }

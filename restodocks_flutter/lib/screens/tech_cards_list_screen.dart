@@ -13,6 +13,7 @@ import 'excel_style_ttk_table.dart';
 import '../models/models.dart';
 import '../widgets/app_bar_home_button.dart';
 import '../services/ai_service.dart';
+import '../services/ai_service_supabase.dart';
 import '../services/services.dart';
 import '../services/excel_export_service.dart';
 
@@ -313,9 +314,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       }
       if (!mounted) return;
       if (list.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t(isPdf ? 'ai_tech_card_pdf_format_hint' : 'ai_tech_card_excel_format_hint'))),
-        );
+        final reason = isPdf && context.read<AiService>() is AiServiceSupabase
+            ? AiServiceSupabase.lastParseTechCardPdfReason
+            : null;
+        final msg = reason != null
+            ? _pdfFailureMessage(reason, loc)
+            : loc.t(isPdf ? 'ai_tech_card_pdf_format_hint' : 'ai_tech_card_excel_format_hint');
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
         return;
       }
       if (list.length == 1 && list.first.ingredients.isEmpty) {
@@ -331,6 +336,19 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     } finally {
       if (mounted) setState(() => _loadingExcel = false);
     }
+  }
+
+  static String _pdfFailureMessage(String reason, LocalizationService loc) {
+    if (reason.startsWith('empty_text')) return 'PDF не содержит извлекаемого текста.';
+    if (reason.startsWith('extraction_failed')) return 'Не удалось прочитать PDF.';
+    if (reason.startsWith('ai_error') || reason.contains('429') || reason.contains('quota')) {
+      return 'Лимит ИИ исчерпан. Попробуйте позже.';
+    }
+    if (reason == 'ai_empty_response' || reason == 'ai_no_cards') {
+      return loc.t('ai_tech_card_pdf_format_hint');
+    }
+    if (reason == 'invoke_null') return 'Сервер не ответил. Проверьте подключение.';
+    return loc.t('ai_tech_card_pdf_format_hint');
   }
 
   /// Простой разбор Excel: столбец A или B — названия ПФ/блюд.
