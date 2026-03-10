@@ -8,17 +8,18 @@ import '../widgets/app_bar_home_button.dart';
 
 /// Экран просмотра и правки распознанных ТТК перед созданием (пакетный импорт из Excel).
 class TechCardsImportReviewScreen extends StatefulWidget {
-  const TechCardsImportReviewScreen({super.key, required this.cards});
+  const TechCardsImportReviewScreen({super.key, required this.cards, this.department = 'kitchen'});
 
   final List<TechCardRecognitionResult> cards;
+  final String department;
 
   @override
   State<TechCardsImportReviewScreen> createState() => _TechCardsImportReviewScreenState();
 }
 
 class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScreen> {
-  /// Цеха для выбора при импорте ТТК (код → ключ локализации)
-  static const _sectionOptions = [
+  /// Цеха кухни
+  static const _kitchenSectionOptions = [
     ('all', 'ttk_sections_all'),
     ('hidden', 'ttk_sections_hidden'),
     ('hot_kitchen', 'section_hot_kitchen'),
@@ -31,10 +32,28 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
     ('banquet_catering', 'section_banquet_catering'),
   ];
 
-  static const _categoryOptions = [
-    'misc', 'vegetables', 'fruits', 'meat', 'seafood', 'dairy', 'grains',
-    'bakery', 'pantry', 'spices', 'beverages', 'eggs', 'legumes', 'nuts',
+  /// Цеха/видимость для бара
+  static const _barSectionOptions = [
+    ('all', 'ttk_sections_all'),
+    ('hidden', 'ttk_sections_hidden'),
+    ('bar', 'bar'),
   ];
+
+  /// Категории кухни: Суп, Салат, Мясо, Десерт и т.д.
+  static const _kitchenCategoryOptions = [
+    'sauce', 'vegetables', 'salad', 'meat', 'seafood', 'side', 'subside',
+    'bakery', 'dessert', 'decor', 'soup', 'misc', 'beverages', 'banquet', 'catering',
+  ];
+
+  /// Категории бара: коктейли, напитки, снеки и т.д.
+  static const _barCategoryOptions = [
+    'alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure',
+    'snacks', 'sauce', 'vegetables', 'salad', 'bakery', 'dessert', 'decor', 'misc', 'beverages',
+  ];
+
+  bool get _isBar => widget.department == 'bar' || widget.department == 'banquet-catering-bar';
+  List<(String, String)> get _sectionOptions => _isBar ? _barSectionOptions : _kitchenSectionOptions;
+  List<String> get _categoryOptions => _isBar ? _barCategoryOptions : _kitchenCategoryOptions;
 
   late List<_ReviewItem> _items;
   bool _saving = false;
@@ -42,28 +61,38 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
   @override
   void initState() {
     super.initState();
+    final defaultSections = _isBar ? const ['bar'] : const ['all'];
     _items = widget.cards.map((c) => _ReviewItem(
       result: c,
       category: _inferCategory(c.dishName ?? ''),
-      sections: const ['all'],
+      sections: defaultSections,
       isSemiFinished: c.isSemiFinished ?? true,
     )).toList();
   }
 
   String _inferCategory(String dishName) {
     final lower = dishName.toLowerCase();
-    if (lower.contains('овощ') || lower.contains('vegetable') || lower.contains('салат')) return 'vegetables';
-    if (lower.contains('фрукт') || lower.contains('fruit') || lower.contains('ягод')) return 'fruits';
+    if (_isBar) {
+      if (lower.contains('коктейл') || lower.contains('cocktail') || lower.contains('мохито') || lower.contains('маргарит')) return 'alcoholic_cocktails';
+      if (lower.contains('лимонад') || lower.contains('сок') || lower.contains('кола') || lower.contains('тоник') || lower.contains('soda') || lower.contains('juice')) return 'non_alcoholic_drinks';
+      if (lower.contains('кофе') || lower.contains('чай') || lower.contains('какао') || lower.contains('coffee') || lower.contains('tea') || lower.contains('cocoa')) return 'hot_drinks';
+      if (lower.contains('виски') || lower.contains('ром') || lower.contains('водка') || lower.contains('вино') || lower.contains('пиво') || lower.contains('whiskey') || lower.contains('rum') || lower.contains('vodka') || lower.contains('wine') || lower.contains('beer')) return 'drinks_pure';
+      if (lower.contains('орех') || lower.contains('чипс') || lower.contains('снек') || lower.contains('nuts') || lower.contains('chips') || lower.contains('snack')) return 'snacks';
+    }
+    if (lower.contains('соус') || lower.contains('sauce')) return 'sauce';
+    if (lower.contains('овощ') || lower.contains('vegetable')) return 'vegetables';
+    if (lower.contains('салат') || lower.contains('salad')) return 'salad';
     if (lower.contains('мяс') || lower.contains('meat') || lower.contains('куриц') || lower.contains('говядин')) return 'meat';
-    if (lower.contains('рыб') || lower.contains('fish') || lower.contains('море')) return 'seafood';
-    if (lower.contains('молок') || lower.contains('dairy') || lower.contains('сыр') || lower.contains('cream')) return 'dairy';
-    if (lower.contains('круп') || lower.contains('grain') || lower.contains('рис') || lower.contains('макарон')) return 'grains';
+    if (lower.contains('рыб') || lower.contains('fish') || lower.contains('море') || lower.contains('seafood')) return 'seafood';
+    if (lower.contains('гарнир') || lower.contains('side')) return 'side';
+    if (lower.contains('подгарнир') || lower.contains('subside')) return 'subside';
     if (lower.contains('выпеч') || lower.contains('bakery') || lower.contains('хлеб') || lower.contains('тест')) return 'bakery';
+    if (lower.contains('десерт') || lower.contains('dessert') || lower.contains('крем') || lower.contains('торт')) return 'dessert';
+    if (lower.contains('декор') || lower.contains('decor')) return 'decor';
+    if (lower.contains('суп') || lower.contains('soup')) return 'soup';
     if (lower.contains('напит') || lower.contains('beverage') || lower.contains('сок') || lower.contains('компот')) return 'beverages';
-    if (lower.contains('специ') || lower.contains('spice')) return 'spices';
-    if (lower.contains('яйц') || lower.contains('egg')) return 'eggs';
-    if (lower.contains('боб') || lower.contains('legume')) return 'legumes';
-    if (lower.contains('орех') || lower.contains('nut')) return 'nuts';
+    if (lower.contains('банкет') || lower.contains('banquet')) return 'banquet';
+    if (lower.contains('кейтринг') || lower.contains('catering')) return 'catering';
     return 'misc';
   }
 
@@ -80,16 +109,23 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
   }
 
   String _categoryLabel(String c, String lang) {
-    if (lang == 'ru') {
-      const map = {
-        'vegetables': 'Овощи', 'fruits': 'Фрукты', 'meat': 'Мясо', 'seafood': 'Рыба',
-        'dairy': 'Молочное', 'grains': 'Крупы', 'bakery': 'Выпечка', 'pantry': 'Бакалея',
-        'spices': 'Специи', 'beverages': 'Напитки', 'eggs': 'Яйца', 'legumes': 'Бобовые',
-        'nuts': 'Орехи', 'misc': 'Разное',
-      };
-      return map[c] ?? c;
-    }
-    return c;
+    const ru = {
+      'sauce': 'Соус', 'vegetables': 'Овощи', 'salad': 'Салат', 'meat': 'Мясо',
+      'seafood': 'Рыба', 'side': 'Гарнир', 'subside': 'Подгарнир', 'bakery': 'Выпечка',
+      'dessert': 'Десерт', 'decor': 'Декор', 'soup': 'Суп', 'misc': 'Разное',
+      'beverages': 'Напитки', 'banquet': 'Банкет', 'catering': 'Кейтеринг',
+      'alcoholic_cocktails': 'Алкогольные коктейли', 'non_alcoholic_drinks': 'Безалкогольные напитки',
+      'hot_drinks': 'Горячие напитки', 'drinks_pure': 'Напитки в чистом виде', 'snacks': 'Снеки',
+    };
+    const en = {
+      'sauce': 'Sauce', 'vegetables': 'Vegetables', 'salad': 'Salad', 'meat': 'Meat',
+      'seafood': 'Seafood', 'side': 'Side dish', 'subside': 'Sub-side', 'bakery': 'Bakery',
+      'dessert': 'Dessert', 'decor': 'Decor', 'soup': 'Soup', 'misc': 'Misc',
+      'beverages': 'Beverages', 'banquet': 'Banquet', 'catering': 'Catering',
+      'alcoholic_cocktails': 'Alcoholic cocktails', 'non_alcoholic_drinks': 'Non-alcoholic drinks',
+      'hot_drinks': 'Hot drinks', 'drinks_pure': 'Drinks (neat)', 'snacks': 'Snacks',
+    };
+    return (lang == 'ru' ? ru : en)[c] ?? c;
   }
 
   Future<void> _createAll() async {
@@ -136,7 +172,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(loc.t('tech_cards_import_created').replaceAll('%s', '$created'))),
         );
-        context.go('/tech-cards?refresh=1');
+        context.go('/tech-cards/${widget.department}?refresh=1');
       }
     } catch (e) {
       if (mounted) {

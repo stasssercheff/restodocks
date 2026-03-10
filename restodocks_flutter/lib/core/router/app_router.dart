@@ -598,7 +598,8 @@ class AppRouter {
             pageBuilder: (context, state) {
               final list = state.extra as List?;
               final cards = list != null ? list.map((e) => e as TechCardRecognitionResult).toList() : <TechCardRecognitionResult>[];
-              return _slideTransitionPage(state, TechCardsImportReviewScreen(cards: cards));
+              final department = state.queryParameters['department'] ?? 'kitchen';
+              return _slideTransitionPage(state, TechCardsImportReviewScreen(cards: cards, department: department));
             },
           ),
           GoRoute(

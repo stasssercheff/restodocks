@@ -324,9 +324,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         );
       }
       if (list.length == 1) {
-        context.push('/tech-cards/new', extra: list.single);
+        context.push(widget.department == 'bar' ? '/tech-cards/new?department=bar' : '/tech-cards/new', extra: list.single);
       } else {
-        context.push('/tech-cards/import-review', extra: list);
+        context.push('/tech-cards/import-review?department=${Uri.encodeComponent(widget.department)}', extra: list);
       }
     } finally {
       if (mounted) setState(() => _loadingExcel = false);
