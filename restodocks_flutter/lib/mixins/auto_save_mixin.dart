@@ -153,6 +153,9 @@ mixin AutoSaveMixin<T extends StatefulWidget> on State<T> {
     } else if (draftKey.startsWith('checklist_fill_')) {
       final id = draftKey.replaceFirst('checklist_fill_', '');
       await _draftStorage.saveChecklistFillDraft(id, data);
+    } else if (draftKey.startsWith('tech_card_edit_')) {
+      final id = draftKey.replaceFirst('tech_card_edit_', '');
+      await _draftStorage.saveTechCardEditDraft(id, data);
     }
   }
 
@@ -169,6 +172,9 @@ mixin AutoSaveMixin<T extends StatefulWidget> on State<T> {
     } else if (draftKey.startsWith('checklist_fill_')) {
       final id = draftKey.replaceFirst('checklist_fill_', '');
       return await _draftStorage.loadChecklistFillDraft(id);
+    } else if (draftKey.startsWith('tech_card_edit_')) {
+      final id = draftKey.replaceFirst('tech_card_edit_', '');
+      return await _draftStorage.loadTechCardEditDraft(id);
     }
     return null;
   }
@@ -186,6 +192,9 @@ mixin AutoSaveMixin<T extends StatefulWidget> on State<T> {
     } else if (draftKey.startsWith('checklist_fill_')) {
       final id = draftKey.replaceFirst('checklist_fill_', '');
       await _draftStorage.clearChecklistFillDraft(id);
+    } else if (draftKey.startsWith('tech_card_edit_')) {
+      final id = draftKey.replaceFirst('tech_card_edit_', '');
+      await _draftStorage.clearTechCardEditDraft(id);
     }
   }
 
@@ -200,6 +209,9 @@ mixin AutoSaveMixin<T extends StatefulWidget> on State<T> {
       final data = await _loadFromStorage();
       return data != null;
     } else if (draftKey.startsWith('checklist_fill_')) {
+      final data = await _loadFromStorage();
+      return data != null;
+    } else if (draftKey.startsWith('tech_card_edit_')) {
       final data = await _loadFromStorage();
       return data != null;
     }

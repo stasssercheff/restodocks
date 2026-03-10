@@ -72,7 +72,6 @@ class CulinaryUnits {
     (id: 'g', ru: 'г', en: 'g'),
     (id: 'kg', ru: 'кг', en: 'kg'),
     (id: 'mg', ru: 'мг', en: 'mg'),
-    (id: 'pcs', ru: 'штуки', en: 'pcs'),
     (id: 'шт', ru: 'штуки', en: 'pcs'),
     (id: 'lb', ru: 'фунт', en: 'lb'),
     (id: 'oz', ru: 'унция', en: 'oz'),
@@ -81,10 +80,6 @@ class CulinaryUnits {
     (id: 'gal', ru: 'галлон', en: 'gal'),
     (id: 'fl_oz', ru: 'ж.унция', en: 'fl oz'),
     (id: 'cup', ru: 'стакан', en: 'cup'),
-    (id: 'tbsp', ru: 'ст.л', en: 'tbsp'),
-    (id: 'tsp', ru: 'ч.л', en: 'tsp'),
-    (id: 'pinch', ru: 'щепотка', en: 'pinch'),
-    (id: 'clove', ru: 'зубчик', en: 'clove'),
     (id: 'bunch', ru: 'пучок', en: 'bunch'),
     (id: 'slice', ru: 'долька', en: 'slice'),
     (id: 'pack', ru: 'упак.', en: 'pack'),
@@ -122,9 +117,9 @@ class CulinaryUnits {
     return unitId;
   }
 
-  /// Единица является счётной (шт, зубчик и т.д.) — нужен ввод "грамм на единицу"
+  /// Единица является счётной (шт, долька, пучок и т.д.) — нужен ввод "грамм на единицу"
   static bool isCountable(String unitId) {
-    const countable = ['pcs', 'шт', 'clove', 'slice', 'bunch'];
+    const countable = ['pcs', 'шт', 'slice', 'bunch'];
     return countable.any((c) => unitId.toLowerCase() == c);
   }
 }

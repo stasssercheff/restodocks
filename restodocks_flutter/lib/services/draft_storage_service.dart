@@ -142,6 +142,37 @@ class DraftStorageService {
     } catch (_) {}
   }
 
+  // ── ТТК (создание/редактирование) ────────────────────────────────────────────
+
+  static const String _techCardEditPrefix = 'draft_tech_card_edit_';
+
+  Future<void> saveTechCardEditDraft(String techCardId, Map<String, dynamic> data) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('$_techCardEditPrefix$techCardId', jsonEncode(data));
+    } catch (e) {
+      debugPrint('Failed to save tech card draft: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>?> loadTechCardEditDraft(String techCardId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final s = prefs.getString('$_techCardEditPrefix$techCardId');
+      return s != null ? jsonDecode(s) as Map<String, dynamic> : null;
+    } catch (e) {
+      debugPrint('Failed to load tech card draft: $e');
+      return null;
+    }
+  }
+
+  Future<void> clearTechCardEditDraft(String techCardId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('$_techCardEditPrefix$techCardId');
+    } catch (_) {}
+  }
+
   // ── iiko-инвентаризация ──────────────────────────────────────────────────────
 
   static const String _iikoInventoryKey = 'draft_iiko_inventory';

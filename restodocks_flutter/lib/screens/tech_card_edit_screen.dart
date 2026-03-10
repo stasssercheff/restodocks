@@ -9,6 +9,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../models/models.dart';
+import '../mixins/auto_save_mixin.dart';
+import '../mixins/input_change_listener_mixin.dart';
 import '../services/app_toast_service.dart';
 import '../services/services.dart';
 import '../utils/number_format_utils.dart';
@@ -485,7 +487,8 @@ class TechCardEditScreen extends StatefulWidget {
   State<TechCardEditScreen> createState() => _TechCardEditScreenState();
 }
 
-class _TechCardEditScreenState extends State<TechCardEditScreen> {
+class _TechCardEditScreenState extends State<TechCardEditScreen>
+    with AutoSaveMixin<TechCardEditScreen>, InputChangeListenerMixin<TechCardEditScreen> {
   TechCard? _techCard;
   bool _loading = true;
   bool _technologyTranslating = false;
@@ -556,6 +559,61 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   List<Uint8List> _pendingPhotoBytes = [];
 
   bool get _isNew => widget.techCardId.isEmpty || widget.techCardId == 'new';
+
+  @override
+  String get draftKey => 'tech_card_edit_${widget.techCardId.isEmpty || widget.techCardId == 'new' ? 'new' : widget.techCardId}';
+
+  @override
+  bool get restoreDraftAfterLoad => true;
+
+  @override
+  Map<String, dynamic> getCurrentState() {
+    return {
+      'techCardId': widget.techCardId,
+      'name': _nameController.text,
+      'technology': _technologyController.text,
+      'category': _selectedCategory,
+      'sections': _selectedSections,
+      'isSemiFinished': _isSemiFinished,
+      'portionWeight': _portionWeight,
+      'descriptionForHall': _descriptionForHallController.text,
+      'compositionForHall': _compositionForHallController.text,
+      'sellingPrice': _sellingPriceController.text,
+      'ingredients': _ingredients.map((i) => i.toJson()).toList(),
+      'photoUrls': _photoUrls,
+    };
+  }
+
+  @override
+  Future<void> restoreState(Map<String, dynamic> data) async {
+    if (data['techCardId'] != widget.techCardId) return;
+    if (!mounted) return;
+    setState(() {
+      _nameController.text = data['name'] as String? ?? '';
+      _technologyController.text = data['technology'] as String? ?? '';
+      _selectedCategory = data['category'] as String? ?? 'misc';
+      _selectedSections = List<String>.from(data['sections'] as List<dynamic>? ?? []);
+      _isSemiFinished = data['isSemiFinished'] as bool? ?? true;
+      _portionWeight = (data['portionWeight'] as num?)?.toDouble() ?? 100;
+      _descriptionForHallController.text = data['descriptionForHall'] as String? ?? '';
+      _compositionForHallController.text = data['compositionForHall'] as String? ?? '';
+      _sellingPriceController.text = data['sellingPrice'] as String? ?? '';
+      _photoUrls = List<String>.from(data['photoUrls'] as List<dynamic>? ?? []);
+      _ingredients.clear();
+      for (final item in data['ingredients'] as List<dynamic>? ?? []) {
+        try {
+          _ingredients.add(TTIngredient.fromJson(Map<String, dynamic>.from(item as Map)));
+        } catch (_) {}
+      }
+      final canEdit = context.read<AccountManagerSupabase>().currentEmployee?.canEditChecklistsAndTechCards ?? false;
+      if (canEdit && !widget.forceViewMode && _ingredients.isEmpty) {
+        _ingredients.add(TTIngredient.emptyPlaceholder());
+        _ingredients.add(TTIngredient.emptyPlaceholder());
+      } else if (canEdit && !widget.forceViewMode && !_ingredients.last.isPlaceholder) {
+        _ingredients.add(TTIngredient.emptyPlaceholder());
+      }
+    });
+  }
   /// Макс. фото: ПФ — 10, блюдо — 1
   int get _maxPhotos => _isSemiFinished ? 10 : 1;
 
@@ -680,6 +738,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
             _ingredients.add(TTIngredient.emptyPlaceholder());
           }
           setState(() { _loading = false; });
+          if (mounted) await restoreDraftNow();
         }
         return;
       }
@@ -689,7 +748,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
       final canEdit = context.read<AccountManagerSupabase>().currentEmployee?.canEditChecklistsAndTechCards ?? false;
           final addPlaceholders = canEdit && !widget.forceViewMode;
       // Откладываем тяжёлый setState на следующий кадр, чтобы не блокировать UI при большом числе ингредиентов
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!mounted) return;
         setState(() {
           _techCard = tc;
@@ -721,23 +780,30 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
         });
         // Если перевод технологии ещё не сохранён — запросить через DeepL
         if (tc != null) _translateTechnologyIfNeeded(tc);
+        if (mounted) await restoreDraftNow();
       });
     } catch (e) {
       if (mounted) setState(() { _error = e.toString(); _loading = false; });
     }
   }
 
+  void _scheduleDraftSave() => scheduleSave();
+
   @override
   void initState() {
     super.initState();
-    // Добавляем listener для обновления таблицы при изменении названия
+    setOnInputChanged(_scheduleDraftSave);
     _nameController.addListener(() {
-      setState(() {}); // Обновляем UI при изменении названия
+      setState(() {});
+      _scheduleDraftSave();
     });
-    // Добавляем listener для обновления таблицы при изменении технологии
     _technologyController.addListener(() {
-      setState(() {}); // Обновляем UI при изменении технологии
+      setState(() {});
+      _scheduleDraftSave();
     });
+    _descriptionForHallController.addListener(_scheduleDraftSave);
+    _compositionForHallController.addListener(_scheduleDraftSave);
+    _sellingPriceController.addListener(_scheduleDraftSave);
     // Сразу 2 строки для внесения продуктов; при заполнении последней добавится следующая
     _ingredients.add(TTIngredient.emptyPlaceholder());
     _ingredients.add(TTIngredient.emptyPlaceholder());
@@ -906,6 +972,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           } catch (_) {}
         });
         if (mounted) {
+          await clearDraft();
           AppToastService.show(loc.t('tech_card_created'));
           context.go('/tech-cards?refresh=1');
         }
@@ -969,6 +1036,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           } catch (_) {}
         });
         if (mounted) {
+          await clearDraft();
           AppToastService.show(context.read<LocalizationService>().t('save') + ' ✓');
           context.go('/tech-cards?refresh=1');
         }
@@ -976,6 +1044,42 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))));
     }
+  }
+
+  Future<void> _confirmClearForm(BuildContext context, LocalizationService loc) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('clear_ttk_form')),
+        content: Text(loc.t('clear_ttk_form_confirm')),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel)),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(loc.t('clear_ttk_form'))),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final canEdit = context.read<AccountManagerSupabase>().currentEmployee?.canEditChecklistsAndTechCards ?? false;
+    final addPlaceholders = canEdit && !widget.forceViewMode;
+    setState(() {
+      _nameController.clear();
+      _technologyController.clear();
+      _descriptionForHallController.clear();
+      _compositionForHallController.clear();
+      _sellingPriceController.clear();
+      _selectedCategory = 'misc';
+      _selectedSections = [];
+      _isSemiFinished = true;
+      _portionWeight = 100;
+      _photoUrls = [];
+      _pendingPhotoBytes = [];
+      _ingredients.clear();
+      if (addPlaceholders) {
+        _ingredients.add(TTIngredient.emptyPlaceholder());
+        _ingredients.add(TTIngredient.emptyPlaceholder());
+      }
+    });
+    await clearDraft();
   }
 
   Future<void> _confirmDelete(BuildContext context, LocalizationService loc) async {
@@ -1319,6 +1423,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
         _ingredients.add(TTIngredient.emptyPlaceholder());
       }
     });
+    _scheduleDraftSave();
   }
 
   /// Подстановка продукта из поиска по номенклатуре в строку [replaceIndex] (или добавление новой).
@@ -1355,6 +1460,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
           _ingredients.add(ing);
         }
       });
+      _scheduleDraftSave();
     });
   }
 
@@ -1389,6 +1495,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
         _ingredients.add(TTIngredient.emptyPlaceholder());
       }
     });
+    _scheduleDraftSave();
   }
 
   /// Добавить первый ингредиент по введённому названию (пустая строка при ingredients.isEmpty) и новую пустую строку.
@@ -1400,6 +1507,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
       _ingredients.add(ing);
       _ingredients.add(TTIngredient.emptyPlaceholder());
     });
+    _scheduleDraftSave();
   }
 
   void _removeIngredient(int i) {
@@ -1414,6 +1522,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
         _ingredients.add(TTIngredient.emptyPlaceholder());
       }
     });
+    _scheduleDraftSave();
   }
 
   /// Подсказка ИИ: процент отхода по названию продукта (для ручной строки).
@@ -1937,7 +2046,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                           value: _selectedCategory,
                           decoration: InputDecoration(labelText: loc.t('category'), isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
                           items: _categoryOptions.map((c) => DropdownMenuItem(value: c, child: Text(_categoryLabel(c, loc.currentLanguageCode)))).toList(),
-                          onChanged: (v) => setState(() => _selectedCategory = v ?? 'misc'),
+                          onChanged: (v) { setState(() => _selectedCategory = v ?? 'misc'); _scheduleDraftSave(); },
                         )
                       : InputDecorator(
                           decoration: InputDecoration(labelText: loc.t('category'), isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
@@ -1949,7 +2058,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                     availableSections: _getAvailableSections(
                         context.read<AccountManagerSupabase>().hasProSubscription, loc),
                     canEdit: effectiveCanEdit,
-                    onChanged: (v) => setState(() => _selectedSections = v),
+                    onChanged: (v) { setState(() => _selectedSections = v); _scheduleDraftSave(); },
                     loc: loc,
                   ),
                   const SizedBox(height: 12),
@@ -1961,7 +2070,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                             DropdownMenuItem(value: true, child: Row(children: [const Icon(Icons.inventory_2, size: 20), const SizedBox(width: 8), Text(loc.t('tt_type_pf'))])),
                             DropdownMenuItem(value: false, child: Row(children: [const Icon(Icons.restaurant, size: 20), const SizedBox(width: 8), Text(loc.t('tt_type_dish'))])),
                           ],
-                          onChanged: (v) => setState(() => _isSemiFinished = v ?? true),
+                          onChanged: (v) { setState(() => _isSemiFinished = v ?? true); _scheduleDraftSave(); },
                         )
                       : InputDecorator(
                           decoration: InputDecoration(
@@ -2008,7 +2117,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                                   value: _selectedCategory,
                                   decoration: InputDecoration(labelText: loc.t('category'), isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)), contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
                                   items: _categoryOptions.map((c) => DropdownMenuItem(value: c, child: Text(_categoryLabel(c, loc.currentLanguageCode)))).toList(),
-                                  onChanged: (v) => setState(() => _selectedCategory = v ?? 'misc'),
+                                  onChanged: (v) { setState(() => _selectedCategory = v ?? 'misc'); _scheduleDraftSave(); },
                                 )
                               : InputDecorator(
                                   decoration: InputDecoration(labelText: loc.t('category'), isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
@@ -2023,7 +2132,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                             availableSections: _getAvailableSections(
                                 context.read<AccountManagerSupabase>().hasProSubscription, loc),
                             canEdit: effectiveCanEdit,
-                            onChanged: (v) => setState(() => _selectedSections = v),
+                            onChanged: (v) { setState(() => _selectedSections = v); _scheduleDraftSave(); },
                             loc: loc,
                             compact: true,
                           ),
@@ -2061,7 +2170,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                                   ),
                                 ],
                               selected: {_isSemiFinished},
-                              onSelectionChanged: (v) => setState(() => _isSemiFinished = v.first),
+                              onSelectionChanged: (v) { setState(() => _isSemiFinished = v.first); _scheduleDraftSave(); },
                               showSelectedIcon: false,
                               ),
                             )
@@ -2116,7 +2225,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                             semiFinishedProducts: _semiFinishedProducts,
                             isCook: isCook,
                             weightPerPortion: _portionWeight,
-                            onWeightPerPortionChanged: (v) => setState(() => _portionWeight = v),
+                            onWeightPerPortionChanged: (v) { setState(() => _portionWeight = v); _scheduleDraftSave(); },
                             onAdd: _showAddIngredient,
                             onUpdate: (i, ing) {
                               setState(() {
@@ -2135,6 +2244,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                                   _ingredients.add(TTIngredient.emptyPlaceholder());
                                 }
                               });
+                              _scheduleDraftSave();
                             },
                             onRemove: _removeIngredient,
                             onSuggestWaste: _suggestWasteForRow,
@@ -2158,6 +2268,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                                     _ingredients.clear();
                                     _ingredients.addAll(list);
                                   });
+                                  _scheduleDraftSave();
                                 });
                               },
                             ),
@@ -2240,6 +2351,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
                           onPressed: _save,
                           child: Text(loc.t('save')),
                           style: FilledButton.styleFrom(minimumSize: const Size(120, 48), padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14)),
+                        ),
+                        const SizedBox(width: 16),
+                        TextButton.icon(
+                          icon: Icon(Icons.clear_all, size: 20, color: Theme.of(context).colorScheme.onSurface),
+                          label: Text(loc.t('clear_ttk_form')),
+                          onPressed: () => _confirmClearForm(context, loc),
+                          style: TextButton.styleFrom(minimumSize: const Size(100, 48), padding: const EdgeInsets.symmetric(horizontal: 16)),
                         ),
                         if (!_isNew) ...[
                           const SizedBox(width: 16),
