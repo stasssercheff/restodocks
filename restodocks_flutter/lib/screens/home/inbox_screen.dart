@@ -61,14 +61,14 @@ class _InboxScreenState extends State<InboxScreen> {
         if (path == '/inbox' || path == '/notifications') _loadDocuments();
       }
       _routeListener = onRouteChange;
-      router.addListener(_routeListener!);
+      router.routerDelegate.addListener(_routeListener!);
     });
   }
 
   @override
   void dispose() {
     if (_goRouter != null && _routeListener != null) {
-      _goRouter!.removeListener(_routeListener!);
+      _goRouter!.routerDelegate.removeListener(_routeListener!);
     }
     super.dispose();
   }

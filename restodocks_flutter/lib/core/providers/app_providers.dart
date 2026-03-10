@@ -38,6 +38,9 @@ class AppProviders {
         ChangeNotifierProvider<NotificationPreferencesService>(
           create: (_) => NotificationPreferencesService(),
         ),
+        ChangeNotifierProvider<InboxViewedService>(
+          create: (_) => InboxViewedService(),
+        ),
         // Используем Supabase версии сервисов
         ChangeNotifierProvider<AccountManagerSupabase>(
           create: (_) => AccountManagerSupabase(),

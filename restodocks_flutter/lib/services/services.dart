@@ -20,6 +20,7 @@ export 'screen_layout_preference_service.dart';
 export 'ttk_branch_filter_service.dart';
 export 'owner_view_preference_service.dart';
 export 'notification_preferences_service.dart';
+export 'inbox_viewed_service.dart';
 export 'translation_service.dart';
 export 'translation_manager.dart';
 export 'ai_service.dart';
