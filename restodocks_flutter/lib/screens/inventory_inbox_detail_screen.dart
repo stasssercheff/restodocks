@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../models/models.dart';
+import '../services/inbox_viewed_service.dart';
 import '../utils/number_format_utils.dart';
 import '../services/inventory_download.dart';
 import '../services/services.dart';
@@ -47,6 +48,8 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
       if (doc == null) _error = 'Документ не найден';
     });
     if (doc != null) {
+      final estId = context.read<AccountManagerSupabase>().establishment?.id;
+      context.read<InboxViewedService>().addViewed(estId, widget.documentId);
       _loadTranslations(doc);
     }
   }

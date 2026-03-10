@@ -105,6 +105,10 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
           : dept == 'hall' || dept == 'dining_room'
               ? techs
               : techs.where((t) => !barCats.contains(t.category) || t.sections.contains('all')).toList();
+      if (widget.viewOnly && c != null && mounted) {
+        final estId = context.read<AccountManagerSupabase>().establishment?.id;
+        context.read<InboxViewedService>().addViewed(estId, widget.checklistId);
+      }
       setState(() {
         _checklist = c;
         _techCards = filteredTechs.isNotEmpty ? filteredTechs : techs;

@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../models/models.dart';
 import '../services/services.dart';
+import '../services/inbox_viewed_service.dart';
 import '../widgets/app_bar_home_button.dart';
 
 /// Просмотр отправленного чеклиста из входящих.
@@ -40,7 +41,9 @@ class _ChecklistInboxDetailScreenState extends State<ChecklistInboxDetailScreen>
       _loading = false;
       if (sub == null) _error = 'Чеклист не найден';
     });
-    if (sub != null) {
+    if (sub != null && mounted) {
+      final estId = context.read<AccountManagerSupabase>().establishment?.id;
+      context.read<InboxViewedService>().addViewed(estId, widget.documentId);
       _loadTranslations(sub);
     }
   }

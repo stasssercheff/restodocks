@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../models/models.dart';
 import '../services/services.dart';
+import '../services/inbox_viewed_service.dart';
 import '../utils/number_format_utils.dart';
 import '../services/inventory_download.dart';
 import '../widgets/app_bar_home_button.dart';
@@ -46,8 +47,9 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
       _loading = false;
       if (doc == null) _error = 'Документ не найден';
     });
-    // После загрузки документа — подгружаем локализованные имена и переводим комментарий
     if (doc != null) {
+      final estId = context.read<AccountManagerSupabase>().establishment?.id;
+      context.read<InboxViewedService>().addViewed(estId, widget.documentId);
       _loadLocalizedNames(doc);
       _translateComment(doc);
     }

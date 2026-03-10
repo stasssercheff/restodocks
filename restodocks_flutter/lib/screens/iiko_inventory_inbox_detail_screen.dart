@@ -9,6 +9,8 @@ import '../services/inventory_download.dart';
 import '../services/iiko_product_store.dart';
 import '../services/iiko_xlsx_patcher.dart';
 import '../services/localization_service.dart';
+import '../services/inbox_viewed_service.dart';
+import '../services/account_manager_supabase.dart';
 import '../widgets/app_bar_home_button.dart';
 
 /// Просмотр iiko-инвентаризации из входящих.
@@ -47,6 +49,10 @@ class _IikoInventoryInboxDetailScreenState
       _loading = false;
       if (doc == null) _error = 'Документ не найден';
     });
+    if (doc != null && mounted) {
+      final estId = context.read<AccountManagerSupabase>().establishment?.id;
+      context.read<InboxViewedService>().addViewed(estId, widget.documentId);
+    }
   }
 
   // ── Скачивание в оригинальном формате бланка ──────────────────────────────

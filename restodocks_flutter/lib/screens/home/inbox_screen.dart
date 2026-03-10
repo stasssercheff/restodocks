@@ -43,6 +43,8 @@ class _InboxScreenState extends State<InboxScreen> {
   _InboxDeptTab? _selectedDeptTab;
   _InboxTypeTab? _selectedTypeTab;
   final GlobalKey<_MessagesContentState> _messagesContentKey = GlobalKey();
+  GoRouter? _goRouter;
+  VoidCallback? _routeListener;
 
   @override
   void initState() {
@@ -51,7 +53,24 @@ class _InboxScreenState extends State<InboxScreen> {
       _inboxService = InboxService(context.read<AccountManagerSupabase>().supabase);
       _initDefaultTab();
       _loadDocuments();
+      final router = context.read<GoRouter>();
+      _goRouter = router;
+      void onRouteChange() {
+        if (!mounted) return;
+        final path = router.routerDelegate.currentConfiguration.fullPath;
+        if (path == '/inbox' || path == '/notifications') _loadDocuments();
+      }
+      _routeListener = onRouteChange;
+      router.addListener(_routeListener!);
     });
+  }
+
+  @override
+  void dispose() {
+    if (_goRouter != null && _routeListener != null) {
+      _goRouter!.removeListener(_routeListener!);
+    }
+    super.dispose();
   }
 
   /// Выбираем первую доступную вкладку для текущего сотрудника
@@ -127,6 +146,7 @@ class _InboxScreenState extends State<InboxScreen> {
           currentEmployee.id, establishment.id);
         unreadMessages = unreadMap.values.fold(0, (a, b) => a + b);
       }
+      await context.read<InboxViewedService>().getViewedIds(establishment.id);
       if (mounted) {
         setState(() {
           _documents = documents;
@@ -215,6 +235,7 @@ class _InboxScreenState extends State<InboxScreen> {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<InboxViewedService>();
     final loc = context.watch<LocalizationService>();
     final accountManager = context.watch<AccountManagerSupabase>();
     final employee = accountManager.currentEmployee;
@@ -315,23 +336,30 @@ class _InboxScreenState extends State<InboxScreen> {
     );
   }
 
+  Set<String> get _viewedIds {
+    final estId = context.read<AccountManagerSupabase>().establishment?.id;
+    return context.read<InboxViewedService>().getViewedIdsSync(estId);
+  }
+
   int _getCountForDeptTab(_InboxDeptTab dept) {
+    final viewed = _viewedIds;
     final deptStr = switch (dept) {
       _InboxDeptTab.kitchen => 'kitchen',
       _InboxDeptTab.bar => 'bar',
       _InboxDeptTab.hall => 'hall',
     };
-    return _documents.where((d) => d.department == deptStr).length;
+    return _documents.where((d) => d.department == deptStr && !viewed.contains(d.id)).length;
   }
 
   int _getCountForOwnerTypeTab(_InboxTypeTab tab) {
     if (_selectedDeptTab == null) return 0;
+    final viewed = _viewedIds;
     final deptStr = switch (_selectedDeptTab!) {
       _InboxDeptTab.kitchen => 'kitchen',
       _InboxDeptTab.bar => 'bar',
       _InboxDeptTab.hall => 'hall',
     };
-    final docsByDept = _documents.where((d) => d.department == deptStr);
+    final docsByDept = _documents.where((d) => d.department == deptStr && !viewed.contains(d.id));
     switch (tab) {
       case _InboxTypeTab.messages:
         return _unreadMessagesCount;
@@ -342,7 +370,8 @@ class _InboxScreenState extends State<InboxScreen> {
       case _InboxTypeTab.iikoInventory:
         return docsByDept.where((d) => d.type == DocumentType.iikoInventory).length;
       case _InboxTypeTab.notifications:
-        return _deletionNotifications.length;
+        final delUnviewed = _deletionNotifications.where((n) => !viewed.contains('del_${n.id}')).length;
+        return docsByDept.where((d) => d.type == DocumentType.checklistMissedDeadline).length + delUnviewed;
       case _InboxTypeTab.checklist:
         return docsByDept.where((d) =>
             d.type == DocumentType.checklistSubmission ||
@@ -351,19 +380,22 @@ class _InboxScreenState extends State<InboxScreen> {
   }
 
   int _getCountForTab(_InboxTab tab) {
+    final viewed = _viewedIds;
+    final docsUnviewed = _documents.where((d) => !viewed.contains(d.id));
     switch (tab) {
       case _InboxTab.messages:
         return _unreadMessagesCount;
       case _InboxTab.order:
-        return _documents.where((d) => d.type == DocumentType.productOrder).length;
+        return docsUnviewed.where((d) => d.type == DocumentType.productOrder).length;
       case _InboxTab.inventory:
-        return _documents.where((d) => d.type == DocumentType.inventory).length;
+        return docsUnviewed.where((d) => d.type == DocumentType.inventory).length;
       case _InboxTab.iikoInventory:
-        return _documents.where((d) => d.type == DocumentType.iikoInventory).length;
+        return docsUnviewed.where((d) => d.type == DocumentType.iikoInventory).length;
       case _InboxTab.notifications:
-        return _deletionNotifications.length;
+        final delUnviewed = _deletionNotifications.where((n) => !viewed.contains('del_${n.id}')).length;
+        return docsUnviewed.where((d) => d.type == DocumentType.checklistMissedDeadline).length + delUnviewed;
       case _InboxTab.checklist:
-        return _documents.where((d) =>
+        return docsUnviewed.where((d) =>
             d.type == DocumentType.checklistSubmission ||
             d.type == DocumentType.checklistMissedDeadline).length;
     }
@@ -582,8 +614,26 @@ class _InboxScreenState extends State<InboxScreen> {
     return _selectedTab == _InboxTab.notifications;
   }
 
+  List<InboxDocument> get _overdueChecklistsForNotifications {
+    if (context.read<AccountManagerSupabase>().currentEmployee?.hasRole('owner') == true &&
+        _selectedDeptTab != null) {
+      final deptStr = switch (_selectedDeptTab!) {
+        _InboxDeptTab.kitchen => 'kitchen',
+        _InboxDeptTab.bar => 'bar',
+        _InboxDeptTab.hall => 'hall',
+      };
+      return _documents.where((d) =>
+          d.type == DocumentType.checklistMissedDeadline && d.department == deptStr).toList();
+    }
+    return _documents.where((d) => d.type == DocumentType.checklistMissedDeadline).toList();
+  }
+
   Widget _buildDeletionNotificationsList(LocalizationService loc) {
-    if (_deletionNotifications.isEmpty) {
+    final overdueChecklists = _overdueChecklistsForNotifications;
+    final hasDeletions = _deletionNotifications.isNotEmpty;
+    final hasOverdue = overdueChecklists.isNotEmpty;
+
+    if (!hasDeletions && !hasOverdue) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -591,7 +641,7 @@ class _InboxScreenState extends State<InboxScreen> {
             Icon(Icons.notifications_none, size: 64, color: Theme.of(context).colorScheme.outline),
             const SizedBox(height: 16),
             Text(
-              loc.t('inbox_notifications_empty') ?? 'Нет уведомлений об удалении',
+              loc.t('inbox_notifications_empty') ?? 'Нет уведомлений',
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
               textAlign: TextAlign.center,
             ),
@@ -599,30 +649,61 @@ class _InboxScreenState extends State<InboxScreen> {
         ),
       );
     }
-    return ListView.builder(
+    return ListView(
       padding: const EdgeInsets.all(16),
-      itemCount: _deletionNotifications.length,
-      itemBuilder: (context, i) {
-        final n = _deletionNotifications[i];
-        final dateStr = DateFormat('dd.MM.yyyy HH:mm').format(n.createdAt.toLocal());
-        return Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: Theme.of(context).colorScheme.errorContainer,
-              child: Icon(Icons.person_remove, color: Theme.of(context).colorScheme.onErrorContainer),
-            ),
-            title: Text(
-              '${n.deletedEmployeeName} ${loc.t('employee_deleted_by') ?? 'удалён (удалил:'} ${n.deletedByName})',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
-            ),
-            subtitle: Text(
-              (n.deletedEmployeeEmail != null ? '${n.deletedEmployeeEmail} • ' : '') + dateStr,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+      children: [
+        if (hasOverdue) ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              loc.t('checklist_overdue') ?? 'Просроченные чеклисты',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.error,
+              ),
             ),
           ),
-        );
-      },
+          ...overdueChecklists.map((doc) => _DocumentTile(
+            document: doc,
+            onDownload: _downloadDocument,
+          )),
+          const SizedBox(height: 16),
+        ],
+        if (hasDeletions) ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              loc.t('employee_deletion_notifications') ?? 'Изменения штата',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+          ),
+          ..._deletionNotifications.map((n) {
+            final estId = context.read<AccountManagerSupabase>().establishment?.id;
+            context.read<InboxViewedService>().addViewed(estId, 'del_${n.id}');
+            final dateStr = DateFormat('dd.MM.yyyy HH:mm').format(n.createdAt.toLocal());
+            return Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: Theme.of(context).colorScheme.errorContainer,
+                  child: Icon(Icons.person_remove, color: Theme.of(context).colorScheme.onErrorContainer),
+                ),
+                title: Text(
+                  '${n.deletedEmployeeName} ${loc.t('employee_deleted_by') ?? 'удалён (удалил:'} ${n.deletedByName})',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                ),
+                subtitle: Text(
+                  (n.deletedEmployeeEmail != null ? '${n.deletedEmployeeEmail} • ' : '') + dateStr,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                ),
+              ),
+            );
+          }),
+        ],
+      ],
     );
   }
 
@@ -859,6 +940,7 @@ class _DocumentTile extends StatelessWidget {
           onSelected: (value) {
             switch (value) {
               case 'download':
+                _markDocumentViewed(context);
                 if (document.type == DocumentType.inventory) {
                   context.push('/inbox/inventory/${document.id}');
                 } else if (document.type == DocumentType.productOrder) {
@@ -909,7 +991,13 @@ class _DocumentTile extends StatelessWidget {
     );
   }
 
+  void _markDocumentViewed(BuildContext context) {
+    final estId = context.read<AccountManagerSupabase>().establishment?.id;
+    context.read<InboxViewedService>().addViewed(estId, document.id);
+  }
+
   void _viewDocument(BuildContext context) {
+    _markDocumentViewed(context);
     if (document.type == DocumentType.inventory) {
       context.push('/inbox/inventory/${document.id}');
       return;
