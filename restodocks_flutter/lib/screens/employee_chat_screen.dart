@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show debugPrint, kDebugMode, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
@@ -356,7 +356,6 @@ class _ChatMessageBubbleState extends State<_ChatMessageBubble> {
   Future<void> _translateIfNeeded() async {
     final loc = context.read<LocalizationService>();
     final targetLang = loc.currentLanguageCode;
-    if (targetLang == 'ru') return;
     final sourceLang = _detectLanguage(widget.message.content);
     if (sourceLang == targetLang) return;
     try {
@@ -372,7 +371,9 @@ class _ChatMessageBubbleState extends State<_ChatMessageBubble> {
       if (mounted && translated != widget.message.content) {
         setState(() => _translatedContent = translated);
       }
-    } catch (_) {}
+    } catch (e) {
+      if (kDebugMode) debugPrint('[Chat] translate failed: $e');
+    }
   }
 
   @override
