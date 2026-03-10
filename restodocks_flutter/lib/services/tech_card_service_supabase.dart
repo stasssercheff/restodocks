@@ -59,14 +59,13 @@ class TechCardServiceSupabase {
   }
 
   /// Payload для вставки в tt_ingredients. Только колонки из схемы БД.
-  /// Убираем: id, price_per_kg, cost_currency, gramsPerPiece — их нет в tt_ingredients.
+  /// Убираем: id, price_per_kg, cost_currency. grams_per_piece сохраняем.
   static Map<String, dynamic> _ingredientPayloadForDb(TTIngredient ingredient) {
     final data = Map<String, dynamic>.from(ingredient.toJson());
     data.remove('id');
     data.remove('price_per_kg');
     data.remove('cost_currency');
-    data.remove('gramsPerPiece'); // camelCase в toJson, колонка может отсутствовать
-    data.remove('grams_per_piece');
+    data.remove('gramsPerPiece'); // toJson выдаёт grams_per_piece (JsonKey)
     data.removeWhere((key, value) => value == null);
     return data;
   }

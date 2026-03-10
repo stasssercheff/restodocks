@@ -47,6 +47,7 @@ class TTIngredient extends Equatable {
   @JsonKey(name: 'primary_waste_pct')
   final double primaryWastePct; // процент отхода при первичной обработке
 
+  @JsonKey(name: 'grams_per_piece')
   final double? gramsPerPiece; // для шт: грамм на штуку
 
   /// Ручной % ужарки (если задан — используется вместо способа приготовления)
@@ -258,10 +259,8 @@ class TTIngredient extends Equatable {
     ProductStoreSupabase? productStore,
     String? establishmentId,
     String? defaultCurrency,
-    bool hasProSubscription = false,
   }) {
-    // Всегда используем 'g' для всех продуктов в ТТК, игнорируя product.unit
-    final actualUnit = 'g';
+    // grossWeight может быть в граммах или в штуках — конвертируем по unit
     final wastePct = primaryWastePct ?? product?.primaryWastePct ?? 0;
     if (product == null) {
       return TTIngredient(
@@ -285,8 +284,8 @@ class TTIngredient extends Equatable {
       );
     }
 
-    // Конвертируем в граммы для расчётов
-    final grossG = CulinaryUnits.toGrams(grossWeight, actualUnit, gramsPerPiece: gramsPerPiece);
+    // Конвертируем в граммы для расчётов (unit может быть г или шт)
+    final grossG = CulinaryUnits.toGrams(grossWeight, unit, gramsPerPiece: gramsPerPiece);
 
     // Эффективный вес после отхода (первичная обработка)
     final waste = wastePct.clamp(0.0, 99.9) / 100.0;
@@ -303,22 +302,16 @@ class TTIngredient extends Equatable {
       if (netWeight == null) {
         finalNetWeight = processed.finalWeight;
       }
-      // Используем КБЖУ только для PRO подписки
-      if (hasProSubscription) {
-        finalCalories = processed.totalCalories;
-        finalProtein = processed.totalProtein;
-        finalFat = processed.totalFat;
-        finalCarbs = processed.totalCarbs;
-      }
+      finalCalories = processed.totalCalories;
+      finalProtein = processed.totalProtein;
+      finalFat = processed.totalFat;
+      finalCarbs = processed.totalCarbs;
     } else {
-      // Используем КБЖУ только для PRO подписки
-      if (hasProSubscription) {
-        final nutrition = product.getNutritionForWeight(finalNetWeight);
-        finalCalories = nutrition.calories;
-        finalProtein = nutrition.protein;
-        finalFat = nutrition.fat;
-        finalCarbs = nutrition.carbs;
-      }
+      final nutrition = product.getNutritionForWeight(finalNetWeight);
+      finalCalories = nutrition.calories;
+      finalProtein = nutrition.protein;
+      finalFat = nutrition.fat;
+      finalCarbs = nutrition.carbs;
     }
 
     // Расчёт стоимости: используем цену из заведения или базовую

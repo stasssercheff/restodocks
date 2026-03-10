@@ -1121,9 +1121,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
   Future<void> _showWeightDialogForProduct(Product p, int? replaceIndex) async {
     final loc = context.read<LocalizationService>();
     final lang = loc.currentLanguageCode;
-    const defaultUnit = 'g';
-    final c = TextEditingController(text: '100');
-    final gppController = TextEditingController(text: '50');
+    final pu = (p.unit ?? 'g').toString().toLowerCase().trim();
+    final usePieces = pu == 'pcs' || pu == 'шт';
+    final defaultUnit = usePieces ? pu : 'g';
+    final defaultQty = usePieces ? '1' : '100';
+    final defaultGpp = (p.gramsPerPiece ?? 50).toStringAsFixed(0);
+    final c = TextEditingController(text: defaultQty);
+    final gppController = TextEditingController(text: defaultGpp);
     final shrinkageController = TextEditingController();
     final processes = CookingProcess.forCategory(p.category);
     CookingProcess? selectedProcess;
@@ -1289,7 +1293,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     final currency = accountManager.currentEmployee?.currency ?? accountManager.establishment?.defaultCurrency ?? 'RUB';
     final productStore = context.read<ProductStoreSupabase>();
     final establishmentId = context.read<AccountManagerSupabase>().dataEstablishmentId;
-    final hasProSubscription = context.read<AccountManagerSupabase>().currentEmployee?.hasProSubscription ?? false;
     final ing = TTIngredient.fromProduct(
       product: p,
       cookingProcess: cookingProcess,
@@ -1302,7 +1305,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
       cookingLossPctOverride: cookingLossPctOverride,
       productStore: productStore,
       establishmentId: establishmentId,
-      hasProSubscription: hasProSubscription,
       defaultCurrency: currency,
     );
     setState(() {
@@ -1329,7 +1331,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
     final currency = accountManager.currentEmployee?.currency ?? accountManager.establishment?.defaultCurrency ?? 'RUB';
       final productStore = context.read<ProductStoreSupabase>();
       final establishmentId = context.read<AccountManagerSupabase>().dataEstablishmentId;
-      final hasProSubscription = context.read<AccountManagerSupabase>().currentEmployee?.hasProSubscription ?? false;
       final ing = TTIngredient.fromProduct(
         product: p,
         cookingProcess: null,
@@ -1341,7 +1342,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen> {
         productStore: productStore,
         establishmentId: establishmentId,
         defaultCurrency: currency,
-        hasProSubscription: hasProSubscription,
       );
       setState(() {
         if (replaceIndex >= 0 && replaceIndex < _ingredients.length) {
@@ -2359,7 +2359,6 @@ class _TtkTableState extends State<_TtkTable> {
     final accountManager = context.read<AccountManagerSupabase>();
     final est = accountManager.establishment;
     final sym = est?.currencySymbol ?? Establishment.currencySymbolFor(est?.defaultCurrency ?? accountManager.currentEmployee?.currency ?? 'VND');
-    final hasProSubscription = context.read<AccountManagerSupabase>().currentEmployee?.hasProSubscription ?? false;
 
     final hasDeleteCol = widget.effectiveCanEdit;
     // Порядок колонок как в образце. Ширины подобраны так, чтобы вся строка с полями ввода помещалась на экране без горизонтальной прокрутки.
@@ -3601,10 +3600,13 @@ class _ProductPickerState extends State<_ProductPicker> {
 
   void _askWeight(Product p, LocalizationService loc) {
     final lang = loc.currentLanguageCode;
-    // По умолчанию на сайте везде граммы, не кг
-    const defaultUnit = 'g';
-    final c = TextEditingController(text: defaultUnit == 'pcs' ? '1' : '100');
-    final gppController = TextEditingController(text: '50');
+    final pu = (p.unit ?? 'g').toString().toLowerCase().trim();
+    final usePieces = pu == 'pcs' || pu == 'шт';
+    final defaultUnit = usePieces ? pu : 'g';
+    final defaultQty = usePieces ? '1' : '100';
+    final defaultGpp = (p.gramsPerPiece ?? 50).toStringAsFixed(0);
+    final c = TextEditingController(text: defaultQty);
+    final gppController = TextEditingController(text: defaultGpp);
     final shrinkageController = TextEditingController();
     final processes = CookingProcess.forCategory(p.category);
     CookingProcess? selectedProcess;

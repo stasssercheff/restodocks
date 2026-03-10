@@ -60,6 +60,23 @@ class ExcelStyleTtkTable extends StatefulWidget {
 class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   static const _cellPad = EdgeInsets.symmetric(horizontal: 6, vertical: 6);
 
+  /// Для unit=шт: true если можно отображать/вводить в штуках (gramsPerPiece или fallback 50).
+  static bool _usesPieces(TTIngredient ing) {
+    final u = (ing.unit).toLowerCase().trim();
+    if (u != 'pcs' && u != 'шт') return false;
+    final gpp = ing.gramsPerPiece ?? 50;
+    return gpp > 0;
+  }
+
+  String _grossDisplayText(TTIngredient ing) {
+    if (ing.grossWeight == 0) return '';
+    if (_usesPieces(ing)) {
+      final v = CulinaryUnits.fromGrams(ing.grossWeight, ing.unit, gramsPerPiece: ing.gramsPerPiece ?? 50);
+      return v == v.truncateToDouble() ? v.toInt().toString() : v.toStringAsFixed(1);
+    }
+    return ing.grossWeight.toStringAsFixed(0);
+  }
+
   // Контроллеры для полей ввода
   final Map<String, TextEditingController> _controllers = {};
 
@@ -251,16 +268,16 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     // Продукт
                     _buildProductCell(ingredient, rowIndex),
 
-                    // Брутто
-                    _buildNumericCell(ingredient.grossWeight == 0 ? '' : ingredient.grossWeight.toStringAsFixed(0), (value) {
-                      final gross = double.tryParse(value) ?? 0;
+                    // Брутто: для unit=шт — в штуках, иначе в граммах
+                    _buildNumericCell(_grossDisplayText(ingredient), (value) {
+                      final parsed = double.tryParse(value?.replaceFirst(',', '.') ?? '') ?? 0;
+                      final gross = _usesPieces(ingredient)
+                          ? CulinaryUnits.toGrams(parsed, ingredient.unit, gramsPerPiece: ingredient.gramsPerPiece ?? 50)
+                          : parsed;
                       // При изменении брутто пересчитываем нетто, выход и стоимость
                       final net = gross * (1 - ingredient.primaryWastePct / 100);
                       final output = net * (1 - (ingredient.cookingLossPctOverride ?? 0) / 100);
-
-                      // Пересчитываем стоимость: цена за кг * вес брутто в кг
                       final newCost = (ingredient.pricePerKg ?? 0) * (gross / 1000.0);
-
                       _updateIngredient(rowIndex, ingredient.copyWith(
                         grossWeight: gross,
                         netWeight: net,
@@ -286,17 +303,30 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
                     // Нетто
                     _buildNumericCell(ingredient.netWeight == 0 ? '' : ingredient.netWeight.toStringAsFixed(0), (value) {
-                      final net = double.tryParse(value) ?? 0;
-                      // При изменении нетто автоматически пересчитываем % отхода (если брутто > 0)
-                      final wastePct = ingredient.grossWeight > 0
-                        ? ((1 - net / ingredient.grossWeight) * 100).clamp(0, 100)
-                        : ingredient.primaryWastePct;
-                      // Пересчитываем выход в соответствии с % ужарки
+                      final net = double.tryParse(value?.replaceFirst(',', '.') ?? '') ?? 0;
+                      double gross = ingredient.grossWeight;
+                      double wastePct = ingredient.primaryWastePct;
+                      if (net > 0) {
+                        if (_usesPieces(ingredient)) {
+                          // Для шт: брутто пересчитываем с округлением вверх
+                          final waste = (ingredient.primaryWastePct).clamp(0.0, 99.9) / 100.0;
+                          final grossNeeded = net / (1.0 - waste);
+                          final gpp = ingredient.gramsPerPiece ?? 50;
+                          final pieces = (gpp > 0) ? (grossNeeded / gpp).ceil().toDouble() : grossNeeded;
+                          gross = pieces * gpp;
+                          wastePct = gross > 0 ? ((1 - net / gross) * 100).clamp(0, 100) : ingredient.primaryWastePct;
+                        } else {
+                          wastePct = gross > 0 ? ((1 - net / gross) * 100).clamp(0, 100) : ingredient.primaryWastePct;
+                        }
+                      }
                       final output = net * (1 - (ingredient.cookingLossPctOverride ?? 0) / 100);
+                      final newCost = (ingredient.pricePerKg ?? 0) * (gross / 1000.0);
                       _updateIngredient(rowIndex, ingredient.copyWith(
+                        grossWeight: gross,
                         netWeight: net,
                         primaryWastePct: wastePct,
-                        outputWeight: output, // Выход с учетом ужарки
+                        outputWeight: output,
+                        cost: newCost,
                       ));
                     }, 'net_$rowIndex'),
 
