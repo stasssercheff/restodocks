@@ -10,7 +10,6 @@ import 'package:provider/provider.dart';
 
 import 'excel_style_ttk_table.dart';
 
-import '../core/feature_flags.dart';
 import '../models/models.dart';
 import '../widgets/app_bar_home_button.dart';
 import '../services/ai_service.dart';
@@ -484,8 +483,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                 ),
               ),
           ].where((_) => true), // чтобы actions не был null
-          // Кнопка загрузки ТТК (Excel) — зеркало кнопки «Скачать», только при включённом флаге
-          if (canEdit && FeatureFlags.ttkImportEnabled)
+          // Кнопка загрузки ТТК (Excel)
+          if (canEdit)
             PopupMenuButton<String>(
               icon: const Icon(Icons.upload),
               tooltip: loc.t('ttk_import_file'),
