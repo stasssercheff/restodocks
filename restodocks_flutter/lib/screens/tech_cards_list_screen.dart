@@ -348,7 +348,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     if (reason == 'ai_empty_response' || reason == 'ai_no_cards') {
       return loc.t('ai_tech_card_pdf_format_hint');
     }
-    if (reason == 'invoke_null') return 'Сервер не ответил (503). Подождите 10–30 сек и попробуйте снова.';
+    if (reason == 'invoke_null') return 'Сервер не ответил (503). Первый запрос после паузы может занять до минуты — подождите и попробуйте снова.';
     return loc.t('ai_tech_card_pdf_format_hint');
   }
 
