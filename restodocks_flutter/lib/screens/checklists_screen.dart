@@ -215,6 +215,13 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
     );
   }
 
+  /// Чеклист просрочен, если deadlineAt задан и истёк.
+  bool _isOverdue(Checklist c) {
+    final deadline = c.deadlineAt ?? c.scheduledForAt;
+    if (deadline == null) return false;
+    return DateTime.now().toUtc().isAfter(deadline.toUtc());
+  }
+
   List<Checklist> get _filteredList {
     if (_searchQuery.isEmpty) return _list;
     return _list.where((c) {
@@ -406,17 +413,33 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
             }
             return fmtDate(utc);
           };
-          final dateParts = <String>[
-            if (c.scheduledForAt != null) '${loc.t('checklist_scheduled_for') ?? 'На когда'}: ${formatDateTime(c.scheduledForAt!)}',
-            if (c.deadlineAt != null) '${loc.t('checklist_complete_by') ?? 'Завершить до'}: ${formatDateTime(c.deadlineAt!)}',
+          final isOverdue = _isOverdue(c);
+          final datePartsData = <(String, bool)>[
+            if (c.scheduledForAt != null) ('${loc.t('checklist_scheduled_for') ?? 'На когда'}: ${formatDateTime(c.scheduledForAt!)}', false),
+            if (c.deadlineAt != null) ('${loc.t('checklist_complete_by') ?? 'Завершить до'}: ${formatDateTime(c.deadlineAt!)}', isOverdue),
           ];
           return Card(
             margin: const EdgeInsets.only(bottom: 8),
+            color: isOverdue
+                ? Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.25)
+                : null,
+            shape: isOverdue
+                ? RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(
+                      color: Theme.of(context).colorScheme.error,
+                      width: 2,
+                    ),
+                  )
+                : null,
             child: ListTile(
               leading: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.checklist),
+                  Icon(
+                    isOverdue ? Icons.warning_amber_rounded : Icons.checklist,
+                    color: isOverdue ? Theme.of(context).colorScheme.error : null,
+                  ),
                   if (sectionLabel != null) ...[
                     const SizedBox(width: 8),
                     Tooltip(
@@ -435,19 +458,47 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                     if (sectionLabel != null) sectionLabel,
                     '${c.items.length} ${loc.t('items_count')}',
                   ].join(' • ')),
-                  if (dateParts.isNotEmpty) ...[
+                  if (datePartsData.isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Wrap(
                       spacing: 8,
                       runSpacing: 4,
-                      children: dateParts.map((p) => Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.6),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(p, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
-                      )).toList(),
+                      children: [
+                        ...datePartsData.map((p) {
+                          final (text, overdue) = p;
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: overdue
+                                  ? Theme.of(context).colorScheme.error.withValues(alpha: 0.2)
+                                  : Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.6),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              text,
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: overdue ? Theme.of(context).colorScheme.error : null,
+                              ),
+                            ),
+                          );
+                        }),
+                        if (isOverdue)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.error.withValues(alpha: 0.3),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              loc.t('checklist_overdue') ?? 'Просрочен',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: Theme.of(context).colorScheme.error,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ],
                 ],
