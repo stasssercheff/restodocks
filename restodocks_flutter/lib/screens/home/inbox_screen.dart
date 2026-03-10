@@ -82,7 +82,7 @@ class _InboxScreenState extends State<InboxScreen> {
     if (employee.hasRole('owner')) {
       setState(() {
         _selectedDeptTab = _InboxDeptTab.kitchen;
-        _selectedTypeTab = _InboxTypeTab.messages; // Сообщения по умолчанию
+        _selectedTypeTab = _InboxTypeTab.order; // Заказы по умолчанию
       });
     } else {
       if (tabs.isNotEmpty) {
@@ -97,7 +97,7 @@ class _InboxScreenState extends State<InboxScreen> {
         r == 'bar_manager' || r == 'floor_manager');
   }
 
-  /// Входящие по ролям: собственник/управление — Сообщения, Заказы, Инвентаризация, iiko, Уведомления; линейные — Сообщения, Заказы, Уведомления.
+  /// Входящие по ролям: Заказы, Инвентаризация, iiko, Уведомления, Чеклисты. Сообщения — отдельная кнопка на главной.
   List<_InboxTab> _visibleTabs(Employee employee) {
     final isOwner = employee.hasRole('owner');
     final isManagement = employee.hasRole('executive_chef') || employee.hasRole('sous_chef') ||
@@ -106,7 +106,6 @@ class _InboxScreenState extends State<InboxScreen> {
     final hasDocs = employee.hasInboxDocuments;
 
     final tabs = <_InboxTab>[];
-    tabs.add(_InboxTab.messages); // Сообщения — всегда первая
     if (hasDocs) {
       tabs.add(_InboxTab.order);
       if (isOwner || isManagement) {
@@ -431,15 +430,17 @@ class _InboxScreenState extends State<InboxScreen> {
   Widget _buildDeptChip(_InboxDeptTab tab, String label, LocalizationService loc) {
     final isSelected = _selectedDeptTab == tab;
     final count = _getCountForDeptTab(tab);
+    final allViewed = count == 0;
     return FilterChip(
       label: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(label),
+          Text(label, style: TextStyle(color: allViewed && !isSelected ? Theme.of(context).colorScheme.onSurfaceVariant : null)),
           _buildCountBadge(count),
         ],
       ),
       selected: isSelected,
+      backgroundColor: allViewed && !isSelected ? Theme.of(context).colorScheme.surfaceContainerLow : Theme.of(context).colorScheme.surface,
       onSelected: (_) {
         setState(() {
           _selectedDeptTab = tab;
@@ -450,13 +451,12 @@ class _InboxScreenState extends State<InboxScreen> {
           }
         });
       },
-      backgroundColor: Theme.of(context).colorScheme.surface,
       selectedColor: Theme.of(context).colorScheme.primaryContainer,
       checkmarkColor: Theme.of(context).colorScheme.onPrimaryContainer,
     );
   }
 
-  /// Типы вкладок для собственника: Сообщения, Заказы, Инвентаризация, iiko (только кухня), Уведомления, Чеклисты.
+  /// Типы вкладок для собственника: Заказы, Инвентаризация, iiko (только кухня), Уведомления, Чеклисты.
   Widget _buildTypeFilterForOwner(LocalizationService loc) {
     final isBarOrHall = _selectedDeptTab == _InboxDeptTab.bar || _selectedDeptTab == _InboxDeptTab.hall;
     return Container(
@@ -474,8 +474,6 @@ class _InboxScreenState extends State<InboxScreen> {
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
-            _buildTypeChip(_InboxTypeTab.messages, loc.t('inbox_tab_messages') ?? 'Сообщения', loc),
-            const SizedBox(width: 8),
             _buildTypeChip(_InboxTypeTab.order, loc.t('inbox_tab_order') ?? 'Заказы', loc),
             const SizedBox(width: 8),
             _buildTypeChip(_InboxTypeTab.inventory, loc.t('inbox_tab_inventory') ?? 'Инвентаризация', loc),
@@ -496,11 +494,12 @@ class _InboxScreenState extends State<InboxScreen> {
   Widget _buildTypeChip(_InboxTypeTab tab, String label, LocalizationService loc) {
     final isSelected = _selectedTypeTab == tab;
     final count = _getCountForOwnerTypeTab(tab);
+    final allViewed = count == 0;
     return FilterChip(
       label: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(label),
+          Text(label, style: TextStyle(color: allViewed && !isSelected ? Theme.of(context).colorScheme.onSurfaceVariant : null)),
           _buildCountBadge(count),
         ],
       ),
@@ -508,7 +507,7 @@ class _InboxScreenState extends State<InboxScreen> {
       onSelected: (_) {
         setState(() => _selectedTypeTab = tab);
       },
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: allViewed && !isSelected ? Theme.of(context).colorScheme.surfaceContainerLow : Theme.of(context).colorScheme.surface,
       selectedColor: Theme.of(context).colorScheme.primaryContainer,
       checkmarkColor: Theme.of(context).colorScheme.onPrimaryContainer,
     );
@@ -555,13 +554,14 @@ class _InboxScreenState extends State<InboxScreen> {
   Widget _buildTabChip(_InboxTab tab, LocalizationService loc) {
     final isSelected = _selectedTab == tab;
     final count = _getCountForTab(tab);
+    final allViewed = count == 0;
     return Container(
       margin: const EdgeInsets.only(right: 8),
       child: FilterChip(
         label: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(_tabLabel(tab, loc)),
+            Text(_tabLabel(tab, loc), style: TextStyle(color: allViewed && !isSelected ? Theme.of(context).colorScheme.onSurfaceVariant : null)),
             _buildCountBadge(count),
           ],
         ),
@@ -569,7 +569,7 @@ class _InboxScreenState extends State<InboxScreen> {
         onSelected: (selected) {
           setState(() => _selectedTab = tab);
         },
-        backgroundColor: Theme.of(context).colorScheme.surface,
+        backgroundColor: allViewed && !isSelected ? Theme.of(context).colorScheme.surfaceContainerLow : Theme.of(context).colorScheme.surface,
         selectedColor: Theme.of(context).colorScheme.primaryContainer,
         checkmarkColor: Theme.of(context).colorScheme.onPrimaryContainer,
       ),
@@ -894,6 +894,9 @@ class _DocumentTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
+    context.watch<InboxViewedService>();
+    final estId = context.read<AccountManagerSupabase>().establishment?.id;
+    final isViewed = context.read<InboxViewedService>().getViewedIdsSync(estId).contains(document.id);
     final dateFormat = DateFormat('dd.MM.yyyy HH:mm', 'ru');
     final grandTotal = document.type == DocumentType.productOrder
         ? (document.metadata?['grandTotal'] as num?)?.toDouble()
@@ -901,18 +904,36 @@ class _DocumentTile extends StatelessWidget {
     final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'VND';
     final totalStr = grandTotal != null ? NumberFormatUtils.formatSum(grandTotal!, currency) : null;
     final totalLabel = loc.t('order_list_grand_total') ?? 'Итого';
+    final theme = Theme.of(context);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
+      color: isViewed ? theme.colorScheme.surfaceContainerLow : theme.colorScheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: isViewed ? theme.colorScheme.outlineVariant : theme.colorScheme.primary,
+          width: isViewed ? 1 : 2,
+        ),
+      ),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+          backgroundColor: isViewed
+              ? theme.colorScheme.surfaceContainerHighest
+              : theme.colorScheme.primaryContainer,
           child: Icon(
             document.icon,
-            color: Theme.of(context).colorScheme.onPrimaryContainer,
+            color: isViewed
+                ? theme.colorScheme.onSurfaceVariant
+                : theme.colorScheme.onPrimaryContainer,
           ),
         ),
-        title: Text(document.getLocalizedTitle(loc)),
+        title: Text(
+          document.getLocalizedTitle(loc),
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: isViewed ? FontWeight.normal : FontWeight.w600,
+          ),
+        ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
