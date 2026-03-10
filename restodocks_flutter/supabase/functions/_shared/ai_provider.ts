@@ -1,14 +1,17 @@
 /**
- * Общий слой вызова ИИ. Поддерживаются: Google Gemini, GigaChat, OpenAI.
+ * Общий слой вызова ИИ. Поддерживаются: Groq, Google Gemini, GigaChat, OpenAI, Claude.
  * Переменные:
- * - AI_PROVIDER = "gemini" | "gigachat" | "openai" — явный выбор; иначе по приоритету ключей
- * - GIGACHAT_AUTH_KEY = Base64(ClientID:ClientSecret) — GigaChat (бесплатный лимит для физлиц)
+ * - AI_PROVIDER = "groq" | "gemini" | "gigachat" | "openai" | "claude" — явный выбор; иначе каскад по ключам.
+ *   Если Gemini даёт 429 (quota), задай AI_PROVIDER=groq в Supabase, чтобы использовать Groq.
+ * - GROQ_API_KEY — Groq (быстро, free tier) — OpenAI-совместимый API
+ * - GEMINI_API_KEY — Google AI Studio, бесплатный tier
+ * - GIGACHAT_AUTH_KEY — GigaChat (бесплатный лимит)
  * - OPENAI_API_KEY — OpenAI (фото + текст)
- * - GEMINI_API_KEY — Google AI Studio, бесплатный tier (aistudio.google.com)
- * - ANTHROPIC_API_KEY — Claude API (платно)
- * Задачи с картинками (чек, ТТК из фото) пока только через OpenAI.
+ * - ANTHROPIC_API_KEY — Claude API
+ * chatText с fallback: при ошибке/пустом ответе пробует следующий провайдер.
  */
 
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const GIGACHAT_AUTH_URL = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth";
 const GIGACHAT_CHAT_URL = "https://gigachat.devices.sberbank.ru/api/v1/chat/completions";
 const GIGACHAT_SCOPE = "GIGACHAT_API_PERS";
@@ -44,29 +47,57 @@ async function getGigaChatToken(authKey: string): Promise<string> {
   return gigachatToken;
 }
 
-export type TextProvider = "gigachat" | "openai" | "gemini" | "claude";
+export type TextProvider = "groq" | "gigachat" | "openai" | "gemini" | "claude";
 
-/** Определяет провайдера: AI_PROVIDER или по приоритету ключей (gemini → gigachat → openai) */
-export function getProvider(): TextProvider {
+/** Список провайдеров с ключами, в порядке приоритета (каскад при fallback) */
+function getAvailableProviders(): TextProvider[] {
   const forced = Deno.env.get("AI_PROVIDER")?.toLowerCase();
-  if (forced === "openai" || forced === "gigachat" || forced === "gemini" || forced === "claude") return forced;
-  if (Deno.env.get("GEMINI_API_KEY")?.trim()) return "gemini";
-  if (Deno.env.get("GIGACHAT_AUTH_KEY")?.trim()) return "gigachat";
-  if (Deno.env.get("OPENAI_API_KEY")?.trim()) return "openai";
-  return "openai";
+  if (forced === "groq" || forced === "openai" || forced === "gigachat" || forced === "gemini" || forced === "claude") {
+    return [forced as TextProvider];
+  }
+  const list: TextProvider[] = [];
+  if (Deno.env.get("GROQ_API_KEY")?.trim()) list.push("groq");
+  if (Deno.env.get("GEMINI_API_KEY")?.trim()) list.push("gemini");
+  if (Deno.env.get("GIGACHAT_AUTH_KEY")?.trim()) list.push("gigachat");
+  if (Deno.env.get("OPENAI_API_KEY")?.trim()) list.push("openai");
+  if (Deno.env.get("ANTHROPIC_API_KEY")?.trim()) list.push("claude");
+  return list.length > 0 ? list : ["openai"];
 }
 
-/**
- * Вызов чата (только текст). Провайдер: GigaChat / Gemini / Claude / OpenAI по AI_PROVIDER или ключам.
- */
-export async function chatText(options: {
+/** Первый доступный провайдер */
+export function getProvider(): TextProvider {
+  return getAvailableProviders()[0];
+}
+
+/** Внутренний вызов одного провайдера (без fallback) */
+async function chatTextWithProvider(provider: TextProvider, options: {
   messages: Message[];
   model?: string;
   temperature?: number;
   maxTokens?: number;
 }): Promise<string> {
-  const provider = getProvider();
   const { messages, temperature = 0.3, maxTokens = 2048 } = options;
+
+  if (provider === "groq") {
+    const apiKey = Deno.env.get("GROQ_API_KEY")?.trim();
+    if (!apiKey) throw new Error("GROQ_API_KEY not set");
+    const model = options.model ?? "llama-3.1-70b-versatile";
+    const body: Record<string, unknown> = { model, messages, temperature };
+    if (maxTokens != null) body.max_tokens = maxTokens;
+    const res = await fetch(GROQ_URL, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Groq: ${res.status} ${err}`);
+    }
+    const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    const content = data.choices?.[0]?.message?.content?.trim();
+    if (content == null) throw new Error("Groq: empty response");
+    return content;
+  }
 
   if (provider === "gemini") {
     const apiKey = Deno.env.get("GEMINI_API_KEY")?.trim();
@@ -159,46 +190,95 @@ export async function chatText(options: {
     return content;
   }
 
-  const apiKey = Deno.env.get("OPENAI_API_KEY");
-  if (!apiKey) throw new Error("OPENAI_API_KEY not set");
-  const model = options.model ?? "gpt-4o-mini";
-  const body: Record<string, unknown> = {
-    model,
-    messages,
-    temperature,
-  };
-  if (maxTokens != null) body.max_tokens = maxTokens;
-  const res = await fetch(OPENAI_URL, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`OpenAI: ${res.status} ${err}`);
+  if (provider === "openai") {
+    const apiKey = Deno.env.get("OPENAI_API_KEY");
+    if (!apiKey) throw new Error("OPENAI_API_KEY not set");
+    const model = options.model ?? "gpt-4o-mini";
+    const body: Record<string, unknown> = { model, messages, temperature };
+    if (maxTokens != null) body.max_tokens = maxTokens;
+    const res = await fetch(OPENAI_URL, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`OpenAI: ${res.status} ${err}`);
+    }
+    const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    const content = data.choices?.[0]?.message?.content?.trim();
+    if (content == null) throw new Error("OpenAI: empty response");
+    return content;
   }
-  const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-  const content = data.choices?.[0]?.message?.content?.trim();
-  if (content == null) throw new Error("OpenAI: empty response");
-  return content;
+
+  throw new Error(`Unknown provider: ${provider}`);
 }
 
-/** Вызов OpenAI с поддержкой изображений (base64). Для чека/ТТК из фото — только OpenAI. */
+/**
+ * Вызов чата (только текст). Каскад: при ошибке/пустом ответе пробует следующий провайдер.
+ */
+export async function chatText(options: {
+  messages: Message[];
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
+}): Promise<string> {
+  const providers = getAvailableProviders();
+  let lastError: Error | null = null;
+  for (const provider of providers) {
+    try {
+      const result = await chatTextWithProvider(provider, options);
+      if (result?.trim()) return result;
+    } catch (e) {
+      lastError = e instanceof Error ? e : new Error(String(e));
+      console.warn(`AI provider ${provider} failed:`, lastError.message);
+    }
+  }
+  throw lastError ?? new Error("No AI provider available");
+}
+
+/** Вызов с поддержкой изображений. Каскад: Groq (Llama 4 Scout) → OpenAI. */
 export async function chatWithVision(options: {
   messages: (Message | { role: "user"; content: Array<{ type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }> })[];
   model?: string;
   temperature?: number;
   maxTokens?: number;
 }): Promise<string> {
-  const apiKey = Deno.env.get("OPENAI_API_KEY");
-  if (!apiKey) throw new Error("OPENAI_API_KEY not set (required for vision)");
+  const groqKey = Deno.env.get("GROQ_API_KEY")?.trim();
+  const openaiKey = Deno.env.get("OPENAI_API_KEY")?.trim();
+
+  if (groqKey) {
+    try {
+      const res = await fetch(GROQ_URL, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${groqKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "meta-llama/llama-4-scout-17b-16e-instruct",
+          messages: options.messages,
+          temperature: options.temperature ?? 0.2,
+          max_tokens: options.maxTokens ?? 2048,
+        }),
+      });
+      if (res.ok) {
+        const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+        const content = data.choices?.[0]?.message?.content?.trim();
+        if (content) return content;
+      } else {
+        console.warn("Groq vision failed:", res.status, await res.text());
+      }
+    } catch (e) {
+      console.warn("Groq vision error:", e);
+    }
+  }
+
+  if (!openaiKey) throw new Error("OPENAI_API_KEY not set (required when Groq vision fails or is unavailable)");
   const res = await fetch(OPENAI_URL, {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${apiKey}`,
+      "Authorization": `Bearer ${openaiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({

@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:archive/archive.dart';
 import 'package:csv/csv.dart';
 import 'package:excel/excel.dart' hide Border;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:xml/xml.dart';
 
 import 'ai_service.dart';
 import 'nutrition_api_service.dart';
@@ -181,17 +183,23 @@ class AiServiceSupabase implements AiService {
     try {
       var rows = _xlsxToRows(xlsxBytes);
       if (rows.isEmpty) rows = _csvToRows(xlsxBytes);
+      if (rows.isEmpty) rows = _docxToRows(xlsxBytes);
       if (rows.isEmpty) return [];
-      final data = await invoke('ai-recognize-tech-cards-batch', {'rows': rows});
-      if (data == null) return [];
-      final raw = data['cards'];
-      if (raw is! List) return [];
-      final list = <TechCardRecognitionResult>[];
-      for (final e in raw) {
-        if (e is! Map) continue;
-        final card = _parseTechCardResult(Map<String, dynamic>.from(e as Map));
-        if (card != null && (card.dishName != null && card.dishName!.isNotEmpty || card.ingredients.isNotEmpty)) {
-          list.add(card);
+      // 1. Сначала парсим по шаблону (без ИИ)
+      var list = AiServiceSupabase.parseTtkByTemplate(rows);
+      // 2. Только если шаблон не сработал — вызываем AI (Groq → Gemini)
+      if (list.isEmpty) {
+        final data = await invoke('ai-recognize-tech-cards-batch', {'rows': rows});
+        if (data == null) return [];
+        final raw = data['cards'];
+        if (raw is! List) return [];
+        list = <TechCardRecognitionResult>[];
+        for (final e in raw) {
+          if (e is! Map) continue;
+          final card = _parseTechCardResult(Map<String, dynamic>.from(e as Map));
+          if (card != null && (card.dishName != null && card.dishName!.isNotEmpty || card.ingredients.isNotEmpty)) {
+            list.add(card);
+          }
         }
       }
       return list;
@@ -225,13 +233,41 @@ class AiServiceSupabase implements AiService {
 
   List<List<String>> _csvToRows(Uint8List bytes) {
     try {
-      final s = utf8.decode(bytes);
-      final decoded = CsvToListConverter().convert(s);
+      var s = utf8.decode(bytes);
+      if (s.contains('\r')) s = s.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+      final decoded = CsvToListConverter(eol: '\n').convert(s);
       final rows = <List<String>>[];
       for (final row in decoded) {
         if (row is! List) continue;
         final strRow = row.map((c) => c?.toString().trim() ?? '').toList();
         if (strRow.any((c) => c.isNotEmpty)) rows.add(strRow);
+      }
+      return rows;
+    } catch (_) {
+      return [];
+    }
+  }
+
+  List<List<String>> _docxToRows(Uint8List bytes) {
+    try {
+      final archive = ZipDecoder().decodeBytes(bytes);
+      final doc = archive.findFile('word/document.xml');
+      if (doc == null) return [];
+      final xml = XmlDocument.parse(utf8.decode(doc.content as List<int>));
+      final paras = xml.descendants.whereType<XmlElement>().where((e) => e.localName == 'p');
+      final rows = <List<String>>[];
+      for (final p in paras) {
+        final texts = p.descendants.whereType<XmlElement>().where((e) => e.localName == 't').map((e) => e.innerText).toList();
+        final line = texts.join('').trim();
+        if (line.isNotEmpty) rows.add([line]);
+      }
+      if (rows.isEmpty) {
+        final allT = xml.descendants.whereType<XmlElement>().where((e) => e.localName == 't').map((e) => e.innerText).join(' ');
+        if (allT.trim().isNotEmpty) {
+          for (final s in allT.split(RegExp(r'\s+')).where((s) => s.length > 1)) {
+            rows.add([s]);
+          }
+        }
       }
       return rows;
     } catch (_) {
@@ -276,6 +312,127 @@ class AiServiceSupabase implements AiService {
     if (v is IntCellValue) return v.value.toString();
     if (v is DoubleCellValue) return v.value.toString();
     return v.toString();
+  }
+
+  /// Парсинг ТТК по шаблону (Наименование, Продукт, Брутто, Нетто...) — без вызова ИИ.
+  /// [testFromRows] — для тестов: передать готовые rows, минуя парсинг файла.
+  static List<TechCardRecognitionResult> parseTtkByTemplate(List<List<String>> rows) {
+    if (rows.length < 2) return [];
+    final results = <TechCardRecognitionResult>[];
+    int headerIdx = -1;
+    int nameCol = -1, productCol = -1, grossCol = -1, netCol = -1, wasteCol = -1;
+
+    final nameKeys = ['наименование', 'название', 'блюдо', 'пф', 'name', 'dish'];
+    final productKeys = ['продукт', 'сырьё', 'ингредиент', 'product', 'ingredient'];
+    final grossKeys = ['брутто', 'бр', 'gross'];
+    final netKeys = ['нетто', 'нт', 'net'];
+    final wasteKeys = ['отход', 'отх', 'waste', 'процент отхода'];
+
+    for (var r = 0; r < rows.length && r < 5; r++) {
+      final row = rows[r].map((c) => c.trim().toLowerCase()).toList();
+      for (var c = 0; c < row.length; c++) {
+        final cell = row[c];
+        if (cell.isEmpty) continue;
+        for (final k in nameKeys) {
+          if (cell.contains(k)) {
+            headerIdx = r;
+            nameCol = c;
+            break;
+          }
+        }
+        for (final k in productKeys) {
+          if (cell.contains(k)) {
+            headerIdx = r;
+            productCol = c;
+            break;
+          }
+        }
+        for (final k in grossKeys) {
+          if (cell.contains(k)) {
+            headerIdx = r;
+            grossCol = c;
+            break;
+          }
+        }
+        for (final k in netKeys) {
+          if (cell.contains(k)) {
+            headerIdx = r;
+            netCol = c;
+            break;
+          }
+        }
+        for (final k in wasteKeys) {
+          if (cell.contains(k)) {
+            headerIdx = r;
+            wasteCol = c;
+            break;
+          }
+        }
+      }
+      if (headerIdx >= 0 && (nameCol >= 0 || productCol >= 0)) break;
+    }
+    if (headerIdx < 0 || (nameCol < 0 && productCol < 0)) return [];
+
+    if (nameCol < 0) nameCol = 0;
+    if (productCol < 0) productCol = 1;
+
+    String? currentDish;
+    final currentIngredients = <TechCardIngredientLine>[];
+
+    void flushCard() {
+      if (currentDish != null && (currentDish!.isNotEmpty || currentIngredients.isNotEmpty)) {
+        results.add(TechCardRecognitionResult(
+          dishName: currentDish,
+          ingredients: List.from(currentIngredients),
+          isSemiFinished: currentDish?.toLowerCase().contains('пф') ?? false,
+        ));
+      }
+      currentIngredients.clear();
+    }
+
+    for (var r = headerIdx + 1; r < rows.length; r++) {
+      final row = rows[r];
+      if (row.isEmpty) continue;
+      final cells = row.map((c) => c.trim()).toList();
+      final nameVal = nameCol < cells.length ? cells[nameCol] : '';
+      final productVal = productCol < cells.length ? cells[productCol] : '';
+      final grossVal = grossCol >= 0 && grossCol < cells.length ? cells[grossCol] : '';
+      final netVal = netCol >= 0 && netCol < cells.length ? cells[netCol] : '';
+      final wasteVal = wasteCol >= 0 && wasteCol < cells.length ? cells[wasteCol] : '';
+
+      if (nameVal.toLowerCase() == 'итого' || productVal.toLowerCase() == 'итого') {
+        flushCard();
+        currentDish = null;
+        continue;
+      }
+      // Строка с названием блюда (начало новой карточки)
+      if (nameVal.isNotEmpty && !RegExp(r'^[\d\s\.\,]+$').hasMatch(nameVal) && productVal.isEmpty) {
+        if (currentDish != null && currentIngredients.isNotEmpty) flushCard();
+        currentDish = nameVal;
+      }
+      // Строка с продуктом (ингредиент)
+      if (productVal.isNotEmpty) {
+        if (currentDish == null && nameVal.isNotEmpty) currentDish = nameVal;
+        final gross = _parseNum(grossVal);
+        final net = _parseNum(netVal);
+        final waste = _parseNum(wasteVal);
+        currentIngredients.add(TechCardIngredientLine(
+          productName: productVal,
+          grossGrams: gross,
+          netGrams: net,
+          primaryWastePct: waste,
+          unit: 'g',
+        ));
+      }
+    }
+    flushCard();
+    return results;
+  }
+
+  static double? _parseNum(String s) {
+    if (s.isEmpty) return null;
+    final n = double.tryParse(s.replaceAll(',', '.').replaceAll(RegExp(r'[^\d\.\-]'), ''));
+    return n;
   }
 
   TechCardRecognitionResult? _parseTechCardResult(Map<String, dynamic>? data) {
