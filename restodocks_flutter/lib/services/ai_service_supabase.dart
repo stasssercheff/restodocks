@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:csv/csv.dart';
 import 'package:excel/excel.dart' hide Border;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -178,7 +179,8 @@ class AiServiceSupabase implements AiService {
   @override
   Future<List<TechCardRecognitionResult>> parseTechCardsFromExcel(Uint8List xlsxBytes) async {
     try {
-      final rows = _xlsxToRows(xlsxBytes);
+      var rows = _xlsxToRows(xlsxBytes);
+      if (rows.isEmpty) rows = _csvToRows(xlsxBytes);
       if (rows.isEmpty) return [];
       final data = await invoke('ai-recognize-tech-cards-batch', {'rows': rows});
       if (data == null) return [];
@@ -193,6 +195,45 @@ class AiServiceSupabase implements AiService {
         }
       }
       return list;
+    } catch (_) {
+      return [];
+    }
+  }
+
+  @override
+  Future<List<TechCardRecognitionResult>> parseTechCardsFromPdf(Uint8List pdfBytes) async {
+    try {
+      final pdfBase64 = base64Encode(pdfBytes);
+      final data = await invoke('ai-parse-tech-cards-pdf', {'pdfBase64': pdfBase64});
+      if (data == null) return [];
+      final raw = data['cards'];
+      if (raw is! List) return [];
+      final list = <TechCardRecognitionResult>[];
+      for (final e in raw) {
+        if (e is! Map) continue;
+        final card = _parseTechCardResult(Map<String, dynamic>.from(e as Map));
+        if (card != null &&
+            (card.dishName != null && card.dishName!.isNotEmpty || card.ingredients.isNotEmpty)) {
+          list.add(card);
+        }
+      }
+      return list;
+    } catch (_) {
+      return [];
+    }
+  }
+
+  List<List<String>> _csvToRows(Uint8List bytes) {
+    try {
+      final s = utf8.decode(bytes);
+      final decoded = const CsvToListConverter().convert(s);
+      final rows = <List<String>>[];
+      for (final row in decoded) {
+        if (row is! List) continue;
+        final strRow = row.map((c) => c?.toString().trim() ?? '').toList();
+        if (strRow.any((c) => c.isNotEmpty)) rows.add(strRow);
+      }
+      return rows;
     } catch (_) {
       return [];
     }
@@ -245,6 +286,7 @@ class AiServiceSupabase implements AiService {
       for (final e in raw) {
         if (e is! Map) continue;
         final m = Map<String, dynamic>.from(e as Map);
+        final it = (m['ingredientType'] as String?)?.toLowerCase();
         ingredients.add(TechCardIngredientLine(
           productName: (m['productName'] as String?) ?? '',
           grossGrams: m['grossGrams'] != null ? (m['grossGrams'] as num).toDouble() : null,
@@ -253,6 +295,7 @@ class AiServiceSupabase implements AiService {
           cookingMethod: m['cookingMethod'] as String?,
           primaryWastePct: m['primaryWastePct'] != null ? (m['primaryWastePct'] as num).toDouble() : null,
           cookingLossPct: m['cookingLossPct'] != null ? (m['cookingLossPct'] as num).toDouble() : null,
+          ingredientType: (it == 'product' || it == 'semi_finished') ? it : null,
         ));
       }
     }

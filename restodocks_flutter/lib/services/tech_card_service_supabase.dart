@@ -382,32 +382,99 @@ class TechCardServiceSupabase {
     }
   }
 
+  static String _normalizeName(String s) =>
+      s.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+
+  /// Поиск по названию: продукт или ПФ.
+  String? _findProductId(
+    String productName,
+    String? ingredientType,
+    List<({String id, String name})> products,
+    List<({String id, String name})> techCardsPf,
+    Map<String, String> createdByName,
+  ) {
+    final norm = _normalizeName(productName);
+    if (norm.isEmpty) return null;
+    if (ingredientType == 'semi_finished') {
+      for (final tc in techCardsPf) {
+        if (_normalizeName(tc.name) == norm) return tc.id;
+      }
+      return createdByName[norm] ?? createdByName[productName.trim()];
+    }
+    if (ingredientType == 'product') {
+      for (final p in products) {
+        if (_normalizeName(p.name) == norm) return p.id;
+      }
+      return null;
+    }
+    for (final p in products) {
+      if (_normalizeName(p.name) == norm) return p.id;
+    }
+    for (final tc in techCardsPf) {
+      if (_normalizeName(tc.name) == norm) return tc.id;
+    }
+    return createdByName[norm] ?? createdByName[productName.trim()];
+  }
+
   /// Создание ТТК из результата распознавания ИИ (пакетный импорт).
   Future<TechCard> createTechCardFromRecognitionResult({
     required String establishmentId,
     required String createdBy,
     required TechCardRecognitionResult result,
     required String category,
+    List<String> sections = const ['all'],
+    bool? isSemiFinishedOverride,
     String languageCode = 'ru',
+    List<({String id, String name})>? productsForMapping,
+    List<({String id, String name})>? techCardsPfForMapping,
+    Map<String, String>? createdTechCardsByName,
   }) async {
     final name = result.dishName?.trim().isNotEmpty == true ? result.dishName!.trim() : 'Без названия';
+    final isPf = isSemiFinishedOverride ?? result.isSemiFinished ?? true;
+    final products = productsForMapping ?? [];
+    final techCardsPf = techCardsPfForMapping ?? [];
+    final createdByName = createdTechCardsByName ?? {};
+
     final created = await createTechCard(
       dishName: name,
       category: category,
-      isSemiFinished: result.isSemiFinished ?? true,
+      sections: sections,
+      isSemiFinished: isPf,
       establishmentId: establishmentId,
       createdBy: createdBy,
     );
+
     final ingredients = <TTIngredient>[];
     for (final line in result.ingredients) {
       if (line.productName.trim().isEmpty) continue;
+      String? productId;
+      String? sourceTechCardId;
+      if (products.isNotEmpty || techCardsPf.isNotEmpty || createdByName.isNotEmpty) {
+        final found = _findProductId(
+          line.productName,
+          line.ingredientType,
+          products,
+          techCardsPf,
+          createdByName,
+        );
+        if (found != null) {
+          final isPfId = techCardsPf.any((t) => t.id == found) || createdByName.values.contains(found);
+          if (isPfId) {
+            sourceTechCardId = found;
+          } else {
+            productId = found;
+          }
+        }
+      }
+
       final gross = line.grossGrams ?? 0.0;
       final net = line.netGrams ?? line.grossGrams ?? gross;
       final unit = line.unit?.trim().isNotEmpty == true ? line.unit! : 'g';
       final wastePct = (line.primaryWastePct ?? 0).clamp(0.0, 99.9);
       ingredients.add(TTIngredient(
         id: '${DateTime.now().millisecondsSinceEpoch}_${ingredients.length}',
-        productId: null,
+        productId: productId,
+        sourceTechCardId: sourceTechCardId,
         productName: line.productName.trim(),
         grossWeight: gross > 0 ? gross : 100,
         netWeight: net > 0 ? net : (gross > 0 ? gross : 100),
@@ -430,6 +497,10 @@ class TechCardServiceSupabase {
     );
     final updated = TechCard.withYieldValue(withIngredients, yieldVal > 0 ? yieldVal : 100);
     await saveTechCard(updated);
+    if (createdTechCardsByName != null) {
+      createdTechCardsByName[_normalizeName(name)] = updated.id;
+      createdTechCardsByName[name] = updated.id;
+    }
     return updated;
   }
 

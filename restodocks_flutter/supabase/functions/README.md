@@ -1,6 +1,6 @@
 # Edge Functions для ИИ (Restodocks)
 
-**На старте приоритет — бесплатные сервисы.** Текстовые задачи (чеклист, продукт, КБЖУ, верификация, ТТК из Excel) идут через **GigaChat** (1 млн токенов/год бесплатно для физлиц), если задан `GIGACHAT_AUTH_KEY`. Задачи с картинками (чек из фото, ТТК из фото) — только **OpenAI** (платно).
+**Каскад провайдеров:** Groq (быстро, free) → Gemini → GigaChat → OpenAI. При ошибке одного пробуем следующий. Задачи с картинками (чек, ТТК из фото) — только **OpenAI**.
 
 ## Секреты и провайдер
 
@@ -30,11 +30,18 @@
   supabase secrets set AI_PROVIDER=claude
   ```
 
+- **Groq (быстро, free tier):**
+  Ключ в [console.groq.com](https://console.groq.com):
+  ```bash
+  supabase secrets set GROQ_API_KEY=gsk_...
+  ```
+  По умолчанию первый в каскаде — самый быстрый.
+
 - **Принудительно выбрать провайдера:**
   ```bash
-  supabase secrets set AI_PROVIDER=gigachat   # или openai, gemini, claude
+  supabase secrets set AI_PROVIDER=groq   # или gemini, gigachat, openai, claude
   ```
-  По умолчанию приоритет: GigaChat → Gemini → Claude → OpenAI (по первому заданному ключу).
+  По умолчанию каскад: Groq → Gemini → GigaChat → OpenAI → Claude (при ошибке пробуем следующий).
 
 - **Google Cloud Translation API (для переводов продуктов, ТТК):**
   1. [Google Cloud Console](https://console.cloud.google.com) → APIs & Services → Enable **Cloud Translation API**
@@ -54,7 +61,7 @@
    supabase link --project-ref YOUR_PROJECT_REF
    ```
 3. Задайте хотя бы один из секретов (см. выше):
-   - для бесплатного старта: `GIGACHAT_AUTH_KEY`;
+   - для бесплатного старта: `GROQ_API_KEY` или `GEMINI_API_KEY` или `GIGACHAT_AUTH_KEY`;
    - для фото: `OPENAI_API_KEY`.
 4. Деплой всех функций:
    ```bash
@@ -63,6 +70,7 @@
    supabase functions deploy ai-recognize-receipt
    supabase functions deploy ai-recognize-tech-card
    supabase functions deploy ai-recognize-tech-cards-batch
+   supabase functions deploy ai-parse-tech-cards-pdf
    supabase functions deploy ai-recognize-product
    supabase functions deploy ai-refine-nutrition
    supabase functions deploy ai-verify-product
@@ -83,6 +91,7 @@
 | `ai-recognize-receipt` | Распознавание чека по фото | только OpenAI (vision) |
 | `ai-recognize-tech-card` | ТТК по фото или по таблице (Excel), одна карточка | Фото: OpenAI; таблица: GigaChat/OpenAI |
 | `ai-recognize-tech-cards-batch` | ТТК из одного документа Excel — все карточки разом | GigaChat / OpenAI (текст) |
+| `ai-parse-tech-cards-pdf` | ТТК из PDF (извлечение текста + парсинг) | Groq / Gemini / OpenAI (текст) |
 | `ai-recognize-product` | Нормализация названия, категория, единица | GigaChat / OpenAI |
 | `ai-refine-nutrition` | КБЖУ по названию продукта | GigaChat / OpenAI |
 | `ai-verify-product` | Верификация продукта (цена, КБЖУ, название) | GigaChat / OpenAI |
@@ -90,6 +99,8 @@
 | `translate-text` | Перевод текста (продукты, ТТК) | Google Cloud Translation API |
 
 ## Локальный запуск (опционально)
+
+**Docker не нужен для деплоя** — `supabase functions deploy` выполняет сборку в облаке. Docker требуется только для `supabase functions serve` (локальная отладка). Если видите «Docker is not running» — можно игнорировать, деплой через GitHub Actions или `supabase deploy` работает без Docker.
 
 ```bash
 supabase functions serve ai-generate-checklist --env-file .env.local

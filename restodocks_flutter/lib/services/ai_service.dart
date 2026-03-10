@@ -43,8 +43,9 @@ class ReceiptRecognitionResult {
   });
 }
 
-/// Один ингредиент, извлечённый из карточки ТТК (фото/Excel).
-/// Поля соответствуют ячейкам таблицы ТТК: наименование, брутто, отход %, нетто, способ приготовления, ужарка %, единица.
+/// Один ингредиент, извлечённый из карточки ТТК (фото/Excel/PDF).
+/// Поля соответствуют ячейкам таблицы ТТК: наименование, брутто, отход %, нетто и т.д.
+/// [ingredientType]: "product" = покупное сырьё (смесь РИКО, мука, масло), "semi_finished" = ПФ (крем, бисквит).
 class TechCardIngredientLine {
   final String productName;
   final double? grossGrams;
@@ -55,6 +56,8 @@ class TechCardIngredientLine {
   final double? primaryWastePct;
   /// Процент ужарки/усушки (колонка «Ужарка %»), 0–100.
   final double? cookingLossPct;
+  /// "product" = покупное сырьё, "semi_finished" = полуфабрикат (ПФ). Для маппинга в номенклатуру.
+  final String? ingredientType;
 
   const TechCardIngredientLine({
     required this.productName,
@@ -64,6 +67,7 @@ class TechCardIngredientLine {
     this.cookingMethod,
     this.primaryWastePct,
     this.cookingLossPct,
+    this.ingredientType,
   });
 }
 
@@ -166,6 +170,9 @@ abstract class AiService {
   /// Парсинг всех ТТК из одного документа Excel (несколько карточек в одном файле).
   Future<List<TechCardRecognitionResult>> parseTechCardsFromExcel(Uint8List xlsxBytes);
 
+  /// Парсинг ТТК из PDF (извлечение текста + ИИ).
+  Future<List<TechCardRecognitionResult>> parseTechCardsFromPdf(Uint8List pdfBytes);
+
   /// Распознавание продукта по введённому тексту (нормализация, категория, единица).
   Future<ProductRecognitionResult?> recognizeProduct(String userInput);
 
@@ -210,6 +217,10 @@ class AiServiceStub implements AiService {
 
   @override
   Future<List<TechCardRecognitionResult>> parseTechCardsFromExcel(Uint8List xlsxBytes) async =>
+      [];
+
+  @override
+  Future<List<TechCardRecognitionResult>> parseTechCardsFromPdf(Uint8List pdfBytes) async =>
       [];
 
   @override

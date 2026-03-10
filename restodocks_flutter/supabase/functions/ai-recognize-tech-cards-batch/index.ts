@@ -25,9 +25,9 @@ Deno.serve(async (req: Request) => {
     const body = (await req.json()) as { rows?: string[][] };
     const rows = body.rows;
 
-    const hasTextProvider = Deno.env.get("GIGACHAT_AUTH_KEY")?.trim() || Deno.env.get("OPENAI_API_KEY");
+    const hasTextProvider = Deno.env.get("GROQ_API_KEY")?.trim() || Deno.env.get("GEMINI_API_KEY")?.trim() || Deno.env.get("GIGACHAT_AUTH_KEY")?.trim() || Deno.env.get("OPENAI_API_KEY");
     if (!hasTextProvider) {
-      return new Response(JSON.stringify({ error: "GIGACHAT_AUTH_KEY or OPENAI_API_KEY required" }), {
+      return new Response(JSON.stringify({ error: "GROQ_API_KEY, GEMINI_API_KEY, GIGACHAT_AUTH_KEY or OPENAI_API_KEY required" }), {
         status: 500,
         headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
       });
@@ -53,10 +53,12 @@ IGNORE these columns (do not use, do not require): "Цена за 1 кг/л", "�
 
 How to split cards: each card is a block — one dish name row (or name in first column), then ingredient rows, then usually an "Итого" (total) row. When you see a new dish name or "Наименование" again or a clear separator, start a new card. Technology text belongs to the card it is next to (merged cell).
 
-If column order or names vary (different languages, extra columns), infer from context. Extract: dishName, ingredients (productName, grossGrams, netGrams, primaryWastePct, cookingLossPct; unit default "g"), technologyText. Do not return empty just because the format is non-standard — parse as much as you can.
+For each ingredient, set ingredientType: "product" if it is purchased (сырьё, смесь, мука, масло, сливки — e.g. "смесь РИКО", "шоколад черный"); "semi_finished" if it is a semi-finished product made in-house (ПФ, крем, бисквит, соус собственного производства).
+
+If column order or names vary (different languages, extra columns), infer from context. Extract: dishName, ingredients (productName, grossGrams, netGrams, primaryWastePct, cookingLossPct, ingredientType; unit default "g"), technologyText. Do not return empty just because the format is non-standard — parse as much as you can.
 
 Return ONLY valid JSON, no markdown:
-{ "cards": [ { "dishName": string, "technologyText": string | null, "isSemiFinished": boolean | null, "ingredients": [ { "productName": string, "grossGrams": number | null, "netGrams": number | null, "primaryWastePct": number | null, "cookingMethod": string | null, "cookingLossPct": number | null, "unit": string | null } ] }, ... ] }
+{ "cards": [ { "dishName": string, "technologyText": string | null, "isSemiFinished": boolean | null, "ingredients": [ { "productName": string, "grossGrams": number | null, "netGrams": number | null, "primaryWastePct": number | null, "cookingMethod": string | null, "cookingLossPct": number | null, "unit": string | null, "ingredientType": "product" | "semi_finished" | null } ] }, ... ] }
 
 Return ALL cards found (up to hundreds). If no cards, return { "cards": [] }.`;
 
@@ -90,15 +92,20 @@ Return ALL cards found (up to hundreds). If no cards, return { "cards": [] }.`;
     const normalized = cards.map((card) => {
       const c = card as Record<string, unknown>;
       const ingredients = Array.isArray(c.ingredients)
-        ? (c.ingredients as Record<string, unknown>[]).map((i) => ({
-            productName: String(i.productName ?? ""),
-            grossGrams: i.grossGrams != null ? Number(i.grossGrams) : undefined,
-            netGrams: i.netGrams != null ? Number(i.netGrams) : undefined,
-            unit: i.unit != null ? String(i.unit) : undefined,
-            cookingMethod: i.cookingMethod != null ? String(i.cookingMethod) : undefined,
-            primaryWastePct: i.primaryWastePct != null ? Number(i.primaryWastePct) : undefined,
-            cookingLossPct: i.cookingLossPct != null ? Number(i.cookingLossPct) : undefined,
-          }))
+        ? (c.ingredients as Record<string, unknown>[]).map((i) => {
+            const it = String(i.ingredientType ?? "").toLowerCase();
+            const ingredientType = (it === "product" || it === "semi_finished") ? it : undefined;
+            return {
+              productName: String(i.productName ?? ""),
+              grossGrams: i.grossGrams != null ? Number(i.grossGrams) : undefined,
+              netGrams: i.netGrams != null ? Number(i.netGrams) : undefined,
+              unit: i.unit != null ? String(i.unit) : undefined,
+              cookingMethod: i.cookingMethod != null ? String(i.cookingMethod) : undefined,
+              primaryWastePct: i.primaryWastePct != null ? Number(i.primaryWastePct) : undefined,
+              cookingLossPct: i.cookingLossPct != null ? Number(i.cookingLossPct) : undefined,
+              ingredientType,
+            };
+          })
         : [];
       return {
         dishName: c.dishName != null ? String(c.dishName) : null,

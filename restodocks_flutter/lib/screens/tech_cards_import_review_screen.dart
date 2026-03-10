@@ -28,7 +28,12 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
   @override
   void initState() {
     super.initState();
-    _items = widget.cards.map((c) => _ReviewItem(result: c, category: _inferCategory(c.dishName ?? ''))).toList();
+    _items = widget.cards.map((c) => _ReviewItem(
+      result: c,
+      category: _inferCategory(c.dishName ?? ''),
+      sections: const ['all'],
+      isSemiFinished: c.isSemiFinished ?? true,
+    )).toList();
   }
 
   String _inferCategory(String dishName) {
@@ -71,14 +76,32 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
     setState(() => _saving = true);
     try {
       final svc = context.read<TechCardServiceSupabase>();
+      final productStore = context.read<ProductStoreSupabase>();
+      final products = productStore.getNomenclatureProducts(est.dataEstablishmentId);
+      final allTc = await svc.getTechCardsForEstablishment(est.dataEstablishmentId);
+      final techCardsPf = allTc
+          .where((tc) => tc.isSemiFinished)
+          .map((tc) => (id: tc.id, name: tc.dishName))
+          .toList();
+      final productsForMapping = products.map((p) => (id: p.id, name: p.name)).toList();
+      final createdByName = <String, String>{};
+
+      final sorted = List<_ReviewItem>.from(_items)
+        ..sort((a, b) => (a.isSemiFinished == b.isSemiFinished) ? 0 : (a.isSemiFinished ? -1 : 1));
+
       int created = 0;
-      for (final item in _items) {
+      for (final item in sorted) {
         await svc.createTechCardFromRecognitionResult(
           establishmentId: est.dataEstablishmentId,
           createdBy: emp.id,
           result: item.result,
           category: item.category,
+          sections: item.sections,
+          isSemiFinishedOverride: item.isSemiFinished,
           languageCode: lang,
+          productsForMapping: productsForMapping,
+          techCardsPfForMapping: techCardsPf,
+          createdTechCardsByName: createdByName,
         );
         created++;
       }
@@ -151,15 +174,35 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                           ],
                         ),
                         const SizedBox(height: 8),
-                        Row(
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             DropdownButton<String>(
                               value: _categoryOptions.contains(item.category) ? item.category : 'misc',
                               isDense: true,
                               items: _categoryOptions.map((c) => DropdownMenuItem(value: c, child: Text(_categoryLabel(c, lang)))).toList(),
-                              onChanged: (v) => setState(() => _items[index] = _ReviewItem(result: item.result, category: v ?? item.category)),
+                              onChanged: (v) => setState(() => _items[index] = _ReviewItem(result: item.result, category: v ?? item.category, sections: item.sections, isSemiFinished: item.isSemiFinished)),
                             ),
-                            const SizedBox(width: 16),
+                            DropdownButton<String>(
+                              value: item.sections.contains('all') ? 'all' : 'hidden',
+                              isDense: true,
+                              items: [
+                                DropdownMenuItem(value: 'all', child: Text(loc.t('ttk_sections_all'))),
+                                DropdownMenuItem(value: 'hidden', child: Text(loc.t('ttk_sections_hidden'))),
+                              ],
+                              onChanged: (v) => setState(() => _items[index] = _ReviewItem(result: item.result, category: item.category, sections: v == 'all' ? const ['all'] : const [], isSemiFinished: item.isSemiFinished)),
+                            ),
+                            DropdownButton<bool>(
+                              value: item.isSemiFinished,
+                              isDense: true,
+                              items: [
+                                DropdownMenuItem(value: true, child: Text(loc.t('ttk_semi_finished'))),
+                                DropdownMenuItem(value: false, child: Text(loc.t('ttk_dish'))),
+                              ],
+                              onChanged: (v) => setState(() => _items[index] = _ReviewItem(result: item.result, category: item.category, sections: item.sections, isSemiFinished: v ?? item.isSemiFinished)),
+                            ),
                             Text(
                               loc.t('tech_cards_ingredients_count').replaceAll('%s', '$count'),
                               style: theme.textTheme.bodySmall,
@@ -194,6 +237,13 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
 class _ReviewItem {
   final TechCardRecognitionResult result;
   final String category;
+  final List<String> sections;
+  final bool isSemiFinished;
 
-  _ReviewItem({required this.result, required this.category});
+  _ReviewItem({
+    required this.result,
+    required this.category,
+    this.sections = const ['all'],
+    this.isSemiFinished = true,
+  });
 }
