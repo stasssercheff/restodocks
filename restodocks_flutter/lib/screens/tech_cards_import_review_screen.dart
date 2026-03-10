@@ -17,6 +17,20 @@ class TechCardsImportReviewScreen extends StatefulWidget {
 }
 
 class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScreen> {
+  /// Цеха для выбора при импорте ТТК (код → ключ локализации)
+  static const _sectionOptions = [
+    ('all', 'ttk_sections_all'),
+    ('hidden', 'ttk_sections_hidden'),
+    ('hot_kitchen', 'section_hot_kitchen'),
+    ('cold_kitchen', 'section_cold_kitchen'),
+    ('prep', 'section_prep'),
+    ('pastry', 'section_pastry'),
+    ('grill', 'section_grill'),
+    ('sushi', 'section_sushi'),
+    ('bakery', 'section_bakery'),
+    ('banquet_catering', 'section_banquet_catering'),
+  ];
+
   static const _categoryOptions = [
     'misc', 'vegetables', 'fruits', 'meat', 'seafood', 'dairy', 'grains',
     'bakery', 'pantry', 'spices', 'beverages', 'eggs', 'legumes', 'nuts',
@@ -51,6 +65,18 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
     if (lower.contains('боб') || lower.contains('legume')) return 'legumes';
     if (lower.contains('орех') || lower.contains('nut')) return 'nuts';
     return 'misc';
+  }
+
+  String _sectionsToDropdownValue(List<String> sections) {
+    if (sections.contains('all')) return 'all';
+    if (sections.isEmpty) return 'hidden';
+    return sections.first;
+  }
+
+  List<String> _dropdownValueToSections(String value) {
+    if (value == 'all') return const ['all'];
+    if (value == 'hidden') return const [];
+    return [value];
   }
 
   String _categoryLabel(String c, String lang) {
@@ -186,13 +212,17 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                               onChanged: (v) => setState(() => _items[index] = _ReviewItem(result: item.result, category: v ?? item.category, sections: item.sections, isSemiFinished: item.isSemiFinished)),
                             ),
                             DropdownButton<String>(
-                              value: item.sections.contains('all') ? 'all' : 'hidden',
+                              value: _sectionsToDropdownValue(item.sections),
                               isDense: true,
-                              items: [
-                                DropdownMenuItem(value: 'all', child: Text(loc.t('ttk_sections_all'))),
-                                DropdownMenuItem(value: 'hidden', child: Text(loc.t('ttk_sections_hidden'))),
-                              ],
-                              onChanged: (v) => setState(() => _items[index] = _ReviewItem(result: item.result, category: item.category, sections: v == 'all' ? const ['all'] : const [], isSemiFinished: item.isSemiFinished)),
+                              items: _sectionOptions
+                                  .map((e) => DropdownMenuItem(value: e.$1, child: Text(loc.t(e.$2) ?? e.$1)))
+                                  .toList(),
+                              onChanged: (v) => setState(() => _items[index] = _ReviewItem(
+                                result: item.result,
+                                category: item.category,
+                                sections: _dropdownValueToSections(v ?? 'all'),
+                                isSemiFinished: item.isSemiFinished,
+                              )),
                             ),
                             DropdownButton<bool>(
                               value: item.isSemiFinished,
