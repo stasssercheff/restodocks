@@ -8,7 +8,6 @@ enum HomeTileId {
   messages,
   schedule,
   productOrder,
-  suppliers,
   menu,
   ttk,
   banquetMenu,

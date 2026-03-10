@@ -67,11 +67,6 @@ class StaffHomeContent extends StatelessWidget {
         title: loc.t('product_order'),
         onTap: () => context.go('/product-order?department=${_deptForRoute(employee.department)}'),
       ),
-      HomeTileId.suppliers: _Tile(
-        icon: Icons.store_outlined,
-        title: loc.t('order_tab_suppliers') ?? 'Поставщики',
-        onTap: () => context.go('/suppliers/${_deptForRoute(employee.department)}'),
-      ),
       HomeTileId.menu: _Tile(
         icon: Icons.restaurant_menu,
         title: loc.t('menu'),

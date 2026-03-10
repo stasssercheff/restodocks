@@ -13,7 +13,6 @@ import 'excel_style_ttk_table.dart';
 import '../models/models.dart';
 import '../widgets/app_bar_home_button.dart';
 import '../services/ai_service.dart';
-import '../services/image_service.dart';
 import '../services/services.dart';
 import '../services/excel_export_service.dart';
 
@@ -282,28 +281,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
-  Future<void> _createFromPhoto(BuildContext context, LocalizationService loc) async {
-    final imageService = ImageService();
-    final xFile = await imageService.pickImageFromGallery();
-    if (xFile == null || !mounted) return;
-    final bytes = await imageService.xFileToBytes(xFile);
-    if (bytes == null || bytes.isEmpty || !mounted) return;
-    final ai = context.read<AiService>();
-    final result = await ai.recognizeTechCardFromImage(bytes);
-    if (!mounted) return;
-    if (result == null || (result.dishName == null && result.ingredients.isEmpty)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.t('ai_tech_card_recognize_empty'))),
-      );
-      return;
-    }
-    context.push('/tech-cards/new', extra: result);
-  }
-
   Future<void> _createFromExcel(BuildContext context, LocalizationService loc) async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['xlsx', 'xls'],
+      allowedExtensions: ['xlsx', 'xls', 'csv', 'pdf', 'docx'],
       withData: true,
     );
     if (!mounted) return;
@@ -311,23 +292,29 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('file_not_selected'))));
       return;
     }
-    final bytes = result.files.single.bytes;
+    final file = result.files.single;
+    final bytes = file.bytes;
     if (bytes == null || bytes.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('file_read_failed'))));
       return;
     }
     final uBytes = Uint8List.fromList(bytes);
+    final isPdf = (file.extension?.toLowerCase() ?? '').contains('pdf');
     setState(() => _loadingExcel = true);
     try {
-      // Сначала ИИ: понимает таблицы с десятками/сотнями ТТК, русские столбцы, разный порядок колонок.
-      var list = await context.read<AiService>().parseTechCardsFromExcel(uBytes);
-      if (list.isEmpty) {
-        list = _parseSimpleExcelNames(uBytes);
+      List<TechCardRecognitionResult> list;
+      if (isPdf) {
+        list = await context.read<AiService>().parseTechCardsFromPdf(uBytes);
+      } else {
+        list = await context.read<AiService>().parseTechCardsFromExcel(uBytes);
+        if (list.isEmpty) {
+          list = _parseSimpleExcelNames(uBytes);
+        }
       }
       if (!mounted) return;
       if (list.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('ai_tech_card_excel_format_hint'))),
+          SnackBar(content: Text(loc.t(isPdf ? 'ai_tech_card_pdf_format_hint' : 'ai_tech_card_excel_format_hint'))),
         );
         return;
       }
@@ -337,9 +324,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         );
       }
       if (list.length == 1) {
-        context.push('/tech-cards/new', extra: list.single);
+        context.push(widget.department == 'bar' ? '/tech-cards/new?department=bar' : '/tech-cards/new', extra: list.single);
       } else {
-        context.push('/tech-cards/import-review', extra: list);
+        context.push('/tech-cards/import-review?department=${Uri.encodeComponent(widget.department)}', extra: list);
       }
     } finally {
       if (mounted) setState(() => _loadingExcel = false);
@@ -485,14 +472,29 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                   onSelected: (value) async {
                     if (value == 'new') {
                       context.push(widget.department == 'bar' ? '/tech-cards/new?department=bar' : '/tech-cards/new');
+                    } else if (value == 'excel') {
+                      await _createFromExcel(context, loc);
                     }
                   },
                   itemBuilder: (_) => [
                     PopupMenuItem(value: 'new', child: Text(loc.t('create_tech_card'))),
+                    PopupMenuItem(value: 'excel', child: Text(loc.t('ai_tech_card_from_excel'))),
                   ],
                 ),
               ),
           ].where((_) => true), // чтобы actions не был null
+          // Кнопка загрузки ТТК (Excel)
+          if (canEdit)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.upload),
+              tooltip: loc.t('ttk_import_file'),
+              onSelected: (value) async {
+                if (value == 'excel') await _createFromExcel(context, loc);
+              },
+              itemBuilder: (_) => [
+                PopupMenuItem(value: 'excel', child: Text(loc.t('ttk_import_file'))),
+              ],
+            ),
           // Кнопка экспорта
           PopupMenuButton<String>(
             icon: const Icon(Icons.download),

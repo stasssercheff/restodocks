@@ -33,7 +33,6 @@ class OwnerHomeContent extends StatelessWidget {
         _Tile(icon: Icons.assignment, title: loc.t('nomenclature'), onTap: () => context.go('/nomenclature/kitchen')),
         _Tile(icon: Icons.shopping_cart, title: loc.t('product_order'), onTap: () => context.go('/product-order?department=kitchen')),
         _Tile(icon: Icons.checklist, title: loc.t('checklists'), onTap: () => context.go('/checklists?department=kitchen')),
-        _Tile(icon: Icons.store_outlined, title: loc.t('order_tab_suppliers') ?? 'Поставщики', onTap: () => context.go('/suppliers/kitchen')),
 
         const SizedBox(height: 16),
         _SectionTitle(title: loc.t('bar')),
@@ -43,14 +42,12 @@ class OwnerHomeContent extends StatelessWidget {
         _Tile(icon: Icons.assignment, title: loc.t('nomenclature'), onTap: () => context.go('/nomenclature/bar')),
         _Tile(icon: Icons.shopping_cart, title: loc.t('product_order'), onTap: () => context.go('/product-order?department=bar')),
         _Tile(icon: Icons.checklist, title: loc.t('checklists'), onTap: () => context.go('/checklists?department=bar')),
-        _Tile(icon: Icons.store_outlined, title: loc.t('order_tab_suppliers') ?? 'Поставщики', onTap: () => context.go('/suppliers/bar')),
 
         const SizedBox(height: 16),
         _SectionTitle(title: loc.t('dining_room')),
         _Tile(icon: Icons.schedule, title: loc.t('schedule'), onTap: () => context.go('/schedule/hall')),
         _Tile(icon: Icons.restaurant_menu, title: loc.t('menu'), onTap: () => context.go('/menu/hall')),
         _Tile(icon: Icons.checklist, title: loc.t('checklists'), onTap: () => context.go('/checklists?department=hall')),
-        _Tile(icon: Icons.store_outlined, title: loc.t('order_tab_suppliers') ?? 'Поставщики', onTap: () => context.go('/suppliers/hall')),
         _Tile(icon: Icons.shopping_cart, title: loc.t('product_order'), onTap: () => context.go('/product-order?department=hall')),
 
         if (screenPref.showBanquetCatering) ...[

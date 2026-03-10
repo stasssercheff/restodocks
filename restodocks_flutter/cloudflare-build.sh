@@ -33,9 +33,11 @@ echo "==> Generating PWA icons"
 dart run flutter_launcher_icons
 
 echo "==> flutter build web (--no-web-resources-cdn, with source maps to avoid 404 parse error)"
+ENABLE_TTK="${ENABLE_TTK_IMPORT:-false}"
 flutter build web --release --no-web-resources-cdn \
   --dart-define=SUPABASE_URL="$SUPABASE_URL" \
-  --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
+  --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
+  --dart-define=ENABLE_TTK_IMPORT="$ENABLE_TTK"
 
 if [ -f scripts/sw_cleanup.js ]; then
   cp scripts/sw_cleanup.js build/web/flutter_service_worker.js

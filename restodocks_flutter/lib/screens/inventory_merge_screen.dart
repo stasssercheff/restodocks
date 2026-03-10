@@ -145,7 +145,7 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
     if (result == null || !mounted) return;
 
     final mergedPayload = _mergeStandardPayloads(docs);
-    await _saveStandardExcel(mergedPayload, saveLang: result);
+    await _saveStandardExcel(mergedPayload, saveLang: result, sourceDocs: docs);
   }
 
   Map<String, dynamic> _mergeStandardPayloads(List<InboxDocument> docs) {
@@ -219,7 +219,44 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
     };
   }
 
-  Future<void> _saveStandardExcel(Map<String, dynamic> payload, {required String saveLang}) async {
+  /// Метаданные объединения для сохранения во входящих
+  Map<String, dynamic> _buildMergeMetadata(List<InboxDocument> sourceDocs) {
+    final account = context.read<AccountManagerSupabase>();
+    final merger = account.currentEmployee;
+    return {
+      'mergedBy': merger?.fullName ?? '—',
+      'mergedById': merger?.id ?? '',
+      'mergedAt': DateTime.now().toUtc().toIso8601String(),
+      'sourceDocuments': sourceDocs.map((d) => {
+        'id': d.id,
+        'employeeName': d.employeeName,
+        'createdAt': d.createdAt.toUtc().toIso8601String(),
+        'title': d.title,
+      }).toList(),
+    };
+  }
+
+  /// Сохранить объединённую инвентаризацию во входящие (inventory_documents).
+  Future<void> _saveMergedToInbox(Map<String, dynamic> payload) async {
+    final account = context.read<AccountManagerSupabase>();
+    final merger = account.currentEmployee;
+    final estId = account.establishment?.id;
+    if (merger == null || estId == null) return;
+    final docService = InventoryDocumentService();
+    await docService.save(
+      establishmentId: estId,
+      createdByEmployeeId: merger.id,
+      recipientChefId: merger.id,
+      recipientEmail: merger.email,
+      payload: payload,
+    );
+  }
+
+  Future<void> _saveStandardExcel(
+    Map<String, dynamic> payload, {
+    required String saveLang,
+    required List<InboxDocument> sourceDocs,
+  }) async {
     final loc = _loc;
     final header = payload['header'] as Map<String, dynamic>? ?? {};
     final rows = payload['rows'] as List<dynamic>? ?? [];
@@ -307,6 +344,12 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
         final date = header['date'] ?? DateTime.now().toIso8601String().split('T').first;
         await saveFileBytes('inventory_merged_$date.xlsx', out);
         if (mounted) {
+          final inboxPayload = Map<String, dynamic>.from(payload);
+          inboxPayload['mergeMetadata'] = _buildMergeMetadata(sourceDocs);
+          inboxPayload['header'] = Map<String, dynamic>.from(header);
+          (inboxPayload['header'] as Map<String, dynamic>)['employeeName'] =
+              context.read<AccountManagerSupabase>().currentEmployee?.fullName ?? '—';
+          await _saveMergedToInbox(inboxPayload);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(loc.t('inventory_excel_downloaded') ?? 'Файл сохранён')),
           );
@@ -408,6 +451,16 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
     if (outBytes.isNotEmpty) {
       await saveFileBytes(fileName, outBytes);
       if (mounted) {
+        final inboxHeader = Map<String, dynamic>.from(firstHeader ?? {});
+        inboxHeader['employeeName'] = account.currentEmployee?.fullName ?? '—';
+        inboxHeader['date'] = dateStr;
+        final inboxPayload = <String, dynamic>{
+          'type': 'iiko_inventory',
+          'header': inboxHeader,
+          'rows': merged.values.toList(),
+          'mergeMetadata': _buildMergeMetadata(docs),
+        };
+        await _saveMergedToInbox(inboxPayload);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(_loc.t('inventory_excel_downloaded') ?? 'Файл сохранён')),
         );

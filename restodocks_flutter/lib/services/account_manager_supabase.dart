@@ -772,8 +772,14 @@ class AccountManagerSupabase extends ChangeNotifier {
             : (resp.data is Map ? Map<String, dynamic>.from(resp.data as Map) : null);
         lastResult = (status: resp.statusCode ?? 0, data: data);
 
-        // 4xx (в т.ч. 401 invalid_credentials) — не retry
+        // 4xx (в т.ч. 401) — retry 1 раз при invalid_credentials (EarlyDrop/сбои на restodocks.com)
         if (resp.statusCode != null && resp.statusCode! >= 400 && resp.statusCode! < 500) {
+          if (resp.statusCode == 401 &&
+              (data?['error'] == 'invalid_credentials') &&
+              attempt < maxRetries - 1) {
+            // один retry при 401 invalid_credentials — может быть EarlyDrop
+            continue;
+          }
           return lastResult;
         }
         // 2xx — успех
