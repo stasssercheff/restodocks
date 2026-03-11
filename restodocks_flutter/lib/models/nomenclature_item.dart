@@ -4,6 +4,7 @@ import 'models.dart';
 class NomenclatureItem {
   final Product? product;
   final TechCard? techCard;
+  final double? _establishmentPrice;
 
   bool get isProduct => product != null;
   bool get isTechCard => techCard != null;
@@ -11,11 +12,11 @@ class NomenclatureItem {
   String get id => product?.id ?? techCard!.id;
   String get name => product?.name ?? techCard!.dishName;
   String get category => product?.category ?? techCard!.category;
-  double? get price => product?.basePrice ?? (techCard != null ? _calculateTechCardCostPerKg(techCard!) : null);
+  double? get price => _establishmentPrice ?? (techCard != null ? _calculateTechCardCostPerKg(techCard!) : null);
   String? get currency => product?.currency;
 
-  const NomenclatureItem.product(this.product) : techCard = null;
-  const NomenclatureItem.techCard(this.techCard) : product = null;
+  const NomenclatureItem.product(this.product, {double? establishmentPrice}) : techCard = null, _establishmentPrice = establishmentPrice;
+  const NomenclatureItem.techCard(this.techCard) : product = null, _establishmentPrice = null;
 
   String getLocalizedName(String lang) {
     if (isProduct) return product!.getLocalizedName(lang);

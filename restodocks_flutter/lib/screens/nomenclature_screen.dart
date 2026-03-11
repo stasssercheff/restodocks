@@ -183,7 +183,8 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
           // Продукт уже есть — просто добавляем в номенклатуру
           final existingId = existingInStore.first.id;
           try {
-            await store.addToNomenclature(estId, existingId, price: item.price ?? existingInStore.first.basePrice, currency: defCur);
+            final ep = store.getEstablishmentPrice(existingId, estId);
+            await store.addToNomenclature(estId, existingId, price: item.price ?? ep?.$1, currency: defCur);
           } catch (_) {}
           setState(() => _skipped++);
           continue;
@@ -223,8 +224,8 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
           containsGluten: containsGluten,
           containsLactose: containsLactose,
           unit: verification?.suggestedUnit ?? 'g',
-          basePrice: verification?.suggestedPrice ?? item.price,
-          currency: (verification?.suggestedPrice ?? item.price) != null ? defCur : null,
+          basePrice: null,
+          currency: defCur,
         );
 
           Product savedProduct;
@@ -260,7 +261,7 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
           }
 
           try {
-            await store.addToNomenclature(estId, savedProduct.id, price: savedProduct.basePrice, currency: savedProduct.currency);
+            await store.addToNomenclature(estId, savedProduct.id, price: item.price ?? verification?.suggestedPrice, currency: defCur);
           } catch (e) {
             // Возможно продукт уже в номенклатуре - считаем это успехом
             if (e.toString().contains('duplicate key') ||
@@ -454,6 +455,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       _translatingProcessed = 0;
     });
     final store = context.read<ProductStoreSupabase>();
+    final estId = context.read<AccountManagerSupabase>().dataEstablishmentId ?? '';
     final loc = context.read<LocalizationService>();
     final translationSvc = context.read<TranslationService>();
     final targetLang = loc.currentLanguageCode;
@@ -497,8 +499,9 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
           if (updatedProduct != null && mounted) {
             final idx = _nomenclatureItems.indexWhere((item) => item.isProduct && item.product!.id == list[i].id);
             if (idx >= 0) {
+              final ep = store.getEstablishmentPrice(updatedProduct!.id, estId);
               _nomenclatureItems = List.from(_nomenclatureItems)
-                ..[idx] = NomenclatureItem.product(updatedProduct);
+                ..[idx] = NomenclatureItem.product(updatedProduct, establishmentPrice: ep?.$1);
             }
           }
         }
@@ -1128,7 +1131,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
   String _buildProductSubtitle(BuildContext context, Product p, ProductStoreSupabase store, String estId, LocalizationService loc) {
     final loc = context.read<LocalizationService>();
     final establishmentPrice = store.getEstablishmentPrice(p.id, estId);
-    final rawPrice = establishmentPrice?.$1 ?? p.basePrice;
+    final rawPrice = establishmentPrice?.$1;
     final accountManager = context.read<AccountManagerSupabase>();
     // Символ берём из валюты заведения, чтобы при смене валюты в настройках знак обновлялся
     final displayCurrency = accountManager.establishment?.defaultCurrency ?? establishmentPrice?.$2 ?? p.currency ?? 'VND';
@@ -1256,7 +1259,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     if (context.mounted) _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {}));
   }
 
-  Future<void> _verifyWithAi(BuildContext context, List<Product> list) async {
+  Future<void> _verifyWithAi(BuildContext context, List<Product> list, String estId) async {
     if (!context.mounted || list.isEmpty) return;
     final ai = context.read<AiService>();
     final store = context.read<ProductStoreSupabase>();
@@ -1268,6 +1271,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       builder: (ctx) => _VerifyProductsProgressDialog(
         list: list,
         store: store,
+        estId: estId,
         aiService: ai,
         loc: loc,
         onComplete: (r) {
@@ -1293,6 +1297,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       builder: (ctx) => _VerifyProductsResultsDialog(
         items: withSuggestions,
         store: store,
+        estId: estId,
         loc: loc,
         onApplied: () {
           Navigator.of(ctx).pop();
@@ -1335,7 +1340,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       if (_filterNoPrice) {
         if (item.isProduct) {
           final ep = store.getEstablishmentPrice(item.product!.id, estId);
-          final price = ep?.$1 ?? item.product!.basePrice;
+          final price = ep?.$1;
           if (price != null) return false;
         } else {
           if (item.price != null) return false;
@@ -1554,7 +1559,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                               onRemoveProduct: (ctx, p) => _confirmRemoveForNomenclature(ctx, p, store, loc, () => _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {})), estId ?? ''),
                               onLoadKbju: (ctx, list) => _loadKbjuForAll(ctx, list),
                               onLoadTranslations: (ctx, list) => _loadTranslationsForAll(ctx, list),
-                              onVerifyWithAi: (ctx, list) => _verifyWithAi(ctx, list),
+                              onVerifyWithAi: (ctx, list) => _verifyWithAi(ctx, list, estId ?? ''),
                               isTranslating: _isTranslatingProducts,
                               onNeedsKbju: (item) => _needsKbju(item),
                               onNeedsTranslation: (item) => _needsTranslation(item),
@@ -1590,10 +1595,9 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         copy.sort((a, b) => _sortKeyForName(b.getLocalizedName(lang)).compareTo(_sortKeyForName(a.getLocalizedName(lang))));
         break;
       case _CatalogSort.priceAsc:
-        copy.sort((a, b) => (a.basePrice ?? 0).compareTo(b.basePrice ?? 0));
-        break;
       case _CatalogSort.priceDesc:
-        copy.sort((a, b) => (b.basePrice ?? 0).compareTo(a.basePrice ?? 0));
+        // Сортировка по цене — в _sortNomenclatureItems (NomenclatureItem.price)
+        copy.sort((a, b) => 0);
         break;
     }
     return copy;
@@ -2437,7 +2441,7 @@ class _AddAllProgressDialogState extends State<_AddAllProgressDialog> {
         await widget.store.addToNomenclature(
           widget.estId,
           p.id,
-          price: ep?.$1 ?? p.basePrice,
+          price: ep?.$1,
           currency: ep?.$2 ?? p.currency,
         );
         if (!mounted) return;
@@ -2594,6 +2598,7 @@ class _VerifyProductsProgressDialog extends StatefulWidget {
   const _VerifyProductsProgressDialog({
     required this.list,
     required this.store,
+    required this.estId,
     required this.aiService,
     required this.loc,
     required this.onComplete,
@@ -2602,6 +2607,7 @@ class _VerifyProductsProgressDialog extends StatefulWidget {
 
   final List<Product> list;
   final ProductStoreSupabase store;
+  final String estId;
   final AiService aiService;
   final LocalizationService loc;
   final void Function(List<_VerifyProductItem>) onComplete;
@@ -2625,6 +2631,7 @@ class _VerifyProductsProgressDialogState extends State<_VerifyProductsProgressDi
   Future<void> _run() async {
     for (final p in widget.list) {
       try {
+        final ep = widget.store.getEstablishmentPrice(p.id, widget.estId);
         final nutrition = (p.calories != null || p.protein != null || p.fat != null || p.carbs != null)
             ? NutritionResult(
                 calories: p.calories,
@@ -2635,7 +2642,7 @@ class _VerifyProductsProgressDialogState extends State<_VerifyProductsProgressDi
             : null;
         final result = await widget.aiService.verifyProduct(
           p.getLocalizedName(widget.loc.currentLanguageCode),
-          currentPrice: p.basePrice,
+          currentPrice: ep?.$1,
           currentNutrition: nutrition,
         );
         if (!mounted) return;
@@ -2684,12 +2691,14 @@ class _VerifyProductsResultsDialog extends StatelessWidget {
   const _VerifyProductsResultsDialog({
     required this.items,
     required this.store,
+    required this.estId,
     required this.loc,
     required this.onApplied,
   });
 
   final List<_VerifyProductItem> items;
   final ProductStoreSupabase store;
+  final String estId;
   final LocalizationService loc;
   final VoidCallback onApplied;
 
@@ -2701,7 +2710,7 @@ class _VerifyProductsResultsDialog extends StatelessWidget {
       updated = updated.copyWith(name: r.normalizedName!.trim());
     }
     if (r.suggestedPrice != null) {
-      updated = updated.copyWith(basePrice: r.suggestedPrice);
+      await store.addToNomenclature(estId, p.id, price: r.suggestedPrice);
     }
     if (r.suggestedCalories != null || r.suggestedProtein != null || r.suggestedFat != null || r.suggestedCarbs != null) {
       final saneCal = NutritionApiService.saneCaloriesForProduct(
@@ -2728,7 +2737,7 @@ class _VerifyProductsResultsDialog extends StatelessWidget {
       if (r.normalizedName != null && r.normalizedName!.trim().isNotEmpty) {
         updated = updated.copyWith(name: r.normalizedName!.trim());
       }
-      if (r.suggestedPrice != null) updated = updated.copyWith(basePrice: r.suggestedPrice);
+      if (r.suggestedPrice != null) await store.addToNomenclature(estId, p.id, price: r.suggestedPrice);
       if (r.suggestedCalories != null || r.suggestedProtein != null || r.suggestedFat != null || r.suggestedCarbs != null) {
         final saneCal = NutritionApiService.saneCaloriesForProduct(
           p.getLocalizedName(loc.currentLanguageCode),
@@ -2785,9 +2794,16 @@ class _VerifyProductsResultsDialog extends StatelessWidget {
                             const SizedBox(height: 4),
                             Text('${loc.t('name')}: ${p.name} → ${r.normalizedName}', style: Theme.of(context).textTheme.bodySmall),
                           ],
-                          if (r.suggestedPrice != null && r.suggestedPrice != p.basePrice) ...[
-                            const SizedBox(height: 2),
-                            Text('${loc.t('price')}: ${p.basePrice != null ? NumberFormatUtils.formatDecimal(p.basePrice!) : '—'} → ${NumberFormatUtils.formatDecimal(r.suggestedPrice!)}', style: Theme.of(context).textTheme.bodySmall),
+                          if (r.suggestedPrice != null) ...[
+                            Builder(builder: (ctx) {
+                              final ep = store.getEstablishmentPrice(p.id, estId);
+                              final currentPrice = ep?.$1;
+                              if (r.suggestedPrice == currentPrice) return const SizedBox.shrink();
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 2),
+                                child: Text('${loc.t('price')}: ${currentPrice != null ? NumberFormatUtils.formatDecimal(currentPrice) : '—'} → ${NumberFormatUtils.formatDecimal(r.suggestedPrice!)}', style: Theme.of(context).textTheme.bodySmall),
+                              );
+                            }),
                           ],
                           const SizedBox(height: 8),
                           Align(
@@ -3222,8 +3238,8 @@ class _CatalogTab extends StatelessWidget {
   Future<void> _addToNomenclature(BuildContext context, Product p) async {
     try {
       final establishmentPrice = store.getEstablishmentPrice(p.id, estId);
-      final price = establishmentPrice?.$1 ?? p.basePrice;
-      await store.addToNomenclature(estId, p.id, price: price, currency: establishmentPrice?.$2 ?? p.currency);
+      final price = establishmentPrice?.$1;
+      await store.addToNomenclature(estId, p.id, price: price, currency: establishmentPrice?.$2);
       // Если продукт ещё не переведён — запускаем перевод фоново
       final names = p.names ?? {};
       final hasAllLangs = names['ru'] != null && names['en'] != null && names['ru'] != names['en'];
@@ -3342,10 +3358,10 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
     super.initState();
     final p = widget.product;
     _nameController = TextEditingController(text: p.getLocalizedName(widget.loc.currentLanguageCode));
-    double? initialPrice = p.basePrice;
+    double? initialPrice;
     if (widget.establishmentId != null && widget.establishmentId!.isNotEmpty) {
       final ep = widget.store.getEstablishmentPrice(p.id, widget.establishmentId);
-      if (ep?.$1 != null) initialPrice = ep!.$1;
+      initialPrice = ep?.$1;
     }
     _priceController = TextEditingController(text: initialPrice?.toString() ?? '');
     // Инициализация полей упаковки
@@ -3554,7 +3570,6 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
     final updated = widget.product.copyWith(
       name: name,
       names: merged,
-      basePrice: pricePerKg,
       currency: _currency,
       packagePrice: pkgPrice,
       clearPackagePrice: !_priceByPackage,

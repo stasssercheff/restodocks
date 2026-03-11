@@ -316,7 +316,7 @@ class TTIngredient extends Equatable {
 
     // Расчёт стоимости: используем цену из заведения или базовую
     final establishmentPrice = productStore?.getEstablishmentPrice(product.id, establishmentId);
-    final productPrice = establishmentPrice?.$1 ?? product.basePrice;
+    final productPrice = establishmentPrice?.$1 ?? 0.0;
     final productCurrency = establishmentPrice?.$2 ?? defaultCurrency ?? 'RUB';
 
     // Расчет стоимости: цена за грамм * вес брутто
@@ -382,7 +382,7 @@ class TTIngredient extends Equatable {
       newCarbs = nutrition.carbs;
     }
 
-    final newCost = (product.basePrice ?? 0) * (newGrossWeight / 1000.0);
+    final newCost = (pricePerKg ?? 0) * (newGrossWeight / 1000.0);
 
     return copyWith(
       grossWeight: newGrossWeight,
@@ -428,7 +428,7 @@ class TTIngredient extends Equatable {
       newCarbs = nutrition.carbs;
     }
 
-    final newCost = (product.basePrice ?? 0) * (grossWeight / 1000.0);
+    final newCost = (pricePerKg ?? 0) * (grossWeight / 1000.0);
 
     return copyWith(
       primaryWastePct: waste,

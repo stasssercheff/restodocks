@@ -221,6 +221,45 @@ class ProductStoreSupabase {
   /// Публичный метод для запуска перевода извне (fire-and-forget)
   void triggerTranslation(String productId) => _translateProductInBackground(productId);
 
+  /// Загрузить алиасы (нормализованное_название → product_id) для разгрузки AI при импорте
+  Future<Map<String, String>> loadProductAliases() async {
+    try {
+      final rows = await _supabase.client
+          .from('product_aliases')
+          .select('input_name_normalized, product_id');
+      final map = <String, String>{};
+      for (final r in rows as List) {
+        final row = r as Map<String, dynamic>;
+        final key = row['input_name_normalized']?.toString().trim();
+        final val = row['product_id']?.toString();
+        if (key != null && key.isNotEmpty && val != null) {
+          map[key] = val;
+        }
+      }
+      return map;
+    } catch (e) {
+      // Таблица может отсутствовать до миграции
+      return {};
+    }
+  }
+
+  /// Сохранить алиас: при следующем импорте не вызывать AI, сразу мапить на product
+  Future<void> saveProductAlias(String inputNameNormalized, String productId) async {
+    if (inputNameNormalized.trim().isEmpty || productId.isEmpty) return;
+    try {
+      await _supabase.client.from('product_aliases').upsert(
+            {
+              'input_name_normalized': inputNameNormalized.trim(),
+              'product_id': productId,
+            },
+            onConflict: 'input_name_normalized',
+          );
+    } catch (e) {
+      // Не прерываем основной поток при ошибке сохранения алиаса
+      print('ProductStore: saveProductAlias failed: $e');
+    }
+  }
+
   /// Запустить перевод продукта фоново через Edge Function auto-translate-product
   void _translateProductInBackground(String productId) {
     Supabase.instance.client.functions
@@ -426,7 +465,7 @@ class ProductStoreSupabase {
         // Добавляем в номенклатуру
         _nomenclatureIds.add(productId);
 
-        // Кэшируем цены: establishment_products или fallback на basePrice из карточки продукта.
+        // Кэшируем цены из establishment_products (номенклатура заведения).
         // Если в заведении несколько отделов (kitchen/bar) — не перезаписывать существующую цену на null.
         final cacheKey = '${establishmentId}_$productId';
         final price = item['price'];
@@ -439,19 +478,8 @@ class ProductStoreSupabase {
           if (existing != null && existing.$1 != null) {
             // Уже есть цена (из другого отдела) — не затирать
           } else {
-            // Нет цены в заведении — используем basePrice из карточки продукта
-            Product? product;
-            for (final p in _allProducts) {
-              if (p.id == productId) {
-                product = p;
-                break;
-              }
-            }
-            if (product != null && product.basePrice != null && product.basePrice! > 0) {
-              _priceCache[cacheKey] = (product.basePrice!, product.currency ?? currency);
-            } else {
-              _priceCache[cacheKey] = null;
-            }
+            // Цена только в establishment_products — если нет, то null
+            _priceCache[cacheKey] = null;
           }
         }
 
@@ -612,18 +640,7 @@ class ProductStoreSupabase {
         }
       }
 
-      // Также обновляем basePrice в таблице products
-      await _supabase.client
-          .from('products')
-          .update({'base_price': price, 'currency': currency})
-          .eq('id', productId);
-      print('✅ ProductStore: basePrice updated in products table');
-
-      // Обновляем локальный кэш продукта
-      final idx = _allProducts.indexWhere((p) => p.id == productId);
-      if (idx != -1) {
-        _allProducts[idx] = _allProducts[idx].copyWith(basePrice: price, currency: currency);
-      }
+      // Цена только в establishment_products (products.base_price не трогаем)
     }
 
     // Обновить кэш цены
@@ -757,7 +774,8 @@ class ProductStoreSupabase {
 
     final items = <NomenclatureItem>[];
     for (final product in products) {
-      items.add(NomenclatureItem.product(product));
+      final price = getEstablishmentPrice(product.id, establishmentId)?.$1;
+      items.add(NomenclatureItem.product(product, establishmentPrice: price));
     }
 
     return items;

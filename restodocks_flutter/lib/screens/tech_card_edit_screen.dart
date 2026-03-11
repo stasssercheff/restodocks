@@ -1399,6 +1399,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     final currency = accountManager.currentEmployee?.currency ?? accountManager.establishment?.defaultCurrency ?? 'RUB';
     final productStore = context.read<ProductStoreSupabase>();
     final establishmentId = context.read<AccountManagerSupabase>().dataEstablishmentId;
+    if (establishmentId != null && establishmentId.isNotEmpty) {
+      final ep = productStore.getEstablishmentPrice(p.id, establishmentId);
+      productStore.addToNomenclature(establishmentId, p.id, price: ep?.$1, currency: ep?.$2 ?? currency);
+    }
     final ing = TTIngredient.fromProduct(
       product: p,
       cookingProcess: cookingProcess,
@@ -1431,13 +1435,24 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   /// Подстановка продукта из поиска по номенклатуре в строку [replaceIndex] (или добавление новой).
   /// Отложенный кадр, чтобы закрытие попапа DropdownSearch не приводило к Navigator.pop экрана редактирования.
   void _addProductIngredientAt(int replaceIndex, Product p, {double? grossGrams}) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       final loc = context.read<LocalizationService>();
       final accountManager = context.read<AccountManagerSupabase>();
     final currency = accountManager.currentEmployee?.currency ?? accountManager.establishment?.defaultCurrency ?? 'RUB';
       final productStore = context.read<ProductStoreSupabase>();
       final establishmentId = context.read<AccountManagerSupabase>().dataEstablishmentId;
+      if (establishmentId != null && establishmentId.isNotEmpty) {
+        try {
+          await productStore.addToNomenclature(
+            establishmentId,
+            p.id,
+            price: productStore.getEstablishmentPrice(p.id, establishmentId)?.$1,
+            currency: p.currency ?? currency,
+          );
+        } catch (_) {}
+      }
+      if (!mounted) return;
       final ing = TTIngredient.fromProduct(
         product: p,
         cookingProcess: null,
@@ -2601,7 +2616,7 @@ class _TtkTableState extends State<_TtkTable> {
           final proc = ing.cookingProcessId != null ? CookingProcess.findById(ing.cookingProcessId!) : null;
           final estId = context.read<AccountManagerSupabase>().establishment?.id;
           final estPrice = product != null && estId != null ? widget.productStore.getEstablishmentPrice(product.id, estId)?.$1 : null;
-          final pricePerUnit = estPrice ?? product?.basePrice ?? (ing.netWeight > 0 ? ing.cost * 1000 / ing.netWeight : 0.0);
+          final pricePerUnit = estPrice ?? (ing.netWeight > 0 ? ing.cost * 1000 / ing.netWeight : 0.0);
           final isFirstRow = i == 0;
           return TableRow(
             decoration: BoxDecoration(color: cellBg),

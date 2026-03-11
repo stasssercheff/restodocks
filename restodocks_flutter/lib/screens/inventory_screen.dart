@@ -1023,7 +1023,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     }
     if (product == null) return 0.0;
     final estPrice = productStore.getEstablishmentPrice(product.id, establishmentId)?.$1;
-    final pricePerKg = product.computedPricePerKg ?? product.basePrice ?? estPrice;
+    final pricePerKg = product.computedPricePerKg ?? estPrice;
     if (pricePerKg == null || pricePerKg <= 0) return 0.0;
     return totalGrams / 1000.0 * pricePerKg;
   }
@@ -2177,17 +2177,17 @@ class _InventoryScreenState extends State<InventoryScreen>
     }
     final u = (p.unit ?? 'g').toLowerCase();
     if (u == 'kg' || u == 'кг') {
-      final pricePerKg = p.computedPricePerKg ?? p.basePrice ?? estPrice;
+      final pricePerKg = p.computedPricePerKg ?? estPrice;
       if (pricePerKg == null) return null;
       return r.totalWeightGrams / 1000.0 * pricePerKg;
     }
     if (u == 'g' || u == 'г') {
-      final pricePerKg = p.computedPricePerKg ?? p.basePrice ?? estPrice;
+      final pricePerKg = p.computedPricePerKg ?? estPrice;
       if (pricePerKg == null) return null;
       return r.totalWeightGrams / 1000.0 * pricePerKg;
     }
     // pcs, шт, ml, l и т.д. — цена за единицу × количество
-    final pricePerUnit = p.basePrice ?? estPrice;
+    final pricePerUnit = estPrice;
     if (pricePerUnit == null) return null;
     return r.total * pricePerUnit;
   }

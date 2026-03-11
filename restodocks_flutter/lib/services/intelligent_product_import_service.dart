@@ -48,6 +48,8 @@ class IntelligentProductImportService {
     final results = <ProductImportResult>[];
     final allProducts = _productStore.allProducts;
     final allTechCards = await _techCardService.getAllTechCards();
+    // Алиасы: сохранённые маппинги — проверяем ДО вызова AI (разгрузка API)
+    final aliases = await _productStore.loadProductAliases();
 
     // Обрабатываем все листы
     for (final sheetName in excel.tables.keys) {
@@ -71,6 +73,7 @@ class IntelligentProductImportService {
             language,
             allProducts,
             establishmentId,
+            aliases: aliases,
           );
 
           results.add(ProductImportResult(
@@ -109,26 +112,28 @@ class IntelligentProductImportService {
 
       switch (result.matchResult.type) {
         case MatchType.exact:
-          // Обновляем цену существующего продукта (автоматически)
-          if (result.matchResult.existingProductId != null && result.filePrice != null) {
-            await _productStore.setEstablishmentPrice(
+          // Связь продукт ↔ заведение (номенклатура) — чтобы ТТК подтягивала цену
+          if (result.matchResult.existingProductId != null) {
+            final ep = _productStore.getEstablishmentPrice(result.matchResult.existingProductId!, establishmentId);
+            final price = result.filePrice ?? ep?.$1;
+            await _productStore.addToNomenclature(
               establishmentId,
               result.matchResult.existingProductId!,
-              result.filePrice,
-              defaultCurrency,
+              price: price,
+              currency: defaultCurrency,
             );
           }
           break;
 
         case MatchType.priceUpdate:
-          // Обновляем цену только если пользователь выбрал 'update' или если нет решения (автоматическое обновление)
           final resolution = resolutions[result.fileName];
-          if (resolution != 'skip' && result.matchResult.existingProductId != null && result.filePrice != null) {
-            await _productStore.setEstablishmentPrice(
+          if (resolution != 'skip' && result.matchResult.existingProductId != null) {
+            final price = result.filePrice;
+            await _productStore.addToNomenclature(
               establishmentId,
               result.matchResult.existingProductId!,
-              result.filePrice,
-              defaultCurrency,
+              price: price,
+              currency: defaultCurrency,
             );
           }
           break;
@@ -139,12 +144,20 @@ class IntelligentProductImportService {
           final product = Product.create(
             name: productName,
             category: 'imported',
-            basePrice: result.filePrice ?? 0.0,
+            basePrice: null,
             currency: result.filePrice != null ? defaultCurrency : null,
           );
 
           final savedProduct = await _productStore.addProduct(product);
           createdProducts.add(savedProduct);
+
+          // Связь продукт ↔ заведение — ТТК подтянет цену
+          await _productStore.addToNomenclature(
+            establishmentId,
+            savedProduct.id,
+            price: result.filePrice,
+            currency: result.filePrice != null ? defaultCurrency : null,
+          );
 
           // Генерируем и сохраняем переводы
           await _generateAndSaveTranslations(
@@ -159,15 +172,20 @@ class IntelligentProductImportService {
           // Используем решение пользователя
           final resolution = resolutions[result.fileName];
           if (resolution == 'replace' && result.matchResult.existingProductId != null) {
-            // Обновляем существующий продукт
-            if (result.filePrice != null) {
-              await _productStore.setEstablishmentPrice(
-                establishmentId,
-                result.matchResult.existingProductId!,
-                result.filePrice,
-                defaultCurrency,
-              );
+            // Сохраняем алиас для следующих импортов (разгрузка AI)
+            final key = _normalizeText(result.fileName);
+            if (key.isNotEmpty) {
+              await _productStore.saveProductAlias(key, result.matchResult.existingProductId!);
             }
+            // Связь продукт ↔ заведение — ТТК подтянет цену
+            final ep = _productStore.getEstablishmentPrice(result.matchResult.existingProductId!, establishmentId);
+            final price = result.filePrice ?? ep?.$1;
+            await _productStore.addToNomenclature(
+              establishmentId,
+              result.matchResult.existingProductId!,
+              price: price,
+              currency: defaultCurrency,
+            );
           } else if (resolution == 'create') {
             // Создаем новый продукт
             final translations = await _translationManager.generateTranslationsForProduct(
@@ -179,12 +197,20 @@ class IntelligentProductImportService {
               name: result.fileName,
               category: 'imported',
               names: translations,
-              basePrice: result.filePrice ?? 0.0,
+              basePrice: null,
               currency: result.filePrice != null ? defaultCurrency : null,
             );
 
             final savedProduct2 = await _productStore.addProduct(product);
             createdProducts.add(savedProduct2);
+
+            // Связь продукт ↔ заведение — ТТК подтянет цену
+            await _productStore.addToNomenclature(
+              establishmentId,
+              savedProduct2.id,
+              price: result.filePrice,
+              currency: result.filePrice != null ? defaultCurrency : null,
+            );
           }
           break;
 
@@ -244,16 +270,45 @@ ${sampleTexts.take(5).join('\n')}
     double? filePrice,
     String language,
     List<Product> allProducts,
-    String establishmentId,
-  ) async {
-    // Сначала нормализуем название через AI для исправления опечаток
-    final aiNormalizedName = await _aiNormalizeProductName(fileName);
-    final normalizedFileName = _normalizeText(aiNormalizedName ?? fileName);
+    String establishmentId, {
+    Map<String, String>? aliases,
+  }) async {
+    final normalizedFileName = _normalizeText(fileName);
 
-    // Ищем точные совпадения
+    // 1. Проверяем сохранённые алиасы (без вызова AI)
+    if (aliases != null) {
+      final productId = aliases[normalizedFileName];
+      if (productId != null) {
+        final existing = allProducts.where((p) => p.id == productId).firstOrNull;
+        if (existing != null) {
+          if (filePrice != null) {
+            final currentPrice = _productStore.getEstablishmentPrice(existing.id, establishmentId);
+            if (currentPrice != null && currentPrice.$1 != null &&
+                (currentPrice.$1! - filePrice).abs() > 0.01) {
+              return ProductMatchResult(
+                type: MatchType.priceUpdate,
+                existingProductId: existing.id,
+                existingProductName: existing.name,
+              );
+            }
+          }
+          return ProductMatchResult(
+            type: MatchType.exact,
+            existingProductId: existing.id,
+            existingProductName: existing.name,
+          );
+        }
+      }
+    }
+
+    // 2. AI-нормализация (только если алиас не найден)
+    final aiNormalizedName = await _aiNormalizeProductName(fileName);
+    final normalizedForMatch = _normalizeText(aiNormalizedName ?? fileName);
+
+    // Ищем точные совпадения (по AI-нормализованному или исходному)
     final exactMatches = allProducts.where((product) {
       final productNames = [product.name, ...(product.names?.values ?? [])];
-      return productNames.any((name) => _normalizeText(name) == normalizedFileName);
+      return productNames.any((name) => _normalizeText(name) == normalizedForMatch);
     }).toList();
 
     if (exactMatches.isNotEmpty) {
@@ -287,7 +342,7 @@ ${sampleTexts.take(5).join('\n')}
     for (final product in allProducts) {
       final productNames = [product.name, ...(product.names?.values ?? [])];
       for (final productName in productNames) {
-        final similarity = _calculateSimilarity(normalizedFileName, _normalizeText(productName));
+        final similarity = _calculateSimilarity(normalizedForMatch, _normalizeText(productName));
         if (similarity > 0.7) { // Понижаем порог с 0.8 до 0.7 для лучшего распознавания
           fuzzyMatches.add(product);
           break; // Нашли соответствие для этого продукта

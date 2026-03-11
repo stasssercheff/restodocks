@@ -1,5 +1,5 @@
 // Edge Function: сохранение документа заказа с подстановкой цен на сервере.
-// Цены берутся из establishment_products (fallback — products.base_price).
+// Цены берутся только из establishment_products (номенклатура заведения).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -83,26 +83,7 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      const missingIds = productIds.filter((id) => !(id in priceMap));
-      if (missingIds.length > 0) {
-        const { data: prodRows } = await supabase
-          .from("products")
-          .select("id, base_price, currency")
-          .in("id", missingIds);
-
-        if (Array.isArray(prodRows)) {
-          for (const row of prodRows) {
-            const pid = row.id as string;
-            const price =
-              typeof row.base_price === "number"
-                ? row.base_price
-                : parseFloat(String(row.base_price || 0));
-            if (!isNaN(price) && !(pid in priceMap)) {
-              priceMap[pid] = { price, currency: row.currency as string | undefined };
-            }
-          }
-        }
-      }
+      // Продукты без цены в номенклатуре — pricePerUnit = 0
     }
 
     let grandTotal = 0;

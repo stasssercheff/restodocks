@@ -757,7 +757,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
             if (selectedItem.type == 'product') {
               final product = selectedItem.item as Product;
               final establishmentPrice = widget.productStore.getEstablishmentPrice(product.id, widget.establishmentId);
-              final pricePerKg = establishmentPrice?.$1 ?? product.basePrice ?? 0.0;
+              final pricePerKg = establishmentPrice?.$1 ?? 0.0;
               final cost = pricePerKg * (ingredient.grossWeight / 1000);
               var ing = ingredient.copyWith(
                 productId: product.id,
@@ -926,7 +926,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       final product = widget.productStore?.findProductForIngredient(ingredient.productId, ingredient.productName);
       if (product != null) {
         final ep = widget.productStore?.getEstablishmentPrice(product.id, widget.establishmentId);
-        pricePerKg = ep?.$1 ?? product.basePrice ?? 0;
+        pricePerKg = ep?.$1 ?? 0.0;
       }
     }
     return pricePerKg;

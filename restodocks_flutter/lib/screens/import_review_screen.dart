@@ -20,6 +20,7 @@ class ImportReviewScreen extends StatefulWidget {
 class _ImportReviewScreenState extends State<ImportReviewScreen> {
   late List<ModerationItem> _items;
   bool _saving = false;
+  final Map<int, TextEditingController> _priceControllers = {};
   int _saveProgress = 0;
   int _saveTotal = 0;
 
@@ -27,6 +28,14 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
   void initState() {
     super.initState();
     _items = List.from(widget.items);
+  }
+
+  @override
+  void dispose() {
+    for (final c in _priceControllers.values) {
+      c.dispose();
+    }
+    super.dispose();
   }
 
   void _toggleAll() {
@@ -53,6 +62,12 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
   void _toggle(int index, bool value) {
     setState(() {
       _items[index] = _items[index].copyWith(approved: value);
+    });
+  }
+
+  void _updatePrice(int index, double? value) {
+    setState(() {
+      _items[index] = _items[index].copyWith(price: value);
     });
   }
 
@@ -91,12 +106,17 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
 
         if (item.existingProductId != null) {
           final newPrice = item.displayPrice ?? item.price;
-          if (newPrice != null) {
-            final cur = item.currency ?? defCur;
-            print('💾 ImportReview: updating price for ${item.displayName} → $newPrice $cur');
-            await store.setEstablishmentPrice(est.id, item.existingProductId!, newPrice, cur);
-            updated++;
-          }
+          final ep = store.getEstablishmentPrice(item.existingProductId!, est.id);
+          final price = newPrice ?? ep?.$1;
+          final cur = item.currency ?? defCur;
+          // Связь продукт ↔ заведение — чтобы ТТК подтягивала цену
+          await store.addToNomenclature(
+            est.id,
+            item.existingProductId!,
+            price: price,
+            currency: cur,
+          );
+          if (newPrice != null) updated++;
         } else {
           final cur = item.currency ?? defCur;
           print('💾 ImportReview: creating new product "${item.displayName}"');
@@ -126,7 +146,7 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
             carbs: carbs,
             containsGluten: containsGluten,
             containsLactose: containsLactose,
-            basePrice: item.displayPrice ?? 0.0,
+            basePrice: null,
             currency: item.displayPrice != null ? cur : null,
           );
           print('💾 ImportReview: addProduct id=${product.id}');
@@ -289,17 +309,58 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
               itemCount: _items.length,
               itemBuilder: (context, i) {
                 final item = _items[i];
+                final isNew = item.existingProductId == null;
                 return Card(
                   margin: const EdgeInsets.only(bottom: 8),
-                  child: CheckboxListTile(
-                    value: item.approved,
-                    onChanged: (v) => _toggle(i, v ?? true),
-                    title: Text(
-                      item.displayName,
-                      style: theme.textTheme.bodyLarge,
-                    ),
-                    subtitle: _buildSubtitle(item, theme),
-                    secondary: _categoryChip(item.category, theme),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      CheckboxListTile(
+                        value: item.approved,
+                        onChanged: (v) => _toggle(i, v ?? true),
+                        title: Text(
+                          item.displayName,
+                          style: theme.textTheme.bodyLarge,
+                        ),
+                        subtitle: _buildSubtitle(item, theme),
+                        secondary: _categoryChip(item.category, theme),
+                      ),
+                      if (isNew)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                          child: Row(
+                            children: [
+                              Text(
+                                loc.t('price_per_kg_computed') ?? 'Цена за кг',
+                                style: theme.textTheme.bodySmall,
+                              ),
+                              const SizedBox(width: 8),
+                              SizedBox(
+                                width: 100,
+                                child: TextField(
+                                  controller: _priceControllers.putIfAbsent(
+                                    i,
+                                    () => TextEditingController(
+                                      text: item.displayPrice?.toStringAsFixed(0) ?? '',
+                                    ),
+                                  ),
+                                  keyboardType: TextInputType.numberWithOptions(decimal: true),
+                                  decoration: const InputDecoration(
+                                    hintText: '-',
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                  ),
+                                  onChanged: (v) {
+                                    final n = double.tryParse(v.replaceFirst(',', '.'));
+                                    _updatePrice(i, n);
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
                   ),
                 );
               },

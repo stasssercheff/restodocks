@@ -1118,11 +1118,10 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       for (final n in pNames) {
         final nNorm = _normalizeForMatch(n);
         if (nNorm == normalized) {
-          // Цена из establishment_products (номенклатура заведения), fallback — basePrice из карточки продукта
+          // Цена только из establishment_products (номенклатура заведения)
           final ep = store.getEstablishmentPrice(p.id, establishmentId);
-          final priceFromEst = ep?.$1;
-          final existingPrice = priceFromEst ?? p.basePrice;
-          final fromEstablishment = priceFromEst != null;
+          final existingPrice = ep?.$1;
+          final fromEstablishment = existingPrice != null;
 
           final priceDiff = price != null && existingPrice != null && (existingPrice - price).abs() > 0.01;
           return (existingId: p.id, existingName: p.name, existingPrice: existingPrice, existingPriceFromEstablishment: fromEstablishment, priceDiff: priceDiff);
@@ -2195,7 +2194,8 @@ ${text}
 
           // Если продукт найден, проверяем нужно ли обновлять цену
           if (item.price != null) {
-            final oldPrice = existingProduct.basePrice;
+            final ep = store.getEstablishmentPrice(existingProduct.id, estId);
+            final oldPrice = ep?.$1;
             final newPrice = item.price;
 
             // Проверяем, отличается ли цена (с учетом округления до 2 знаков)
@@ -2312,8 +2312,8 @@ ${text}
             containsGluten: containsGluten,
             containsLactose: containsLactose,
             unit: verification?.suggestedUnit ?? 'g',
-            basePrice: verification?.suggestedPrice ?? item.price,
-            currency: (verification?.suggestedPrice ?? item.price) != null ? defCur : null,
+            basePrice: null,
+            currency: defCur,
           );
 
           print('DEBUG: Created product: ${product.toJson()}');
@@ -2369,8 +2369,8 @@ ${text}
               await store.addToNomenclature(
                 estId,
                 savedProduct.id,
-                price: savedProduct.basePrice,
-                currency: savedProduct.currency ?? defCur,
+                price: verification?.suggestedPrice ?? item.price,
+                currency: defCur,
               );
               added++;
               print('DEBUG: Successfully added "${product.name}" to nomenclature');
@@ -2383,7 +2383,7 @@ ${text}
               if (existingResult.isNotEmpty) {
                 existingResult['status'] = 'added';
                 existingResult['oldPrice'] = null;
-                existingResult['newPrice'] = product.basePrice;
+                existingResult['newPrice'] = verification?.suggestedPrice ?? item.price;
                 existingResult['productId'] = product.id;
               }
             } catch (e) {
@@ -2429,7 +2429,7 @@ ${text}
             if (existingResult.isNotEmpty) {
               existingResult['status'] = 'added_db_only';
               existingResult['oldPrice'] = null;
-              existingResult['newPrice'] = product.basePrice;
+              existingResult['newPrice'] = verification?.suggestedPrice ?? item.price;
               existingResult['productId'] = product.id;
             }
           }
