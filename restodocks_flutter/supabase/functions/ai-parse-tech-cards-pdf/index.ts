@@ -41,9 +41,15 @@ Deno.serve(async (req: Request) => {
         headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
       });
     }
-    // Быстрый warm — без загрузки unpdf/AI (прогревает контейнер)
     if (pdfBase64 === "warm") {
       return new Response(JSON.stringify({ cards: [], reason: "warm" }), {
+        status: 200,
+        headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+      });
+    }
+    const MAX_B64 = 2.5 * 1024 * 1024;
+    if (pdfBase64.length > MAX_B64) {
+      return new Response(JSON.stringify({ cards: [], reason: "extraction_failed: PDF too large (max ~1.8MB)" }), {
         status: 200,
         headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
       });
@@ -90,7 +96,9 @@ Deno.serve(async (req: Request) => {
       }
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : String(e);
-      return new Response(JSON.stringify({ cards: [], reason: `extraction_failed: ${errMsg.slice(0, 200)}` }), {
+      const part = errMsg.slice(0, 200).replace(/["\n\r]/g, " ");
+      console.error("[ai-parse-tech-cards-pdf] extraction failed:", errMsg);
+      return new Response(JSON.stringify({ cards: [], reason: `extraction_failed: ${part}` }), {
         status: 200,
         headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
       });
