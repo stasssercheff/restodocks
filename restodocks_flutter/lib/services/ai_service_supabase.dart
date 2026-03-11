@@ -9,6 +9,7 @@ import 'package:xml/xml.dart';
 
 import 'ai_service.dart';
 import 'nutrition_api_service.dart';
+import '../utils/product_name_utils.dart';
 
 /// Реализация AiService через Supabase Edge Functions.
 /// Требует: задеплоенные функции и секрет OPENAI_API_KEY в Supabase.
@@ -286,6 +287,23 @@ class AiServiceSupabase implements AiService {
       final doc = archive.findFile('word/document.xml');
       if (doc == null) return [];
       final xml = XmlDocument.parse(utf8.decode(doc.content as List<int>));
+      // 1. Сначала пробуем таблицу w:tbl — сохраняем структуру строк (Наименование, Продукт, Брутто...)
+      final tables = xml.descendants.whereType<XmlElement>().where((e) => e.localName == 'tbl');
+      for (final tbl in tables) {
+        final tableRows = <List<String>>[];
+        for (final tr in tbl.children.whereType<XmlElement>().where((e) => e.localName == 'tr')) {
+          final cells = <String>[];
+          for (final tc in tr.children.whereType<XmlElement>().where((e) => e.localName == 'tc')) {
+            final texts = tc.descendants.whereType<XmlElement>().where((e) => e.localName == 't').map((e) => e.innerText).toList();
+            cells.add(texts.join('').trim());
+          }
+          if (cells.any((c) => c.isNotEmpty)) {
+            tableRows.add(cells);
+          }
+        }
+        if (tableRows.length >= 2) return tableRows;
+      }
+      // 2. Fallback: параграфы (документ без таблицы)
       final paras = xml.descendants.whereType<XmlElement>().where((e) => e.localName == 'p');
       final rows = <List<String>>[];
       for (final p in paras) {
@@ -400,7 +418,8 @@ class AiServiceSupabase implements AiService {
     final netKeys = ['нетто', 'нт', 'вес нетто', 'net'];
     final wasteKeys = ['отход', 'отх', 'waste', 'процент отхода'];
 
-    for (var r = 0; r < rows.length && r < 5; r++) {
+    // Поиск строки с колонками (Наименование продукта, Брутто, Нетто) — может быть далеко от верха
+    for (var r = 0; r < rows.length; r++) {
       final row = rows[r].map((c) => c.trim().toLowerCase()).toList();
       for (var c = 0; c < row.length; c++) {
         final cell = row[c];
@@ -448,7 +467,20 @@ class AiServiceSupabase implements AiService {
     if (nameCol < 0) nameCol = 0;
     if (productCol < 0) productCol = 1;
 
+    // Название блюда может быть в строках выше заголовка (DOCX iiko/ГОСТ)
     String? currentDish;
+    for (var r = 0; r < headerIdx && r < rows.length; r++) {
+      for (final c in rows[r]) {
+        final s = c.trim();
+        if (s.length < 3) continue;
+        if (s.endsWith(':')) continue; // "Хранение:", "Область применения:"
+        if (RegExp(r'^\d{1,2}\.\d{1,2}\.\d{2,4}').hasMatch(s)) continue; // дата
+        if (s.toLowerCase().startsWith('технологическая карта')) continue;
+        currentDish = s;
+        break;
+      }
+      if (currentDish != null) break;
+    }
     final currentIngredients = <TechCardIngredientLine>[];
 
     void flushCard() {
@@ -591,7 +623,8 @@ class AiServiceSupabase implements AiService {
 
   @override
   Future<NutritionResult?> refineOrGetNutrition(String productName, NutritionResult? existing) async {
-    final body = <String, dynamic>{'productName': productName};
+    final nameForSearch = stripIikoPrefix(productName).trim();
+    final body = <String, dynamic>{'productName': nameForSearch.isEmpty ? productName : nameForSearch};
     if (existing != null) {
       body['existing'] = {
         'calories': existing.calories,
