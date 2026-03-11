@@ -278,12 +278,12 @@ class _InboxScreenState extends State<InboxScreen> {
         actions: [
           if (!widget.messagesOnly) ...[
             if (!_isNotificationsTab(isOwner) && _getUnviewedIdsForCurrentTab(isOwner).isNotEmpty)
-              TextButton.icon(
+              OutlinedButton.icon(
                 onPressed: () async {
                   await _markAllInCurrentTabAsViewed();
                 },
                 icon: const Icon(Icons.done_all, size: 20),
-                label: Text(loc.t('inbox_mark_all_viewed') ?? 'Прочитать все'),
+                label: Text(loc.t('inbox_mark_all_viewed') ?? 'Просмотреть все'),
               ),
             if (_isInventoryMergeTabSelected(isOwner) &&
                 _mergeableDocumentsForCurrentTab.isNotEmpty &&
@@ -879,7 +879,7 @@ class _InboxScreenState extends State<InboxScreen> {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
       child: Align(
         alignment: Alignment.centerLeft,
-        child: TextButton.icon(
+        child: OutlinedButton.icon(
           onPressed: () async {
             await _markAllInCurrentTabAsViewed();
           },

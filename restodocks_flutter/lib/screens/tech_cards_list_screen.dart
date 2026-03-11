@@ -49,9 +49,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     super.dispose();
   }
 
-  /// Порядок категорий для отображения: кухня/банкет и бар
-  static const _kitchenCategoryOrder = ['sauce', 'vegetables', 'zagotovka', 'salad', 'meat', 'seafood', 'side', 'subside', 'bakery', 'dessert', 'decor', 'soup', 'misc', 'beverages', 'banquet', 'catering'];
-  static const _barCategoryOrder = ['alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks', 'sauce', 'vegetables', 'salad', 'bakery', 'dessert', 'decor', 'misc', 'beverages'];
+  /// Порядок категорий: кухня (без напитков) и бар (только напитки/снеки)
+  static const _kitchenCategoryOrder = ['sauce', 'vegetables', 'zagotovka', 'salad', 'meat', 'seafood', 'poultry', 'side', 'subside', 'bakery', 'dessert', 'decor', 'soup', 'misc', 'banquet', 'catering'];
+  static const _barCategoryOrder = ['alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks', 'beverages'];
 
   List<({String category, List<TechCard> cards})> _groupByCategory(List<TechCard> cards) {
     final order = (widget.department == 'bar' || widget.department == 'banquet-catering-bar') ? _barCategoryOrder : _kitchenCategoryOrder;
@@ -212,16 +212,16 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
             (tc.category == 'banquet' || tc.category == 'catering') &&
             (tc.sections.contains('bar') || tc.sections.contains('all') || barCategories.contains(tc.category))).toList();
       } else if (widget.department == 'bar') {
+        const barCats = {'beverages', 'alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks'};
+        final cat = (String c) => c.isEmpty ? 'misc' : c;
         list = all.where((tc) =>
-            tc.category == 'beverages' ||
-            tc.sections.contains('bar') ||
-            tc.sections.contains('all')).toList();
+            barCats.contains(cat(tc.category)) || tc.sections.contains('bar')).toList();
       } else if (widget.department == 'hall') {
         list = []; // Зал не имеет своих ТТК
       } else {
-        list = all.where((tc) =>
-            tc.category != 'beverages' ||
-            tc.sections.contains('all')).toList();
+        const barCats = {'beverages', 'alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks'};
+        final cat = (String c) => c.isEmpty ? 'misc' : c;
+        list = all.where((tc) => !barCats.contains(cat(tc.category))).toList();
       }
       if (mounted) {
         setState(() { _list = list; _loading = false; });

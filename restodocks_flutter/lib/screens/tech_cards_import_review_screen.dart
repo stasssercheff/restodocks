@@ -39,16 +39,16 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
     ('bar', 'bar'),
   ];
 
-  /// Категории кухни: Суп, Салат, Мясо, Десерт и т.д.
+  /// Кухня: без напитков. Рыба, мясо, птица, заготовка и т.д.
   static const _kitchenCategoryOptions = [
-    'sauce', 'vegetables', 'zagotovka', 'salad', 'meat', 'seafood', 'side', 'subside',
-    'bakery', 'dessert', 'decor', 'soup', 'misc', 'beverages', 'banquet', 'catering',
+    'sauce', 'vegetables', 'zagotovka', 'salad', 'meat', 'seafood', 'poultry', 'side', 'subside',
+    'bakery', 'dessert', 'decor', 'soup', 'misc', 'banquet', 'catering',
   ];
 
-  /// Категории бара: коктейли, напитки, снеки и т.д.
+  /// Бар: только напитки и снеки.
   static const _barCategoryOptions = [
     'alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure',
-    'snacks', 'zagotovka', 'sauce', 'vegetables', 'salad', 'bakery', 'dessert', 'decor', 'misc', 'beverages',
+    'snacks', 'beverages',
   ];
 
   bool get _isBar => widget.department == 'bar' || widget.department == 'banquet-catering-bar';
@@ -83,8 +83,9 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
     if (lower.contains('овощ') || lower.contains('vegetable')) return 'vegetables';
     if (lower.contains('заготовк') || lower.contains('preparation') || lower.contains('подготовк')) return 'zagotovka';
     if (lower.contains('салат') || lower.contains('salad')) return 'salad';
-    if (lower.contains('мяс') || lower.contains('meat') || lower.contains('куриц') || lower.contains('говядин')) return 'meat';
+    if (lower.contains('мяс') || lower.contains('meat') || lower.contains('говядин') || lower.contains('свинин') || lower.contains('баран')) return 'meat';
     if (lower.contains('рыб') || lower.contains('fish') || lower.contains('море') || lower.contains('seafood')) return 'seafood';
+    if (lower.contains('птиц') || lower.contains('poultry') || lower.contains('куриц') || lower.contains('индейк') || lower.contains('утк') || lower.contains('цыплят')) return 'poultry';
     if (lower.contains('гарнир') || lower.contains('side')) return 'side';
     if (lower.contains('подгарнир') || lower.contains('subside')) return 'subside';
     if (lower.contains('выпеч') || lower.contains('bakery') || lower.contains('хлеб') || lower.contains('тест')) return 'bakery';
@@ -112,7 +113,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
   String _categoryLabel(String c, String lang) {
     const ru = {
       'sauce': 'Соус', 'vegetables': 'Овощи', 'zagotovka': 'Заготовка', 'salad': 'Салат', 'meat': 'Мясо',
-      'seafood': 'Рыба', 'side': 'Гарнир', 'subside': 'Подгарнир', 'bakery': 'Выпечка',
+      'seafood': 'Рыба', 'poultry': 'Птица', 'side': 'Гарнир', 'subside': 'Подгарнир', 'bakery': 'Выпечка',
       'dessert': 'Десерт', 'decor': 'Декор', 'soup': 'Суп', 'misc': 'Разное',
       'beverages': 'Напитки', 'banquet': 'Банкет', 'catering': 'Кейтеринг',
       'alcoholic_cocktails': 'Алкогольные коктейли', 'non_alcoholic_drinks': 'Безалкогольные напитки',
@@ -120,7 +121,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
     };
     const en = {
       'sauce': 'Sauce', 'vegetables': 'Vegetables', 'zagotovka': 'Preparation', 'salad': 'Salad', 'meat': 'Meat',
-      'seafood': 'Seafood', 'side': 'Side dish', 'subside': 'Sub-side', 'bakery': 'Bakery',
+      'seafood': 'Seafood', 'poultry': 'Poultry', 'side': 'Side dish', 'subside': 'Sub-side', 'bakery': 'Bakery',
       'dessert': 'Dessert', 'decor': 'Decor', 'soup': 'Soup', 'misc': 'Misc',
       'beverages': 'Beverages', 'banquet': 'Banquet', 'catering': 'Catering',
       'alcoholic_cocktails': 'Alcoholic cocktails', 'non_alcoholic_drinks': 'Non-alcoholic drinks',

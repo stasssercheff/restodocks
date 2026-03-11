@@ -495,8 +495,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   String? _error;
   /// 'photo' | 'excel' — какая кнопка сейчас загружает (чтобы показывать правильный текст).
   final _nameController = TextEditingController();
-  static const _kitchenCategoryOptions = ['sauce', 'vegetables', 'zagotovka', 'salad', 'meat', 'seafood', 'side', 'subside', 'bakery', 'dessert', 'decor', 'soup', 'misc', 'beverages', 'banquet', 'catering'];
-  static const _barCategoryOptions = ['alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks', 'zagotovka', 'sauce', 'vegetables', 'salad', 'bakery', 'dessert', 'decor', 'misc', 'beverages'];
+  /// Кухня: без напитков. Рыба, мясо, птица, заготовка и т.д.
+  static const _kitchenCategoryOptions = ['sauce', 'vegetables', 'zagotovka', 'salad', 'meat', 'seafood', 'poultry', 'side', 'subside', 'bakery', 'dessert', 'decor', 'soup', 'misc', 'banquet', 'catering'];
+  /// Бар: только напитки и снеки.
+  static const _barCategoryOptions = ['alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks', 'beverages'];
 
   List<String> get _categoryOptions {
     if (widget.department == 'bar') return _barCategoryOptions;
@@ -632,6 +634,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       'salad': {'ru': 'Салат', 'en': 'Salad'},
       'meat': {'ru': 'Мясо', 'en': 'Meat'},
       'seafood': {'ru': 'Рыба', 'en': 'Seafood'},
+      'poultry': {'ru': 'Птица', 'en': 'Poultry'},
       'side': {'ru': 'Гарнир', 'en': 'Side dish'},
       'subside': {'ru': 'Подгарнир', 'en': 'Sub-side dish'},
       'bakery': {'ru': 'Выпечка', 'en': 'Bakery'},
@@ -666,8 +669,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     if (lower.contains('овощ') || lower.contains('vegetable')) return 'vegetables';
     if (lower.contains('заготовк') || lower.contains('preparation') || lower.contains('подготовк')) return 'zagotovka';
     if (lower.contains('салат') || lower.contains('salad')) return 'salad';
-    if (lower.contains('мяс') || lower.contains('meat') || lower.contains('куриц') || lower.contains('говядин')) return 'meat';
+    if (lower.contains('мяс') || lower.contains('meat') || lower.contains('говядин') || lower.contains('свинин') || lower.contains('баран')) return 'meat';
     if (lower.contains('рыб') || lower.contains('fish') || lower.contains('море') || lower.contains('seafood')) return 'seafood';
+    if (lower.contains('птиц') || lower.contains('poultry') || lower.contains('куриц') || lower.contains('индейк') || lower.contains('утк') || lower.contains('цыплят')) return 'poultry';
     if (lower.contains('гарнир') || lower.contains('side')) return 'side';
     if (lower.contains('подгарнир') || lower.contains('subside')) return 'subside';
     if (lower.contains('выпеч') || lower.contains('bakery') || lower.contains('хлеб') || lower.contains('тест')) return 'bakery';
