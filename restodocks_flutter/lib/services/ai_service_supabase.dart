@@ -21,6 +21,9 @@ class AiServiceSupabase implements AiService {
   /// Причина пустого результата при парсинге PDF ТТК (empty_text, ai_error, ai_no_cards и т.д.).
   static String? lastParseTechCardPdfReason;
 
+  /// Причина пустого результата при парсинге Excel ТТК (ai_limit_exceeded и т.д.).
+  static String? lastParseTechCardExcelReason;
+
   /// Преобразует сырую ошибку API (JSON, 429 и т.д.) в понятное пользователю сообщение.
   static String _sanitizeAiError(String raw) {
     if (raw.isEmpty) return 'Неизвестная ошибка';
@@ -40,21 +43,29 @@ class AiServiceSupabase implements AiService {
     return raw;
   }
 
+  /// Вызов Edge Function с retry при 5xx/сети (proxy/ EarlyDrop).
   Future<Map<String, dynamic>?> invoke(String name, Map<String, dynamic> body) async {
-    try {
-      final res = await _client.functions.invoke(name, body: body);
-      if (res.status != 200) {
-        return null;
+    const maxRetries = 3;
+    const delays = [500, 1000];
+    Object? lastError;
+    for (var attempt = 0; attempt < maxRetries; attempt++) {
+      if (attempt > 0) {
+        await Future<void>.delayed(Duration(milliseconds: delays[attempt - 1]));
       }
-      final data = res.data;
-      if (data is Map<String, dynamic>) {
-        if (data.containsKey('error')) return null;
-        return data;
+      try {
+        final res = await _client.functions.invoke(name, body: body);
+        if (res.status >= 200 && res.status < 300) {
+          final data = res.data;
+          if (data is Map<String, dynamic> && !data.containsKey('error')) return data;
+          return null;
+        }
+        if (res.status >= 400 && res.status < 500) return null; // 4xx не retry
+        lastError = 'HTTP ${res.status}';
+      } catch (e) {
+        lastError = e;
       }
-      return null;
-    } catch (_) {
-      return null;
     }
+    return null;
   }
 
   @override
@@ -181,18 +192,23 @@ class AiServiceSupabase implements AiService {
   }
 
   @override
-  Future<List<TechCardRecognitionResult>> parseTechCardsFromExcel(Uint8List xlsxBytes) async {
+  Future<List<TechCardRecognitionResult>> parseTechCardsFromExcel(Uint8List xlsxBytes, {String? establishmentId}) async {
     try {
       var rows = _xlsxToRows(xlsxBytes);
       if (rows.isEmpty) rows = _csvToRows(xlsxBytes);
       if (rows.isEmpty) rows = _docxToRows(xlsxBytes);
       if (rows.isEmpty) return [];
-      // 1. Сначала парсим по шаблону (без ИИ)
+      // 1. Сначала парсим по шаблону (без ИИ) — лимит не применяется
       var list = AiServiceSupabase.parseTtkByTemplate(rows);
-      // 2. Только если шаблон не сработал — вызываем AI (Groq → Gemini)
+      // 2. Только если шаблон не сработал — вызываем AI (лимит 3/день)
       if (list.isEmpty) {
-        final data = await invoke('ai-recognize-tech-cards-batch', {'rows': rows});
+        lastParseTechCardExcelReason = null;
+        final body = <String, dynamic>{'rows': rows};
+        if (establishmentId != null && establishmentId.isNotEmpty) body['establishmentId'] = establishmentId;
+        final data = await invoke('ai-recognize-tech-cards-batch', body);
         if (data == null) return [];
+        final err = data['error'] as String? ?? data['reason'] as String?;
+        if (err == 'limit_3_per_day' || err == 'ai_limit_exceeded') lastParseTechCardExcelReason = err;
         final raw = data['cards'];
         if (raw is! List) return [];
         list = <TechCardRecognitionResult>[];
@@ -204,31 +220,30 @@ class AiServiceSupabase implements AiService {
           }
         }
       }
+      if (list.isNotEmpty) lastParseTechCardExcelReason = null;
       return list;
     } catch (_) {
+      lastParseTechCardExcelReason = null;
       return [];
     }
   }
 
   @override
-  Future<List<TechCardRecognitionResult>> parseTechCardsFromPdf(Uint8List pdfBytes) async {
+  Future<List<TechCardRecognitionResult>> parseTechCardsFromPdf(Uint8List pdfBytes, {String? establishmentId}) async {
     lastParseTechCardPdfReason = null;
     try {
-      final pdfBase64 = base64Encode(pdfBytes);
-      // 1. Прогрев: лёгкий запрос «warm» будит контейнер (минимум кода, быстрый ответ)
-      await invoke('ai-parse-tech-cards-pdf', {'pdfBase64': 'warm'});
-      await Future<void>.delayed(const Duration(seconds: 25));
-      // 2. Реальный запрос
-      var data = await invoke('ai-parse-tech-cards-pdf', {'pdfBase64': pdfBase64});
+      final body = <String, dynamic>{'pdfBase64': base64Encode(pdfBytes)};
+      if (establishmentId != null && establishmentId.isNotEmpty) body['establishmentId'] = establishmentId;
+      var data = await invoke('ai-parse-tech-cards-pdf', body);
       for (var retry = 0; data == null && retry < 2; retry++) {
-        await Future<void>.delayed(Duration(seconds: retry == 0 ? 15 : 20));
-        data = await invoke('ai-parse-tech-cards-pdf', {'pdfBase64': pdfBase64});
+        await Future<void>.delayed(Duration(milliseconds: retry == 0 ? 1500 : 3000));
+        data = await invoke('ai-parse-tech-cards-pdf', body);
       }
       if (data == null) {
         lastParseTechCardPdfReason = 'invoke_null';
         return [];
       }
-      lastParseTechCardPdfReason = data['reason'] as String?;
+      lastParseTechCardPdfReason = data['reason'] as String? ?? (data['error'] as String?);
       final raw = data['cards'];
       if (raw is! List) return [];
       final list = <TechCardRecognitionResult>[];

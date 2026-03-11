@@ -168,10 +168,12 @@ abstract class AiService {
   Future<TechCardRecognitionResult?> parseTechCardFromExcel(Uint8List xlsxBytes);
 
   /// Парсинг всех ТТК из одного документа Excel (несколько карточек в одном файле).
-  Future<List<TechCardRecognitionResult>> parseTechCardsFromExcel(Uint8List xlsxBytes);
+  /// [establishmentId] — для учёта лимита AI (3/день). Шаблонный парсинг без лимита.
+  Future<List<TechCardRecognitionResult>> parseTechCardsFromExcel(Uint8List xlsxBytes, {String? establishmentId});
 
   /// Парсинг ТТК из PDF (извлечение текста + ИИ).
-  Future<List<TechCardRecognitionResult>> parseTechCardsFromPdf(Uint8List pdfBytes);
+  /// [establishmentId] — для учёта лимита AI (3/день). Шаблонный парсинг без лимита.
+  Future<List<TechCardRecognitionResult>> parseTechCardsFromPdf(Uint8List pdfBytes, {String? establishmentId});
 
   /// Распознавание продукта по введённому тексту (нормализация, категория, единица).
   Future<ProductRecognitionResult?> recognizeProduct(String userInput);
@@ -216,11 +218,11 @@ class AiServiceStub implements AiService {
       null;
 
   @override
-  Future<List<TechCardRecognitionResult>> parseTechCardsFromExcel(Uint8List xlsxBytes) async =>
+  Future<List<TechCardRecognitionResult>> parseTechCardsFromExcel(Uint8List xlsxBytes, {String? establishmentId}) async =>
       [];
 
   @override
-  Future<List<TechCardRecognitionResult>> parseTechCardsFromPdf(Uint8List pdfBytes) async =>
+  Future<List<TechCardRecognitionResult>> parseTechCardsFromPdf(Uint8List pdfBytes, {String? establishmentId}) async =>
       [];
 
   @override
