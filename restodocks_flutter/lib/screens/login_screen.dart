@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -226,6 +227,13 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
+      // На web: дать браузеру время дописать автозаполнение в поля.
+      // Иначе первый запрос может уйти с пустым/устаревшим паролем → 401.
+      if (kIsWeb) {
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+        if (!mounted) return;
+      }
+
       final accountManager = context.read<AccountManagerSupabase>();
       final loc = context.read<LocalizationService>();
 

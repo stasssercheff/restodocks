@@ -741,12 +741,12 @@ class AccountManagerSupabase extends ChangeNotifier {
 
   /// Вызов Edge Function authenticate-employee через raw HTTP (обход Safari cross-origin
   /// POST body issues с supabase functions.invoke — body иногда не уходит).
-  /// Retry при 5xx и сетевых ошибках (EarlyDrop и др.).
+  /// Retry при 401/5xx/сети — proxy/маршрутизация может обрывать первый запрос.
   Future<({int status, Map<String, dynamic>? data})> _invokeAuthenticateEmployeeHttp(
     Map<String, dynamic> body,
   ) async {
     const maxRetries = 3;
-    const retryDelays = [400, 800, 1600]; // ms, exponential backoff
+    const retryDelays = [600, 1200]; // ms, увеличенные задержки при proxy/маршрутизации
 
     final url = '${supabase_url.getSupabaseBaseUrl()}/functions/v1/authenticate-employee';
     final dio = Dio(BaseOptions(
@@ -754,6 +754,8 @@ class AccountManagerSupabase extends ChangeNotifier {
         'apikey': _supabaseAnonKey,
         'Authorization': 'Bearer $_supabaseAnonKey',
         'Content-Type': 'application/json',
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+        'Pragma': 'no-cache',
       },
       validateStatus: (_) => true, // не бросать на 4xx
     ));
@@ -772,12 +774,11 @@ class AccountManagerSupabase extends ChangeNotifier {
             : (resp.data is Map ? Map<String, dynamic>.from(resp.data as Map) : null);
         lastResult = (status: resp.statusCode ?? 0, data: data);
 
-        // 4xx (в т.ч. 401) — retry 1 раз при invalid_credentials (EarlyDrop/сбои на restodocks.com)
+        // 4xx (в т.ч. 401) — retry при invalid_credentials (proxy/маршрутизация может обрывать запрос)
         if (resp.statusCode != null && resp.statusCode! >= 400 && resp.statusCode! < 500) {
           if (resp.statusCode == 401 &&
               (data?['error'] == 'invalid_credentials') &&
               attempt < maxRetries - 1) {
-            // один retry при 401 invalid_credentials — может быть EarlyDrop
             continue;
           }
           return lastResult;
