@@ -37,6 +37,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   String? _error;
   Set<String> _selectedTechCards = {}; // ID выбранных карточек
   bool _selectionMode = false;
+  bool _ttkSortBySection = false; // true = по цеху, false = по категории
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
 
@@ -67,6 +68,67 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       result.add((category: e.key, cards: e.value));
     }
     return result;
+  }
+
+  /// Группировка по цеху.
+  static const _sectionOrder = ['all', 'hot_kitchen', 'cold_kitchen', 'preparation', 'prep', 'confectionery', 'pastry', 'grill', 'pizza', 'sushi', 'bakery', 'banquet_catering', 'bar', 'hidden'];
+
+  List<({String section, List<TechCard> cards})> _groupBySection(List<TechCard> cards) {
+    final grouped = <String, List<TechCard>>{};
+    for (final tc in cards) {
+      final key = _sectionKeyForGroup(tc);
+      grouped.putIfAbsent(key, () => []).add(tc);
+    }
+    final result = <({String section, List<TechCard> cards})>[];
+    final seen = <String>{};
+    for (final s in _sectionOrder) {
+      final list = grouped.remove(s);
+      if (list != null && list.isNotEmpty) {
+        result.add((section: s, cards: list));
+        seen.add(s);
+      }
+    }
+    for (final e in grouped.entries) {
+      result.add((section: e.key, cards: e.value));
+    }
+    return result;
+  }
+
+  String _sectionKeyForGroup(TechCard tc) {
+    if (tc.sections.isEmpty) return 'hidden';
+    if (tc.sections.contains('all')) return 'all';
+    return tc.sections.first;
+  }
+
+  String _sectionLabelForDisplay(TechCard tc, LocalizationService loc) {
+    if (tc.sections.isEmpty) return loc.t('ttk_sections_hidden');
+    if (tc.sections.contains('all')) return loc.t('ttk_sections_all');
+    final labels = tc.sections.map((s) => _sectionCodeToLabel(s, loc)).where((l) => l.isNotEmpty);
+    return labels.join(', ');
+  }
+
+  String _sectionCodeToLabel(String code, LocalizationService loc) {
+    const keys = {
+      'hot_kitchen': 'section_hot_kitchen',
+      'cold_kitchen': 'section_cold_kitchen',
+      'preparation': 'section_prep',
+      'prep': 'section_prep',
+      'confectionery': 'section_pastry',
+      'pastry': 'section_pastry',
+      'grill': 'section_grill',
+      'pizza': 'section_pizza',
+      'sushi': 'section_sushi',
+      'bakery': 'section_bakery',
+      'banquet_catering': 'section_banquet_catering',
+    };
+    final key = keys[code];
+    return key != null ? (loc.t(key) ?? code) : code;
+  }
+
+  String _sectionGroupLabel(String sectionKey, LocalizationService loc) {
+    if (sectionKey == 'all') return loc.t('ttk_sections_all');
+    if (sectionKey == 'hidden') return loc.t('ttk_sections_hidden');
+    return _sectionCodeToLabel(sectionKey, loc);
   }
 
   String _categoryLabel(String c, LocalizationService loc) {
@@ -718,29 +780,52 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
               Tab(text: loc.t('ttk_tab_dishes')),
             ],
           ),
-          // Поиск по названию
+          // Поиск и сортировка
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-            child: TextField(
-              controller: _searchController,
-              focusNode: _searchFocusNode,
-              decoration: InputDecoration(
-                hintText: loc.t('ttk_search_hint'),
-                isDense: true,
-                prefixIcon: const Icon(Icons.search, size: 20),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear, size: 20),
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() {});
-                        },
-                      )
-                    : null,
-                border: const OutlineInputBorder(),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              ),
-              onChanged: (_) => setState(() {}),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: _searchController,
+                  focusNode: _searchFocusNode,
+                  decoration: InputDecoration(
+                    hintText: loc.t('ttk_search_hint'),
+                    isDense: true,
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 20),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() {});
+                            },
+                          )
+                        : null,
+                    border: const OutlineInputBorder(),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    FilterChip(
+                      avatar: Icon(Icons.category, size: 18, color: _ttkSortBySection ? null : Theme.of(context).colorScheme.primary),
+                      label: Text(loc.t('ttk_sort_category')),
+                      selected: !_ttkSortBySection,
+                      onSelected: (v) => setState(() => _ttkSortBySection = false),
+                    ),
+                    FilterChip(
+                      avatar: Icon(Icons.business, size: 18, color: _ttkSortBySection ? Theme.of(context).colorScheme.primary : null),
+                      label: Text(loc.t('ttk_sort_section')),
+                      selected: _ttkSortBySection,
+                      onSelected: (v) => setState(() => _ttkSortBySection = true),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
           Expanded(
@@ -756,16 +841,40 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     );
   }
 
-  /// Компактная таблица с шапкой и группировкой по категориям.
+  /// Компактная таблица с шапкой и группировкой по категории или цеху.
   /// isDishesTab: для блюд — себестоимость за порцию, для ПФ — стоимость за кг.
   Widget _buildTechCardsTable(List<TechCard> techCards, LocalizationService loc, bool canEdit, bool showCost, {bool isDishesTab = false}) {
     final lang = loc.currentLanguageCode;
+    const colSectionWidth = 70.0;
     const colCatWidth = 76.0;
-    const colCostWidth = 56.0; // шире для себестоимости (десятичные)
-    const colActionsWidth = 62.0; // «Просмотр» целиком
+    const colCostWidth = 56.0;
+    const colActionsWidth = 62.0;
     final est = context.read<AccountManagerSupabase>().establishment;
     final costSym = est?.currencySymbol ?? Establishment.currencySymbolFor(est?.defaultCurrency ?? 'VND');
-    final groups = _groupByCategory(techCards);
+    final catOrder = (widget.department == 'bar' || widget.department == 'banquet-catering-bar') ? _barCategoryOrder : _kitchenCategoryOrder;
+    List<TechCard> sortCards(List<TechCard> cards, bool bySection) {
+      return List.from(cards)..sort((a, b) {
+        if (bySection) {
+          final sa = _sectionOrder.indexOf(_sectionKeyForGroup(a));
+          final sb = _sectionOrder.indexOf(_sectionKeyForGroup(b));
+          if (sa != sb) return sa.compareTo(sb);
+          final ca = catOrder.indexOf(a.category.isNotEmpty ? a.category : 'misc');
+          final cb = catOrder.indexOf(b.category.isNotEmpty ? b.category : 'misc');
+          if (ca != cb) return ca.compareTo(cb);
+        } else {
+          final ca = catOrder.indexOf(a.category.isNotEmpty ? a.category : 'misc');
+          final cb = catOrder.indexOf(b.category.isNotEmpty ? b.category : 'misc');
+          if (ca != cb) return ca.compareTo(cb);
+          final sa = _sectionOrder.indexOf(_sectionKeyForGroup(a));
+          final sb = _sectionOrder.indexOf(_sectionKeyForGroup(b));
+          if (sa != sb) return sa.compareTo(sb);
+        }
+        return (a.getDisplayNameInLists(lang)).toLowerCase().compareTo((b.getDisplayNameInLists(lang)).toLowerCase());
+      });
+    }
+    final groups = _ttkSortBySection
+        ? _groupBySection(techCards).map((g) => (category: g.section, cards: sortCards(g.cards, true), isSection: true)).toList()
+        : _groupByCategory(techCards).map((g) => (category: g.category, cards: sortCards(g.cards, false), isSection: false)).toList();
     final costLabel = showCost
         ? (isDishesTab ? loc.t('ttk_col_cost_per_portion').replaceFirst('%s', costSym) : '$costSym/${loc.t('kg')}')
         : '—';
@@ -777,12 +886,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           SliverPersistentHeader(
             pinned: true,
             delegate: _TableHeaderDelegate(
+              colSectionWidth: colSectionWidth,
               colCatWidth: colCatWidth,
               colCostWidth: colCostWidth,
               colActionsWidth: colActionsWidth,
               color: Theme.of(context).colorScheme.primaryContainer,
               onColor: Theme.of(context).colorScheme.onPrimaryContainer,
               labelName: loc.t('ttk_col_name'),
+              labelSection: loc.t('ttk_section_label'),
               labelCat: loc.t('column_category'),
               labelCost: costLabel,
               labelView: loc.t('ttk_col_view'),
@@ -795,7 +906,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 child: Text(
-                  _categoryLabel(g.category, loc),
+                  g.isSection ? _sectionGroupLabel(g.category, loc) : _categoryLabel(g.category, loc),
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: Theme.of(context).colorScheme.onSurface,
@@ -813,6 +924,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                   canEdit: canEdit,
                   showCost: showCost,
                   isDishesTab: isDishesTab,
+                  colSectionWidth: colSectionWidth,
                   colCatWidth: colCatWidth,
                   colCostWidth: colCostWidth,
                   colActionsWidth: colActionsWidth,
@@ -836,6 +948,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     required bool canEdit,
     required bool showCost,
     required bool isDishesTab,
+    required double colSectionWidth,
     required double colCatWidth,
     required double colCostWidth,
     required double colActionsWidth,
@@ -844,6 +957,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     final tc = techCards[index];
     final selected = _selectedTechCards.contains(tc.id);
     final name = tc.getDisplayNameInLists(lang);
+    final sectionStr = _sectionLabelForDisplay(tc, loc);
     final cat = _categoryLabel(tc.category, loc);
     final cost = showCost
         ? (isDishesTab
@@ -876,6 +990,19 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                   style: const TextStyle(fontSize: 14),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              SizedBox(
+                width: colSectionWidth,
+                child: Text(
+                  sectionStr.length > 7 ? '${sectionStr.substring(0, 6)}…' : sectionStr,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
                 ),
               ),
               SizedBox(
@@ -939,6 +1066,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
             headingRowColor: WidgetStateProperty.all(Theme.of(context).colorScheme.primaryContainer),
             columns: [
               DataColumn(label: Text(loc.t('ttk_col_name'), style: const TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(label: Text(loc.t('ttk_section_label'), style: const TextStyle(fontWeight: FontWeight.bold))),
               DataColumn(label: Text(loc.t('ttk_col_category'), style: const TextStyle(fontWeight: FontWeight.bold))),
               DataColumn(label: Text(loc.t('ttk_col_cost_per_kg'), style: const TextStyle(fontWeight: FontWeight.bold))),
             ],
@@ -948,6 +1076,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                 selected: _selectedTechCards.contains(tc.id),
                 cells: [
                   DataCell(Text(tc.getDisplayNameInLists(lang))),
+                  DataCell(Text(_sectionLabelForDisplay(tc, loc))),
                   DataCell(Text(_categoryLabel(tc.category, loc))),
                   DataCell(Text(NumberFormatUtils.formatInt(_calculateCostPerKg(tc)))),
                 ],
@@ -961,26 +1090,30 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   }
 }
 
-/// Делегат для липкой шапки таблицы ТТК (Название | Категория | ₽/кг | Просмотр).
+/// Делегат для липкой шапки таблицы ТТК (Название | Цех | Категория | ₽/кг | Просмотр).
 class _TableHeaderDelegate extends SliverPersistentHeaderDelegate {
   _TableHeaderDelegate({
+    required this.colSectionWidth,
     required this.colCatWidth,
     required this.colCostWidth,
     required this.colActionsWidth,
     required this.color,
     required this.onColor,
     required this.labelName,
+    required this.labelSection,
     required this.labelCat,
     required this.labelCost,
     required this.labelView,
   });
 
+  final double colSectionWidth;
   final double colCatWidth;
   final double colCostWidth;
   final double colActionsWidth;
   final Color color;
   final Color onColor;
   final String labelName;
+  final String labelSection;
   final String labelCat;
   final String labelCost;
   final String labelView;
@@ -1003,6 +1136,10 @@ class _TableHeaderDelegate extends SliverPersistentHeaderDelegate {
             child: Text(labelName, style: style),
           ),
           SizedBox(
+            width: colSectionWidth,
+            child: Text(labelSection, style: style, textAlign: TextAlign.center),
+          ),
+          SizedBox(
             width: colCatWidth,
             child: Text(labelCat, style: style, textAlign: TextAlign.center),
           ),
@@ -1021,12 +1158,14 @@ class _TableHeaderDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(covariant _TableHeaderDelegate oldDelegate) {
-    return oldDelegate.colCatWidth != colCatWidth ||
+    return oldDelegate.colSectionWidth != colSectionWidth ||
+        oldDelegate.colCatWidth != colCatWidth ||
         oldDelegate.colCostWidth != colCostWidth ||
         oldDelegate.colActionsWidth != colActionsWidth ||
         oldDelegate.color != color ||
         oldDelegate.onColor != onColor ||
         oldDelegate.labelName != labelName ||
+        oldDelegate.labelSection != labelSection ||
         oldDelegate.labelCat != labelCat ||
         oldDelegate.labelCost != labelCost ||
         oldDelegate.labelView != labelView;

@@ -352,6 +352,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
   // Фильтры номенклатуры
   _CatalogSort _nomSort = _CatalogSort.nameAz;
   _NomenclatureFilter _nomFilter = _NomenclatureFilter.all;
+  bool _filterNoPrice = false;
 
   // Список элементов номенклатуры (продукты + ТТК ПФ)
   List<NomenclatureItem> _nomenclatureItems = [];
@@ -1330,6 +1331,17 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       // Фильтр по типу
       if (_nomFilter == _NomenclatureFilter.products && item.isTechCard) return false;
 
+      // Фильтр «без цены»: только продукты/ПФ без указанной цены
+      if (_filterNoPrice) {
+        if (item.isProduct) {
+          final ep = store.getEstablishmentPrice(item.product!.id, estId);
+          final price = ep?.$1 ?? item.product!.basePrice;
+          if (price != null) return false;
+        } else {
+          if (item.price != null) return false;
+        }
+      }
+
       // Фильтр по категории (только для продуктов)
       if (_category != null && item.isProduct && item.product!.category != _category) return false;
 
@@ -1496,14 +1508,31 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                   children: [
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                      child: TextField(
-                        decoration: InputDecoration(
-                          hintText: loc.t('search'),
-                          prefixIcon: const Icon(Icons.search),
-                          border: const OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        onChanged: (v) => setState(() => _query = v),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          TextField(
+                            decoration: InputDecoration(
+                              hintText: loc.t('search'),
+                              prefixIcon: const Icon(Icons.search),
+                              border: const OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                            onChanged: (v) => setState(() => _query = v),
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            children: [
+                              FilterChip(
+                                avatar: Icon(Icons.monetization_off, size: 18, color: _filterNoPrice ? Theme.of(context).colorScheme.primary : null),
+                                label: Text(loc.t('filter_no_price')),
+                                selected: _filterNoPrice,
+                                onSelected: (v) => setState(() => _filterNoPrice = v),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                     Expanded(
