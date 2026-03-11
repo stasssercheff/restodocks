@@ -318,13 +318,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         final reason = isPdf && context.read<AiService>() is AiServiceSupabase
             ? AiServiceSupabase.lastParseTechCardPdfReason
             : null;
-        if (reason != null) debugPrint('[TTK PDF] reason: $reason');
         final msg = reason != null
             ? _pdfFailureMessage(reason, loc)
             : loc.t(isPdf ? 'ai_tech_card_pdf_format_hint' : 'ai_tech_card_excel_format_hint');
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(msg),
-          duration: const Duration(seconds: 8),
+          content: Text(reason != null ? '$msg\n\nПричина: $reason' : msg),
+          duration: const Duration(seconds: 15),
+          action: SnackBarAction(label: 'OK', onPressed: () {}),
         ));
         return;
       }
@@ -345,13 +345,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
 
   static String _pdfFailureMessage(String reason, LocalizationService loc) {
     if (reason.startsWith('empty_text')) return 'PDF не содержит извлекаемого текста.';
-    if (reason.startsWith('extraction_failed')) {
-      const prefix = 'extraction_failed: ';
-      final detail = reason.length > prefix.length
-          ? reason.substring(prefix.length, prefix.length + 80).replaceAll('\n', ' ')
-          : '';
-      return detail.isNotEmpty ? 'Не удалось прочитать PDF. ($detail)' : 'Не удалось прочитать PDF.';
-    }
+    if (reason.startsWith('extraction_failed')) return 'Не удалось прочитать PDF.';
     if (reason.startsWith('ai_error') || reason.contains('429') || reason.contains('quota')) {
       return 'Лимит ИИ исчерпан. Попробуйте позже.';
     }
