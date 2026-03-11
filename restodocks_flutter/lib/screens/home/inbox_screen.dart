@@ -709,16 +709,6 @@ class _InboxScreenState extends State<InboxScreen> {
           const SizedBox(height: 16),
         ],
         if (hasDeletions) ...[
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Text(
-              loc.t('employee_deletion_notifications') ?? 'Изменения штата',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-            ),
-          ),
           ..._deletionNotifications.map((n) {
             final estId = context.read<AccountManagerSupabase>().establishment?.id;
             context.read<InboxViewedService>().addViewed(estId, 'del_${n.id}');
