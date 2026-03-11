@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import '../utils/dev_log.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _keyPrefix = 'restodocks_inbox_viewed_';
@@ -52,6 +53,28 @@ class InboxViewedService extends ChangeNotifier {
       if (existing == null) existing = await getViewedIds(establishmentId);
       if (existing.contains(documentId)) return;
       final list = [...existing, documentId];
+      if (list.length > _maxViewedIds) {
+        list.removeRange(0, list.length - _maxViewedIds);
+      }
+      final prefs = await SharedPreferences.getInstance();
+      final key = '$_keyPrefix$establishmentId';
+      await prefs.setString(key, jsonEncode(list));
+      _cache[establishmentId] = list.toSet();
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  /// Добавить несколько документов как просмотренные (для «Прочитать все» во вкладке).
+  Future<void> addViewedBatch(String? establishmentId, Iterable<String> documentIds) async {
+    if (establishmentId == null || establishmentId.isEmpty) return;
+    final ids = documentIds.where((id) => id.isNotEmpty).toSet();
+    if (ids.isEmpty) return;
+    try {
+      var existing = _cache[establishmentId];
+      if (existing == null) existing = await getViewedIds(establishmentId) ?? {};
+      final toAdd = ids.where((id) => !existing!.contains(id)).toList();
+      if (toAdd.isEmpty) return;
+      final list = [...existing, ...toAdd];
       if (list.length > _maxViewedIds) {
         list.removeRange(0, list.length - _maxViewedIds);
       }

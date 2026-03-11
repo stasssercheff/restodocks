@@ -219,7 +219,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       } else if (widget.department == 'hall') {
         list = []; // Зал не имеет своих ТТК
       } else {
-        // Кухня: повара и сотрудники подразделения видят все ТТК (блюда и ПФ) в режиме просмотра
         list = all.where((tc) =>
             tc.category != 'beverages' ||
             tc.sections.contains('all')).toList();
