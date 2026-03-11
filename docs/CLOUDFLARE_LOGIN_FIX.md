@@ -89,11 +89,10 @@ https://restodocks.pages.dev
 
 ## 6. 401 от authenticate-employee
 
-Если в Network видишь **401** на `authenticate-employee`:
-- Сначала пробуется **Supabase Auth** (signInWithPassword), при ошибке — **legacy** (Edge Function).
-- 401 от legacy = неверный email/пароль **или** учётка в auth.users без password_hash в employees.
-- Проверь: тот же логин работает на restodocks-2u8.pages.dev? Если да — добавь restodocks.com в Supabase (п. 5).
-- В консоли должно быть: `🔐 Login: Supabase Auth failed: ...` — по этому сообщению можно понять причину.
+Если в Network видишь **401** на `authenticate-employee` (даже при правильном пароле):
+- Может быть **proxy/маршрутизация** — Cloudflare или сеть обрывает первый запрос. Приложение делает retry, один из запросов доходит.
+- Проверь: **Configuration Rule Bypass cache** (см. [CLOUDFLARE_RESTODOCKS_COM_FIX.md](CLOUDFLARE_RESTODOCKS_COM_FIX.md)).
+- Тот же логин работает на restodocks-2u8.pages.dev? Если да — добавь restodocks.com в Supabase (п. 5).
 
 ## 7. Отладка: auth/v1/token
 
