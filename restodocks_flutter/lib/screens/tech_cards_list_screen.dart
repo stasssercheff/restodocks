@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:excel/excel.dart' hide Border;
 
+import '../core/feature_flags.dart';
 import '../utils/number_format_utils.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -47,7 +48,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   }
 
   /// Порядок категорий для отображения: кухня/банкет и бар
-  static const _kitchenCategoryOrder = ['sauce', 'vegetables', 'salad', 'meat', 'seafood', 'side', 'subside', 'bakery', 'dessert', 'decor', 'soup', 'misc', 'beverages', 'banquet', 'catering'];
+  static const _kitchenCategoryOrder = ['sauce', 'vegetables', 'zagotovka', 'salad', 'meat', 'seafood', 'side', 'subside', 'bakery', 'dessert', 'decor', 'soup', 'misc', 'beverages', 'banquet', 'catering'];
   static const _barCategoryOrder = ['alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks', 'sauce', 'vegetables', 'salad', 'bakery', 'dessert', 'decor', 'misc', 'beverages'];
 
   List<({String category, List<TechCard> cards})> _groupByCategory(List<TechCard> cards) {
@@ -73,6 +74,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     final Map<String, Map<String, String>> categoryTranslations = {
       'sauce': {'ru': 'Соус', 'en': 'Sauce'},
       'vegetables': {'ru': 'Овощи', 'en': 'Vegetables'},
+      'zagotovka': {'ru': 'Заготовка', 'en': 'Preparation'},
       'salad': {'ru': 'Салат', 'en': 'Salad'},
       'meat': {'ru': 'Мясо', 'en': 'Meat'},
       'seafood': {'ru': 'Рыба', 'en': 'Seafood'},
@@ -501,13 +503,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                   },
                   itemBuilder: (_) => [
                     PopupMenuItem(value: 'new', child: Text(loc.t('create_tech_card'))),
-                    PopupMenuItem(value: 'excel', child: Text(loc.t('ai_tech_card_from_excel'))),
+                    if (FeatureFlags.ttkImportEnabled)
+                      PopupMenuItem(value: 'excel', child: Text(loc.t('ai_tech_card_from_excel'))),
                   ],
                 ),
               ),
-          ].where((_) => true), // чтобы actions не был null
-          // Кнопка загрузки ТТК (Excel)
-          if (canEdit)
+          ].where((_) => true),
+          if (canEdit && FeatureFlags.ttkImportEnabled)
             PopupMenuButton<String>(
               icon: const Icon(Icons.upload),
               tooltip: loc.t('ttk_import_file'),
