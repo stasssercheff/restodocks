@@ -64,19 +64,33 @@ Deno.serve(async (req: Request) => {
     const { extractText, getDocumentProxy } = await import("npm:unpdf@0.4.1");
     const { chatText } = await import("../_shared/ai_provider.ts");
 
-    const binary = atob(pdfBase64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      bytes[i] = binary.charCodeAt(i);
+    let bytes: Uint8Array;
+    try {
+      const binary = atob(pdfBase64.replace(/\s/g, ""));
+      bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : String(e);
+      return new Response(JSON.stringify({ cards: [], reason: `extraction_failed: invalid base64: ${errMsg.slice(0, 80)}` }), {
+        status: 200,
+        headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+      });
     }
 
     let text: string;
     try {
       const pdf = await getDocumentProxy(bytes);
-      const result = await extractText(pdf, { mergePages: true });
+      let result = await extractText(pdf, { mergePages: true });
       text = result.text ?? "";
+      if (!text.trim()) {
+        result = await extractText(pdf, { mergePages: false });
+        text = result.text ?? "";
+      }
     } catch (e) {
-      return new Response(JSON.stringify({ cards: [], reason: `extraction_failed: ${e}` }), {
+      const errMsg = e instanceof Error ? e.message : String(e);
+      return new Response(JSON.stringify({ cards: [], reason: `extraction_failed: ${errMsg.slice(0, 200)}` }), {
         status: 200,
         headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
       });
