@@ -131,6 +131,22 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     return _sectionCodeToLabel(sectionKey, loc);
   }
 
+  /// Метка текущего подразделения (цех) для шапки
+  String _departmentHeaderLabel(LocalizationService loc) {
+    switch (widget.department) {
+      case 'kitchen':
+        return loc.t('department_kitchen');
+      case 'bar':
+        return loc.t('department_bar');
+      case 'banquet-catering':
+        return loc.t('banquet_catering');
+      case 'banquet-catering-bar':
+        return '${loc.t('banquet_catering')} + ${loc.t('department_bar')}';
+      default:
+        return loc.t('department_kitchen');
+    }
+  }
+
   String _categoryLabel(String c, LocalizationService loc) {
     final lang = loc.currentLanguageCode;
     final Map<String, Map<String, String>> categoryTranslations = {
@@ -368,25 +384,33 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     final isPdf = (file.extension?.toLowerCase() ?? '').contains('pdf');
     setState(() { _loadingExcel = true; _loadingTtkIsPdf = isPdf; });
     try {
+      final est = context.read<AccountManagerSupabase>().establishment;
+      final establishmentId = est?.dataEstablishmentId;
       List<TechCardRecognitionResult> list;
       if (isPdf) {
-        list = await context.read<AiService>().parseTechCardsFromPdf(uBytes);
+        list = await context.read<AiService>().parseTechCardsFromPdf(uBytes, establishmentId: establishmentId);
       } else {
-        list = await context.read<AiService>().parseTechCardsFromExcel(uBytes);
+        list = await context.read<AiService>().parseTechCardsFromExcel(uBytes, establishmentId: establishmentId);
         if (list.isEmpty) {
           list = _parseSimpleExcelNames(uBytes);
         }
       }
       if (!mounted) return;
       if (list.isEmpty) {
-        final reason = isPdf && context.read<AiService>() is AiServiceSupabase
-            ? AiServiceSupabase.lastParseTechCardPdfReason
-            : null;
-        final msg = reason != null
-            ? _pdfFailureMessage(reason, loc)
-            : loc.t(isPdf ? 'ai_tech_card_pdf_format_hint' : 'ai_tech_card_excel_format_hint');
+        String msg;
+        if (isPdf && context.read<AiService>() is AiServiceSupabase) {
+          final reason = AiServiceSupabase.lastParseTechCardPdfReason;
+          msg = reason != null ? _pdfFailureMessage(reason, loc) : loc.t('ai_tech_card_pdf_format_hint');
+        } else if (!isPdf && context.read<AiService>() is AiServiceSupabase) {
+          final reason = AiServiceSupabase.lastParseTechCardExcelReason;
+          msg = (reason == 'ai_limit_exceeded' || reason == 'limit_3_per_day')
+              ? loc.t('ai_ttk_limit_3_per_day')
+              : loc.t('ai_tech_card_excel_format_hint');
+        } else {
+          msg = loc.t(isPdf ? 'ai_tech_card_pdf_format_hint' : 'ai_tech_card_excel_format_hint');
+        }
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(reason != null ? '$msg\n\nПричина: $reason' : msg),
+          content: Text(msg),
           duration: const Duration(seconds: 15),
           action: SnackBarAction(label: 'OK', onPressed: () {}),
         ));
@@ -408,6 +432,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   }
 
   static String _pdfFailureMessage(String reason, LocalizationService loc) {
+    if (reason == 'ai_limit_exceeded' || reason == 'limit_3_per_day') {
+      return loc.t('ai_ttk_limit_3_per_day');
+    }
     if (reason.startsWith('empty_text')) return 'PDF не содержит извлекаемого текста.';
     if (reason.startsWith('extraction_failed')) return 'Не удалось прочитать PDF.';
     if (reason.startsWith('ai_error') || reason.contains('429') || reason.contains('quota')) {
@@ -774,6 +801,30 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                 );
               },
             ),
+          // Шапка: цех (подразделение) над вкладками ТТК/ПФ
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Row(
+              children: [
+                Icon(Icons.business, size: 20, color: Theme.of(context).colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  loc.t('ttk_section'),
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _departmentHeaderLabel(loc),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+          ),
           TabBar(
             tabs: [
               Tab(text: loc.t('ttk_tab_pf')),

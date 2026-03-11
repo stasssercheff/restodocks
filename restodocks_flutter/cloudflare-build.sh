@@ -33,7 +33,7 @@ echo "==> Generating PWA icons"
 dart run flutter_launcher_icons
 
 echo "==> flutter build web (--no-web-resources-cdn, with source maps to avoid 404 parse error)"
-ENABLE_TTK="${ENABLE_TTK_IMPORT:-false}"
+ENABLE_TTK="${ENABLE_TTK_IMPORT:-true}"
 flutter build web --release --no-web-resources-cdn \
   --dart-define=SUPABASE_URL="$SUPABASE_URL" \
   --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \

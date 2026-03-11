@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:excel/excel.dart' hide Border;
 import 'package:file_picker/file_picker.dart';
+import '../utils/dev_log.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -145,7 +146,7 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
           );
         } catch (aiError) {
           // Если AI не работает, продолжаем без него
-          print('AI verification failed for "${item.name}": $aiError');
+          devLog('AI verification failed for "${item.name}": $aiError');
           verification = null;
         }
 
@@ -251,11 +252,11 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
                   continue;
                 }
               } catch (findError) {
-                print('Failed to find existing product "${product.name}": $findError');
+                devLog('Failed to find existing product "${product.name}": $findError');
               }
             }
             // Другая ошибка
-            print('Failed to add product "${product.name}": $e');
+            devLog('Failed to add product "${product.name}": $e');
             setState(() => _failed++);
             continue;
           }
@@ -271,7 +272,7 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
               continue;
             }
             // Другая ошибка
-            print('Failed to add to nomenclature "${product.name}": $e');
+            devLog('Failed to add to nomenclature "${product.name}": $e');
             setState(() => _failed++);
             continue;
           }
@@ -281,7 +282,7 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
           // Небольшая задержка чтобы не перегружать сервер
           await Future.delayed(const Duration(milliseconds: 50));
         } catch (e) {
-          print('Unexpected error for "${item.name}": $e');
+          devLog('Unexpected error for "${item.name}": $e');
           setState(() => _failed++);
         }
     }
@@ -358,10 +359,6 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
   // Список элементов номенклатуры (продукты + ТТК ПФ)
   List<NomenclatureItem> _nomenclatureItems = [];
   bool _isLoading = true;
-  bool _isTranslatingProducts = false;
-  int _translatingDone = 0;   // реально переведено (шкала = done/total)
-  int _translatingTotal = 0;
-  int _translatingProcessed = 0; // обработано вызовов API
   bool _hasRunAutoTranslationThisSession = false;
 
   // Активная вкладка
@@ -391,7 +388,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       // Фильтр по подразделению: каждый видит только свою номенклатуру
       _nomenclatureItems = _filterByDepartment(items, widget.department);
     } catch (e) {
-      print('❌ NomenclatureScreen: _ensureLoaded error: $e');
+      devLog('❌ NomenclatureScreen: _ensureLoaded error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Ошибка загрузки номенклатуры: $e'), duration: const Duration(seconds: 6)),
@@ -410,131 +407,20 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
               .map((i) => i.product!)
               .toList();
           if (needTranslate.isNotEmpty) {
-            final shouldSkip = await _shouldSkipAutoTranslate();
-            if (!shouldSkip && mounted) {
-              _hasRunAutoTranslationThisSession = true;
-              _runAutoTranslation(needTranslate);
-            }
+            _hasRunAutoTranslationThisSession = true;
+            _runAutoTranslation(needTranslate);
           }
         }
       }
     }
   }
 
-  static const _kAutoTranslateSkipKey = 'nomenclature_autotranslate_skip_until';
-  static const _kAutoTranslateSkipMinutes = 30;
-
-  /// Не запускать автоперевод сразу после неудачного прогона (0 обновлений).
-  Future<bool> _shouldSkipAutoTranslate() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final until = prefs.getInt(_kAutoTranslateSkipKey);
-      if (until != null && DateTime.now().millisecondsSinceEpoch < until) return true;
-    } catch (_) {}
-    return false;
-  }
-
-  /// Запомнить, что автоперевод дал 0 обновлений — не запускать снова 30 мин.
-  Future<void> _markAutoTranslateZeroUpdates() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final until = DateTime.now().add(const Duration(minutes: _kAutoTranslateSkipMinutes));
-      await prefs.setInt(_kAutoTranslateSkipKey, until.millisecondsSinceEpoch);
-    } catch (_) {}
-  }
-
-  /// Фоновый перевод продуктов (Edge Function DeepL). Один прогон, честная шкала.
-  /// setState не чаще чем раз в 10 продуктов — меньше мерцания.
-  /// Пауза между запросами — снизить rate limit DeepL.
-  Future<void> _runAutoTranslation(List<Product> list) async {
-    if (_isTranslatingProducts || !mounted) return;
-    setState(() {
-      _isTranslatingProducts = true;
-      _translatingDone = 0;
-      _translatingTotal = list.length;
-      _translatingProcessed = 0;
-    });
+  /// Фоновый перевод продуктов (Edge Function DeepL). Fire-and-forget — без UI.
+  void _runAutoTranslation(List<Product> list) {
     final store = context.read<ProductStoreSupabase>();
-    final estId = context.read<AccountManagerSupabase>().dataEstablishmentId ?? '';
-    final loc = context.read<LocalizationService>();
-    final translationSvc = context.read<TranslationService>();
-    final targetLang = loc.currentLanguageCode;
-    const sourceLang = 'ru';
-    int updated = 0;
-    const setStateEvery = 10; // реже setState — меньше мерцания
-    for (var i = 0; i < list.length; i++) {
-      if (!mounted) return;
-      Product? updatedProduct;
-      try {
-        var r = await store.translateProductAwait(list[i].id);
-        // Fallback: если DeepL не вернул перевод — пробуем TranslationService (Google/MyMemory)
-        if ((r == null || (r[targetLang] ?? '').trim().isEmpty)) {
-          final p = list[i];
-          final sourceText = (p.names?[sourceLang] ?? p.name).trim();
-          if (sourceText.isNotEmpty) {
-            final translated = await translationSvc.translate(
-              entityType: TranslationEntityType.product,
-              entityId: p.id,
-              fieldName: 'name',
-              text: sourceText,
-              from: sourceLang,
-              to: targetLang,
-            );
-            if (translated != null && translated.trim().isNotEmpty && translated != sourceText) {
-              final merged = Map<String, String>.from(p.names ?? {});
-              merged[sourceLang] = sourceText;
-              merged[targetLang] = translated.trim();
-              final upd = p.copyWith(names: merged);
-              await store.updateProduct(upd);
-              r = merged;
-              updatedProduct = upd;
-            }
-          }
-        } else {
-          updatedProduct = store.allProducts.where((p) => p.id == list[i].id).firstOrNull;
-        }
-        if (r != null && (r[targetLang] ?? '').trim().isNotEmpty) {
-          updated++;
-          _translatingDone = updated; // шкала = только реально переведённые
-          if (updatedProduct != null && mounted) {
-            final idx = _nomenclatureItems.indexWhere((item) => item.isProduct && item.product!.id == list[i].id);
-            if (idx >= 0) {
-              final ep = store.getEstablishmentPrice(updatedProduct!.id, estId);
-              _nomenclatureItems = List.from(_nomenclatureItems)
-                ..[idx] = NomenclatureItem.product(updatedProduct, establishmentPrice: ep?.$1);
-            }
-          }
-        }
-        // Пауза между запросами — снизить rate limit
-        if (i < list.length - 1) await Future<void>.delayed(const Duration(milliseconds: 400));
-      } catch (_) {}
-      _translatingProcessed = i + 1;
-      // setState: при успешных переводах, при прогрессе обработки (каждые N), в конце
-      if (!mounted) return;
-      if ((updated > 0 && updated % setStateEvery == 0) ||
-          _translatingProcessed % setStateEvery == 0 ||
-          i == list.length - 1) {
-        setState(() {});
-      }
-    }
-    if (!mounted) return;
-    setState(() {
-      _isTranslatingProducts = false;
-      _translatingTotal = 0;
-    });
-    await _ensureLoaded(skipAutoTranslation: true);
-    if (mounted) {
-      setState(() {});
-      if (updated == 0) await _markAutoTranslateZeroUpdates();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            updated > 0 ? '${loc.t('translate_done')} (+$updated)' : loc.t('translate_no_changes'),
-          ),
-          backgroundColor: updated > 0 ? Colors.green : null,
-          duration: updated > 0 ? const Duration(seconds: 3) : const Duration(seconds: 5),
-        ),
-      );
+    for (final p in list) {
+      if ((p.name).trim().isEmpty) continue;
+      store.triggerTranslation(p.id);
     }
   }
 
@@ -1425,63 +1311,6 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       ),
       body: Column(
         children: [
-          // ── Баннер «Переводим продукты» с прогрессом ────────────────────────
-          if (_isTranslatingProducts)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              color: Theme.of(context).colorScheme.primaryContainer,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: [
-                      SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          value: _translatingTotal > 0 ? _translatingDone / _translatingTotal : null,
-                          color: Theme.of(context).colorScheme.onPrimaryContainer,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              '${loc.t('translating_products')} '
-                              '${loc.t('translated_count').replaceFirst('%s', '$_translatingDone').replaceFirst('%s', '$_translatingTotal')}',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.onPrimaryContainer,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            if (_translatingProcessed < _translatingTotal && _translatingTotal > 0)
-                              Text(
-                                loc.t('processed_count').replaceFirst('%s', '$_translatingProcessed').replaceFirst('%s', '$_translatingTotal'),
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onPrimaryContainer.withOpacity(0.8),
-                                  fontSize: 12,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  LinearProgressIndicator(
-                    value: _translatingTotal > 0 ? _translatingDone / _translatingTotal : 0,
-                    backgroundColor: Theme.of(context).colorScheme.onPrimaryContainer.withOpacity(0.3),
-                    valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.onPrimaryContainer),
-                  ),
-                ],
-              ),
-            ),
           // ── Переключатель вкладок (FilterChip, как в Входящих) ──────────────
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -1530,7 +1359,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                             spacing: 8,
                             children: [
                               FilterChip(
-                                avatar: Icon(Icons.monetization_off, size: 18, color: _filterNoPrice ? Theme.of(context).colorScheme.primary : null),
+                                avatar: Icon(Icons.money_off, size: 18, color: _filterNoPrice ? Theme.of(context).colorScheme.primary : null),
                                 label: Text(loc.t('filter_no_price')),
                                 selected: _filterNoPrice,
                                 onSelected: (v) => setState(() => _filterNoPrice = v),
@@ -1558,9 +1387,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                               onEditProduct: (ctx, p) => _showEditProductForNomenclature(ctx, p, store, loc, () => _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {})), estId ?? ''),
                               onRemoveProduct: (ctx, p) => _confirmRemoveForNomenclature(ctx, p, store, loc, () => _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {})), estId ?? ''),
                               onLoadKbju: (ctx, list) => _loadKbjuForAll(ctx, list),
-                              onLoadTranslations: (ctx, list) => _loadTranslationsForAll(ctx, list),
                               onVerifyWithAi: (ctx, list) => _verifyWithAi(ctx, list, estId ?? ''),
-                              isTranslating: _isTranslatingProducts,
                               onNeedsKbju: (item) => _needsKbju(item),
                               onNeedsTranslation: (item) => _needsTranslation(item),
                               onCanShowNutrition: (context) => _canShowNutrition(context),
@@ -2193,9 +2020,7 @@ class _NomenclatureTab extends StatefulWidget {
     required this.onEditProduct,
     required this.onRemoveProduct,
     required this.onLoadKbju,
-    required this.onLoadTranslations,
     required this.onVerifyWithAi,
-    required this.isTranslating,
     required this.onNeedsKbju,
     required this.onNeedsTranslation,
     required this.onCanShowNutrition,
@@ -2217,9 +2042,7 @@ class _NomenclatureTab extends StatefulWidget {
   final void Function(BuildContext, Product) onEditProduct;
   final void Function(BuildContext, Product) onRemoveProduct;
   final void Function(BuildContext, List<Product>) onLoadKbju;
-  final void Function(BuildContext, List<Product>) onLoadTranslations;
   final void Function(BuildContext, List<Product>) onVerifyWithAi;
-  final bool isTranslating;
   final bool Function(NomenclatureItem) onNeedsKbju;
   final bool Function(NomenclatureItem) onNeedsTranslation;
   final bool Function(BuildContext) onCanShowNutrition;
@@ -2280,34 +2103,80 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
             ],
           ),
         ),
-        if ((needsTranslation.isNotEmpty && !widget.isTranslating) || widget.items.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                if (needsTranslation.isNotEmpty && !widget.isTranslating)
-                  FilledButton.tonalIcon(
-                    onPressed: () => widget.onLoadTranslations(context, needsTranslation.where((item) => item.isProduct).map((item) => item.product!).toList()),
-                    icon: const Icon(Icons.translate, size: 20),
-                    label: Text(widget.loc.t('translate_names_for_all').replaceAll('%s', '${needsTranslation.length}')),
-                  ),
-              ],
-            ),
-          ),
         Expanded(
           child: ListView.builder(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
             itemCount: widget.items.length,
             itemBuilder: (_, i) {
               final item = widget.items[i];
+              if (item.isProduct) {
+                final p = item.product!;
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 6),
+                  child: ExpansionTile(
+                    leading: CircleAvatar(
+                      backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                      child: Text(
+                        (i + 1).toString(),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.onPrimaryContainer,
+                        ),
+                      ),
+                    ),
+                    title: Text(p.getLocalizedName(widget.loc.currentLanguageCode)),
+                    subtitle: Text(
+                      widget.onBuildProductSubtitle(context, p, widget.store, widget.estId, widget.loc),
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit_outlined),
+                          tooltip: widget.loc.t('edit_product'),
+                          onPressed: () => widget.onEditProduct(context, p),
+                        ),
+                        if (widget.canRemove)
+                          IconButton(
+                            icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                            tooltip: widget.loc.t('remove_from_nomenclature'),
+                            onPressed: () => widget.onRemoveProduct(context, p),
+                          ),
+                      ],
+                    ),
+                    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(widget.loc.t('product_kbju_section'), style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 8),
+                            Text(
+                              p.nutritionInfo.isNotEmpty
+                                  ? '${p.nutritionInfo}${p.allergensInfo.isNotEmpty ? '. ${p.allergensInfo}' : ''}'
+                                  : (p.allergensInfo.isNotEmpty ? p.allergensInfo : widget.loc.t('not_specified')),
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                            const SizedBox(height: 8),
+                            FilledButton.tonalIcon(
+                              icon: const Icon(Icons.edit, size: 18),
+                              label: Text(widget.loc.t('edit_product')),
+                              onPressed: () => widget.onEditProduct(context, p),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
               return Card(
                 margin: const EdgeInsets.only(bottom: 6),
                 child: ListTile(
-                  onTap: item.isProduct
-                      ? () => widget.onEditProduct(context, item.product!)
-                      : null,
+                  onTap: null,
                   leading: CircleAvatar(
                     backgroundColor: Theme.of(context).colorScheme.primaryContainer,
                     child: Text(
@@ -2320,33 +2189,10 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
                   ),
                   title: Text(item.getLocalizedName(widget.loc.currentLanguageCode)),
                   subtitle: Text(
-                    item.isProduct
-                        ? widget.onBuildProductSubtitle(context, item.product!, widget.store, widget.estId, widget.loc)
-                        : widget.onBuildTechCardSubtitle(item.techCard!),
+                    widget.onBuildTechCardSubtitle(item.techCard!),
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (item.isProduct) ...[
-                        GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: () => widget.onEditProduct(context, item.product!),
-                          child: IconButton(
-                            icon: const Icon(Icons.edit_outlined),
-                            tooltip: widget.loc.t('edit_product'),
-                            onPressed: () => widget.onEditProduct(context, item.product!),
-                          ),
-                        ),
-                        if (widget.canRemove)
-                          IconButton(
-                            icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
-                            tooltip: widget.loc.t('remove_from_nomenclature'),
-                            onPressed: () => widget.onRemoveProduct(context, item.product!),
-                          ),
-                      ],
-                    ],
-                  ),
+                  trailing: const SizedBox.shrink(),
                 ),
               );
             },
@@ -3062,11 +2908,22 @@ class _CatalogTab extends StatelessWidget {
     if (context.mounted) onRefresh();
   }
 
+  static final Set<String> _triggeredTranslationIds = {};
+
   @override
   Widget build(BuildContext context) {
     final notInNom = products.where((p) => !store.isInNomenclature(p.id)).toList();
     final needsKbju = store.allProducts.where((p) => p.category == 'manual' && _needsKbju(p)).toList();
     final needsTranslation = store.allProducts.where(_needsTranslation).toList();
+    // Фоновый автоперевод — один раз на продукт за сессию
+    if (needsTranslation.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        for (final p in needsTranslation) {
+          if (p.name.trim().isEmpty) continue;
+          if (_triggeredTranslationIds.add(p.id)) store.triggerTranslation(p.id);
+        }
+      });
+    }
     return Column(
       children: [
         Padding(
@@ -3112,21 +2969,6 @@ class _CatalogTab extends StatelessWidget {
               onPressed: () => _addAllToNomenclature(context, notInNom),
               icon: const Icon(Icons.add_circle, size: 20),
               label: Text(loc.t('add_all_to_nomenclature').replaceAll('%s', '${notInNom.length}')),
-            ),
-          ),
-        if (needsTranslation.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                FilledButton.tonalIcon(
-                  onPressed: () => _loadTranslationsForAll(context, needsTranslation),
-                  icon: const Icon(Icons.translate, size: 20),
-                  label: Text(loc.t('translate_names_for_all').replaceAll('%s', '${needsTranslation.length}')),
-                ),
-              ],
             ),
           ),
         Expanded(
@@ -3338,7 +3180,6 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
   late final TextEditingController _packageWeightController;
   late final TextEditingController _gramsPerPieceController;
   bool _checkingName = false;
-  bool _fetchingKbju = false;
   late final TextEditingController _caloriesController;
   late final TextEditingController _proteinController;
   late final TextEditingController _fatController;
@@ -3426,61 +3267,6 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
     return double.tryParse(s);
   }
 
-  /// Объединить значение: пусто → брать new; иначе перезапись только при расхождении >10%
-  double? _mergeKbjuField(double? current, double? newVal) {
-    if (newVal == null) return current;
-    if (current == null || current == 0) return newVal;
-    final denom = current > newVal ? current : newVal;
-    if (denom < 0.01) return newVal;
-    final diffPct = (current - newVal).abs() / denom;
-    return diffPct > 0.10 ? newVal : current;
-  }
-
-  /// Подтянуть КБЖУ и аллергены из Open Food Facts
-  Future<void> _fetchKbjuFromOff() async {
-    final name = _nameController.text.trim();
-    if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(widget.loc.t('product_name_required') ?? 'Введите название')),
-      );
-      return;
-    }
-    setState(() => _fetchingKbju = true);
-    try {
-      final result = await NutritionApiService.fetchNutrition(name);
-      if (!mounted) return;
-      if (result == null || !result.hasData) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(widget.loc.t('kbju_not_found') ?? 'КБЖУ не найдено')),
-        );
-        return;
-      }
-      setState(() {
-        _caloriesController.text = (result.calories ?? 0).toStringAsFixed(0);
-        _proteinController.text = (result.protein ?? 0).toStringAsFixed(1);
-        _fatController.text = (result.fat ?? 0).toStringAsFixed(1);
-        _carbsController.text = (result.carbs ?? 0).toStringAsFixed(1);
-        if (result.containsGluten != null) _containsGluten = result.containsGluten!;
-        if (result.containsLactose != null) _containsLactose = result.containsLactose!;
-      });
-      final fmt = widget.loc.t('kbju_result_format') ?? '%s ккал, Б:%s Ж:%s У:%s';
-      final msg = fmt
-          .replaceFirst('%s', '${result.calories?.round() ?? 0}')
-          .replaceFirst('%s', '${result.protein?.toStringAsFixed(1) ?? 0}')
-          .replaceFirst('%s', '${result.fat?.toStringAsFixed(1) ?? 0}')
-          .replaceFirst('%s', '${result.carbs?.toStringAsFixed(1) ?? 0}');
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(widget.loc.t('error_with_message')?.replaceAll('%s', e.toString()) ?? e.toString())),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _fetchingKbju = false);
-    }
-  }
-
   /// ИИ проверяет название на опечатки и предлагает исправление
   Future<void> _checkNameWithAi() async {
     final name = _nameController.text.trim();
@@ -3532,28 +3318,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
     bool containsGluten = _containsGluten;
     bool containsLactose = _containsLactose;
 
-    // Автоподгрузка недостающих КБЖУ из Open Food Facts
-    // Пустые поля — заполняем. Заполненные — перезаписываем только при расхождении >10%
-    final hasEmptyKbju = (calories == null || calories == 0) ||
-        (protein == null || protein == 0) ||
-        (fat == null || fat == 0) ||
-        (carbs == null || carbs == 0);
-    if (hasEmptyKbju && widget.isCreate) {
-      setState(() => _fetchingKbju = true);
-      try {
-        final result = await NutritionApiService.fetchNutrition(name);
-        if (result != null && result.hasData) {
-          calories = _mergeKbjuField(calories, result.calories);
-          protein = _mergeKbjuField(protein, result.protein);
-          fat = _mergeKbjuField(fat, result.fat);
-          carbs = _mergeKbjuField(carbs, result.carbs);
-          if (result.containsGluten != null) containsGluten = result.containsGluten!;
-          if (result.containsLactose != null) containsLactose = result.containsLactose!;
-        }
-      } catch (_) {}
-      if (mounted) setState(() => _fetchingKbju = false);
-    }
-
+    // КБЖУ подгружаются в фоне (NutritionBackfillService)
     final curLang = widget.loc.currentLanguageCode;
     final allLangs = LocalizationService.productLanguageCodes;
     final merged = Map<String, String>.from(widget.product.names ?? {});
@@ -3682,7 +3447,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(widget.loc.t('nutrition') ?? 'КБЖУ', style: Theme.of(context).textTheme.titleSmall),
+                        Text(widget.loc.t('kbju_per_100g') ?? 'КБЖУ на 100 г', style: Theme.of(context).textTheme.titleSmall),
                         const SizedBox(height: 8),
                         Row(
                           children: [
@@ -3690,7 +3455,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                               child: TextFormField(
                                 controller: _caloriesController,
                                 decoration: InputDecoration(
-                                  labelText: widget.loc.t('calories') ?? 'ккал',
+                                  labelText: widget.loc.t('ttk_calories') ?? 'Калории',
                                   border: const OutlineInputBorder(),
                                   isDense: true,
                                 ),
@@ -3702,7 +3467,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                               child: TextFormField(
                                 controller: _proteinController,
                                 decoration: InputDecoration(
-                                  labelText: 'Б',
+                                  labelText: widget.loc.t('ttk_protein') ?? 'Белки',
                                   border: const OutlineInputBorder(),
                                   isDense: true,
                                 ),
@@ -3714,7 +3479,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                               child: TextFormField(
                                 controller: _fatController,
                                 decoration: InputDecoration(
-                                  labelText: 'Ж',
+                                  labelText: widget.loc.t('ttk_fat') ?? 'Жиры',
                                   border: const OutlineInputBorder(),
                                   isDense: true,
                                 ),
@@ -3726,7 +3491,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                               child: TextFormField(
                                 controller: _carbsController,
                                 decoration: InputDecoration(
-                                  labelText: 'У',
+                                  labelText: widget.loc.t('ttk_carbs') ?? 'Углеводы',
                                   border: const OutlineInputBorder(),
                                   isDense: true,
                                 ),
@@ -3736,17 +3501,6 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                           ],
                         ),
                       ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  SizedBox(
-                    height: 48,
-                    child: FilledButton.icon(
-                      onPressed: _fetchingKbju ? null : _fetchKbjuFromOff,
-                      icon: _fetchingKbju
-                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                          : const Icon(Icons.cloud_download_outlined, size: 18),
-                      label: Text(widget.loc.t('kbju_fetch') ?? 'Подтянуть'),
                     ),
                   ),
                 ],

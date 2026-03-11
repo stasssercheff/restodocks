@@ -57,8 +57,10 @@ https://*.restodocks.pages.dev
 | Root directory | **пусто** (корень репо) | **пусто** |
 | Build command | `bash cloudflare-build.sh` | `bash cloudflare-build.sh` |
 | Build output | `restodocks_flutter/build/web` | `restodocks_flutter/build/web` |
-| Env | SUPABASE_URL, SUPABASE_ANON_KEY (одни и те же) | те же |
+| Env | SUPABASE_URL, SUPABASE_ANON_KEY | SUPABASE_URL, SUPABASE_ANON_KEY, **ENABLE_TTK_IMPORT=true** |
 | Preview branch | **None** (обязательно!) | **None** (обязательно!) |
+
+**Важно:** Кнопка загрузки ТТК (Excel/PDF) включена по умолчанию (ENABLE_TTK_IMPORT=true) для Beta и Prod. Можно переопределить через env.
 
 Если Preview включён — будут строиться ветки при push, и Prod может обновиться от staging.
 

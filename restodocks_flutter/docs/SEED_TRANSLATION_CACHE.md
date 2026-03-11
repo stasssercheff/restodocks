@@ -1,3 +1,16 @@
+# translation_cache — каталог переводов
+
+**translation_cache** — единый каталог пар (source_text, source_lang, target_lang, translated) для переиспользования и машинного обучения.
+
+## Откуда попадают переводы
+
+1. **Edge Functions** (translate-text, auto-translate-product) — DeepL, результат пишется в translation_cache.
+2. **TranslationService** (MyMemory, AI) — сохраняет в таблицу `translations`, триггер `tr_translations_sync_to_cache` дублирует в translation_cache.
+
+Таким образом все новые переводы попадают в каталог для будущего использования (ML, префилл, экспорт).
+
+---
+
 # Предзаполнение translation_cache (без расхода DeepL)
 
 Чтобы не тратить лимиты DeepL на перевод названий продуктов, можно один раз предзаполнить таблицу `translation_cache` переводами RU/EN/ES → TR через бесплатный MyMemory API.

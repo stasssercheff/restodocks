@@ -33,7 +33,7 @@ echo "==> flutter build web (--no-web-resources-cdn, --no-source-maps)"
 flutter build web --release --no-web-resources-cdn --no-source-maps \
   --dart-define=SUPABASE_URL="$SUPABASE_URL" \
   --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
-  --dart-define=ENABLE_TTK_IMPORT=false
+  --dart-define=ENABLE_TTK_IMPORT=true
 
 if [ -f scripts/sw_cleanup.js ]; then
   cp scripts/sw_cleanup.js build/web/flutter_service_worker.js
