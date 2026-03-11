@@ -318,10 +318,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         final reason = isPdf && context.read<AiService>() is AiServiceSupabase
             ? AiServiceSupabase.lastParseTechCardPdfReason
             : null;
+        if (reason != null) debugPrint('[TTK PDF] reason: $reason');
         final msg = reason != null
             ? _pdfFailureMessage(reason, loc)
             : loc.t(isPdf ? 'ai_tech_card_pdf_format_hint' : 'ai_tech_card_excel_format_hint');
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(msg),
+          duration: const Duration(seconds: 8),
+        ));
         return;
       }
       if (list.length == 1 && list.first.ingredients.isEmpty) {
