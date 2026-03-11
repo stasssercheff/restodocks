@@ -48,7 +48,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
   /// Категории бара: коктейли, напитки, снеки и т.д.
   static const _barCategoryOptions = [
     'alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure',
-    'snacks', 'sauce', 'vegetables', 'salad', 'bakery', 'dessert', 'decor', 'misc', 'beverages',
+    'snacks', 'zagotovka', 'sauce', 'vegetables', 'salad', 'bakery', 'dessert', 'decor', 'misc', 'beverages',
   ];
 
   bool get _isBar => widget.department == 'bar' || widget.department == 'banquet-catering-bar';

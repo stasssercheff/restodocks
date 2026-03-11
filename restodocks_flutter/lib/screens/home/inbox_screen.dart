@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/dev_log.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -155,11 +156,40 @@ class _InboxScreenState extends State<InboxScreen> {
         });
       }
     } catch (e) {
-      print('Error loading inbox documents: $e');
+      devLog('Error loading inbox documents: $e');
       if (mounted) {
         setState(() => _loading = false);
       }
     }
+  }
+
+  /// ID непросмотренных документов/уведомлений текущей вкладки (для «Прочитать все»).
+  List<String> _getUnviewedIdsForCurrentTab(bool isOwner) {
+    final viewed = _viewedIds;
+    if (isOwner) {
+      if (_selectedTypeTab == _InboxTypeTab.messages) return []; // Чат — отдельная логика
+      if (_selectedTypeTab == _InboxTypeTab.notifications) {
+        final overdue = _overdueChecklistsForNotifications.where((d) => !viewed.contains(d.id)).map((d) => d.id).toList();
+        final del = _deletionNotifications.where((n) => !viewed.contains('del_${n.id}')).map((n) => 'del_${n.id}').toList();
+        return [...overdue, ...del];
+      }
+      return _filteredDocuments.where((d) => !viewed.contains(d.id)).map((d) => d.id).toList();
+    }
+    if (_selectedTab == _InboxTab.messages) return []; // Чат — отдельная логика
+    if (_selectedTab == _InboxTab.notifications) {
+      final overdue = _overdueChecklistsForNotifications.where((d) => !viewed.contains(d.id)).map((d) => d.id).toList();
+      final del = _deletionNotifications.where((n) => !viewed.contains('del_${n.id}')).map((n) => 'del_${n.id}').toList();
+      return [...overdue, ...del];
+    }
+    return _filteredDocuments.where((d) => !viewed.contains(d.id)).map((d) => d.id).toList();
+  }
+
+  Future<void> _markAllInCurrentTabAsViewed() async {
+    final estId = context.read<AccountManagerSupabase>().establishment?.id;
+    final isOwner = context.read<AccountManagerSupabase>().currentEmployee?.hasRole('owner') ?? false;
+    final ids = _getUnviewedIdsForCurrentTab(isOwner);
+    if (ids.isEmpty) return;
+    await context.read<InboxViewedService>().addViewedBatch(estId, ids);
   }
 
   /// Кнопка объединения только на вкладках «Инвентаризация стандарт» и «Инвентаризация iiko».
@@ -246,25 +276,34 @@ class _InboxScreenState extends State<InboxScreen> {
         leading: widget.embedded ? null : appBarBackButton(context),
         title: Text(widget.messagesOnly ? (loc.t('inbox_tab_messages') ?? 'Сообщения') : loc.t('inbox')),
         actions: [
-          if (!widget.messagesOnly &&
-              _isInventoryMergeTabSelected(isOwner) &&
-              _mergeableDocumentsForCurrentTab.isNotEmpty &&
-              (employee?.hasRole('executive_chef') == true ||
-                  employee?.hasRole('sous_chef') == true ||
-                  employee?.hasRole('owner') == true ||
-                  employee?.hasRole('bar_manager') == true ||
-                  employee?.hasRole('floor_manager') == true))
-            IconButton(
-              icon: const Icon(Icons.merge),
-              tooltip: loc.t('inventory_merge_title') ?? 'Объединить бланки',
-              onPressed: () async {
-                final result = await context.push<bool>(
-                  '/inbox/merge',
-                  extra: _mergeableDocumentsForCurrentTab,
-                );
-                if (result == true && mounted) await _loadDocuments();
-              },
-            ),
+          if (!widget.messagesOnly) ...[
+            if (!_isNotificationsTab(isOwner) && _getUnviewedIdsForCurrentTab(isOwner).isNotEmpty)
+              TextButton.icon(
+                onPressed: () async {
+                  await _markAllInCurrentTabAsViewed();
+                },
+                icon: const Icon(Icons.done_all, size: 20),
+                label: Text(loc.t('inbox_mark_all_viewed') ?? 'Прочитать все'),
+              ),
+            if (_isInventoryMergeTabSelected(isOwner) &&
+                _mergeableDocumentsForCurrentTab.isNotEmpty &&
+                (employee?.hasRole('executive_chef') == true ||
+                    employee?.hasRole('sous_chef') == true ||
+                    employee?.hasRole('owner') == true ||
+                    employee?.hasRole('bar_manager') == true ||
+                    employee?.hasRole('floor_manager') == true))
+              IconButton(
+                icon: const Icon(Icons.merge),
+                tooltip: loc.t('inventory_merge_title') ?? 'Объединить бланки',
+                onPressed: () async {
+                  final result = await context.push<bool>(
+                    '/inbox/merge',
+                    extra: _mergeableDocumentsForCurrentTab,
+                  );
+                  if (result == true && mounted) await _loadDocuments();
+                },
+              ),
+          ],
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () async {
@@ -714,6 +753,16 @@ class _InboxScreenState extends State<InboxScreen> {
 
   /// Чеклисты с группировкой: Просроченные, затем по цеху → дате → сотруднику
   Widget _buildChecklistsGroupedList(LocalizationService loc) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildMarkAllViewedButton(loc),
+        Expanded(child: _buildChecklistsGroupedListContent(loc)),
+      ],
+    );
+  }
+
+  Widget _buildChecklistsGroupedListContent(LocalizationService loc) {
     final docs = _filteredDocuments;
     final overdue = docs.where((d) => d.type == DocumentType.checklistMissedDeadline).toList();
     final submitted = docs.where((d) => d.type == DocumentType.checklistSubmission).toList();
@@ -822,7 +871,27 @@ class _InboxScreenState extends State<InboxScreen> {
     );
   }
 
+  Widget _buildMarkAllViewedButton(LocalizationService loc) {
+    final isOwner = context.read<AccountManagerSupabase>().currentEmployee?.hasRole('owner') ?? false;
+    final ids = _getUnviewedIdsForCurrentTab(isOwner);
+    if (ids.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          onPressed: () async {
+            await _markAllInCurrentTabAsViewed();
+          },
+          icon: const Icon(Icons.done_all, size: 20),
+          label: Text(loc.t('inbox_mark_all_viewed') ?? 'Просмотреть все'),
+        ),
+      ),
+    );
+  }
+
   Widget _buildDocumentsList() {
+    final loc = context.read<LocalizationService>();
     // Группируем документы по отделам
     final groupedDocuments = <String, List<InboxDocument>>{};
     for (final doc in _filteredDocuments) {
@@ -830,7 +899,12 @@ class _InboxScreenState extends State<InboxScreen> {
       groupedDocuments.putIfAbsent(department, () => []).add(doc);
     }
 
-    return ListView.builder(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildMarkAllViewedButton(loc),
+        Expanded(
+          child: ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: groupedDocuments.length,
       itemBuilder: (context, index) {
@@ -859,6 +933,9 @@ class _InboxScreenState extends State<InboxScreen> {
           ],
         );
       },
+          ),
+        ),
+      ],
     );
   }
 

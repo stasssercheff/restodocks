@@ -496,7 +496,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   /// 'photo' | 'excel' — какая кнопка сейчас загружает (чтобы показывать правильный текст).
   final _nameController = TextEditingController();
   static const _kitchenCategoryOptions = ['sauce', 'vegetables', 'zagotovka', 'salad', 'meat', 'seafood', 'side', 'subside', 'bakery', 'dessert', 'decor', 'soup', 'misc', 'beverages', 'banquet', 'catering'];
-  static const _barCategoryOptions = ['alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks', 'sauce', 'vegetables', 'salad', 'bakery', 'dessert', 'decor', 'misc', 'beverages'];
+  static const _barCategoryOptions = ['alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks', 'zagotovka', 'sauce', 'vegetables', 'salad', 'bakery', 'dessert', 'decor', 'misc', 'beverages'];
 
   List<String> get _categoryOptions {
     if (widget.department == 'bar') return _barCategoryOptions;
@@ -2216,6 +2216,41 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
             const SizedBox(height: 16),
             Text(loc.t('ttk_composition'), style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
+            // Баннер: продукты без КБЖУ/лактозы/глютена
+            Builder(
+              builder: (ctx) {
+                final store = context.read<ProductStoreSupabase>();
+                final missingNames = <String>{};
+                for (final ing in _ingredients.where((i) => i.productId != null && i.productName.isNotEmpty)) {
+                  final p = store.findProductForIngredient(ing.productId, ing.productName);
+                  if (p == null) continue;
+                  final lacksKbju = (p.calories == null || p.calories == 0) && p.protein == null && p.fat == null && p.carbs == null;
+                  final lacksAllergens = p.containsGluten == null || p.containsLactose == null;
+                  if (lacksKbju || lacksAllergens) {
+                    missingNames.add(p.getLocalizedName(loc.currentLanguageCode));
+                  }
+                }
+                if (missingNames.isEmpty) return const SizedBox.shrink();
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.errorContainer.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Theme.of(context).colorScheme.error.withOpacity(0.5)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(loc.t('tt_missing_nutrition'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.onSurface)),
+                      const SizedBox(height: 4),
+                      Text(loc.t('tt_missing_products').replaceFirst('%s', missingNames.join(', ')), style: const TextStyle(fontSize: 12)),
+                    ],
+                  ),
+                );
+              },
+            ),
             // Таблица ТТК на странице: без «окна», при росте числа продуктов страница скроллится, технология остаётся ниже
             Scrollbar(
               thumbVisibility: true,
@@ -2353,6 +2388,43 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                 ),
               ),
             ),
+            // КБЖУ и аллергены (только для блюда)
+            if (!_isSemiFinished)
+              Builder(
+                builder: (ctx) {
+                  final totalCal = _ingredients.fold<double>(0, (s, i) => s + i.finalCalories);
+                  final totalProt = _ingredients.fold<double>(0, (s, i) => s + i.finalProtein);
+                  final totalFatVal = _ingredients.fold<double>(0, (s, i) => s + i.finalFat);
+                  final totalCarbVal = _ingredients.fold<double>(0, (s, i) => s + i.finalCarbs);
+                  if (totalCal == 0 && totalProt == 0 && totalFatVal == 0 && totalCarbVal == 0) return const SizedBox.shrink();
+                  final store = context.read<ProductStoreSupabase>();
+                  final allergens = <String>[];
+                  for (final ing in _ingredients.where((i) => i.productId != null)) {
+                    final p = store.findProductForIngredient(ing.productId, ing.productName);
+                    if (p?.containsGluten == true && !allergens.contains('глютен')) allergens.add('глютен');
+                    if (p?.containsLactose == true && !allergens.contains('лактоза')) allergens.add('лактоза');
+                  }
+                  final allergenStr = allergens.isEmpty ? (loc.currentLanguageCode == 'ru' ? 'нет' : 'none') : allergens.join(', ');
+                  return Container(
+                    margin: const EdgeInsets.only(top: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Theme.of(context).colorScheme.primary.withOpacity(0.3)),
+                    ),
+                    child: Text(
+                      loc.t('kbju_allergens_in_dish')
+                          .replaceFirst('%s', totalCal.round().toString())
+                          .replaceFirst('%s', totalProt.toStringAsFixed(1))
+                          .replaceFirst('%s', totalFatVal.toStringAsFixed(1))
+                          .replaceFirst('%s', totalCarbVal.toStringAsFixed(1))
+                          .replaceFirst('%s', allergenStr),
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  );
+                },
+              ),
             // Блок фото: ПФ — сетка до 10, блюдо — 1 фото
             _buildPhotoSection(loc, effectiveCanEdit),
             // Описание и состав для зала (только для блюд)

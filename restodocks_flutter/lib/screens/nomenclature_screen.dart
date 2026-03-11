@@ -2113,7 +2113,7 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
                 final p = item.product!;
                 return Card(
                   margin: const EdgeInsets.only(bottom: 6),
-                  child: ExpansionTile(
+                  child: ListTile(
                     leading: CircleAvatar(
                       backgroundColor: Theme.of(context).colorScheme.primaryContainer,
                       child: Text(
@@ -2145,31 +2145,8 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
                           ),
                       ],
                     ),
+                    onTap: () => widget.onEditProduct(context, p),
                     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Text(widget.loc.t('product_kbju_section'), style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 8),
-                            Text(
-                              p.nutritionInfo.isNotEmpty
-                                  ? '${p.nutritionInfo}${p.allergensInfo.isNotEmpty ? '. ${p.allergensInfo}' : ''}'
-                                  : (p.allergensInfo.isNotEmpty ? p.allergensInfo : widget.loc.t('not_specified')),
-                              style: const TextStyle(fontSize: 13),
-                            ),
-                            const SizedBox(height: 8),
-                            FilledButton.tonalIcon(
-                              icon: const Icon(Icons.edit, size: 18),
-                              label: Text(widget.loc.t('edit_product')),
-                              onPressed: () => widget.onEditProduct(context, p),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
                   ),
                 );
               }

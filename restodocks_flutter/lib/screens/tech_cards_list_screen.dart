@@ -37,7 +37,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   String? _error;
   Set<String> _selectedTechCards = {}; // ID выбранных карточек
   bool _selectionMode = false;
-  bool _ttkSortBySection = false; // true = по цеху, false = по категории
+  String? _filterSection; // null = все цеха
+  String? _filterCategory; // null = все категории
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
 
@@ -752,16 +753,27 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       );
     }
 
-    // Разделяем список на ПФ и Блюда и фильтруем по поиску
+    // Разделяем список на ПФ и Блюда, фильтруем по поиску, цеху и категории
     final query = _searchController.text.trim().toLowerCase();
+    final catOrder = (widget.department == 'bar' || widget.department == 'banquet-catering-bar') ? _barCategoryOrder : _kitchenCategoryOrder;
     List<TechCard> filterBySearch(List<TechCard> list) {
       if (query.isEmpty) return list;
       final loc = context.read<LocalizationService>();
       final lang = loc.currentLanguageCode;
       return list.where((tc) => tc.getDisplayNameInLists(lang).toLowerCase().contains(query)).toList();
     }
-    final semiFinishedCards = filterBySearch(_list.where((tc) => tc.isSemiFinished).toList());
-    final dishCards = filterBySearch(_list.where((tc) => !tc.isSemiFinished).toList());
+    List<TechCard> filterBySectionAndCategory(List<TechCard> list) {
+      var result = list;
+      if (_filterSection != null) {
+        result = result.where((tc) => tc.sections.contains(_filterSection) || tc.sections.contains('all')).toList();
+      }
+      if (_filterCategory != null) {
+        result = result.where((tc) => (tc.category.isEmpty ? 'misc' : tc.category) == _filterCategory).toList();
+      }
+      return result;
+    }
+    final semiFinishedFiltered = filterBySectionAndCategory(filterBySearch(_list.where((tc) => tc.isSemiFinished).toList()));
+    final dishFiltered = filterBySectionAndCategory(filterBySearch(_list.where((tc) => !tc.isSemiFinished).toList()));
 
     final acc = context.read<AccountManagerSupabase>();
     final emp = acc.currentEmployee;
@@ -859,20 +871,46 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                   onChanged: (_) => setState(() {}),
                 ),
                 const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
+                Row(
                   children: [
-                    FilterChip(
-                      avatar: Icon(Icons.category, size: 18, color: _ttkSortBySection ? null : Theme.of(context).colorScheme.primary),
-                      label: Text(loc.t('ttk_sort_category')),
-                      selected: !_ttkSortBySection,
-                      onSelected: (v) => setState(() => _ttkSortBySection = false),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: _filterSection,
+                        decoration: InputDecoration(
+                          labelText: loc.t('ttk_section_label'),
+                          isDense: true,
+                          border: const OutlineInputBorder(),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
+                        items: [
+                          DropdownMenuItem(value: null, child: Text(loc.t('all') ?? 'Все')),
+                          ..._sectionOrder.where((s) => s != 'hidden' && s != 'all').map((s) => DropdownMenuItem(
+                            value: s,
+                            child: Text(_sectionCodeToLabel(s, loc)),
+                          )),
+                        ],
+                        onChanged: (v) => setState(() => _filterSection = v),
+                      ),
                     ),
-                    FilterChip(
-                      avatar: Icon(Icons.business, size: 18, color: _ttkSortBySection ? Theme.of(context).colorScheme.primary : null),
-                      label: Text(loc.t('ttk_sort_section')),
-                      selected: _ttkSortBySection,
-                      onSelected: (v) => setState(() => _ttkSortBySection = true),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: _filterCategory,
+                        decoration: InputDecoration(
+                          labelText: loc.t('column_category'),
+                          isDense: true,
+                          border: const OutlineInputBorder(),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
+                        items: [
+                          DropdownMenuItem(value: null, child: Text(loc.t('all') ?? 'Все')),
+                          ...catOrder.map((c) => DropdownMenuItem(
+                            value: c,
+                            child: Text(_categoryLabel(c, loc)),
+                          )),
+                        ],
+                        onChanged: (v) => setState(() => _filterCategory = v),
+                      ),
                     ),
                   ],
                 ),
@@ -882,8 +920,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           Expanded(
             child: TabBarView(
               children: [
-                _buildTechCardsTable(semiFinishedCards, loc, canEdit, showCost, isDishesTab: false),
-                _buildTechCardsTable(dishCards, loc, canEdit, showCost, isDishesTab: true),
+                _buildTechCardsTable(semiFinishedFiltered, loc, canEdit, showCost, isDishesTab: false),
+                _buildTechCardsTable(dishFiltered, loc, canEdit, showCost, isDishesTab: true),
               ],
             ),
           ),
@@ -923,9 +961,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         return (a.getDisplayNameInLists(lang)).toLowerCase().compareTo((b.getDisplayNameInLists(lang)).toLowerCase());
       });
     }
-    final groups = _ttkSortBySection
-        ? _groupBySection(techCards).map((g) => (category: g.section, cards: sortCards(g.cards, true), isSection: true)).toList()
-        : _groupByCategory(techCards).map((g) => (category: g.category, cards: sortCards(g.cards, false), isSection: false)).toList();
+    final groups = _groupByCategory(techCards).map((g) => (category: g.category, cards: sortCards(g.cards, false), isSection: false)).toList();
     final costLabel = showCost
         ? (isDishesTab ? loc.t('ttk_col_cost_per_portion').replaceFirst('%s', costSym) : '$costSym/${loc.t('kg')}')
         : '—';
