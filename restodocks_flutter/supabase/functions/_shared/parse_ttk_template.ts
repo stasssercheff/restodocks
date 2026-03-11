@@ -5,8 +5,8 @@
 
 const NAME_KEYS = ["наименование", "название", "блюдо", "пф", "name", "dish"];
 const PRODUCT_KEYS = ["продукт", "сырьё", "ингредиент", "product", "ingredient"];
-const GROSS_KEYS = ["брутто", "бр", "gross"];
-const NET_KEYS = ["нетто", "нт", "net"];
+const GROSS_KEYS = ["брутто", "бр", "вес брутто", "gross"];
+const NET_KEYS = ["нетто", "нт", "вес нетто", "net"];
 const WASTE_KEYS = ["отход", "отх", "waste", "процент отхода"];
 
 function parseNum(s: string): number | null {
@@ -98,10 +98,23 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
     const row = rows[r];
     if (!row || row.length === 0) continue;
     const cells = row.map((c) => (c ?? "").trim());
+    let pCol = productCol;
+    let gCol = grossCol;
+    let nCol = netCol;
+    if (cells.length >= 3 && cells.length <= 8) {
+      const atProduct = productCol < cells.length ? cells[productCol] : "";
+      if (atProduct && /^[\d,.\-\s]+$/.test(atProduct)) {
+        pCol = 1;
+        if (cells.length >= 4) {
+          gCol = 2;
+          nCol = 3;
+        }
+      }
+    }
     const nameVal = nameCol < cells.length ? cells[nameCol] : "";
-    const productVal = productCol < cells.length ? cells[productCol] : "";
-    const grossVal = grossCol >= 0 && grossCol < cells.length ? cells[grossCol] : "";
-    const netVal = netCol >= 0 && netCol < cells.length ? cells[netCol] : "";
+    const productVal = pCol < cells.length ? cells[pCol] : "";
+    const grossVal = gCol >= 0 && gCol < cells.length ? cells[gCol] : "";
+    const netVal = nCol >= 0 && nCol < cells.length ? cells[nCol] : "";
     const wasteVal = wasteCol >= 0 && wasteCol < cells.length ? cells[wasteCol] : "";
 
     if (nameVal.toLowerCase() === "итого" || productVal.toLowerCase() === "итого") {

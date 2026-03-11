@@ -38,6 +38,19 @@ void main() {
       expect(list[1].ingredients.length, 2);
     });
 
+    test('parseTtkByTemplate handles single-cell rows (DOCX-style)', () {
+      // DOCX даёт каждый параграф как одну ячейку
+      final rows = [
+        ['№ Наименование продукта Ед. изм. Брутто в ед. изм. Вес брутто, кг Вес нетто, кг'],
+        ['1 Т. Крылья куриные острые Баффало кг 0,150 0,150 0,150'],
+        ['2 Т. Соус Терияки л 0,010 0,010 0,010'],
+      ];
+      final list = AiServiceSupabase.parseTtkByTemplate(rows);
+      expect(list, isNotEmpty);
+      expect(list[0].ingredients.length, greaterThanOrEqualTo(2));
+      expect(list[0].ingredients.any((i) => i.productName.contains('Крылья')), true);
+    });
+
     test('full parseTechCardsFromExcel with standard CSV bytes', () async {
       final csv = 'Наименование,Продукт,Брутто,Нетто\n'
           'ПФ Крем,Сливки 33%,500,500\n'

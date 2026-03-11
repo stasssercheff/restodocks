@@ -346,9 +346,49 @@ class AiServiceSupabase implements AiService {
     return v.toString();
   }
 
+  /// Разворачивает строки с одной ячейкой в несколько (для DOCX: каждая строка — один параграф).
+  static List<List<String>> _expandSingleCellRows(List<List<String>> rows) {
+    if (rows.isEmpty) return rows;
+    final singleCell = rows.every((r) => r.length <= 1);
+    if (!singleCell) return rows;
+    final expanded = <List<String>>[];
+    for (final row in rows) {
+      final line = row.isEmpty ? '' : (row[0] as String).trim();
+      if (line.isEmpty) continue;
+      List<String> cells;
+      final byTab = line.split('\t').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+      if (byTab.length >= 3) {
+        cells = byTab;
+      } else {
+        final bySpaces = line.split(RegExp(r'\s{2,}')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+        if (bySpaces.length >= 3) {
+          cells = bySpaces;
+        } else {
+          // "1 Т. Крылья... кг 0,150 0,150" — числа в конце
+          final trailing = RegExp(r'([\d,.\-]+\s*)+$').firstMatch(line);
+          if (trailing != null) {
+            final numsPart = trailing.group(0)!.trim();
+            final nums = numsPart.split(RegExp(r'\s+'));
+            final rest = line.substring(0, line.length - numsPart.length).trim();
+            final numStart = RegExp(r'^(\d+)\s+(.+)$').firstMatch(rest);
+            cells = numStart != null
+                ? [numStart.group(1)!, numStart.group(2)!, ...nums]
+                : [rest, ...nums];
+          } else {
+            cells = line.split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toList();
+          }
+        }
+      }
+      if (cells.isNotEmpty) expanded.add(cells);
+    }
+    return expanded;
+  }
+
   /// Парсинг ТТК по шаблону (Наименование, Продукт, Брутто, Нетто...) — без вызова ИИ.
   /// [testFromRows] — для тестов: передать готовые rows, минуя парсинг файла.
   static List<TechCardRecognitionResult> parseTtkByTemplate(List<List<String>> rows) {
+    if (rows.length < 2) return [];
+    rows = _expandSingleCellRows(rows);
     if (rows.length < 2) return [];
     final results = <TechCardRecognitionResult>[];
     int headerIdx = -1;
@@ -356,8 +396,8 @@ class AiServiceSupabase implements AiService {
 
     final nameKeys = ['наименование', 'название', 'блюдо', 'пф', 'name', 'dish'];
     final productKeys = ['продукт', 'сырьё', 'ингредиент', 'product', 'ingredient'];
-    final grossKeys = ['брутто', 'бр', 'gross'];
-    final netKeys = ['нетто', 'нт', 'net'];
+    final grossKeys = ['брутто', 'бр', 'вес брутто', 'gross'];
+    final netKeys = ['нетто', 'нт', 'вес нетто', 'net'];
     final wasteKeys = ['отход', 'отх', 'waste', 'процент отхода'];
 
     for (var r = 0; r < rows.length && r < 5; r++) {
@@ -426,10 +466,21 @@ class AiServiceSupabase implements AiService {
       final row = rows[r];
       if (row.isEmpty) continue;
       final cells = row.map((c) => c.trim()).toList();
+      // Если колонок мало (DOCX: № продукт n n n), productCol может указывать на число — берём col 1
+      var pCol = productCol;
+      var gCol = grossCol;
+      var nCol = netCol;
+      if (cells.length >= 3 && cells.length <= 8) {
+        final atProduct = productCol < cells.length ? cells[productCol] : '';
+        if (atProduct.isNotEmpty && RegExp(r'^[\d,.\-\s]+$').hasMatch(atProduct)) {
+          pCol = 1;
+          if (cells.length >= 4) { gCol = 2; nCol = 3; }
+        }
+      }
       final nameVal = nameCol < cells.length ? cells[nameCol] : '';
-      final productVal = productCol < cells.length ? cells[productCol] : '';
-      final grossVal = grossCol >= 0 && grossCol < cells.length ? cells[grossCol] : '';
-      final netVal = netCol >= 0 && netCol < cells.length ? cells[netCol] : '';
+      final productVal = pCol < cells.length ? cells[pCol] : '';
+      final grossVal = gCol >= 0 && gCol < cells.length ? cells[gCol] : '';
+      final netVal = nCol >= 0 && nCol < cells.length ? cells[nCol] : '';
       final wasteVal = wasteCol >= 0 && wasteCol < cells.length ? cells[wasteCol] : '';
 
       if (nameVal.toLowerCase() == 'итого' || productVal.toLowerCase() == 'итого') {
