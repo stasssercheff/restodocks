@@ -33,8 +33,9 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const body = (await req.json()) as { pdfBase64?: string };
+    const body = (await req.json()) as { pdfBase64?: string; establishmentId?: string };
     const pdfBase64 = body.pdfBase64;
+    const establishmentId = typeof body.establishmentId === "string" ? body.establishmentId.trim() : undefined;
     if (!pdfBase64 || typeof pdfBase64 !== "string") {
       return new Response(JSON.stringify({ error: "pdfBase64 required" }), {
         status: 400,
@@ -66,9 +67,14 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Динамический импорт — грузим только при реальном запросе
-    const { extractText, getDocumentProxy } = await import("npm:unpdf@0.4.1");
+    // Polyfill DOMMatrix — в Deno Edge нет, нужен для pdf-parse/PDF.js
+    if (typeof globalThis.DOMMatrix === "undefined") {
+      const { default: DOMMatrix } = await import("npm:@thednp/dommatrix@2.0.12");
+      (globalThis as unknown as { DOMMatrix: unknown }).DOMMatrix = DOMMatrix;
+    }
+    const { PDFParse } = await import("npm:pdf-parse");
     const { chatText } = await import("../_shared/ai_provider.ts");
+    const { pdfTextToRows, parseTtkByTemplate } = await import("../_shared/parse_ttk_template.ts");
 
     let bytes: Uint8Array;
     try {
@@ -87,13 +93,11 @@ Deno.serve(async (req: Request) => {
 
     let text: string;
     try {
-      const pdf = await getDocumentProxy(bytes);
-      let result = await extractText(pdf, { mergePages: true });
-      text = result.text ?? "";
-      if (!text.trim()) {
-        result = await extractText(pdf, { mergePages: false });
-        text = result.text ?? "";
-      }
+      const parser = new PDFParse({ data: bytes });
+      const result = await parser.getText();
+      await parser.destroy();
+      // Сохраняем переносы строк — нужны для шаблонного парсинга
+      text = (result?.text ?? "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : String(e);
       const part = errMsg.slice(0, 200).replace(/["\n\r]/g, " ");
@@ -111,14 +115,63 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    // 1. Сначала шаблонный парсинг (без AI)
+    const rows = pdfTextToRows(text);
+    let templateCards = rows.length >= 2 ? parseTtkByTemplate(rows) : [];
+    // Shama.Book / ГОСТ: блюдо в "Проведено контрольное приготовление блюда: XXX" или на след. строке
+    const dishMatch = text.match(/Проведено\s+контрольное\s+приготовление\s+блюда\s*:?\s*\n?\s*([^\n]+?)(?:\n|$)/i)
+      ?? text.match(/Наименование\s+блюда[^:]*:\s*([^\n]+)/i);
+    const extractedDish = dishMatch?.[1]?.trim();
+    if (templateCards.length === 1 && extractedDish && !templateCards[0].dishName) {
+      templateCards = [{ ...templateCards[0], dishName: extractedDish }];
+    } else if (templateCards.length >= 1 && extractedDish && templateCards.every((c) => !c.dishName)) {
+      templateCards = templateCards.map((c, i) => (i === 0 ? { ...c, dishName: extractedDish } : c));
+    }
+    if (templateCards.length > 0) {
+      // Шаблон сработал — AI не используется, лимит не применяется
+      const normalized = templateCards.map((card) => ({
+        dishName: card.dishName ?? null,
+        technologyText: card.technologyText ?? null,
+        isSemiFinished: card.isSemiFinished ?? undefined,
+        ingredients: card.ingredients.map((i) => ({
+          productName: i.productName,
+          grossGrams: i.grossGrams ?? undefined,
+          netGrams: i.netGrams ?? undefined,
+          primaryWastePct: i.primaryWastePct ?? undefined,
+          unit: i.unit ?? "g",
+          cookingMethod: undefined,
+          cookingLossPct: undefined,
+          ingredientType: undefined,
+        })),
+      }));
+      return new Response(
+        JSON.stringify({ cards: normalized, reason: "template" }),
+        { status: 200, headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" } },
+      );
+    }
+
+    // 2. Шаблон не сработал — AI. Проверяем лимит (3 ТТК/день на заведение)
+    if (establishmentId) {
+      const { checkAndIncrementAiTtkUsage } = await import("../_shared/ai_ttk_limit.ts");
+      const { allowed } = await checkAndIncrementAiTtkUsage(establishmentId);
+      if (!allowed) {
+        return new Response(
+          JSON.stringify({ cards: [], reason: "ai_limit_exceeded", error: "limit_3_per_day" }),
+          { status: 200, headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" } },
+        );
+      }
+    }
+
+    const textForAi = text.replace(/\s+/g, " ").trim();
     let content: string;
     try {
       content = await chatText({
         messages: [
           { role: "system", content: PDF_SYSTEM_PROMPT },
-          { role: "user", content: `PDF extracted text:\n\n${text}` },
+          { role: "user", content: `PDF extracted text:\n\n${textForAi}` },
         ],
         maxTokens: 16384,
+        context: "ttk",
       }) ?? "";
     } catch (aiErr) {
       return new Response(JSON.stringify({ cards: [], reason: `ai_error: ${aiErr}` }), {
@@ -161,6 +214,7 @@ Deno.serve(async (req: Request) => {
             { role: "user", content: text },
           ],
           maxTokens: 8192,
+          context: "ttk",
         });
         if (simpleContent?.trim()) {
           const simpleCleaned = simpleContent.replace(/^```\w*\n?|\n?```$/g, "").trim();
