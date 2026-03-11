@@ -968,8 +968,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     'Сотрудники настройка': 'https://youtu.be/bGVJtSdpid0',
     'Смена роли собственника': 'https://youtu.be/nkk9BpyIkuQ',
     'Инвента iiko выгрузка бланка': 'https://youtu.be/rFXg9gJ5qUw',
+    'Инвентаризации IIKO слияние': 'https://youtu.be/tJvjUcNRnsc',
     'График правка': 'https://youtu.be/sF26hjgdjO8',
     'Сообщения': 'https://youtu.be/zgH9ITDHU4U',
+    'Сообщения с переводом': 'https://youtu.be/ZICdajkAbNY',
     'Расчет выплаты за период + выгрузка': 'https://youtu.be/tO4ihTk8bDM',
     'Загрузка продуктов изменение цены': 'https://youtu.be/p9I1rsNgXpU',
     'Загрузка продуктов в номенклатуру файл': 'https://youtu.be/po5_brrXdVw',
@@ -1352,7 +1354,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const Divider(),
             ],
             ExpansionTile(
-              initiallyExpanded: true,
+              initiallyExpanded: false,
               leading: const Icon(Icons.dashboard_customize),
               title: Text(localization.t('home_layout_config') ?? 'Настройка домашнего экрана'),
               children: [
