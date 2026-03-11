@@ -754,8 +754,6 @@ class AccountManagerSupabase extends ChangeNotifier {
         'apikey': _supabaseAnonKey,
         'Authorization': 'Bearer $_supabaseAnonKey',
         'Content-Type': 'application/json',
-        'Cache-Control': 'no-store, no-cache, must-revalidate',
-        'Pragma': 'no-cache',
       },
       validateStatus: (_) => true, // не бросать на 4xx
     ));
