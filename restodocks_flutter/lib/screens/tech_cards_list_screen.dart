@@ -341,7 +341,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
 
   static String _pdfFailureMessage(String reason, LocalizationService loc) {
     if (reason.startsWith('empty_text')) return 'PDF не содержит извлекаемого текста.';
-    if (reason.startsWith('extraction_failed')) return 'Не удалось прочитать PDF.';
+    if (reason.startsWith('extraction_failed')) {
+      const prefix = 'extraction_failed: ';
+      final detail = reason.length > prefix.length
+          ? reason.substring(prefix.length, prefix.length + 80).replaceAll('\n', ' ')
+          : '';
+      return detail.isNotEmpty ? 'Не удалось прочитать PDF. ($detail)' : 'Не удалось прочитать PDF.';
+    }
     if (reason.startsWith('ai_error') || reason.contains('429') || reason.contains('quota')) {
       return 'Лимит ИИ исчерпан. Попробуйте позже.';
     }
