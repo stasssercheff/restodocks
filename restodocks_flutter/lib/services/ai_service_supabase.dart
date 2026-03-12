@@ -233,6 +233,30 @@ class AiServiceSupabase implements AiService {
         if (rows.isEmpty) rows = await _parseDocViaServer(xlsxBytes);
         source = rows.isNotEmpty ? 'xls' : 'doc';
       } else if (fmt == 'xlsx') {
+        final allSheets = _xlsxToAllSheetsRows(xlsxBytes);
+        if (allSheets.isNotEmpty) {
+          final merged = <TechCardRecognitionResult>[];
+          final kbzuPattern = RegExp(r'белки|жиры|углеводы|калори|бжу|кбжу|жирн|белк', caseSensitive: false);
+          for (final sheetRows in allSheets) {
+            var expanded = _expandSingleCellRows(sheetRows);
+            if (expanded.length < 2) continue;
+            final firstRows = expanded.take(3).expand((r) => r).map((c) => c.toLowerCase()).join(' ');
+            if (kbzuPattern.hasMatch(firstRows) && expanded.length <= 6 && !firstRows.contains('брутто') && !firstRows.contains('нетто')) continue;
+            var part = await _tryParseByStoredTemplates(expanded);
+            if (part.isEmpty) {
+              final excelErrors = <TtkParseError>[];
+              part = AiServiceSupabase.parseTtkByTemplate(expanded, errors: excelErrors);
+              if (part.isEmpty) part = AiServiceSupabase._tryParseKkFromRows(expanded);
+            }
+            final multiBlock = AiServiceSupabase._tryParseMultiColumnBlocks(expanded);
+            if (multiBlock.length > part.length) part = multiBlock;
+            merged.addAll(part);
+          }
+          if (merged.isNotEmpty) {
+            _saveTemplateFromKeywordParse(allSheets.first, 'xlsx');
+            return merged;
+          }
+        }
         rows = _xlsxToRows(xlsxBytes);
       }
       if (rows.isEmpty) rows = _csvToRows(xlsxBytes);
@@ -276,6 +300,8 @@ class AiServiceSupabase implements AiService {
         list = AiServiceSupabase.parseTtkByTemplate(rows, errors: excelErrors);
         if (excelErrors.isNotEmpty) lastParseTechCardErrors = excelErrors;
         if (list.isEmpty) list = AiServiceSupabase._tryParseKkFromRows(rows);
+        final multiBlock = AiServiceSupabase._tryParseMultiColumnBlocks(rows);
+        if (multiBlock.length > list.length) list = multiBlock;
       }
       // 3. Только если и там пусто — вызываем AI (лимит 3/день)
       if (list.isEmpty) {
@@ -514,6 +540,31 @@ class AiServiceSupabase implements AiService {
         }
       }
       return rows;
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Все листы xlsx как список rows (для парсинга многолистовых файлов).
+  List<List<List<String>>> _xlsxToAllSheetsRows(Uint8List bytes) {
+    try {
+      final decodable = IikoXlsxSanitizer.ensureDecodable(bytes);
+      final excel = Excel.decodeBytes(decodable.toList());
+      final result = <List<List<String>>>[];
+      for (final sheetName in excel.tables.keys) {
+        final sheet = excel.tables[sheetName]!;
+        final rows = <List<String>>[];
+        for (var r = 0; r < sheet.maxRows; r++) {
+          final row = <String>[];
+          for (var c = 0; c < sheet.maxColumns; c++) {
+            final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r));
+            row.add(_cellValueToString(cell.value));
+          }
+          if (row.any((s) => s.trim().isNotEmpty)) rows.add(row);
+        }
+        if (rows.length >= 2) result.add(rows);
+      }
+      return result;
     } catch (_) {
       return [];
     }
@@ -768,6 +819,7 @@ class AiServiceSupabase implements AiService {
         continue;
       }
       final ingredients = <TechCardIngredientLine>[];
+      String? technologyText;
       var dataRow = r + 2;
       while (dataRow < rows.length) {
         final dr = rows[dataRow].map((c) => (c ?? '').toString().trim()).toList();
@@ -777,6 +829,29 @@ class AiServiceSupabase implements AiService {
         if (d0 == '№' && dr.length > 1 && dr[1].toLowerCase().contains('наименование')) break;
         final product = dr.length > 1 ? dr[1].trim() : '';
         final grossStr = dr.length > 2 ? dr[2].trim() : '';
+        final looksLikeIngredient = product.isNotEmpty && (RegExp(r'\d').hasMatch(grossStr) || grossStr.toLowerCase().contains('шт'));
+        if (looksLikeIngredient) {
+          // Не сбрасываем technologyText — технология может идти до или после ингредиентов
+        } else {
+          final rowText = dr.join(' ');
+          if (rowText.toLowerCase().contains('технология')) {
+            final techParts = <String>[];
+            for (var c = 0; c < dr.length; c++) {
+              final cell = dr[c].trim();
+              if (cell.isEmpty || cell.toLowerCase().contains('технология')) continue;
+              if (cell.length > 10 && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(cell)) techParts.add(cell);
+            }
+            if (techParts.isNotEmpty) technologyText = (technologyText != null ? '$technologyText\n' : '') + techParts.join(' ');
+            dataRow++;
+            continue;
+          }
+          if (technologyText != null) {
+            final more = dr.where((c) => c.length > 15 && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(c)).join(' ').trim();
+            if (more.isNotEmpty) technologyText = '$technologyText\n$more';
+            dataRow++;
+            continue;
+          }
+        }
         if (product.isEmpty) { dataRow++; continue; }
         if (product.toLowerCase() == 'декор') { dataRow++; continue; }
         final gross = _parseNum(grossStr);
@@ -785,6 +860,8 @@ class AiServiceSupabase implements AiService {
         if (grossVal <= 0 && grossStr.replaceAll(RegExp(r'[^\d]'), '').isEmpty) { dataRow++; continue; }
         var unit = 'g';
         if (grossStr.toLowerCase().contains('шт') || grossStr.toLowerCase().contains('л')) unit = 'pcs';
+        final isPf = RegExp(r'^П/Ф\s|п/ф|пф(?!\w)', caseSensitive: false).hasMatch(product) ||
+            RegExp(r'\sп/ф\s*$|\sпф\s*$', caseSensitive: false).hasMatch(product);
         ingredients.add(TechCardIngredientLine(
           productName: product.replaceFirst(RegExp(r'^П/Ф\s*', caseSensitive: false), '').trim(),
           grossGrams: grossVal,
@@ -792,7 +869,7 @@ class AiServiceSupabase implements AiService {
           outputGrams: grossVal,
           primaryWastePct: null,
           unit: unit,
-          ingredientType: RegExp(r'^П/Ф\s|п/ф\s|пф\s', caseSensitive: false).hasMatch(product) ? 'semi_finished' : 'product',
+          ingredientType: isPf ? 'semi_finished' : 'product',
         ));
         dataRow++;
       }
@@ -801,11 +878,61 @@ class AiServiceSupabase implements AiService {
           dishName: dishName,
           ingredients: ingredients,
           isSemiFinished: dishName.toLowerCase().contains('пф'),
+          technologyText: technologyText?.trim().isNotEmpty == true ? technologyText!.trim() : null,
         ));
       }
       r = dataRow;
     }
     return results;
+  }
+
+  /// Несколько блоков таблиц на одном листе (карточки в колонках K, R и т.д.). Привязка к данным, не к колонке.
+  static List<TechCardRecognitionResult> _tryParseMultiColumnBlocks(List<List<String>> rows) {
+    if (rows.length < 2) return [];
+    final maxCol = rows.fold<int>(0, (m, r) => m > r.length ? m : r.length);
+    if (maxCol < 12) return [];
+    const headerWords = ['наименование', 'продукт', 'брутто', 'нетто', 'сырьё', 'сырья', 'расход', 'норма'];
+    final headerCols = <int>[];
+    for (var c = 0; c < maxCol && c < 30; c++) {
+      for (var r = 0; r < rows.length && r < 20; r++) {
+        final cell = r < rows.length && c < rows[r].length ? rows[r][c].trim().toLowerCase() : '';
+        if (headerWords.any((w) => cell.contains(w))) {
+          headerCols.add(c);
+          break;
+        }
+      }
+    }
+    if (headerCols.isEmpty) return [];
+    headerCols.sort();
+    final blocks = <List<int>>[];
+    for (final c in headerCols) {
+      if (blocks.isEmpty || c - blocks.last.last > 4) {
+        blocks.add([c]);
+      } else {
+        blocks.last.add(c);
+      }
+    }
+    final merged = <TechCardRecognitionResult>[];
+    final seen = <String>{};
+    for (final block in blocks) {
+      if (block.length < 2) continue;
+      final start = block.first;
+      final end = (block.last + 6).clamp(start + 3, maxCol);
+      final subRows = rows.map((row) {
+        if (row.length <= start) return <String>[];
+        return row.sublist(start, end.clamp(0, row.length));
+      }).where((r) => r.any((c) => c.trim().isNotEmpty)).toList();
+      if (subRows.length < 2) continue;
+      final part = parseTtkByTemplate(subRows);
+      for (final card in part) {
+        if (card.ingredients.isEmpty) continue;
+        final key = '${card.dishName ?? ""}|${card.ingredients.map((i) => i.productName).join(",")}';
+        if (seen.contains(key)) continue;
+        seen.add(key);
+        merged.add(card);
+      }
+    }
+    return merged;
   }
 
   /// Парсинг ТТК по шаблону (Наименование, Продукт, Брутто, Нетто...) — без вызова ИИ.
@@ -1409,9 +1536,10 @@ class AiServiceSupabase implements AiService {
         final res = await _client.from('tt_parse_templates').select().eq('header_signature', sig).limit(1).maybeSingle();
         if (res == null) continue;
         final data = res as Map<String, dynamic>;
+        final headerRowIdx = (data['header_row_index'] as num?)?.toInt() ?? r;
         final list = parseTtkByStoredTemplate(
           rows,
-          headerIdx: r,
+          headerIdx: headerRowIdx,
           nameCol: (data['name_col'] as num?)?.toInt() ?? 0,
           productCol: (data['product_col'] as num?)?.toInt() ?? 1,
           grossCol: (data['gross_col'] as num?)?.toInt() ?? -1,

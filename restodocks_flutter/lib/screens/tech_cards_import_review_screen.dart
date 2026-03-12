@@ -481,7 +481,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text(loc.t('tech_cards_import_review_title')),
+        title: Text('${loc.t('tech_cards_import_review_title')} (${_items.length})'),
       ),
       body: Column(
         children: [

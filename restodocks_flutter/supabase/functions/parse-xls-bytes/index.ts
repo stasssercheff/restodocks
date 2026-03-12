@@ -105,10 +105,10 @@ Deno.serve(async (req: Request) => {
         if (line.length > 300) continue;
         if (cells.every((c) => !c)) continue;
         rows.push(cells);
-        if (rows.length >= 1000) break;
+        if (rows.length >= 5000) break;
       }
 
-      if (rows.length >= 1000) break;
+      if (rows.length >= 5000) break;
     }
 
     return new Response(JSON.stringify({ rows }), {

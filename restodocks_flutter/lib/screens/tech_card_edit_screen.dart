@@ -3483,9 +3483,17 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                         onTap: () => widget.onTapPfIngredient!(ing.sourceTechCardId!),
                         child: Padding(
                           padding: _TtkCookTable._cellPad,
-                          child: Text(
-                            cookDisplayName,
-                            style: const TextStyle(fontSize: 12),
+                          child: Text.rich(
+                            TextSpan(
+                              style: const TextStyle(fontSize: 12),
+                              children: [
+                                TextSpan(
+                                  text: cookDisplayName,
+                                  style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.primary, decoration: TextDecoration.underline),
+                                ),
+                                TextSpan(text: ' (${ing.outputWeight.toStringAsFixed(0)} ${widget.loc.t('gram')})'),
+                              ],
+                            ),
                             overflow: TextOverflow.ellipsis,
                             maxLines: 2,
                           ),
