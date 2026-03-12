@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:uuid/uuid.dart';
 
-import '../services/ai_service.dart';
+import '../models/models.dart';
 import '../services/services.dart';
+import '../utils/product_name_utils.dart';
 import '../widgets/app_bar_home_button.dart';
 
 /// Экран просмотра и правки распознанных ТТК перед созданием (пакетный импорт из Excel).
@@ -130,6 +132,9 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
     return (lang == 'ru' ? ru : en)[c] ?? c;
   }
 
+  static String _norm(String s) =>
+      stripIikoPrefix(s).trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+
   Future<void> _createAll() async {
     final acc = context.read<AccountManagerSupabase>();
     final est = acc.establishment;
@@ -147,8 +152,82 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
           .where((tc) => tc.isSemiFinished)
           .map((tc) => (id: tc.id, name: tc.dishName))
           .toList();
-      final productsForMapping = products.map((p) => (id: p.id, name: p.name)).toList();
+      var productsForMapping = products.map((p) => (id: p.id, name: p.name)).toList();
       final createdByName = <String, String>{};
+      final defCur = est.defaultCurrency;
+
+      // Собираем все уникальные названия продуктов (не ПФ) из ингредиентов
+      final productNamesToCreate = <String>{};
+      for (final item in _items) {
+        for (final ing in item.result.ingredients) {
+          if (ing.productName.trim().isEmpty) continue;
+          if (ing.ingredientType == 'semi_finished') continue;
+          final norm = _norm(ing.productName);
+          if (norm.length < 2) continue;
+          final inProducts = productsForMapping.any((p) => _norm(p.name) == norm);
+          final inPf = techCardsPf.any((t) => _norm(t.name) == norm);
+          if (!inProducts && !inPf) productNamesToCreate.add(ing.productName.trim());
+        }
+      }
+
+      // Создаём отсутствующие продукты в каталоге, подтягиваем КБЖУ, добавляем в номенклатуру
+      for (final rawName in productNamesToCreate) {
+        final normalizedName = stripIikoPrefix(rawName).trim();
+        if (normalizedName.isEmpty) continue;
+        final norm = _norm(normalizedName);
+        if (productsForMapping.any((p) => _norm(p.name) == norm)) continue;
+
+        double? calories;
+        double? protein;
+        double? fat;
+        double? carbs;
+        bool? containsGluten;
+        bool? containsLactose;
+        try {
+          final nutrition = await NutritionApiService.fetchNutrition(normalizedName);
+          if (nutrition != null && nutrition.hasData) {
+            calories = nutrition.calories;
+            protein = nutrition.protein;
+            fat = nutrition.fat;
+            carbs = nutrition.carbs;
+            containsGluten = nutrition.containsGluten;
+            containsLactose = nutrition.containsLactose;
+          }
+        } catch (_) {}
+
+        final product = Product(
+          id: const Uuid().v4(),
+          name: normalizedName,
+          category: 'manual',
+          names: null,
+          calories: calories,
+          protein: protein,
+          fat: fat,
+          carbs: carbs,
+          containsGluten: containsGluten,
+          containsLactose: containsLactose,
+          unit: 'g',
+          basePrice: null,
+          currency: defCur,
+        );
+
+        try {
+          final savedProduct = await productStore.addProduct(product);
+          await productStore.addToNomenclature(est.dataEstablishmentId, savedProduct.id, currency: defCur);
+          productsForMapping = [...productsForMapping, (id: savedProduct.id, name: savedProduct.name)];
+        } catch (e) {
+          if (e.toString().contains('duplicate') ||
+              e.toString().contains('already exists') ||
+              e.toString().contains('unique')) {
+            final existing = productStore.allProducts
+                .where((p) => _norm(p.name) == norm)
+                .toList();
+            if (existing.isNotEmpty) {
+              productsForMapping = [...productsForMapping, (id: existing.first.id, name: existing.first.name)];
+            }
+          }
+        }
+      }
 
       final sorted = List<_ReviewItem>.from(_items)
         ..sort((a, b) => (a.isSemiFinished == b.isSemiFinished) ? 0 : (a.isSemiFinished ? -1 : 1));

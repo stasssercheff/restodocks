@@ -150,6 +150,102 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
   return results;
 }
 
+/** Подпись заголовка для сопоставления с каталогом шаблонов */
+export function headerSignature(headerCells: string[]): string {
+  return headerCells.map((c) => (c ?? "").trim().toLowerCase()).filter(Boolean).join("|");
+}
+
+/** Парсинг по сохранённому шаблону (индексы колонок заданы явно). */
+export function parseTtkByStoredTemplate(
+  rows: string[][],
+  opts: {
+    headerIdx: number;
+    nameCol: number;
+    productCol: number;
+    grossCol?: number;
+    netCol?: number;
+    wasteCol?: number;
+  },
+): TtkCard[] {
+  const { headerIdx, nameCol, productCol, grossCol = -1, netCol = -1, wasteCol = -1 } = opts;
+  if (rows.length <= headerIdx + 1) return [];
+
+  let currentDish: string | null = null;
+  const currentIngredients: TtkIngredient[] = [];
+  const results: TtkCard[] = [];
+
+  const flushCard = () => {
+    if (currentDish != null && (currentDish.length > 0 || currentIngredients.length > 0)) {
+      results.push({
+        dishName: currentDish || null,
+        technologyText: null,
+        ingredients: [...currentIngredients],
+        isSemiFinished: (currentDish ?? "").toLowerCase().includes("пф"),
+      });
+    }
+    currentIngredients.length = 0;
+  };
+
+  for (let r = 0; r < headerIdx && r < rows.length; r++) {
+    for (const c of rows[r] ?? []) {
+      const s = (c ?? "").trim();
+      if (s.length < 3) continue;
+      if (s.endsWith(":")) continue;
+      if (/^\d{1,2}\.\d{1,2}\.\d{2,4}/.test(s)) continue;
+      if (s.toLowerCase().startsWith("технологическая карта")) continue;
+      currentDish = s;
+      break;
+    }
+    if (currentDish != null) break;
+  }
+
+  for (let r = headerIdx + 1; r < rows.length; r++) {
+    const row = rows[r];
+    if (!row || row.length === 0) continue;
+    const cells = row.map((c) => (c ?? "").trim());
+    let pCol = productCol;
+    let gCol = grossCol;
+    let nCol = netCol;
+    if (cells.length >= 3 && cells.length <= 8) {
+      const atProduct = productCol < cells.length ? cells[productCol] : "";
+      if (atProduct && /^[\d,.\-\s]+$/.test(atProduct)) {
+        pCol = 1;
+        if (cells.length >= 4) {
+          gCol = 2;
+          nCol = 3;
+        }
+      }
+    }
+    const nameVal = nameCol < cells.length ? cells[nameCol] : "";
+    const productVal = pCol < cells.length ? cells[pCol] : "";
+    const grossVal = gCol >= 0 && gCol < cells.length ? cells[gCol] : "";
+    const netVal = nCol >= 0 && nCol < cells.length ? cells[nCol] : "";
+    const wasteVal = wasteCol >= 0 && wasteCol < cells.length ? cells[wasteCol] : "";
+
+    if (nameVal.toLowerCase() === "итого" || productVal.toLowerCase() === "итого") {
+      flushCard();
+      currentDish = null;
+      continue;
+    }
+    if (nameVal && !/^[\d\s.,]+$/.test(nameVal) && !productVal) {
+      if (currentDish != null && currentIngredients.length > 0) flushCard();
+      currentDish = nameVal;
+    }
+    if (productVal) {
+      if (currentDish == null && nameVal) currentDish = nameVal;
+      currentIngredients.push({
+        productName: productVal,
+        grossGrams: parseNum(grossVal),
+        netGrams: parseNum(netVal),
+        primaryWastePct: parseNum(wasteVal),
+        unit: "g",
+      });
+    }
+  }
+  flushCard();
+  return results;
+}
+
 /**
  * Конвертирует текст из PDF в rows (массив строк с ячейками).
  * Пробует: табуляция, 2+ пробела, разбор по числам в конце строки.

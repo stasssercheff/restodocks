@@ -115,9 +115,17 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // 1. Сначала шаблонный парсинг (без AI)
+    // 1. Сначала шаблонный парсинг (встроенные ключевые слова)
     const rows = pdfTextToRows(text);
     let templateCards = rows.length >= 2 ? parseTtkByTemplate(rows) : [];
+
+    // 2. Если встроенный шаблон не сработал — пробуем каталог (сохранённые шаблоны после AI/Excel)
+    if (templateCards.length === 0 && rows.length >= 2) {
+      const { tryParseByStoredTemplates } = await import("../_shared/try_stored_ttk_templates.ts");
+      const stored = await tryParseByStoredTemplates(rows);
+      if (stored && stored.length > 0) templateCards = stored;
+    }
+
     // Shama.Book / ГОСТ: блюдо в "Проведено контрольное приготовление блюда: XXX" или на след. строке
     const dishMatch = text.match(/Проведено\s+контрольное\s+приготовление\s+блюда\s*:?\s*\n?\s*([^\n]+?)(?:\n|$)/i)
       ?? text.match(/Наименование\s+блюда[^:]*:\s*([^\n]+)/i);
@@ -128,7 +136,7 @@ Deno.serve(async (req: Request) => {
       templateCards = templateCards.map((c, i) => (i === 0 ? { ...c, dishName: extractedDish } : c));
     }
     if (templateCards.length > 0) {
-      // Шаблон сработал — AI не используется, лимит не применяется
+      // Шаблон или каталог сработал — AI не используется, лимит не применяется
       const normalized = templateCards.map((card) => ({
         dishName: card.dishName ?? null,
         technologyText: card.technologyText ?? null,
@@ -150,7 +158,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // 2. Шаблон не сработал — AI. Проверяем лимит (3 ТТК/день на заведение)
+    // 3. Шаблон и каталог не сработали — AI. Проверяем лимит (3 ТТК/день на заведение)
     if (establishmentId) {
       const { checkAndIncrementAiTtkUsage } = await import("../_shared/ai_ttk_limit.ts");
       const { allowed } = await checkAndIncrementAiTtkUsage(establishmentId);

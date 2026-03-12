@@ -207,7 +207,8 @@ class AiServiceSupabase implements AiService {
       if (rows.length < 2) return [];
       // 1. Сначала парсим по шаблону (без ИИ)
       var list = AiServiceSupabase.parseTtkByTemplate(rows);
-      // 2. Если шаблон не сработал — пробуем сохранённые шаблоны (обучение)
+      if (list.isNotEmpty) _saveTemplateFromKeywordParse(rows, 'excel'); // Обучение: повторная загрузка — без AI
+      // 2. Если шаблон не сработал — пробуем сохранённые шаблоны (каталог)
       if (list.isEmpty) list = await _tryParseByStoredTemplates(rows);
       // 3. Только если и там пусто — вызываем AI (лимит 3/день)
       if (list.isEmpty) {
@@ -682,6 +683,57 @@ class AiServiceSupabase implements AiService {
       }
     } catch (_) {}
     return [];
+  }
+
+  /// Сохранить шаблон при успешном парсинге по ключевым словам (без AI). Повторная загрузка — из каталога.
+  void _saveTemplateFromKeywordParse(List<List<String>> rows, String source) {
+    try {
+      int headerIdx = -1;
+      int nameCol = -1, productCol = -1, grossCol = -1, netCol = -1, wasteCol = -1;
+      const nameKeys = ['наименование', 'название', 'блюдо', 'пф', 'name', 'dish'];
+      const productKeys = ['продукт', 'сырьё', 'ингредиент', 'product', 'ingredient'];
+      const grossKeys = ['брутто', 'бр', 'вес брутто', 'gross'];
+      const netKeys = ['нетто', 'нт', 'вес нетто', 'net'];
+      const wasteKeys = ['отход', 'отх', 'waste', 'процент отхода'];
+      for (var r = 0; r < rows.length; r++) {
+        final row = rows[r].map((c) => c.trim().toLowerCase()).toList();
+        for (var c = 0; c < row.length; c++) {
+          final cell = row[c];
+          if (cell.isEmpty) continue;
+          for (final k in nameKeys) {
+            if (cell.contains(k)) { headerIdx = r; nameCol = c; break; }
+          }
+          for (final k in productKeys) {
+            if (cell.contains(k)) { headerIdx = r; productCol = c; break; }
+          }
+          for (final k in grossKeys) {
+            if (cell.contains(k)) { headerIdx = r; grossCol = c; break; }
+          }
+          for (final k in netKeys) {
+            if (cell.contains(k)) { headerIdx = r; netCol = c; break; }
+          }
+          for (final k in wasteKeys) {
+            if (cell.contains(k)) { headerIdx = r; wasteCol = c; break; }
+          }
+        }
+        if (headerIdx >= 0 && (nameCol >= 0 || productCol >= 0)) break;
+      }
+      if (headerIdx < 0 || (nameCol < 0 && productCol < 0)) return;
+      if (nameCol < 0) nameCol = 0;
+      if (productCol < 0) productCol = 1;
+      final sig = _headerSignature(rows[headerIdx].map((c) => c.trim()).toList());
+      if (sig.isEmpty) return;
+      _client.from('tt_parse_templates').upsert({
+        'header_signature': sig,
+        'header_row_index': headerIdx,
+        'name_col': nameCol,
+        'product_col': productCol,
+        'gross_col': grossCol >= 0 ? grossCol : -1,
+        'net_col': netCol >= 0 ? netCol : -1,
+        'waste_col': wasteCol >= 0 ? wasteCol : -1,
+        'source': source,
+      }, onConflict: 'header_signature').then((_) {});
+    } catch (_) {}
   }
 
   void _saveTemplateAfterAi(List<List<String>> rows, List<TechCardRecognitionResult> cards, String source) {

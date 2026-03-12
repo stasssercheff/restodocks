@@ -73,6 +73,7 @@ class CulinaryUnits {
     (id: 'kg', ru: 'кг', en: 'kg'),
     (id: 'mg', ru: 'мг', en: 'mg'),
     (id: 'шт', ru: 'штуки', en: 'pcs'),
+    (id: 'pcs', ru: 'штуки', en: 'pcs'),
     (id: 'lb', ru: 'фунт', en: 'lb'),
     (id: 'oz', ru: 'унция', en: 'oz'),
     (id: 'ml', ru: 'мл', en: 'ml'),
@@ -86,6 +87,10 @@ class CulinaryUnits {
     (id: 'can', ru: 'банка', en: 'can'),
     (id: 'box', ru: 'коробка', en: 'box'),
     (id: 'bottle', ru: 'бутылка', en: 'bottle'),
+    (id: 'pkg', ru: 'упак.', en: 'pkg'),
+    (id: 'clove', ru: 'зубчик', en: 'clove'),
+    (id: 'tbsp', ru: 'ст.л', en: 'tbsp'),
+    (id: 'tsp', ru: 'ч.л', en: 'tsp'),
   ];
 
   /// Конвертировать значение в граммы
