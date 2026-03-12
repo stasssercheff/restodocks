@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -428,6 +429,135 @@ class _SettingsScreenState extends State<SettingsScreen> {
           String snack = loc.t('delete_establishment_wrong_pin') ?? 'Неверный PIN';
           if (msg.contains('Email') || msg.contains('email')) snack = loc.t('delete_establishment_wrong_email') ?? 'Email не совпадает';
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(snack), backgroundColor: Colors.red));
+        }
+      }
+    });
+  }
+
+  void _showClearAllTtkConfirm(BuildContext context, LocalizationService loc) {
+    final account = context.read<AccountManagerSupabase>();
+    final establishment = account.establishment;
+    if (establishment == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('establishment') ?? 'Не найдено заведение')),
+      );
+      return;
+    }
+    final pinController = TextEditingController();
+    final pinKey = GlobalKey<FormState>();
+    showDialog<String?>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('clear_all_ttk') ?? 'Удалить все ТТК?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              loc.t('clear_all_ttk_enter_pin') ?? 'Введите PIN заведения для подтверждения:',
+              style: Theme.of(ctx).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 12),
+            Form(
+              key: pinKey,
+              child: TextFormField(
+                controller: pinController,
+                obscureText: true,
+                autofocus: true,
+                textCapitalization: TextCapitalization.characters,
+                decoration: InputDecoration(
+                  labelText: loc.t('company_pin') ?? 'PIN компании',
+                  hintText: loc.t('enter_company_pin') ?? 'Введите PIN компании',
+                ),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return loc.t('company_pin_required') ?? 'PIN обязателен';
+                  return null;
+                },
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null),
+            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (!pinKey.currentState!.validate()) return;
+              final pin = pinController.text.trim();
+              if (!establishment.verifyPinCode(pin)) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(loc.t('clear_nomenclature_wrong_pin') ?? 'Неверный PIN')),
+                );
+                return;
+              }
+              Navigator.of(ctx).pop(pin);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: Text(loc.t('clear_all_ttk') ?? 'Удалить все ТТК'),
+          ),
+        ],
+      ),
+    ).then((pinVerified) async {
+      if (pinVerified == null || !context.mounted) return;
+      final techCardSvc = context.read<TechCardServiceSupabase>();
+      final account = context.read<AccountManagerSupabase>();
+      final estId = account.dataEstablishmentId;
+      if (estId == null) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(loc.t('establishment') ?? 'Не найдено заведение')),
+          );
+        }
+        return;
+      }
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => const Center(
+          child: Card(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Удаление ТТК...'),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      try {
+        final count = await techCardSvc.deleteAllTechCards(estId);
+        if (context.mounted) {
+          final nav = Navigator.of(context, rootNavigator: true);
+          if (nav.canPop()) nav.pop();
+        }
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${loc.t('clear_all_ttk_done') ?? 'Удалено ТТК'}: $count'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          final nav = Navigator.of(context, rootNavigator: true);
+          if (nav.canPop()) nav.pop();
+        }
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${loc.t('error') ?? 'Ошибка'}: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
         }
       }
     });
@@ -1448,6 +1578,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => _showClearNomenclatureConfirm(context, localization),
               ),
+              // Временно (Beta): удалить все ТТК
+              if (kDebugMode)
+                ListTile(
+                  leading: const Icon(Icons.restaurant_menu, color: Colors.orange),
+                  title: Text(localization.t('clear_all_ttk') ?? 'Удалить все ТТК'),
+                  subtitle: const Text('Временно для тестов (Beta)'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _showClearAllTtkConfirm(context, localization),
+                ),
             ],
             if (currentEmployee.hasRole('owner')) ...[
               // 1. Должность — добавляемая должность для собственника (не «собственник»)

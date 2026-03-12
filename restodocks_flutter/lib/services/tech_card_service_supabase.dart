@@ -293,6 +293,22 @@ class TechCardServiceSupabase {
     }
   }
 
+  /// Удаление всех ТТК заведения (временно, для тестов на Beta).
+  /// Ингредиенты удаляются CASCADE.
+  Future<int> deleteAllTechCards(String establishmentId) async {
+    try {
+      final deleted = await _supabase.client
+          .from('tech_cards')
+          .delete()
+          .eq('establishment_id', establishmentId)
+          .select('id');
+      return (deleted as List).length;
+    } catch (e) {
+      devLog('Ошибка удаления всех ТТК: $e');
+      rethrow;
+    }
+  }
+
   /// Добавление ингредиента в ТТК
   Future<TechCard> addIngredientToTechCard({
     required String techCardId,

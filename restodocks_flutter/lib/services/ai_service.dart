@@ -189,6 +189,10 @@ abstract class AiService {
   /// [establishmentId] — для учёта лимита AI (3/день). Шаблонный парсинг без лимита.
   Future<List<TechCardRecognitionResult>> parseTechCardsFromPdf(Uint8List pdfBytes, {String? establishmentId});
 
+  /// Парсинг ТТК из вставленного текста (табуляции, как продукты).
+  /// Формат: название блюда → заголовок (наименование, Ед.изм, Норма закладки…) → строки ингредиентов → Выход.
+  Future<List<TechCardRecognitionResult>> parseTechCardsFromText(String text, {String? establishmentId});
+
   /// Распознавание продукта по введённому тексту (нормализация, категория, единица).
   Future<ProductRecognitionResult?> recognizeProduct(String userInput);
 
@@ -237,6 +241,10 @@ class AiServiceStub implements AiService {
 
   @override
   Future<List<TechCardRecognitionResult>> parseTechCardsFromPdf(Uint8List pdfBytes, {String? establishmentId}) async =>
+      [];
+
+  @override
+  Future<List<TechCardRecognitionResult>> parseTechCardsFromText(String text, {String? establishmentId}) async =>
       [];
 
   @override

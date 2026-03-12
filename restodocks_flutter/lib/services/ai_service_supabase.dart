@@ -250,9 +250,13 @@ class AiServiceSupabase implements AiService {
       // DOCX: если много таблиц — парсим каждую; если одна и не парсится — пробуем все по очереди
       if (docxTables != null && docxTables.isNotEmpty) {
         final merged = <TechCardRecognitionResult>[];
+        final kbzuPattern = RegExp(r'белки|жиры|углеводы|калори|бжу|кбжу|жирн|белк', caseSensitive: false);
         for (final tbl in docxTables) {
           var expanded = _expandSingleCellRows(tbl);
           if (expanded.length < 2) continue;
+          // Таблица КБЖУ (ГОСТ): Белки г, Жиры г — не парсим как ТТК
+          final firstRows = expanded.take(3).expand((r) => r).map((c) => c.toLowerCase()).join(' ');
+          if (kbzuPattern.hasMatch(firstRows) && expanded.length <= 6 && !firstRows.contains('брутто') && !firstRows.contains('нетто')) continue;
           var part = AiServiceSupabase.parseTtkByTemplate(expanded);
           if (part.isEmpty) part = AiServiceSupabase._tryParseKkFromRows(expanded);
           merged.addAll(part);
@@ -302,6 +306,36 @@ class AiServiceSupabase implements AiService {
       lastParseTechCardExcelReason = null;
       return [];
     }
+  }
+
+  @override
+  Future<List<TechCardRecognitionResult>> parseTechCardsFromText(String text, {String? establishmentId}) async {
+    lastParseTechCardExcelReason = null;
+    lastParseTechCardErrors = null;
+    final rows = _textToRows(text);
+    if (rows.length < 2) return [];
+    var expanded = _expandSingleCellRows(rows);
+    if (expanded.length < 2) return [];
+    var list = await _tryParseByStoredTemplates(expanded);
+    if (list.isEmpty) {
+      final excelErrors = <TtkParseError>[];
+      list = AiServiceSupabase.parseTtkByTemplate(expanded, errors: excelErrors);
+      if (excelErrors.isNotEmpty) lastParseTechCardErrors = excelErrors;
+      if (list.isEmpty) list = AiServiceSupabase._tryParseKkFromRows(expanded);
+    }
+    if (list.isNotEmpty) _saveTemplateFromKeywordParse(expanded, 'text');
+    return list;
+  }
+
+  /// Текст → строки (split по \n, каждая строка по \t).
+  List<List<String>> _textToRows(String text) {
+    final lines = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+    final rows = <List<String>>[];
+    for (final line in lines) {
+      final cells = line.split('\t').map((s) => s.trim()).toList();
+      if (cells.any((c) => c.isNotEmpty)) rows.add(cells);
+    }
+    return rows;
   }
 
   @override
@@ -395,6 +429,32 @@ class AiServiceSupabase implements AiService {
     }
   }
 
+  /// Параграфы перед первой таблицей (название блюда в ГОСТ docx: «Салат Цезарь» и т.п.)
+  List<List<String>> _docxLeadingRows(Uint8List bytes) {
+    final lead = <List<String>>[];
+    try {
+      final archive = ZipDecoder().decodeBytes(bytes);
+      final doc = archive.findFile('word/document.xml');
+      if (doc == null) return lead;
+      final xml = XmlDocument.parse(utf8.decode(doc.content as List<int>));
+      final body = xml.descendants.whereType<XmlElement>().where((e) => e.localName == 'body').firstOrNull;
+      if (body == null) return lead;
+      final skipStart = RegExp(r'^(ттк|технико-технологическая|технологическая карта|область применения|настоящая)', caseSensitive: false);
+      for (final child in body.childElements) {
+        if (child.localName == 'tbl') break; // первая таблица — стоп
+        if (child.localName != 'p') continue;
+        final texts = child.descendants.whereType<XmlElement>().where((e) => e.localName == 't').map((e) => e.innerText).toList();
+        final line = texts.join('').trim();
+        if (line.isEmpty || line.length > 80) continue;
+        if (skipStart.hasMatch(line)) continue;
+        if (RegExp(r'^\d+\.\s').hasMatch(line)) continue; // "1. ОБЛАСТЬ ПРИМЕНЕНИЯ"
+        lead.add([line]);
+        if (lead.length >= 3) break; // не более 3 строк (название + возможно подзаголовок)
+      }
+    } catch (_) {}
+    return lead;
+  }
+
   /// Все таблицы DOCX (для файлов с несколькими ТТК).
   List<List<List<String>>> _docxToAllTables(Uint8List bytes) {
     final result = <List<List<String>>>[];
@@ -403,6 +463,8 @@ class AiServiceSupabase implements AiService {
       final doc = archive.findFile('word/document.xml');
       if (doc == null) return result;
       final xml = XmlDocument.parse(utf8.decode(doc.content as List<int>));
+      final leading = _docxLeadingRows(bytes);
+      var tableIndex = 0;
       for (final tbl in xml.descendants.whereType<XmlElement>().where((e) => e.localName == 'tbl')) {
         final tableRows = <List<String>>[];
         for (final tr in tbl.children.whereType<XmlElement>().where((e) => e.localName == 'tr')) {
@@ -413,7 +475,14 @@ class AiServiceSupabase implements AiService {
           }
           if (cells.any((c) => c.isNotEmpty)) tableRows.add(cells);
         }
-        if (tableRows.length >= 2) result.add(tableRows);
+        if (tableRows.length >= 2) {
+          if (tableIndex == 0 && leading.isNotEmpty) {
+            result.add([...leading, ...tableRows]);
+          } else {
+            result.add(tableRows);
+          }
+          tableIndex++;
+        }
       }
     } catch (_) {}
     return result;
@@ -757,7 +826,7 @@ class AiServiceSupabase implements AiService {
 
     final nameKeys = ['наименование', 'название', 'блюдо', 'пф', 'набор', 'name', 'dish'];
     final productKeys = ['продукт', 'продукты', 'сырьё', 'сырья', 'ингредиент', 'product', 'ingredient'];
-    final grossKeys = ['брутто', 'бр', 'вес брутто', 'вес гр', '1 порция', 'расход', 'норма', 'масса', 'gross'];
+    final grossKeys = ['брутто', 'бр', 'вес брутто', 'вес гр', '1 порция', 'расход', 'норма', 'норма закладки', 'масса', 'gross'];
     final netKeys = ['нетто', 'нт', 'вес нетто', 'net'];
     final wasteKeys = ['отход', 'отх', 'waste', 'процент отхода'];
     final outputKeys = ['выход', 'вес готового', 'вес готового продукта', 'готовый', 'output'];
@@ -929,9 +998,6 @@ class AiServiceSupabase implements AiService {
 
     var r = headerIdx + 1;
     while (r < rows.length) {
-      if (errors != null || rows.length > 20) {
-        print('Обрабатываю строку: $r'); // для диагностики — видно на какой строке затыкается
-      }
       final row = rows[r];
       if (row.isEmpty) { r++; continue; }
       final cells = row.map((c) => (c ?? '').toString().trim()).toList();

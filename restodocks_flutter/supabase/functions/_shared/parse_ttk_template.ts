@@ -1,34 +1,21 @@
 /**
  * Парсинг ТТК по шаблону — без AI.
  * Ищет заголовки (Продукт, Брутто, Нетто...) и извлекает данные по найденным колонкам.
- * Поддержка: fingerprinting, разделители (ИТОГО/пустые строки), изоляция ошибок (try-catch на карточку).
  */
 
 const NAME_KEYS = ["наименование", "название", "блюдо", "пф", "name", "dish"];
 const PRODUCT_KEYS = ["продукт", "сырьё", "сырья", "ингредиент", "product", "ingredient"];
 // Сборник/ГОСТ: "Расход сырья на 1 порцию", "Наименование сырья", "Брутто", "Нетто"
-const GROSS_KEYS = ["брутто", "бр", "вес брутто", "расход сырья", "расход", "норма", "масса", "gross"];
+const GROSS_KEYS = ["брутто", "бр", "вес брутто", "расход сырья", "расход", "норма", "норма закладки", "масса", "gross"];
 const NET_KEYS = ["нетто", "нт", "вес нетто", "net"];
 const WASTE_KEYS = ["отход", "отх", "waste", "процент отхода"];
 // Сборник/ГОСТ: "Выход готовой продукции"
 const OUTPUT_KEYS = ["выход", "вес готового", "вес готового продукта", "выход готовой продукции", "готовый", "output"];
 const UNIT_KEYS = ["ед. изм", "ед изм", "единица", "unit"];
 
-/** Разделители карточек: ИТОГО, Всего, пустая строка (regex для поиска границ блюд) */
-const CARD_SEPARATOR_REGEX = /^\s*(итого|всего|всего\s*:)\s*$/i;
-
-/** Безопасный парсинг: «0.5 кг», «1/2 шт», запятые. Никогда не бросает. */
 function parseNum(s: string): number | null {
   if (!s || !s.trim()) return null;
-  const t = s.trim();
-  const fracMatch = t.match(/^(\d+)\/(\d+)$/);
-  if (fracMatch) {
-    const a = parseInt(fracMatch[1], 10);
-    const b = parseInt(fracMatch[2], 10);
-    if (b !== 0) return a / b;
-  }
-  const cleaned = t.replace(/,/g, ".").replace(/[^\d.\-]/g, "");
-  if (!cleaned) return null;
+  const cleaned = s.replace(/,/g, ".").replace(/[^\d.\-]/g, "");
   const n = parseFloat(cleaned);
   return Number.isNaN(n) ? null : n;
 }
@@ -244,203 +231,6 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
   }
   flushCard();
 
-  return results;
-}
-
-export interface TtkParseError {
-  dishName?: string;
-  error: string;
-}
-
-/**
- * Парсит rows с изоляцией ошибок: при падении на строке пропускаем текущую карточку,
- * записываем в errors и продолжаем. Возвращает: { cards, errors }.
- */
-export function parseTtkByTemplateSafe(rows: string[][]): { cards: TtkCard[]; errors: TtkParseError[] } {
-  if (rows.length < 2) return { cards: [], errors: [] };
-
-  const errors: TtkParseError[] = [];
-  const parseResult = _parseTtkByTemplateWithErrorHandling(rows, errors);
-  return { cards: parseResult, errors };
-}
-
-function _parseTtkByTemplateWithErrorHandling(rows: string[][], errors: TtkParseError[]): TtkCard[] {
-  const results: TtkCard[] = [];
-  let headerIdx = -1;
-  let nameCol = -1;
-  let productCol = -1;
-  let grossCol = -1;
-  let netCol = -1;
-  let wasteCol = -1;
-  let outputCol = -1;
-  let unitCol = -1;
-  let grossColIsKg = false;
-  let netColIsKg = false;
-  let outputColIsKg = false;
-
-  for (let r = 0; r < rows.length && r < 25; r++) {
-    try {
-      const row = (rows[r] ?? []).map((c) => (String(c ?? "")).trim().toLowerCase());
-      for (let c = 0; c < row.length; c++) {
-        const cell = row[c];
-        if (!cell) continue;
-        if (NAME_KEYS.some((k) => cell.includes(k))) { headerIdx = r; nameCol = c; }
-        if (PRODUCT_KEYS.some((k) => cell.includes(k))) { headerIdx = r; productCol = c; }
-        if (GROSS_KEYS.some((k) => cell.includes(k))) { headerIdx = r; grossCol = c; }
-        if (NET_KEYS.some((k) => cell.includes(k))) { headerIdx = r; netCol = c; }
-        if (WASTE_KEYS.some((k) => cell.includes(k))) { headerIdx = r; wasteCol = c; }
-        if (OUTPUT_KEYS.some((k) => cell.includes(k))) { headerIdx = r; outputCol = c; }
-        if (UNIT_KEYS.some((k) => cell.includes(k))) { headerIdx = r; unitCol = c; }
-      }
-      if (headerIdx >= 0 && (nameCol >= 0 || productCol >= 0)) break;
-    } catch (e) {
-      /* skip malformed header rows */
-    }
-  }
-
-  if (headerIdx < 0 || (nameCol < 0 && productCol < 0)) {
-    for (let r = 0; r < rows.length && r < 15; r++) {
-      try {
-        const row = rows[r] ?? [];
-        const c0 = (String(row[0] ?? "")).trim().toLowerCase();
-        const c1 = (String(row[1] ?? "")).trim();
-        if ((c0 === "№" || c0 === "n" || /^\d+$/.test(c0)) && c1.length >= 2 && !/^[\d,.\s]+$/.test(c1)) {
-          headerIdx = r;
-          nameCol = 1;
-          productCol = 1;
-          if (row.length >= 4) { grossCol = 2; netCol = 3; }
-          if (row.length >= 5) outputCol = 4;
-          break;
-        }
-      } catch {
-        /* skip */
-      }
-    }
-  }
-  if (headerIdx < 0 || (nameCol < 0 && productCol < 0)) return [];
-
-  const headerRow = headerIdx < rows.length ? (rows[headerIdx] ?? []).map((c) => (String(c ?? "")).trim().toLowerCase()) : [];
-  if (grossCol >= 0 && headerRow[grossCol]?.includes("кг")) grossColIsKg = true;
-  if (netCol >= 0 && headerRow[netCol]?.includes("кг")) netColIsKg = true;
-  if (outputCol >= 0 && headerRow[outputCol]?.includes("кг")) outputColIsKg = true;
-  if (nameCol < 0) nameCol = 0;
-  if (productCol < 0) productCol = 1;
-
-  const headerKeys = [...NAME_KEYS, ...PRODUCT_KEYS, ...GROSS_KEYS, ...NET_KEYS, ...WASTE_KEYS, ...OUTPUT_KEYS, ...UNIT_KEYS];
-  let initialDish: string | null = null;
-  for (let r = 0; r < headerIdx && r < rows.length; r++) {
-    try {
-      const row = rows[r] ?? [];
-      for (let c = 0; c < row.length; c++) {
-        const cell = (String(row[c] ?? "")).trim();
-        if (cell.length < 3) continue;
-        if (cell.endsWith(":")) continue;
-        if (/^\d{1,2}\.\d{1,2}\.\d{2,4}/.test(cell)) continue;
-        if (cell.toLowerCase().startsWith("технологическая карта")) continue;
-        if (cell.toLowerCase().includes("название на чеке") || cell.toLowerCase().includes("название чека")) continue;
-        if (cell.length < 15 && !/[a-zA-Zа-яА-ЯёЁ]{4,}/.test(cell)) continue;
-        const lower = cell.toLowerCase();
-        if (headerKeys.some((k) => lower.includes(k))) continue;
-        if (!/[a-zA-Zа-яА-ЯёЁ]/.test(cell)) continue;
-        if (/^[\d\s.,]+$/.test(cell)) continue;
-        initialDish = cell;
-        break;
-      }
-      if (initialDish) break;
-    } catch {
-      /* skip */
-    }
-  }
-
-  let currentDish: string | null = initialDish;
-  const currentIngredients: TtkIngredient[] = [];
-
-  const flushCard = () => {
-    if (currentDish != null && (currentDish.length > 0 || currentIngredients.length > 0)) {
-      results.push({
-        dishName: currentDish || null,
-        technologyText: null,
-        ingredients: [...currentIngredients],
-        isSemiFinished: (currentDish ?? "").toLowerCase().includes("пф"),
-      });
-    }
-    currentIngredients.length = 0;
-  };
-
-  const flushCardWithError = (err: unknown) => {
-    const errMsg = err instanceof Error ? err.message : String(err);
-    errors.push({ dishName: currentDish ?? undefined, error: errMsg });
-    currentIngredients.length = 0;
-    currentDish = null;
-  };
-
-  for (let r = headerIdx + 1; r < rows.length; r++) {
-    const row = rows[r];
-    if (!row || !Array.isArray(row) || row.length === 0) continue;
-    try {
-      const cells = row.map((c) => (String(c ?? "")).trim());
-      let pCol = productCol;
-      let gCol = grossCol;
-      let nCol = netCol;
-      if (cells.length >= 3 && cells.length <= 8) {
-        const atProduct = productCol < cells.length ? cells[productCol] : "";
-        if (atProduct && /^[\d,.\-\s]+$/.test(atProduct)) {
-          pCol = 1;
-          if (cells.length >= 4) { gCol = 2; nCol = 3; }
-        }
-      }
-      const nameVal = nameCol < cells.length ? cells[nameCol] : "";
-      const productVal = pCol < cells.length ? cells[pCol] : "";
-      const grossVal = gCol >= 0 && gCol < cells.length ? cells[gCol] : "";
-      const netVal = nCol >= 0 && nCol < cells.length ? cells[nCol] : "";
-      const wasteVal = wasteCol >= 0 && wasteCol < cells.length ? cells[wasteCol] : "";
-      const outputVal = outputCol >= 0 && outputCol < cells.length ? cells[outputCol] : "";
-
-      if (CARD_SEPARATOR_REGEX.test(nameVal) || CARD_SEPARATOR_REGEX.test(productVal) || productVal.toLowerCase().startsWith("всего")) {
-        flushCard();
-        currentDish = null;
-        continue;
-      }
-      if (productVal.toLowerCase().includes("выход блюда") || productVal.toLowerCase().startsWith("выход одного")) continue;
-
-      if (nameVal && !/^[\d\s.,]+$/.test(nameVal) && !productVal) {
-        if (currentDish != null && currentIngredients.length > 0) flushCard();
-        currentDish = nameVal;
-      }
-
-      if (productVal && !/^[\d\s\.\,\-\+]+$/.test(productVal)) {
-        if (currentDish == null && nameVal) currentDish = nameVal;
-        let gross = parseNum(grossVal);
-        let net = parseNum(netVal);
-        let outputG = parseNum(outputVal);
-        if (grossColIsKg && gross != null && gross > 0 && gross < 100) gross = gross * 1000;
-        if (netColIsKg && net != null && net > 0 && net < 100) net = net * 1000;
-        if (outputColIsKg && outputG != null && outputG > 0 && outputG < 100) outputG = outputG * 1000;
-        let waste = parseNum(wasteVal);
-        if (gross != null && gross > 0 && net != null && net > 0 && net < gross && (waste == null || waste === 0)) {
-          waste = (1 - net / gross) * 100;
-        }
-        const unitCell = unitCol >= 0 && unitCol < cells.length ? (cells[unitCol] ?? "").trim().toLowerCase() : "";
-        let unit = "g";
-        if (unitCell.includes("л") || unitCell === "l") unit = "ml";
-        else if (unitCell.includes("шт") || unitCell === "pcs") unit = "pcs";
-        const cleanName = productVal.replace(/^Т\.\s*/i, "").replace(/^П\/Ф\s*/i, "").trim() || productVal;
-        const isPf = /^П\/Ф\s/i.test(productVal);
-        currentIngredients.push({
-          productName: cleanName,
-          grossGrams: gross,
-          netGrams: net,
-          primaryWastePct: waste,
-          outputGrams: outputG,
-          unit,
-          ingredientType: isPf ? "semi_finished" : "product",
-        } as TtkIngredient);
-      }
-    } catch (e) {
-      flushCardWithError(e);
-    }
-  }
-  flushCard();
   return results;
 }
 

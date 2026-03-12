@@ -588,12 +588,16 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                       context.push(widget.department == 'bar' ? '/tech-cards/new?department=bar' : '/tech-cards/new');
                     } else if (value == 'excel') {
                       await _createFromExcel(context, loc);
+                    } else if (value == 'text') {
+                      await _createFromText(context, loc);
                     }
                   },
                   itemBuilder: (_) => [
                     PopupMenuItem(value: 'new', child: Text(loc.t('create_tech_card'))),
                     if (FeatureFlags.ttkImportEnabled)
                       PopupMenuItem(value: 'excel', child: Text(loc.t('ai_tech_card_from_excel'))),
+                    if (FeatureFlags.ttkImportEnabled)
+                      PopupMenuItem(value: 'text', child: Text(loc.t('ttk_import_text') ?? 'Вставить из текста')),
                   ],
                 ),
               ),

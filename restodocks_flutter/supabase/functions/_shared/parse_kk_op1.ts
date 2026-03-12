@@ -65,24 +65,40 @@ function splitKkBlocks(text: string): string[] {
 
 /**
  * Извлекает название блюда из блока.
- * В форме ОП-1: название рядом с «наименование блюда» или «структурное подразделение».
+ * В форме ОП-1: название ВЫШЕ таблицы — строка перед «организация», «структурное подразделение», «наименование блюда».
+ * Порядок типичный: OOO "Каспий +" | Ресторан "Перец" | Гребешок сахалинский | организация | структурное подразделение | наименование блюда (заголовок)
  */
 function extractDishName(block: string): string | null {
   const lines = block.split(/\n/).map((l) => l.trim()).filter(Boolean);
+  const skip = /^(организация|структурное подразделение|наименование блюда|ресторан|ooo|ооо)/i;
+  const isDishLike = (s: string) =>
+    s.length >= 3 && s.length < 80 && /[а-яА-ЯёЁa-zA-Z]/.test(s) &&
+    !/^[\d\s.,:]+$/.test(s) && !/^№\s*\d*$/.test(s) && !skip.test(s) &&
+    !s.toLowerCase().includes("организация") && !s.toLowerCase().includes("подразделение");
   for (let i = 0; i < lines.length; i++) {
     const lower = lines[i].toLowerCase();
-    if (lower.includes("структурное подразделение") || lower === "наименование блюда") {
-      const next = lines[i + 1];
-      if (next && next.length >= 2 && next.length < 100 && /[а-яА-ЯёЁa-zA-Z]/.test(next)) {
-        if (!/^[\d\s.,:]+$/.test(next) && !next.toLowerCase().includes("организация")) {
-          return next;
-        }
+    // Строка «организация» или «структурное подразделение» — название блюда в предыдущей строке (над таблицей)
+    if (lower === "организация" || (lower.includes("структурное") && lower.includes("подразделение"))) {
+      const prev = lines[i - 1];
+      if (prev && isDishLike(prev) && !/ресторан|ооо|организация/i.test(prev)) {
+        return prev;
       }
     }
-    if (lower === "наименование блюда" && i > 0) {
+    if (lower.includes("структурное подразделение") || lower === "наименование блюда") {
+      const next = lines[i + 1];
+      if (next && isDishLike(next)) return next;
+    }
+    if (lower.includes("наименование блюда") && i > 0) {
       const prev = lines[i - 1];
-      if (prev && prev.length >= 2 && /[а-яА-ЯёЁ]/.test(prev) && !prev.includes("Ресторан") && !prev.includes("организация")) {
-        return prev;
+      if (prev && isDishLike(prev) && !/ресторан|ооо/i.test(prev)) return prev;
+      // Ищем выше: организация/подразделение, перед ними — название
+      for (let j = i - 1; j >= 0 && j >= i - 5; j--) {
+        const ln = lines[j];
+        if (ln && (ln.toLowerCase().includes("организация") || ln.toLowerCase().includes("подразделение"))) {
+          const dishCandidate = lines[j - 1];
+          if (dishCandidate && isDishLike(dishCandidate)) return dishCandidate;
+          break;
+        }
       }
     }
   }

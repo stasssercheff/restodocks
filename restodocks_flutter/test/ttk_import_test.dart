@@ -1,6 +1,12 @@
 /// Тест парсинга ТТК: шаблон и цепочка.
 /// Запуск: flutter test test/ttk_import_test.dart
+///
+/// Фикстуры DOCX (как iiko-бланк — исходники в проекте):
+///   test/fixtures/Техкарта_Салат_Цезарь.docx
+///   test/fixtures/Технологическая карта.docx
+///   test/fixtures/tehnologicheskie_kartiy_blyud.docx
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:csv/csv.dart';
@@ -200,6 +206,50 @@ void main() {
       expect(list[0].ingredients.length, 2);
       expect(list[1].dishName, contains('Борщ'));
       expect(list[1].ingredients.length, 2);
+    });
+  });
+
+  group('TTK DOCX fixtures (как iiko-бланк — документы из test/fixtures/)', () {
+    Future<Uint8List?> _loadFixture(String name) async {
+      final f = File('test/fixtures/$name');
+      if (!await f.exists()) return null;
+      return f.readAsBytes();
+    }
+
+    test('parseTechCardsFromExcel Техкарта_Салат_Цезарь.docx', () async {
+      final bytes = await _loadFixture('Техкарта_Салат_Цезарь.docx');
+      if (bytes == null) {
+        return; // фикстура отсутствует — пропускаем
+      }
+      final ai = AiServiceSupabase();
+      final list = await ai.parseTechCardsFromExcel(bytes);
+      // debug: print('Cards: ${list.map((c) => "${c.dishName} (${c.ingredients.length})").join("; ")}');
+      expect(list, isNotEmpty, reason: 'Должна распознаться хотя бы 1 карточка');
+      final cezarCard = list.where((c) {
+        final n = (c.dishName ?? '').toLowerCase();
+        return n.contains('цезар') || n.contains('салат');
+      }).toList();
+      expect(cezarCard, isNotEmpty, reason: 'Название должно содержать Салат/Цезарь, получено: ${list.map((c) => c.dishName).join(", ")}');
+      if (cezarCard.first.ingredients.isNotEmpty) {
+        expect(cezarCard.first.ingredients.length, greaterThanOrEqualTo(2), reason: 'Ожидаем ингредиенты (Куриное филе, Хлеб и т.д.)');
+      }
+    });
+
+    test('parseTechCardsFromExcel Технологическая карта.docx', () async {
+      final bytes = await _loadFixture('Технологическая карта.docx');
+      if (bytes == null) return;
+      final ai = AiServiceSupabase();
+      final list = await ai.parseTechCardsFromExcel(bytes);
+      expect(list, isNotEmpty, reason: 'Должна распознаться хотя бы 1 карточка');
+      expect(list.first.ingredients.length, greaterThanOrEqualTo(1));
+    });
+
+    test('parseTechCardsFromExcel tehnologicheskie_kartiy_blyud.docx', () async {
+      final bytes = await _loadFixture('tehnologicheskie_kartiy_blyud.docx');
+      if (bytes == null) return;
+      final ai = AiServiceSupabase();
+      final list = await ai.parseTechCardsFromExcel(bytes);
+      expect(list, isNotEmpty, reason: 'Должна распознаться хотя бы 1 карточка');
     });
   });
 }

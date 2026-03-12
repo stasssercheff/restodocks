@@ -80,8 +80,7 @@ Deno.serve(async (req: Request) => {
     }
     const { PDFParse } = await import("npm:pdf-parse");
     const { chatText } = await import("../_shared/ai_provider.ts");
-    const { pdfTextToRows, parseTtkByTemplate, parseTtkByTemplateSafe } = await import("../_shared/parse_ttk_template.ts");
-    const { detectTemplateFingerprint } = await import("../_shared/parse_ttk_fingerprint.ts");
+    const { pdfTextToRows, parseTtkByTemplate } = await import("../_shared/parse_ttk_template.ts");
     const { parseKkOp1 } = await import("../_shared/parse_kk_op1.ts");
 
     let bytes: Uint8Array;
@@ -147,22 +146,15 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // 1. Шаблонный парсинг (встроенные ключевые слова)
     const rows = pdfTextToRows(text);
-    const fingerprint = rows.length >= 2 ? detectTemplateFingerprint(rows, 50) : null;
+    let templateCards = rows.length >= 2 ? parseTtkByTemplate(rows) : [];
 
-    // 1. СНАЧАЛА — сохранённые шаблоны (каталог tt_parse_templates). Те же файлы, что уже сохранялись — распознаются по ним.
-    let templateCards: { dishName: string | null; ingredients: unknown[] }[] = [];
-    const parseErrors: Array<{ dishName?: string; error: string }> = [];
-    if (rows.length >= 2) {
+    // 2. Если встроенный шаблон не сработал — пробуем каталог (сохранённые шаблоны после AI/Excel)
+    if (templateCards.length === 0 && rows.length >= 2) {
       const { tryParseByStoredTemplates } = await import("../_shared/try_stored_ttk_templates.ts");
       const stored = await tryParseByStoredTemplates(rows);
       if (stored && stored.length > 0) templateCards = stored;
-    }
-    // 2. Только если шаблон не найден — эвристический парсер
-    if (templateCards.length === 0 && rows.length >= 2) {
-      const parsed = parseTtkByTemplateSafe(rows);
-      templateCards = parsed.cards;
-      parseErrors.push(...parsed.errors);
     }
 
     // Shama.Book / ГОСТ: блюдо в "Проведено контрольное приготовление блюда: XXX" или на след. строке
@@ -176,11 +168,11 @@ Deno.serve(async (req: Request) => {
     }
     if (templateCards.length > 0) {
       // Шаблон или каталог сработал — AI не используется, лимит не применяется
-      const normalized = templateCards.map((card: { dishName: string | null; ingredients: unknown[] }) => ({
+      const normalized = templateCards.map((card) => ({
         dishName: card.dishName ?? null,
         technologyText: card.technologyText ?? null,
         isSemiFinished: card.isSemiFinished ?? undefined,
-        ingredients: (card.ingredients ?? []).map((i: Record<string, unknown>) => ({
+        ingredients: card.ingredients.map((i) => ({
           productName: i.productName,
           grossGrams: i.grossGrams ?? undefined,
           netGrams: i.netGrams ?? undefined,
@@ -192,11 +184,8 @@ Deno.serve(async (req: Request) => {
           ingredientType: undefined,
         })),
       }));
-      const payload: Record<string, unknown> = { cards: normalized, reason: "template" };
-      if (parseErrors.length > 0) payload.parseErrors = parseErrors;
-      if (fingerprint?.hint) payload.fingerprintHint = fingerprint.hint;
       return new Response(
-        JSON.stringify(payload),
+        JSON.stringify({ cards: normalized, reason: "template" }),
         { status: 200, headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" } },
       );
     }
