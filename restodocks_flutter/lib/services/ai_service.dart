@@ -92,6 +92,14 @@ class TechCardRecognitionResult {
   });
 }
 
+/// Ошибка парсинга одной карточки (битая/пропущенная).
+class TtkParseError {
+  final String? dishName;
+  final String error;
+
+  const TtkParseError({this.dishName, required this.error});
+}
+
 /// Результат распознавания продукта при ручном вводе.
 class ProductRecognitionResult {
   final String normalizedName;
