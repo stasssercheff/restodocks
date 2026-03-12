@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:xml/xml.dart';
 
 import 'ai_service.dart';
+import 'iiko_xlsx_sanitizer.dart';
 import 'nutrition_api_service.dart';
 import '../utils/dev_log.dart';
 import '../utils/product_name_utils.dart';
@@ -520,7 +521,8 @@ class AiServiceSupabase implements AiService {
 
   List<List<String>> _xlsxToRows(Uint8List bytes) {
     try {
-      final excel = Excel.decodeBytes(bytes.toList());
+      final decodable = IikoXlsxSanitizer.ensureDecodable(bytes);
+      final excel = Excel.decodeBytes(decodable.toList());
       final sheetName = excel.tables.keys.isNotEmpty ? excel.tables.keys.first : null;
       if (sheetName == null) return [];
       final sheet = excel.tables[sheetName]!;

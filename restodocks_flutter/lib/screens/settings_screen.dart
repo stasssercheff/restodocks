@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -1579,14 +1578,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onTap: () => _showClearNomenclatureConfirm(context, localization),
               ),
               // Временно (Beta): удалить все ТТК
-              if (kDebugMode)
-                ListTile(
-                  leading: const Icon(Icons.restaurant_menu, color: Colors.orange),
-                  title: Text(localization.t('clear_all_ttk') ?? 'Удалить все ТТК'),
-                  subtitle: const Text('Временно для тестов (Beta)'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => _showClearAllTtkConfirm(context, localization),
-                ),
+              ListTile(
+                leading: const Icon(Icons.restaurant_menu, color: Colors.orange),
+                title: Text(localization.t('clear_all_ttk') ?? 'Удалить все ТТК'),
+                subtitle: const Text('Временно для тестов (Beta)'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _showClearAllTtkConfirm(context, localization),
+              ),
             ],
             if (currentEmployee.hasRole('owner')) ...[
               // 1. Должность — добавляемая должность для собственника (не «собственник»)

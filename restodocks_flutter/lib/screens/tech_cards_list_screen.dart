@@ -431,6 +431,59 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     }
   }
 
+  Future<void> _createFromText(BuildContext context, LocalizationService loc) async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('ttk_import_text') ?? 'Вставить из текста'),
+        content: SizedBox(
+          width: 400,
+          child: TextField(
+            controller: controller,
+            maxLines: 12,
+            decoration: InputDecoration(
+              hintText: 'Название блюда\nнаименование\tЕд.изм\tНорма закладки\t...\n1\tПродукт\tкг\t0,100\t...\nВыход\t\tкг\t1,000',
+              border: const OutlineInputBorder(),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null),
+            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+            child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (result == null || result.isEmpty || !mounted) return;
+    setState(() => _loadingExcel = true);
+    try {
+      final est = context.read<AccountManagerSupabase>().establishment;
+      final establishmentId = est?.dataEstablishmentId;
+      final list = await context.read<AiService>().parseTechCardsFromText(result, establishmentId: establishmentId);
+      if (!mounted) return;
+      if (list.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.t('ai_tech_card_excel_format_hint') ?? 'Не удалось распознать ТТК в тексте')),
+        );
+        return;
+      }
+      if (list.length == 1) {
+        context.push(widget.department == 'bar' ? '/tech-cards/new?department=bar' : '/tech-cards/new', extra: list.single);
+      } else {
+        context.push('/tech-cards/import-review?department=${Uri.encodeComponent(widget.department)}', extra: list);
+      }
+    } finally {
+      if (mounted) setState(() => _loadingExcel = false);
+    }
+  }
+
   static String _pdfFailureMessage(String reason, LocalizationService loc) {
     if (reason == 'ai_limit_exceeded' || reason == 'limit_3_per_day') {
       return loc.t('ai_ttk_limit_3_per_day');
