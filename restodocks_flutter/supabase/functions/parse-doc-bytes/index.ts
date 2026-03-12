@@ -21,6 +21,28 @@ function base64ToUint8Array(b64: string): Uint8Array {
   return bytes;
 }
 
+/** Подсчёт кириллицы в тексте */
+function cyrillicCount(s: string): number {
+  let n = 0;
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    if ((c >= 0x0400 && c <= 0x04ff) || (c >= 0x0500 && c <= 0x052f)) n++;
+  }
+  return n;
+}
+
+/** Исправление mojibake: текст был в Windows-1251, но считан как Latin-1 */
+async function tryFixWin1251Mojibake(text: string): Promise<string> {
+  try {
+    const { Buffer } = await import("node:buffer");
+    const iconv = await import("npm:iconv-lite@0.6.3");
+    const buf = Buffer.from(text, "latin1");
+    const fixed = iconv.decode(buf, "win1251");
+    if (cyrillicCount(fixed) > cyrillicCount(text)) return fixed;
+  } catch (_) {}
+  return text;
+}
+
 /** Текст → rows (массив строк с ячейками) для парсера ТТК */
 function textToRows(text: string): string[][] {
   const lines = text.split(/\r\n|\r|\n/).map((l) => l.trim()).filter(Boolean);
@@ -72,7 +94,8 @@ Deno.serve(async (req: Request) => {
     const WordExtractor = (await import("npm:word-extractor@1.0.4")).default;
     const extractor = new WordExtractor();
     const doc = await extractor.extract(buf);
-    const bodyText = doc.getBody() ?? "";
+    let bodyText = doc.getBody() ?? "";
+    bodyText = await tryFixWin1251Mojibake(bodyText);
     const text = bodyText.trim();
 
     if (!text) {

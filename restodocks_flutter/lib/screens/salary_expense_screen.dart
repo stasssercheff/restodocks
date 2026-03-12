@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 
 import '../models/models.dart';
 import '../services/schedule_storage_service.dart';
+import '../utils/number_format_utils.dart';
 import '../services/salary_export_service.dart';
 import '../services/inventory_download.dart';
 import '../services/services.dart';
@@ -27,7 +28,7 @@ class _EmployeeAdjustment {
 
   String label(String currency) {
     final sign = type == _AdjustmentType.bonus ? '+' : '-';
-    return '$sign${amount.toStringAsFixed(0)} $currency';
+    return '$sign${NumberFormatUtils.formatSum(amount, currency)} $currency';
   }
 
   String get typeName {
@@ -193,7 +194,7 @@ class _SalaryEmployeeCard extends StatelessWidget {
                 Expanded(
                   flex: 2,
                   child: Text(
-                    '${base.toStringAsFixed(0)} $currency',
+                    '${NumberFormatUtils.formatSum(base, currency)} $currency',
                     style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -242,7 +243,7 @@ class _SalaryEmployeeCard extends StatelessWidget {
                 Expanded(
                   flex: 2,
                   child: Text(
-                    '${total.toStringAsFixed(0)} $currency',
+                    '${NumberFormatUtils.formatSum(total, currency)} $currency',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.primary,
                       fontWeight: FontWeight.w600,
@@ -316,7 +317,7 @@ class _SalaryEmployeeCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '${loc.t('ttk_total')}: ${base.toStringAsFixed(0)} $currency',
+                    '${loc.t('ttk_total')}: ${NumberFormatUtils.formatSum(base, currency)} $currency',
                     style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                   ),
                   const SizedBox(height: 8),
@@ -366,7 +367,7 @@ class _SalaryEmployeeCard extends StatelessWidget {
                   if (adjustments.isNotEmpty && expanded) ...[
                     const SizedBox(height: 6),
                     Text(
-                      'Корректировка: ${adjTotal >= 0 ? '+' : ''}${adjTotal.toStringAsFixed(0)} $currency',
+                      'Корректировка: ${adjTotal >= 0 ? '+' : ''}${NumberFormatUtils.formatSum(adjTotal, currency)} $currency',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: adjTotal >= 0 ? Colors.green : Colors.red,
                         fontWeight: FontWeight.w600,
@@ -375,7 +376,7 @@ class _SalaryEmployeeCard extends StatelessWidget {
                   ],
                   const SizedBox(height: 8),
                   Text(
-                    '${loc.t('salary_payable') ?? 'К выплате'}: ${(base + adjTotal).toStringAsFixed(0)} $currency',
+                    '${loc.t('salary_payable') ?? 'К выплате'}: ${NumberFormatUtils.formatSum(base + adjTotal, currency)} $currency',
                     style: theme.textTheme.titleSmall?.copyWith(
                       color: theme.colorScheme.primary,
                       fontWeight: FontWeight.bold,
@@ -996,7 +997,7 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
                                   style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                                 ),
                                 Text(
-                                  '${_totalIncluded().toStringAsFixed(0)} $currency',
+                                  '${NumberFormatUtils.formatSum(_totalIncluded(), currency)} $currency',
                                   style: theme.textTheme.titleLarge?.copyWith(
                                     fontWeight: FontWeight.bold,
                                     color: theme.colorScheme.primary,

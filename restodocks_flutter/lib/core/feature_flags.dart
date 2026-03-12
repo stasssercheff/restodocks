@@ -1,8 +1,9 @@
 /// Feature flags.
-/// Enable via --dart-define=ENABLE_XXX=true at build time.
+/// Enable via --dart-define=ENABLE_TTK_IMPORT=true at build time.
 class FeatureFlags {
   FeatureFlags._();
 
-  /// TТК import from Excel/PDF. Включён.
-  static bool get ttkImportEnabled => true;
+  /// ТТК import from Excel/PDF. По умолчанию выключен, включается в Beta через ENABLE_TTK_IMPORT=true.
+  static bool get ttkImportEnabled =>
+      const String.fromEnvironment('ENABLE_TTK_IMPORT', defaultValue: 'false') == 'true';
 }

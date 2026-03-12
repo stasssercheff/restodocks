@@ -86,6 +86,8 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
 
   late List<_ReviewItem> _items;
   bool _saving = false;
+  int _saveProgress = 0;
+  int _saveTotal = 0;
 
   @override
   void initState() {
@@ -337,8 +339,13 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
         }
       }
 
+      _saveTotal = productNamesToCreate.length + _items.length + 1;
+      _saveProgress = 0;
+      if (mounted) setState(() {});
+
       // Создаём отсутствующие продукты в каталоге, подтягиваем КБЖУ, добавляем в номенклатуру
       for (final rawName in productNamesToCreate) {
+        if (mounted) setState(() => _saveProgress++);
         final normalizedName = stripIikoPrefix(rawName).trim();
         if (normalizedName.isEmpty) continue;
         final norm = _norm(normalizedName);
@@ -422,6 +429,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
           productStore: productStore,
         );
         created++;
+        if (mounted) setState(() => _saveProgress = productNamesToCreate.length + created);
       }
       if (mounted) {
         setState(() => _saving = false);
@@ -554,12 +562,42 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: _saving || _items.isEmpty ? null : _createAll,
-                  child: _saving ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2)) : Text(loc.t('tech_cards_import_create_all')),
-                ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_saving && _saveTotal > 0) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          LinearProgressIndicator(
+                            value: _saveTotal > 0 ? (_saveProgress / _saveTotal).clamp(0.0, 1.0) : null,
+                            minHeight: 6,
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            '$_saveProgress / $_saveTotal',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: _saving || _items.isEmpty ? null : _createAll,
+                      child: _saving
+                          ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                          : Text(loc.t('tech_cards_import_create_all')),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

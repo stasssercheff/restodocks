@@ -192,23 +192,72 @@ class AiServiceSupabase implements AiService {
     }
   }
 
+  /// Определение формата по magic bytes: docx/xlsx (ZIP), xls (OLE), csv (текст).
+  static String _detectFormat(Uint8List bytes) {
+    if (bytes.length < 8) return 'csv';
+    if (bytes[0] == 0xD0 && bytes[1] == 0xCF && bytes[2] == 0x11 && bytes[3] == 0xE0) return 'ole';
+    if (bytes[0] == 0x50 && bytes[1] == 0x4B) {
+      try {
+        final archive = ZipDecoder().decodeBytes(bytes);
+        if (archive.findFile('word/document.xml') != null) return 'docx';
+      } catch (_) {}
+      return 'xlsx';
+    }
+    return 'csv';
+  }
+
   @override
   Future<List<TechCardRecognitionResult>> parseTechCardsFromExcel(Uint8List xlsxBytes, {String? establishmentId}) async {
     try {
-      var rows = _xlsxToRows(xlsxBytes);
-      if (rows.isEmpty) rows = _csvToRows(xlsxBytes);
+      final fmt = _detectFormat(xlsxBytes);
+      var rows = <List<String>>[];
       String source = 'excel';
-      if (rows.isEmpty) {
-        rows = _docxToRows(xlsxBytes);
-        source = 'docx';
+      List<List<List<String>>>? docxTables;
+
+      if (fmt == 'docx') {
+        docxTables = _docxToAllTables(xlsxBytes);
+        if (docxTables.isNotEmpty) {
+          rows = docxTables.first;
+          source = 'docx';
+        } else {
+          rows = _docxToRows(xlsxBytes);
+          if (rows.isNotEmpty) source = 'docx';
+        }
+      } else if (fmt == 'ole') {
+        rows = await _parseXlsViaServer(xlsxBytes);
+        if (rows.isEmpty) rows = await _parseDocViaServer(xlsxBytes);
+        source = rows.isNotEmpty ? 'xls' : 'doc';
+      } else if (fmt == 'xlsx') {
+        rows = _xlsxToRows(xlsxBytes);
       }
-      // .xls (BIFF) — Dart excel пакет не поддерживает; используем серверный парсинг
+      if (rows.isEmpty) rows = _csvToRows(xlsxBytes);
+      if (rows.isEmpty && fmt != 'docx') {
+        docxTables = _docxToAllTables(xlsxBytes);
+        if (docxTables.isNotEmpty) {
+          rows = docxTables.first;
+          source = 'docx';
+        }
+      }
       if (rows.isEmpty) rows = await _parseXlsViaServer(xlsxBytes);
-      // .doc (Word 97–2003) — через word-extractor на сервере
       if (rows.isEmpty) rows = await _parseDocViaServer(xlsxBytes);
       if (rows.isEmpty) return [];
       rows = _expandSingleCellRows(rows);
       if (rows.length < 2) return [];
+      // DOCX: если много таблиц — парсим каждую; если одна и не парсится — пробуем все по очереди
+      if (docxTables != null && docxTables.isNotEmpty) {
+        final merged = <TechCardRecognitionResult>[];
+        for (final tbl in docxTables) {
+          var expanded = _expandSingleCellRows(tbl);
+          if (expanded.length < 2) continue;
+          var part = AiServiceSupabase.parseTtkByTemplate(expanded);
+          if (part.isEmpty) part = AiServiceSupabase._tryParseKkFromRows(expanded);
+          merged.addAll(part);
+        }
+        if (merged.isNotEmpty) {
+          _saveTemplateFromKeywordParse(rows, 'docx');
+          return merged;
+        }
+      }
       // Сначала шаблон ТТК (Брутто/Нетто, разбивка по Итого) — для CSV/Excel с несколькими карточками.
       // КК (норма/цена) — для простых калькуляционных карт без разбивки.
       var list = AiServiceSupabase.parseTtkByTemplate(rows);
@@ -322,15 +371,15 @@ class AiServiceSupabase implements AiService {
     }
   }
 
-  List<List<String>> _docxToRows(Uint8List bytes) {
+  /// Все таблицы DOCX (для файлов с несколькими ТТК).
+  List<List<List<String>>> _docxToAllTables(Uint8List bytes) {
+    final result = <List<List<String>>>[];
     try {
       final archive = ZipDecoder().decodeBytes(bytes);
       final doc = archive.findFile('word/document.xml');
-      if (doc == null) return [];
+      if (doc == null) return result;
       final xml = XmlDocument.parse(utf8.decode(doc.content as List<int>));
-      // 1. Сначала пробуем таблицу w:tbl — сохраняем структуру строк (Наименование, Продукт, Брутто...)
-      final tables = xml.descendants.whereType<XmlElement>().where((e) => e.localName == 'tbl');
-      for (final tbl in tables) {
+      for (final tbl in xml.descendants.whereType<XmlElement>().where((e) => e.localName == 'tbl')) {
         final tableRows = <List<String>>[];
         for (final tr in tbl.children.whereType<XmlElement>().where((e) => e.localName == 'tr')) {
           final cells = <String>[];
@@ -338,13 +387,23 @@ class AiServiceSupabase implements AiService {
             final texts = tc.descendants.whereType<XmlElement>().where((e) => e.localName == 't').map((e) => e.innerText).toList();
             cells.add(texts.join('').trim());
           }
-          if (cells.any((c) => c.isNotEmpty)) {
-            tableRows.add(cells);
-          }
+          if (cells.any((c) => c.isNotEmpty)) tableRows.add(cells);
         }
-        if (tableRows.length >= 2) return tableRows;
+        if (tableRows.length >= 2) result.add(tableRows);
       }
+    } catch (_) {}
+    return result;
+  }
+
+  List<List<String>> _docxToRows(Uint8List bytes) {
+    try {
+      final tables = _docxToAllTables(bytes);
+      if (tables.isNotEmpty) return tables.first;
       // 2. Fallback: параграфы (документ без таблицы)
+      final archive = ZipDecoder().decodeBytes(bytes);
+      final doc = archive.findFile('word/document.xml');
+      if (doc == null) return [];
+      final xml = XmlDocument.parse(utf8.decode(doc.content as List<int>));
       final paras = xml.descendants.whereType<XmlElement>().where((e) => e.localName == 'p');
       final rows = <List<String>>[];
       for (final p in paras) {
@@ -573,8 +632,8 @@ class AiServiceSupabase implements AiService {
     int headerIdx = -1;
     int nameCol = -1, productCol = -1, grossCol = -1, netCol = -1, wasteCol = -1, outputCol = -1;
 
-    final nameKeys = ['наименование', 'название', 'блюдо', 'пф', 'name', 'dish'];
-    final productKeys = ['продукт', 'сырьё', 'сырья', 'ингредиент', 'product', 'ingredient'];
+    final nameKeys = ['наименование', 'название', 'блюдо', 'пф', 'набор', 'name', 'dish'];
+    final productKeys = ['продукт', 'продукты', 'сырьё', 'сырья', 'ингредиент', 'product', 'ingredient'];
     final grossKeys = ['брутто', 'бр', 'вес брутто', 'расход', 'норма', 'масса', 'gross'];
     final netKeys = ['нетто', 'нт', 'вес нетто', 'net'];
     final wasteKeys = ['отход', 'отх', 'waste', 'процент отхода'];
@@ -585,14 +644,18 @@ class AiServiceSupabase implements AiService {
     bool grossColIsKg = false;
     bool netColIsKg = false;
 
-    // Поиск строки с колонками (Наименование продукта, Брутто, Нетто) — может быть далеко от верха
-    for (var r = 0; r < rows.length; r++) {
+    // Поиск колонок (Наименование, Брутто, Нетто) — заголовок может быть в 2 строках (ГОСТ)
+    for (var r = 0; r < rows.length && r < 25; r++) {
       final row = rows[r].map((c) => c.trim().toLowerCase()).toList();
       for (var c = 0; c < row.length; c++) {
         final cell = row[c];
         if (cell.isEmpty) continue;
+        bool _matchKey(String key, String txt) {
+          if (key.length <= 3) return txt == key || txt == 'п/ф'; // не "ПФ Крем"
+          return txt.contains(key);
+        }
         for (final k in nameKeys) {
-          if (cell.contains(k)) {
+          if (_matchKey(k, cell)) {
             headerIdx = r;
             nameCol = c;
             break;
@@ -600,22 +663,27 @@ class AiServiceSupabase implements AiService {
         }
         for (final k in productKeys) {
           if (cell.contains(k)) {
-            headerIdx = r;
-            productCol = c;
+            // "Расход сырья на 1 порцию" — группа числовых колонок, не колонка продуктов
+            final isNumericHeader = grossKeys.any((g) => cell.contains(g)) || netKeys.any((n) => cell.contains(n));
+            if (!isNumericHeader) {
+              headerIdx = r;
+              productCol = c;
+            }
             break;
           }
         }
         for (final k in grossKeys) {
           if (cell.contains(k)) {
             headerIdx = r;
-            grossCol = c;
+            // Предпочитаем колонку с "кг" (Вес брутто, кг вместо Брутто в ед. изм.)
+            if (grossCol < 0 || cell.contains('кг')) grossCol = c;
             break;
           }
         }
         for (final k in netKeys) {
           if (cell.contains(k)) {
             headerIdx = r;
-            netCol = c;
+            if (netCol < 0 || cell.contains('кг')) netCol = c;
             break;
           }
         }
@@ -641,7 +709,7 @@ class AiServiceSupabase implements AiService {
           }
         }
       }
-      if (headerIdx >= 0 && (nameCol >= 0 || productCol >= 0)) break;
+      // Не break — собираем все колонки (Брутто/Нетто могут быть во 2-й строке заголовка)
     }
     if (headerIdx < 0 || (nameCol < 0 && productCol < 0)) {
       for (var r = 0; r < rows.length && r < 15; r++) {
@@ -653,8 +721,14 @@ class AiServiceSupabase implements AiService {
           headerIdx = r;
           nameCol = 1;
           productCol = 1;
-          if (row.length >= 4) { grossCol = 2; netCol = 3; }
-          if (row.length >= 5) outputCol = 4;
+          for (var c = 2; c < row.length && c < 12; c++) {
+            final h = row[c].trim().toLowerCase();
+            if (h.contains('брутто') && (grossCol < 0 || h.contains('кг'))) grossCol = c;
+            if (h.contains('нетто') && (netCol < 0 || h.contains('кг'))) netCol = c;
+          }
+          if (grossCol < 0 && row.length >= 4) grossCol = 2;
+          if (netCol < 0 && row.length >= 5) netCol = 3;
+          if (row.length >= 6) outputCol = 5;
           break;
         }
       }
@@ -744,8 +818,14 @@ class AiServiceSupabase implements AiService {
         var gross = _parseNum(grossVal);
         var net = _parseNum(netVal);
         var output = _parseNum(outputVal);
-        if (grossColIsKg && gross != null && gross > 0 && gross < 100) gross = gross * 1000;
-        if (netColIsKg && net != null && net > 0 && net < 100) net = net * 1000;
+        final unitCell = unitCol >= 0 && unitCol < cells.length ? cells[unitCol].trim().toLowerCase() : '';
+        final unitIsKg = unitCell.contains('кг') || unitCell == 'kg';
+        if (grossColIsKg || (unitIsKg && gross != null && gross > 0 && gross < 100)) {
+          if (gross != null && gross > 0 && gross < 100) gross = gross * 1000;
+        }
+        if (netColIsKg || (unitIsKg && net != null && net > 0 && net < 100)) {
+          if (net != null && net > 0 && net < 100) net = net * 1000;
+        }
         var outputG = output;
         if (outputCol >= 0 && outputCol < headerRow.length && headerRow[outputCol].contains('кг')) {
           if (output != null && output > 0 && output < 100) outputG = output * 1000;
@@ -754,7 +834,6 @@ class AiServiceSupabase implements AiService {
         if (gross != null && gross > 0 && net != null && net > 0 && net < gross && (waste == null || waste == 0)) {
           waste = (1.0 - net / gross) * 100.0;
         }
-        final unitCell = unitCol >= 0 && unitCol < cells.length ? cells[unitCol].trim().toLowerCase() : '';
         String unit = 'g';
         if (unitCell.contains('л') || unitCell == 'l') unit = 'ml';
         else if (unitCell.contains('шт') || unitCell == 'pcs') unit = 'pcs';
@@ -970,7 +1049,7 @@ class AiServiceSupabase implements AiService {
         'waste_col': wasteCol >= 0 ? wasteCol : -1,
         'output_col': outputCol >= 0 ? outputCol : -1,
         'source': source,
-      }, onConflict: 'header_signature').then((_) {});
+      }, onConflict: 'header_signature').then((_) {}).catchError((_) {});
     } catch (_) {}
   }
 
@@ -1027,8 +1106,9 @@ class AiServiceSupabase implements AiService {
         'gross_col': grossCol,
         'net_col': netCol,
         'waste_col': -1,
+        'output_col': -1,
         'source': source,
-      }, onConflict: 'header_signature').then((_) {});
+      }, onConflict: 'header_signature').then((_) {}).catchError((_) {});
     } catch (_) {}
   }
 
