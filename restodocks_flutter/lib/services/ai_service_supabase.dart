@@ -837,10 +837,35 @@ class AiServiceSupabase implements AiService {
     if (headerIdx < 0 || (nameCol < 0 && productCol < 0)) {
       for (var r = 0; r < rows.length && r < 15; r++) {
         final row = rows[r];
-        if (row.length < 3) continue;
+        if (row.length < 2) continue;
         final c0 = row[0].trim().toLowerCase();
+        // № | Наименование продукта (c1 может быть пустым — колонка между № и названием)
+        if (c0 == '№' || c0 == 'n' || RegExp(r'^\d+$').hasMatch(c0)) {
+          var foundProductCol = -1;
+          for (var c = 1; c < row.length && c < 12; c++) {
+            final h = row[c].trim().toLowerCase();
+            if (h.contains('наименование') && h.contains('продукт')) {
+              foundProductCol = c;
+              break;
+            }
+          }
+          if (foundProductCol >= 0) {
+            headerIdx = r;
+            nameCol = foundProductCol;
+            productCol = foundProductCol;
+            for (var c = foundProductCol + 1; c < row.length && c < 12; c++) {
+              final h = row[c].trim().toLowerCase();
+              if (h.contains('брутто') && (grossCol < 0 || h.contains('кг'))) grossCol = c;
+              if (h.contains('нетто') && (netCol < 0 || h.contains('кг'))) netCol = c;
+              if ((h.contains('вес гр') || h.contains('1 порция') || h.contains('вес брутто')) && grossCol < 0) grossCol = c;
+            }
+            if (grossCol < 0 && row.length >= foundProductCol + 2) grossCol = foundProductCol + 1;
+            if (netCol < 0 && row.length >= foundProductCol + 4) netCol = foundProductCol + 2;
+            break;
+          }
+        }
         final c1 = row.length > 1 ? row[1].trim() : '';
-        if ((c0 == '№' || c0 == 'n' || RegExp(r'^\d+$').hasMatch(c0)) && c1.length >= 2 && !RegExp(r'^[\d,.\s]+$').hasMatch(c1)) {
+        if ((c0 == '№' || c0 == 'n') && c1.length >= 2 && !RegExp(r'^[\d,.\s]+$').hasMatch(c1)) {
           headerIdx = r;
           nameCol = 1;
           productCol = 1;

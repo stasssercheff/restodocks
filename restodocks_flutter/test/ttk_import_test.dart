@@ -119,6 +119,23 @@ void main() {
       expect(list[1].ingredients.length, greaterThanOrEqualTo(2));
     });
 
+    test('parseTtkByTemplate iiko/1С с пустой колонкой № empty Наименование (печенная свекла.xls)', () {
+      final rows = [
+        ['ПЕЧЕНАЯ СВЕКЛА С СЫРОМ СТРАЧАТЕЛЛА И ШПИНАТОМ', '', '', '', '', '', '', '', '', ''],
+        ['Технологическая карта № 121138271', '', '', '', '', '', '', '', '', ''],
+        ['', '', '', '', '', '', '', '', '', ''],
+        ['№', '', 'Наименование продукта', '', '', '', 'Ед. изм.', 'Брутто в ед. изм.', '', 'Вес брутто, кг'],
+        ['1', '', 'Свекла печеная п/ф.', '', '', '', 'кг', '0.23', '', '0.23'],
+        ['2', '', 'Соус органик п/ф.', '', '', '', 'кг', '0.03', '', '0.03'],
+        ['3', '', 'Орех Кедровый', '', '', '', 'кг', '0.01', '', '0.01'],
+        ['ИТОГО', '', '', '', '', '', '', '', '', ''],
+      ];
+      final list = AiServiceSupabase.parseTtkByTemplate(rows);
+      expect(list.length, 1, reason: 'Got: ${list.map((c) => "${c.dishName}(${c.ingredients.length})").join("; ")}');
+      expect(list[0].dishName, contains('ПЕЧЕНАЯ'));
+      expect(list[0].ingredients.length, greaterThanOrEqualTo(3));
+    });
+
     test('parseTtkByTemplate ГОСТ 2-row header (docx Цезарь)', () {
       // Заголовок в 2 строках: row0 Наименование/Расход, row1 Брутто/Нетто
       final rows = [
