@@ -83,6 +83,7 @@ Deno.serve(async (req: Request) => {
       ],
       temperature: 0.2,
       maxTokens: 4096,
+      context: "product",
     });
 
     if (!content?.trim()) {

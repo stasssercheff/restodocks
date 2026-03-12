@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
+import '../utils/dev_log.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Сервис для работы с Supabase
@@ -16,7 +17,7 @@ class SupabaseService {
       await client.from('establishments').select('id').limit(1);
       return true;
     } catch (e) {
-      print('Supabase connection error: $e');
+      devLog('Supabase connection error: $e');
       return false;
     }
   }
@@ -68,7 +69,7 @@ class SupabaseService {
   /// Вставка данных в таблицу
   Future<Map<String, dynamic>> insertData(String tableName, Map<String, dynamic> data) async {
     if (kDebugMode) {
-      debugPrint('SupabaseService: insert $tableName');
+      devLog('SupabaseService: insert $tableName');
     }
     final response = await client.from(tableName).insert(data).select();
     if (response.isEmpty) {
@@ -102,7 +103,7 @@ class SupabaseService {
       );
     } catch (e) {
       if (e is Exception) rethrow;
-      if (kDebugMode) debugPrint('SupabaseService: updateData error ($tableName): $e');
+      if (kDebugMode) devLog('SupabaseService: updateData error ($tableName): $e');
       rethrow;
     }
   }

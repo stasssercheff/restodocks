@@ -133,17 +133,14 @@ Examples:
 
     const systemPrompt = SYSTEM_PROMPT + contextBlock;
 
-    // Gemini быстрее из ap-northeast-1; GigaChat может быть недоступен
-    if (!Deno.env.get("AI_PROVIDER") && Deno.env.get("GEMINI_API_KEY")?.trim()) {
-      Deno.env.set("AI_PROVIDER", "gemini");
-    }
-    console.log("[ai-generate-checklist] Calling AI, provider:", getProvider());
+    console.log("[ai-generate-checklist] Calling AI, provider:", getProvider("checklist"));
     const content = await chatText({
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: prompt },
       ],
       temperature: 0.5,
+      context: "checklist",
     });
 
     if (!content?.trim()) {
@@ -196,6 +193,7 @@ Examples:
             { role: "user", content: `Checklist: ${prompt}` },
           ],
           temperature: 0.5,
+          context: "checklist",
         });
         if (fallbackContent?.trim()) {
           let fs = fallbackContent.trim();
@@ -222,6 +220,7 @@ Examples:
             { role: "user", content: `${prompt}\n\nGenerate a checklist. Return JSON: {"name":"Checklist title","items":["item1","item2","item3",...]}. Items = short task names. Output ONLY valid JSON.` },
           ],
           temperature: 0.5,
+          context: "checklist",
         });
         if (fallbackContent?.trim()) {
           let fs = fallbackContent.trim();
@@ -266,6 +265,7 @@ Examples:
             { role: "user", content: `${prompt}\n\n${fallbackPrompt}` },
           ],
           temperature: 0.5,
+          context: "checklist",
         });
         if (fallbackContent?.trim()) {
           let fs = fallbackContent.trim();

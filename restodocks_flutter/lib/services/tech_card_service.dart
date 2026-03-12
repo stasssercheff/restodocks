@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/dev_log.dart';
 
 import '../models/models.dart';
 
@@ -207,7 +208,7 @@ class TechCardService {
       await saveTechCard(techCard);
       return techCard;
     } catch (e) {
-      print('Ошибка импорта ТТК: $e');
+      devLog('Ошибка импорта ТТК: $e');
       return null;
     }
   }

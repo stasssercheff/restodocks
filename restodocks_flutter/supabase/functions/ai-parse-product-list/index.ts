@@ -116,9 +116,6 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    if (!Deno.env.get("AI_PROVIDER") && Deno.env.get("GEMINI_API_KEY")?.trim()) {
-      Deno.env.set("AI_PROVIDER", "gemini");
-    }
     const body = (await req.json()) as {
       rows?: string[];
       text?: string;
@@ -197,6 +194,7 @@ Deno.serve(async (req: Request) => {
       ],
       temperature: 0.2,
       maxTokens: 8192,
+      context: "product",
     });
 
     if (!content?.trim()) {

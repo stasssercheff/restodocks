@@ -14,6 +14,7 @@ import 'package:uuid/uuid.dart';
 
 import '../models/iiko_product.dart';
 import '../utils/number_format_utils.dart';
+import '../utils/product_name_utils.dart';
 import '../services/iiko_product_store.dart';
 import '../services/iiko_xlsx_sanitizer.dart';
 
@@ -1537,16 +1538,17 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('no_establishment'))));
       return;
     }
+    final store = context.read<ProductStoreSupabase>();
     final result = await showDialog<({String name, String category, String unit})>(
       context: context,
       builder: (ctx) => _AddProductDialog(
         loc: loc,
         categories: _addProductCategories,
         units: _addProductUnits,
+        store: store,
       ),
     );
     if (result == null || result.name.trim().isEmpty || !mounted) return;
-    final store = context.read<ProductStoreSupabase>();
     final translationManager = context.read<TranslationManager>();
     final defCur = account.establishment?.defaultCurrency ?? 'VND';
     final sourceName = result.name.trim();
@@ -1894,18 +1896,20 @@ class _AddProductDialog extends StatefulWidget {
     required this.loc,
     required this.categories,
     required this.units,
+    required this.store,
   });
 
   final LocalizationService loc;
   final List<String> categories;
   final List<String> units;
+  final ProductStoreSupabase store;
 
   @override
   State<_AddProductDialog> createState() => _AddProductDialogState();
 }
 
 class _AddProductDialogState extends State<_AddProductDialog> {
-  late TextEditingController _nameController;
+  TextEditingController? _nameController;
   late String _category;
   late String _unit;
   bool _recognizing = false;
@@ -1913,19 +1917,12 @@ class _AddProductDialogState extends State<_AddProductDialog> {
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController();
     _category = 'manual';
     _unit = 'g';
   }
 
-  @override
-  void dispose() {
-    _nameController.dispose();
-    super.dispose();
-  }
-
   Future<void> _recognize() async {
-    final name = _nameController.text.trim();
+    final name = _nameController?.text.trim() ?? '';
     if (name.isEmpty) return;
     setState(() => _recognizing = true);
     final ai = context.read<AiService>();
@@ -1937,7 +1934,7 @@ class _AddProductDialogState extends State<_AddProductDialog> {
     setState(() {
       _recognizing = false;
       if (result != null) {
-        _nameController.text = result.normalizedName;
+        _nameController?.text = result.normalizedName;
         if (result.suggestedCategory != null && widget.categories.contains(result.suggestedCategory)) {
           _category = result.suggestedCategory!;
         }
@@ -1957,13 +1954,60 @@ class _AddProductDialogState extends State<_AddProductDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            TextField(
-              controller: _nameController,
-              decoration: InputDecoration(
-                labelText: widget.loc.t('product_name'),
-                border: const OutlineInputBorder(),
+            Autocomplete<String>(
+              optionsBuilder: (textEditingValue) {
+                final query = textEditingValue.text.trim().toLowerCase();
+                if (query.isEmpty) return const Iterable<String>.empty();
+                final qStripped = stripIikoPrefix(query).toLowerCase();
+                return widget.store.allProducts
+                    .map((p) => p.getLocalizedName(widget.loc.currentLanguageCode))
+                    .where((name) {
+                      final n = name.toLowerCase();
+                      final nStripped = stripIikoPrefix(name).toLowerCase();
+                      return n.contains(query) || n.contains(qStripped) ||
+                          nStripped.contains(query) || nStripped.contains(qStripped);
+                    })
+                    .take(15);
+              },
+              fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                _nameController = controller;
+                return TextField(
+                  controller: controller,
+                  focusNode: focusNode,
+                  decoration: InputDecoration(
+                    labelText: widget.loc.t('product_name'),
+                    border: const OutlineInputBorder(),
+                  ),
+                  onSubmitted: (_) => _recognize(),
+                );
+              },
+              onSelected: (value) {
+                _nameController?.text = value;
+              },
+              optionsViewBuilder: (context, onSelected, options) => Align(
+                alignment: Alignment.topLeft,
+                child: Material(
+                  elevation: 4,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 200),
+                    child: ListView.builder(
+                      padding: EdgeInsets.zero,
+                      shrinkWrap: true,
+                      itemCount: options.length,
+                      itemBuilder: (context, i) {
+                        final opt = options.elementAt(i);
+                        return InkWell(
+                          onTap: () => onSelected(opt),
+                          child: ListTile(
+                            dense: true,
+                            title: Text(opt, style: const TextStyle(fontSize: 14)),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
               ),
-              onSubmitted: (_) => _recognize(),
             ),
             const SizedBox(height: 8),
             FilledButton.tonalIcon(
@@ -1992,7 +2036,7 @@ class _AddProductDialogState extends State<_AddProductDialog> {
         TextButton(onPressed: () => Navigator.of(context).pop(null), child: Text(widget.loc.t('cancel'))),
         FilledButton(
           onPressed: () {
-            final name = _nameController.text.trim();
+            final name = _nameController?.text.trim() ?? '';
             if (name.isEmpty) return;
             Navigator.of(context).pop((name: name, category: _category, unit: _unit));
           },

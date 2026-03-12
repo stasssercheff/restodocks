@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
+import '../utils/dev_log.dart';
 import 'package:flutter/foundation.dart';
 
 /// Утилита для байтового патча xlsx-бланка iiko.
@@ -117,7 +118,7 @@ class IikoXlsxPatcher {
         }
       }
       final codeColLetter = colLetter(codeColIdx);
-      debugPrint(
+      devLog(
           'IikoXlsxPatcher[$sheetName]: codeCol=$codeColLetter qtyCol=$qtyColLetter');
 
       var patchedCount = 0;
@@ -182,7 +183,7 @@ class IikoXlsxPatcher {
           return '$rowOpen$rowBody$rowClose';
         },
       );
-      debugPrint('IikoXlsxPatcher[$sheetName]: patched $patchedCount rows');
+      devLog('IikoXlsxPatcher[$sheetName]: patched $patchedCount rows');
       return result;
     }
 

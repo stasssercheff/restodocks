@@ -1,4 +1,5 @@
 import '../models/checklist_submission.dart';
+import '../utils/dev_log.dart';
 import 'supabase_service.dart';
 
 /// Сервис отправленных заполненных чеклистов.
@@ -83,7 +84,7 @@ class ChecklistSubmissionService {
           .map((e) => ChecklistSubmission.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList();
     } catch (e) {
-      print('Ошибка загрузки checklist_submissions: $e');
+      devLog('Ошибка загрузки checklist_submissions: $e');
       return [];
     }
   }
@@ -100,7 +101,7 @@ class ChecklistSubmissionService {
           .map((e) => ChecklistSubmission.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList();
     } catch (e) {
-      print('Ошибка загрузки checklist_submissions: $e');
+      devLog('Ошибка загрузки checklist_submissions: $e');
       return [];
     }
   }
@@ -115,7 +116,7 @@ class ChecklistSubmissionService {
           .maybeSingle();
       return data != null ? ChecklistSubmission.fromJson(Map<String, dynamic>.from(data as Map)) : null;
     } catch (e) {
-      print('Ошибка загрузки checklist_submission: $e');
+      devLog('Ошибка загрузки checklist_submission: $e');
       return null;
     }
   }

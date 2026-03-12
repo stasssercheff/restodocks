@@ -5,6 +5,7 @@ import 'package:restodocks/core/supabase_url_resolver_stub.dart'
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/models.dart';
+import '../utils/dev_log.dart';
 import 'secure_storage_service.dart';
 import 'supabase_service.dart';
 
@@ -73,7 +74,7 @@ class AccountManagerSupabase extends ChangeNotifier {
     if (forceRetryFromAuth) _initialized = false;
     // Если уже инициализирован и авторизован — не повторяем дорогую инициализацию.
     if (_initialized && isLoggedInSync) return;
-    print('🔐 AccountManager: Starting initialization...');
+    devLog('🔐 AccountManager: Starting initialization...');
     await _secureStorage.initialize();
 
     await _tryRestoreSession();
@@ -85,20 +86,20 @@ class AccountManagerSupabase extends ChangeNotifier {
     _initialized = true;
     if (isLoggedInSync) return;
 
-    print('🔐 AccountManager: No stored session and not authenticated');
+    devLog('🔐 AccountManager: No stored session and not authenticated');
   }
 
   Future<void> _tryRestoreSession() async {
     final employeeId = await _secureStorage.get(_keyEmployeeId);
     final establishmentId = await _secureStorage.get(_keyEstablishmentId);
-    print('🔐 AccountManager: Storage - employee: $employeeId, establishment: $establishmentId, auth: ${_supabase.isAuthenticated}');
+    devLog('🔐 AccountManager: Storage - employee: $employeeId, establishment: $establishmentId, auth: ${_supabase.isAuthenticated}');
 
     // 1. Сначала проверяем Supabase Auth — приоритет для пользователей с auth
     if (_supabase.isAuthenticated) {
-      print('🔐 AccountManager: Supabase Auth session found, loading user data...');
+      devLog('🔐 AccountManager: Supabase Auth session found, loading user data...');
       final ok = await _loadCurrentUserFromAuth();
       if (ok) {
-        print('🔐 AccountManager: User data loaded from Auth, logged in: $isLoggedInSync');
+        devLog('🔐 AccountManager: User data loaded from Auth, logged in: $isLoggedInSync');
         await _checkPromoAccess();
         return;
       }
@@ -106,9 +107,9 @@ class AccountManagerSupabase extends ChangeNotifier {
 
     // 2. Иначе — восстановление из хранилища (legacy)
     if (employeeId != null && establishmentId != null) {
-      print('🔐 AccountManager: Restoring session from storage...');
+      devLog('🔐 AccountManager: Restoring session from storage...');
       await _restoreSession(employeeId, establishmentId);
-      print('🔐 AccountManager: Session restored, logged in: $isLoggedInSync');
+      devLog('🔐 AccountManager: Session restored, logged in: $isLoggedInSync');
       await _checkPromoAccess();
     }
   }
@@ -123,18 +124,18 @@ class AccountManagerSupabase extends ChangeNotifier {
         params: {'p_establishment_id': estId},
       );
       if (result == 'expired') {
-        print('🔐 AccountManager: Promo code expired for establishment $estId — logging out');
+        devLog('🔐 AccountManager: Promo code expired for establishment $estId — logging out');
         await logout();
       }
     } catch (e) {
-      print('🔐 AccountManager: _checkPromoAccess error (ignored): $e');
+      devLog('🔐 AccountManager: _checkPromoAccess error (ignored): $e');
       // Не блокируем доступ при ошибке сети
     }
   }
 
   Future<void> _restoreSession(String employeeId, String establishmentId) async {
     try {
-      print('🔐 AccountManager: Loading employee data for ID: $employeeId');
+      devLog('🔐 AccountManager: Loading employee data for ID: $employeeId');
       final employeeDataRaw = await _supabase.client
           .from('employees')
           .select()
@@ -143,13 +144,13 @@ class AccountManagerSupabase extends ChangeNotifier {
           .limit(1)
           .single();
 
-      print('🔐 AccountManager: Employee data loaded successfully');
+      devLog('🔐 AccountManager: Employee data loaded successfully');
       final empData = Map<String, dynamic>.from(employeeDataRaw);
       empData['password'] = empData['password_hash'] ?? '';
       _currentEmployee = Employee.fromJson(empData);
       onPreferredLanguageLoaded?.call(_currentEmployee!.preferredLanguage);
 
-      print('🔐 AccountManager: Loading establishment data for ID: $establishmentId');
+      devLog('🔐 AccountManager: Loading establishment data for ID: $establishmentId');
       final estData = await _supabase.client
           .from('establishments')
           .select()
@@ -157,13 +158,13 @@ class AccountManagerSupabase extends ChangeNotifier {
           .limit(1)
           .single();
 
-      print('🔐 AccountManager: Establishment data loaded successfully');
+      devLog('🔐 AccountManager: Establishment data loaded successfully');
       _establishment = Establishment.fromJson(estData);
 
-      print('🔐 AccountManager: Session restored successfully');
+      devLog('🔐 AccountManager: Session restored successfully');
     } catch (e) {
-      print('❌ AccountManager: Error restoring session: $e');
-      print('🔍 AccountManager: This might be RLS policy issue');
+      devLog('❌ AccountManager: Error restoring session: $e');
+      devLog('🔍 AccountManager: This might be RLS policy issue');
       await _clearStoredSession();
       _currentEmployee = null;
       _establishment = null;
@@ -201,7 +202,7 @@ class AccountManagerSupabase extends ChangeNotifier {
       final list = data as List;
       return list.map((e) => Establishment.fromJson(Map<String, dynamic>.from(e as Map))).toList();
     } catch (e) {
-      print('AccountManager: getEstablishmentsForOwner error: $e');
+      devLog('AccountManager: getEstablishmentsForOwner error: $e');
       return [];
     }
   }
@@ -248,7 +249,7 @@ class AccountManagerSupabase extends ChangeNotifier {
       final list = data as List;
       return list.map((e) => Establishment.fromJson(Map<String, dynamic>.from(e as Map))).toList();
     } catch (e) {
-      print('AccountManager: getBranchesForEstablishment error: $e');
+      devLog('AccountManager: getBranchesForEstablishment error: $e');
       return [];
     }
   }
@@ -331,7 +332,7 @@ class AccountManagerSupabase extends ChangeNotifier {
 
       return Establishment.fromJson(data);
     } catch (e) {
-      print('Ошибка поиска заведения: $e');
+      devLog('Ошибка поиска заведения: $e');
       return null;
     }
   }
@@ -349,7 +350,7 @@ class AccountManagerSupabase extends ChangeNotifier {
 
       return Establishment.fromJson(data);
     } catch (e) {
-      print('Ошибка поиска заведения по PIN: $e');
+      devLog('Ошибка поиска заведения по PIN: $e');
       return null;
     }
   }
@@ -408,7 +409,7 @@ class AccountManagerSupabase extends ChangeNotifier {
 
     // Отправка email с ссылкой (здесь должна быть интеграция с email сервисом)
     final invitationLink = 'https://yourapp.com/accept-co-owner-invitation?token=$token';
-    print('Invitation link: $invitationLink'); // Временно выводим в консоль
+    devLog('Invitation link: $invitationLink'); // Временно выводим в консоль
 
     // TODO: Интегрировать с email сервисом для отправки приглашения
   }
@@ -424,9 +425,9 @@ class AccountManagerSupabase extends ChangeNotifier {
           .or('email.ilike.%test%,email.ilike.%demo%,email.ilike.%example%')
           .neq('roles', ['owner']); // Не удаляем владельцев
 
-      print('Test employees deleted successfully');
+      devLog('Test employees deleted successfully');
     } catch (e) {
-      print('Error deleting test employees: $e');
+      devLog('Error deleting test employees: $e');
       rethrow;
     }
   }
@@ -494,43 +495,43 @@ class AccountManagerSupabase extends ChangeNotifier {
   /// Регистрация в Supabase Auth (для сотрудников). Возвращает (userId, hasSession).
   Future<({String? userId, bool hasSession})> signUpToSupabaseAuth(String email, String password) async {
     final emailTrim = email.trim();
-    print('DEBUG: signUpToSupabaseAuth called with email: $emailTrim');
+    devLog('DEBUG: signUpToSupabaseAuth called with email: $emailTrim');
 
     // Сначала попробуем войти - вдруг пользователь уже существует
     try {
-      print('DEBUG: Attempting signIn first...');
+      devLog('DEBUG: Attempting signIn first...');
       final signInRes = await _supabase.signInWithEmail(emailTrim, password);
       if (_supabase.currentUser != null) {
-        print('DEBUG: User already exists, signed in: ${_supabase.currentUser!.id}');
+        devLog('DEBUG: User already exists, signed in: ${_supabase.currentUser!.id}');
         return (userId: _supabase.currentUser!.id, hasSession: signInRes.session != null);
       }
     } catch (signInError) {
-      print('DEBUG: signIn failed: $signInError');
+      devLog('DEBUG: signIn failed: $signInError');
       // Продолжаем к signUp
     }
 
     // Если вход не удался, пробуем зарегистрировать нового пользователя
     try {
-      print('DEBUG: Attempting signUp...');
+      devLog('DEBUG: Attempting signUp...');
       final redirectUrl = _getEmailRedirectUrl();
       final res = await _supabase.signUpWithEmail(emailTrim, password, emailRedirectTo: redirectUrl);
       final uid = res.user?.id ?? _supabase.currentUser?.id;
       final hasSession = res.session != null;
-      print('DEBUG: signUp completed, userId: $uid, hasSession: $hasSession');
+      devLog('DEBUG: signUp completed, userId: $uid, hasSession: $hasSession');
       return (userId: uid, hasSession: hasSession);
     } catch (signUpError) {
-      print('DEBUG: signUpWithEmail failed: $signUpError');
+      devLog('DEBUG: signUpWithEmail failed: $signUpError');
 
       // Если signUp тоже не удался из-за "user already exists", попробуем войти еще раз
       if (signUpError.toString().contains('already') || signUpError.toString().contains('exists')) {
         try {
-          print('DEBUG: signUp failed with "already exists", trying signIn again...');
+          devLog('DEBUG: signUp failed with "already exists", trying signIn again...');
           final signInRes = await _supabase.signInWithEmail(emailTrim, password);
           if (_supabase.currentUser != null) {
             return (userId: _supabase.currentUser!.id, hasSession: signInRes.session != null);
           }
         } catch (finalSignInError) {
-          print('DEBUG: Final signIn also failed: $finalSignInError');
+          devLog('DEBUG: Final signIn also failed: $finalSignInError');
         }
       }
 
@@ -620,7 +621,7 @@ class AccountManagerSupabase extends ChangeNotifier {
         establishment: Establishment.fromJson(estData),
       );
     } catch (e) {
-      if (kDebugMode) debugPrint('🔐 fix_owner_without_employee fallback: $e');
+      devLog('🔐 fix_owner_without_employee fallback: $e');
       return null;
     }
   }
@@ -712,7 +713,7 @@ class AccountManagerSupabase extends ChangeNotifier {
             return (employee: employee, establishment: establishment);
           }
         } catch (fixErr) {
-          if (kDebugMode) debugPrint('🔐 fix_owner_without_employee failed: $fixErr');
+          devLog('🔐 fix_owner_without_employee failed: $fixErr');
         }
 
         await _supabase.signOut();
@@ -724,11 +725,11 @@ class AccountManagerSupabase extends ChangeNotifier {
       }
       // Логируем всегда — иначе в prod (kDebugMode=false) не увидим причину
       lastLoginError = 'Auth: ${authErr.toString().replaceAll(RegExp(r'\s+'), ' ')}';
-      print('🔐 Login: Supabase Auth failed: $authErr');
+      devLog('🔐 Login: Supabase Auth failed: $authErr');
       if (authErr.toString().contains('Invalid login credentials')) {
-        print('🔐 Login: (Invalid credentials → пробуем legacy authenticate-employee)');
+        devLog('🔐 Login: (Invalid credentials → пробуем legacy authenticate-employee)');
       } else if (authErr.toString().toLowerCase().contains('cors') || authErr.toString().toLowerCase().contains('network')) {
-        print('🔐 Login: (CORS/сеть? Добавь restodocks.com в Supabase Auth Redirect URLs и API CORS)');
+        devLog('🔐 Login: (CORS/сеть? Добавь restodocks.com в Supabase Auth Redirect URLs и API CORS)');
       }
       try {
         await _supabase.signOut();
@@ -763,7 +764,7 @@ class AccountManagerSupabase extends ChangeNotifier {
     for (var attempt = 0; attempt < maxRetries; attempt++) {
       if (attempt > 0) {
         await Future<void>.delayed(Duration(milliseconds: retryDelays[attempt - 1]));
-        if (kDebugMode) debugPrint('🔐 authenticate-employee retry $attempt/$maxRetries');
+        devLog('🔐 authenticate-employee retry $attempt/$maxRetries');
       }
       try {
         final resp = await dio.post(url, data: body);
@@ -808,19 +809,19 @@ class AccountManagerSupabase extends ChangeNotifier {
     String password,
   ) async {
     try {
-      print('🔐 Login: Legacy fallback — calling authenticate-employee (HTTP)');
+      devLog('🔐 Login: Legacy fallback — calling authenticate-employee (HTTP)');
 
       final res = await _invokeAuthenticateEmployeeHttp({'email': email, 'password': password});
 
       if (res.status == 401) {
         lastLoginError = (lastLoginError != null ? '$lastLoginError → ' : '') + 'Legacy: 401 invalid credentials';
-        print('🔐 Login: Legacy — invalid credentials (401)');
+        devLog('🔐 Login: Legacy — invalid credentials (401)');
         return null;
       }
 
       if (res.status != 200) {
         lastLoginError = (lastLoginError != null ? '$lastLoginError → ' : '') + 'Legacy: ${res.status} ${res.data}';
-        print('🔐 Login: Legacy — Edge Function error: ${res.status}, data=${res.data}');
+        devLog('🔐 Login: Legacy — Edge Function error: ${res.status}, data=${res.data}');
         return null;
       }
 
@@ -828,7 +829,7 @@ class AccountManagerSupabase extends ChangeNotifier {
       if (data == null) return null;
       if (data is! Map<String, dynamic>) return null;
       if (data.containsKey('error')) {
-        if (kDebugMode) debugPrint('🔐 Login: Legacy — error: ${data['error']}');
+        devLog('🔐 Login: Legacy — error: ${data['error']}');
         return null;
       }
 
@@ -842,11 +843,24 @@ class AccountManagerSupabase extends ChangeNotifier {
       final employee = Employee.fromJson(empData);
       final establishment = Establishment.fromJson(Map<String, dynamic>.from(estRaw as Map));
 
-      if (kDebugMode) debugPrint('🔐 Login: Legacy — success for ${employee.email}');
+      // Если сервер создал auth user — входим в Supabase Auth для последующих запросов с JWT (RLS)
+      final authUserCreated = data['authUserCreated'] == true;
+      if (authUserCreated) {
+        try {
+          await _supabase.signInWithEmail(email.trim(), password);
+          if (_supabase.isAuthenticated) {
+            devLog('🔐 Login: Legacy → Supabase Auth session established for ${employee.email}');
+          }
+        } catch (signInErr) {
+          devLog('🔐 Login: signInWithPassword after authUserCreated failed (continuing with legacy): $signInErr');
+        }
+      }
+
+      devLog('🔐 Login: Legacy — success for ${employee.email}');
       return (employee: employee, establishment: establishment);
     } catch (e, st) {
       lastLoginError = (lastLoginError != null ? '$lastLoginError → ' : '') + 'Legacy exception: $e';
-      print('🔐 Login: Legacy Edge Function threw: $e');
+      devLog('🔐 Login: Legacy Edge Function threw: $e');
       rethrow;
     }
   }
@@ -877,7 +891,7 @@ class AccountManagerSupabase extends ChangeNotifier {
       empData['password_hash'] = '';
       return Employee.fromJson(empData);
     } catch (e) {
-      if (kDebugMode) debugPrint('🔐 findEmployeeByEmailAndPassword error: $e');
+      devLog('🔐 findEmployeeByEmailAndPassword error: $e');
       return null;
     }
   }
@@ -892,15 +906,15 @@ class AccountManagerSupabase extends ChangeNotifier {
     String? email,
     String? password,
   }) async {
-    print('🔐 AccountManager: Setting current user - employee: ${employee.id}, establishment: ${establishment.id}');
+    devLog('🔐 AccountManager: Setting current user - employee: ${employee.id}, establishment: ${establishment.id}');
     _currentEmployee = employee;
     _establishment = establishment;
     onPreferredLanguageLoaded?.call(employee.preferredLanguage);
 
-    print('🔐 AccountManager: Saving to secure storage...');
+    devLog('🔐 AccountManager: Saving to secure storage...');
     await _secureStorage.set(_keyEmployeeId, employee.id);
     await _secureStorage.set(_keyEstablishmentId, establishment.id);
-    print('🔐 AccountManager: Data saved to secure storage');
+    devLog('🔐 AccountManager: Data saved to secure storage');
 
     if (rememberCredentials && email != null && password != null) {
       await _secureStorage.set(_keyRememberEmail, email);
@@ -943,12 +957,13 @@ class AccountManagerSupabase extends ChangeNotifier {
 
       return (data as List).map((json) => Employee.fromJson(json)).toList();
     } catch (e) {
-      print('Ошибка получения сотрудников: $e');
+      devLog('Ошибка получения сотрудников: $e');
       return [];
     }
   }
 
-  /// Шеф-повара заведения (для инвентаризации: кабинет + email).
+  /// Шеф-повара/су-шеф/владельцы заведения (для инвентаризации: кабинет + email).
+  /// Приоритет: executive_chef, sous_chef, owner — чтобы хотя бы один получатель был.
   Future<List<Employee>> getExecutiveChefsForEstablishment(String establishmentId) async {
     try {
       final data = await _supabase.client
@@ -958,9 +973,14 @@ class AccountManagerSupabase extends ChangeNotifier {
           .eq('is_active', true);
 
       final all = (data as List).map((json) => Employee.fromJson(json)).toList();
-      return all.where((e) => e.roles.contains('executive_chef')).toList();
+      final execChefs = all.where((e) => e.roles.contains('executive_chef')).toList();
+      if (execChefs.isNotEmpty) return execChefs;
+      final sousChefs = all.where((e) => e.roles.contains('sous_chef')).toList();
+      if (sousChefs.isNotEmpty) return sousChefs;
+      final owners = all.where((e) => e.roles.contains('owner')).toList();
+      return owners;
     } catch (e) {
-      print('Ошибка получения шеф-поваров: $e');
+      devLog('Ошибка получения шеф-поваров: $e');
       return [];
     }
   }
@@ -1023,7 +1043,7 @@ class AccountManagerSupabase extends ChangeNotifier {
         notifyListeners();
       }
     } catch (e) {
-      print('Ошибка обновления сотрудника: $e');
+      devLog('Ошибка обновления сотрудника: $e');
       rethrow;
     }
   }
@@ -1032,14 +1052,14 @@ class AccountManagerSupabase extends ChangeNotifier {
   @Deprecated('Use deleteEmployeeWithPin for full deletion and email reuse')
   Future<void> deleteEmployee(String employeeId) async {
     try {
-      print('🗑️ AccountManager: Deleting employee $employeeId...');
+      devLog('🗑️ AccountManager: Deleting employee $employeeId...');
       await _supabase.client
           .from('employees')
           .delete()
           .eq('id', employeeId);
-      print('✅ AccountManager: Employee deleted successfully');
+      devLog('✅ AccountManager: Employee deleted successfully');
     } catch (e) {
-      print('❌ AccountManager: Failed to delete employee: $e');
+      devLog('❌ AccountManager: Failed to delete employee: $e');
       rethrow;
     }
   }
@@ -1129,7 +1149,7 @@ class AccountManagerSupabase extends ChangeNotifier {
       _establishment = establishment;
       notifyListeners(); // Обновить символ валюты в номенклатуре и др.
     } catch (e) {
-      print('Ошибка обновления заведения: $e');
+      devLog('Ошибка обновления заведения: $e');
       rethrow; // Пробросить, чтобы UI мог показать ошибку
     }
   }
@@ -1146,7 +1166,7 @@ class AccountManagerSupabase extends ChangeNotifier {
           .eq('id', emp.id);
       _currentEmployee = emp.copyWith(preferredLanguage: languageCode);
     } catch (e) {
-      print('AccountManager: savePreferredLanguage error: $e');
+      devLog('AccountManager: savePreferredLanguage error: $e');
     }
   }
 
@@ -1156,10 +1176,11 @@ class AccountManagerSupabase extends ChangeNotifier {
       final authUserId = _supabase.currentUser?.id;
       if (authUserId == null) return false;
 
+      // employees.id = auth.uid() (owners) или employees.auth_user_id = auth.uid() (legacy→auth)
       var list = await _supabase.client
           .from('employees')
           .select()
-          .eq('id', authUserId)
+          .or('id.eq.$authUserId,auth_user_id.eq.$authUserId')
           .eq('is_active', true)
           .limit(1);
 
@@ -1217,7 +1238,7 @@ class AccountManagerSupabase extends ChangeNotifier {
       await _secureStorage.set(_keyEstablishmentId, _establishment!.id);
       return true;
     } catch (e) {
-      print('🔐 AccountManager: _loadCurrentUserFromAuth error: $e');
+      devLog('🔐 AccountManager: _loadCurrentUserFromAuth error: $e');
       return false;
     }
   }

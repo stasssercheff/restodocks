@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show debugPrint, kDebugMode, kIsWeb;
 import 'package:flutter/material.dart';
+import '../utils/dev_log.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
@@ -384,7 +385,7 @@ class _ChatMessageBubbleState extends State<_ChatMessageBubble> {
         setState(() => _translatedContent = translated);
       }
     } catch (e) {
-      if (kDebugMode) debugPrint('[Chat] translate failed: $e');
+      if (kDebugMode) devLog('[Chat] translate failed: $e');
     }
   }
 

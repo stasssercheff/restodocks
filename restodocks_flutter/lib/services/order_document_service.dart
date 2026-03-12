@@ -1,3 +1,4 @@
+import '../utils/dev_log.dart';
 import 'supabase_service.dart';
 
 /// Документы заказов продуктов: сохранение во входящие (шефу и собственнику).
@@ -36,7 +37,7 @@ class OrderDocumentService {
       final data = res.data;
       if (res.status != 200 || data == null) {
         final err = data is Map ? (data['error'] ?? res.data) : res.data;
-        print('Ошибка Edge Function save-order-document: $err');
+        devLog('Ошибка Edge Function save-order-document: $err');
         return null;
       }
       final ok = data is Map && data['ok'] == true;
@@ -44,7 +45,7 @@ class OrderDocumentService {
       if (!ok || id == null) return null;
       return getById(id);
     } catch (e) {
-      print('Ошибка сохранения документа заказа (Edge Function): $e');
+      devLog('Ошибка сохранения документа заказа (Edge Function): $e');
       return null;
     }
   }
@@ -66,7 +67,7 @@ class OrderDocumentService {
       if (list.isEmpty) return null;
       return Map<String, dynamic>.from(list.first as Map<String, dynamic>);
     } catch (e) {
-      print('Ошибка сохранения документа заказа: $e');
+      devLog('Ошибка сохранения документа заказа: $e');
       return null;
     }
   }
@@ -82,7 +83,7 @@ class OrderDocumentService {
 
       return (data as List).map((e) => Map<String, dynamic>.from(e as Map<String, dynamic>)).toList();
     } catch (e) {
-      print('Ошибка загрузки документов заказов: $e');
+      devLog('Ошибка загрузки документов заказов: $e');
       return [];
     }
   }
@@ -97,7 +98,7 @@ class OrderDocumentService {
           .maybeSingle();
       return data != null ? Map<String, dynamic>.from(data as Map<String, dynamic>) : null;
     } catch (e) {
-      print('Ошибка загрузки документа заказа: $e');
+      devLog('Ошибка загрузки документа заказа: $e');
       return null;
     }
   }

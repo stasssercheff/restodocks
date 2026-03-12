@@ -71,9 +71,11 @@ STRICT NUTRITION GUIDELINES:
 - Grains (rice, pasta, bread): 300-400 kcal, 8-15g protein, 1-5g fat, 70-85g carbs
 - Eggs: 155 kcal, 13g protein, 11g fat, 1g carbs
 
-RECOGNITION PATTERNS:
+RECOGNITION PATTERNS (fix typos, normalize abbreviations):
 - "куриная грудка" → "chicken breast", meat, 165 kcal, 31g protein
-- "морковь" → "carrot", vegetables, 41 kcal, 10g carbs
+- "морковь", "мокровь", "МокровьVND" → "carrot", vegetables, 41 kcal, 10g carbs
+- "купуста б/к", "капуста б/к" → "white cabbage", vegetables, 27 kcal
+- "купуста к/к", "капуста к/к" → "red cabbage", vegetables, 31 kcal
 - "клубника" → "strawberry", fruits, 32 kcal, 8g carbs
 - "говядина" → "beef", meat, 250 kcal, 26g protein
 - "лосось" → "salmon", seafood, 206 kcal, 22g protein
@@ -99,6 +101,7 @@ Output ONLY valid JSON. No explanations.`;
         { role: "user", content: userContent },
       ],
       temperature: 0.2,
+      context: "product",
     });
     if (!content?.trim()) {
       return new Response(JSON.stringify({

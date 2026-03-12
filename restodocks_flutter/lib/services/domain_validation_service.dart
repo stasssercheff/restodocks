@@ -1,5 +1,7 @@
 import 'dart:html' as html;
 
+import '../utils/dev_log.dart';
+
 /// Сервис для валидации домена приложения
 class DomainValidationService {
   /// Разрешенные домены для работы приложения
@@ -82,12 +84,12 @@ class DomainValidationService {
     final timestamp = DateTime.now().toIso8601String();
 
     // Логируем в консоль для анализа
-    print('🚨 DOMAIN SECURITY ALERT 🚨');
-    print('Time: $timestamp');
-    print('Domain: $domain');
-    print('User-Agent: $userAgent');
-    print('Referrer: $referrer');
-    print('URL: ${html.window.location.href}');
+    devLog('🚨 DOMAIN SECURITY ALERT 🚨');
+    devLog('Time: $timestamp');
+    devLog('Domain: $domain');
+    devLog('User-Agent: $userAgent');
+    devLog('Referrer: $referrer');
+    devLog('URL: ${html.window.location.href}');
 
     // В будущем можно отправить на сервер для мониторинга
     // _sendSecurityAlert({

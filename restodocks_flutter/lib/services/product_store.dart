@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/services.dart' show rootBundle;
 
 import '../models/models.dart';
+import '../utils/dev_log.dart';
 
 /// Сервис управления продуктами
 class ProductStore {
@@ -45,7 +46,7 @@ class ProductStore {
         ..sort();
 
     } catch (e) {
-      print('Ошибка загрузки продуктов: $e');
+      devLog('Ошибка загрузки продуктов: $e');
     } finally {
       _isLoading = false;
     }
@@ -174,7 +175,7 @@ class ProductStore {
         ..sort();
 
     } catch (e) {
-      print('Ошибка загрузки продуктов для отдела $department: $e');
+      devLog('Ошибка загрузки продуктов для отдела $department: $e');
     } finally {
       _isLoading = false;
     }
@@ -187,7 +188,7 @@ class ProductStore {
       final jsonData = json.decode(jsonString) as List<dynamic>;
       return jsonData.map((json) => Product.fromJson(json)).toList();
     } catch (e) {
-      print('Ошибка загрузки $assetPath: $e');
+      devLog('Ошибка загрузки $assetPath: $e');
       return [];
     }
   }

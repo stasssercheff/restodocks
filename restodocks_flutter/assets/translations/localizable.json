@@ -1221,7 +1221,12 @@
     "order_suppliers_empty_hint": "Создайте поставщика — укажите название, контакты и список продуктов из номенклатуры",
     "order_products_count": "продуктов",
     "order_delete_supplier_confirm": "Удалить поставщика",
-    "order_delete_order_confirm": "Удалить список заказа"
+    "order_delete_order_confirm": "Удалить список заказа",
+    "order_search_supplier_or_product": "Поиск по поставщику или продукту",
+    "order_sort": "Сортировка:",
+    "order_sort_az": "А–Я",
+    "order_sort_za": "Я–А",
+    "order_no_results": "Ничего не найдено"
   },
   "en": {
     "app_name": "Restodocks",

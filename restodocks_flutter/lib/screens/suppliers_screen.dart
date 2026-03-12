@@ -22,6 +22,30 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
   List<OrderList> _suppliers = [];
   bool _loading = true;
   String? _error;
+  final TextEditingController _searchController = TextEditingController();
+  bool _sortAsc = true; // true = А–Я, false = Я–А
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<OrderList> get _filteredSuppliers {
+    var list = List<OrderList>.from(_suppliers);
+    final q = _searchController.text.trim().toLowerCase();
+    if (q.isNotEmpty) {
+      list = list.where((s) {
+        if (s.supplierName.toLowerCase().contains(q)) return true;
+        return s.items.any((i) => i.productName.toLowerCase().contains(q));
+      }).toList();
+    }
+    list.sort((a, b) {
+      final cmp = a.supplierName.toLowerCase().compareTo(b.supplierName.toLowerCase());
+      return _sortAsc ? cmp : -cmp;
+    });
+    return list;
+  }
 
   String get _departmentLabel {
     switch (widget.department) {
@@ -71,6 +95,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
   @override
   void initState() {
     super.initState();
+    _searchController.addListener(() => setState(() {}));
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
@@ -84,13 +109,79 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
         title: Text('${loc.t('order_tab_suppliers') ?? 'Поставщики'} — $_departmentLabel'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.add),
+            onPressed: () async {
+              await context.push('/product-order/new?department=${widget.department}');
+              if (mounted) _load();
+            },
+            tooltip: loc.t('order_create_supplier') ?? 'Создать поставщика',
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loading ? null : _load,
             tooltip: loc.t('refresh'),
           ),
         ],
       ),
-      body: _buildBody(loc),
+      body: _suppliers.isEmpty && !_loading && _error == null
+          ? _buildBody(loc)
+          : Column(
+              children: [
+                if (_suppliers.isNotEmpty) _buildSearchAndSortPanel(loc),
+                Expanded(child: _buildBody(loc)),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildSearchAndSortPanel(LocalizationService loc) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: loc.t('order_search_supplier_or_product') ?? 'Поиск по поставщику или продукту',
+              prefixIcon: const Icon(Icons.search, size: 22),
+              suffixIcon: _searchController.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, size: 20),
+                      onPressed: () => setState(() => _searchController.clear()),
+                    )
+                  : null,
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Text(
+                loc.t('order_sort') ?? 'Сортировка:',
+                style: Theme.of(context).textTheme.labelMedium,
+              ),
+              const SizedBox(width: 8),
+              ChoiceChip(
+                label: Text(loc.t('order_sort_az') ?? 'А–Я'),
+                selected: _sortAsc,
+                onSelected: (_) => setState(() => _sortAsc = true),
+              ),
+              const SizedBox(width: 6),
+              ChoiceChip(
+                label: Text(loc.t('order_sort_za') ?? 'Я–А'),
+                selected: !_sortAsc,
+                onSelected: (_) => setState(() => _sortAsc = false),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -146,13 +237,28 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
       );
     }
 
+    final filtered = _filteredSuppliers;
+    if (filtered.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            loc.t('order_no_results') ?? 'Ничего не найдено',
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
+        ),
+      );
+    }
+
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
-        itemCount: _suppliers.length,
+        itemCount: filtered.length,
         itemBuilder: (_, i) {
-          final s = _suppliers[i];
+          final s = filtered[i];
           final contacts = [s.email, s.phone, s.telegram, s.whatsapp, s.zalo]
               .where((v) => v != null && v.isNotEmpty)
               .join(' · ');

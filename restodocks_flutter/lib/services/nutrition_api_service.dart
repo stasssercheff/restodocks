@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../utils/product_name_utils.dart';
+
 /// Результат поиска КБЖУ и аллергенов
 class NutritionResult {
   final double? calories;
@@ -64,10 +66,13 @@ class NutritionApiService {
     return rawCalories;
   }
 
-  /// Поиск КБЖУ по названию продукта (с проверкой адекватности)
+  /// Поиск КБЖУ по названию продукта (с проверкой адекватности).
+  /// Убирает префиксы iiko (Т., ТМЦ) для лучшего поиска в Open Food Facts.
   static Future<NutritionResult?> fetchNutrition(String productName) async {
     if (productName.trim().isEmpty) return null;
-    final query = Uri.encodeQueryComponent(productName.trim());
+    final clean = stripIikoPrefix(productName).trim();
+    if (clean.isEmpty) return null;
+    final query = Uri.encodeQueryComponent(clean);
     final url = Uri.parse(
       '$_baseUrl/cgi/search.pl?search_terms=$query&search_simple=1&action=process&json=1&page_size=15',
     );
@@ -78,7 +83,7 @@ class NutritionApiService {
       final products = json['products'] as List<dynamic>?;
       if (products == null || products.isEmpty) return null;
 
-      final searchLower = productName.toLowerCase();
+      final searchLower = clean.toLowerCase();
       NutritionResult? best;
       double bestScore = -1;
 

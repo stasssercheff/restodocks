@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/models.dart';
 import '../models/translation.dart';
+import '../utils/dev_log.dart';
 import 'ai_service_supabase.dart';
 import 'translation_service.dart';
 
@@ -27,14 +28,14 @@ class TranslationManager {
     required String sourceLanguage,
     String? userId,
   }) async {
-    if (kDebugMode) debugPrint('TranslationManager: Processing save for $entityType:$entityId');
+    devLog('TranslationManager: Processing save for $entityType:$entityId');
 
     // Определяем язык оригинала если не указан
     final detectedLanguage = sourceLanguage.isNotEmpty
         ? sourceLanguage
         : await _detectLanguage(textFields.values.join(' '));
 
-    if (kDebugMode) debugPrint('TranslationManager: Detected language: $detectedLanguage');
+    devLog('TranslationManager: Detected language: $detectedLanguage');
 
     // Переводим на все поддерживаемые языки
     for (final fieldName in textFields.keys) {
@@ -56,12 +57,12 @@ class TranslationManager {
             allowOverride: false, // Не перезаписывать manual overrides
           );
         } catch (e) {
-          debugPrint('TranslationManager: Failed to translate $fieldName to $targetLang: $e');
+          devLog('TranslationManager: Failed to translate $fieldName to $targetLang: $e');
         }
       }
     }
 
-    if (kDebugMode) debugPrint('TranslationManager: Translation processing completed');
+    devLog('TranslationManager: Translation processing completed');
   }
 
   /// Получить локализованный текст для сущности
@@ -88,7 +89,7 @@ class TranslationManager {
 
       return translation ?? sourceText; // Fallback на оригинал
     } catch (e) {
-      debugPrint('TranslationManager: Failed to get localized text: $e');
+      devLog('TranslationManager: Failed to get localized text: $e');
       return sourceText;
     }
   }
@@ -146,7 +147,7 @@ class TranslationManager {
           translations[targetLang] = translatedText;
         }
       } catch (e) {
-        debugPrint('Translation error for $targetLang: $e');
+        devLog('Translation error for $targetLang: $e');
       }
     }
 
@@ -177,7 +178,7 @@ class TranslationManager {
       final codes = _getSupportedLanguages();
       return codes.contains(detectedLang) ? detectedLang : 'en';
     } catch (e) {
-      debugPrint('TranslationManager: Failed to detect language: $e');
+      devLog('TranslationManager: Failed to detect language: $e');
       return 'en'; // fallback
     }
   }

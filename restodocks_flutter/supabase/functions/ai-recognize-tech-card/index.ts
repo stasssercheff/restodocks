@@ -55,6 +55,7 @@ No markdown.`;
           { role: "user", content: `Table:\n${JSON.stringify(rows)}` },
         ],
         maxTokens: 2048,
+        context: "ttk",
       });
 
       if (!content?.trim()) {

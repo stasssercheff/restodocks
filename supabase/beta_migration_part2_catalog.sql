@@ -942,9 +942,9 @@ from (values
 
 -- ==================== АЗИАТСКИЕ ПРОДУКТЫ ====================
 ('Соус Pon Zu','pantry','{"ru":"Соус Pon Zu","en":"Pon Zu sauce"}','ml'),
-('Юzu сок','pantry','{"ru":"Юzu сок","en":"Yuzu juice"}','ml'),
+('Юзу сок','pantry','{"ru":"Юзу сок","en":"Yuzu juice"}','ml'),
 ('Тонкацу соус','pantry','{"ru":"Тонкацу соус","en":"Tonkatsu sauce"}','ml'),
-('Соус Кewpie (японский майонез)','pantry','{"ru":"Соус Кewpie (японский майонез)","en":"Kewpie mayonnaise"}','g'),
+('Соус Kewpie (японский майонез)','pantry','{"ru":"Соус Kewpie (японский майонез)","en":"Kewpie mayonnaise"}','g'),
 ('Рисовая бумага (для роллов)','pantry','{"ru":"Рисовая бумага (для роллов)","en":"Rice paper (for rolls)"}','g'),
 ('Тофу жареный (абурааге)','legumes','{"ru":"Тофу жареный (абурааге)","en":"Fried tofu (aburage)"}','g'),
 ('Юба (пленка соевого молока)','legumes','{"ru":"Юба (пленка соевого молока)","en":"Yuba (tofu skin)"}','g'),
@@ -955,7 +955,7 @@ from (values
 ('Паста юдзу-косё','spices','{"ru":"Паста юдзу-косё","en":"Yuzu kosho paste"}','g'),
 ('Кочуджан (корейская паста)','pantry','{"ru":"Кочуджан (корейская паста)","en":"Gochujang paste"}','g'),
 ('Доенджан (корейская мисо)','pantry','{"ru":"Доенджан (корейская мисо)","en":"Doenjang paste"}','g'),
-('Пасте карри Массаман','spices','{"ru":"Пасте карри Массаман","en":"Massaman curry paste"}','g'),
+('Паста карри Массаман','spices','{"ru":"Паста карри Массаман","en":"Massaman curry paste"}','g'),
 ('Паста Nam Prik Pao','spices','{"ru":"Паста Nam Prik Pao","en":"Nam Prik Pao paste"}','g'),
 ('Галангал молотый','spices','{"ru":"Галангал молотый","en":"Ground galangal"}','g'),
 

@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:excel/excel.dart' hide Border;
 import 'package:flutter/foundation.dart';
+import '../utils/dev_log.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -74,7 +75,7 @@ class IikoProductStore extends ChangeNotifier {
           sheetQtyColumns = (jsonDecode(sheetQtyColsJson) as Map)
               .map((k, v) => MapEntry(k as String, v as int));
         }
-        debugPrint('IikoProductStore: blank restored from localStorage '
+        devLog('IikoProductStore: blank restored from localStorage '
             '(${originalBlankBytes!.length} bytes, qtyCol=$originalQuantityColumnIndex, sheets=${sheetNames.length})');
         // Если продукты уже загружены но без sheetName — проставляем из бланка
         if (_products.isNotEmpty && _products.every((p) => p.sheetName == null)) {
@@ -84,7 +85,7 @@ class IikoProductStore extends ChangeNotifier {
         return;
       }
     } catch (e) {
-      debugPrint('IikoProductStore.restoreBlankFromStorage(local) error: $e');
+      devLog('IikoProductStore.restoreBlankFromStorage(local) error: $e');
     }
 
     // 2) Supabase Storage (инкогнито / другое устройство)
@@ -129,10 +130,10 @@ class IikoProductStore extends ChangeNotifier {
 
       // Кэшируем в localStorage
       await _persistBlank(originalBlankBytes!, originalQuantityColumnIndex);
-      debugPrint('IikoProductStore: blank restored from Supabase Storage '
+      devLog('IikoProductStore: blank restored from Supabase Storage '
           '(${originalBlankBytes!.length} bytes, qtyCol=$originalQuantityColumnIndex, sheets=${sheetNames.length})');
     } catch (e) {
-      debugPrint('IikoProductStore._restoreBlankFromServer error: $e');
+      devLog('IikoProductStore._restoreBlankFromServer error: $e');
     }
   }
 
@@ -153,10 +154,10 @@ class IikoProductStore extends ChangeNotifier {
         await prefs.remove(_kSheetNamesKey);
         await prefs.remove(_kSheetQtyColsKey);
       }
-      debugPrint('IikoProductStore: blank saved to localStorage '
+      devLog('IikoProductStore: blank saved to localStorage '
           '(${bytes.length} bytes, qtyCol=$qtyCol, sheets=${sheetNames.length})');
     } catch (e) {
-      debugPrint('IikoProductStore._persistBlank error: $e');
+      devLog('IikoProductStore._persistBlank error: $e');
     }
   }
 
@@ -208,9 +209,9 @@ class IikoProductStore extends ChangeNotifier {
         'sheet_names': sheetNames.isEmpty ? null : sheetNames,
         'sheet_qty_cols': sheetQtyColumns.isEmpty ? null : sheetQtyColumns,
       }).select('id');
-      debugPrint('IikoProductStore: blank uploaded to Supabase Storage ($storagePath, version $versionPath)');
+      devLog('IikoProductStore: blank uploaded to Supabase Storage ($storagePath, version $versionPath)');
     } catch (e) {
-      debugPrint('IikoProductStore._uploadBlankToServer error: $e');
+      devLog('IikoProductStore._uploadBlankToServer error: $e');
     }
   }
 
@@ -234,7 +235,7 @@ class IikoProductStore extends ChangeNotifier {
         result.add(Map<String, dynamic>.from(m));
       }
     } catch (e) {
-      debugPrint('IikoProductStore.listBlanksForMerge (versions) error: $e');
+      devLog('IikoProductStore.listBlanksForMerge (versions) error: $e');
       // Таблица iiko_blank_versions может отсутствовать до применения миграции
     }
     // Если нет версий — добавляем текущий бланк из meta
@@ -249,7 +250,7 @@ class IikoProductStore extends ChangeNotifier {
           result.add(Map<String, dynamic>.from(meta as Map));
         }
       } catch (e) {
-        debugPrint('IikoProductStore.listBlanksForMerge (meta) error: $e');
+        devLog('IikoProductStore.listBlanksForMerge (meta) error: $e');
       }
     }
     return result;
@@ -263,7 +264,7 @@ class IikoProductStore extends ChangeNotifier {
           .download(storagePath);
       return Uint8List.fromList(bytes);
     } catch (e) {
-      debugPrint('IikoProductStore.downloadBlankByPath error: $e');
+      devLog('IikoProductStore.downloadBlankByPath error: $e');
       return null;
     }
   }
@@ -283,13 +284,13 @@ class IikoProductStore extends ChangeNotifier {
               .map((k, v) => MapEntry(k as String, v as int));
         }
         if (sheetNames.isNotEmpty) {
-          debugPrint('IikoProductStore: sheetNames restored from localStorage: $sheetNames');
+          devLog('IikoProductStore: sheetNames restored from localStorage: $sheetNames');
           notifyListeners();
           return;
         }
       }
     } catch (e) {
-      debugPrint('IikoProductStore._restoreSheetNamesOnly(local) error: $e');
+      devLog('IikoProductStore._restoreSheetNamesOnly(local) error: $e');
     }
     // Если в localStorage нет — читаем из Supabase метаданные
     final estId = _loadedEstablishmentId;
@@ -310,10 +311,10 @@ class IikoProductStore extends ChangeNotifier {
         sheetQtyColumns =
             sheetQtyColsRaw.map((k, v) => MapEntry(k as String, v as int));
       }
-      debugPrint('IikoProductStore: sheetNames restored from Supabase: $sheetNames');
+      devLog('IikoProductStore: sheetNames restored from Supabase: $sheetNames');
       notifyListeners();
     } catch (e) {
-      debugPrint('IikoProductStore._restoreSheetNamesOnly(server) error: $e');
+      devLog('IikoProductStore._restoreSheetNamesOnly(server) error: $e');
     }
   }
 
@@ -348,7 +349,7 @@ class IikoProductStore extends ChangeNotifier {
         await _assignSheetNamesInMemory();
       }
     } catch (e) {
-      debugPrint('IikoProductStore.loadProducts error: $e');
+      devLog('IikoProductStore.loadProducts error: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -409,17 +410,17 @@ class IikoProductStore extends ChangeNotifier {
       // Заполняем sheetNames если пусты
       if (sheetNames.length <= 1 && foundSheets.length > 1) {
         sheetNames = foundSheets;
-        debugPrint('IikoProductStore: restored sheetNames from blank: $sheetNames');
+        devLog('IikoProductStore: restored sheetNames from blank: $sheetNames');
       }
 
       _products = _products.map((p) {
         final s = p.code != null ? codeToSheet[p.code!.trim()] : null;
         return s != null ? p.copyWith(sheetName: s) : p;
       }).toList();
-      debugPrint('IikoProductStore: assigned sheetName in-memory for '
+      devLog('IikoProductStore: assigned sheetName in-memory for '
           '${_products.where((p) => p.sheetName != null).length}/${_products.length} products');
     } catch (e) {
-      debugPrint('IikoProductStore._assignSheetNamesInMemory error: $e');
+      devLog('IikoProductStore._assignSheetNamesInMemory error: $e');
     }
   }
 
@@ -473,9 +474,9 @@ class IikoProductStore extends ChangeNotifier {
             'insert_iiko_products',
             params: {'p_items': jsonItems},
           );
-          debugPrint('IikoProductStore: batch ${i ~/ batchSize + 1} OK (${batch.length} items)');
+          devLog('IikoProductStore: batch ${i ~/ batchSize + 1} OK (${batch.length} items)');
         } catch (batchErr) {
-          debugPrint('IikoProductStore: batch ${i ~/ batchSize + 1} failed: $batchErr');
+          devLog('IikoProductStore: batch ${i ~/ batchSize + 1} failed: $batchErr');
           // Если батч не прошёл — пробуем по одной записи
           for (final p in batch) {
             try {
@@ -484,7 +485,7 @@ class IikoProductStore extends ChangeNotifier {
                 params: {'p_items': [p.toJson()..remove('id')]},
               );
             } catch (singleErr) {
-              debugPrint('IikoProductStore: single insert failed: ${p.code} — $singleErr');
+              devLog('IikoProductStore: single insert failed: ${p.code} — $singleErr');
             }
           }
         }
@@ -492,7 +493,7 @@ class IikoProductStore extends ChangeNotifier {
 
       await loadProducts(establishmentId, force: true);
     } catch (e) {
-      debugPrint('IikoProductStore.replaceAll error: $e');
+      devLog('IikoProductStore.replaceAll error: $e');
       // Не rethrow — даже при частичной ошибке загружаем что вставили
     } finally {
       _isLoading = false;
@@ -517,7 +518,7 @@ class IikoProductStore extends ChangeNotifier {
       sheetQtyColumns = {};
       await _clearPersistedBlank();
     } catch (e) {
-      debugPrint('IikoProductStore.deleteAll error: $e');
+      devLog('IikoProductStore.deleteAll error: $e');
       rethrow;
     } finally {
       _isLoading = false;

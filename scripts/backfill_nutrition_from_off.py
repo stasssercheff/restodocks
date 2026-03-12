@@ -7,10 +7,12 @@ Backfill КБЖУ и аллергенов для продуктов без ка�
   1. Open Food Facts (всегда)
   2. USDA FoodData Central (если USDA_API_KEY задан)
   3. FatSecret (если FATSECRET_CLIENT_ID и FATSECRET_CLIENT_SECRET заданы)
-  4. Правила по категориям (fallback без API): молоко 3.2%, сметана 20%, сливки, масло, сахар и т.п.
+  4. Правила по категориям (молоко, сливки, алкоголь, вода и т.п.)
+  5. AI (ai-refine-nutrition) — fallback для «Не найдено». Требует настроенные ключи в Supabase (GIGACHAT, OPENAI и т.п.)
 
 Использование:
-  export SUPABASE_SERVICE_KEY=...
+  export SUPABASE_SERVICE_KEY='ключ_из_supabase'
+  # ключ вставлять БЕЗ своих кавычек, только между кавычками команды
   export USDA_API_KEY=...                    # опционально
   export FATSECRET_CLIENT_ID=...             # опционально
   export FATSECRET_CLIENT_SECRET=...
@@ -38,9 +40,10 @@ LOG_FILE = os.path.join(REPO_ROOT, "backfill_nutrition.log")
 
 SUPABASE_URL = "https://osglfptwbuqqmqunttha.supabase.co"
 ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zZ2xmcHR3YnVxcW1xdW50dGhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUwNTk0MDQsImV4cCI6MjA4MDYzNTQwNH0.Jy7yi2TNdSrmoBdILXBGRYB_vxGtq8scCZ9eCA9vfTE"
-# Для PATCH нужен SERVICE_ROLE_KEY (RLS). Задайте: export SUPABASE_SERVICE_KEY=...
+# Для PATCH нужен service_role. Задайте: export SUPABASE_SERVICE_KEY='ключ' (ключ без кавычек)
 SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY")
 API_KEY = SERVICE_KEY or ANON_KEY
+# При 401: проверь что SUPABASE_SERVICE_KEY задан и относится к проекту osglfptwbuqqmqunttha
 
 OFF_BASE = "https://world.openfoodfacts.org"
 USDA_BASE = "https://api.nal.usda.gov/fdc/v1"
@@ -102,6 +105,102 @@ CATEGORY_RULES = [
     # Вода (питьевая, без калорий)
     (["вода", "питьев"], {"calories": 0, "protein": 0, "fat": 0, "carbs": 0, "contains_gluten": False, "contains_lactose": False}),
     (["water"], {"calories": 0, "protein": 0, "fat": 0, "carbs": 0, "contains_gluten": False, "contains_lactose": False}),
+    # Грибы
+    (["шампиньон"], {"calories": 27, "protein": 4.3, "fat": 1.0, "carbs": 0.1, "contains_gluten": False, "contains_lactose": False}),
+    (["шиитаке"], {"calories": 34, "protein": 2.2, "fat": 0.5, "carbs": 6.8, "contains_gluten": False, "contains_lactose": False}),
+    (["энокитаке"], {"calories": 37, "protein": 2.7, "fat": 0.3, "carbs": 7.8, "contains_gluten": False, "contains_lactose": False}),
+    (["эринги"], {"calories": 37, "protein": 3.1, "fat": 0.4, "carbs": 6.9, "contains_gluten": False, "contains_lactose": False}),
+    (["вешенк"], {"calories": 33, "protein": 3.3, "fat": 0.4, "carbs": 6.1, "contains_gluten": False, "contains_lactose": False}),
+    # Овощи и зелень
+    (["мокровь"], {"calories": 41, "protein": 0.9, "fat": 0.2, "carbs": 9.6, "contains_gluten": False, "contains_lactose": False}),  # опечатка: морковь
+    (["купуста", "б/к"], {"calories": 27, "protein": 1.8, "fat": 0.1, "carbs": 5.4, "contains_gluten": False, "contains_lactose": False}),  # белокочанная
+    (["купуста", "к/к"], {"calories": 31, "protein": 1.4, "fat": 0.2, "carbs": 7.4, "contains_gluten": False, "contains_lactose": False}),  # краснокочанная
+    (["шпинат"], {"calories": 23, "protein": 2.9, "fat": 0.4, "carbs": 3.6, "contains_gluten": False, "contains_lactose": False}),
+    (["щавель"], {"calories": 22, "protein": 2.0, "fat": 0.7, "carbs": 3.2, "contains_gluten": False, "contains_lactose": False}),
+    (["эндивий"], {"calories": 17, "protein": 1.3, "fat": 0.2, "carbs": 3.4, "contains_gluten": False, "contains_lactose": False}),
+    (["spinach"], {"calories": 23, "protein": 2.9, "fat": 0.4, "carbs": 3.6, "contains_gluten": False, "contains_lactose": False}),
+    # Фрукты
+    (["черешн"], {"calories": 52, "protein": 1.1, "fat": 0.2, "carbs": 12.2, "contains_gluten": False, "contains_lactose": False}),
+    (["яблоко", "красн"], {"calories": 52, "protein": 0.3, "fat": 0.2, "carbs": 13.6, "contains_gluten": False, "contains_lactose": False}),
+    # Шоколад
+    (["шоколад", "белый"], {"calories": 539, "protein": 5.9, "fat": 32.1, "carbs": 59.2, "contains_gluten": False, "contains_lactose": True}),
+    (["шоколад", "молочн"], {"calories": 535, "protein": 7.7, "fat": 29.7, "carbs": 59.4, "contains_gluten": False, "contains_lactose": True}),
+    (["шоколад", "темн"], {"calories": 546, "protein": 4.9, "fat": 31.3, "carbs": 61.2, "contains_gluten": False, "contains_lactose": False}),
+    (["шоколад", "горьк"], {"calories": 546, "protein": 4.9, "fat": 31.3, "carbs": 61.2, "contains_gluten": False, "contains_lactose": False}),
+    (["шоколад", "рубинов"], {"calories": 540, "protein": 5.0, "fat": 32.0, "carbs": 60.0, "contains_gluten": False, "contains_lactose": False}),
+    (["шоколадные", "капл"], {"calories": 540, "protein": 5.0, "fat": 32.0, "carbs": 60.0, "contains_gluten": False, "contains_lactose": True}),
+    (["chocolate", "dark"], {"calories": 546, "protein": 4.9, "fat": 31.3, "carbs": 61.2, "contains_gluten": False, "contains_lactose": False}),
+    # Специи и травы
+    (["шалфей"], {"calories": 315, "protein": 10.6, "fat": 12.8, "carbs": 60.7, "contains_gluten": False, "contains_lactose": False}),
+    (["шафран"], {"calories": 310, "protein": 11.4, "fat": 5.9, "carbs": 65.4, "contains_gluten": False, "contains_lactose": False}),
+    (["хмели", "сунели"], {"calories": 270, "protein": 10.0, "fat": 5.0, "carbs": 50.0, "contains_gluten": False, "contains_lactose": False}),
+    # Мясо и птица
+    (["шейка", "курин"], {"calories": 158, "protein": 16.8, "fat": 10.0, "carbs": 0, "contains_gluten": False, "contains_lactose": False}),
+    (["щека", "говяж"], {"calories": 154, "protein": 21.4, "fat": 7.0, "carbs": 0, "contains_gluten": False, "contains_lactose": False}),
+    (["щека", "свин"], {"calories": 267, "protein": 12.8, "fat": 24.1, "carbs": 0, "contains_gluten": False, "contains_lactose": False}),
+    # Рыба
+    (["щука"], {"calories": 84, "protein": 18.4, "fat": 0.8, "carbs": 0, "contains_gluten": False, "contains_lactose": False}),
+    (["шпрот"], {"calories": 363, "protein": 17.4, "fat": 32.4, "carbs": 0.4, "contains_gluten": False, "contains_lactose": False}),
+    # Колбасы и мясопродукты
+    (["чоризо"], {"calories": 455, "protein": 24.1, "fat": 38.3, "carbs": 1.9, "contains_gluten": False, "contains_lactose": False}),
+    (["chorizo"], {"calories": 455, "protein": 24.1, "fat": 38.3, "carbs": 1.9, "contains_gluten": False, "contains_lactose": False}),
+    # Бобовые
+    (["эдамаме"], {"calories": 122, "protein": 10.9, "fat": 5.2, "carbs": 9.9, "contains_gluten": False, "contains_lactose": False}),
+    (["edamame"], {"calories": 122, "protein": 10.9, "fat": 5.2, "carbs": 9.9, "contains_gluten": False, "contains_lactose": False}),
+    # Снэки
+    (["чипсы", "картофел"], {"calories": 536, "protein": 7.0, "fat": 35.0, "carbs": 49.0, "contains_gluten": False, "contains_lactose": False}),
+    # Подсластители
+    (["эритрит"], {"calories": 0, "protein": 0, "fat": 0, "carbs": 0, "contains_gluten": False, "contains_lactose": False}),
+    (["erythritol"], {"calories": 0, "protein": 0, "fat": 0, "carbs": 0, "contains_gluten": False, "contains_lactose": False}),
+    # Яйца
+    (["яйцо", "вес"], {"calories": 155, "protein": 12.6, "fat": 10.6, "carbs": 1.1, "contains_gluten": False, "contains_lactose": False}),
+    # Кокос
+    (["кокос", "мякоть"], {"calories": 354, "protein": 3.3, "fat": 33.5, "carbs": 15.2, "contains_gluten": False, "contains_lactose": False}),
+    (["комбу"], {"calories": 43, "protein": 1.0, "fat": 0.6, "carbs": 9.6, "contains_gluten": False, "contains_lactose": False}),
+    # Колбаса охотничья, куленова
+    (["колбаса", "охотнич"], {"calories": 380, "protein": 25.0, "fat": 30.0, "carbs": 2.0, "contains_gluten": False, "contains_lactose": False}),
+    (["куленова"], {"calories": 380, "protein": 25.0, "fat": 30.0, "carbs": 2.0, "contains_gluten": False, "contains_lactose": False}),
+    # Соль, добавки
+    (["флёр", "де", "сель"], {"calories": 0, "protein": 0, "fat": 0, "carbs": 0, "contains_gluten": False, "contains_lactose": False}),
+    (["хлорид", "кальция"], {"calories": 0, "protein": 0, "fat": 0, "carbs": 0, "contains_gluten": False, "contains_lactose": False}),
+    # Соки (юзу)
+    (["юзу", "сок"], {"calories": 32, "protein": 0.5, "fat": 0.1, "carbs": 7.0, "contains_gluten": False, "contains_lactose": False}),
+    # Алкоголь — типичные ккал/100г (крепость ~40% = ~231, вино ~80, пиво ~43)
+    (["водка"], {"calories": 231, "protein": 0, "fat": 0, "carbs": 0, "contains_gluten": False, "contains_lactose": False}),
+    (["виски"], {"calories": 231, "protein": 0, "fat": 0, "carbs": 0, "contains_gluten": False, "contains_lactose": False}),
+    (["вино", "бел"], {"calories": 82, "protein": 0, "fat": 0, "carbs": 3.5, "contains_gluten": False, "contains_lactose": False}),
+    (["вино", "красн"], {"calories": 83, "protein": 0, "fat": 0, "carbs": 3.7, "contains_gluten": False, "contains_lactose": False}),
+    (["вино"], {"calories": 80, "protein": 0, "fat": 0, "carbs": 3.5, "contains_gluten": False, "contains_lactose": False}),
+    (["вино", "розов"], {"calories": 75, "protein": 0, "fat": 0, "carbs": 2.0, "contains_gluten": False, "contains_lactose": False}),
+    (["пиво"], {"calories": 43, "protein": 0.5, "fat": 0, "carbs": 3.6, "contains_gluten": True, "contains_lactose": False}),
+    (["текила"], {"calories": 231, "protein": 0, "fat": 0, "carbs": 0, "contains_gluten": False, "contains_lactose": False}),
+    (["ром"], {"calories": 231, "protein": 0, "fat": 0, "carbs": 0, "contains_gluten": False, "contains_lactose": False}),
+    (["джин"], {"calories": 263, "protein": 0, "fat": 0, "carbs": 0, "contains_gluten": False, "contains_lactose": False}),
+    (["коньяк"], {"calories": 239, "protein": 0, "fat": 0, "carbs": 0, "contains_gluten": False, "contains_lactose": False}),
+    (["ликер"], {"calories": 320, "protein": 0, "fat": 0, "carbs": 40, "contains_gluten": False, "contains_lactose": False}),
+    (["ликёр"], {"calories": 320, "protein": 0, "fat": 0, "carbs": 40, "contains_gluten": False, "contains_lactose": False}),
+    (["просекко"], {"calories": 80, "protein": 0, "fat": 0, "carbs": 4.0, "contains_gluten": False, "contains_lactose": False}),
+    (["шампан"], {"calories": 80, "protein": 0, "fat": 0, "carbs": 3.5, "contains_gluten": False, "contains_lactose": False}),
+    (["игрист"], {"calories": 80, "protein": 0, "fat": 0, "carbs": 3.5, "contains_gluten": False, "contains_lactose": False}),
+    (["абсент"], {"calories": 264, "protein": 0, "fat": 0, "carbs": 0, "contains_gluten": False, "contains_lactose": False}),
+    (["вермут"], {"calories": 140, "protein": 0, "fat": 0, "carbs": 15, "contains_gluten": False, "contains_lactose": False}),
+    (["сидр"], {"calories": 47, "protein": 0, "fat": 0, "carbs": 4.3, "contains_gluten": False, "contains_lactose": False}),
+    (["саке"], {"calories": 134, "protein": 0.5, "fat": 0, "carbs": 5.0, "contains_gluten": False, "contains_lactose": False}),
+    # «Т.» — префикс барных продуктов (типовые)
+    (["т.", "водка"], {"calories": 231, "protein": 0, "fat": 0, "carbs": 0, "contains_gluten": False, "contains_lactose": False}),
+    (["т.", "вино"], {"calories": 80, "protein": 0, "fat": 0, "carbs": 3.5, "contains_gluten": False, "contains_lactose": False}),
+    (["т.", "виски"], {"calories": 231, "protein": 0, "fat": 0, "carbs": 0, "contains_gluten": False, "contains_lactose": False}),
+    (["т.", "пиво"], {"calories": 43, "protein": 0.5, "fat": 0, "carbs": 3.6, "contains_gluten": True, "contains_lactose": False}),
+    (["т.", "текила"], {"calories": 231, "protein": 0, "fat": 0, "carbs": 0, "contains_gluten": False, "contains_lactose": False}),
+    (["т.", "ром"], {"calories": 231, "protein": 0, "fat": 0, "carbs": 0, "contains_gluten": False, "contains_lactose": False}),
+    (["т.", "джин"], {"calories": 263, "protein": 0, "fat": 0, "carbs": 0, "contains_gluten": False, "contains_lactose": False}),
+    (["т.", "коньяк"], {"calories": 239, "protein": 0, "fat": 0, "carbs": 0, "contains_gluten": False, "contains_lactose": False}),
+    (["т.", "ликер"], {"calories": 320, "protein": 0, "fat": 0, "carbs": 40, "contains_gluten": False, "contains_lactose": False}),
+    (["т.", "ликёр"], {"calories": 320, "protein": 0, "fat": 0, "carbs": 40, "contains_gluten": False, "contains_lactose": False}),
+    # Напитки без калорий
+    (["кока-кола", "zero"], {"calories": 0, "protein": 0, "fat": 0, "carbs": 0, "contains_gluten": False, "contains_lactose": False}),
+    (["кола", "zero"], {"calories": 0, "protein": 0, "fat": 0, "carbs": 0, "contains_gluten": False, "contains_lactose": False}),
+    (["тоник"], {"calories": 34, "protein": 0, "fat": 0, "carbs": 8.4, "contains_gluten": False, "contains_lactose": False}),
 ]
 
 # Упаковка, тара, расходники — не ищем КБЖУ в OFF (подстроки, ловят вариации)
@@ -461,6 +560,54 @@ def fetch_fatsecret(search_term: str) -> Optional[dict]:
     return best
 
 
+def fetch_ai_refine_nutrition(product_name: str) -> Optional[dict]:
+    """AI fallback: Edge Function ai-refine-nutrition. Оценка КБЖУ по названию."""
+    if not (product_name or "").strip():
+        return None
+    url = f"{SUPABASE_URL}/functions/v1/ai-refine-nutrition"
+    body = json.dumps({"productName": product_name.strip()}).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=body,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {API_KEY}",
+            "apikey": API_KEY,
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        body = e.read().decode()[:300]
+        log(f"  AI error {e.code}: {body}")
+        return None
+    except (urllib.error.URLError, TimeoutError, socket.timeout, OSError, json.JSONDecodeError) as e:
+        log(f"  AI error: {type(e).__name__}: {e}")
+        return None
+
+    if isinstance(data, dict) and "error" in data:
+        log(f"  AI error: {data.get('error', data)}")
+        return None
+    cal = parse_num(data.get("calories"))
+    pr = parse_num(data.get("protein"))
+    fa = parse_num(data.get("fat"))
+    ca = parse_num(data.get("carbs"))
+    if cal is None and pr is None and fa is None and ca is None:
+        return None
+    if cal is not None and (cal < MIN_SANE_KCAL or cal > MAX_SANE_KCAL):
+        return None
+    return {
+        "calories": cal,
+        "protein": pr or 0,
+        "fat": fa or 0,
+        "carbs": ca or 0,
+        "contains_gluten": None,
+        "contains_lactose": None,
+    }
+
+
 def _product_text_for_rules(product: dict) -> str:
     """Объединённый текст названий для сопоставления с правилами."""
     texts = []
@@ -613,7 +760,9 @@ def main() -> None:
     log("=" * 60)
     log("Backfill nutrition: OFF → USDA → FatSecret (cascade)")
     log(f"Mode: {'DRY-RUN (no changes)' if dry_run else 'APPLY (will update DB)'}")
-    log(f"OFF: on | USDA: {'on' if USDA_API_KEY else 'off (no USDA_API_KEY)'} | FatSecret: {'on' if FATSECRET_CLIENT_ID else 'off (no FATSECRET_CLIENT_ID)'}")
+    log(f"OFF: on | USDA: {'on' if USDA_API_KEY else 'off'} | FatSecret: {'on' if FATSECRET_CLIENT_ID else 'off'} | AI: on (ai-refine-nutrition)")
+    key_type = "service_role" if SERVICE_KEY else "anon (export SUPABASE_SERVICE_KEY for PATCH)"
+    log(f"Supabase: {key_type}" + (f" (key len={len(SERVICE_KEY)})" if SERVICE_KEY else ""))
     if limit:
         log(f"Limit: {limit} products")
     log("")
@@ -631,6 +780,7 @@ def main() -> None:
     updated = 0
     not_found = 0
     from_rules = 0
+    from_ai = 0
     errors = 0
     skipped = 0
     total = len(products)
@@ -658,12 +808,20 @@ def main() -> None:
                 if result is not None:
                     break
 
-            # Fallback: правила по категориям (молоко 3.2%, сметана 20% и т.п.)
+            # Fallback: правила по категориям (молоко, алкоголь, «Т.» и т.п.)
             if result is None:
                 result = apply_category_rules(p)
                 if result is not None:
                     from_rules += 1
                     log(f"[{i+1}/{total}] ({pct}%) {name[:35]:<35} | Правило по категории")
+
+            # Fallback: AI (ai-refine-nutrition) — оценка КБЖУ по названию
+            if result is None and search_variants:
+                time.sleep(PAUSE_SEC * 0.5)
+                result = fetch_ai_refine_nutrition(search_variants[0])
+                if result is not None:
+                    from_ai += 1
+                    log(f"[{i+1}/{total}] ({pct}%) {name[:35]:<35} | AI")
 
             if result is None:
                 not_found += 1
@@ -717,6 +875,7 @@ def main() -> None:
     log("ИТОГО:")
     log(f"  Обновлено:    {updated}")
     log(f"  из них по правилам: {from_rules}")
+    log(f"  из них по AI:  {from_ai}")
     log(f"  Не найдено:   {not_found}")
     log(f"  Ошибки:       {errors}")
     log(f"  Пропущено:    {skipped}")

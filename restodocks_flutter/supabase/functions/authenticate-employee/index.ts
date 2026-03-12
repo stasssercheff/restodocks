@@ -91,7 +91,7 @@ Deno.serve(async (req: Request) => {
     // Ищем сотрудников по email (limit 5 — один email редко в >5 заведениях)
     let query = supabase
       .from("employees")
-      .select("id, email, full_name, surname, roles, establishment_id, department, section, is_active, password_hash, preferred_language, data_access_enabled, can_edit_own_schedule")
+      .select("id, auth_user_id, email, full_name, surname, roles, establishment_id, department, section, is_active, password_hash, preferred_language, data_access_enabled, can_edit_own_schedule")
       .ilike("email", email)
       .eq("is_active", true)
       .limit(5);
@@ -122,6 +122,12 @@ Deno.serve(async (req: Request) => {
 
     // Перебираем — может быть несколько заведений с одним email
     for (const emp of employees) {
+      // Пароль только в Auth: для сотрудников с auth_user_id не проверяем password_hash
+      if (emp.auth_user_id) {
+        console.log(`[authenticate-employee] Employee ${emp.id} has auth_user_id — use Supabase Auth`);
+        continue;
+      }
+
       const hash = emp.password_hash as string | null;
       if (!hash) {
         console.log(`[authenticate-employee] Employee ${emp.id} has no password_hash, skipping`);
@@ -166,13 +172,44 @@ Deno.serve(async (req: Request) => {
         continue;
       }
 
+      // Связка с Supabase Auth: если auth_user_id пуст — создаём auth user для последующего signIn
+      let authUserCreated = false;
+      if (!emp.auth_user_id) {
+        try {
+          const { data: newUser, error: createErr } = await supabase.auth.admin.createUser({
+            email: emp.email,
+            password,
+            email_confirm: true,
+          });
+          if (!createErr && newUser?.user?.id) {
+            const { error: updateErr } = await supabase
+              .from("employees")
+              .update({ auth_user_id: newUser.user.id })
+              .eq("id", emp.id);
+            if (!updateErr) {
+              authUserCreated = true;
+              console.log(`[authenticate-employee] Created auth user ${newUser.user.id} for employee ${emp.id}`);
+            } else {
+              console.warn("[authenticate-employee] Failed to update auth_user_id:", updateErr?.message);
+            }
+          } else {
+            console.warn("[authenticate-employee] createUser failed:", createErr?.message);
+          }
+        } catch (authErr) {
+          console.warn("[authenticate-employee] Auth user creation error (non-blocking):", authErr);
+        }
+      }
+
       // Возвращаем данные БЕЗ password_hash
       const { password_hash: _omit, ...employeeWithoutHash } = emp;
+      const payload: Record<string, unknown> = {
+        employee: employeeWithoutHash,
+        establishment: estData,
+      };
+      if (authUserCreated) payload.authUserCreated = true;
+
       return new Response(
-        JSON.stringify({
-          employee: employeeWithoutHash,
-          establishment: estData,
-        }),
+        JSON.stringify(payload),
         { status: 200, headers: { ...cors, "Content-Type": "application/json" } }
       );
     }

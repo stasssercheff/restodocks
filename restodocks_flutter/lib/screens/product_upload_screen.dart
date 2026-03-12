@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
+import '../utils/dev_log.dart';
 import 'package:flutter/services.dart';
 
 import 'package:archive/archive.dart';
@@ -1132,13 +1133,13 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   }
 
   Future<void> _uploadExcelSimple() async {
-    print('=== _uploadExcelSimple called ===');
+    devLog('=== _uploadExcelSimple called ===');
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['xls', 'xlsx'],
       allowMultiple: false,
     );
-    print('Excel simple picker result: ${result != null ? "files selected" : "cancelled"}');
+    devLog('Excel simple picker result: ${result != null ? "files selected" : "cancelled"}');
 
     if (result != null && result.files.isNotEmpty) {
       final file = result.files.first;
@@ -1176,10 +1177,10 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
     final fileName = result.files.single.name.toLowerCase();
     final bytes = result.files.single.bytes!;
-    print('Processing file: $fileName');
+    devLog('Processing file: $fileName');
 
     if (fileName.endsWith('.txt')) {
-      print('Processing as TXT file');
+      devLog('Processing as TXT file');
       final text = utf8.decode(bytes, allowMalformed: true);
       await _processText(text, loc, widget.defaultAddToNomenclature);
     } else if (fileName.endsWith('.rtf')) {
@@ -1301,7 +1302,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   }
 
   Future<void> _showSmartPasteDialog() async {
-    print('=== _showSmartPasteDialog called ===');
+    devLog('=== _showSmartPasteDialog called ===');
     final controller = TextEditingController();
     final loc = context.read<LocalizationService>();
     bool addToNomenclature = widget.defaultAddToNomenclature;
@@ -1393,7 +1394,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   }
 
   Future<void> _showIntelligentImportDialog() async {
-    print('=== _showIntelligentImportDialog called ===');
+    devLog('=== _showIntelligentImportDialog called ===');
     final loc = context.read<LocalizationService>();
     final account = context.read<AccountManagerSupabase>();
     final establishmentId = account.dataEstablishmentId;
@@ -1652,7 +1653,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   }
 
   Future<void> _processTextWithAI(String text, LocalizationService loc, bool addToNomenclature) async {
-    print('=== _processTextWithAI called ===');
+    devLog('=== _processTextWithAI called ===');
     _addDebugLog('=== STARTING AI TEXT PROCESSING ===');
     _setLoadingMessage('Обрабатываем текст...');
 
@@ -1801,9 +1802,9 @@ ${text}
 
 
   Future<void> _processText(String text, LocalizationService loc, bool addToNomenclature) async {
-    print('=== _processText called ===');
-    print('Text length: ${text.length}');
-    print('Add to nomenclature: $addToNomenclature');
+    devLog('=== _processText called ===');
+    devLog('Text length: ${text.length}');
+    devLog('Add to nomenclature: $addToNomenclature');
     _addDebugLog('=== STARTING TEXT PROCESSING ===');
     _addDebugLog('Text length: ${text.length} characters');
     _addDebugLog('Add to nomenclature: $addToNomenclature');
@@ -1812,9 +1813,9 @@ ${text}
     // Проверяем основные параметры
     final account = context.read<AccountManagerSupabase>();
     final establishmentId = account.establishment?.id;
-    print('User logged in: ${account.isLoggedInSync}');
-    print('Establishment ID: $establishmentId');
-    print('Services check - Account: ${account != null}, Establishment: ${account.establishment != null}');
+    devLog('User logged in: ${account.isLoggedInSync}');
+    devLog('Establishment ID: $establishmentId');
+    devLog('Services check - Account: ${account != null}, Establishment: ${account.establishment != null}');
     _addDebugLog('User logged in: ${account.isLoggedInSync}');
     _addDebugLog('Establishment ID: $establishmentId');
 
@@ -1916,7 +1917,7 @@ ${text}
 
   String _detectTextFormat(String text) {
     final lines = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).take(5);
-    print('DEBUG: Detecting format for ${lines.length} sample lines');
+    devLog('DEBUG: Detecting format for ${lines.length} sample lines');
 
     // Проверяем на сложные форматы или форматы требующие AI
     bool hasComplexFormat = false;
@@ -2129,11 +2130,11 @@ ${text}
       final sourceLang = loc.currentLanguageCode;
       final allLangs = LocalizationService.productLanguageCodes;
 
-      print('DEBUG: Establishment ID: $estId, Default currency: $defCur');
-      print('DEBUG: User logged in: ${account.isLoggedInSync}');
+      devLog('DEBUG: Establishment ID: $estId, Default currency: $defCur');
+      devLog('DEBUG: User logged in: ${account.isLoggedInSync}');
 
       if (!account.isLoggedInSync) {
-        print('DEBUG: User not logged in!');
+        devLog('DEBUG: User not logged in!');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Пользователь не авторизован')),
         );
@@ -2141,7 +2142,7 @@ ${text}
       }
 
       if (estId == null) {
-        print('DEBUG: No establishment found!');
+        devLog('DEBUG: No establishment found!');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Не найдено заведение')),
         );
@@ -2291,13 +2292,13 @@ ${text}
               carbs = carbs ?? nutritionResult.carbs;
               containsGluten = nutritionResult.containsGluten ?? containsGluten;
               containsLactose = nutritionResult.containsLactose ?? containsLactose;
-              print('DEBUG: Used Nutrition API fallback for "${normalizedName}": calories=$calories');
+              devLog('DEBUG: Used Nutrition API fallback for "${normalizedName}": calories=$calories');
             }
           } catch (nutritionError) {
-            print('DEBUG: Nutrition API failed for "${normalizedName}": $nutritionError');
+            devLog('DEBUG: Nutrition API failed for "${normalizedName}": $nutritionError');
           }
         } else {
-          print('DEBUG: Using AI nutrition data for "${normalizedName}": ${calories}kcal, ${protein}g protein');
+          devLog('DEBUG: Using AI nutrition data for "${normalizedName}": ${calories}kcal, ${protein}g protein');
         }
 
           final product = Product(
@@ -2316,14 +2317,14 @@ ${text}
             currency: defCur,
           );
 
-          print('DEBUG: Created product: ${product.toJson()}');
+          devLog('DEBUG: Created product: ${product.toJson()}');
 
           // Пытаемся добавить продукт
           Product savedProduct;
           try {
-            print('DEBUG: Adding product "${product.name}" to database...');
+            devLog('DEBUG: Adding product "${product.name}" to database...');
             savedProduct = await store.addProduct(product);
-            print('DEBUG: Successfully added product "${product.name}"');
+            devLog('DEBUG: Successfully added product "${product.name}"');
 
             // Запускаем автоматический перевод для нового продукта
             final translationManager = TranslationManager(
@@ -2348,15 +2349,15 @@ ${text}
               userId: context.read<AccountManagerSupabase>().currentEmployee?.id,
             );
           } catch (e) {
-            print('DEBUG: Failed to add product "${product.name}": $e');
+            devLog('DEBUG: Failed to add product "${product.name}": $e');
             if (e.toString().contains('duplicate key') ||
                 e.toString().contains('already exists') ||
                 e.toString().contains('unique constraint')) {
-              print('DEBUG: Product "${product.name}" already exists, skipping');
+              devLog('DEBUG: Product "${product.name}" already exists, skipping');
               skipped++;
               continue;
             } else {
-              print('DEBUG: Unexpected error adding "${product.name}": $e');
+              devLog('DEBUG: Unexpected error adding "${product.name}": $e');
               failed++;
               continue;
             }
@@ -2365,7 +2366,7 @@ ${text}
             // Добавляем в номенклатуру только если выбрана эта опция
           if (addToNomenclature) {
             try {
-              print('DEBUG: Adding product "${product.name}" to nomenclature...');
+              devLog('DEBUG: Adding product "${product.name}" to nomenclature...');
               await store.addToNomenclature(
                 estId,
                 savedProduct.id,
@@ -2373,7 +2374,7 @@ ${text}
                 currency: defCur,
               );
               added++;
-              print('DEBUG: Successfully added "${product.name}" to nomenclature');
+              devLog('DEBUG: Successfully added "${product.name}" to nomenclature');
 
               // Находим и обновляем соответствующий продукт в результатах
               final existingResult = processingResults.firstWhere(
@@ -2387,11 +2388,11 @@ ${text}
                 existingResult['productId'] = product.id;
               }
             } catch (e) {
-              print('DEBUG: Failed to add "${product.name}" to nomenclature: $e');
+              devLog('DEBUG: Failed to add "${product.name}" to nomenclature: $e');
               if (e.toString().contains('duplicate key') ||
                   e.toString().contains('already exists') ||
                   e.toString().contains('unique constraint')) {
-                print('DEBUG: Product "${product.name}" already in nomenclature, skipping');
+                devLog('DEBUG: Product "${product.name}" already in nomenclature, skipping');
                 skipped++;
                 // Обновляем статус продукта в результатах
                 final existingResult = processingResults.firstWhere(
@@ -2403,7 +2404,7 @@ ${text}
                   existingResult['reason'] = 'already_exists';
                 }
               } else {
-                print('DEBUG: Unexpected error adding "${product.name}" to nomenclature: $e');
+                devLog('DEBUG: Unexpected error adding "${product.name}" to nomenclature: $e');
                 failed++;
                 // Обновляем статус продукта в результатах
                 final existingResult = processingResults.firstWhere(
@@ -2419,7 +2420,7 @@ ${text}
           } else {
             // Продукт добавлен только в базу
             added++;
-            print('DEBUG: Product "${product.name}" added to database only');
+            devLog('DEBUG: Product "${product.name}" added to database only');
 
             // Находим и обновляем соответствующий продукт в результатах
             final existingResult = processingResults.firstWhere(
@@ -2490,7 +2491,7 @@ ${text}
           ? 'Добавлено: ${added + skipped}'
           : 'Добавлено: ${added + skipped}, Ошибок: $failed';
 
-      print('DEBUG: Final result - Added: $added, Skipped: $skipped, Failed: $failed');
+      devLog('DEBUG: Final result - Added: $added, Skipped: $skipped, Failed: $failed');
 
       // Сохраняем заказ в историю
       if (added > 0 || skipped > 0) {
@@ -2515,10 +2516,10 @@ ${text}
                 'addToNomenclature': addToNomenclature,
               },
             );
-            print('DEBUG: Order saved to history');
+            devLog('DEBUG: Order saved to history');
           }
         } catch (e) {
-          print('DEBUG: Failed to save order to history: $e');
+          devLog('DEBUG: Failed to save order to history: $e');
           // Не показываем ошибку пользователю - история не критична
         }
       }
@@ -2686,7 +2687,7 @@ ${text}
       }
 
     } catch (e) {
-      print('DEBUG: Error in direct processing: $e');
+      devLog('DEBUG: Error in direct processing: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Ошибка обработки: $e')),

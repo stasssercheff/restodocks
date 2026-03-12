@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../../utils/dev_log.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -130,7 +131,7 @@ class AppRouter {
       // Web: если роутер показал корень/splash — восстанавливаем исходный путь
       if (kIsWeb && (loc == '/' || loc == '/splash')) {
         final target = initial_loc.getCachedInitialPath() ?? initial_loc.getCurrentBrowserPath();
-        if (kDebugMode) debugPrint('[Restodocks] redirect: loc=$loc, target=$target');
+        if (kDebugMode) devLog('[Restodocks] redirect: loc=$loc, target=$target');
         if (target != null && target != '/' && target != '/splash' && target.isNotEmpty) return target;
       }
       if (_isPublicPath(loc)) {
@@ -476,7 +477,7 @@ class AppRouter {
               try {
                 return _slideTransitionPage(state, ProductUploadScreen(defaultAddToNomenclature: defaultAddToNomenclature));
               } catch (e) {
-                print('=== Error building ProductUploadScreen: $e ===');
+                devLog('=== Error building ProductUploadScreen: $e ===');
                 return _slideTransitionPage(state, Scaffold(
                   appBar: AppBar(title: const Text('Ошибка')),
                   body: Center(child: Text('Ошибка загрузки экрана: $e')),
@@ -682,7 +683,7 @@ class _SplashScreenState extends State<SplashScreen> {
           target = null;
         }
       }
-      debugPrint('[Splash] go → ${target ?? '/home'} (cached=${initial_loc.getCachedInitialPath()})');
+      devLog('[Splash] go → ${target ?? '/home'} (cached=${initial_loc.getCachedInitialPath()})');
       context.go(target ?? '/home');
     } else {
       context.go('/login');

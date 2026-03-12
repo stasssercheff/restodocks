@@ -1,10 +1,11 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/translation.dart';
+import '../utils/dev_log.dart';
 import 'ai_service_supabase.dart';
 import 'supabase_service.dart';
 
@@ -106,7 +107,7 @@ class TranslationService {
         try {
           await saveToDatabase(translation);
         } catch (e) {
-          if (kDebugMode) debugPrint('[TranslationService] saveToDatabase failed: $e');
+          devLog('[TranslationService] saveToDatabase failed: $e');
         }
         _cache[cacheKey] = translation;
         return translatedText;

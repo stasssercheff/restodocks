@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import '../utils/dev_log.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image/image.dart' as img;
 
@@ -62,7 +63,7 @@ class ImageService {
       );
       return image;
     } catch (e) {
-      print('Ошибка выбора изображения из галереи: $e');
+      devLog('Ошибка выбора изображения из галереи: $e');
       return null;
     }
   }
@@ -78,7 +79,7 @@ class ImageService {
       );
       return photo;
     } catch (e) {
-      print('Ошибка съемки фото: $e');
+      devLog('Ошибка съемки фото: $e');
       return null;
     }
   }
@@ -116,7 +117,7 @@ class ImageService {
       final int quality = getCompressionQuality(size);
       return img.encodeJpg(resizedImage, quality: quality);
     } catch (e) {
-      print('Ошибка ресайза изображения: $e');
+      devLog('Ошибка ресайза изображения: $e');
       return null;
     }
   }
@@ -132,7 +133,7 @@ class ImageService {
     try {
       return await xFile.readAsBytes();
     } catch (e) {
-      print('Ошибка чтения файла: $e');
+      devLog('Ошибка чтения файла: $e');
       return null;
     }
   }
@@ -188,7 +189,7 @@ class ImageService {
 
       return img.encodeJpg(resizedImage, quality: 90);
     } catch (e) {
-      print('Ошибка создания аватара: $e');
+      devLog('Ошибка создания аватара: $e');
       return null;
     }
   }
@@ -226,7 +227,7 @@ class ImageService {
       if (best != null) return best;
       return img.encodeJpg(original, quality: hi > 0 ? hi : 10);
     } catch (e) {
-      print('Ошибка сжатия изображения: $e');
+      devLog('Ошибка сжатия изображения: $e');
       return null;
     }
   }

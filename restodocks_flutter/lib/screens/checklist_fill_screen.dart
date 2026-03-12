@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../utils/dev_log.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -206,7 +207,7 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
         'updated_at': DateTime.now().toIso8601String(),
       }, onConflict: 'checklist_id,employee_id');
     } catch (e) {
-      debugPrint('Checklist fill draft server save failed: $e');
+      devLog('Checklist fill draft server save failed: $e');
     }
   }
 

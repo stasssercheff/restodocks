@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../utils/dev_log.dart';
 
 import '../models/employee_direct_message.dart';
 import 'image_service.dart';
@@ -32,7 +33,7 @@ class EmployeeMessageService {
       list.sort((a, b) => a.createdAt.compareTo(b.createdAt));
       return list;
     } catch (e) {
-      print('EmployeeMessageService getMessagesWith: $e');
+      devLog('EmployeeMessageService getMessagesWith: $e');
       return [];
     }
   }
@@ -54,7 +55,7 @@ class EmployeeMessageService {
       final url = _supabase.client.storage.from(_chatImagesBucket).getPublicUrl(path);
       return send(senderEmployeeId, recipientEmployeeId, '', imageUrl: url);
     } catch (e) {
-      print('EmployeeMessageService sendPhoto: $e');
+      devLog('EmployeeMessageService sendPhoto: $e');
       rethrow;
     }
   }
@@ -82,7 +83,7 @@ class EmployeeMessageService {
           .single();
       return EmployeeDirectMessage.fromJson(data);
     } catch (e) {
-      print('EmployeeMessageService send: $e');
+      devLog('EmployeeMessageService send: $e');
       rethrow;
     }
   }
@@ -97,7 +98,7 @@ class EmployeeMessageService {
           .eq('sender_employee_id', senderId)
           .isFilter('read_at', null);
     } catch (e) {
-      print('EmployeeMessageService markAsRead: $e');
+      devLog('EmployeeMessageService markAsRead: $e');
     }
   }
 
@@ -118,7 +119,7 @@ class EmployeeMessageService {
       }
       return counts;
     } catch (e) {
-      print('EmployeeMessageService getUnreadCountPerPartner: $e');
+      devLog('EmployeeMessageService getUnreadCountPerPartner: $e');
       return {};
     }
   }
@@ -151,7 +152,7 @@ class EmployeeMessageService {
       }
       return ids.toList();
     } catch (e) {
-      print('EmployeeMessageService getConversationPartnerIds: $e');
+      devLog('EmployeeMessageService getConversationPartnerIds: $e');
       return [];
     }
   }

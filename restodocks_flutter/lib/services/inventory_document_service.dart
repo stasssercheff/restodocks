@@ -1,3 +1,4 @@
+import '../utils/dev_log.dart';
 import 'supabase_service.dart';
 
 /// Сервис документов инвентаризации: сохранение в БД, кабинет шеф-повара.
@@ -31,7 +32,7 @@ class InventoryDocumentService {
       if (list.isEmpty) return null;
       return Map<String, dynamic>.from(list.first as Map<String, dynamic>);
     } catch (e) {
-      print('Ошибка сохранения документа инвентаризации: $e');
+      devLog('Ошибка сохранения документа инвентаризации: $e');
       return null;
     }
   }
@@ -43,7 +44,7 @@ class InventoryDocumentService {
           .from(_table)
           .update({'email_sent_at': DateTime.now().toIso8601String()}).eq('id', documentId);
     } catch (e) {
-      print('Ошибка обновления email_sent_at: $e');
+      devLog('Ошибка обновления email_sent_at: $e');
     }
   }
 
@@ -58,7 +59,7 @@ class InventoryDocumentService {
 
       return (data as List).map((e) => Map<String, dynamic>.from(e as Map<String, dynamic>)).toList();
     } catch (e) {
-      print('Ошибка загрузки документов инвентаризации: $e');
+      devLog('Ошибка загрузки документов инвентаризации: $e');
       return [];
     }
   }
@@ -74,7 +75,7 @@ class InventoryDocumentService {
 
       return (data as List).map((e) => Map<String, dynamic>.from(e as Map<String, dynamic>)).toList();
     } catch (e) {
-      print('Ошибка загрузки документов инвентаризации по заведению: $e');
+      devLog('Ошибка загрузки документов инвентаризации по заведению: $e');
       return [];
     }
   }
@@ -89,7 +90,7 @@ class InventoryDocumentService {
           .maybeSingle();
       return data != null ? Map<String, dynamic>.from(data as Map<String, dynamic>) : null;
     } catch (e) {
-      print('Ошибка загрузки документа инвентаризации: $e');
+      devLog('Ошибка загрузки документа инвентаризации: $e');
       return null;
     }
   }
@@ -104,7 +105,7 @@ class InventoryDocumentService {
           .inFilter('id', ids);
       return (data as List).map((e) => Map<String, dynamic>.from(e as Map<String, dynamic>)).toList();
     } catch (e) {
-      print('Ошибка загрузки документов инвентаризации: $e');
+      devLog('Ошибка загрузки документов инвентаризации: $e');
       return [];
     }
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/dev_log.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -152,7 +153,7 @@ class _OrderExportSheetState extends State<OrderExportSheet> {
         }
       }
     } catch (e) {
-      debugPrint('OrderExportSheet _preTranslate error: $e');
+      devLog('OrderExportSheet _preTranslate error: $e');
     }
     if (mounted) setState(() => _translating = false);
   }
@@ -272,14 +273,14 @@ class _OrderExportSheetState extends State<OrderExportSheet> {
         t: s.t,
         lightweight: true,
       );
-      debugPrint('OrderExportSheet: PDF generated (lightweight), size=${pdfBytes.length} bytes');
+      devLog('OrderExportSheet: PDF generated (lightweight), size=${pdfBytes.length} bytes');
     } catch (e) {
       pdfError = e.toString();
-      debugPrint('OrderExportSheet: PDF generation failed: $e');
+      devLog('OrderExportSheet: PDF generation failed: $e');
     }
 
     try {
-      debugPrint('OrderExportSheet: sending email to=$to, pdfBytes=${pdfBytes?.length ?? 0} bytes, pdfError=$pdfError');
+      devLog('OrderExportSheet: sending email to=$to, pdfBytes=${pdfBytes?.length ?? 0} bytes, pdfError=$pdfError');
       final result = await EmailService().sendOrderEmail(
         to: to,
         subject: subject,
@@ -287,7 +288,7 @@ class _OrderExportSheetState extends State<OrderExportSheet> {
         pdfBytes: pdfBytes,
         pdfFileName: pdfFileName,
       );
-      debugPrint('OrderExportSheet: sendOrderEmail result ok=${result.ok} error=${result.error}');
+      devLog('OrderExportSheet: sendOrderEmail result ok=${result.ok} error=${result.error}');
       if (result.ok) {
         await s.onExportToInbox?.call();
         if (pdfError != null) {
@@ -301,7 +302,7 @@ class _OrderExportSheetState extends State<OrderExportSheet> {
         s.onSaved('${s.t('error_short')}: ${result.error}');
       }
     } catch (e) {
-      debugPrint('OrderExportSheet: sendOrderEmail exception: $e');
+      devLog('OrderExportSheet: sendOrderEmail exception: $e');
       s.onSaved('${s.t('error_short')}: $e');
     }
   }

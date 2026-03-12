@@ -22,8 +22,21 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const body = (await req.json()) as { rows?: string[][] };
+    const body = (await req.json()) as { rows?: string[][]; establishmentId?: string };
     const rows = body.rows;
+    const establishmentId = typeof body.establishmentId === "string" ? body.establishmentId.trim() : undefined;
+
+    // Лимит: 3 парсинга через AI в день на заведение
+    if (establishmentId) {
+      const { checkAndIncrementAiTtkUsage } = await import("../_shared/ai_ttk_limit.ts");
+      const { allowed } = await checkAndIncrementAiTtkUsage(establishmentId);
+      if (!allowed) {
+        return new Response(
+          JSON.stringify({ cards: [], error: "limit_3_per_day", reason: "ai_limit_exceeded" }),
+          { status: 200, headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" } },
+        );
+      }
+    }
 
     const hasTextProvider = Deno.env.get("GROQ_API_KEY")?.trim() || Deno.env.get("GEMINI_API_KEY")?.trim() || Deno.env.get("GIGACHAT_AUTH_KEY")?.trim() || Deno.env.get("OPENAI_API_KEY");
     if (!hasTextProvider) {
@@ -68,6 +81,7 @@ Return ALL cards found (up to hundreds). If no cards, return { "cards": [] }.`;
         { role: "user", content: `Document table rows:\n${JSON.stringify(rows)}` },
       ],
       maxTokens: 16384,
+      context: "ttk",
     });
 
     if (!content?.trim()) {

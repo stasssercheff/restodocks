@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../utils/dev_log.dart';
 
 import '../models/models.dart';
 import 'ai_service.dart';
@@ -34,7 +35,7 @@ class TechCardServiceSupabase {
       final url = _supabase.client.storage.from(kTechCardPhotosBucket).getPublicUrl(path);
       return url;
     } catch (e) {
-      print('TechCardServiceSupabase.uploadTechCardPhoto: $e');
+      devLog('TechCardServiceSupabase.uploadTechCardPhoto: $e');
       return null;
     }
   }
@@ -142,7 +143,7 @@ class TechCardServiceSupabase {
 
       return techCards;
     } catch (e) {
-      print('Ошибка получения ТТК: $e');
+      devLog('Ошибка получения ТТК: $e');
       return [];
     }
   }
@@ -171,7 +172,7 @@ class TechCardServiceSupabase {
 
       return techCard.copyWith(ingredients: ingredients);
     } catch (e) {
-      print('Ошибка получения ТТК: $e');
+      devLog('Ошибка получения ТТК: $e');
       return null;
     }
   }
@@ -206,7 +207,7 @@ class TechCardServiceSupabase {
 
       return techCards;
     } catch (e) {
-      print('Ошибка поиска ТТК: $e');
+      devLog('Ошибка поиска ТТК: $e');
       return [];
     }
   }
@@ -231,7 +232,7 @@ class TechCardServiceSupabase {
           techCard.id,
         );
       } else {
-        print('Ошибка сохранения ТТК: $e');
+        devLog('Ошибка сохранения ТТК: $e');
         rethrow;
       }
     }
@@ -260,7 +261,7 @@ class TechCardServiceSupabase {
       // Удаление ингредиентов произойдет автоматически из-за CASCADE
       await _supabase.deleteData('tech_cards', 'id', techCardId);
     } catch (e) {
-      print('Ошибка удаления ТТК: $e');
+      devLog('Ошибка удаления ТТК: $e');
       rethrow;
     }
   }
@@ -377,7 +378,7 @@ class TechCardServiceSupabase {
 
       return techCards;
     } catch (e) {
-      print('Ошибка получения ТТК по создателю: $e');
+      devLog('Ошибка получения ТТК по создателю: $e');
       return [];
     }
   }
@@ -575,7 +576,7 @@ class TechCardServiceSupabase {
           .eq('id', techCardId);
       return translated;
     } catch (e) {
-      print('TechCardServiceSupabase.translateTechCardName: $e');
+      devLog('TechCardServiceSupabase.translateTechCardName: $e');
       return null;
     }
   }

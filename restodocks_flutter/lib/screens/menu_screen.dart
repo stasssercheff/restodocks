@@ -229,22 +229,107 @@ class _MenuScreenState extends State<MenuScreen> {
     return cat;
   }
 
+  /// Блюда, которые пользователь может скачать (полный вид ТТК).
+  List<TechCard> get _downloadableDishes {
+    final emp = context.read<AccountManagerSupabase>().currentEmployee;
+    return _displayDishes.where((tc) => _canSeeFullTtkView(emp, tc)).toList();
+  }
+
+  Future<void> _downloadMenu() async {
+    final loc = context.read<LocalizationService>();
+    final list = _downloadableDishes;
+    if (list.isEmpty) return;
+    try {
+      final sym = context.read<AccountManagerSupabase>().establishment?.currencySymbol ?? '₽';
+      final fileName = await MenuExportService.saveMenuPdf(
+        dishes: list,
+        t: loc.t,
+        lang: loc.currentLanguageCode,
+        currencySym: sym,
+        productStore: context.read<ProductStoreSupabase>(),
+      );
+      if (mounted) AppToastService.show(loc.t('menu') + ' ✓ $fileName');
+    } catch (e) {
+      if (mounted) AppToastService.show('${loc.t('error_short')}: $e', duration: const Duration(seconds: 4));
+    }
+  }
+
+  Future<void> _downloadAllDishes() async {
+    final loc = context.read<LocalizationService>();
+    final list = _downloadableDishes;
+    if (list.isEmpty) return;
+    try {
+      final sym = context.read<AccountManagerSupabase>().establishment?.currencySymbol ?? '₽';
+      final tcs = context.read<TechCardServiceSupabase>();
+      final store = context.read<ProductStoreSupabase>();
+      int count = 0;
+      for (final tc in list) {
+        await MenuExportService.saveDishPdf(
+          dish: tc,
+          techCardService: tcs,
+          productStore: store,
+          t: loc.t,
+          lang: loc.currentLanguageCode,
+          currencySym: sym,
+        );
+        count++;
+      }
+      if (mounted) AppToastService.show('${loc.t('download_all_dishes')} ✓ ($count)', duration: const Duration(seconds: 3));
+    } catch (e) {
+      if (mounted) AppToastService.show('${loc.t('error_short')}: $e', duration: const Duration(seconds: 4));
+    }
+  }
+
+  Future<void> _downloadDish(TechCard tc) async {
+    final loc = context.read<LocalizationService>();
+    try {
+      final sym = context.read<AccountManagerSupabase>().establishment?.currencySymbol ?? '₽';
+      final fileName = await MenuExportService.saveDishPdf(
+        dish: tc,
+        techCardService: context.read<TechCardServiceSupabase>(),
+        productStore: context.read<ProductStoreSupabase>(),
+        t: loc.t,
+        lang: loc.currentLanguageCode,
+        currencySym: sym,
+      );
+      if (mounted) AppToastService.show(loc.t('download_dish') + ' ✓ $fileName');
+    } catch (e) {
+      if (mounted) AppToastService.show('${loc.t('error_short')}: $e', duration: const Duration(seconds: 4));
+    }
+  }
+
   /// Контент раскрытой карточки: полная ТТК с ценой / полная ТТК без цены / описание для зала.
   Widget _buildExpandedContent(Employee? emp, LocalizationService loc, TechCard tc, String lang, String currencySym) {
     if (_canSeeFullTtkView(emp, tc)) {
-      return _MenuDishTable(
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.download, size: 18),
+              label: Text(loc.t('download_dish')),
+              onPressed: () => _downloadDish(tc),
+            ),
+          ),
+          _MenuDishTable(
         loc: loc,
         dishName: tc.dishName,
+        techCard: tc,
         ingredients: tc.ingredients.where((i) => !i.isPlaceholder || i.hasData).toList(),
         technology: tc.getLocalizedTechnology(lang),
         currencySym: currencySym,
         showCost: true,
+        productStore: context.read<ProductStoreSupabase>(),
+      ),
+        ],
       );
     }
-    // Меню зала: описание, состав, продажная цена
+    // Меню зала: описание, состав, КБЖУ, аллергены, продажная цена
     if (_isHallMenu) {
       return _HallDishContent(
         loc: loc,
+        techCard: tc,
         description: tc.descriptionForHall ?? '',
         composition: tc.compositionForHall ?? '',
         sellingPrice: tc.sellingPrice,
@@ -255,10 +340,12 @@ class _MenuScreenState extends State<MenuScreen> {
     return _MenuDishTable(
       loc: loc,
       dishName: tc.dishName,
+      techCard: tc,
       ingredients: tc.ingredients.where((i) => !i.isPlaceholder || i.hasData).toList(),
       technology: tc.getLocalizedTechnology(lang),
       currencySym: currencySym,
       showCost: false,
+      productStore: context.read<ProductStoreSupabase>(),
     );
   }
 
@@ -302,6 +389,19 @@ class _MenuScreenState extends State<MenuScreen> {
               )
             : null,
         actions: [
+          if (_downloadableDishes.isNotEmpty && !_loading)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.download),
+              tooltip: loc.t('download'),
+              onSelected: (v) async {
+                if (v == 'menu') await _downloadMenu();
+                if (v == 'all') await _downloadAllDishes();
+              },
+              itemBuilder: (_) => [
+                PopupMenuItem(value: 'menu', child: Text(loc.t('download_menu'))),
+                PopupMenuItem(value: 'all', child: Text(loc.t('download_all_dishes'))),
+              ],
+            ),
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loading ? null : _load, tooltip: loc.t('refresh')),
         ],
       ),
@@ -549,10 +649,11 @@ class _HallTabChip extends StatelessWidget {
   }
 }
 
-/// Блок описания, состава и продажной цены для зала (вместо полной ТТК).
+/// Блок описания, состава, КБЖУ, аллергенов и продажной цены для зала.
 class _HallDishContent extends StatelessWidget {
   const _HallDishContent({
     required this.loc,
+    required this.techCard,
     required this.description,
     required this.composition,
     this.sellingPrice,
@@ -560,6 +661,7 @@ class _HallDishContent extends StatelessWidget {
   });
 
   final LocalizationService loc;
+  final TechCard techCard;
   final String description;
   final String composition;
   final double? sellingPrice;
@@ -567,6 +669,20 @@ class _HallDishContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final totalCal = techCard.totalCalories;
+    final totalProt = techCard.totalProtein;
+    final totalFat = techCard.totalFat;
+    final totalCarb = techCard.totalCarbs;
+    final store = context.read<ProductStoreSupabase>();
+    final allergens = <String>[];
+    for (final ing in techCard.ingredients.where((i) => i.productId != null)) {
+      final p = store.findProductForIngredient(ing.productId, ing.productName);
+      if (p?.containsGluten == true && !allergens.contains('глютен')) allergens.add('глютен');
+      if (p?.containsLactose == true && !allergens.contains('лактоза')) allergens.add('лактоза');
+    }
+    final allergenStr = allergens.isEmpty ? (loc.currentLanguageCode == 'ru' ? 'нет' : 'none') : allergens.join(', ');
+    final hasNutrition = totalCal > 0 || totalProt > 0 || totalFat > 0 || totalCarb > 0;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -580,6 +696,20 @@ class _HallDishContent extends StatelessWidget {
           Text(loc.t('composition_for_hall'), style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
           Text(composition, style: const TextStyle(fontSize: 13, height: 1.4)),
+          const SizedBox(height: 12),
+        ],
+        if (hasNutrition) ...[
+          Text(loc.t('ttk_nutrition_dish'), style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          Text(
+            loc.t('kbju_allergens_in_dish')
+                .replaceFirst('%s', totalCal.round().toString())
+                .replaceFirst('%s', totalProt.toStringAsFixed(1))
+                .replaceFirst('%s', totalFat.toStringAsFixed(1))
+                .replaceFirst('%s', totalCarb.toStringAsFixed(1))
+                .replaceFirst('%s', allergenStr),
+            style: const TextStyle(fontSize: 13, height: 1.4),
+          ),
           const SizedBox(height: 12),
         ],
         if (sellingPrice != null && sellingPrice! > 0) ...[
@@ -598,18 +728,22 @@ class _MenuDishTable extends StatelessWidget {
   const _MenuDishTable({
     required this.loc,
     required this.dishName,
+    required this.techCard,
     required this.ingredients,
     required this.technology,
     required this.currencySym,
     this.showCost = true,
+    this.productStore,
   });
 
   final LocalizationService loc;
   final String dishName;
+  final TechCard techCard;
   final List<TTIngredient> ingredients;
   final String technology;
   final String currencySym;
   final bool showCost;
+  final ProductStoreSupabase? productStore;
 
   static const _cellPad = EdgeInsets.symmetric(horizontal: 6, vertical: 6);
 
@@ -701,6 +835,42 @@ class _MenuDishTable extends StatelessWidget {
           ),
         ],
       ),
+          if (techCard.totalCalories > 0 || techCard.totalProtein > 0 || techCard.totalFat > 0 || techCard.totalCarbs > 0) ...[
+            const SizedBox(height: 8),
+            Builder(
+              builder: (ctx) {
+                final totalCal = techCard.totalCalories;
+                final totalProt = techCard.totalProtein;
+                final totalFat = techCard.totalFat;
+                final totalCarb = techCard.totalCarbs;
+                final allergens = <String>[];
+                final store = productStore ?? context.read<ProductStoreSupabase>();
+                for (final ing in techCard.ingredients.where((i) => i.productId != null)) {
+                  final p = store.findProductForIngredient(ing.productId, ing.productName);
+                  if (p?.containsGluten == true && !allergens.contains('глютен')) allergens.add('глютен');
+                  if (p?.containsLactose == true && !allergens.contains('лактоза')) allergens.add('лактоза');
+                }
+                final allergenStr = allergens.isEmpty ? (loc.currentLanguageCode == 'ru' ? 'нет' : 'none') : allergens.join(', ');
+                return Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.2),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: Text(
+                    loc.t('kbju_allergens_in_dish')
+                        .replaceFirst('%s', totalCal.round().toString())
+                        .replaceFirst('%s', totalProt.toStringAsFixed(1))
+                        .replaceFirst('%s', totalFat.toStringAsFixed(1))
+                        .replaceFirst('%s', totalCarb.toStringAsFixed(1))
+                        .replaceFirst('%s', allergenStr),
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                );
+              },
+            ),
+          ],
           if (technology.trim().isNotEmpty) ...[
             const SizedBox(height: 8),
             Container(

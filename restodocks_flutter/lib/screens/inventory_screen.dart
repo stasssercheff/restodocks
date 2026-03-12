@@ -8,6 +8,7 @@ import 'dart:js' as js;
 
 
 import 'package:archive/archive.dart';
+import '../utils/dev_log.dart';
 
 import 'package:excel/excel.dart' hide Border, TextSpan;
 import 'package:file_picker/file_picker.dart';
@@ -659,10 +660,10 @@ class _InventoryScreenState extends State<InventoryScreen>
       // Отправить на сервер как черновик инвентаризации
       await _saveDraftToServer(establishmentId, currentState);
 
-      print('📡 Auto-saved inventory draft to server');
+      devLog('📡 Auto-saved inventory draft to server');
     } catch (e) {
       // Тихая ошибка - не показывать пользователю
-      print('⚠️ Failed to auto-save inventory draft: $e');
+      devLog('⚠️ Failed to auto-save inventory draft: $e');
     }
   }
 
@@ -933,9 +934,9 @@ class _InventoryScreenState extends State<InventoryScreen>
         endTime: endTime,
         notes: 'Отправлено шефу ${chef.fullName}',
       );
-      print('✅ Inventory saved to history');
+      devLog('✅ Inventory saved to history');
     } catch (e) {
-      print('⚠️ Failed to save inventory to history: $e');
+      devLog('⚠️ Failed to save inventory to history: $e');
       // Продолжаем выполнение, так как сохранение в историю не критично
     }
 
@@ -1294,7 +1295,7 @@ class _InventoryScreenState extends State<InventoryScreen>
       final out = excel.encode();
       return out != null && out.isNotEmpty ? out : null;
     } catch (e) {
-      print('Error building Excel: $e');
+      devLog('Error building Excel: $e');
       return null;
     }
   }
@@ -3049,12 +3050,12 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
       final employee = account.currentEmployee;
       if (establishment == null || employee == null) return;
 
-      // Ищем шеф-повара в заведении
+      // Ищем шеф-повара/су-шефа/владельца в заведении (получатель во входящих)
       final allEmployees = await Supabase.instance.client
           .from('employees')
           .select()
           .eq('establishment_id', establishment.id)
-          .or('roles.cs.{executive_chef},roles.cs.{owner}');
+          .or('roles.cs.{executive_chef},roles.cs.{owner},roles.cs.{sous_chef}');
       final chefList = allEmployees as List;
       if (chefList.isEmpty) return;
       final chef = chefList.first as Map<String, dynamic>;
@@ -3093,7 +3094,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
         payload: payload,
       );
     } catch (e) {
-      debugPrint('InventoryIiko._sendToChef error: $e');
+      devLog('InventoryIiko._sendToChef error: $e');
       // Не прерываем — скачивание файла важнее
     }
   }
@@ -3215,7 +3216,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
         }
       }
       final codeColLetter = colLetter(codeColIdx);
-      debugPrint('_buildFromOriginal[$sheetName]: codeCol=$codeColLetter qtyCol=$qtyColLetter');
+      devLog('_buildFromOriginal[$sheetName]: codeCol=$codeColLetter qtyCol=$qtyColLetter');
 
       var patchedCount = 0;
       final result = xml.replaceAllMapped(
@@ -3269,7 +3270,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
           return '$rowOpen$rowBody$rowClose';
         },
       );
-      debugPrint('_buildFromOriginal[$sheetName]: patched $patchedCount rows');
+      devLog('_buildFromOriginal[$sheetName]: patched $patchedCount rows');
       return result;
     }
 

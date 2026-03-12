@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/dev_log.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -133,7 +134,7 @@ class _OrderHistoryTabState extends State<_OrderHistoryTab> {
         _loading = false;
       });
     } catch (e) {
-      print('Error loading order history: $e');
+      devLog('Error loading order history: $e');
       setState(() => _loading = false);
     }
   }
@@ -298,7 +299,7 @@ class _InventoryHistoryTabState extends State<_InventoryHistoryTab> {
         _loading = false;
       });
     } catch (e) {
-      print('Error loading inventory history: $e');
+      devLog('Error loading inventory history: $e');
       setState(() => _loading = false);
     }
   }

@@ -13,6 +13,7 @@ import 'translation_service.dart';
 import 'translation_manager.dart';
 import 'product_store_supabase.dart';
 import 'tech_card_service_supabase.dart';
+import '../utils/product_name_utils.dart';
 
 /// Сервис для интеллектуального импорта продуктов
 class IntelligentProductImportService {
@@ -375,9 +376,10 @@ ${sampleTexts.take(5).join('\n')}
     );
   }
 
-  /// Нормализовать текст для сравнения
+  /// Нормализовать текст для сравнения (включая снятие префиксов iiko: Т., ТМЦ)
   String _normalizeText(String text) {
-    return text
+    var t = stripIikoPrefix(text);
+    return t
         .toLowerCase()
         .replaceAll(RegExp(r'[^\w\s]'), '') // Удаляем пунктуацию
         .replaceAll(RegExp(r'\s+'), ' ') // Нормализуем пробелы

@@ -25,7 +25,7 @@ CREATE POLICY "auth_select_menu_stop_go" ON menu_stop_go FOR SELECT TO authentic
     establishment_id IN (
       SELECT e.id FROM establishments e
       JOIN employees emp ON emp.establishment_id = e.id
-      WHERE emp.auth_user_id = auth.uid()
+      WHERE emp.id = auth.uid()
     )
   );
 
@@ -35,7 +35,7 @@ CREATE POLICY "auth_insert_menu_stop_go" ON menu_stop_go FOR INSERT TO authentic
     establishment_id IN (
       SELECT e.id FROM establishments e
       JOIN employees emp ON emp.establishment_id = e.id
-      WHERE emp.auth_user_id = auth.uid()
+      WHERE emp.id = auth.uid()
     )
   );
 
@@ -45,7 +45,7 @@ CREATE POLICY "auth_update_menu_stop_go" ON menu_stop_go FOR UPDATE TO authentic
     establishment_id IN (
       SELECT e.id FROM establishments e
       JOIN employees emp ON emp.establishment_id = e.id
-      WHERE emp.auth_user_id = auth.uid()
+      WHERE emp.id = auth.uid()
     )
   );
 
@@ -55,6 +55,6 @@ CREATE POLICY "auth_delete_menu_stop_go" ON menu_stop_go FOR DELETE TO authentic
     establishment_id IN (
       SELECT e.id FROM establishments e
       JOIN employees emp ON emp.establishment_id = e.id
-      WHERE emp.auth_user_id = auth.uid()
+      WHERE emp.id = auth.uid()
     )
   );

@@ -1,6 +1,9 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../utils/dev_log.dart';
+import '../utils/product_name_utils.dart';
 
 import '../models/models.dart';
+import 'nutrition_backfill_service.dart';
 import '../models/nomenclature_item.dart';
 import 'supabase_service.dart';
 
@@ -36,7 +39,7 @@ class ProductStoreSupabase {
     _isLoading = true;
 
     try {
-      print('DEBUG ProductStore: Loading ALL products from database (paginated)...');
+      devLog('DEBUG ProductStore: Loading ALL products from database (paginated)...');
       // PostgREST ограничивает ответ 1000 строками по умолчанию.
       // Грузим постранично пока не получим все записи.
       const pageSize = 1000;
@@ -55,16 +58,16 @@ class ProductStoreSupabase {
           allData.add(item as Map<String, dynamic>);
         }
 
-        print('DEBUG ProductStore: Page offset=$offset, got ${pageList.length} rows, total so far: ${allData.length}');
+        devLog('DEBUG ProductStore: Page offset=$offset, got ${pageList.length} rows, total so far: ${allData.length}');
 
         if (pageList.length < pageSize) break; // последняя страница
         offset += pageSize;
         if (offset > 50000) break; // защита от бесконечного цикла
       }
 
-      print('DEBUG ProductStore: Loaded ${allData.length} products total');
+      devLog('DEBUG ProductStore: Loaded ${allData.length} products total');
       _allProducts = allData.map((json) => Product.fromJson(json)).toList();
-      print('DEBUG ProductStore: Parsed ${_allProducts.length} products successfully');
+      devLog('DEBUG ProductStore: Parsed ${_allProducts.length} products successfully');
 
       _categories = _allProducts
           .map((product) => product.category)
@@ -72,8 +75,11 @@ class ProductStoreSupabase {
           .toList()
         ..sort();
 
+      // Фоновая подгрузка КБЖУ для продуктов без калорий (в течение суток)
+      NutritionBackfillService().startBackgroundBackfill(this);
+
     } catch (e) {
-      print('❌ ProductStore: Error loading products: $e');
+      devLog('❌ ProductStore: Error loading products: $e');
       rethrow;
     } finally {
       _isLoading = false;
@@ -139,19 +145,24 @@ class ProductStoreSupabase {
     return _allProducts.where((p) => p.id.trim().toLowerCase() == idLower).firstOrNull;
   }
 
-  /// Найти продукт для ингредиента: по productId, при неудаче — по productName (для совместимости с UUID-миграцией)
+  /// Найти продукт для ингредиента: по productId, при неудаче — по productName (для совместимости с UUID-миграцией).
+  /// Игнорирует префиксы iiko (Т., ТМЦ) при сопоставлении.
   Product? findProductForIngredient(String? productId, String productName) {
     if (productId != null && productId.isNotEmpty) {
       final p = findProductById(productId);
       if (p != null) return p;
     }
-    final nameNorm = productName.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
-    if (nameNorm.isEmpty) return null;
+    final raw = productName.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+    final stripped = stripIikoPrefix(productName).trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+    if (raw.isEmpty && stripped.isEmpty) return null;
     return _allProducts.where((p) {
       final n = (p.name.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' '));
-      if (n == nameNorm) return true;
+      final pStripped = stripIikoPrefix(p.name).trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+      if (n == raw || n == stripped || pStripped == raw || pStripped == stripped) return true;
       for (final v in p.names?.values ?? <String>[]) {
-        if (v.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ') == nameNorm) return true;
+        final vn = v.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+        final vs = stripIikoPrefix(v).trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+        if (vn == raw || vn == stripped || vs == raw || vs == stripped) return true;
       }
       return false;
     }).firstOrNull;
@@ -166,22 +177,22 @@ class ProductStoreSupabase {
       (p) => p.name.trim().toLowerCase() == nameLower,
     ).toList();
     if (existingLocal.isNotEmpty) {
-      print('DEBUG ProductStore: Product "${product.name}" already exists locally, skipping insert');
+      devLog('DEBUG ProductStore: Product "${product.name}" already exists locally, skipping insert');
       return existingLocal.first;
     }
 
     try {
-      print('DEBUG ProductStore: Adding product "${product.name}" to database...');
+      devLog('DEBUG ProductStore: Adding product "${product.name}" to database...');
       // Убираем null-поля перед вставкой, чтобы БД использовала DEFAULT значения
       final json = Map<String, dynamic>.fromEntries(
         product.toJson().entries.where((e) => e.value != null),
       );
       final response = await _supabase.insertData('products', json);
-      print('DEBUG ProductStore: Insert response: $response');
+      devLog('DEBUG ProductStore: Insert response: $response');
 
       final saved = Product.fromJson(response);
       _allProducts.add(saved);
-      print('DEBUG ProductStore: Product added successfully, total products: ${_allProducts.length}');
+      devLog('DEBUG ProductStore: Product added successfully, total products: ${_allProducts.length}');
       if (!_categories.contains(saved.category)) {
         _categories.add(saved.category);
         _categories.sort();
@@ -195,7 +206,7 @@ class ProductStoreSupabase {
       // Уникальный индекс сработал — продукт уже есть в БД, ищем его
       final errStr = e.toString().toLowerCase();
       if (errStr.contains('duplicate') || errStr.contains('unique') || errStr.contains('already exists')) {
-        print('DEBUG ProductStore: Duplicate detected for "${product.name}", fetching existing...');
+        devLog('DEBUG ProductStore: Duplicate detected for "${product.name}", fetching existing...');
         try {
           final existing = await _supabase.client
               .from('products')
@@ -210,10 +221,10 @@ class ProductStoreSupabase {
             return saved;
           }
         } catch (fetchErr) {
-          print('DEBUG ProductStore: Failed to fetch existing product: $fetchErr');
+          devLog('DEBUG ProductStore: Failed to fetch existing product: $fetchErr');
         }
       }
-      print('DEBUG ProductStore: Error adding product: $e');
+      devLog('DEBUG ProductStore: Error adding product: $e');
       rethrow;
     }
   }
@@ -256,7 +267,7 @@ class ProductStoreSupabase {
           );
     } catch (e) {
       // Не прерываем основной поток при ошибке сохранения алиаса
-      print('ProductStore: saveProductAlias failed: $e');
+      devLog('ProductStore: saveProductAlias failed: $e');
     }
   }
 
@@ -280,7 +291,7 @@ class ProductStoreSupabase {
         }
       }
     }).catchError((e) {
-      print('DEBUG ProductStore: Background translation failed for $productId: $e');
+      devLog('DEBUG ProductStore: Background translation failed for $productId: $e');
     });
   }
 
@@ -303,7 +314,7 @@ class ProductStoreSupabase {
         }
       }
     } catch (e) {
-      print('DEBUG ProductStore: translateProductAwait failed for $productId: $e');
+      devLog('DEBUG ProductStore: translateProductAwait failed for $productId: $e');
     }
     return null;
   }
@@ -353,25 +364,25 @@ class ProductStoreSupabase {
 
   /// Загрузить номенклатуру заведения (ID продуктов и цены)
   Future<void> loadNomenclature(String establishmentId) async {
-    print('🔄 ProductStore: Loading nomenclature for establishment $establishmentId...');
+    devLog('🔄 ProductStore: Loading nomenclature for establishment $establishmentId...');
 
     // Очищаем текущие данные
     _nomenclatureIds.clear();
     _priceCache.removeWhere((key, _) => key.startsWith('${establishmentId}_'));
 
-    print('👤 ProductStore: Loading nomenclature for establishment: $establishmentId');
+    devLog('👤 ProductStore: Loading nomenclature for establishment: $establishmentId');
 
     // Пробуем основной метод загрузки
     try {
       await _loadNomenclatureDirect(establishmentId);
     } catch (e) {
-      print('⚠️ ProductStore: Primary loading failed, trying fallback method: $e');
+      devLog('⚠️ ProductStore: Primary loading failed, trying fallback method: $e');
 
       // Пробуем альтернативный метод (RPC функция или упрощенный запрос)
       try {
         await _loadNomenclatureFallback(establishmentId);
       } catch (fallbackError) {
-        print('❌ ProductStore: Fallback loading also failed: $fallbackError');
+        devLog('❌ ProductStore: Fallback loading also failed: $fallbackError');
 
         // Очищаем данные при ошибке
         _nomenclatureIds.clear();
@@ -385,8 +396,8 @@ class ProductStoreSupabase {
 
   /// Основной метод загрузки номенклатуры
   Future<void> _loadNomenclatureDirect(String establishmentId) async {
-    print('🔍 ProductStore: Making query to establishment_products...');
-    print('🔍 ProductStore: establishment_id = $establishmentId');
+    devLog('🔍 ProductStore: Making query to establishment_products...');
+    devLog('🔍 ProductStore: establishment_id = $establishmentId');
 
     dynamic response;
     try {
@@ -396,7 +407,7 @@ class ProductStoreSupabase {
           .eq('establishment_id', establishmentId)
           .limit(10000);
     } catch (e) {
-      print('⚠️ ProductStore: Full select failed (price/currency columns may not exist), trying product_id only: $e');
+      devLog('⚠️ ProductStore: Full select failed (price/currency columns may not exist), trying product_id only: $e');
       response = await _supabase.client
           .from('establishment_products')
           .select('product_id')
@@ -405,10 +416,10 @@ class ProductStoreSupabase {
     }
 
     final list = response is List ? response : <dynamic>[];
-    print('📊 ProductStore: Raw response received, length: ${list.length}');
+    devLog('📊 ProductStore: Raw response received, length: ${list.length}');
 
     if (list.isEmpty) {
-      print('ℹ️ ProductStore: No nomenclature data found for establishment $establishmentId');
+      devLog('ℹ️ ProductStore: No nomenclature data found for establishment $establishmentId');
       return;
     }
 
@@ -417,7 +428,7 @@ class ProductStoreSupabase {
 
   /// Альтернативный метод загрузки (если основной не работает)
   Future<void> _loadNomenclatureFallback(String establishmentId) async {
-    print('🔄 ProductStore: Trying fallback loading method...');
+    devLog('🔄 ProductStore: Trying fallback loading method...');
 
     // Пробуем RPC функцию, если она существует
     try {
@@ -430,7 +441,7 @@ class ProductStoreSupabase {
         return;
       }
     } catch (e) {
-      print('⚠️ ProductStore: RPC fallback failed: $e');
+      devLog('⚠️ ProductStore: RPC fallback failed: $e');
     }
 
     // Если RPC не работает, пробуем упрощенный запрос без RLS
@@ -444,7 +455,7 @@ class ProductStoreSupabase {
 
       await _processNomenclatureResponse(response, establishmentId);
     } catch (e) {
-      print('❌ ProductStore: All fallback methods failed');
+      devLog('❌ ProductStore: All fallback methods failed');
       rethrow;
     }
   }
@@ -490,12 +501,12 @@ class ProductStoreSupabase {
       }
     }
 
-    print('✅ ProductStore: Nomenclature loaded successfully: $processedCount products, cache size: ${_priceCache.length}');
+    devLog('✅ ProductStore: Nomenclature loaded successfully: $processedCount products, cache size: ${_priceCache.length}');
   }
 
   /// Проверить и восстановить номенклатуру при ошибках
   Future<void> ensureNomenclatureLoaded(String establishmentId) async {
-    print('🔄 ProductStore: Ensuring nomenclature is loaded for $establishmentId...');
+    devLog('🔄 ProductStore: Ensuring nomenclature is loaded for $establishmentId...');
 
     try {
       // Пробуем загрузить, если еще не загружено
@@ -505,19 +516,19 @@ class ProductStoreSupabase {
 
       // Если все еще пусто, возможно проблемы с данными
       if (_nomenclatureIds.isEmpty) {
-        print('⚠️ ProductStore: Nomenclature is empty, this might be normal for new establishments');
+        devLog('⚠️ ProductStore: Nomenclature is empty, this might be normal for new establishments');
       } else {
-        print('✅ ProductStore: Nomenclature verified: ${_nomenclatureIds.length} products');
+        devLog('✅ ProductStore: Nomenclature verified: ${_nomenclatureIds.length} products');
       }
     } catch (e) {
-      print('❌ ProductStore: Failed to ensure nomenclature loaded: $e');
+      devLog('❌ ProductStore: Failed to ensure nomenclature loaded: $e');
       // Не выбрасываем ошибку, чтобы не ломать основной поток
     }
   }
 
   /// Добавить продукт в номенклатуру (опционально с ценой)
   Future<void> addToNomenclature(String establishmentId, String productId, {double? price, String? currency}) async {
-    print('➕ ProductStore: Adding product $productId to nomenclature for establishment $establishmentId...');
+    devLog('➕ ProductStore: Adding product $productId to nomenclature for establishment $establishmentId...');
 
     // Валидация входных данных
     if (establishmentId.isEmpty || productId.isEmpty) {
@@ -531,7 +542,7 @@ class ProductStoreSupabase {
         'product_id': productId,
       };
 
-      print('📝 ProductStore: Inserting/updating nomenclature record: $data');
+      devLog('📝 ProductStore: Inserting/updating nomenclature record: $data');
 
       // Используем upsert для создания записи если её нет
       final response = await _supabase.client
@@ -542,22 +553,22 @@ class ProductStoreSupabase {
           )
           .select();
 
-      print('✅ ProductStore: Nomenclature record upsert successful, response: $response');
+      devLog('✅ ProductStore: Nomenclature record upsert successful, response: $response');
 
       // Теперь всегда устанавливаем цену, если она указана (даже если запись уже существовала)
       if (price != null) {
-        print('💰 ProductStore: Setting price for product $productId: $price $currency');
+        devLog('💰 ProductStore: Setting price for product $productId: $price $currency');
         await setEstablishmentPrice(establishmentId, productId, price, currency);
       }
 
       // Добавляем в локальный кэш
       _nomenclatureIds.add(productId);
 
-      print('✅ ProductStore: Product $productId added to nomenclature successfully');
+      devLog('✅ ProductStore: Product $productId added to nomenclature successfully');
 
     } catch (e, stackTrace) {
-      print('❌ ProductStore: Error adding to nomenclature: $e');
-      print('🔍 Stack trace: $stackTrace');
+      devLog('❌ ProductStore: Error adding to nomenclature: $e');
+      devLog('🔍 Stack trace: $stackTrace');
 
       // Не добавляем в локальный кэш при ошибке
       // Вызывающий код должен обработать ошибку
@@ -606,7 +617,7 @@ class ProductStoreSupabase {
 
   /// Установить цену продукта в номенклатуре заведения
   Future<void> setEstablishmentPrice(String establishmentId, String productId, double? price, String? currency) async {
-    print('💰 ProductStore: Setting price for $productId in establishment $establishmentId: $price $currency');
+    devLog('💰 ProductStore: Setting price for $productId in establishment $establishmentId: $price $currency');
 
     if (price != null) {
       final oldPrice = getEstablishmentPrice(productId, establishmentId)?.$1;
@@ -623,7 +634,7 @@ class ProductStoreSupabase {
             },
             onConflict: 'establishment_id,product_id',
           );
-      print('✅ ProductStore: Price upserted in establishment_products');
+      devLog('✅ ProductStore: Price upserted in establishment_products');
 
       // Записываем в историю изменений (если цена изменилась)
       if (oldPrice == null || (oldPrice - price).abs() > 0.001) {
@@ -636,7 +647,7 @@ class ProductStoreSupabase {
             'currency': currency ?? 'RUB',
           });
         } catch (e) {
-          print('⚠️ ProductStore: Failed to record price history: $e');
+          devLog('⚠️ ProductStore: Failed to record price history: $e');
         }
       }
 
@@ -656,7 +667,7 @@ class ProductStoreSupabase {
   /// Использует RPC для быстрого bulk delete (без возврата тысяч строк).
   /// Fallback на прямой DELETE если RPC ещё не применён.
   Future<void> clearAllNomenclature(String establishmentId) async {
-    print('🗑️ ProductStore: Clearing all nomenclature for establishment $establishmentId');
+    devLog('🗑️ ProductStore: Clearing all nomenclature for establishment $establishmentId');
 
     try {
       try {
@@ -680,18 +691,18 @@ class ProductStoreSupabase {
       _nomenclatureIds.clear();
       _priceCache.removeWhere((key, _) => key.startsWith('${establishmentId}_'));
 
-      print('✅ ProductStore: All nomenclature cleared successfully');
+      devLog('✅ ProductStore: All nomenclature cleared successfully');
 
     } catch (e, stackTrace) {
-      print('❌ ProductStore: Error clearing nomenclature: $e');
-      print('🔍 Stack trace: $stackTrace');
+      devLog('❌ ProductStore: Error clearing nomenclature: $e');
+      devLog('🔍 Stack trace: $stackTrace');
       rethrow;
     }
   }
 
   /// Удалить ВСЕ продукты из общего списка (только для администраторов!)
   Future<void> clearAllProducts() async {
-    print('🗑️ ProductStore: Clearing ALL products from database');
+    devLog('🗑️ ProductStore: Clearing ALL products from database');
 
     try {
       // Проверяем, что пользователь имеет права администратора
@@ -708,11 +719,11 @@ class ProductStoreSupabase {
       _nomenclatureIds.clear();
       _priceCache.clear();
 
-      print('✅ ProductStore: ALL products cleared successfully (DANGER: This removed all products!)');
+      devLog('✅ ProductStore: ALL products cleared successfully (DANGER: This removed all products!)');
 
     } catch (e, stackTrace) {
-      print('❌ ProductStore: Error clearing all products: $e');
-      print('🔍 Stack trace: $stackTrace');
+      devLog('❌ ProductStore: Error clearing all products: $e');
+      devLog('🔍 Stack trace: $stackTrace');
       rethrow;
     }
   }
@@ -763,7 +774,7 @@ class ProductStoreSupabase {
       }
       return products;
     } catch (e) {
-      print('❌ ProductStore: loadNomenclatureProductsDirect failed: $e');
+      devLog('❌ ProductStore: loadNomenclatureProductsDirect failed: $e');
       rethrow;
     }
   }
@@ -867,7 +878,7 @@ class ProductStoreSupabase {
         );
       }).toList();
     } catch (e) {
-      print('⚠️ ProductStore: Failed to load price history: $e');
+      devLog('⚠️ ProductStore: Failed to load price history: $e');
       return [];
     }
   }

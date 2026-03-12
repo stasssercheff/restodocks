@@ -1,7 +1,5 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-
 import '../models/models.dart';
+import '../utils/dev_log.dart';
 import 'services.dart';
 
 /// Сервис для работы с документами во входящих (инвентаризации — шефу и собственнику).
@@ -18,35 +16,64 @@ class InboxService {
 
     try {
       final docService = InventoryDocumentService();
-      List<Map<String, dynamic>> rawList;
+      final isOwnerOrMgmt = currentEmployee.hasRole('owner') || currentEmployee.department == 'management';
+      final isChefOrOwner = currentEmployee.hasRole('executive_chef') || currentEmployee.hasRole('sous_chef') || isOwnerOrMgmt;
 
-      if (currentEmployee.hasRole('owner') || currentEmployee.department == 'management') {
-        rawList = await docService.listForEstablishment(establishmentId);
-      } else if (currentEmployee.hasRole('executive_chef') || currentEmployee.hasRole('sous_chef')) {
-        rawList = await docService.listForChef(currentEmployee.id);
-      } else if (currentEmployee.hasRole('bar_manager')) {
-        rawList = await docService.listForEstablishment(establishmentId);
-        rawList = rawList.where((d) {
-          final p = d['payload'] as Map<String, dynamic>?;
-          final h = p?['header'] as Map<String, dynamic>?;
-          final isIiko = p?['type'] == 'iiko_inventory';
-          if (isIiko) return false; // iiko — кухня, барменеджер не видит
-          final dept = (h?['department'] ?? '').toString();
-          return dept == 'bar' || dept == 'Bar';
-        }).toList();
-      } else if (currentEmployee.hasRole('floor_manager')) {
-        rawList = await docService.listForEstablishment(establishmentId);
-        rawList = rawList.where((d) {
-          final p = d['payload'] as Map<String, dynamic>?;
-          final h = p?['header'] as Map<String, dynamic>?;
-          final isIiko = p?['type'] == 'iiko_inventory';
-          if (isIiko) return false;
-          final dept = (h?['department'] ?? '').toString().toLowerCase();
-          return dept == 'hall' || dept == 'dining_room' || dept == 'зал';
-        }).toList();
-      } else {
-        rawList = [];
-      }
+      // Параллельная загрузка: инвентаризации, чеклисты, просрочки, заказы
+      final inventoryFuture = () async {
+        List<Map<String, dynamic>> rawList;
+        if (isOwnerOrMgmt) {
+          rawList = await docService.listForEstablishment(establishmentId);
+        } else if (currentEmployee.hasRole('executive_chef') || currentEmployee.hasRole('sous_chef')) {
+          rawList = await docService.listForChef(currentEmployee.id);
+        } else if (currentEmployee.hasRole('bar_manager')) {
+          rawList = await docService.listForEstablishment(establishmentId);
+          rawList = rawList.where((d) {
+            final p = d['payload'] as Map<String, dynamic>?;
+            final h = p?['header'] as Map<String, dynamic>?;
+            final isIiko = p?['type'] == 'iiko_inventory';
+            if (isIiko) return false;
+            final dept = (h?['department'] ?? '').toString();
+            return dept == 'bar' || dept == 'Bar';
+          }).toList();
+        } else if (currentEmployee.hasRole('floor_manager')) {
+          rawList = await docService.listForEstablishment(establishmentId);
+          rawList = rawList.where((d) {
+            final p = d['payload'] as Map<String, dynamic>?;
+            final h = p?['header'] as Map<String, dynamic>?;
+            final isIiko = p?['type'] == 'iiko_inventory';
+            if (isIiko) return false;
+            final dept = (h?['department'] ?? '').toString().toLowerCase();
+            return dept == 'hall' || dept == 'dining_room' || dept == 'зал';
+          }).toList();
+        } else {
+          rawList = [];
+        }
+        return rawList;
+      }();
+
+      final checklistFuture = isChefOrOwner
+          ? (currentEmployee.hasRole('owner') || currentEmployee.department == 'management'
+              ? ChecklistSubmissionService().listForEstablishment(establishmentId)
+              : ChecklistSubmissionService().listForChef(currentEmployee.id))
+          : Future<List<dynamic>>.value([]);
+
+      final missedFuture = isChefOrOwner
+          ? ChecklistServiceSupabase().getChecklistsWithMissedDeadline(establishmentId)
+          : Future<List<dynamic>>.value([]);
+
+      final ordersFuture = OrderDocumentService().listForEstablishment(establishmentId);
+
+      final results = await Future.wait([
+        inventoryFuture,
+        checklistFuture,
+        missedFuture,
+        ordersFuture,
+      ]);
+      final rawList = results[0] as List<Map<String, dynamic>>;
+      final subList = results[1];
+      final missed = results[2];
+      final orderDocs = results[3] as List<Map<String, dynamic>>;
 
       for (final doc in rawList) {
         final payload = doc['payload'] as Map<String, dynamic>? ?? {};
@@ -75,58 +102,47 @@ class InboxService {
         ));
       }
 
-      // Отправленные чеклисты — для шефа и су-шефа
-      if (currentEmployee.hasRole('executive_chef') || currentEmployee.hasRole('sous_chef') ||
-          currentEmployee.hasRole('owner') || currentEmployee.department == 'management') {
-        final subSvc = ChecklistSubmissionService();
-        final subList = currentEmployee.hasRole('owner') || currentEmployee.department == 'management'
-            ? await subSvc.listForEstablishment(establishmentId)
-            : await subSvc.listForChef(currentEmployee.id);
-        for (final sub in subList) {
-          final submittedName = sub.submittedByName.isNotEmpty ? sub.submittedByName : '—';
-          final subDept = sub.payload['department']?.toString() ?? 'kitchen';
-          documents.add(InboxDocument(
-            id: sub.id,
-            type: DocumentType.checklistSubmission,
-            title: 'Чеклист: ${sub.checklistName}',
-            description: '$submittedName${sub.section != null ? ' • ${sub.section}' : ''}',
-            createdAt: sub.createdAt,
-            employeeId: sub.submittedByEmployeeId ?? '',
-            employeeName: submittedName,
-            department: subDept,
-            fileUrl: null,
-            metadata: {'submission': sub.payload, 'checklistId': sub.checklistId},
-          ));
-        }
+      // Отправленные чеклисты — для шефа и су-шефа (данные уже загружены параллельно выше)
+      for (final sub in subList) {
+        final s = sub as ChecklistSubmission;
+        final submittedName = s.submittedByName.isNotEmpty ? s.submittedByName : '—';
+        final subDept = s.payload['department']?.toString() ?? 'kitchen';
+        documents.add(InboxDocument(
+          id: s.id,
+          type: DocumentType.checklistSubmission,
+          title: 'Чеклист: ${s.checklistName}',
+          description: '$submittedName${s.section != null ? ' • ${s.section}' : ''}',
+          createdAt: s.createdAt,
+          employeeId: s.submittedByEmployeeId ?? '',
+          employeeName: submittedName,
+          department: subDept,
+          fileUrl: null,
+          metadata: {'submission': s.payload, 'checklistId': s.checklistId},
+        ));
       }
 
-      // Чеклисты с пропущенным дедлайном — для шефа, су-шефа и собственника
-      if (currentEmployee.hasRole('executive_chef') || currentEmployee.hasRole('sous_chef') ||
-          currentEmployee.hasRole('owner') || currentEmployee.department == 'management') {
-        final checklistSvc = ChecklistServiceSupabase();
-        final missed = await checklistSvc.getChecklistsWithMissedDeadline(establishmentId);
-        for (final c in missed) {
-          final deadlineStr = c.deadlineAt != null
-              ? DateTime(c.deadlineAt!.year, c.deadlineAt!.month, c.deadlineAt!.day)
-                  .toIso8601String()
-              : '';
-          documents.add(InboxDocument(
-            id: c.id,
-            type: DocumentType.checklistMissedDeadline,
-            title: 'Чеклист не выполнен: ${c.name}',
-            description: deadlineStr.isNotEmpty ? 'Срок: $deadlineStr' : '',
-            createdAt: c.deadlineAt ?? c.updatedAt,
-            employeeId: '',
-            employeeName: '',
-            department: c.assignedDepartment,
-            fileUrl: null,
-            metadata: {'checklistId': c.id, 'checklistName': c.name},
-          ));
-        }
+      // Чеклисты с пропущенным дедлайном (данные уже загружены параллельно выше)
+      for (final c in missed) {
+        final ch = c as Checklist;
+        final deadlineStr = ch.deadlineAt != null
+            ? DateTime(ch.deadlineAt!.year, ch.deadlineAt!.month, ch.deadlineAt!.day)
+                .toIso8601String()
+            : '';
+        documents.add(InboxDocument(
+          id: ch.id,
+          type: DocumentType.checklistMissedDeadline,
+          title: 'Чеклист не выполнен: ${ch.name}',
+          description: deadlineStr.isNotEmpty ? 'Срок: $deadlineStr' : '',
+          createdAt: ch.deadlineAt ?? ch.updatedAt,
+          employeeId: '',
+          employeeName: '',
+          department: ch.assignedDepartment,
+          fileUrl: null,
+          metadata: {'checklistId': ch.id, 'checklistName': ch.name},
+        ));
       }
 
-      // Заказы продуктов — для шефа и собственника по заведению
-      final orderDocs = await OrderDocumentService().listForEstablishment(establishmentId);
+      // Заказы продуктов (данные уже загружены параллельно выше)
       for (final doc in orderDocs) {
         final payload = doc['payload'] as Map<String, dynamic>? ?? {};
         final header = payload['header'] as Map<String, dynamic>? ?? {};
@@ -154,7 +170,7 @@ class InboxService {
       documents.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       return documents;
     } catch (e) {
-      print('Error loading inbox documents: $e');
+      devLog('Error loading inbox documents: $e');
       return [];
     }
   }
@@ -183,14 +199,14 @@ class InboxService {
     try {
       // В реальном приложении здесь будет логика скачивания файла
       // Пока просто имитируем скачивание
-      print('Downloading document: ${document.title}');
-      print('File URL: ${document.fileUrl}');
+      devLog('Downloading document: ${document.title}');
+      devLog('File URL: ${document.fileUrl}');
 
       // Можно добавить логику сохранения файла на устройство
       // используя packages как path_provider и http
 
     } catch (e) {
-      print('Error downloading document: $e');
+      devLog('Error downloading document: $e');
       rethrow;
     }
   }
@@ -222,7 +238,7 @@ class InboxService {
         );
       }).toList();
     } catch (e) {
-      print('Error loading deletion notifications: $e');
+      devLog('Error loading deletion notifications: $e');
       return [];
     }
   }

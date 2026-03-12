@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import '../utils/dev_log.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -54,7 +55,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
         }
         final deduplicatedProducts = uniqueProducts.values.toList();
 
-        print('DEBUG: Loaded ${store.allProducts.length} products, deduplicated to ${deduplicatedProducts.length}');
+        devLog('DEBUG: Loaded ${store.allProducts.length} products, deduplicated to ${deduplicatedProducts.length}');
 
         setState(() {
           _products = deduplicatedProducts;
@@ -226,9 +227,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
       try {
         final techCardService = context.read<TechCardServiceSupabase>();
         allTechCards = await techCardService.getAllTechCards();
-        print('Получено ${allTechCards.length} ТТК для проверки');
+        devLog('Получено ${allTechCards.length} ТТК для проверки');
       } catch (e) {
-        print('Не удалось получить ТТК: $e, продолжаем без проверки ТТК');
+        devLog('Не удалось получить ТТК: $e, продолжаем без проверки ТТК');
       }
 
       int deletedCount = 0;
@@ -268,17 +269,17 @@ class _ProductsScreenState extends State<ProductsScreen> {
         }
 
         if (isUsed) {
-          print('Пропускаем продукт "${product.name}": $usageMessage');
+          devLog('Пропускаем продукт "${product.name}": $usageMessage');
           skippedCount++;
           continue;
         }
 
         try {
           await store.deleteProduct(product.id);
-          print('Удален продукт "${product.name}" (${product.id})');
+          devLog('Удален продукт "${product.name}" (${product.id})');
           deletedCount++;
         } catch (e) {
-          print('Ошибка при удалении продукта "${product.name}": $e');
+          devLog('Ошибка при удалении продукта "${product.name}": $e');
           skippedCount++;
         }
       }
@@ -333,7 +334,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
       try {
         allTechCards = await techCardService.getAllTechCards();
       } catch (e) {
-        print('Warning: Could not load tech cards for duplicate removal: $e');
+        devLog('Warning: Could not load tech cards for duplicate removal: $e');
         // Продолжаем без проверки ТТК
       }
 
@@ -456,7 +457,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
         // Полные дубликаты - группируем по всем полям
         final Map<String, List<Product>> groupedProducts = {};
         for (final product in _products) {
-          final key = '${product.name}_${product.basePrice}_${product.currency}_${product.calories}_${product.protein}_${product.fat}_${product.carbs}';
+          final key = '${product.name}_${product.calories}_${product.protein}_${product.fat}_${product.carbs}';
           groupedProducts.putIfAbsent(key, () => []).add(product);
         }
         duplicateGroups = groupedProducts.values.where((group) => group.length > 1).toList();
@@ -496,7 +497,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
             try {
               allTechCards = await techCardService.getAllTechCards();
             } catch (e) {
-              print('Warning: Could not load tech cards for duplicate removal: $e');
+              devLog('Warning: Could not load tech cards for duplicate removal: $e');
             }
 
             for (final productId in idsToRemove) {
@@ -529,15 +530,15 @@ class _ProductsScreenState extends State<ProductsScreen> {
               }
 
               if (isUsed) {
-                print('Skipping product ${product.name}: used in nomenclature or tech card');
+                devLog('Skipping product ${product.name}: used in nomenclature or tech card');
                 skippedCount++;
               } else {
                 try {
                   await store.deleteProduct(productId);
                   deletedCount++;
-                  print('Deleted duplicate product: ${product.name}');
+                  devLog('Deleted duplicate product: ${product.name}');
                 } catch (e) {
-                  print('Error deleting product ${product.name}: $e');
+                  devLog('Error deleting product ${product.name}: $e');
                 }
               }
               processed++;
@@ -611,7 +612,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
               }
             }
           } catch (e) {
-            print('AI similarity check failed for "${product.name}" vs "${otherProduct.name}": $e');
+            devLog('AI similarity check failed for "${product.name}" vs "${otherProduct.name}": $e');
             // Fallback: простая проверка
             final similarity = _calculateSimilarity(product.name, otherProduct.name);
             if (similarity > 0.7) {
@@ -629,7 +630,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
       }
 
     } catch (e) {
-      print('Error in AI duplicate detection: $e');
+      devLog('Error in AI duplicate detection: $e');
     }
 
     return groups;
@@ -718,7 +719,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
     try {
       final store = context.read<ProductStoreSupabase>();
-      await store.addToNomenclature(estId, product.id, price: product.basePrice, currency: product.currency);
+      final ep = store.getEstablishmentPrice(product.id, estId);
+      final est = account.establishment;
+      await store.addToNomenclature(estId, product.id, price: ep?.$1, currency: ep?.$2 ?? est?.defaultCurrency);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(loc.t('product_added_to_nomenclature'))),
@@ -1387,9 +1390,19 @@ class _SmartDuplicatesDialogState extends State<_SmartDuplicatesDialog> {
                                         : null,
                                   ),
                                 ),
-                                subtitle: Text(
-                                  "Цена: ${product.basePrice ?? "не указана"} ${product.currency ?? ""}",
-                                  style: theme.textTheme.bodySmall,
+                                subtitle: Builder(
+                                  builder: (ctx) {
+                                    final store = ctx.read<ProductStoreSupabase>();
+                                    final estId = ctx.read<AccountManagerSupabase>().establishment?.id ?? '';
+                                    final ep = store.getEstablishmentPrice(product.id, estId);
+                                    final priceStr = ep != null && ep.$1 != null
+                                        ? '${ep.$1} ${ep.$2 ?? ""}'
+                                        : "не указана";
+                                    return Text(
+                                      "Цена: $priceStr",
+                                      style: theme.textTheme.bodySmall,
+                                    );
+                                  },
                                 ),
                                 dense: true,
                                 controlAffinity: ListTileControlAffinity.leading,

@@ -58,6 +58,7 @@ Use reasonable values for common foods. If uncertain, use null for that field. N
         { role: "user", content: userContent },
       ],
       temperature: 0.2,
+      context: "nutrition",
     });
 
     if (!content?.trim()) {

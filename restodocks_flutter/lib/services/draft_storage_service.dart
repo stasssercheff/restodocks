@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import '../utils/dev_log.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Сервис для хранения черновиков инвентаризации и чек-листов в localStorage
@@ -13,9 +14,9 @@ class DraftStorageService {
       final prefs = await SharedPreferences.getInstance();
       final jsonString = jsonEncode(data);
       await prefs.setString(_inventoryKey, jsonString);
-      debugPrint('Inventory draft saved: ${data.length} items');
+      devLog('Inventory draft saved: ${data.length} items');
     } catch (e) {
-      debugPrint('Failed to save inventory draft: $e');
+      devLog('Failed to save inventory draft: $e');
     }
   }
 
@@ -26,11 +27,11 @@ class DraftStorageService {
       final jsonString = prefs.getString(_inventoryKey);
       if (jsonString != null) {
         final data = jsonDecode(jsonString) as Map<String, dynamic>;
-        debugPrint('Inventory draft loaded: ${data.length} items');
+        devLog('Inventory draft loaded: ${data.length} items');
         return data;
       }
     } catch (e) {
-      debugPrint('Failed to load inventory draft: $e');
+      devLog('Failed to load inventory draft: $e');
     }
     return null;
   }
@@ -40,9 +41,9 @@ class DraftStorageService {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_inventoryKey);
-      debugPrint('Inventory draft cleared');
+      devLog('Inventory draft cleared');
     } catch (e) {
-      debugPrint('Failed to clear inventory draft: $e');
+      devLog('Failed to clear inventory draft: $e');
     }
   }
 
@@ -62,9 +63,9 @@ class DraftStorageService {
       final prefs = await SharedPreferences.getInstance();
       final jsonString = jsonEncode(data);
       await prefs.setString(_checklistKey, jsonString);
-      debugPrint('Checklist draft saved: ${data.length} items');
+      devLog('Checklist draft saved: ${data.length} items');
     } catch (e) {
-      debugPrint('Failed to save checklist draft: $e');
+      devLog('Failed to save checklist draft: $e');
     }
   }
 
@@ -75,11 +76,11 @@ class DraftStorageService {
       final jsonString = prefs.getString(_checklistKey);
       if (jsonString != null) {
         final data = jsonDecode(jsonString) as Map<String, dynamic>;
-        debugPrint('Checklist draft loaded: ${data.length} items');
+        devLog('Checklist draft loaded: ${data.length} items');
         return data;
       }
     } catch (e) {
-      debugPrint('Failed to load checklist draft: $e');
+      devLog('Failed to load checklist draft: $e');
     }
     return null;
   }
@@ -90,7 +91,7 @@ class DraftStorageService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('${_checklistKey}_edit_$checklistId', jsonEncode(data));
     } catch (e) {
-      debugPrint('Failed to save checklist edit draft: $e');
+      devLog('Failed to save checklist edit draft: $e');
     }
   }
 
@@ -119,7 +120,7 @@ class DraftStorageService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('${_checklistKey}_fill_$checklistId', jsonEncode(data));
     } catch (e) {
-      debugPrint('Failed to save checklist fill draft: $e');
+      devLog('Failed to save checklist fill draft: $e');
     }
   }
 
@@ -151,7 +152,7 @@ class DraftStorageService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('$_techCardEditPrefix$techCardId', jsonEncode(data));
     } catch (e) {
-      debugPrint('Failed to save tech card draft: $e');
+      devLog('Failed to save tech card draft: $e');
     }
   }
 
@@ -161,7 +162,7 @@ class DraftStorageService {
       final s = prefs.getString('$_techCardEditPrefix$techCardId');
       return s != null ? jsonDecode(s) as Map<String, dynamic> : null;
     } catch (e) {
-      debugPrint('Failed to load tech card draft: $e');
+      devLog('Failed to load tech card draft: $e');
       return null;
     }
   }
@@ -182,7 +183,7 @@ class DraftStorageService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_iikoInventoryKey, jsonEncode(data));
     } catch (e) {
-      debugPrint('Failed to save iiko draft: $e');
+      devLog('Failed to save iiko draft: $e');
     }
   }
 
@@ -192,7 +193,7 @@ class DraftStorageService {
       final s = prefs.getString(_iikoInventoryKey);
       return s != null ? jsonDecode(s) as Map<String, dynamic> : null;
     } catch (e) {
-      debugPrint('Failed to load iiko draft: $e');
+      devLog('Failed to load iiko draft: $e');
       return null;
     }
   }
@@ -220,9 +221,9 @@ class DraftStorageService {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_checklistKey);
-      debugPrint('Checklist draft cleared');
+      devLog('Checklist draft cleared');
     } catch (e) {
-      debugPrint('Failed to clear checklist draft: $e');
+      devLog('Failed to clear checklist draft: $e');
     }
   }
 

@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/core.dart';
+import 'utils/dev_log.dart';
 import 'core/initial_location_stub.dart'
     if (dart.library.html) 'core/initial_location_web.dart' as initial_loc;
 import 'core/supabase_url_resolver_stub.dart'
@@ -31,12 +32,12 @@ void main() async {
   if (kIsWeb) initial_loc.getInitialLocation();
   url_strategy.initUrlStrategy(); // после кэша — PathUrlStrategy не должен менять текущий URL
   FlutterError.onError = (details) {
-    debugPrint('FlutterError: ${details.exception}');
-    debugPrint('Stack: ${details.stack}');
+    devLog('FlutterError: ${details.exception}');
+    devLog('Stack: ${details.stack}');
   };
 
   final supabaseUrl = supabase_url.resolveSupabaseUrl(_supabaseUrlEnv);
-  print('=== SUPABASE INIT: url=$supabaseUrl key=${_supabaseAnonKey.substring(0, 15)}... ===');
+  devLog('=== SUPABASE INIT: url=$supabaseUrl key=${_supabaseAnonKey.substring(0, 15)}... ===');
 
   await Supabase.initialize(
     url: supabaseUrl,
@@ -52,11 +53,11 @@ void main() async {
     final hasTokens = uri.fragment.contains('access_token') || uri.query.contains('access_token');
     if (hasTokens) {
       try {
-        if (kDebugMode) debugPrint('[Auth] getSessionFromUrl path=${uri.path} hasFragment=${uri.fragment.isNotEmpty}');
+        devLog('[Auth] getSessionFromUrl path=${uri.path} hasFragment=${uri.fragment.isNotEmpty}');
         await Supabase.instance.client.auth.getSessionFromUrl(uri);
         await Future.delayed(const Duration(milliseconds: 500));
       } catch (e) {
-        if (kDebugMode) debugPrint('[Auth] getSessionFromUrl error: $e');
+        devLog('[Auth] getSessionFromUrl error: $e');
       }
     }
   }

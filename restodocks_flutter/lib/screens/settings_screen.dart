@@ -614,10 +614,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (!showBanquet) {
       order = order.where((id) => id != HomeTileId.banquetMenu && id != HomeTileId.banquetTtk).toList();
     }
+    order = order.where((id) => id != HomeTileId.suppliers).toList();
     final tileLabels = <HomeTileId, String>{
       HomeTileId.messages: loc.t('inbox_tab_messages') ?? 'Сообщения',
       HomeTileId.schedule: loc.t('schedule'),
       HomeTileId.productOrder: loc.t('product_order'),
+      HomeTileId.suppliers: loc.t('suppliers') ?? loc.t('order_tab_suppliers') ?? 'Поставщики',
       HomeTileId.menu: loc.t('menu'),
       HomeTileId.ttk: emp.department == 'bar' ? loc.t('ttk_bar') : loc.t('ttk_kitchen'),
       HomeTileId.banquetMenu: '${loc.t('menu')} — ${loc.t('banquet_catering') ?? 'Банкет / Кейтринг'}',

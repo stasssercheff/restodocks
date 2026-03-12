@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import '../utils/dev_log.dart';
 import 'package:flutter/scheduler.dart';
 
 import '../services/draft_storage_service.dart';
@@ -71,13 +72,13 @@ mixin AutoSaveMixin<T extends StatefulWidget> on State<T> {
         if (data != null && mounted) {
           await restoreState(data);
           _isInitialized = true;
-          debugPrint('Draft restored for $draftKey');
+          devLog('Draft restored for $draftKey');
         }
       } else {
         _isInitialized = true;
       }
     } catch (e) {
-      debugPrint('Failed to restore draft: $e');
+      devLog('Failed to restore draft: $e');
       _isInitialized = true;
     }
   }
@@ -122,7 +123,7 @@ mixin AutoSaveMixin<T extends StatefulWidget> on State<T> {
       final data = getCurrentState();
       await _saveToStorage(data);
     } catch (e) {
-      debugPrint('Failed to save draft: $e');
+      devLog('Failed to save draft: $e');
     }
   }
 

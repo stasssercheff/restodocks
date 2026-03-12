@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/dev_log.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -135,13 +136,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
       String? authUserId;
       bool hasSession = false;
       try {
-        print('DEBUG: Attempting Supabase Auth signUp for email: $email');
+        devLog('DEBUG: Attempting Supabase Auth signUp for email: $email');
         final signUpRes = await accountManager.signUpToSupabaseAuth(email, password);
         authUserId = signUpRes.userId;
         hasSession = signUpRes.hasSession;
-        print('DEBUG: Supabase Auth signUp: userId=$authUserId, hasSession=$hasSession');
+        devLog('DEBUG: Supabase Auth signUp: userId=$authUserId, hasSession=$hasSession');
       } catch (e) {
-        print('DEBUG: Supabase Auth signUp failed: $e');
+        devLog('DEBUG: Supabase Auth signUp failed: $e');
       }
 
       // Проверяем лимит сотрудников по промокоду заведения

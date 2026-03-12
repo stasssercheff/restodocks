@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import '../utils/dev_log.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -808,7 +809,7 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
         ),
       );
     } catch (e, st) {
-      debugPrint('Salary export error: $e\n$st');
+      devLog('Salary export error: $e\n$st');
       if (mounted) Navigator.of(context, rootNavigator: true).pop();
       scaffoldMessenger.showSnackBar(
         SnackBar(

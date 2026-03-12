@@ -1,17 +1,10 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-
-import 'package:restodocks/core/supabase_url_resolver_stub.dart'
-    if (dart.library.html) 'package:restodocks/core/supabase_url_resolver_web.dart' as supabase_url;
+import '../utils/dev_log.dart';
 
 import '../models/models.dart';
 import 'checklist_submission_service.dart';
+import 'edge_function_http.dart';
 import 'supabase_service.dart';
-
-const _supabaseAnonKey = String.fromEnvironment(
-  'SUPABASE_ANON_KEY',
-  defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zZ2xmcHR3YnVxcW1xdW50dGhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUwNTk0MDQsImV4cCI6MjA4MDYzNTQwNH0.Jy7yi2TNdSrmoBdILXBGRYB_vxGtq8scCZ9eCA9vfTE',
-);
 
 /// Сервис чеклистов-шаблонов (Supabase).
 class ChecklistServiceSupabase {
@@ -64,11 +57,11 @@ class ChecklistServiceSupabase {
         list.add(c.copyWith(items: items));
       }
       if (kDebugMode) {
-        print('ChecklistService: loaded ${list.length} checklists for $establishmentId dept=$department');
+        devLog('ChecklistService: loaded ${list.length} checklists for $establishmentId dept=$department');
       }
       return list;
     } catch (e) {
-      print('ChecklistService: Ошибка загрузки чеклистов: $e');
+      devLog('ChecklistService: Ошибка загрузки чеклистов: $e');
       rethrow;
     }
   }
@@ -90,7 +83,7 @@ class ChecklistServiceSupabase {
       final items = (itemsData as List).map((e) => ChecklistItem.fromJson(e)).toList();
       return c.copyWith(items: items);
     } catch (e) {
-      print('Ошибка загрузки чеклиста: $e');
+      devLog('Ошибка загрузки чеклиста: $e');
       return null;
     }
   }
@@ -184,7 +177,7 @@ class ChecklistServiceSupabase {
       list.sort((a, b) => (b.deadlineAt ?? DateTime(0)).compareTo(a.deadlineAt ?? DateTime(0)));
       return list;
     } catch (e) {
-      print('Ошибка загрузки чеклистов с пропущенным дедлайном: $e');
+      devLog('Ошибка загрузки чеклистов с пропущенным дедлайном: $e');
       return [];
     }
   }
@@ -269,21 +262,10 @@ class ChecklistServiceSupabase {
       'items': itemsPayload,
     };
 
-    // 1. Пробуем Edge Function (service role)
-    final dio = Dio(BaseOptions(
-      headers: {
-        'apikey': _supabaseAnonKey,
-        'Authorization': 'Bearer $_supabaseAnonKey',
-        'Content-Type': 'application/json',
-      },
-      validateStatus: (_) => true,
-    ));
+    // 1. Пробуем Edge Function (с retry при 5xx/сети)
     try {
-      final resp = await dio.post('${supabase_url.getSupabaseBaseUrl()}/functions/v1/save-checklist', data: body);
-      if (resp.statusCode == 200) {
-        final data = resp.data is Map ? Map<String, dynamic>.from(resp.data as Map) : null;
-        if (data?['ok'] == true) return;
-      }
+      final res = await postEdgeFunctionWithRetry('save-checklist', body);
+      if (res.status == 200 && res.data?['ok'] == true) return;
     } catch (_) { /* пробуем RPC */ }
 
     // 2. Fallback: RPC save_checklist (anon grant)

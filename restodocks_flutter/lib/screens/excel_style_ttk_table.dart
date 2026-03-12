@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import '../utils/dev_log.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../models/models.dart';
 import '../utils/number_format_utils.dart';
+import '../utils/product_name_utils.dart';
 import '../models/nomenclature_item.dart';
 import '../services/services.dart';
 
@@ -768,6 +770,26 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
               );
               final outputWeight = ing.netWeight * (1 - (ing.cookingLossPctOverride ?? 0) / 100);
               updated = ing.copyWith(outputWeight: outputWeight);
+            } else if (selectedItem.type == 'add_by_name') {
+              final name = (selectedItem.item as String).trim();
+              if (name.isEmpty) return;
+              final p = widget.productStore.findProductForIngredient(null, name);
+              if (p != null) {
+                final establishmentPrice = widget.productStore.getEstablishmentPrice(p.id, widget.establishmentId);
+                final pricePerKg = establishmentPrice?.$1 ?? 0.0;
+                final cost = pricePerKg * (ingredient.grossWeight / 1000);
+                var ing = ingredient.copyWith(
+                  productId: p.id,
+                  productName: p.name,
+                  unit: p.unit ?? 'g',
+                  pricePerKg: pricePerKg,
+                  cost: cost,
+                );
+                final outputWeight = ing.netWeight * (1 - (ing.cookingLossPctOverride ?? 0) / 100);
+                updated = ing.copyWith(outputWeight: outputWeight);
+              } else {
+                updated = ingredient.copyWith(productName: name);
+              }
             } else if (selectedItem.type == 'pf') {
               final pf = selectedItem.item as TechCard;
               double? pfPricePerKg;
@@ -793,7 +815,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
               }
             }
           } catch (e, st) {
-            debugPrint('TTK onProductSelected error: $e\n$st');
+            devLog('TTK onProductSelected error: $e\n$st');
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text('Ошибка: $e'), backgroundColor: Colors.red),
@@ -1059,10 +1081,15 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
       return widget.items.toList();
     }
     final q = query.trim().toLowerCase();
+    final qStripped = stripIikoPrefix(query).trim().toLowerCase();
     return widget.items
-        .where((item) =>
-            item.displayName.toLowerCase().contains(q) ||
-            item.searchName.contains(q))
+        .where((item) {
+          final dn = item.displayName.toLowerCase();
+          final sn = item.searchName;
+          final dnStripped = stripIikoPrefix(item.displayName).toLowerCase();
+          return dn.contains(q) || sn.contains(q) ||
+              (qStripped.isNotEmpty && (dn.contains(qStripped) || dnStripped.contains(qStripped) || sn.contains(qStripped)));
+        })
         .toList();
   }
 
@@ -1105,15 +1132,30 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
                       ),
                     ),
                     Expanded(
-                      child: ListView.builder(
-                        itemCount: filtered.length,
-                        itemBuilder: (_, i) {
-                          final item = filtered[i];
-                          return ListTile(
-                            title: Text(item.displayName, style: const TextStyle(fontSize: 14)),
-                            onTap: () => Navigator.of(ctx).pop(item),
-                          );
-                        },
+                      child: ListView(
+                        children: [
+                          if (searchCtrl.text.trim().isNotEmpty)
+                            ListTile(
+                              leading: const Icon(Icons.add_circle_outline, size: 20),
+                              title: Text(
+                                '${widget.loc.t('add')} "${searchCtrl.text.trim()}"',
+                                style: const TextStyle(fontSize: 14, fontStyle: FontStyle.italic),
+                              ),
+                              onTap: () => Navigator.of(ctx).pop(SelectableItem(
+                                type: 'add_by_name',
+                                item: searchCtrl.text.trim(),
+                                displayName: searchCtrl.text.trim(),
+                                searchName: searchCtrl.text.trim().toLowerCase(),
+                              )),
+                            ),
+                          ...List.generate(filtered.length, (i) {
+                            final item = filtered[i];
+                            return ListTile(
+                              title: Text(item.displayName, style: const TextStyle(fontSize: 14)),
+                              onTap: () => Navigator.of(ctx).pop(item),
+                            );
+                          }),
+                        ],
                       ),
                     ),
                     const Divider(height: 1),

@@ -111,8 +111,7 @@ class _InboxScreenState extends State<InboxScreen> {
       tabs.add(_InboxTab.order);
       if (isOwner || isManagement) {
         tabs.add(_InboxTab.inventory);
-        if ((employee.hasRole('executive_chef') || employee.hasRole('owner')) &&
-            _documents.any((d) => d.type == DocumentType.iikoInventory)) {
+        if (employee.hasRole('executive_chef') || employee.hasRole('owner')) {
           tabs.add(_InboxTab.iikoInventory);
         }
       }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/dev_log.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -99,7 +100,7 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
     var created = 0;
     var updated = 0;
 
-    print('💾 ImportReview: starting save, ${toSave.length} items, est=${est.id}');
+    devLog('💾 ImportReview: starting save, ${toSave.length} items, est=${est.id}');
     try {
       for (final item in toSave) {
         if (!mounted) return;
@@ -119,7 +120,7 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
           if (newPrice != null) updated++;
         } else {
           final cur = item.currency ?? defCur;
-          print('💾 ImportReview: creating new product "${item.displayName}"');
+          devLog('💾 ImportReview: creating new product "${item.displayName}"');
           double? calories;
           double? protein;
           double? fat;
@@ -149,26 +150,26 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
             basePrice: null,
             currency: item.displayPrice != null ? cur : null,
           );
-          print('💾 ImportReview: addProduct id=${product.id}');
+          devLog('💾 ImportReview: addProduct id=${product.id}');
           final savedProduct = await store.addProduct(product);
-          print('💾 ImportReview: addToNomenclature id=${savedProduct.id}');
+          devLog('💾 ImportReview: addToNomenclature id=${savedProduct.id}');
           await store.addToNomenclature(
             est.id,
             savedProduct.id,
             price: item.displayPrice,
             currency: item.displayPrice != null ? cur : null,
           );
-          print('💾 ImportReview: ✅ saved "${item.displayName}"');
+          devLog('💾 ImportReview: ✅ saved "${item.displayName}"');
           created++;
         }
 
         if (mounted) setState(() => _saveProgress++);
       }
 
-      print('💾 ImportReview: all saved. created=$created updated=$updated. Reloading...');
+      devLog('💾 ImportReview: all saved. created=$created updated=$updated. Reloading...');
       await store.loadProducts(force: true);
       await store.loadNomenclature(est.dataEstablishmentId);
-      print('💾 ImportReview: reload done, navigating to nomenclature');
+      devLog('💾 ImportReview: reload done, navigating to nomenclature');
 
       if (mounted) {
         setState(() {
@@ -188,7 +189,7 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
         context.go('/nomenclature?refresh=1');
       }
     } catch (e, st) {
-      print('❌ ImportReview: save error: $e\n$st');
+      devLog('❌ ImportReview: save error: $e\n$st');
       if (mounted) {
         setState(() {
           _saving = false;

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import '../utils/dev_log.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/translation.dart';
@@ -59,7 +60,7 @@ class LocalizationService extends ChangeNotifier {
         }
       });
     } catch (e) {
-      print('Ошибка загрузки переводов: $e');
+      devLog('Ошибка загрузки переводов: $e');
     }
   }
 

@@ -1,17 +1,25 @@
 /**
- * Общий слой вызова ИИ. Поддерживаются: Groq, Google Gemini, GigaChat, OpenAI, Claude.
+ * Общий слой вызова ИИ. Поддерживаются: Groq, Gemini, GigaChat, OpenRouter, Mistral, Cerebras, OpenAI, Claude.
  * Переменные:
- * - AI_PROVIDER = "groq" | "gemini" | "gigachat" | "openai" | "claude" — явный выбор; иначе каскад по ключам.
- *   Если Gemini даёт 429 (quota), задай AI_PROVIDER=groq в Supabase, чтобы использовать Groq.
- * - GROQ_API_KEY — Groq (быстро, free tier) — OpenAI-совместимый API
- * - GEMINI_API_KEY — Google AI Studio, бесплатный tier
- * - GIGACHAT_AUTH_KEY — GigaChat (бесплатный лимит)
- * - OPENAI_API_KEY — OpenAI (фото + текст)
- * - ANTHROPIC_API_KEY — Claude API
- * chatText с fallback: при ошибке/пустом ответе пробует следующий провайдер.
+ * - AI_PROVIDER = глобально для всех (если задан)
+ * - AI_PROVIDER_TTK = парсинг ТТК (ai-parse-tech-cards-pdf, ai-recognize-tech-card, ai-recognize-tech-cards-batch)
+ * - AI_PROVIDER_NUTRITION = КБЖУ (ai-refine-nutrition)
+ * - AI_PROVIDER_PRODUCT = продукты (ai-normalize, ai-find-duplicates, ai-verify, ai-recognize-product, ai-parse-product-list)
+ * - AI_PROVIDER_CHECKLIST = чеклисты (ai-generate-checklist)
+ * - GROQ_API_KEY — Groq (free tier)
+ * - GEMINI_API_KEY — Google AI Studio
+ * - GIGACHAT_AUTH_KEY / GIGACHAT_API_KEY — GigaChat (Base64 client_id:client_secret)
+ * - OPENROUTER_API_KEY — OpenRouter (много бесплатных моделей)
+ * - MISTRAL_API_KEY — Mistral La Plateforme (free tier)
+ * - CEREBRAS_API_KEY — Cerebras (free tier, быстрая генерация)
+ * - OPENAI_API_KEY, ANTHROPIC_API_KEY
+ * chatText с fallback: при ошибке пробует следующий провайдер.
  */
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+const MISTRAL_URL = "https://api.mistral.ai/v1/chat/completions";
+const CEREBRAS_URL = "https://api.cerebras.ai/v1/chat/completions";
 const GIGACHAT_AUTH_URL = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth";
 const GIGACHAT_CHAT_URL = "https://gigachat.devices.sberbank.ru/api/v1/chat/completions";
 const GIGACHAT_SCOPE = "GIGACHAT_API_PERS";
@@ -47,26 +55,39 @@ async function getGigaChatToken(authKey: string): Promise<string> {
   return gigachatToken;
 }
 
-export type TextProvider = "groq" | "gigachat" | "openai" | "gemini" | "claude";
+export type TextProvider = "groq" | "gigachat" | "openai" | "gemini" | "claude" | "openrouter" | "mistral" | "cerebras";
+
+const PROVIDER_NAMES: TextProvider[] = ["groq", "openai", "gigachat", "gemini", "claude", "openrouter", "mistral", "cerebras"];
+
+export type AIContext = "ttk" | "nutrition" | "product" | "checklist";
 
 /** Список провайдеров с ключами, в порядке приоритета (каскад при fallback) */
-function getAvailableProviders(): TextProvider[] {
-  const forced = Deno.env.get("AI_PROVIDER")?.toLowerCase();
-  if (forced === "groq" || forced === "openai" || forced === "gigachat" || forced === "gemini" || forced === "claude") {
+function getAvailableProviders(context?: AIContext): TextProvider[] {
+  const ctx = context ?? null;
+  const ttkRaw = ctx === "ttk" ? Deno.env.get("AI_PROVIDER_TTK") : undefined;
+  const nutritionRaw = ctx === "nutrition" ? Deno.env.get("AI_PROVIDER_NUTRITION") : undefined;
+  const productRaw = ctx === "product" ? Deno.env.get("AI_PROVIDER_PRODUCT") : undefined;
+  const checklistRaw = ctx === "checklist" ? Deno.env.get("AI_PROVIDER_CHECKLIST") : undefined;
+  const raw = ttkRaw || nutritionRaw || productRaw || checklistRaw || Deno.env.get("AI_PROVIDER");
+  const forced = raw ? String(raw).toLowerCase().trim() : undefined;
+  if (forced && PROVIDER_NAMES.includes(forced as TextProvider)) {
     return [forced as TextProvider];
   }
   const list: TextProvider[] = [];
   if (Deno.env.get("GROQ_API_KEY")?.trim()) list.push("groq");
   if (Deno.env.get("GEMINI_API_KEY")?.trim()) list.push("gemini");
-  if (Deno.env.get("GIGACHAT_AUTH_KEY")?.trim()) list.push("gigachat");
+  if (Deno.env.get("GIGACHAT_AUTH_KEY")?.trim() || Deno.env.get("GIGACHAT_API_KEY")?.trim()) list.push("gigachat");
+  if (Deno.env.get("OPENROUTER_API_KEY")?.trim()) list.push("openrouter");
+  if (Deno.env.get("MISTRAL_API_KEY")?.trim()) list.push("mistral");
+  if (Deno.env.get("CEREBRAS_API_KEY")?.trim()) list.push("cerebras");
   if (Deno.env.get("OPENAI_API_KEY")?.trim()) list.push("openai");
   if (Deno.env.get("ANTHROPIC_API_KEY")?.trim()) list.push("claude");
   return list.length > 0 ? list : ["openai"];
 }
 
-/** Первый доступный провайдер */
-export function getProvider(): TextProvider {
-  return getAvailableProviders()[0];
+/** Первый доступный провайдер (для context — с учётом AI_PROVIDER_*) */
+export function getProvider(context?: AIContext): TextProvider {
+  return getAvailableProviders(context)[0];
 }
 
 /** Внутренний вызов одного провайдера (без fallback) */
@@ -81,7 +102,7 @@ async function chatTextWithProvider(provider: TextProvider, options: {
   if (provider === "groq") {
     const apiKey = Deno.env.get("GROQ_API_KEY")?.trim();
     if (!apiKey) throw new Error("GROQ_API_KEY not set");
-    const model = options.model ?? "llama-3.1-70b-versatile";
+    const model = options.model ?? "llama-3.3-70b-versatile";
     const body: Record<string, unknown> = { model, messages, temperature };
     if (maxTokens != null) body.max_tokens = maxTokens;
     const res = await fetch(GROQ_URL, {
@@ -162,8 +183,8 @@ async function chatTextWithProvider(provider: TextProvider, options: {
   }
 
   if (provider === "gigachat") {
-    const authKey = Deno.env.get("GIGACHAT_AUTH_KEY")?.trim();
-    if (!authKey) throw new Error("GIGACHAT_AUTH_KEY not set");
+    const authKey = Deno.env.get("GIGACHAT_AUTH_KEY")?.trim() || Deno.env.get("GIGACHAT_API_KEY")?.trim();
+    if (!authKey) throw new Error("GIGACHAT_AUTH_KEY or GIGACHAT_API_KEY not set");
     const token = await getGigaChatToken(authKey);
     const model = options.model ?? "GigaChat-2"; // Lite, бесплатный лимит
     const body: Record<string, unknown> = {
@@ -187,6 +208,69 @@ async function chatTextWithProvider(provider: TextProvider, options: {
     const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
     const content = data.choices?.[0]?.message?.content?.trim();
     if (content == null) throw new Error("GigaChat: empty response");
+    return content;
+  }
+
+  if (provider === "openrouter") {
+    const apiKey = Deno.env.get("OPENROUTER_API_KEY")?.trim();
+    if (!apiKey) throw new Error("OPENROUTER_API_KEY not set");
+    const model = options.model ?? "meta-llama/llama-3.2-3b-instruct:free";
+    const body: Record<string, unknown> = { model, messages, temperature };
+    if (maxTokens != null) body.max_tokens = maxTokens;
+    const res = await fetch(OPENROUTER_URL, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`OpenRouter: ${res.status} ${err}`);
+    }
+    const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    const content = data.choices?.[0]?.message?.content?.trim();
+    if (content == null) throw new Error("OpenRouter: empty response");
+    return content;
+  }
+
+  if (provider === "mistral") {
+    const apiKey = Deno.env.get("MISTRAL_API_KEY")?.trim();
+    if (!apiKey) throw new Error("MISTRAL_API_KEY not set");
+    const model = options.model ?? "mistral-small-latest";
+    const body: Record<string, unknown> = { model, messages, temperature };
+    if (maxTokens != null) body.max_tokens = maxTokens;
+    const res = await fetch(MISTRAL_URL, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Mistral: ${res.status} ${err}`);
+    }
+    const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    const content = data.choices?.[0]?.message?.content?.trim();
+    if (content == null) throw new Error("Mistral: empty response");
+    return content;
+  }
+
+  if (provider === "cerebras") {
+    const apiKey = Deno.env.get("CEREBRAS_API_KEY")?.trim();
+    if (!apiKey) throw new Error("CEREBRAS_API_KEY not set");
+    const model = options.model ?? "llama3.1-8b";
+    const body: Record<string, unknown> = { model, messages, temperature };
+    if (maxTokens != null) body.max_tokens = maxTokens;
+    const res = await fetch(CEREBRAS_URL, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Cerebras: ${res.status} ${err}`);
+    }
+    const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    const content = data.choices?.[0]?.message?.content?.trim();
+    if (content == null) throw new Error("Cerebras: empty response");
     return content;
   }
 
@@ -216,14 +300,16 @@ async function chatTextWithProvider(provider: TextProvider, options: {
 
 /**
  * Вызов чата (только текст). Каскад: при ошибке/пустом ответе пробует следующий провайдер.
+ * context: "ttk" | "nutrition" | "product" | "checklist" — для выбора AI_PROVIDER_*.
  */
 export async function chatText(options: {
   messages: Message[];
   model?: string;
   temperature?: number;
   maxTokens?: number;
+  context?: AIContext;
 }): Promise<string> {
-  const providers = getAvailableProviders();
+  const providers = getAvailableProviders(options.context);
   let lastError: Error | null = null;
   for (const provider of providers) {
     try {

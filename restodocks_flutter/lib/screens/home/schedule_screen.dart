@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart' show CupertinoTimerPicker, CupertinoTimerPickerMode;
 import 'package:flutter/material.dart';
+import '../../utils/dev_log.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -521,7 +522,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               }
             }
           } catch (e, st) {
-            debugPrint('Schedule copy save error: $e\n$st');
+            devLog('Schedule copy save error: $e\n$st');
             if (mounted) {
               scaffoldMessenger.showSnackBar(SnackBar(content: Text(loc.t('save_error').replaceFirst('%s', e.toString()))));
             }

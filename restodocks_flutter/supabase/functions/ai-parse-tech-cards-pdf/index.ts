@@ -231,6 +231,9 @@ Deno.serve(async (req: Request) => {
     const cards = parsed && Array.isArray(parsed.cards) ? parsed.cards : [];
     const reasonIfEmpty = cards.length === 0 ? "ai_no_cards" : undefined;
 
+    // Возвращаем rows для обучения шаблонов на клиенте (когда AI успешно распарсил)
+    const rowsForLearning = rows.length >= 2 && cards.length > 0 ? rows : undefined;
+
     const normalized = cards.map((card) => {
       const c = card as Record<string, unknown>;
       const ingredients = Array.isArray(c.ingredients)
@@ -257,7 +260,8 @@ Deno.serve(async (req: Request) => {
       };
     });
 
-    const payload = reasonIfEmpty ? { cards: normalized, reason: reasonIfEmpty } : { cards: normalized };
+    const payload: Record<string, unknown> = reasonIfEmpty ? { cards: normalized, reason: reasonIfEmpty } : { cards: normalized };
+    if (rowsForLearning != null) payload.rows = rowsForLearning;
     return new Response(JSON.stringify(payload), {
       status: 200,
       headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },

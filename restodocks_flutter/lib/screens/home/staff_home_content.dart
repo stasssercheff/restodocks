@@ -67,6 +67,11 @@ class StaffHomeContent extends StatelessWidget {
         title: loc.t('product_order'),
         onTap: () => context.go('/product-order?department=${_deptForRoute(employee.department)}'),
       ),
+      HomeTileId.suppliers: _Tile(
+        icon: Icons.add_business,
+        title: loc.t('suppliers') ?? loc.t('order_tab_suppliers') ?? 'Поставщики',
+        onTap: () => context.push('/suppliers/${_deptForRoute(employee.department)}'),
+      ),
       HomeTileId.menu: _Tile(
         icon: Icons.restaurant_menu,
         title: loc.t('menu'),
@@ -95,6 +100,7 @@ class StaffHomeContent extends StatelessWidget {
     };
     final showChecklists = employee.department == 'kitchen' || employee.department == 'bar' || employee.department == 'dining_room';
     final showNomenclature = employee.department == 'kitchen' || employee.department == 'bar' || employee.department == 'hall' || employee.department == 'dining_room';
+    final showSuppliers = employee.department == 'kitchen' || employee.department == 'bar' || employee.department == 'hall' || employee.department == 'dining_room';
     final showBanquet = (employee.department == 'kitchen' || employee.department == 'bar') && screenPref.showBanquetCatering;
     // ТТК: кухня, бар, зал — у каждого подразделения свои
     final showTtk = employee.department == 'kitchen' || employee.department == 'bar' || employee.department == 'hall' || employee.department == 'dining_room';
@@ -103,6 +109,7 @@ class StaffHomeContent extends StatelessWidget {
     final ordered = <Widget>[];
     for (final id in order) {
       if (id == HomeTileId.checklists && !showChecklists) continue;
+      if (id == HomeTileId.suppliers && !showSuppliers) continue;
       if (id == HomeTileId.menu && !showMenu) continue;
       if (id == HomeTileId.nomenclature && !showNomenclature) continue;
       if ((id == HomeTileId.banquetMenu || id == HomeTileId.banquetTtk) && !showBanquet) continue;

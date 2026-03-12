@@ -63,6 +63,7 @@ Output only valid JSON. No markdown.`;
         { role: "user", content: userInput.trim() },
       ],
       temperature: 0.3,
+      context: "product",
     });
     const parsed = (content?.trim() ? JSON.parse(content) : {}) as Record<string, unknown>;
     const waste = parsed.suggestedWastePct;

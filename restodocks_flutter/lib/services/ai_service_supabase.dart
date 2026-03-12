@@ -197,11 +197,19 @@ class AiServiceSupabase implements AiService {
     try {
       var rows = _xlsxToRows(xlsxBytes);
       if (rows.isEmpty) rows = _csvToRows(xlsxBytes);
-      if (rows.isEmpty) rows = _docxToRows(xlsxBytes);
+      String source = 'excel';
+      if (rows.isEmpty) {
+        rows = _docxToRows(xlsxBytes);
+        source = 'docx';
+      }
       if (rows.isEmpty) return [];
-      // 1. Сначала парсим по шаблону (без ИИ) — лимит не применяется
+      rows = _expandSingleCellRows(rows);
+      if (rows.length < 2) return [];
+      // 1. Сначала парсим по шаблону (без ИИ)
       var list = AiServiceSupabase.parseTtkByTemplate(rows);
-      // 2. Только если шаблон не сработал — вызываем AI (лимит 3/день)
+      // 2. Если шаблон не сработал — пробуем сохранённые шаблоны (обучение)
+      if (list.isEmpty) list = await _tryParseByStoredTemplates(rows);
+      // 3. Только если и там пусто — вызываем AI (лимит 3/день)
       if (list.isEmpty) {
         lastParseTechCardExcelReason = null;
         final body = <String, dynamic>{'rows': rows};
@@ -219,6 +227,10 @@ class AiServiceSupabase implements AiService {
           if (card != null && (card.dishName != null && card.dishName!.isNotEmpty || card.ingredients.isNotEmpty)) {
             list.add(card);
           }
+        }
+        // 4. Обучение: сохраняем шаблон для следующих загрузок того же формата
+        if (list.isNotEmpty) {
+          _saveTemplateAfterAi(rows, list, source);
         }
       }
       if (list.isNotEmpty) lastParseTechCardExcelReason = null;
@@ -256,7 +268,15 @@ class AiServiceSupabase implements AiService {
           list.add(card);
         }
       }
-      if (list.isNotEmpty) lastParseTechCardPdfReason = null;
+      // Обучение: сохраняем шаблон PDF для следующих загрузок (rows приходят при успешном AI)
+      if (list.isNotEmpty) {
+        lastParseTechCardPdfReason = null;
+        final rowsRaw = data['rows'];
+        if (rowsRaw is List && rowsRaw.isNotEmpty) {
+          final rows = rowsRaw.map((r) => (r is List ? r : <String>[]).map((c) => c?.toString() ?? '').toList()).toList();
+          if (rows.length >= 2) _saveTemplateAfterAi(rows, list, 'pdf');
+        }
+      }
       return list;
     } catch (e) {
       lastParseTechCardPdfReason = 'catch: $e';
@@ -548,6 +568,178 @@ class AiServiceSupabase implements AiService {
     if (s.isEmpty) return null;
     final n = double.tryParse(s.replaceAll(',', '.').replaceAll(RegExp(r'[^\d\.\-]'), ''));
     return n;
+  }
+
+  static String _headerSignature(List<String> headerCells) {
+    return headerCells.map((c) => c.trim().toLowerCase()).where((c) => c.isNotEmpty).join('|');
+  }
+
+  /// Парсинг по сохранённому шаблону (колонки заданы явно).
+  static List<TechCardRecognitionResult> parseTtkByStoredTemplate(
+    List<List<String>> rows, {
+    required int headerIdx,
+    required int nameCol,
+    required int productCol,
+    int grossCol = -1,
+    int netCol = -1,
+    int wasteCol = -1,
+  }) {
+    if (rows.length <= headerIdx + 1) return [];
+    String? currentDish;
+    final currentIngredients = <TechCardIngredientLine>[];
+    final results = <TechCardRecognitionResult>[];
+
+    void flushCard() {
+      if (currentDish != null && (currentDish!.isNotEmpty || currentIngredients.isNotEmpty)) {
+        results.add(TechCardRecognitionResult(
+          dishName: currentDish,
+          ingredients: List.from(currentIngredients),
+          isSemiFinished: currentDish?.toLowerCase().contains('пф') ?? false,
+        ));
+      }
+      currentIngredients.clear();
+    }
+
+    for (var r = 0; r < headerIdx && r < rows.length; r++) {
+      for (final c in rows[r]) {
+        final s = c.trim();
+        if (s.length < 3) continue;
+        if (s.endsWith(':')) continue;
+        if (RegExp(r'^\d{1,2}\.\d{1,2}\.\d{2,4}').hasMatch(s)) continue;
+        if (s.toLowerCase().startsWith('технологическая карта')) continue;
+        currentDish = s;
+        break;
+      }
+      if (currentDish != null) break;
+    }
+
+    for (var r = headerIdx + 1; r < rows.length; r++) {
+      final cells = rows[r].map((c) => c.trim()).toList();
+      if (cells.isEmpty) continue;
+      var pCol = productCol;
+      var gCol = grossCol;
+      var nCol = netCol;
+      if (cells.length >= 3 && cells.length <= 8) {
+        final atProduct = productCol < cells.length ? cells[productCol] : '';
+        if (atProduct.isNotEmpty && RegExp(r'^[\d,.\-\s]+$').hasMatch(atProduct)) {
+          pCol = 1;
+          if (cells.length >= 4) { gCol = 2; nCol = 3; }
+        }
+      }
+      final nameVal = nameCol < cells.length ? cells[nameCol] : '';
+      final productVal = pCol < cells.length ? cells[pCol] : '';
+      final grossVal = gCol >= 0 && gCol < cells.length ? cells[gCol] : '';
+      final netVal = nCol >= 0 && nCol < cells.length ? cells[nCol] : '';
+      final wasteVal = wasteCol >= 0 && wasteCol < cells.length ? cells[wasteCol] : '';
+
+      if (nameVal.toLowerCase() == 'итого' || productVal.toLowerCase() == 'итого') {
+        flushCard();
+        currentDish = null;
+        continue;
+      }
+      if (nameVal.isNotEmpty && !RegExp(r'^[\d\s\.\,]+$').hasMatch(nameVal) && productVal.isEmpty) {
+        if (currentDish != null && currentIngredients.isNotEmpty) flushCard();
+        currentDish = nameVal;
+      }
+      if (productVal.isNotEmpty) {
+        if (currentDish == null && nameVal.isNotEmpty) currentDish = nameVal;
+        currentIngredients.add(TechCardIngredientLine(
+          productName: productVal,
+          grossGrams: _parseNum(grossVal),
+          netGrams: _parseNum(netVal),
+          primaryWastePct: _parseNum(wasteVal),
+          unit: 'g',
+        ));
+      }
+    }
+    flushCard();
+    return results;
+  }
+
+  Future<List<TechCardRecognitionResult>> _tryParseByStoredTemplates(List<List<String>> rows) async {
+    try {
+      final keywords = ['наименование', 'продукт', 'брутто', 'нетто', 'название', 'сырьё', 'ингредиент'];
+      for (var r = 0; r < rows.length && r < 50; r++) {
+        final row = rows[r].map((c) => c.trim().toLowerCase()).toList();
+        if (row.length < 3) continue;
+        final hasKeyword = row.any((c) => keywords.any((k) => c.contains(k)));
+        if (!hasKeyword) continue;
+        final sig = _headerSignature(rows[r].map((c) => c.trim()).toList());
+        if (sig.isEmpty) continue;
+        final res = await _client.from('tt_parse_templates').select().eq('header_signature', sig).limit(1).maybeSingle();
+        if (res == null) continue;
+        final data = res as Map<String, dynamic>;
+        final list = parseTtkByStoredTemplate(
+          rows,
+          headerIdx: r,
+          nameCol: (data['name_col'] as num?)?.toInt() ?? 0,
+          productCol: (data['product_col'] as num?)?.toInt() ?? 1,
+          grossCol: (data['gross_col'] as num?)?.toInt() ?? -1,
+          netCol: (data['net_col'] as num?)?.toInt() ?? -1,
+          wasteCol: (data['waste_col'] as num?)?.toInt() ?? -1,
+        );
+        if (list.isNotEmpty) return list;
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  void _saveTemplateAfterAi(List<List<String>> rows, List<TechCardRecognitionResult> cards, String source) {
+    try {
+      final allNames = cards.expand((c) => c.ingredients.map((i) => stripIikoPrefix(i.productName).trim().toLowerCase())).where((s) => s.length > 2).toSet().toList();
+      if (allNames.isEmpty) return;
+      int bestHeaderIdx = -1;
+      int bestProductCol = -1;
+      int bestScore = 0;
+
+      for (var hr = 0; hr < rows.length && hr < 30; hr++) {
+        if (hr + 1 >= rows.length) break;
+        final headerRow = rows[hr];
+        if (headerRow.length < 3) continue;
+        for (var pc = 0; pc < headerRow.length; pc++) {
+          var score = 0;
+          for (var r = hr + 1; r < rows.length && r < hr + 100; r++) {
+            final cells = rows[r].map((c) => c.trim()).toList();
+            if (pc >= cells.length) continue;
+            final cell = stripIikoPrefix(cells[pc]).toLowerCase();
+            if (allNames.any((n) => cell.contains(n) || n.contains(cell))) score++;
+          }
+          if (score > bestScore) {
+            bestScore = score;
+            bestHeaderIdx = hr;
+            bestProductCol = pc;
+          }
+        }
+      }
+      if (bestHeaderIdx < 0 || bestProductCol < 0 || bestScore < 2) return;
+
+      int grossCol = -1;
+      int netCol = -1;
+      final hr = bestHeaderIdx;
+      for (var c = 0; c < (rows[hr].length < 12 ? rows[hr].length : 12); c++) {
+        if (c == bestProductCol) continue;
+        if (hr + 1 >= rows.length) break;
+        final v = rows[hr + 1].length > c ? rows[hr + 1][c].trim() : '';
+        if (RegExp(r'^[\d,.\-\s]+$').hasMatch(v)) {
+          if (grossCol < 0) grossCol = c;
+          else if (netCol < 0) { netCol = c; break; }
+        }
+      }
+
+      final sig = _headerSignature(rows[bestHeaderIdx].map((c) => c.trim()).toList());
+      if (sig.isEmpty) return;
+
+      _client.from('tt_parse_templates').upsert({
+        'header_signature': sig,
+        'header_row_index': bestHeaderIdx,
+        'name_col': bestProductCol,
+        'product_col': bestProductCol,
+        'gross_col': grossCol,
+        'net_col': netCol,
+        'waste_col': -1,
+        'source': source,
+      }, onConflict: 'header_signature').then((_) {});
+    } catch (_) {}
   }
 
   TechCardRecognitionResult? _parseTechCardResult(Map<String, dynamic>? data) {
