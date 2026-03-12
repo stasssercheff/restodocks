@@ -288,8 +288,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                       ));
                     }, 'gross_$rowIndex'),
 
-                    // % отхода
-                    _buildNumericCell(ingredient.primaryWastePct == 0 ? '' : ingredient.primaryWastePct.toString(), (value) {
+                    // % отхода — всегда показываем, в т.ч. 0
+                    _buildNumericCell(ingredient.primaryWastePct.toStringAsFixed(0), (value) {
                       final waste = double.tryParse(value) ?? 0;
                       final clampedWaste = waste.clamp(0, 100);
                       // При изменении % отхода автоматически пересчитываем нетто, выход и стоимость
@@ -335,9 +335,9 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     // Способ приготовления
                     _buildCookingMethodCell(ingredient, rowIndex),
 
-                    // % ужарки
+                    // % ужарки — всегда показываем, в т.ч. 0
                     _buildNumericCell(
-                      ((ingredient.cookingLossPctOverride ?? 0) == 0 ? '' : (ingredient.cookingLossPctOverride ?? 0).toString()),
+                      (ingredient.cookingLossPctOverride ?? 0).toStringAsFixed(0),
                       (value) {
                       final loss = double.tryParse(value) ?? 0;
                       final clampedLoss = loss.clamp(0.0, 99.9);

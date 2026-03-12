@@ -2906,7 +2906,7 @@ class _TtkTableState extends State<_TtkTable> {
                         ),
                       )),
                     )
-                  : _cell(ing.cookingProcessName != null ? ing.weightLossPercentage.toStringAsFixed(0) : loc.t('dash')),
+                  : _cell(ing.weightLossPercentage.toStringAsFixed(0)),
               widget.effectiveCanEdit
                   ? TableCell(
                       child: wrapCell(ConstrainedBox(

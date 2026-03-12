@@ -347,7 +347,7 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
 }
 
 // Вкладки номенклатуры
-enum _NomTab { nomenclature, iiko }
+enum _NomTab { nomenclature, newProducts, iiko }
 
 class _NomenclatureScreenState extends State<NomenclatureScreen> {
   String _query = '';
@@ -1249,6 +1249,23 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     // Сортируем
     nomItems = _sortNomenclatureItems(nomItems, _nomSort, lang: loc.currentLanguageCode);
 
+    // «Новые» — продукты без цены (из загрузки ТТК и т.д.), для проверки и внесения цены/единицы
+    final newItems = _nomenclatureItems.where((item) {
+      if (item.isProduct) {
+        final ep = store.getEstablishmentPrice(item.product!.id, estId);
+        return ep?.$1 == null;
+      }
+      return item.price == null;
+    }).where((item) {
+      if (_query.isNotEmpty) {
+        final q = _query.toLowerCase();
+        return item.name.toLowerCase().contains(q) ||
+            item.getLocalizedName(loc.currentLanguageCode).toLowerCase().contains(q);
+      }
+      return true;
+    }).toList();
+    final newItemsSorted = _sortNomenclatureItems(newItems, _nomSort, lang: loc.currentLanguageCode);
+
     final iikoStore = context.watch<IikoProductStore>();
     final estId2 = account.dataEstablishmentId ?? '';
 
@@ -1258,7 +1275,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         title: Text(loc.t('nomenclature')),
         actions: [
           // Счётчик: показываем для активной вкладки
-          if (_selectedTab == _NomTab.nomenclature)
+          if (_selectedTab == _NomTab.nomenclature || _selectedTab == _NomTab.newProducts)
             Center(
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -1267,7 +1284,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  '${nomItems.length}',
+                  _selectedTab == _NomTab.newProducts ? '${newItemsSorted.length}' : '${nomItems.length}',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.onSurface,
                         fontWeight: FontWeight.w600,
@@ -1275,7 +1292,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                 ),
               ),
             ),
-          if (_selectedTab == _NomTab.nomenclature) ...[
+          if (_selectedTab == _NomTab.nomenclature || _selectedTab == _NomTab.newProducts) ...[
             IconButton(
               icon: const Icon(Icons.warning),
               onPressed: () => _showDuplicates(),
@@ -1326,6 +1343,8 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
               child: Row(
                 children: [
                   _tabChip(_NomTab.nomenclature, loc.t('nomenclature')),
+                  const SizedBox(width: 8),
+                  _tabChip(_NomTab.newProducts, loc.t('nomenclature_new')),
                   const SizedBox(width: 8),
                   _tabChip(_NomTab.iiko, 'iiko'),
                 ],
@@ -1399,7 +1418,74 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                   ],
                 ),
 
-                // Вкладка 1: iiko-продукты
+                // Вкладка 1: «Новые» — продукты без цены (из ТТК и т.д.)
+                Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (newItemsSorted.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              child: Text(
+                                loc.t('nomenclature_new_empty') ?? 'Нет продуктов без цены',
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                    ),
+                              ),
+                            )
+                          else
+                            Text(
+                              loc.t('nomenclature_new_hint') ?? 'Укажите цену и единицу измерения',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  ),
+                            ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            decoration: InputDecoration(
+                              hintText: loc.t('search'),
+                              prefixIcon: const Icon(Icons.search),
+                              border: const OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                            onChanged: (v) => setState(() => _query = v),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: _isLoading
+                          ? _buildNomenclatureSkeletonLoading()
+                          : _NomenclatureTab(
+                              items: newItemsSorted,
+                              store: store,
+                              estId: estId ?? '',
+                              canRemove: true,
+                              loc: loc,
+                              sort: _nomSort,
+                              filterType: _nomFilter,
+                              onSortChanged: (s) => setState(() => _nomSort = s),
+                              onFilterTypeChanged: (f) => setState(() => _nomFilter = f),
+                              onRefresh: () => _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {})),
+                              onSwitchToCatalog: () => _showCreateProductDialog(loc),
+                              onEditProduct: (ctx, p) => _showEditProductForNomenclature(ctx, p, store, loc, () => _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {})), estId ?? ''),
+                              onRemoveProduct: (ctx, p) => _confirmRemoveForNomenclature(ctx, p, store, loc, () => _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {})), estId ?? ''),
+                              onLoadKbju: (ctx, list) => _loadKbjuForAll(ctx, list),
+                              onVerifyWithAi: (ctx, list) => _verifyWithAi(ctx, list, estId ?? ''),
+                              onNeedsKbju: (item) => _needsKbju(item),
+                              onNeedsTranslation: (item) => _needsTranslation(item),
+                              onCanShowNutrition: (context) => _canShowNutrition(context),
+                              onBuildProductSubtitle: (context, p, store, estId, loc) => _buildProductSubtitle(context, p, store, estId, loc),
+                              onBuildTechCardSubtitle: (tc) => _buildTechCardSubtitle(context, tc),
+                            ),
+                    ),
+                  ],
+                ),
+
+                // Вкладка 2: iiko-продукты
                 _IikoNomenclatureTab(
                   store: iikoStore,
                   establishmentId: estId2,
