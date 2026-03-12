@@ -5,6 +5,7 @@ import '../utils/dev_log.dart';
 import '../models/models.dart';
 import 'ai_service.dart';
 import 'image_service.dart';
+import 'product_store_supabase.dart';
 import 'supabase_service.dart';
 
 /// Bucket для фото ТТК (блюда и ПФ). Создать в Supabase Storage вручную, public.
@@ -418,6 +419,7 @@ class TechCardServiceSupabase {
   }
 
   /// Создание ТТК из результата распознавания ИИ (пакетный импорт).
+  /// [productStore] — для подтягивания цен из номенклатуры (если продукт уже есть).
   Future<TechCard> createTechCardFromRecognitionResult({
     required String establishmentId,
     required String createdBy,
@@ -429,6 +431,7 @@ class TechCardServiceSupabase {
     List<({String id, String name})>? productsForMapping,
     List<({String id, String name})>? techCardsPfForMapping,
     Map<String, String>? createdTechCardsByName,
+    ProductStoreSupabase? productStore,
   }) async {
     final name = result.dishName?.trim().isNotEmpty == true ? result.dishName!.trim() : 'Без названия';
     final isPf = isSemiFinishedOverride ?? result.isSemiFinished ?? true;
@@ -468,10 +471,37 @@ class TechCardServiceSupabase {
         }
       }
 
-      final gross = line.grossGrams ?? 0.0;
-      final net = line.netGrams ?? line.grossGrams ?? gross;
+      var gross = line.grossGrams ?? 0.0;
+      var net = line.netGrams ?? line.grossGrams ?? gross;
       final unit = line.unit?.trim().isNotEmpty == true ? line.unit! : 'g';
-      final wastePct = (line.primaryWastePct ?? 0).clamp(0.0, 99.9);
+      var wastePct = line.primaryWastePct;
+      // Авторасчёт % отхода: нетто = брутто × (1 − отход/100) → отход = (1 − нетто/брутто)×100
+      if (gross > 0 && net > 0 && net < gross && (wastePct == null || wastePct == 0)) {
+        wastePct = (1.0 - net / gross) * 100.0;
+      }
+      wastePct = (wastePct ?? 0).clamp(0.0, 99.9);
+      var cookingLoss = line.cookingLossPct != null ? line.cookingLossPct!.clamp(0.0, 99.9) : null;
+      var output = line.outputGrams;
+      // Нетто после отхода (для расчёта ужарки). Файл может дать нетто напрямую.
+      final netAfterWaste = net > 0 ? net : (gross > 0 ? gross * (1.0 - wastePct / 100.0) : 0.0);
+      // Авторасчёт % ужарки: выход = нетто × (1 − ужарка/100) → ужарка = (1 − выход/нетто)×100
+      if (output != null && output > 0 && netAfterWaste > 0 && output < netAfterWaste && cookingLoss == null) {
+        cookingLoss = (1.0 - output / netAfterWaste) * 100.0;
+        cookingLoss = cookingLoss.clamp(0.0, 99.9);
+      } else if (output == null && cookingLoss != null && netAfterWaste > 0) {
+        output = netAfterWaste * (1.0 - cookingLoss / 100.0);
+      } else if (output == null || output <= 0) {
+        output = netAfterWaste;
+      }
+      double cost = 0;
+      if (productId != null && productStore != null) {
+        final ep = productStore.getEstablishmentPrice(productId, establishmentId);
+        final price = ep?.$1;
+        if (price != null && price > 0) {
+          final grossG = gross > 0 ? gross : 100;
+          cost = (price / 1000.0) * grossG;
+        }
+      }
       ingredients.add(TTIngredient(
         id: '${DateTime.now().millisecondsSinceEpoch}_${ingredients.length}',
         productId: productId,
@@ -479,15 +509,16 @@ class TechCardServiceSupabase {
         productName: line.productName.trim(),
         grossWeight: gross > 0 ? gross : 100,
         netWeight: net > 0 ? net : (gross > 0 ? gross : 100),
+        outputWeight: output ?? net,
         unit: unit,
         primaryWastePct: wastePct,
-        cookingLossPctOverride: line.cookingLossPct != null ? line.cookingLossPct!.clamp(0.0, 99.9) : null,
+        cookingLossPctOverride: cookingLoss,
         isNetWeightManual: line.netGrams != null,
         finalCalories: 0,
         finalProtein: 0,
         finalFat: 0,
         finalCarbs: 0,
-        cost: 0,
+        cost: cost,
       ));
     }
     final yieldVal = ingredients.fold<double>(0.0, (s, i) => s + i.netWeight);

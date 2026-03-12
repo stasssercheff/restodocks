@@ -202,6 +202,8 @@ class AiServiceSupabase implements AiService {
         rows = _docxToRows(xlsxBytes);
         source = 'docx';
       }
+      // .xls (BIFF) — Dart excel пакет не поддерживает; используем серверный парсинг
+      if (rows.isEmpty) rows = await _parseXlsViaServer(xlsxBytes);
       if (rows.isEmpty) return [];
       rows = _expandSingleCellRows(rows);
       if (rows.length < 2) return [];
@@ -368,6 +370,29 @@ class AiServiceSupabase implements AiService {
     }
   }
 
+  /// Парсинг .xls (BIFF) через Supabase Edge Function — Dart excel пакет .xls не поддерживает
+  Future<List<List<String>>> _parseXlsViaServer(Uint8List bytes) async {
+    try {
+      final res = await _client.functions.invoke(
+        'parse-xls-bytes',
+        body: {'bytes': base64Encode(bytes), 'rawRows': true},
+      ).timeout(const Duration(seconds: 20));
+      if (res.status != 200) return [];
+      final data = res.data;
+      if (data is! Map) return [];
+      final raw = data['rows'];
+      if (raw is! List) return [];
+      final rows = <List<String>>[];
+      for (final r in raw) {
+        if (r is! List) continue;
+        rows.add(r.map((c) => (c ?? '').toString().trim()).toList());
+      }
+      return rows;
+    } catch (_) {
+      return [];
+    }
+  }
+
   static String _cellValueToString(CellValue? v) {
     if (v == null) return '';
     if (v is TextCellValue) {
@@ -431,13 +456,14 @@ class AiServiceSupabase implements AiService {
     if (rows.length < 2) return [];
     final results = <TechCardRecognitionResult>[];
     int headerIdx = -1;
-    int nameCol = -1, productCol = -1, grossCol = -1, netCol = -1, wasteCol = -1;
+    int nameCol = -1, productCol = -1, grossCol = -1, netCol = -1, wasteCol = -1, outputCol = -1;
 
     final nameKeys = ['наименование', 'название', 'блюдо', 'пф', 'name', 'dish'];
     final productKeys = ['продукт', 'сырьё', 'ингредиент', 'product', 'ingredient'];
     final grossKeys = ['брутто', 'бр', 'вес брутто', 'gross'];
     final netKeys = ['нетто', 'нт', 'вес нетто', 'net'];
     final wasteKeys = ['отход', 'отх', 'waste', 'процент отхода'];
+    final outputKeys = ['выход', 'вес готового', 'готовый', 'output'];
 
     // Поиск строки с колонками (Наименование продукта, Брутто, Нетто) — может быть далеко от верха
     for (var r = 0; r < rows.length; r++) {
@@ -477,6 +503,13 @@ class AiServiceSupabase implements AiService {
           if (cell.contains(k)) {
             headerIdx = r;
             wasteCol = c;
+            break;
+          }
+        }
+        for (final k in outputKeys) {
+          if (cell.contains(k)) {
+            headerIdx = r;
+            outputCol = c;
             break;
           }
         }
@@ -535,6 +568,7 @@ class AiServiceSupabase implements AiService {
       final grossVal = gCol >= 0 && gCol < cells.length ? cells[gCol] : '';
       final netVal = nCol >= 0 && nCol < cells.length ? cells[nCol] : '';
       final wasteVal = wasteCol >= 0 && wasteCol < cells.length ? cells[wasteCol] : '';
+      final outputVal = outputCol >= 0 && outputCol < cells.length ? cells[outputCol] : '';
 
       if (nameVal.toLowerCase() == 'итого' || productVal.toLowerCase() == 'итого') {
         flushCard();
@@ -551,11 +585,16 @@ class AiServiceSupabase implements AiService {
         if (currentDish == null && nameVal.isNotEmpty) currentDish = nameVal;
         final gross = _parseNum(grossVal);
         final net = _parseNum(netVal);
-        final waste = _parseNum(wasteVal);
+        var waste = _parseNum(wasteVal);
+        final output = _parseNum(outputVal);
+        if (gross != null && gross > 0 && net != null && net > 0 && net < gross && (waste == null || waste == 0)) {
+          waste = (1.0 - net / gross) * 100.0;
+        }
         currentIngredients.add(TechCardIngredientLine(
           productName: productVal,
           grossGrams: gross,
           netGrams: net,
+          outputGrams: output,
           primaryWastePct: waste,
           unit: 'g',
         ));
@@ -584,6 +623,7 @@ class AiServiceSupabase implements AiService {
     int grossCol = -1,
     int netCol = -1,
     int wasteCol = -1,
+    int outputCol = -1,
   }) {
     if (rows.length <= headerIdx + 1) return [];
     String? currentDish;
@@ -632,6 +672,7 @@ class AiServiceSupabase implements AiService {
       final grossVal = gCol >= 0 && gCol < cells.length ? cells[gCol] : '';
       final netVal = nCol >= 0 && nCol < cells.length ? cells[nCol] : '';
       final wasteVal = wasteCol >= 0 && wasteCol < cells.length ? cells[wasteCol] : '';
+      final outputVal = outputCol >= 0 && outputCol < cells.length ? cells[outputCol] : '';
 
       if (nameVal.toLowerCase() == 'итого' || productVal.toLowerCase() == 'итого') {
         flushCard();
@@ -644,11 +685,19 @@ class AiServiceSupabase implements AiService {
       }
       if (productVal.isNotEmpty) {
         if (currentDish == null && nameVal.isNotEmpty) currentDish = nameVal;
+        final gross = _parseNum(grossVal);
+        final net = _parseNum(netVal);
+        var waste = _parseNum(wasteVal);
+        final output = _parseNum(outputVal);
+        if (gross != null && gross > 0 && net != null && net > 0 && net < gross && (waste == null || waste == 0)) {
+          waste = (1.0 - net / gross) * 100.0;
+        }
         currentIngredients.add(TechCardIngredientLine(
           productName: productVal,
-          grossGrams: _parseNum(grossVal),
-          netGrams: _parseNum(netVal),
-          primaryWastePct: _parseNum(wasteVal),
+          grossGrams: gross,
+          netGrams: net,
+          outputGrams: output,
+          primaryWastePct: waste,
           unit: 'g',
         ));
       }
@@ -678,6 +727,7 @@ class AiServiceSupabase implements AiService {
           grossCol: (data['gross_col'] as num?)?.toInt() ?? -1,
           netCol: (data['net_col'] as num?)?.toInt() ?? -1,
           wasteCol: (data['waste_col'] as num?)?.toInt() ?? -1,
+          outputCol: (data['output_col'] as num?)?.toInt() ?? -1,
         );
         if (list.isNotEmpty) return list;
       }
@@ -689,12 +739,13 @@ class AiServiceSupabase implements AiService {
   void _saveTemplateFromKeywordParse(List<List<String>> rows, String source) {
     try {
       int headerIdx = -1;
-      int nameCol = -1, productCol = -1, grossCol = -1, netCol = -1, wasteCol = -1;
+      int nameCol = -1, productCol = -1, grossCol = -1, netCol = -1, wasteCol = -1, outputCol = -1;
       const nameKeys = ['наименование', 'название', 'блюдо', 'пф', 'name', 'dish'];
       const productKeys = ['продукт', 'сырьё', 'ингредиент', 'product', 'ingredient'];
       const grossKeys = ['брутто', 'бр', 'вес брутто', 'gross'];
       const netKeys = ['нетто', 'нт', 'вес нетто', 'net'];
       const wasteKeys = ['отход', 'отх', 'waste', 'процент отхода'];
+      const outputKeys = ['выход', 'вес готового', 'готовый', 'output'];
       for (var r = 0; r < rows.length; r++) {
         final row = rows[r].map((c) => c.trim().toLowerCase()).toList();
         for (var c = 0; c < row.length; c++) {
@@ -715,6 +766,9 @@ class AiServiceSupabase implements AiService {
           for (final k in wasteKeys) {
             if (cell.contains(k)) { headerIdx = r; wasteCol = c; break; }
           }
+          for (final k in outputKeys) {
+            if (cell.contains(k)) { headerIdx = r; outputCol = c; break; }
+          }
         }
         if (headerIdx >= 0 && (nameCol >= 0 || productCol >= 0)) break;
       }
@@ -731,6 +785,7 @@ class AiServiceSupabase implements AiService {
         'gross_col': grossCol >= 0 ? grossCol : -1,
         'net_col': netCol >= 0 ? netCol : -1,
         'waste_col': wasteCol >= 0 ? wasteCol : -1,
+        'output_col': outputCol >= 0 ? outputCol : -1,
         'source': source,
       }, onConflict: 'header_signature').then((_) {});
     } catch (_) {}
@@ -807,6 +862,7 @@ class AiServiceSupabase implements AiService {
           productName: (m['productName'] as String?) ?? '',
           grossGrams: m['grossGrams'] != null ? (m['grossGrams'] as num).toDouble() : null,
           netGrams: m['netGrams'] != null ? (m['netGrams'] as num).toDouble() : null,
+          outputGrams: m['outputGrams'] != null ? (m['outputGrams'] as num).toDouble() : null,
           unit: m['unit'] as String?,
           cookingMethod: m['cookingMethod'] as String?,
           primaryWastePct: m['primaryWastePct'] != null ? (m['primaryWastePct'] as num).toDouble() : null,

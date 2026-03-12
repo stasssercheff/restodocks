@@ -35,13 +35,14 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const body = await req.json() as { bytes?: string };
+    const body = await req.json() as { bytes?: string; rawRows?: boolean };
     if (!body.bytes || body.bytes.length === 0) {
       return new Response(JSON.stringify({ error: "Missing 'bytes' field (base64)", rows: [] }), {
         status: 400,
         headers: { ...corsHeaders(origin), "Content-Type": "application/json" },
       });
     }
+    const rawRows = body.rawRows === true;
 
     const data = base64ToUint8Array(body.bytes);
 
@@ -78,6 +79,32 @@ Deno.serve(async (req: Request) => {
     if (!workbook?.SheetNames?.length) {
       return new Response(JSON.stringify({ error: "No sheets found", rows: [] }), {
         status: 200,
+        headers: { ...corsHeaders(origin), "Content-Type": "application/json" },
+      });
+    }
+
+    if (rawRows) {
+      // Режим rawRows: для ТТК — полная матрица ячеек (сохраняем пустые для выравнивания колонок)
+      const outRows: string[][] = [];
+      for (const sheetName of workbook.SheetNames) {
+        const sheet = workbook.Sheets[sheetName];
+        if (!sheet) continue;
+        const jsonRows = XLSX.utils.sheet_to_json(sheet, {
+          header: 1,
+          defval: "",
+          blankrows: false,
+          raw: false,
+        }) as (string | number)[][];
+        for (const row of jsonRows) {
+          if (!Array.isArray(row)) continue;
+          const cells = row.map((c) => (c != null ? String(c).trim() : ""));
+          if (cells.every((c) => c === "")) continue;
+          outRows.push(cells);
+          if (outRows.length >= 500) break;
+        }
+        if (outRows.length > 0) break;
+      }
+      return new Response(JSON.stringify({ rows: outRows }), {
         headers: { ...corsHeaders(origin), "Content-Type": "application/json" },
       });
     }

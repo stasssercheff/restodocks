@@ -145,6 +145,7 @@ Deno.serve(async (req: Request) => {
           productName: i.productName,
           grossGrams: i.grossGrams ?? undefined,
           netGrams: i.netGrams ?? undefined,
+          outputGrams: i.outputGrams ?? undefined,
           primaryWastePct: i.primaryWastePct ?? undefined,
           unit: i.unit ?? "g",
           cookingMethod: undefined,

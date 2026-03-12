@@ -29,7 +29,7 @@ export async function tryParseByStoredTemplates(rows: string[][]): Promise<TtkCa
 
     const { data } = await supabase
       .from("tt_parse_templates")
-      .select("header_row_index, name_col, product_col, gross_col, net_col, waste_col")
+      .select("header_row_index, name_col, product_col, gross_col, net_col, waste_col, output_col")
       .eq("header_signature", sig)
       .limit(1)
       .maybeSingle();
@@ -43,6 +43,7 @@ export async function tryParseByStoredTemplates(rows: string[][]): Promise<TtkCa
       grossCol: (data.gross_col as number) ?? -1,
       netCol: (data.net_col as number) ?? -1,
       wasteCol: (data.waste_col as number) ?? -1,
+      outputCol: (data.output_col as number) ?? -1,
     });
 
     if (list.length > 0) return list;

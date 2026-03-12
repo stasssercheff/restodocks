@@ -245,6 +245,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
           productsForMapping: productsForMapping,
           techCardsPfForMapping: techCardsPf,
           createdTechCardsByName: createdByName,
+          productStore: productStore,
         );
         created++;
       }

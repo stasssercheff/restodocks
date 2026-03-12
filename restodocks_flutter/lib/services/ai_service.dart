@@ -50,6 +50,8 @@ class TechCardIngredientLine {
   final String productName;
   final double? grossGrams;
   final double? netGrams;
+  /// Вес готового продукта (выход после ужарки), г.
+  final double? outputGrams;
   final String? unit;
   final String? cookingMethod;
   /// Процент отхода при первичной обработке (колонка «Отход %»), 0–100.
@@ -63,6 +65,7 @@ class TechCardIngredientLine {
     required this.productName,
     this.grossGrams,
     this.netGrams,
+    this.outputGrams,
     this.unit,
     this.cookingMethod,
     this.primaryWastePct,

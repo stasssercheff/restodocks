@@ -71,7 +71,9 @@ For each ingredient, set ingredientType: "product" if it is purchased (сырь�
 If column order or names vary (different languages, extra columns), infer from context. Extract: dishName, ingredients (productName, grossGrams, netGrams, primaryWastePct, cookingLossPct, ingredientType; unit default "g"), technologyText. Do not return empty just because the format is non-standard — parse as much as you can.
 
 Return ONLY valid JSON, no markdown:
-{ "cards": [ { "dishName": string, "technologyText": string | null, "isSemiFinished": boolean | null, "ingredients": [ { "productName": string, "grossGrams": number | null, "netGrams": number | null, "primaryWastePct": number | null, "cookingMethod": string | null, "cookingLossPct": number | null, "unit": string | null, "ingredientType": "product" | "semi_finished" | null } ] }, ... ] }
+{ "cards": [ { "dishName": string, "technologyText": string | null, "isSemiFinished": boolean | null, "ingredients": [ { "productName": string, "grossGrams": number | null, "netGrams": number | null, "outputGrams": number | null, "primaryWastePct": number | null, "cookingMethod": string | null, "cookingLossPct": number | null, "unit": string | null, "ingredientType": "product" | "semi_finished" | null } ] }, ... ] }
+
+If gross and net are given but primaryWastePct is not: calculate waste = (1 - net/gross)*100. If net and output (weight after cooking) are given but cookingLossPct is not: calculate cookingLossPct = (1 - output/net)*100.
 
 Return ALL cards found (up to hundreds). If no cards, return { "cards": [] }.`;
 
