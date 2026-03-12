@@ -204,11 +204,15 @@ class AiServiceSupabase implements AiService {
       }
       // .xls (BIFF) — Dart excel пакет не поддерживает; используем серверный парсинг
       if (rows.isEmpty) rows = await _parseXlsViaServer(xlsxBytes);
+      // .doc (Word 97–2003) — через word-extractor на сервере
+      if (rows.isEmpty) rows = await _parseDocViaServer(xlsxBytes);
       if (rows.isEmpty) return [];
       rows = _expandSingleCellRows(rows);
       if (rows.length < 2) return [];
-      var list = AiServiceSupabase._tryParseKkFromRows(rows);
-      if (list.isEmpty) list = AiServiceSupabase.parseTtkByTemplate(rows);
+      // Сначала шаблон ТТК (Брутто/Нетто, разбивка по Итого) — для CSV/Excel с несколькими карточками.
+      // КК (норма/цена) — для простых калькуляционных карт без разбивки.
+      var list = AiServiceSupabase.parseTtkByTemplate(rows);
+      if (list.isEmpty) list = AiServiceSupabase._tryParseKkFromRows(rows);
       if (list.isNotEmpty) _saveTemplateFromKeywordParse(rows, 'excel'); // Обучение: повторная загрузка — без AI
       // 2. Если шаблон не сработал — пробуем сохранённые шаблоны (каталог)
       if (list.isEmpty) list = await _tryParseByStoredTemplates(rows);
@@ -391,6 +395,29 @@ class AiServiceSupabase implements AiService {
         'parse-xls-bytes',
         body: {'bytes': base64Encode(bytes), 'rawRows': true},
       ).timeout(const Duration(seconds: 20));
+      if (res.status != 200) return [];
+      final data = res.data;
+      if (data is! Map) return [];
+      final raw = data['rows'];
+      if (raw is! List) return [];
+      final rows = <List<String>>[];
+      for (final r in raw) {
+        if (r is! List) continue;
+        rows.add(r.map((c) => (c ?? '').toString().trim()).toList());
+      }
+      return rows;
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Парсинг .doc (Word 97–2003) через Supabase Edge Function — word-extractor
+  Future<List<List<String>>> _parseDocViaServer(Uint8List bytes) async {
+    try {
+      final res = await _client.functions.invoke(
+        'parse-doc-bytes',
+        body: {'bytes': base64Encode(bytes)},
+      ).timeout(const Duration(seconds: 25));
       if (res.status != 200) return [];
       final data = res.data;
       if (data is! Map) return [];
@@ -697,12 +724,20 @@ class AiServiceSupabase implements AiService {
         currentDish = null;
         continue;
       }
-      // Строка с названием блюда (начало новой карточки)
-      if (nameVal.isNotEmpty && !RegExp(r'^[\d\s\.\,]+$').hasMatch(nameVal) && productVal.isEmpty) {
-        if (currentDish != null && currentIngredients.isNotEmpty) flushCard();
+      // Новая карточка: в nameCol новое блюдо (напр. "ПФ Биск,Креветки" — имя и первый ингредиент в одной строке).
+      // Не срабатывает при nameCol==pCol (DOCX: имя и продукт из одной колонки).
+      if (nameCol != pCol &&
+          nameVal.isNotEmpty &&
+          !RegExp(r'^[\d\s\.\,]+$').hasMatch(nameVal) &&
+          nameVal.toLowerCase() != 'итого') {
+        if (currentDish != null && currentDish != nameVal && currentIngredients.isNotEmpty) {
+          flushCard();
+        }
         currentDish = nameVal;
       }
       if (productVal.toLowerCase().contains('выход блюда') || productVal.toLowerCase().startsWith('выход одного')) continue;
+      // Пропускаем, если productVal — только цифры/пробелы (ошибочная колонка)
+      if (RegExp(r'^[\d\s\.\,\-\+]+$').hasMatch(productVal)) continue;
       // Строка с продуктом (ингредиент)
       if (productVal.isNotEmpty) {
         if (currentDish == null && nameVal.isNotEmpty) currentDish = nameVal;
@@ -816,7 +851,18 @@ class AiServiceSupabase implements AiService {
         currentDish = null;
         continue;
       }
-      if (nameVal.isNotEmpty && !RegExp(r'^[\d\s\.\,]+$').hasMatch(nameVal) && productVal.isEmpty) {
+      // Новая карточка: новое блюдо в nameCol (как в parseTtkByTemplate)
+      final effectiveNameCol = nameCol;
+      final effectiveProductCol = pCol;
+      if (effectiveNameCol != effectiveProductCol &&
+          nameVal.isNotEmpty &&
+          !RegExp(r'^[\d\s\.\,]+$').hasMatch(nameVal) &&
+          nameVal.toLowerCase() != 'итого') {
+        if (currentDish != null && currentDish != nameVal && currentIngredients.isNotEmpty) {
+          flushCard();
+        }
+        currentDish = nameVal;
+      } else if (nameVal.isNotEmpty && !RegExp(r'^[\d\s\.\,]+$').hasMatch(nameVal) && productVal.isEmpty) {
         if (currentDish != null && currentIngredients.isNotEmpty) flushCard();
         currentDish = nameVal;
       }

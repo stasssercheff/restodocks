@@ -6,7 +6,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { headerSignature, parseTtkByStoredTemplate } from "./parse_ttk_template.ts";
 import type { TtkCard } from "./parse_ttk_template.ts";
 
-const KEYWORDS = ["наименование", "продукт", "брутто", "нетто", "название", "сырьё", "ингредиент"];
+// Сборник/ГОСТ/Word: "Наименование сырья", "Расход сырья на 1 порцию"
+const KEYWORDS = ["наименование", "продукт", "брутто", "нетто", "название", "сырьё", "ингредиент", "расход сырья"];
 
 export async function tryParseByStoredTemplates(rows: string[][]): Promise<TtkCard[] | null> {
   if (rows.length < 2) return null;

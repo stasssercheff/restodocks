@@ -35,14 +35,13 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const body = await req.json() as { bytes?: string; rawRows?: boolean };
+    const body = await req.json() as { bytes?: string };
     if (!body.bytes || body.bytes.length === 0) {
       return new Response(JSON.stringify({ error: "Missing 'bytes' field (base64)", rows: [] }), {
         status: 400,
         headers: { ...corsHeaders(origin), "Content-Type": "application/json" },
       });
     }
-    const rawRows = body.rawRows === true;
 
     const data = base64ToUint8Array(body.bytes);
 
@@ -83,33 +82,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    if (rawRows) {
-      // Режим rawRows: для ТТК — полная матрица ячеек (сохраняем пустые для выравнивания колонок)
-      const outRows: string[][] = [];
-      for (const sheetName of workbook.SheetNames) {
-        const sheet = workbook.Sheets[sheetName];
-        if (!sheet) continue;
-        const jsonRows = XLSX.utils.sheet_to_json(sheet, {
-          header: 1,
-          defval: "",
-          blankrows: false,
-          raw: false,
-        }) as (string | number)[][];
-        for (const row of jsonRows) {
-          if (!Array.isArray(row)) continue;
-          const cells = row.map((c) => (c != null ? String(c).trim() : ""));
-          if (cells.every((c) => c === "")) continue;
-          outRows.push(cells);
-          if (outRows.length >= 500) break;
-        }
-        if (outRows.length > 0) break;
-      }
-      return new Response(JSON.stringify({ rows: outRows }), {
-        headers: { ...corsHeaders(origin), "Content-Type": "application/json" },
-      });
-    }
-
-    const rows: string[] = [];
+    const rows: string[][] = [];
 
     for (const sheetName of workbook.SheetNames) {
       const sheet = workbook.Sheets[sheetName];
@@ -124,14 +97,14 @@ Deno.serve(async (req: Request) => {
 
       for (const row of jsonRows) {
         if (!Array.isArray(row)) continue;
-        const cells = row.map((c: any) => (c ?? "").toString().trim()).filter((c: string) => c.length > 0);
-        if (cells.length === 0) continue;
+        const cells = row.map((c: any) => (c ?? "").toString().trim());
         const line = cells.join("\t");
         // Пропускаем строки без букв (числа-итоги, разделители)
         if (!/[a-zA-Zа-яА-ЯёЁ]/.test(line)) continue;
         // Пропускаем слишком длинные строки (описания, примечания)
         if (line.length > 300) continue;
-        rows.push(line);
+        if (cells.every((c) => !c)) continue;
+        rows.push(cells);
         if (rows.length >= 1000) break;
       }
 

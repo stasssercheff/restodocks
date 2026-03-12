@@ -366,7 +366,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   Future<void> _createFromExcel(BuildContext context, LocalizationService loc) async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['xlsx', 'xls', 'csv', 'pdf', 'docx'],
+      allowedExtensions: ['xlsx', 'xls', 'csv', 'pdf', 'docx', 'doc'],
       withData: true,
     );
     if (!mounted) return;
