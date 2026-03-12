@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/models.dart';
+import '../services/ai_service.dart';
 import '../services/services.dart';
 import '../utils/product_name_utils.dart';
 import '../widgets/app_bar_home_button.dart';
@@ -89,9 +90,14 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
   int _saveProgress = 0;
   int _saveTotal = 0;
 
+  /// Ошибки парсинга (битые карточки) — берём из сервиса и очищаем
+  List<TtkParseError>? _parseErrors;
+
   @override
   void initState() {
     super.initState();
+    _parseErrors = AiServiceSupabase.lastParseTechCardErrors;
+    if (_parseErrors != null) AiServiceSupabase.lastParseTechCardErrors = null;
     final defaultSections = _isBar ? const ['bar'] : const ['all'];
     _items = widget.cards.map((c) => _ReviewItem(
       result: c,
@@ -413,30 +419,48 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
         ..sort((a, b) => (a.isSemiFinished == b.isSemiFinished) ? 0 : (a.isSemiFinished ? -1 : 1));
 
       int created = 0;
+      final failed = <({String name, String error})>[];
+      final failedItems = <_ReviewItem>[];
       for (final item in sorted) {
-        await svc.createTechCardFromRecognitionResult(
-          establishmentId: est.dataEstablishmentId,
-          createdBy: emp.id,
-          createdByName: emp.fullName,
-          result: item.result,
-          category: item.category,
-          sections: _normalizeSections(item.sections),
-          isSemiFinishedOverride: item.isSemiFinished,
-          languageCode: lang,
-          productsForMapping: productsForMapping,
-          techCardsPfForMapping: techCardsPf,
-          createdTechCardsByName: createdByName,
-          productStore: productStore,
-        );
-        created++;
+        try {
+          await svc.createTechCardFromRecognitionResult(
+            establishmentId: est.dataEstablishmentId,
+            createdBy: emp.id,
+            createdByName: emp.fullName,
+            result: item.result,
+            category: item.category,
+            sections: _normalizeSections(item.sections),
+            isSemiFinishedOverride: item.isSemiFinished,
+            languageCode: lang,
+            productsForMapping: productsForMapping,
+            techCardsPfForMapping: techCardsPf,
+            createdTechCardsByName: createdByName,
+            productStore: productStore,
+          );
+          created++;
+        } catch (e) {
+          final name = (item.result.dishName ?? '').trim().isEmpty ? (loc.t('tech_cards_import_unnamed') ?? 'Без названия') : (item.result.dishName ?? '').trim();
+          failed.add((name: name, error: e.toString()));
+          failedItems.add(item);
+        }
         if (mounted) setState(() => _saveProgress = productNamesToCreate.length + created);
       }
       if (mounted) {
         setState(() => _saving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('tech_cards_import_created').replaceAll('%s', '$created'))),
-        );
-        context.go('/tech-cards/${widget.department}?refresh=1');
+        if (failed.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(loc.t('tech_cards_import_created').replaceAll('%s', '$created'))),
+          );
+          context.go('/tech-cards/${widget.department}?refresh=1');
+        } else {
+          _items = failedItems;
+          final msg = created > 0
+              ? '${loc.t('tech_cards_import_created').replaceAll('%s', '$created')}. Не удалось ${failed.length}: ${failed.map((f) => f.name).join(', ')}. Исправьте и повторите.'
+              : 'Не удалось сохранить: ${failed.map((f) => f.name).join(', ')}';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(msg), duration: const Duration(seconds: 6)),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -461,6 +485,33 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
       ),
       body: Column(
         children: [
+          if (_parseErrors != null && _parseErrors!.isNotEmpty) ...[
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.errorContainer.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: theme.colorScheme.error.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, size: 20, color: theme.colorScheme.error),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${loc.t('tech_cards_import_review_loaded') ?? 'Загружено'} ${widget.cards.length} блюд. '
+                      '${_parseErrors!.length} ${_parseErrors!.length == 1 ? 'блюдо' : 'блюд'} '
+                      '${loc.t('tech_cards_import_review_requires_manual') ?? 'требует ручной правки'}: '
+                      '${_parseErrors!.map((e) => e.dishName ?? '—').where((s) => s != '—').take(3).join(', ')}${_parseErrors!.length > 3 ? '...' : ''}',
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onErrorContainer),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           Padding(
             padding: const EdgeInsets.all(16),
             child: Text(

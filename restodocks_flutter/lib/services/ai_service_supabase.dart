@@ -665,6 +665,78 @@ class AiServiceSupabase implements AiService {
     return rows.length;
   }
 
+  /// Формат «Полное пособие Кухня» / супы.xlsx: [название] [№|Наименование продукта|Вес] [ингредиенты] [Выход] — повтор блоков.
+  static List<TechCardRecognitionResult> _tryParsePolnoePosobieFormat(List<List<String>> rows) {
+    final results = <TechCardRecognitionResult>[];
+    var r = 0;
+    while (r < rows.length) {
+      final row = rows[r];
+      final cells = row.map((c) => (c ?? '').toString().trim()).toList();
+      if (cells.every((c) => c.isEmpty)) { r++; continue; }
+      final c0 = cells.isNotEmpty ? cells[0].trim().toLowerCase() : '';
+      // Конец блока
+      if (c0 == 'выход') { r++; continue; }
+      // Строка заголовка №|Наименование продукта
+      if (c0 == '№' && cells.length > 1) {
+        final c1 = cells[1].toLowerCase();
+        if (c1.contains('наименование') && c1.contains('продукт')) { r++; continue; }
+      }
+      // Ищем блок: следующая строка — №|Наименование продукта
+      if (r + 1 >= rows.length) { r++; continue; }
+      final nextRow = rows[r + 1].map((c) => (c ?? '').toString().trim()).toList();
+      final next0 = nextRow.isNotEmpty ? nextRow[0].toLowerCase() : '';
+      final next1 = nextRow.length > 1 ? nextRow[1].toLowerCase() : '';
+      if (next0 != '№' || !next1.contains('наименование') || !next1.contains('продукт')) {
+        r++;
+        continue;
+      }
+      final dishName = cells.isNotEmpty ? cells[0].trim() : '';
+      if (dishName.length < 3 || !RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(dishName) ||
+          RegExp(r'^№$|^выход$|^декор$', caseSensitive: false).hasMatch(dishName)) {
+        r++;
+        continue;
+      }
+      final ingredients = <TechCardIngredientLine>[];
+      var dataRow = r + 2;
+      while (dataRow < rows.length) {
+        final dr = rows[dataRow].map((c) => (c ?? '').toString().trim()).toList();
+        if (dr.every((c) => c.isEmpty)) { dataRow++; continue; }
+        final d0 = dr.isNotEmpty ? dr[0].toLowerCase() : '';
+        if (d0 == 'выход') break;
+        if (d0 == '№' && dr.length > 1 && dr[1].toLowerCase().contains('наименование')) break;
+        final product = dr.length > 1 ? dr[1].trim() : '';
+        final grossStr = dr.length > 2 ? dr[2].trim() : '';
+        if (product.isEmpty) { dataRow++; continue; }
+        if (product.toLowerCase() == 'декор') { dataRow++; continue; }
+        final gross = _parseNum(grossStr);
+        if (gross == null && !RegExp(r'\d').hasMatch(grossStr)) { dataRow++; continue; }
+        final grossVal = gross ?? 0.0;
+        if (grossVal <= 0 && grossStr.replaceAll(RegExp(r'[^\d]'), '').isEmpty) { dataRow++; continue; }
+        var unit = 'g';
+        if (grossStr.toLowerCase().contains('шт') || grossStr.toLowerCase().contains('л')) unit = 'pcs';
+        ingredients.add(TechCardIngredientLine(
+          productName: product.replaceFirst(RegExp(r'^П/Ф\s*', caseSensitive: false), '').trim(),
+          grossGrams: grossVal,
+          netGrams: grossVal,
+          outputGrams: grossVal,
+          primaryWastePct: null,
+          unit: unit,
+          ingredientType: RegExp(r'^П/Ф\s|п/ф\s|пф\s', caseSensitive: false).hasMatch(product) ? 'semi_finished' : 'product',
+        ));
+        dataRow++;
+      }
+      if (dishName.isNotEmpty && ingredients.isNotEmpty) {
+        results.add(TechCardRecognitionResult(
+          dishName: dishName,
+          ingredients: ingredients,
+          isSemiFinished: dishName.toLowerCase().contains('пф'),
+        ));
+      }
+      r = dataRow;
+    }
+    return results;
+  }
+
   /// Парсинг ТТК по шаблону (Наименование, Продукт, Брутто, Нетто...) — без вызова ИИ.
   /// [errors] — при не null: try-catch на каждую строку, битые карточки в errors, цикл продолжается.
   static List<TechCardRecognitionResult> parseTtkByTemplate(
@@ -674,13 +746,18 @@ class AiServiceSupabase implements AiService {
     if (rows.length < 2) return [];
     rows = _expandSingleCellRows(rows);
     if (rows.length < 2) return [];
+
+    // Формат «Полное пособие Кухня» / супы.xlsx: блоки [название блюда] [№|Наименование продукта|Вес] [данные] [Выход]
+    final polnoePosobie = _tryParsePolnoePosobieFormat(rows);
+    if (polnoePosobie.isNotEmpty) return polnoePosobie;
+
     final results = <TechCardRecognitionResult>[];
     int headerIdx = -1;
     int nameCol = -1, productCol = -1, grossCol = -1, netCol = -1, wasteCol = -1, outputCol = -1;
 
     final nameKeys = ['наименование', 'название', 'блюдо', 'пф', 'набор', 'name', 'dish'];
     final productKeys = ['продукт', 'продукты', 'сырьё', 'сырья', 'ингредиент', 'product', 'ingredient'];
-    final grossKeys = ['брутто', 'бр', 'вес брутто', 'расход', 'норма', 'масса', 'gross'];
+    final grossKeys = ['брутто', 'бр', 'вес брутто', 'вес гр', '1 порция', 'расход', 'норма', 'масса', 'gross'];
     final netKeys = ['нетто', 'нт', 'вес нетто', 'net'];
     final wasteKeys = ['отход', 'отх', 'waste', 'процент отхода'];
     final outputKeys = ['выход', 'вес готового', 'вес готового продукта', 'готовый', 'output'];
@@ -771,8 +848,9 @@ class AiServiceSupabase implements AiService {
             final h = row[c].trim().toLowerCase();
             if (h.contains('брутто') && (grossCol < 0 || h.contains('кг'))) grossCol = c;
             if (h.contains('нетто') && (netCol < 0 || h.contains('кг'))) netCol = c;
+            if ((h.contains('вес гр') || h.contains('1 порция')) && grossCol < 0) grossCol = c;
           }
-          if (grossCol < 0 && row.length >= 4) grossCol = 2;
+          if (grossCol < 0 && row.length >= 3) grossCol = 2;
           if (netCol < 0 && row.length >= 5) netCol = 3;
           if (row.length >= 6) outputCol = 5;
           break;
@@ -853,11 +931,36 @@ class AiServiceSupabase implements AiService {
       final wasteVal = wasteCol >= 0 && wasteCol < cells.length ? cells[wasteCol] : '';
       final outputVal = outputCol >= 0 && outputCol < cells.length ? cells[outputCol] : '';
 
-      // Точки отсечения между карточками: Итого и Технология (у каждой карточки своя)
+      // Выход — завершение карточки (формат «Полное пособие Кухня», супы.xlsx)
+      final c0 = cells.isNotEmpty ? cells[0].trim().toLowerCase() : '';
+      if (c0 == 'выход') {
+        flushCard();
+        currentDish = null;
+        return true;
+      }
+      // Новая карточка: строка с названием блюда в col 0, след. строка — №|Наименование продукта (повтор заголовка)
+      if (r + 1 < rows.length) {
+        final nextRow = rows[r + 1].map((c) => (c ?? '').toString().trim()).toList();
+        final nextC0 = nextRow.isNotEmpty ? nextRow[0].toLowerCase() : '';
+        final nextC1 = nextRow.length > 1 ? nextRow[1].toLowerCase() : '';
+        if (nextC0 == '№' && nextC1.contains('наименование') && nextC1.contains('продукт')) {
+          final dishInCol0 = cells.isNotEmpty ? cells[0].trim() : '';
+          if (dishInCol0.length >= 3 && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(dishInCol0) &&
+              !RegExp(r'^№$|^выход$|^декор$', caseSensitive: false).hasMatch(dishInCol0)) {
+            if (currentDish != null || currentIngredients.isNotEmpty) flushCard();
+            currentDish = dishInCol0;
+            // Следующая итерация — пропустить строку заголовка (r+1). Сместим r в основном цикле.
+            return true;
+          }
+        }
+      }
+      // Повтор заголовка №|Наименование продукта — пропуск (второй блок и далее)
+      if (c0 == '№' && productVal.toLowerCase().contains('наименование') && productVal.toLowerCase().contains('продукт')) return true;
+      // Точки отсечения: Итого и Технология
       if (nameVal.toLowerCase() == 'итого' || productVal.toLowerCase() == 'итого' || productVal.toLowerCase().startsWith('всего')) {
         flushCard();
         currentDish = null;
-        return true; // skip
+        return true;
       }
       final rowText = cells.join(' ').toLowerCase();
       if (RegExp(r'^технология\s|^технология\s*:|технология\s+приготовления').hasMatch(rowText) ||
@@ -933,6 +1036,7 @@ class AiServiceSupabase implements AiService {
         return true;
       }
       if (productVal.toLowerCase().contains('выход блюда') || productVal.toLowerCase().startsWith('выход одного')) return true;
+      if (productVal.toLowerCase() == 'декор') return true; // секция, не ингредиент
       // Пропускаем, если productVal — только цифры/пробелы (ошибочная колонка)
       if (RegExp(r'^[\d\s\.\,\-\+]+$').hasMatch(productVal)) return true;
       // Мусор: пусто в Наименовании (продукт/название)

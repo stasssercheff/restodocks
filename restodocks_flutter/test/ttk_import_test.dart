@@ -82,6 +82,43 @@ void main() {
       expect(wings.grossGrams, 150); // 0,150 kg → 150 g
     });
 
+    test('parseTtkByTemplate супы format minimal (1 block)', () {
+      final rows = [
+        ['Тыквенный суп', ''],
+        ['№', 'Наименование продукта', 'Вес гр/шт'],
+        ['1', 'Сливки 22%', '30'],
+        ['Выход', '', '400'],
+      ];
+      final list = AiServiceSupabase.parseTtkByTemplate(rows);
+      expect(list.length, 1);
+      expect(list[0].dishName, contains('Тыквенный'));
+      expect(list[0].ingredients.length, 1);
+    });
+
+    test('parseTtkByTemplate супы.xlsx / Полное пособие Кухня (блоки: название→№|Наименование|Вес→Выход)', () {
+      final rows = [
+        ['Тыквенный крем-суп с горгонзолой', '', '', '', 'Доставка:', '', ''],
+        ['№', 'Наименование продукта', 'Вес гр/шт', 'Вид нарезки', '', ''],
+        ['1', 'Сливки 22% или кокосовое молоко', '30', '', '', ''],
+        ['3', 'Тыквенный суп пф', '420', '', 'Технология', ''],
+        ['4', 'Горгонзола п/ф', '25', 'мелкие кусочки', '', ''],
+        ['Выход', '', '400', '', '', ''],
+        ['Рыбная похлебка по-лигурийски', '', '', '', 'Доставка:', ''],
+        ['№', 'Наименование продукта', '', 'Вид нарезки', '', ''],
+        ['1', 'Набор морепродуктов', '1 шт', '', '', ''],
+        ['4', 'База на лигурию п/ф', '290', '', '', ''],
+        ['5', 'Бульон куриный п/ф', '160', '', '', ''],
+        ['Выход', '', '420/70', '', '', ''],
+      ];
+      final list = AiServiceSupabase.parseTtkByTemplate(rows);
+      // debug: print(list.map((c) => '${c.dishName} (${c.ingredients.length})').join('; '));
+      expect(list.length, 2);
+      expect(list[0].dishName, contains('Тыквенный'));
+      expect(list[0].ingredients.length, greaterThanOrEqualTo(3));
+      expect(list[1].dishName, contains('Рыбная'));
+      expect(list[1].ingredients.length, greaterThanOrEqualTo(2));
+    });
+
     test('parseTtkByTemplate ГОСТ 2-row header (docx Цезарь)', () {
       // Заголовок в 2 строках: row0 Наименование/Расход, row1 Брутто/Нетто
       final rows = [
@@ -105,6 +142,27 @@ void main() {
       final list = await AiServiceSupabase().parseTechCardsFromExcel(csvBytes);
       expect(list, isNotEmpty);
       expect(list.first.ingredients.any((i) => i.productName.contains('Свекла')), true);
+    });
+
+    test('safeParseDouble handles 0.5 кг, 1/2 шт', () {
+      expect(AiServiceSupabase.safeParseDouble('0.5 кг'), 0.5);
+      expect(AiServiceSupabase.safeParseDouble('1/2'), 0.5);
+      expect(AiServiceSupabase.safeParseDouble('100 г'), 100);
+      expect(AiServiceSupabase.safeParseDouble(null), 0);
+    });
+
+    test('parseTtkByTemplate with errors collects failed cards', () {
+      final rows = [
+        ['Наименование', 'Продукт', 'Брутто', 'Нетто'],
+        ['Борщ', 'Свекла', '100', '80'],
+        ['Борщ', 'Говядина', '200', '150'],
+        ['Итого', '', '', ''],
+        ['Салат', 'Помидоры', '50', '50'],
+      ];
+      final errors = <TtkParseError>[];
+      final list = AiServiceSupabase.parseTtkByTemplate(rows, errors: errors);
+      expect(list.length, 2);
+      expect(errors, isEmpty);
     });
 
     test('full parseTechCardsFromExcel with standard CSV bytes', () async {
