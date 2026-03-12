@@ -464,7 +464,7 @@ class TechCardServiceSupabase {
     final isPf = isSemiFinishedOverride ?? result.isSemiFinished ?? true;
     final products = productsForMapping ?? [];
     final techCardsPf = techCardsPfForMapping ?? [];
-    final createdByName = createdTechCardsByName ?? {};
+    final createdIdsByName = createdTechCardsByName ?? {};
 
     final created = await createTechCard(
       dishName: name,
@@ -480,16 +480,16 @@ class TechCardServiceSupabase {
       if (line.productName.trim().isEmpty) continue;
       String? productId;
       String? sourceTechCardId;
-      if (products.isNotEmpty || techCardsPf.isNotEmpty || createdByName.isNotEmpty) {
+      if (products.isNotEmpty || techCardsPf.isNotEmpty || createdIdsByName.isNotEmpty) {
         final found = _findProductId(
           line.productName,
           line.ingredientType,
           products,
           techCardsPf,
-          createdByName,
+          createdIdsByName,
         );
         if (found != null) {
-          final isPfId = techCardsPf.any((t) => t.id == found) || createdByName.values.contains(found);
+          final isPfId = techCardsPf.any((t) => t.id == found) || createdIdsByName.values.contains(found);
           if (isPfId) {
             sourceTechCardId = found;
           } else {
