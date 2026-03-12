@@ -153,7 +153,7 @@ class _MenuScreenState extends State<MenuScreen> {
             nameMap[curLang] = tc.dishName;
             nameMap[targetLang] = translated;
             final updated = tc.copyWith(dishNameLocalized: nameMap);
-            await svc.saveTechCard(updated);
+            await svc.saveTechCard(updated, skipHistory: true);
             if (mounted) {
               setState(() {
                 final idx = _dishes.indexWhere((d) => d.id == tc.id);

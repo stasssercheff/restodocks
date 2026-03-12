@@ -10,14 +10,16 @@ function corsHeaders(origin: string | null) {
   };
 }
 
-const PDF_SYSTEM_PROMPT = `Ты парсер технологических карт (ТТК, рецептов, полуфабрикатов). На входе — сырой текст из PDF.
+const PDF_SYSTEM_PROMPT = `Ты парсер технологических карт (ТТК, рецептов, полуфабрикатов, калькуляционных карт КК ОП-1). На входе — сырой текст из PDF.
 
-КРИТИЧНО: Если в тексте есть хоть какая-то ТТК (название блюда/ПФ, ингредиенты, технология) — ты ОБЯЗАН извлечь хотя бы одну карточку. Подстраивайся под ЛЮБОЙ формат: Shama.Book, iiko, ГОСТ, собственные шаблоны ресторанов. Не требуй точного соответствия образцу.
+КРИТИЧНО: Если в тексте есть хоть какая-то ТТК (название блюда/ПФ, ингредиенты, технология) — ты ОБЯЗАН извлечь хотя бы одну карточку. Подстраивайся под ЛЮБОЙ формат: Shama.Book, iiko, ГОСТ, КК (форма №ОП-1), собственные шаблоны. Не требуй точного соответствия образцу.
 
-Структура бывает разной: название в заголовке или отдельной строке; таблица с колонками № / Наименование / Продукт / Сырьё / Брутто / Нетто / Расход; числа в граммах или порциях. Извлекай что есть. Для grossGrams/netGrams бери любые подходящие числа (брутто, нетто, расход на порцию). ingredientType: "product" — сырьё; "semi_finished" — ПФ. isSemiFinished: true если в названии "ПФ".
+Структура бывает разной: название в заголовке или отдельной строке; таблица с колонками № / Наименование / Продукт / Сырьё / Брутто / Нетто / Расход / Норма / Цена / Сумма; числа в граммах или кг. Для grossGrams/netGrams бери любые подходящие числа (брутто, нетто, норма в кг×1000). ingredientType: "product" — сырьё (Т.); "semi_finished" — ПФ (П/Ф). isSemiFinished: true если в названии "ПФ".
+
+Если есть КК (калькуляционная карта) с ценами — извлекай pricePerKg (цена за кг или за л, руб.) для каждого ингредиента. Это важно для расчёта себестоимости.
 
 Верни ТОЛЬКО валидный JSON, без markdown и обёрток:
-{ "cards": [ { "dishName": string, "technologyText": string|null, "isSemiFinished": boolean|null, "ingredients": [ { "productName": string, "grossGrams": number|null, "netGrams": number|null, "primaryWastePct": number|null, "cookingMethod": string|null, "cookingLossPct": number|null, "unit": string|null, "ingredientType": "product"|"semi_finished"|null } ] } ] }
+{ "cards": [ { "dishName": string, "technologyText": string|null, "isSemiFinished": boolean|null, "ingredients": [ { "productName": string, "grossGrams": number|null, "netGrams": number|null, "primaryWastePct": number|null, "cookingMethod": string|null, "cookingLossPct": number|null, "unit": string|null, "ingredientType": "product"|"semi_finished"|null, "pricePerKg": number|null } ] } ] }
 
 Если нет ни одной карточки: { "cards": [] }`;
 
@@ -75,6 +77,7 @@ Deno.serve(async (req: Request) => {
     const { PDFParse } = await import("npm:pdf-parse");
     const { chatText } = await import("../_shared/ai_provider.ts");
     const { pdfTextToRows, parseTtkByTemplate } = await import("../_shared/parse_ttk_template.ts");
+    const { parseKkOp1 } = await import("../_shared/parse_kk_op1.ts");
 
     let bytes: Uint8Array;
     try {
@@ -115,7 +118,31 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // 1. Сначала шаблонный парсинг (встроенные ключевые слова)
+    // 0. КК (калькуляционная карта ОП-1) — формат с ценами
+    const kkCards = parseKkOp1(text);
+    if (kkCards.length > 0) {
+      const normalized = kkCards.map((card) => ({
+        dishName: card.dishName ?? null,
+        technologyText: card.technologyText ?? null,
+        isSemiFinished: card.isSemiFinished ?? undefined,
+        ingredients: card.ingredients.map((i) => ({
+          productName: i.productName,
+          grossGrams: i.grossGrams ?? undefined,
+          netGrams: i.netGrams ?? undefined,
+          outputGrams: i.outputGrams ?? undefined,
+          primaryWastePct: i.primaryWastePct ?? undefined,
+          unit: i.unit ?? "g",
+          pricePerKg: i.pricePerKg ?? undefined,
+          ingredientType: (i as { ingredientType?: string }).ingredientType ?? undefined,
+        })),
+      }));
+      return new Response(
+        JSON.stringify({ cards: normalized, reason: "kk_op1" }),
+        { status: 200, headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" } },
+      );
+    }
+
+    // 1. Шаблонный парсинг (встроенные ключевые слова)
     const rows = pdfTextToRows(text);
     let templateCards = rows.length >= 2 ? parseTtkByTemplate(rows) : [];
 
@@ -258,6 +285,7 @@ Deno.serve(async (req: Request) => {
               primaryWastePct: i.primaryWastePct != null ? Number(i.primaryWastePct) : undefined,
               cookingLossPct: i.cookingLossPct != null ? Number(i.cookingLossPct) : undefined,
               ingredientType,
+              pricePerKg: i.pricePerKg != null ? Number(i.pricePerKg) : undefined,
             };
           })
         : [];

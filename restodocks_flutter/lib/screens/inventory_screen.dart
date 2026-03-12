@@ -446,6 +446,8 @@ class _InventoryScreenState extends State<InventoryScreen>
     if (!mounted) return;
     final iikoStore = context.read<IikoProductStore>();
     final hasIiko = iikoStore.hasProducts || hasIikoDraft;
+    final employee = context.read<AccountManagerSupabase>().currentEmployee;
+    final isHall = employee?.department == 'hall' || employee?.department == 'dining_room';
 
     Widget _continueBadge(BuildContext ctx) {
       final theme = Theme.of(ctx);
@@ -490,27 +492,29 @@ class _InventoryScreenState extends State<InventoryScreen>
                 tileColor: Colors.blue.withOpacity(0.05),
                 onTap: () => Navigator.of(ctx).pop('standard'),
               ),
-              const SizedBox(height: 8),
-              ListTile(
-                leading: Icon(Icons.table_chart_outlined,
-                    color: hasIiko ? theme.colorScheme.primary : Colors.grey),
-                title: Row(children: [
-                  const Text('Бланк iiko'),
-                  if (hasIikoDraft) _continueBadge(ctx),
-                ]),
-                subtitle: Text(
-                  hasIikoDraft
-                      ? 'Незавершённая инвентаризация сохранена'
-                      : hasIiko
-                          ? 'Продукты из iiko-бланка · ${iikoStore.products.length} позиций'
-                          : 'Сначала загрузите бланк iiko в «Загрузка продуктов»',
+              if (!isHall) ...[
+                const SizedBox(height: 8),
+                ListTile(
+                  leading: Icon(Icons.table_chart_outlined,
+                      color: hasIiko ? theme.colorScheme.primary : Colors.grey),
+                  title: Row(children: [
+                    const Text('Бланк iiko'),
+                    if (hasIikoDraft) _continueBadge(ctx),
+                  ]),
+                  subtitle: Text(
+                    hasIikoDraft
+                        ? 'Незавершённая инвентаризация сохранена'
+                        : hasIiko
+                            ? 'Продукты из iiko-бланка · ${iikoStore.products.length} позиций'
+                            : 'Сначала загрузите бланк iiko в «Загрузка продуктов»',
+                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  tileColor: hasIiko
+                      ? theme.colorScheme.primaryContainer.withOpacity(0.3)
+                      : Colors.grey.withOpacity(0.03),
+                  onTap: hasIiko ? () => Navigator.of(ctx).pop('iiko') : null,
                 ),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                tileColor: hasIiko
-                    ? theme.colorScheme.primaryContainer.withOpacity(0.3)
-                    : Colors.grey.withOpacity(0.03),
-                onTap: hasIiko ? () => Navigator.of(ctx).pop('iiko') : null,
-              ),
+              ],
             ],
           ),
         );

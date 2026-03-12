@@ -35,6 +35,8 @@ class ChecklistServiceSupabase {
         final itemsRaw = map.remove('checklist_items');
         final c = Checklist.fromJson(map);
         if (c.assignedDepartment != department) continue;
+        // Зал: без заготовок (нет приготовления и ТТК)
+        if (department == 'hall' && c.type?.code == 'prep') continue;
         if (applyAssignmentFilter && currentEmployeeId != null) {
           final ids = c.assignedEmployeeIds;
           final singleId = c.assignedEmployeeId;

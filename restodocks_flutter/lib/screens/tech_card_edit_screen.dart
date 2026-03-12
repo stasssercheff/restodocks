@@ -470,7 +470,17 @@ TechCard _applyEdits(
 }
 
 class TechCardEditScreen extends StatefulWidget {
-  const TechCardEditScreen({super.key, required this.techCardId, this.initialFromAi, this.forceViewMode = false, this.department, this.forceHallView = false});
+  const TechCardEditScreen({
+    super.key,
+    required this.techCardId,
+    this.initialFromAi,
+    this.forceViewMode = false,
+    this.department,
+    this.forceHallView = false,
+    this.initialCategory,
+    this.initialSections,
+    this.initialIsSemiFinished,
+  });
 
   /// Пусто для «новой», иначе id существующей ТТК.
   final String techCardId;
@@ -482,6 +492,10 @@ class TechCardEditScreen extends StatefulWidget {
   final String? department;
   /// Показать описание и состав для зала вместо полной ТТК (меню зала).
   final bool forceHallView;
+  /// Категория и цеха при открытии из импорта.
+  final String? initialCategory;
+  final List<String>? initialSections;
+  final bool? initialIsSemiFinished;
 
   @override
   State<TechCardEditScreen> createState() => _TechCardEditScreenState();
@@ -563,7 +577,26 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   bool get _isNew => widget.techCardId.isEmpty || widget.techCardId == 'new';
 
   @override
-  String get draftKey => 'tech_card_edit_${widget.techCardId.isEmpty || widget.techCardId == 'new' ? 'new' : widget.techCardId}';
+  String get draftKey {
+    if (widget.techCardId.isNotEmpty && widget.techCardId != 'new') {
+      return 'tech_card_edit_${widget.techCardId}';
+    }
+    // При открытии из импорта — детерминированный ключ по содержимому карточки (не identityHashCode),
+    // чтобы корректно работало у всех: разные платформы, сессии, браузеры.
+    if (widget.initialFromAi != null) {
+      return 'tech_card_edit_import_${_importDraftKeyHash(widget.initialFromAi!)}';
+    }
+    return 'tech_card_edit_new';
+  }
+
+  /// Детерминированный хеш для уникального ключа черновика при открытии из импорта.
+  /// На основе названия и ингредиентов — один и тот же состав даёт один и тот же ключ.
+  static String _importDraftKeyHash(TechCardRecognitionResult r) {
+    final name = r.dishName ?? '';
+    final ingPart = r.ingredients.map((i) => '${i.productName}|${i.grossGrams ?? 0}|${i.netGrams ?? 0}').join(';');
+    final h = Object.hash(name, ingPart);
+    return (h & 0x7FFFFFFF).toRadixString(36);
+  }
 
   @override
   bool get restoreDraftAfterLoad => true;
@@ -704,10 +737,21 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           if (ai != null) {
             _nameController.text = ai.dishName?.trim() ?? '';
             _technologyController.text = ai.technologyText?.trim() ?? '';
-            if (ai.isSemiFinished != null) _isSemiFinished = ai.isSemiFinished!;
-            if (ai.dishName != null && ai.dishName!.isNotEmpty) {
+            if (widget.initialIsSemiFinished != null) {
+              _isSemiFinished = widget.initialIsSemiFinished!;
+            } else if (ai.isSemiFinished != null) {
+              _isSemiFinished = ai.isSemiFinished!;
+            }
+            if (widget.initialCategory != null && _categoryOptions.contains(widget.initialCategory)) {
+              _selectedCategory = widget.initialCategory!;
+            } else if (ai.dishName != null && ai.dishName!.isNotEmpty) {
               final cat = _inferCategory(ai.dishName!);
               if (_categoryOptions.contains(cat)) _selectedCategory = cat;
+            }
+            if (widget.initialSections != null && widget.initialSections!.isNotEmpty) {
+              _selectedSections = List<String>.from(widget.initialSections!);
+            } else if (widget.initialSections != null && widget.initialSections!.isEmpty) {
+              _selectedSections = [];
             }
             _ingredients.clear();
             for (final line in ai.ingredients) {
@@ -875,7 +919,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         newTechMap[targetLang] = translated;
         try {
           final updated = tc.copyWith(technologyLocalized: newTechMap);
-          await svc.saveTechCard(updated);
+          await svc.saveTechCard(updated, skipHistory: true);
           if (mounted) setState(() => _techCard = updated);
         } catch (_) {}
       }
@@ -932,7 +976,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           }
           if (urls.isNotEmpty) updated = updated.copyWith(photoUrls: urls);
         }
-        await svc.saveTechCard(updated);
+        await svc.saveTechCard(updated, changedByEmployeeId: emp.id, changedByName: emp.fullName);
         // Переводим название и технологию фоново. Используем updated (с фото и ингредиентами),
         // иначе перезапись через created удалит photoUrls и ingredients.
         final savedForTranslation = updated;
@@ -974,7 +1018,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
             await svc.saveTechCard(savedForTranslation.copyWith(
               dishNameLocalized: nameMap,
               technologyLocalized: newTechMap,
-            ));
+            ), skipHistory: true);
           } catch (_) {}
         });
         if (mounted) {
@@ -997,7 +1041,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         }
         final sellingPrice = _parseSellingPrice();
         final updated = _applyEdits(tc, dishName: name, category: category, sections: _selectedSections, isSemiFinished: _isSemiFinished, portionWeight: _portionWeight, yieldGrams: yieldVal, technologyLocalized: techMap, descriptionForHall: _descriptionForHallController.text.trim().isEmpty ? null : _descriptionForHallController.text.trim(), compositionForHall: _compositionForHallController.text.trim().isEmpty ? null : _compositionForHallController.text.trim(), sellingPrice: sellingPrice, photoUrls: photoUrls, ingredients: toSaveIngredients);
-        await svc.saveTechCard(updated);
+        await svc.saveTechCard(updated, changedByEmployeeId: emp.id, changedByName: emp.fullName);
         // Переводим название и технологию фоново
         final techText = _technologyController.text.trim();
         final fieldsToTranslate = <String, String>{'dish_name': name};
@@ -1038,7 +1082,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
             await svc.saveTechCard(updated.copyWith(
               dishNameLocalized: nameMap,
               technologyLocalized: newTechMap,
-            ));
+            ), skipHistory: true);
           } catch (_) {}
         });
         if (mounted) {
@@ -1086,6 +1130,83 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       }
     });
     await clearDraft();
+  }
+
+  Future<void> _showTechCardHistory(BuildContext context) async {
+    final loc = context.read<LocalizationService>();
+    final historyService = context.read<TechCardHistoryService>();
+    final techCardId = widget.techCardId;
+    if (techCardId.isEmpty || techCardId == 'new') return;
+    final entries = await historyService.getHistory(techCardId);
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('ttk_history')),
+        content: SizedBox(
+          width: 400,
+          child: entries.isEmpty
+              ? Text(loc.t('ttk_history_empty') ?? 'Нет записей', style: Theme.of(ctx).textTheme.bodyMedium)
+              : ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: entries.length,
+                  separatorBuilder: (_, __) => const Divider(height: 16),
+                  itemBuilder: (_, i) {
+                    final e = entries[i];
+                    final dateStr = '${e.changedAt.day.toString().padLeft(2, '0')}.${e.changedAt.month.toString().padLeft(2, '0')}.${e.changedAt.year} ${e.changedAt.hour.toString().padLeft(2, '0')}:${e.changedAt.minute.toString().padLeft(2, '0')}';
+                    final who = e.changedByName ?? (loc.t('ttk_history_unknown') ?? '—');
+                    final changeLines = e.changes.map<String>((c) => _formatHistoryChange(c, loc)).where((s) => s.isNotEmpty).toList();
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(dateStr, style: Theme.of(ctx).textTheme.labelMedium?.copyWith(color: Theme.of(ctx).colorScheme.primary)),
+                        const SizedBox(height: 2),
+                        Text(who, style: Theme.of(ctx).textTheme.bodySmall?.copyWith(color: Theme.of(ctx).colorScheme.onSurfaceVariant)),
+                        if (changeLines.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          ...changeLines.map((line) => Padding(
+                            padding: const EdgeInsets.only(left: 8),
+                            child: Text('• $line', style: Theme.of(ctx).textTheme.bodySmall),
+                          )),
+                        ],
+                      ],
+                    );
+                  },
+                ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(loc.t('back'))),
+        ],
+      ),
+    );
+  }
+
+  String _formatHistoryChange(Map<String, dynamic> c, LocalizationService loc) {
+    final type = c['type'] as String?;
+    final label = c['label'] as String? ?? '';
+    if (type == 'created') return label;
+    if (type == 'portion_weight') return '$label: ${_numStr(c['old'])} → ${_numStr(c['new'])} г';
+    if (type == 'yield') return '$label: ${_numStr(c['old'])} → ${_numStr(c['new'])} г';
+    if (type == 'dish_name') return '$label: "${c['old']}" → "${c['new']}"';
+    if (type == 'technology') return '$label';
+    if (type == 'ingredient_added') return '$label "${c['product']}" (${_numStr(c['gross'])} г)';
+    if (type == 'ingredient_removed') return '$label "${c['product']}"';
+    if (type == 'ingredient_modified') {
+      final product = c['product'] as String? ?? '';
+      final details = c['details'] as List<dynamic>? ?? [];
+      final parts = details.map((d) {
+        final m = Map<String, dynamic>.from(d as Map);
+        return '${m['field']}: ${_numStr(m['old'])} → ${_numStr(m['new'])}';
+      }).join(', ');
+      return '$label "$product" ($parts)';
+    }
+    return label;
+  }
+
+  String _numStr(dynamic v) {
+    if (v == null) return '—';
+    if (v is num) return v.toStringAsFixed(v is int ? 0 : 1);
+    return v.toString();
   }
 
   Future<void> _confirmDelete(BuildContext context, LocalizationService loc) async {
@@ -2438,33 +2559,61 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                   top: false,
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-                    child: Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        FilledButton(
-                          onPressed: _save,
-                          child: Text(loc.t('save')),
-                          style: FilledButton.styleFrom(minimumSize: const Size(120, 48), padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14)),
-                        ),
-                        const SizedBox(width: 16),
-                        TextButton.icon(
-                          icon: Icon(Icons.clear_all, size: 20, color: Theme.of(context).colorScheme.onSurface),
-                          label: Text(loc.t('clear_ttk_form')),
-                          onPressed: () => _confirmClearForm(context, loc),
-                          style: TextButton.styleFrom(minimumSize: const Size(100, 48), padding: const EdgeInsets.symmetric(horizontal: 16)),
+                        Row(
+                          children: [
+                            FilledButton(
+                              onPressed: _save,
+                              child: Text(loc.t('save')),
+                              style: FilledButton.styleFrom(minimumSize: const Size(120, 48), padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14)),
+                            ),
+                            const SizedBox(width: 16),
+                            TextButton.icon(
+                              icon: Icon(Icons.clear_all, size: 20, color: Theme.of(context).colorScheme.onSurface),
+                              label: Text(loc.t('clear_ttk_form')),
+                              onPressed: () => _confirmClearForm(context, loc),
+                              style: TextButton.styleFrom(minimumSize: const Size(100, 48), padding: const EdgeInsets.symmetric(horizontal: 16)),
+                            ),
+                            if (!_isNew) ...[
+                              const SizedBox(width: 16),
+                              TextButton.icon(
+                                icon: Icon(Icons.delete_outline, size: 20, color: Theme.of(context).colorScheme.error),
+                                label: Text(loc.t('delete_tech_card'), style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                                onPressed: () => _confirmDelete(context, loc),
+                                style: TextButton.styleFrom(minimumSize: const Size(120, 48), padding: const EdgeInsets.symmetric(horizontal: 16)),
+                              ),
+                            ],
+                          ],
                         ),
                         if (!_isNew) ...[
-                          const SizedBox(width: 16),
+                          const SizedBox(height: 8),
                           TextButton.icon(
-                            icon: Icon(Icons.delete_outline, size: 20, color: Theme.of(context).colorScheme.error),
-                            label: Text(loc.t('delete_tech_card'), style: TextStyle(color: Theme.of(context).colorScheme.error)),
-                            onPressed: () => _confirmDelete(context, loc),
-                            style: TextButton.styleFrom(minimumSize: const Size(120, 48), padding: const EdgeInsets.symmetric(horizontal: 16)),
+                            icon: Icon(Icons.history, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                            label: Text(loc.t('ttk_history'), style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                            onPressed: () => _showTechCardHistory(context),
+                            style: TextButton.styleFrom(minimumSize: const Size(0, 36), padding: const EdgeInsets.symmetric(horizontal: 0)),
                           ),
                         ],
                       ],
                     ),
                   ),
                 ),
+            if (!_isNew && !effectiveCanEdit)
+              SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+                  child: TextButton.icon(
+                    icon: Icon(Icons.history, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    label: Text(loc.t('ttk_history'), style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                    onPressed: () => _showTechCardHistory(context),
+                    style: TextButton.styleFrom(minimumSize: const Size(0, 36), padding: const EdgeInsets.symmetric(horizontal: 0)),
+                  ),
+                ),
+              ),
               ],
             ),
           ),

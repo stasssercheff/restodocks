@@ -34,6 +34,7 @@ export 'menu_export_service.dart';
 export 'excel_export_service.dart';
 export 'domain_validation_service.dart';
 export 'order_history_service.dart';
+export 'tech_card_history_service.dart';
 export 'order_document_service.dart';
 export 'employee_message_service.dart';
 export 'inventory_history_service.dart';

@@ -4,11 +4,12 @@
  */
 
 const NAME_KEYS = ["наименование", "название", "блюдо", "пф", "name", "dish"];
-const PRODUCT_KEYS = ["продукт", "сырьё", "ингредиент", "product", "ingredient"];
-const GROSS_KEYS = ["брутто", "бр", "вес брутто", "gross"];
+const PRODUCT_KEYS = ["продукт", "сырьё", "сырья", "ингредиент", "product", "ingredient"];
+const GROSS_KEYS = ["брутто", "бр", "вес брутто", "расход", "норма", "масса", "gross"];
 const NET_KEYS = ["нетто", "нт", "вес нетто", "net"];
 const WASTE_KEYS = ["отход", "отх", "waste", "процент отхода"];
-const OUTPUT_KEYS = ["выход", "вес готового", "готовый", "output"];
+const OUTPUT_KEYS = ["выход", "вес готового", "вес готового продукта", "готовый", "output"];
+const UNIT_KEYS = ["ед. изм", "ед изм", "единица", "unit"];
 
 function parseNum(s: string): number | null {
   if (!s || !s.trim()) return null;
@@ -24,6 +25,9 @@ export interface TtkIngredient {
   primaryWastePct: number | null;
   outputGrams?: number | null;
   unit: string | null;
+  /** Цена за кг/л из КК (калькуляционная карта). Для создания продуктов в номенклатуру. */
+  pricePerKg?: number | null;
+  ingredientType?: "product" | "semi_finished" | null;
 }
 
 export interface TtkCard {
@@ -47,7 +51,12 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
   let wasteCol = -1;
   let outputCol = -1;
 
-  for (let r = 0; r < rows.length && r < 5; r++) {
+  let unitCol = -1;
+  let grossColIsKg = false;
+  let netColIsKg = false;
+  let outputColIsKg = false;
+
+  for (let r = 0; r < rows.length && r < 25; r++) {
     const row = rows[r].map((c) => (c ?? "").trim().toLowerCase());
     for (let c = 0; c < row.length; c++) {
       const cell = row[c];
@@ -76,23 +85,51 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
         headerIdx = r;
         outputCol = c;
       }
+      if (UNIT_KEYS.some((k) => cell.includes(k))) {
+        headerIdx = r;
+        unitCol = c;
+      }
     }
     if (headerIdx >= 0 && (nameCol >= 0 || productCol >= 0)) break;
   }
 
+  if (headerIdx < 0 || (nameCol < 0 && productCol < 0)) {
+    for (let r = 0; r < rows.length && r < 15; r++) {
+      const row = rows[r] ?? [];
+      const c0 = (row[0] ?? "").trim().toLowerCase();
+      const c1 = (row[1] ?? "").trim();
+      if ((c0 === "№" || c0 === "n" || /^\d+$/.test(c0)) && c1.length >= 2 && !/^[\d,.\s]+$/.test(c1)) {
+        headerIdx = r;
+        nameCol = 1;
+        productCol = 1;
+        if (row.length >= 4) { grossCol = 2; netCol = 3; }
+        if (row.length >= 5) outputCol = 4;
+        break;
+      }
+    }
+  }
   if (headerIdx < 0 || (nameCol < 0 && productCol < 0)) return [];
+  const headerRow = headerIdx < rows.length ? rows[headerIdx].map((c) => (c ?? "").trim().toLowerCase()) : [];
+  if (grossCol >= 0 && headerRow[grossCol]?.includes("кг")) grossColIsKg = true;
+  if (netCol >= 0 && headerRow[netCol]?.includes("кг")) netColIsKg = true;
+  if (outputCol >= 0 && headerRow[outputCol]?.includes("кг")) outputColIsKg = true;
 
   if (nameCol < 0) nameCol = 0;
   if (productCol < 0) productCol = 1;
 
   // Название блюда часто в первых строках (шапка ТТК до таблицы)
   let initialDish: string | null = null;
-  const headerKeys = [...NAME_KEYS, ...PRODUCT_KEYS, ...GROSS_KEYS, ...NET_KEYS, ...WASTE_KEYS, ...OUTPUT_KEYS];
+  const headerKeys = [...NAME_KEYS, ...PRODUCT_KEYS, ...GROSS_KEYS, ...NET_KEYS, ...WASTE_KEYS, ...OUTPUT_KEYS, ...UNIT_KEYS];
   for (let r = 0; r < headerIdx && r < rows.length; r++) {
     const row = rows[r] ?? [];
     for (let c = 0; c < row.length; c++) {
       const cell = (row[c] ?? "").trim();
-      if (cell.length < 15) continue;
+      if (cell.length < 3) continue;
+      if (cell.endsWith(":")) continue;
+      if (/^\d{1,2}\.\d{1,2}\.\d{2,4}/.test(cell)) continue;
+      if (cell.toLowerCase().startsWith("технологическая карта")) continue;
+      if (cell.toLowerCase().includes("название на чеке") || cell.toLowerCase().includes("название чека")) continue;
+      if (cell.length < 15 && !/[a-zA-Zа-яА-ЯёЁ]{4,}/.test(cell)) continue;
       const lower = cell.toLowerCase();
       if (headerKeys.some((k) => lower.includes(k))) continue;
       if (!/[a-zA-Zа-яА-ЯёЁ]/.test(cell)) continue;
@@ -143,11 +180,12 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
     const wasteVal = wasteCol >= 0 && wasteCol < cells.length ? cells[wasteCol] : "";
     const outputVal = outputCol >= 0 && outputCol < cells.length ? cells[outputCol] : "";
 
-    if (nameVal.toLowerCase() === "итого" || productVal.toLowerCase() === "итого") {
+    if (nameVal.toLowerCase() === "итого" || productVal.toLowerCase() === "итого" || productVal.toLowerCase().startsWith("всего")) {
       flushCard();
       currentDish = null;
       continue;
     }
+    if (productVal.toLowerCase().includes("выход блюда") || productVal.toLowerCase().startsWith("выход одного")) continue;
 
     // Строка с названием блюда (начало новой карточки)
     if (
@@ -162,20 +200,31 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
     // Строка с продуктом (ингредиент)
     if (productVal) {
       if (currentDish == null && nameVal) currentDish = nameVal;
+      let gross = parseNum(grossVal);
+      let net = parseNum(netVal);
+      let outputG = parseNum(outputVal);
+      if (grossColIsKg && gross != null && gross > 0 && gross < 100) gross = gross * 1000;
+      if (netColIsKg && net != null && net > 0 && net < 100) net = net * 1000;
+      if (outputColIsKg && outputG != null && outputG > 0 && outputG < 100) outputG = outputG * 1000;
       let waste = parseNum(wasteVal);
-      const gross = parseNum(grossVal);
-      const net = parseNum(netVal);
-      if (gross != null && gross > 0 && net != null && net < gross && (waste == null || waste === 0)) {
+      if (gross != null && gross > 0 && net != null && net > 0 && net < gross && (waste == null || waste === 0)) {
         waste = (1 - net / gross) * 100;
       }
+      const unitCell = unitCol >= 0 && unitCol < cells.length ? (cells[unitCol] ?? "").trim().toLowerCase() : "";
+      let unit = "g";
+      if (unitCell.includes("л") || unitCell === "l") unit = "ml";
+      else if (unitCell.includes("шт") || unitCell === "pcs") unit = "pcs";
+      const cleanName = productVal.replace(/^Т\.\s*/i, "").replace(/^П\/Ф\s*/i, "").trim() || productVal;
+      const isPf = /^П\/Ф\s/i.test(productVal);
       currentIngredients.push({
-        productName: productVal,
+        productName: cleanName,
         grossGrams: gross,
         netGrams: net,
         primaryWastePct: waste,
-        outputGrams: parseNum(outputVal),
-        unit: "g",
-      });
+        outputGrams: outputG,
+        unit,
+        ingredientType: isPf ? "semi_finished" : "product",
+      } as TtkIngredient);
     }
   }
   flushCard();

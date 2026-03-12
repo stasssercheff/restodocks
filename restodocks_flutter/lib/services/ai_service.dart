@@ -60,6 +60,8 @@ class TechCardIngredientLine {
   final double? cookingLossPct;
   /// "product" = покупное сырьё, "semi_finished" = полуфабрикат (ПФ). Для маппинга в номенклатуру.
   final String? ingredientType;
+  /// Цена за кг/л из документа (КК). При создании продукта в номенклатуру — подставить в цену.
+  final double? pricePerKg;
 
   const TechCardIngredientLine({
     required this.productName,
@@ -71,6 +73,7 @@ class TechCardIngredientLine {
     this.primaryWastePct,
     this.cookingLossPct,
     this.ingredientType,
+    this.pricePerKg,
   });
 }
 

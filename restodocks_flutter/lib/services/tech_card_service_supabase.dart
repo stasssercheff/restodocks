@@ -7,6 +7,7 @@ import 'ai_service.dart';
 import 'image_service.dart';
 import 'product_store_supabase.dart';
 import 'supabase_service.dart';
+import 'tech_card_history_service.dart';
 
 /// Bucket для фото ТТК (блюда и ПФ). Создать в Supabase Storage вручную, public.
 const String kTechCardPhotosBucket = 'tech_card_photos';
@@ -214,7 +215,21 @@ class TechCardServiceSupabase {
   }
 
   /// Сохранение ТТК. При PGRST204 (колонка не найдена) повтор без composition_for_hall, description_for_hall.
-  Future<void> saveTechCard(TechCard techCard) async {
+  /// [changedByEmployeeId], [changedByName] — для записи в историю изменений.
+  /// [skipHistory] — не записывать историю (напр. при фоновом обновлении переводов).
+  Future<void> saveTechCard(
+    TechCard techCard, {
+    String? changedByEmployeeId,
+    String? changedByName,
+    bool skipHistory = false,
+  }) async {
+    TechCard? oldCard;
+    if (!skipHistory) {
+      try {
+        oldCard = await getTechCardById(techCard.id);
+      } catch (_) {}
+    }
+
     Map<String, dynamic> payload = _techCardPayloadForDb(techCard);
     try {
       await _supabase.updateData(
@@ -248,6 +263,17 @@ class TechCardServiceSupabase {
       final ingredientData = _ingredientPayloadForDb(ingredient);
       ingredientData['tech_card_id'] = techCard.id;
       await _supabase.insertData('tt_ingredients', ingredientData);
+    }
+
+    if (!skipHistory) {
+      await TechCardHistoryService().saveHistory(
+        techCardId: techCard.id,
+        establishmentId: techCard.establishmentId,
+        oldCard: oldCard,
+        newCard: techCard,
+        changedByEmployeeId: changedByEmployeeId,
+        changedByName: changedByName,
+      );
     }
   }
 
@@ -423,6 +449,7 @@ class TechCardServiceSupabase {
   Future<TechCard> createTechCardFromRecognitionResult({
     required String establishmentId,
     required String createdBy,
+    String? createdByName,
     required TechCardRecognitionResult result,
     required String category,
     List<String> sections = const ['all'],
@@ -494,13 +521,20 @@ class TechCardServiceSupabase {
         output = netAfterWaste;
       }
       double cost = 0;
+      double? pricePerKg;
       if (productId != null && productStore != null) {
         final ep = productStore.getEstablishmentPrice(productId, establishmentId);
         final price = ep?.$1;
         if (price != null && price > 0) {
+          pricePerKg = price;
           final grossG = gross > 0 ? gross : 100;
           cost = (price / 1000.0) * grossG;
         }
+      }
+      if (cost == 0 && line.pricePerKg != null && line.pricePerKg! > 0) {
+        pricePerKg = line.pricePerKg;
+        final grossG = gross > 0 ? gross : 100;
+        cost = (pricePerKg! / 1000.0) * grossG;
       }
       ingredients.add(TTIngredient(
         id: '${DateTime.now().millisecondsSinceEpoch}_${ingredients.length}',
@@ -519,6 +553,7 @@ class TechCardServiceSupabase {
         finalFat: 0,
         finalCarbs: 0,
         cost: cost,
+        pricePerKg: pricePerKg,
       ));
     }
     final yieldVal = ingredients.fold<double>(0.0, (s, i) => s + i.netWeight);
@@ -528,7 +563,7 @@ class TechCardServiceSupabase {
       technologyLocalized: techMap,
     );
     final updated = TechCard.withYieldValue(withIngredients, yieldVal > 0 ? yieldVal : 100);
-    await saveTechCard(updated);
+    await saveTechCard(updated, changedByEmployeeId: createdBy, changedByName: createdByName);
     if (createdTechCardsByName != null) {
       createdTechCardsByName[_normalizeName(name)] = updated.id;
       createdTechCardsByName[name] = updated.id;

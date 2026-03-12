@@ -207,8 +207,8 @@ class AiServiceSupabase implements AiService {
       if (rows.isEmpty) return [];
       rows = _expandSingleCellRows(rows);
       if (rows.length < 2) return [];
-      // 1. Сначала парсим по шаблону (без ИИ)
-      var list = AiServiceSupabase.parseTtkByTemplate(rows);
+      var list = AiServiceSupabase._tryParseKkFromRows(rows);
+      if (list.isEmpty) list = AiServiceSupabase.parseTtkByTemplate(rows);
       if (list.isNotEmpty) _saveTemplateFromKeywordParse(rows, 'excel'); // Обучение: повторная загрузка — без AI
       // 2. Если шаблон не сработал — пробуем сохранённые шаблоны (каталог)
       if (list.isEmpty) list = await _tryParseByStoredTemplates(rows);
@@ -289,11 +289,25 @@ class AiServiceSupabase implements AiService {
 
   List<List<String>> _csvToRows(Uint8List bytes) {
     try {
-      var s = utf8.decode(bytes);
+      var s = utf8.decode(bytes, allowMalformed: true);
+      if (s.startsWith('\uFEFF')) s = s.substring(1);
       if (s.contains('\r')) s = s.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
-      final decoded = CsvToListConverter(eol: '\n').convert(s);
+      List<List<dynamic>> best = CsvToListConverter(eol: '\n').convert(s);
+      if (best.isEmpty) return [];
+      int bestCols = best.first is List ? (best.first as List).length : 0;
+      for (final d in [';', '\t', '|']) {
+        try {
+          final decoded = CsvToListConverter(fieldDelimiter: d, eol: '\n').convert(s);
+          if (decoded.isEmpty) continue;
+          final cols = decoded.first is List ? (decoded.first as List).length : 0;
+          if (cols >= 2 && cols > bestCols) {
+            best = decoded;
+            bestCols = cols;
+          }
+        } catch (_) {}
+      }
       final rows = <List<String>>[];
-      for (final row in decoded) {
+      for (final row in best) {
         if (row is! List) continue;
         final strRow = row.map((c) => c?.toString().trim() ?? '').toList();
         if (strRow.any((c) => c.isNotEmpty)) rows.add(strRow);
@@ -448,6 +462,80 @@ class AiServiceSupabase implements AiService {
     return expanded;
   }
 
+  /// КК (калькуляционная карта) из таблицы — когда есть колонки Цена, Сумма, Норма.
+  static List<TechCardRecognitionResult> _tryParseKkFromRows(List<List<String>> rows) {
+    if (rows.length < 2) return [];
+    int headerIdx = -1, productCol = -1, normCol = -1, unitCol = -1, priceCol = -1;
+    for (var r = 0; r < rows.length && r < 15; r++) {
+      final row = rows[r].map((c) => c.trim().toLowerCase()).toList();
+      bool hasPrice = false;
+      bool hasProduct = false;
+      for (var c = 0; c < row.length; c++) {
+        final cell = row[c];
+        if (cell.contains('цена') || cell.contains('price')) { headerIdx = r; priceCol = c; hasPrice = true; }
+        if (cell.contains('сумма') || cell.contains('sum')) hasPrice = true;
+        if (cell.contains('норма') || cell.contains('norm')) { headerIdx = r; normCol = c; }
+        if (cell.contains('продукт') || cell.contains('наименование') || cell.contains('сырьё')) { headerIdx = r; productCol = c; hasProduct = true; }
+        if (cell.contains('ед') && cell.contains('изм')) { headerIdx = r; unitCol = c; }
+      }
+      if (headerIdx >= 0 && hasPrice && (productCol >= 0 || normCol >= 0)) {
+        if (productCol < 0) productCol = 1;
+        if (normCol < 0 && row.length > 2) normCol = 2;
+        if (priceCol < 0 && row.length > 4) priceCol = 4;
+        break;
+      }
+      headerIdx = -1;
+      productCol = -1;
+      normCol = -1;
+      priceCol = -1;
+    }
+    if (headerIdx < 0 || productCol < 0) return [];
+    String? dishName;
+    for (var r = 0; r < headerIdx; r++) {
+      for (final c in rows[r]) {
+        final s = c.trim();
+        if (s.length >= 4 && s.length < 80 && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(s) && !s.toLowerCase().contains('калькуляционная') && !s.toLowerCase().contains('оп-1')) {
+          dishName = s;
+          break;
+        }
+      }
+      if (dishName != null) break;
+    }
+    final ingredients = <TechCardIngredientLine>[];
+    for (var r = headerIdx + 1; r < rows.length; r++) {
+      final cells = rows[r].map((c) => c.trim()).toList();
+      if (cells.length <= productCol) continue;
+      final productVal = cells[productCol];
+      if (productVal.isEmpty || productVal.toLowerCase() == 'итого' || productVal.toLowerCase().startsWith('общая стоимость')) break;
+      if (!RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(productVal)) continue;
+      final norm = normCol >= 0 && normCol < cells.length ? _parseNum(cells[normCol]) : null;
+      final price = priceCol >= 0 && priceCol < cells.length ? _parseNum(cells[priceCol]) : null;
+      if (norm == null || norm <= 0) continue;
+      final unitCell = unitCol >= 0 && unitCol < cells.length ? cells[unitCol].toLowerCase() : 'кг';
+      double grams = norm;
+      if (unitCell.contains('кг') || unitCell == 'kg') grams = norm * 1000;
+      else if (unitCell.contains('л') || unitCell == 'l') grams = norm * 1000;
+      double? pricePerKg;
+      if (price != null && price > 0) {
+        if (unitCell.contains('кг') || unitCell.contains('л') || unitCell == 'kg' || unitCell == 'l') pricePerKg = price;
+        else if (unitCell.contains('шт')) pricePerKg = norm > 0 ? (price / norm) * 1000 : null;
+      }
+      String cleanName = productVal.replaceFirst(RegExp(r'^Т\.\s*', caseSensitive: false), '').replaceFirst(RegExp(r'^П/Ф\s*', caseSensitive: false), '').trim();
+      if (cleanName.isEmpty) cleanName = productVal;
+      ingredients.add(TechCardIngredientLine(
+        productName: cleanName,
+        grossGrams: grams,
+        netGrams: grams,
+        primaryWastePct: null,
+        unit: unitCell.contains('л') ? 'ml' : unitCell.contains('шт') ? 'pcs' : 'g',
+        ingredientType: RegExp(r'^П/Ф\s', caseSensitive: false).hasMatch(productVal) ? 'semi_finished' : 'product',
+        pricePerKg: pricePerKg,
+      ));
+    }
+    if (ingredients.isEmpty) return [];
+    return [TechCardRecognitionResult(dishName: dishName ?? 'Без названия', ingredients: ingredients, isSemiFinished: false)];
+  }
+
   /// Парсинг ТТК по шаблону (Наименование, Продукт, Брутто, Нетто...) — без вызова ИИ.
   /// [testFromRows] — для тестов: передать готовые rows, минуя парсинг файла.
   static List<TechCardRecognitionResult> parseTtkByTemplate(List<List<String>> rows) {
@@ -459,11 +547,16 @@ class AiServiceSupabase implements AiService {
     int nameCol = -1, productCol = -1, grossCol = -1, netCol = -1, wasteCol = -1, outputCol = -1;
 
     final nameKeys = ['наименование', 'название', 'блюдо', 'пф', 'name', 'dish'];
-    final productKeys = ['продукт', 'сырьё', 'ингредиент', 'product', 'ingredient'];
-    final grossKeys = ['брутто', 'бр', 'вес брутто', 'gross'];
+    final productKeys = ['продукт', 'сырьё', 'сырья', 'ингредиент', 'product', 'ingredient'];
+    final grossKeys = ['брутто', 'бр', 'вес брутто', 'расход', 'норма', 'масса', 'gross'];
     final netKeys = ['нетто', 'нт', 'вес нетто', 'net'];
     final wasteKeys = ['отход', 'отх', 'waste', 'процент отхода'];
-    final outputKeys = ['выход', 'вес готового', 'готовый', 'output'];
+    final outputKeys = ['выход', 'вес готового', 'вес готового продукта', 'готовый', 'output'];
+    final unitKeys = ['ед. изм', 'ед изм', 'единица', 'unit'];
+
+    int unitCol = -1;
+    bool grossColIsKg = false;
+    bool netColIsKg = false;
 
     // Поиск строки с колонками (Наименование продукта, Брутто, Нетто) — может быть далеко от верха
     for (var r = 0; r < rows.length; r++) {
@@ -513,13 +606,41 @@ class AiServiceSupabase implements AiService {
             break;
           }
         }
+        for (final k in unitKeys) {
+          if (cell.contains(k)) {
+            headerIdx = r;
+            unitCol = c;
+            break;
+          }
+        }
       }
       if (headerIdx >= 0 && (nameCol >= 0 || productCol >= 0)) break;
+    }
+    if (headerIdx < 0 || (nameCol < 0 && productCol < 0)) {
+      for (var r = 0; r < rows.length && r < 15; r++) {
+        final row = rows[r];
+        if (row.length < 3) continue;
+        final c0 = row[0].trim().toLowerCase();
+        final c1 = row.length > 1 ? row[1].trim() : '';
+        if ((c0 == '№' || c0 == 'n' || RegExp(r'^\d+$').hasMatch(c0)) && c1.length >= 2 && !RegExp(r'^[\d,.\s]+$').hasMatch(c1)) {
+          headerIdx = r;
+          nameCol = 1;
+          productCol = 1;
+          if (row.length >= 4) { grossCol = 2; netCol = 3; }
+          if (row.length >= 5) outputCol = 4;
+          break;
+        }
+      }
     }
     if (headerIdx < 0 || (nameCol < 0 && productCol < 0)) return [];
 
     if (nameCol < 0) nameCol = 0;
     if (productCol < 0) productCol = 1;
+
+    // Колонки с "кг" в заголовке — значения в килограммах, переводим в граммы
+    final headerRow = headerIdx < rows.length ? rows[headerIdx].map((c) => c.trim().toLowerCase()).toList() : <String>[];
+    if (grossCol >= 0 && grossCol < headerRow.length && headerRow[grossCol].contains('кг')) grossColIsKg = true;
+    if (netCol >= 0 && netCol < headerRow.length && headerRow[netCol].contains('кг')) netColIsKg = true;
 
     // Название блюда может быть в строках выше заголовка (DOCX iiko/ГОСТ)
     String? currentDish;
@@ -530,6 +651,7 @@ class AiServiceSupabase implements AiService {
         if (s.endsWith(':')) continue; // "Хранение:", "Область применения:"
         if (RegExp(r'^\d{1,2}\.\d{1,2}\.\d{2,4}').hasMatch(s)) continue; // дата
         if (s.toLowerCase().startsWith('технологическая карта')) continue;
+        if (s.toLowerCase().contains('название на чеке') || s.toLowerCase().contains('название чека')) continue;
         currentDish = s;
         break;
       }
@@ -570,7 +692,7 @@ class AiServiceSupabase implements AiService {
       final wasteVal = wasteCol >= 0 && wasteCol < cells.length ? cells[wasteCol] : '';
       final outputVal = outputCol >= 0 && outputCol < cells.length ? cells[outputCol] : '';
 
-      if (nameVal.toLowerCase() == 'итого' || productVal.toLowerCase() == 'итого') {
+      if (nameVal.toLowerCase() == 'итого' || productVal.toLowerCase() == 'итого' || productVal.toLowerCase().startsWith('всего')) {
         flushCard();
         currentDish = null;
         continue;
@@ -580,23 +702,38 @@ class AiServiceSupabase implements AiService {
         if (currentDish != null && currentIngredients.isNotEmpty) flushCard();
         currentDish = nameVal;
       }
+      if (productVal.toLowerCase().contains('выход блюда') || productVal.toLowerCase().startsWith('выход одного')) continue;
       // Строка с продуктом (ингредиент)
       if (productVal.isNotEmpty) {
         if (currentDish == null && nameVal.isNotEmpty) currentDish = nameVal;
-        final gross = _parseNum(grossVal);
-        final net = _parseNum(netVal);
+        var gross = _parseNum(grossVal);
+        var net = _parseNum(netVal);
+        var output = _parseNum(outputVal);
+        if (grossColIsKg && gross != null && gross > 0 && gross < 100) gross = gross * 1000;
+        if (netColIsKg && net != null && net > 0 && net < 100) net = net * 1000;
+        var outputG = output;
+        if (outputCol >= 0 && outputCol < headerRow.length && headerRow[outputCol].contains('кг')) {
+          if (output != null && output > 0 && output < 100) outputG = output * 1000;
+        }
         var waste = _parseNum(wasteVal);
-        final output = _parseNum(outputVal);
         if (gross != null && gross > 0 && net != null && net > 0 && net < gross && (waste == null || waste == 0)) {
           waste = (1.0 - net / gross) * 100.0;
         }
+        final unitCell = unitCol >= 0 && unitCol < cells.length ? cells[unitCol].trim().toLowerCase() : '';
+        String unit = 'g';
+        if (unitCell.contains('л') || unitCell == 'l') unit = 'ml';
+        else if (unitCell.contains('шт') || unitCell == 'pcs') unit = 'pcs';
+        String cleanName = productVal.replaceFirst(RegExp(r'^Т\.\s*', caseSensitive: false), '').replaceFirst(RegExp(r'^П/Ф\s*', caseSensitive: false), '').trim();
+        if (cleanName.isEmpty) cleanName = productVal;
+        final isPf = RegExp(r'^П/Ф\s', caseSensitive: false).hasMatch(productVal);
         currentIngredients.add(TechCardIngredientLine(
-          productName: productVal,
+          productName: cleanName,
           grossGrams: gross,
           netGrams: net,
-          outputGrams: output,
+          outputGrams: outputG,
           primaryWastePct: waste,
-          unit: 'g',
+          unit: unit,
+          ingredientType: isPf ? 'semi_finished' : 'product',
         ));
       }
     }
@@ -868,6 +1005,7 @@ class AiServiceSupabase implements AiService {
           primaryWastePct: m['primaryWastePct'] != null ? (m['primaryWastePct'] as num).toDouble() : null,
           cookingLossPct: m['cookingLossPct'] != null ? (m['cookingLossPct'] as num).toDouble() : null,
           ingredientType: (it == 'product' || it == 'semi_finished') ? it : null,
+          pricePerKg: m['pricePerKg'] != null ? (m['pricePerKg'] as num).toDouble() : null,
         ));
       }
     }

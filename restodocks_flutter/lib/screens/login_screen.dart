@@ -247,11 +247,13 @@ class _LoginScreenState extends State<LoginScreen> {
           final am = context.read<AccountManagerSupabase>();
           final detail = am.lastLoginError ?? '';
           final unconfirmed = _isUnconfirmedError(detail);
+          // Не показывать технические детали для неверного пароля — только понятное сообщение
+          final isInvalidCredentials = _isInvalidCredentialsError(detail);
           setState(() {
             _isUnconfirmedEmail = unconfirmed;
             _errorMessage = unconfirmed
                 ? loc.t('email_not_confirmed_resend_prompt')
-                : (detail.isNotEmpty
+                : (detail.isNotEmpty && !isInvalidCredentials
                     ? '${loc.t('invalid_email_or_password')}\n\n$detail'
                     : loc.t('invalid_email_or_password'));
           });
@@ -371,6 +373,15 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isUnconfirmedError(String text) {
     final s = text.toLowerCase();
     return s.contains('not confirmed') || s.contains('email_not_confirmed');
+  }
+
+  /// Проверяет, является ли ошибка типичной "неверный пароль" — технические детали пользователю не показываем.
+  bool _isInvalidCredentialsError(String text) {
+    final s = text.toLowerCase();
+    return s.contains('invalid_credentials') ||
+        s.contains('invalid login credentials') ||
+        s.contains('legacy: 401 invalid credentials') ||
+        s.contains('authapiexception');
   }
 
   Future<void> _resendConfirmationLink() async {

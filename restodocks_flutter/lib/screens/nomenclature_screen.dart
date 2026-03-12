@@ -1345,8 +1345,10 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                   _tabChip(_NomTab.nomenclature, loc.t('nomenclature')),
                   const SizedBox(width: 8),
                   _tabChip(_NomTab.newProducts, loc.t('nomenclature_new')),
-                  const SizedBox(width: 8),
-                  _tabChip(_NomTab.iiko, 'iiko'),
+                  if (widget.department != 'hall' && widget.department != 'dining_room') ...[
+                    const SizedBox(width: 8),
+                    _tabChip(_NomTab.iiko, 'iiko'),
+                  ],
                 ],
               ),
             ),

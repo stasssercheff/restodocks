@@ -34,3 +34,14 @@
 
 - **Build and Deploy to Vercel (Demo/Beta)** — checkout `staging`, деплой Beta.
 - **Build and Deploy to Vercel (Production)** — checkout `main`, только ручной запуск.
+
+## Supabase Edge Functions (ТТК-импорт)
+
+Деплой только вручную. Требуется: `cd restodocks_flutter`, `npx supabase` (CLI установлен).
+
+```bash
+cd restodocks_flutter
+npx supabase functions deploy parse-xls-bytes --project-ref osglfptwbuqqmqunttha
+npx supabase functions deploy ai-recognize-tech-cards-batch --project-ref osglfptwbuqqmqunttha
+npx supabase functions deploy ai-parse-tech-cards-pdf --project-ref osglfptwbuqqmqunttha
+```

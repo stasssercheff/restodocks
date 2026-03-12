@@ -589,9 +589,28 @@ class AppRouter {
           GoRoute(
             path: '/tech-cards/new',
             pageBuilder: (context, state) {
-              final initialFromAi = state.extra as TechCardRecognitionResult?;
+              TechCardRecognitionResult? initialFromAi;
+              String? initialCategory;
+              List<String>? initialSections;
+              bool? initialIsSemiFinished;
+              final extra = state.extra;
+              if (extra is Map) {
+                initialFromAi = extra['result'] as TechCardRecognitionResult?;
+                initialCategory = extra['category'] as String?;
+                initialSections = (extra['sections'] as List?)?.cast<String>();
+                initialIsSemiFinished = extra['isSemiFinished'] as bool?;
+              } else if (extra is TechCardRecognitionResult) {
+                initialFromAi = extra;
+              }
               final department = state.queryParameters['department'];
-              return _slideTransitionPage(state, TechCardEditScreen(techCardId: 'new', initialFromAi: initialFromAi, department: department));
+              return _slideTransitionPage(state, TechCardEditScreen(
+                techCardId: 'new',
+                initialFromAi: initialFromAi,
+                department: department,
+                initialCategory: initialCategory,
+                initialSections: initialSections,
+                initialIsSemiFinished: initialIsSemiFinished,
+              ));
             },
           ),
           GoRoute(

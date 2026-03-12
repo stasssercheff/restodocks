@@ -85,6 +85,9 @@ class AppProviders {
         Provider<InventoryHistoryService>(
           create: (_) => InventoryHistoryService(),
         ),
+        Provider<TechCardHistoryService>(
+          create: (_) => TechCardHistoryService(),
+        ),
         Provider<NutritionApiService>(
           create: (_) => NutritionApiService(),
         ),

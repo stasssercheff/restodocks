@@ -20,26 +20,33 @@ class TechCardsImportReviewScreen extends StatefulWidget {
 }
 
 class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScreen> {
-  /// Цеха кухни
-  static const _kitchenSectionOptions = [
-    ('all', 'ttk_sections_all'),
-    ('hidden', 'ttk_sections_hidden'),
-    ('hot_kitchen', 'section_hot_kitchen'),
-    ('cold_kitchen', 'section_cold_kitchen'),
-    ('prep', 'section_prep'),
-    ('pastry', 'section_pastry'),
-    ('grill', 'section_grill'),
-    ('sushi', 'section_sushi'),
-    ('bakery', 'section_bakery'),
-    ('banquet_catering', 'section_banquet_catering'),
+  /// Цеха кухни (коды как в создании ТТК: preparation, confectionery)
+  static const _kitchenSectionCodes = [
+    'hot_kitchen',
+    'cold_kitchen',
+    'preparation',
+    'confectionery',
+    'grill',
+    'pizza',
+    'sushi',
+    'bakery',
+    'banquet_catering',
   ];
 
-  /// Цеха/видимость для бара
-  static const _barSectionOptions = [
-    ('all', 'ttk_sections_all'),
-    ('hidden', 'ttk_sections_hidden'),
-    ('bar', 'bar'),
-  ];
+  static const _kitchenSectionLocKeys = {
+    'hot_kitchen': 'section_hot_kitchen',
+    'cold_kitchen': 'section_cold_kitchen',
+    'preparation': 'section_prep',
+    'confectionery': 'section_pastry',
+    'grill': 'section_grill',
+    'pizza': 'section_pizza',
+    'sushi': 'section_sushi',
+    'bakery': 'section_bakery',
+    'banquet_catering': 'section_banquet_catering',
+  };
+
+  /// Цех для бара (только bar)
+  static const _barSectionCodes = ['bar'];
 
   /// Кухня: без напитков. Рыба, мясо, птица, заготовка и т.д.
   static const _kitchenCategoryOptions = [
@@ -54,8 +61,28 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
   ];
 
   bool get _isBar => widget.department == 'bar' || widget.department == 'banquet-catering-bar';
-  List<(String, String)> get _sectionOptions => _isBar ? _barSectionOptions : _kitchenSectionOptions;
   List<String> get _categoryOptions => _isBar ? _barCategoryOptions : _kitchenCategoryOptions;
+
+  /// Коды цехов для выбора (кухня или бар)
+  List<String> get _sectionCodes => _isBar ? _barSectionCodes : _kitchenSectionCodes;
+
+  Map<String, String> _getSectionLabels(LocalizationService loc) {
+    if (_isBar) {
+      return {'bar': loc.t('bar') ?? 'Бар'};
+    }
+    return Map.fromEntries(
+      _kitchenSectionCodes.map((c) => MapEntry(c, loc.t(_kitchenSectionLocKeys[c] ?? c) ?? c)),
+    );
+  }
+
+  String _sectionsDisplayLabel(List<String> sections, LocalizationService loc) {
+    if (sections.isEmpty) return loc.t('ttk_sections_hidden') ?? 'Скрыто';
+    if (sections.contains('all')) return loc.t('ttk_sections_all') ?? 'Все цеха';
+    if (sections.length == 1) {
+      return _getSectionLabels(loc)[sections.first] ?? sections.first;
+    }
+    return (loc.t('ttk_sections_count') ?? '%s цеха').replaceAll('%s', '${sections.length}');
+  }
 
   late List<_ReviewItem> _items;
   bool _saving = false;
@@ -100,16 +127,152 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
     return 'misc';
   }
 
-  String _sectionsToDropdownValue(List<String> sections) {
-    if (sections.contains('all')) return 'all';
-    if (sections.isEmpty) return 'hidden';
-    return sections.first;
+  /// Нормализация старых кодов (prep->preparation, pastry->confectionery)
+  List<String> _normalizeSections(List<String> sections) {
+    if (sections.isEmpty) return [];
+    if (sections.contains('all')) return const ['all'];
+    return sections.map((s) {
+      if (s == 'prep') return 'preparation';
+      if (s == 'pastry') return 'confectionery';
+      return s;
+    }).toList();
   }
 
-  List<String> _dropdownValueToSections(String value) {
-    if (value == 'all') return const ['all'];
-    if (value == 'hidden') return const [];
-    return [value];
+  Future<void> _showSectionPicker(int index) async {
+    final item = _items[index];
+    final loc = context.read<LocalizationService>();
+    final theme = Theme.of(context);
+    final sectionLabels = _getSectionLabels(loc);
+    var selected = List<String>.from(_normalizeSections(item.sections));
+
+    final result = await showDialog<List<String>>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx2, setDialog) {
+            void toggle(String code) {
+              setDialog(() {
+                if (code == 'all') {
+                  selected = selected.contains('all') ? [] : ['all'];
+                } else {
+                  selected.remove('all');
+                  if (selected.contains(code)) {
+                    selected.remove(code);
+                  } else {
+                    selected.add(code);
+                  }
+                }
+              });
+            }
+
+            final isHidden = selected.isEmpty;
+            final isAll = selected.contains('all');
+
+            return Dialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 360),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(children: [
+                        Icon(Icons.store, color: theme.colorScheme.primary, size: 22),
+                        const SizedBox(width: 10),
+                        Text(loc.t('ttk_section_select') ?? 'Выбор цеха',
+                            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                      ]),
+                      const SizedBox(height: 4),
+                      Text(
+                        loc.t('ttk_section_hint') ?? 'ТТК будет видна только поварам выбранных цехов.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: isHidden
+                              ? theme.colorScheme.errorContainer.withValues(alpha: 0.3)
+                              : theme.colorScheme.surfaceContainerLowest,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isHidden
+                                ? theme.colorScheme.error.withValues(alpha: 0.4)
+                                : theme.colorScheme.outline.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Row(children: [
+                          Icon(Icons.visibility_off,
+                              size: 18,
+                              color: isHidden
+                                  ? theme.colorScheme.error
+                                  : theme.colorScheme.onSurface.withValues(alpha: 0.4)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              isHidden
+                                  ? (loc.t('ttk_section_hidden') ?? 'Скрыто')
+                                  : (loc.t('ttk_section_uncheck_hint') ?? 'Снимите все цеха чтобы скрыть'),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isHidden
+                                    ? theme.colorScheme.error
+                                    : theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                              ),
+                            ),
+                          ),
+                        ]),
+                      ),
+                      const SizedBox(height: 12),
+                      ..._sectionCodes.map((code) => _CheckItem(
+                            label: sectionLabels[code] ?? code,
+                            checked: selected.contains(code),
+                            onTap: () => toggle(code),
+                            theme: theme,
+                          )),
+                      const Divider(height: 20),
+                      _CheckItem(
+                        label: loc.t('ttk_section_all') ?? 'Все цеха',
+                        checked: isAll,
+                        onTap: () => toggle('all'),
+                        theme: theme,
+                        icon: Icons.done_all,
+                        bold: true,
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: () => Navigator.of(ctx).pop(),
+                            child: Text(loc.t('back') ?? 'Назад'),
+                          ),
+                          FilledButton(
+                            onPressed: () => Navigator.of(ctx).pop(selected),
+                            child: Text(loc.t('save') ?? 'Сохранить'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+    if (result != null && mounted) {
+      setState(() => _items[index] = _ReviewItem(
+        result: item.result,
+        category: item.category,
+        sections: result,
+        isSemiFinished: item.isSemiFinished,
+      ));
+    }
   }
 
   String _categoryLabel(String c, String lang) {
@@ -156,8 +319,9 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
       final createdByName = <String, String>{};
       final defCur = est.defaultCurrency;
 
-      // Собираем все уникальные названия продуктов (не ПФ) из ингредиентов
+      // Собираем уникальные названия продуктов (не ПФ) и цены из КК/документа
       final productNamesToCreate = <String>{};
+      final priceFromDoc = <String, double>{};
       for (final item in _items) {
         for (final ing in item.result.ingredients) {
           if (ing.productName.trim().isEmpty) continue;
@@ -167,6 +331,9 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
           final inProducts = productsForMapping.any((p) => _norm(p.name) == norm);
           final inPf = techCardsPf.any((t) => _norm(t.name) == norm);
           if (!inProducts && !inPf) productNamesToCreate.add(ing.productName.trim());
+          if (ing.pricePerKg != null && ing.pricePerKg! > 0 && !priceFromDoc.containsKey(norm)) {
+            priceFromDoc[norm] = ing.pricePerKg!;
+          }
         }
       }
 
@@ -213,7 +380,13 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
 
         try {
           final savedProduct = await productStore.addProduct(product);
-          await productStore.addToNomenclature(est.dataEstablishmentId, savedProduct.id, currency: defCur);
+          final docPrice = priceFromDoc[norm];
+          await productStore.addToNomenclature(
+            est.dataEstablishmentId,
+            savedProduct.id,
+            price: docPrice,
+            currency: defCur,
+          );
           productsForMapping = [...productsForMapping, (id: savedProduct.id, name: savedProduct.name)];
         } catch (e) {
           if (e.toString().contains('duplicate') ||
@@ -237,9 +410,10 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
         await svc.createTechCardFromRecognitionResult(
           establishmentId: est.dataEstablishmentId,
           createdBy: emp.id,
+          createdByName: emp.fullName,
           result: item.result,
           category: item.category,
-          sections: item.sections,
+          sections: _normalizeSections(item.sections),
           isSemiFinishedOverride: item.isSemiFinished,
           languageCode: lang,
           productsForMapping: productsForMapping,
@@ -310,7 +484,12 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                             ),
                             TextButton.icon(
                               onPressed: _saving ? null : () {
-                                context.push('/tech-cards/new', extra: item.result);
+                                context.push('/tech-cards/new', extra: {
+                                  'result': item.result,
+                                  'category': item.category,
+                                  'sections': _normalizeSections(item.sections),
+                                  'isSemiFinished': item.isSemiFinished,
+                                });
                               },
                               icon: const Icon(Icons.open_in_new, size: 18),
                               label: Text(loc.t('open')),
@@ -329,18 +508,26 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                               items: _categoryOptions.map((c) => DropdownMenuItem(value: c, child: Text(_categoryLabel(c, lang)))).toList(),
                               onChanged: (v) => setState(() => _items[index] = _ReviewItem(result: item.result, category: v ?? item.category, sections: item.sections, isSemiFinished: item.isSemiFinished)),
                             ),
-                            DropdownButton<String>(
-                              value: _sectionsToDropdownValue(item.sections),
-                              isDense: true,
-                              items: _sectionOptions
-                                  .map((e) => DropdownMenuItem(value: e.$1, child: Text(loc.t(e.$2) ?? e.$1)))
-                                  .toList(),
-                              onChanged: (v) => setState(() => _items[index] = _ReviewItem(
-                                result: item.result,
-                                category: item.category,
-                                sections: _dropdownValueToSections(v ?? 'all'),
-                                isSemiFinished: item.isSemiFinished,
-                              )),
+                            InkWell(
+                              onTap: _saving ? null : () => _showSectionPicker(index),
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.5)),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.store, size: 18, color: theme.colorScheme.primary),
+                                    const SizedBox(width: 8),
+                                    Text(_sectionsDisplayLabel(_normalizeSections(item.sections), loc)),
+                                    const SizedBox(width: 4),
+                                    Icon(Icons.arrow_drop_down, size: 20),
+                                  ],
+                                ),
+                              ),
                             ),
                             DropdownButton<bool>(
                               value: item.isSemiFinished,
@@ -394,4 +581,70 @@ class _ReviewItem {
     this.sections = const ['all'],
     this.isSemiFinished = true,
   });
+}
+
+class _CheckItem extends StatelessWidget {
+  final String label;
+  final bool checked;
+  final VoidCallback onTap;
+  final ThemeData theme;
+  final IconData icon;
+  final bool bold;
+
+  const _CheckItem({
+    required this.label,
+    required this.checked,
+    required this.onTap,
+    required this.theme,
+    this.icon = Icons.kitchen,
+    this.bold = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+        child: Row(
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                shape: BoxShape.rectangle,
+                borderRadius: BorderRadius.circular(4),
+                color: checked ? theme.colorScheme.primary : Colors.transparent,
+                border: Border.all(
+                  color: checked
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.outline,
+                  width: 2,
+                ),
+              ),
+              child: checked
+                  ? const Icon(Icons.check, size: 14, color: Colors.white)
+                  : null,
+            ),
+            const SizedBox(width: 10),
+            Icon(icon, size: 16,
+                color: checked
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurface.withValues(alpha: 0.55)),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: bold ? FontWeight.w600 : FontWeight.normal,
+                color: checked ? theme.colorScheme.primary : null,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
