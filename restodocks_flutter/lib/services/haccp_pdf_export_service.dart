@@ -64,57 +64,79 @@ class HaccpPdfExportService {
         pw.Page(
           pageFormat: PdfPageFormat.a4,
           margin: pw.EdgeInsets.all(40),
-          build: (ctx) => pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            mainAxisAlignment: pw.MainAxisAlignment.center,
+          build: (ctx) => pw.Stack(
             children: [
-              pw.Text(
-                establishmentName,
-                style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+              pw.Positioned(
+                top: 0,
+                right: 0,
+                child: pw.Text(
+                  sanpinRef,
+                  style: pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
+                ),
               ),
-              pw.SizedBox(height: 24),
-              pw.Text(
-                journalTitle,
-                style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
+              pw.Center(
+                child: pw.Column(
+                  mainAxisSize: pw.MainAxisSize.min,
+                  children: [
+                    pw.Text(
+                      journalTitle.toUpperCase(),
+                      style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+                    ),
+                    pw.SizedBox(height: 16),
+                    pw.Text(
+                      establishmentName,
+                      style: pw.TextStyle(fontSize: 14),
+                    ),
+                    pw.SizedBox(height: 24),
+                    pw.Text(
+                      'Период: ${dateFmt.format(dateFrom)} — ${dateFmt.format(dateTo)}',
+                      style: pw.TextStyle(fontSize: 10),
+                    ),
+                  ],
+                ),
               ),
-              pw.SizedBox(height: 16),
-              pw.Text('Период: с ${dateFmt.format(dateFrom)} по ${dateFmt.format(dateTo)}'),
-              pw.SizedBox(height: 8),
-              pw.Text(sanpinRef, style: pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
             ],
           ),
         ),
       );
     }
 
-    final colKeys = _collectColumnKeys(logs);
-    final hasLogs = logs.isNotEmpty;
+    final colKeys = logs.isNotEmpty
+        ? _collectColumnKeys(logs)
+        : _defaultColumnKeysForType(logType);
 
     doc.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         margin: pw.EdgeInsets.fromLTRB(24, 50, 24, 40),
-        header: (ctx) => pw.Row(
-          mainAxisAlignment: pw.MainAxisAlignment.end,
+        header: (ctx) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+          mainAxisSize: pw.MainAxisSize.min,
           children: [
-            pw.Text(
-              sanpinRef,
-              style: pw.TextStyle(fontSize: 7, color: PdfColors.grey700),
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.SizedBox.shrink(),
+                pw.Text(
+                  journalTitle.toUpperCase(),
+                  style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
+                ),
+                pw.Text(
+                  sanpinRef,
+                  style: pw.TextStyle(fontSize: 7, color: PdfColors.grey700),
+                ),
+              ],
+            ),
+            pw.SizedBox(height: 4),
+            pw.Center(
+              child: pw.Text(
+                establishmentName,
+                style: pw.TextStyle(fontSize: 9),
+              ),
             ),
           ],
         ),
         build: (ctx) {
-          if (!hasLogs) {
-            return [
-              pw.Padding(
-                padding: pw.EdgeInsets.all(24),
-                child: pw.Text(
-                  'Нет записей за выбранный период',
-                  style: pw.TextStyle(fontSize: 11, color: PdfColors.grey700),
-                ),
-              ),
-            ];
-          }
           final rows = <pw.TableRow>[
             pw.TableRow(
               decoration: pw.BoxDecoration(color: PdfColors.grey300),
@@ -126,13 +148,17 @@ class HaccpPdfExportService {
               ],
             ),
           ];
-          for (var i = 0; i < logs.length; i++) {
-            final log = logs[i];
+          const blankRowCount = 25;
+          final rowCount = logs.isEmpty ? blankRowCount : logs.length;
+          for (var i = 0; i < rowCount; i++) {
             final cells = <pw.Widget>[
               _cell('${i + 1}'),
-              _cell(dateTimeFmt.format(log.createdAt)),
-              ...colKeys.map((k) => _cell(log.toPdfRow()[k] ?? '—')),
-              _cell(employeeIdToName[log.createdByEmployeeId] ?? log.createdByEmployeeId),
+              _cell(logs.length > i ? dateTimeFmt.format(logs[i].createdAt) : ''),
+              ...colKeys.map((k) => _cell(
+                  logs.length > i ? (logs[i].toPdfRow()[k] ?? '') : '')),
+              _cell(logs.length > i
+                  ? (employeeIdToName[logs[i].createdByEmployeeId] ?? logs[i].createdByEmployeeId)
+                  : ''),
             ];
             rows.add(pw.TableRow(children: cells));
           }
@@ -189,6 +215,37 @@ class HaccpPdfExportService {
       }
     }
     return set.toList()..sort();
+  }
+
+  /// Колонки для пустого бланка по типу журнала.
+  static List<String> _defaultColumnKeysForType(HaccpLogType logType) {
+    switch (logType.targetTable) {
+      case HaccpLogTable.numeric:
+        return switch (logType) {
+          HaccpLogType.uvLamps => ['value1', 'note'],
+          HaccpLogType.fridgeTemperature => ['value1', 'equipment', 'note'],
+          HaccpLogType.warehouseTempHumidity => ['value1', 'value2', 'note'],
+          HaccpLogType.disinfectantConcentration => ['value1', 'note'],
+          _ => ['value1', 'value2', 'equipment', 'note'],
+        };
+      case HaccpLogTable.status:
+        return switch (logType) {
+          HaccpLogType.healthHygiene || HaccpLogType.pediculosis => ['status', 'note'],
+          HaccpLogType.dishwasherControl => ['status', 'status2', 'note'],
+          HaccpLogType.glassCeramicsBreakage => ['description', 'location'],
+          HaccpLogType.emergencyIncidents => ['description', 'note'],
+          _ => ['status', 'status2', 'description', 'location', 'note'],
+        };
+      case HaccpLogTable.quality:
+        return switch (logType) {
+          HaccpLogType.finishedProductBrakerage ||
+          HaccpLogType.incomingRawBrakerage => ['product', 'result', 'note'],
+          HaccpLogType.fryingOil => ['action', 'oil_name', 'note'],
+          HaccpLogType.foodWaste => ['weight', 'reason', 'note'],
+          HaccpLogType.disinsectionDeratization => ['agent', 'note'],
+          _ => ['product', 'result', 'weight', 'reason', 'action', 'agent', 'concentration', 'note'],
+        };
+    }
   }
 
   static String _humanKey(String key) {

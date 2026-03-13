@@ -154,21 +154,97 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
     );
   }
 
+  String _formatDateRange(DateTime from, DateTime to, LocalizationService loc) {
+    final today = DateTime.now();
+    final fromDay = DateTime(from.year, from.month, from.day);
+    final toDay = DateTime(to.year, to.month, to.day);
+    final todayStart = DateTime(today.year, today.month, today.day);
+    if (fromDay == toDay && fromDay == todayStart) {
+      return loc.t('haccp_period_today') ?? 'Сегодня';
+    }
+    if (fromDay == toDay) {
+      return DateFormat('dd.MM.yyyy').format(from);
+    }
+    return '${DateFormat('dd.MM.yyyy').format(from)} — ${DateFormat('dd.MM.yyyy').format(to)}';
+  }
+
   Future<void> _showDateRangePicker() async {
-    final from = await showDatePicker(
+    final loc = context.read<LocalizationService>();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    final choice = await showModalBottomSheet<String>(
       context: context,
-      initialDate: _dateFrom ?? DateTime.now(),
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                loc.t('haccp_period') ?? 'Период',
+                style: Theme.of(ctx).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const Icon(Icons.today),
+                title: Text(loc.t('haccp_period_today') ?? 'Сегодня'),
+                onTap: () => Navigator.pop(ctx, 'today'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.date_range),
+                title: Text(loc.t('haccp_period_week') ?? 'Неделя'),
+                subtitle: Text(DateFormat('dd.MM').format(today.subtract(const Duration(days: 6))) + ' — ' + DateFormat('dd.MM.yyyy').format(now)),
+                onTap: () => Navigator.pop(ctx, 'week'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.calendar_month),
+                title: Text(loc.t('haccp_period_month') ?? 'Месяц'),
+                subtitle: Text('${DateFormat('dd.MM').format(DateTime(now.year, now.month, 1))} — ${DateFormat('dd.MM.yyyy').format(now)}'),
+                onTap: () => Navigator.pop(ctx, 'month'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.edit_calendar),
+                title: Text(loc.t('haccp_period_custom') ?? 'Выбрать диапазон'),
+                onTap: () => Navigator.pop(ctx, 'custom'),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
-    if (from == null || !mounted) return;
-    final to = await showDatePicker(
-      context: context,
-      initialDate: _dateTo ?? from,
-      firstDate: from,
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-    );
-    if (to == null || !mounted) return;
+    if (choice == null || !mounted) return;
+
+    DateTime from;
+    DateTime to;
+    if (choice == 'today') {
+      from = today;
+      to = now;
+    } else if (choice == 'week') {
+      from = today.subtract(const Duration(days: 6));
+      to = now;
+    } else if (choice == 'month') {
+      from = DateTime(now.year, now.month, 1);
+      to = now;
+    } else {
+      final fromPicked = await showDatePicker(
+        context: context,
+        initialDate: _dateFrom ?? now,
+        firstDate: DateTime(2020),
+        lastDate: now.add(const Duration(days: 365)),
+      );
+      if (fromPicked == null || !mounted) return;
+      final toPicked = await showDatePicker(
+        context: context,
+        initialDate: _dateTo ?? fromPicked,
+        firstDate: fromPicked,
+        lastDate: now.add(const Duration(days: 365)),
+      );
+      if (toPicked == null || !mounted) return;
+      from = fromPicked;
+      to = toPicked;
+    }
     setState(() {
       _dateFrom = from;
       _dateTo = to;
@@ -205,9 +281,18 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
                 if (_dateFrom != null && _dateTo != null)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                    child: Text(
-                      '${DateFormat('dd.MM.yyyy').format(_dateFrom!)} — ${DateFormat('dd.MM.yyyy').format(_dateTo!)}',
-                      style: Theme.of(context).textTheme.bodySmall,
+                    child: Row(
+                      children: [
+                        Text(
+                          _formatDateRange(_dateFrom!, _dateTo!, loc),
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        const SizedBox(width: 8),
+                        TextButton(
+                          onPressed: _showDateRangePicker,
+                          child: Text(loc.t('haccp_change_period') ?? 'Изменить период'),
+                        ),
+                      ],
                     ),
                   ),
                 Expanded(
@@ -257,9 +342,21 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
 
   Future<void> _openAddForm() async {
     final acc = context.read<AccountManagerSupabase>();
+    final loc = context.read<LocalizationService>();
     final emp = acc.currentEmployee;
     final est = acc.establishment;
-    if (emp == null || est == null) return;
+    if (est == null) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('haccp_establishment_not_selected') ?? 'Заведение не выбрано')),
+      );
+      return;
+    }
+    if (emp == null) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('haccp_employee_required') ?? 'Выберите сотрудника или войдите под учётной записью с доступом к заведению')),
+      );
+      return;
+    }
 
     final result = await context.push<Map<String, dynamic>>(
       '/haccp-journals/${widget.logTypeCode}/add',

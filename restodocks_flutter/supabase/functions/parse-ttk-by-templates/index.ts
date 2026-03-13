@@ -24,14 +24,26 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const body = (await req.json()) as { rows?: string[][] };
-    const rows = body.rows;
-    if (!rows || !Array.isArray(rows) || rows.length < 2) {
+    let body: { rows?: unknown };
+    try {
+      body = (await req.json()) as { rows?: unknown };
+    } catch {
       return new Response(JSON.stringify({ cards: null }), {
         status: 200,
         headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
       });
     }
+    const raw = body.rows;
+    if (!raw || !Array.isArray(raw) || raw.length < 2) {
+      return new Response(JSON.stringify({ cards: null }), {
+        status: 200,
+        headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+      });
+    }
+    // Гарантированно string[][] (клиент может передать num в ячейках → 400)
+    const rows: string[][] = raw.map((r: unknown) =>
+      Array.isArray(r) ? (r as unknown[]).map((c) => (c != null ? String(c).trim() : "")) : []
+    );
 
     const result = await tryParseByStoredTemplates(rows);
     if (!result || result.cards.length === 0) {

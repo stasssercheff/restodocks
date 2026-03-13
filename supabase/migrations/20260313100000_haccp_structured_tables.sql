@@ -30,9 +30,9 @@ CREATE TABLE IF NOT EXISTS public.haccp_numeric_logs (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_haccp_numeric_establishment ON haccp_numeric_logs(establishment_id);
-CREATE INDEX idx_haccp_numeric_log_type ON haccp_numeric_logs(log_type);
-CREATE INDEX idx_haccp_numeric_est_type_created ON haccp_numeric_logs(establishment_id, log_type, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_haccp_numeric_establishment ON haccp_numeric_logs(establishment_id);
+CREATE INDEX IF NOT EXISTS idx_haccp_numeric_log_type ON haccp_numeric_logs(log_type);
+CREATE INDEX IF NOT EXISTS idx_haccp_numeric_est_type_created ON haccp_numeric_logs(establishment_id, log_type, created_at DESC);
 
 ALTER TABLE haccp_numeric_logs ENABLE ROW LEVEL SECURITY;
 
@@ -70,9 +70,9 @@ CREATE TABLE IF NOT EXISTS public.haccp_status_logs (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_haccp_status_establishment ON haccp_status_logs(establishment_id);
-CREATE INDEX idx_haccp_status_log_type ON haccp_status_logs(log_type);
-CREATE INDEX idx_haccp_status_est_type_created ON haccp_status_logs(establishment_id, log_type, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_haccp_status_establishment ON haccp_status_logs(establishment_id);
+CREATE INDEX IF NOT EXISTS idx_haccp_status_log_type ON haccp_status_logs(log_type);
+CREATE INDEX IF NOT EXISTS idx_haccp_status_est_type_created ON haccp_status_logs(establishment_id, log_type, created_at DESC);
 
 ALTER TABLE haccp_status_logs ENABLE ROW LEVEL SECURITY;
 
@@ -115,10 +115,10 @@ CREATE TABLE IF NOT EXISTS public.haccp_quality_logs (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_haccp_quality_establishment ON haccp_quality_logs(establishment_id);
-CREATE INDEX idx_haccp_quality_log_type ON haccp_quality_logs(log_type);
-CREATE INDEX idx_haccp_quality_tech_card ON haccp_quality_logs(tech_card_id);
-CREATE INDEX idx_haccp_quality_est_type_created ON haccp_quality_logs(establishment_id, log_type, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_haccp_quality_establishment ON haccp_quality_logs(establishment_id);
+CREATE INDEX IF NOT EXISTS idx_haccp_quality_log_type ON haccp_quality_logs(log_type);
+CREATE INDEX IF NOT EXISTS idx_haccp_quality_tech_card ON haccp_quality_logs(tech_card_id);
+CREATE INDEX IF NOT EXISTS idx_haccp_quality_est_type_created ON haccp_quality_logs(establishment_id, log_type, created_at DESC);
 
 ALTER TABLE haccp_quality_logs ENABLE ROW LEVEL SECURITY;
 

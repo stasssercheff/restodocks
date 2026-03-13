@@ -316,7 +316,7 @@ class AiServiceSupabase implements AiService {
       // 3. Только если и там пусто — вызываем AI (лимит 3/день)
       if (list.isEmpty) {
         lastParseTechCardExcelReason = null;
-        final body = <String, dynamic>{'rows': rows};
+        final body = <String, dynamic>{'rows': _rowsForJson(rows)};
         if (establishmentId != null && establishmentId.isNotEmpty) body['establishmentId'] = establishmentId;
         final data = await invoke('ai-recognize-tech-cards-batch', body);
         if (data == null) return [];
@@ -1854,11 +1854,21 @@ class AiServiceSupabase implements AiService {
     return results;
   }
 
+  /// Привести rows к гарантированному string[][] для JSON (Edge Function 400 при num/NaN).
+  static List<List<String>> _rowsForJson(List<List<String>> rows) {
+    return rows.map((r) => r.map((c) {
+      final s = c.trim();
+      if (s == 'NaN' || s == 'Infinity' || s == '-Infinity') return '';
+      return s;
+    }).toList()).toList();
+  }
+
   /// Парсинг по шаблонам — через Edge Function (service_role). Без лимитов, без AI.
   /// Так надёжно работает независимо от сессии; иначе на 3-й загрузке упираемся в лимит AI.
   Future<List<TechCardRecognitionResult>> _tryParseByStoredTemplates(List<List<String>> rows) async {
     try {
-      final data = await invoke('parse-ttk-by-templates', {'rows': rows});
+      final safeRows = _rowsForJson(rows);
+      final data = await invoke('parse-ttk-by-templates', {'rows': safeRows});
       if (data == null) return [];
       final sig = data['header_signature'] as String?;
       if (sig != null && sig.isNotEmpty) lastParseHeaderSignature = sig;

@@ -6,27 +6,27 @@ enum HaccpLogTable { numeric, status, quality }
 enum HaccpLogType {
   // Группа А: Санитария и Персонал
   healthHygiene('health_hygiene', 'Гигиенический журнал (Здоровье)', 'А', 'Приложение 1 к СанПиН 2.3/2.4.3590-20', HaccpLogTable.status),
-  uvLamps('uv_lamps', 'Учёт работы бак-ламп (Кварцевание)', 'А', '31.rospotrebnadzor.ru', HaccpLogTable.numeric),
+  uvLamps('uv_lamps', 'Учёт работы бак-ламп (Кварцевание)', 'А', 'Приложение 3 к СанПиН 2.3/2.4.3590-20', HaccpLogTable.numeric),
   pediculosis('pediculosis', 'Осмотр на педикулёз', 'А', 'Форма учёта гигиенического контроля', HaccpLogTable.status),
 
   // Группа Б: Оборудование и Склад
   fridgeTemperature('fridge_temperature', 'Температурный режим холодильников', 'Б', 'Приложение 2 к СанПиН 2.3/2.4.3590-20', HaccpLogTable.numeric),
-  warehouseTempHumidity('warehouse_temp_humidity', 'Температура и влажность склада', 'Б', '74.rospotrebnadzor.ru (Психрометр)', HaccpLogTable.numeric),
-  dishwasherControl('dishwasher_control', 'Контроль посудомоечных машин', 'Б', '66.rospotrebnadzor.ru', HaccpLogTable.status),
+  warehouseTempHumidity('warehouse_temp_humidity', 'Температура и влажность склада', 'Б', 'Приложение 5 к СанПиН 2.3/2.4.3590-20', HaccpLogTable.numeric),
+  dishwasherControl('dishwasher_control', 'Контроль посудомоечных машин', 'Б', 'Приложение 6 к СанПиН 2.3/2.4.3590-20', HaccpLogTable.status),
   greaseTrapCleaning('grease_trap_cleaning', 'Очистка жироуловителей и вентиляции', 'Б', 'График ТО и чистки фильтров', HaccpLogTable.status),
 
   // Группа В: Качество и Бракераж
   finishedProductBrakerage('finished_product_brakerage', 'Бракераж готовой продукции', 'В', 'Приложение 4 к СанПиН 2.3/2.4.3590-20', HaccpLogTable.quality),
-  incomingRawBrakerage('incoming_raw_brakerage', 'Входной контроль сырья (Бракераж скоропорта)', 'В', '74.rospotrebnadzor.ru', HaccpLogTable.quality),
+  incomingRawBrakerage('incoming_raw_brakerage', 'Входной контроль сырья (Бракераж скоропорта)', 'В', 'Приложение 4 к СанПиН 2.3/2.4.3590-20', HaccpLogTable.quality),
   fryingOil('frying_oil', 'Учёт фритюрных жиров (Замена масла)', 'В', 'Приложение 8 к СанПиН 2.3/2.4.3590-20', HaccpLogTable.quality),
   foodWaste('food_waste', 'Учёт пищевых отходов (Утилизация)', 'В', 'Вес, причина списания', HaccpLogTable.quality),
 
   // Группа Г: HACCP PRO
   glassCeramicsBreakage('glass_ceramics_breakage', 'Журнал боя стекла и керамики', 'Г', '«Стеклянная политика»', HaccpLogTable.status),
   emergencyIncidents('emergency_incidents', 'Регистрация аварийных ситуаций', 'Г', 'Вода, свет, канализация', HaccpLogTable.status),
-  disinsectionDeratization('disinsection_deratization', 'Учёт дезинсекции и дератизации', 'Г', '74.rospotrebnadzor.ru', HaccpLogTable.quality),
-  generalCleaningSchedule('general_cleaning_schedule', 'График генеральных уборок', 'Г', '74.rospotrebnadzor.ru', HaccpLogTable.status),
-  disinfectantConcentration('disinfectant_concentration', 'Учёт концентрации дезсредств', 'Г', '74.rospotrebnadzor.ru', HaccpLogTable.numeric),
+  disinsectionDeratization('disinsection_deratization', 'Учёт дезинсекции и дератизации', 'Г', 'Приложение 9 к СанПиН 2.3/2.4.3590-20', HaccpLogTable.quality),
+  generalCleaningSchedule('general_cleaning_schedule', 'График генеральных уборок', 'Г', 'Приложение 10 к СанПиН 2.3/2.4.3590-20', HaccpLogTable.status),
+  disinfectantConcentration('disinfectant_concentration', 'Учёт концентрации дезсредств', 'Г', 'Приложение 11 к СанПиН 2.3/2.4.3590-20', HaccpLogTable.numeric),
   ;
 
   const HaccpLogType(this.code, this.displayNameRu, this.group, this.sanpinRef, this.targetTable);

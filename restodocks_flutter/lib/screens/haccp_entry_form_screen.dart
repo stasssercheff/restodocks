@@ -191,9 +191,21 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final acc = context.read<AccountManagerSupabase>();
+    final loc = context.read<LocalizationService>();
     final est = acc.establishment;
     final emp = acc.currentEmployee;
-    if (est == null || emp == null) return;
+    if (est == null) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('haccp_establishment_not_selected') ?? 'Заведение не выбрано')),
+      );
+      return;
+    }
+    if (emp == null) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('haccp_employee_required') ?? 'Войдите под учётной записью сотрудника заведения')),
+      );
+      return;
+    }
 
     final svc = context.read<HaccpLogServiceSupabase>();
     setState(() => _saving = true);
