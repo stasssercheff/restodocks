@@ -823,9 +823,10 @@ class AiServiceSupabase implements AiService {
       // Ищем блок: следующая строка — №|Наименование продукта
       if (r + 1 >= rows.length) { r++; continue; }
       final nextRow = rows[r + 1].map((c) => (c ?? '').toString().trim()).toList();
-      final next0 = nextRow.isNotEmpty ? nextRow[0].toLowerCase() : '';
+      final next0 = nextRow.isNotEmpty ? nextRow[0].trim().toLowerCase() : '';
       final next1 = nextRow.length > 1 ? nextRow[1].toLowerCase() : '';
-      if (next0 != '№' || !next1.contains('наименование') || !next1.contains('продукт')) {
+      final headerOk = (next0 == '№' || next0.isEmpty) && next1.contains('наименование') && next1.contains('продукт');
+      if (!headerOk) {
         r++;
         continue;
       }
@@ -858,15 +859,21 @@ class AiServiceSupabase implements AiService {
               if (cell.isEmpty || cell.toLowerCase().contains('технология')) continue;
               if (cell.length > 10 && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(cell)) techParts.add(cell);
             }
-            if (techParts.isNotEmpty) technologyText = (technologyText != null ? '$technologyText\n' : '') + techParts.join(' ');
+            if (techParts.isNotEmpty) {
+              technologyText = (technologyText != null ? '$technologyText\n' : '') + techParts.join(' ');
+            } else {
+              technologyText ??= ''; // заголовок «Технология» — текст в следующих строках
+            }
             dataRow++;
             continue;
           }
           if (technologyText != null) {
             final more = dr.where((c) => c.length > 15 && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(c)).join(' ').trim();
-            if (more.isNotEmpty) technologyText = '$technologyText\n$more';
-            dataRow++;
-            continue;
+            if (more.isNotEmpty) {
+              technologyText = (technologyText!.isEmpty ? '' : '$technologyText\n') + more;
+              dataRow++;
+              continue;
+            }
           }
         }
         if (product.isEmpty) { dataRow++; continue; }
