@@ -1140,6 +1140,9 @@ class AccountManagerSupabase extends ChangeNotifier {
       await _supabase.client
           .from('establishments')
           .update({
+            'name': establishment.name,
+            'address': establishment.address,
+            'inn_bin': establishment.innBin,
             'default_currency': establishment.defaultCurrency,
             'updated_at': establishment.updatedAt.toIso8601String(),
           })

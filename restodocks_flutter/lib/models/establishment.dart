@@ -23,6 +23,9 @@ class Establishment extends Equatable {
   @JsonKey(name: 'address')
   final String? address;
 
+  @JsonKey(name: 'inn_bin')
+  final String? innBin;
+
   @JsonKey(name: 'phone')
   final String? phone;
 
@@ -65,6 +68,7 @@ class Establishment extends Equatable {
     required this.pinCode,
     required this.ownerId,
     this.address,
+    this.innBin,
     this.phone,
     this.email,
     this.defaultCurrency = 'RUB',
@@ -81,6 +85,7 @@ class Establishment extends Equatable {
     String? pinCode,
     String? ownerId,
     String? address,
+    String? innBin,
     String? phone,
     String? email,
     String? defaultCurrency,
@@ -95,6 +100,7 @@ class Establishment extends Equatable {
       pinCode: pinCode ?? this.pinCode,
       ownerId: ownerId ?? this.ownerId,
       address: address ?? this.address,
+      innBin: innBin ?? this.innBin,
       phone: phone ?? this.phone,
       email: email ?? this.email,
       defaultCurrency: defaultCurrency ?? this.defaultCurrency,
@@ -165,6 +171,7 @@ class Establishment extends Equatable {
     pinCode,
     ownerId,
     address,
+    innBin,
     phone,
     email,
     defaultCurrency,

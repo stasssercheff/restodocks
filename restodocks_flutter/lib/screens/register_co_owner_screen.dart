@@ -90,6 +90,8 @@ class _RegisterCoOwnerScreenState extends State<RegisterCoOwnerScreen> {
         name: establishment['name'] as String,
         pinCode: establishment['pin_code'] as String? ?? '',
         ownerId: establishment['owner_id']?.toString() ?? '',
+        address: establishment['address']?.toString(),
+        innBin: establishment['inn_bin']?.toString(),
         defaultCurrency: establishment['default_currency'] as String? ?? 'RUB',
         createdAt: DateTime.parse(establishment['created_at'] as String),
         updatedAt: DateTime.parse(establishment['updated_at'] as String),
