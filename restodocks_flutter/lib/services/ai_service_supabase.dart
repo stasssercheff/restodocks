@@ -263,6 +263,9 @@ class AiServiceSupabase implements AiService {
           if (merged.isNotEmpty) {
             _saveTemplateFromKeywordParse(allSheets.first, 'xlsx');
             lastParsedRows = allSheets.first;
+            if (lastParseHeaderSignature == null || lastParseHeaderSignature!.isEmpty) {
+              lastParseHeaderSignature = _headerSignatureFromRows(allSheets.first);
+            }
             return _applyParseCorrections(merged, lastParseHeaderSignature, establishmentId);
           }
         }
@@ -304,6 +307,9 @@ class AiServiceSupabase implements AiService {
         if (merged.isNotEmpty) {
           _saveTemplateFromKeywordParse(rows, 'docx');
           lastParsedRows = rows;
+          if (lastParseHeaderSignature == null || lastParseHeaderSignature!.isEmpty) {
+            lastParseHeaderSignature = _headerSignatureFromRows(rows);
+          }
           return _applyParseCorrections(merged, lastParseHeaderSignature, establishmentId);
         }
       }
@@ -346,8 +352,9 @@ class AiServiceSupabase implements AiService {
       if (list.isNotEmpty) {
         lastParseTechCardExcelReason = null;
         lastParsedRows = rows;
-        if (lastParseHeaderSignature == null && rows.isNotEmpty && rows[0].isNotEmpty) {
-          lastParseHeaderSignature = _headerSignature(rows[0].map((c) => c.toString().trim()).toList());
+        if (lastParseHeaderSignature == null || lastParseHeaderSignature!.isEmpty) {
+          lastParseHeaderSignature = _headerSignatureFromRows(rows) ??
+              (rows.isNotEmpty && rows[0].isNotEmpty ? _headerSignature(rows[0].map((c) => c.toString().trim()).toList()) : null);
         }
       }
       final corrected = await _applyParseCorrections(list, lastParseHeaderSignature, establishmentId);
@@ -367,6 +374,8 @@ class AiServiceSupabase implements AiService {
   Future<List<TechCardRecognitionResult>> parseTechCardsFromText(String text, {String? establishmentId}) async {
     lastParseTechCardExcelReason = null;
     lastParseTechCardErrors = null;
+    lastParsedRows = null;
+    lastParseHeaderSignature = null;
     final rows = _textToRows(text);
     if (rows.length < 2) return [];
     var expanded = _expandSingleCellRows(rows);
@@ -378,7 +387,14 @@ class AiServiceSupabase implements AiService {
       if (excelErrors.isNotEmpty) lastParseTechCardErrors = excelErrors;
       if (list.isEmpty) list = AiServiceSupabase._tryParseKkFromRows(expanded);
     }
-    if (list.isNotEmpty) _saveTemplateFromKeywordParse(expanded, 'text');
+    if (list.isNotEmpty) {
+      _saveTemplateFromKeywordParse(expanded, 'text');
+      lastParsedRows = expanded;
+      if (lastParseHeaderSignature == null || lastParseHeaderSignature!.isEmpty) {
+        lastParseHeaderSignature = _headerSignatureFromRows(expanded);
+      }
+      return _applyParseCorrections(list, lastParseHeaderSignature, establishmentId);
+    }
     return list;
   }
 
