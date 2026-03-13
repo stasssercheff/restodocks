@@ -35,7 +35,20 @@
 - **Build and Deploy to Vercel (Demo/Beta)** — checkout `staging`, деплой Beta.
 - **Build and Deploy to Vercel (Production)** — checkout `main`, только ручной запуск.
 
-## Supabase Edge Functions (ТТК-импорт)
+## Supabase: миграции и Edge Functions
+
+### Миграции HACCP (журналы)
+
+Таблицы `establishment_haccp_config` и `haccp_*_logs` создаются миграциями 20260313. Если при выборе журналов ошибка 404 — применить миграции:
+
+```bash
+cd restodocks_flutter
+npx supabase db push --project-ref osglfptwbuqqmqunttha
+```
+
+Либо выполнить `supabase/migrations/20260313000000_haccp_journals.sql` и `20260313100000_haccp_structured_tables.sql` вручную в SQL Editor.
+
+### Edge Functions (ТТК-импорт)
 
 Деплой только вручную. Требуется: `cd restodocks_flutter`, `npx supabase` (CLI установлен).
 
@@ -45,4 +58,5 @@ npx supabase functions deploy parse-xls-bytes --project-ref osglfptwbuqqmqunttha
 npx supabase functions deploy parse-ttk-by-templates --project-ref osglfptwbuqqmqunttha   # шаблоны без лимита, без AI
 npx supabase functions deploy ai-recognize-tech-cards-batch --project-ref osglfptwbuqqmqunttha
 npx supabase functions deploy ai-parse-tech-cards-pdf --project-ref osglfptwbuqqmqunttha
+npx supabase functions deploy request-change-password --project-ref osglfptwbuqqmqunttha
 ```

@@ -1238,9 +1238,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Future<void> _downloadHaccpAgreement(BuildContext context, LocalizationService loc) async {
+  Future<void> _toggleHaccpJournal(
+    BuildContext context,
+    HaccpConfigService config,
+    String establishmentId,
+    HaccpLogType logType,
+    bool enabled,
+    LocalizationService loc,
+  ) async {
     try {
-      final bytes = await HaccpAgreementPdfService.buildAgreementPdfBytes();
+      await config.setEnabled(establishmentId, logType, enabled);
+    } catch (e) {
+      if (context.mounted) {
+        final msg = e.toString().contains('404') || e.toString().contains('does not exist')
+            ? (loc.t('haccp_config_table_missing') ?? 'Таблица настроек журналов не найдена. Примените миграции Supabase (supabase db push или миграции 20260313).')
+            : '${loc.t('error')}: $e';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), duration: const Duration(seconds: 5)));
+      }
+    }
+  }
+
+  Future<void> _downloadHaccpAgreement(BuildContext context, LocalizationService loc) async {
+    final account = context.read<AccountManagerSupabase>();
+    final est = account.establishment;
+    final emp = account.currentEmployee;
+    if (est == null || emp == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.t('establishment_not_found') ?? 'Заведение не выбрано')),
+        );
+      }
+      return;
+    }
+    try {
+      final bytes = await HaccpAgreementPdfService.buildAgreementPdfBytes(
+        establishment: est,
+        employerEmployee: emp,
+      );
       await saveFileBytes('haccp_agreement_employee.pdf', bytes);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1510,6 +1544,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
               const Divider(),
             ],
+            if (currentEmployee.hasRole('owner') && establishment != null)
+              ExpansionTile(
+                initiallyExpanded: false,
+                leading: const Icon(Icons.business),
+                title: Text(localization.t('requisites') ?? 'Реквизиты'),
+                subtitle: Text(
+                  localization.t('requisites_hint') ?? 'Для бланка соглашения с сотрудником',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                children: [
+                  _RequisitesForm(
+                    establishment: establishment!,
+                    onSave: (e) async {
+                      await accountManager.updateEstablishment(e);
+                      if (mounted) setState(() {});
+                    },
+                    loc: localization,
+                  ),
+                ],
+              ),
             ExpansionTile(
               initiallyExpanded: false,
               leading: const Icon(Icons.dashboard_customize),
@@ -1594,10 +1648,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               return ListTile(
                                 leading: Checkbox(
                                   value: isOn,
-                                  onChanged: (v) => config.setEnabled(est.id, t, v ?? false),
+                                  onChanged: (v) => _toggleHaccpJournal(context, config, est.id, t, v ?? false, localization),
                                 ),
                                 title: Text(t.displayNameRu, style: const TextStyle(fontSize: 14)),
-                                onTap: () => config.setEnabled(est.id, t, !isOn),
+                                onTap: () => _toggleHaccpJournal(context, config, est.id, t, !isOn, localization),
                               );
                             }),
                           ],
@@ -1789,6 +1843,109 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _RequisitesForm extends StatefulWidget {
+  const _RequisitesForm({
+    required this.establishment,
+    required this.onSave,
+    required this.loc,
+  });
+
+  final Establishment establishment;
+  final Future<void> Function(Establishment) onSave;
+  final LocalizationService loc;
+
+  @override
+  State<_RequisitesForm> createState() => _RequisitesFormState();
+}
+
+class _RequisitesFormState extends State<_RequisitesForm> {
+  late TextEditingController _nameController;
+  late TextEditingController _innBinController;
+  late TextEditingController _addressController;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.establishment.name);
+    _innBinController = TextEditingController(text: widget.establishment.innBin ?? '');
+    _addressController = TextEditingController(text: widget.establishment.address ?? '');
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _innBinController.dispose();
+    _addressController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 8, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            controller: _nameController,
+            decoration: InputDecoration(
+              labelText: widget.loc.t('requisites_organization') ?? 'Организация',
+              border: const OutlineInputBorder(),
+              filled: true,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _innBinController,
+            decoration: InputDecoration(
+              labelText: widget.loc.t('requisites_inn_bin') ?? 'ИНН / БИН',
+              border: const OutlineInputBorder(),
+              filled: true,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _addressController,
+            decoration: InputDecoration(
+              labelText: widget.loc.t('requisites_address') ?? 'Адрес',
+              border: const OutlineInputBorder(),
+              filled: true,
+            ),
+            maxLines: 2,
+          ),
+          const SizedBox(height: 16),
+          FilledButton(
+            onPressed: _saving
+                ? null
+                : () async {
+                    setState(() => _saving = true);
+                    try {
+                      final name = _nameController.text.trim();
+                      final updated = widget.establishment.copyWith(
+                        name: name.isEmpty ? widget.establishment.name : name,
+                        innBin: _innBinController.text.trim().isEmpty ? null : _innBinController.text.trim(),
+                        address: _addressController.text.trim().isEmpty ? null : _addressController.text.trim(),
+                        updatedAt: DateTime.now(),
+                      );
+                      await widget.onSave(updated);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(widget.loc.t('saved') ?? 'Сохранено')),
+                        );
+                      }
+                    } finally {
+                      if (mounted) setState(() => _saving = false);
+                    }
+                  },
+            child: Text(_saving ? (widget.loc.t('saving') ?? 'Сохранение...') : (widget.loc.t('save') ?? 'Сохранить')),
+          ),
+        ],
       ),
     );
   }

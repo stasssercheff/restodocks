@@ -472,7 +472,7 @@ class AiServiceSupabase implements AiService {
       final xml = XmlDocument.parse(utf8.decode(doc.content as List<int>));
       final body = xml.descendants.whereType<XmlElement>().where((e) => e.localName == 'body').firstOrNull;
       if (body == null) return lead;
-      final skipStart = RegExp(r'^(ттк|технико-технологическая|технологическая карта|область применения|настоящая)', caseSensitive: false);
+      final skipStart = RegExp(r'^(ттк|технико-технологическая|технологическая карта|область применения|настоящая|органолептическ|внешний вид|консистенция|запах|вкус|цвет)', caseSensitive: false);
       for (final child in body.childElements) {
         if (child.localName == 'tbl') break; // первая таблица — стоп
         if (child.localName != 'p') continue;
@@ -1088,6 +1088,16 @@ class AiServiceSupabase implements AiService {
     return merged;
   }
 
+  /// Единицы ("г", "кДж)") и КБЖУ — не названия блюд.
+  static bool _isValidDishName(String s) {
+    if (s.length < 4) return false;
+    final t = s.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '');
+    if (RegExp(r'^(г|кг|мл|л|шт|кдж\)?|ккал\)?)$').hasMatch(t)) return false;
+    if (RegExp(r'^\d+\s*кдж\)?$', caseSensitive: false).hasMatch(s)) return false;
+    if (RegExp(r'^\d+\s*ккал$', caseSensitive: false).hasMatch(s)) return false;
+    return RegExp(r'[а-яА-ЯёЁa-zA-Z]{2,}').hasMatch(s);
+  }
+
   /// Парсинг ТТК по шаблону (Наименование, Продукт, Брутто, Нетто...) — без вызова ИИ.
   /// [errors] — при не null: try-catch на каждую строку, битые карточки в errors, цикл продолжается.
   static List<TechCardRecognitionResult> parseTtkByTemplate(
@@ -1273,6 +1283,8 @@ class AiServiceSupabase implements AiService {
         if (RegExp(r'^\d{1,2}\.\d{1,2}\.\d{2,4}').hasMatch(s)) continue; // дата
         if (s.toLowerCase().startsWith('технологическая карта')) continue;
         if (s.toLowerCase().contains('название на чеке') || s.toLowerCase().contains('название чека')) continue;
+        if (s.toLowerCase().contains('органолептическ') || s.toLowerCase().contains('внешний вид') || s.toLowerCase().contains('консистенция') || s.toLowerCase().contains('запах') || s.toLowerCase().contains('вкус') || s.toLowerCase().contains('цвет')) continue;
+        if (!_isValidDishName(s)) continue;
         currentDish = s;
         break;
       }
@@ -1332,6 +1344,7 @@ class AiServiceSupabase implements AiService {
       // пф гц: новая карточка — название в col 0, col 1 пусто (Песто пф, База на лигурию п/ф)
       final c0Val = cells.isNotEmpty ? cells[0].trim() : '';
       if (c0Val.length >= 3 &&
+          _isValidDishName(c0Val) &&
           RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(c0Val) &&
           !RegExp(r'^№$|^выход$|^итого$|^декор$|^наименование$', caseSensitive: false).hasMatch(c0Val.toLowerCase()) &&
           productVal.isEmpty &&
@@ -1347,7 +1360,7 @@ class AiServiceSupabase implements AiService {
         final nextC1 = nextRow.length > 1 ? nextRow[1].toLowerCase() : '';
         if (nextC0 == '№' && nextC1.contains('наименование') && nextC1.contains('продукт')) {
           final dishInCol0 = cells.isNotEmpty ? cells[0].trim() : '';
-          if (dishInCol0.length >= 3 && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(dishInCol0) &&
+          if (dishInCol0.length >= 3 && _isValidDishName(dishInCol0) && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(dishInCol0) &&
               !RegExp(r'^№$|^выход$|^декор$', caseSensitive: false).hasMatch(dishInCol0)) {
             if (currentDish != null || currentIngredients.isNotEmpty) flushCard();
             currentDish = dishInCol0;
@@ -1377,10 +1390,11 @@ class AiServiceSupabase implements AiService {
         if (currentDish != null || currentIngredients.isNotEmpty) flushCard();
         clearCurrentCard();
         final dishMatch = RegExp(r'наименование\s+блюда\s*:?\s*([^\n]+)', caseSensitive: false).firstMatch(cells.join(' '));
-        currentDish = dishMatch?.group(1)?.trim();
+        final dm = dishMatch?.group(1)?.trim();
+        currentDish = (dm != null && dm.isNotEmpty && _isValidDishName(dm)) ? dm : null;
         if (currentDish == null || currentDish!.isEmpty) {
           for (final c in cells) {
-            if (c.length > 2 && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(c) && !RegExp(r'ттк|карта|брутто|нетто|наименование').hasMatch(c.toLowerCase())) {
+            if (c.length > 2 && _isValidDishName(c) && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(c) && !RegExp(r'ттк|карта|брутто|нетто|наименование').hasMatch(c.toLowerCase())) {
               currentDish = c;
               break;
             }
@@ -1404,14 +1418,14 @@ class AiServiceSupabase implements AiService {
         if (currentDish != null && currentDish != nameVal && currentIngredients.isNotEmpty) {
           flushCard();
         }
-        currentDish = nameVal;
+        if (_isValidDishName(nameVal)) currentDish = nameVal;
       }
       // CSV-формат: при пустом Наименовании название новой карточки может быть в Продукте (ПФ ..., блюдо)
       if (nameCol != pCol && nameVal.isEmpty && productVal.isNotEmpty &&
           RegExp(r'^ПФ\s|^П/Ф\s', caseSensitive: false).hasMatch(productVal) &&
           productVal.length > 5 && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(productVal)) {
         if (currentDish != null || currentIngredients.isNotEmpty) flushCard();
-        currentDish = productVal;
+        if (_isValidDishName(productVal)) currentDish = productVal;
         // Та же строка может содержать первый ингредиент в col[grossCol] (сдвиг колонок)
         if (gCol >= 0 && gCol + 2 < cells.length) {
           final shiftedProduct = cells[gCol].trim();
@@ -1449,7 +1463,7 @@ class AiServiceSupabase implements AiService {
       if (productVal.isNotEmpty && !hasDigitsInGross && !hasDigitsInNet) return true;
       // Строка с продуктом (ингредиент)
       if (productVal.isNotEmpty) {
-        if (currentDish == null && nameVal.isNotEmpty) currentDish = nameVal;
+        if (currentDish == null && nameVal.isNotEmpty && _isValidDishName(nameVal)) currentDish = nameVal;
         var gross = _parseNum(grossVal);
         var net = _parseNum(netVal);
         var output = _parseNum(outputVal);
@@ -1582,6 +1596,8 @@ class AiServiceSupabase implements AiService {
         if (s.endsWith(':')) continue;
         if (RegExp(r'^\d{1,2}\.\d{1,2}\.\d{2,4}').hasMatch(s)) continue;
         if (s.toLowerCase().startsWith('технологическая карта')) continue;
+        if (s.toLowerCase().contains('органолептическ') || s.toLowerCase().contains('внешний вид') || s.toLowerCase().contains('консистенция') || s.toLowerCase().contains('запах') || s.toLowerCase().contains('вкус') || s.toLowerCase().contains('цвет')) continue;
+        if (!_isValidDishName(s)) continue;
         currentDish = s;
         break;
       }
@@ -1618,7 +1634,7 @@ class AiServiceSupabase implements AiService {
           RegExp(r'^ПФ\s|^П/Ф\s', caseSensitive: false).hasMatch(productVal) &&
           productVal.length > 5) {
         if (currentDish != null || currentIngredients.isNotEmpty) flushCard();
-        currentDish = productVal;
+        if (_isValidDishName(productVal)) currentDish = productVal;
         if (gCol >= 0 && gCol + 2 < cells.length) {
           final shiftedProduct = cells[gCol].trim();
           final shiftedGross = gCol + 1 < cells.length ? cells[gCol + 1] : '';
@@ -1678,13 +1694,13 @@ class AiServiceSupabase implements AiService {
         if (currentDish != null && currentDish != nameVal && currentIngredients.isNotEmpty) {
           flushCard();
         }
-        currentDish = nameVal;
+        if (_isValidDishName(nameVal)) currentDish = nameVal;
       } else if (nameVal.isNotEmpty && !RegExp(r'^[\d\s\.\,]+$').hasMatch(nameVal) && productVal.isEmpty) {
         if (currentDish != null && currentIngredients.isNotEmpty) flushCard();
         currentDish = nameVal;
       }
       if (productVal.isNotEmpty) {
-        if (currentDish == null && nameVal.isNotEmpty) currentDish = nameVal;
+        if (currentDish == null && nameVal.isNotEmpty && _isValidDishName(nameVal)) currentDish = nameVal;
         final gross = _parseNum(grossVal);
         final net = _parseNum(netVal);
         var waste = _parseNum(wasteVal);

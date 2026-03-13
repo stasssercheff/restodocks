@@ -158,8 +158,11 @@ Deno.serve(async (req: Request) => {
     }
 
     // Shama.Book / ГОСТ: блюдо в "Проведено контрольное приготовление блюда: XXX" или на след. строке
+    // Shama.Book: "Технологическая карта № 2510 от 09.10.2024 Сливочный крем для мафинов и дэкоров п/ф"
     const dishMatch = text.match(/Проведено\s+контрольное\s+приготовление\s+блюда\s*:?\s*\n?\s*([^\n]+?)(?:\n|$)/i)
-      ?? text.match(/Наименование\s+блюда[^:]*:\s*([^\n]+)/i);
+      ?? text.match(/Наименование\s+блюда[^:]*:\s*([^\n]+)/i)
+      ?? text.match(/Технологическая\s+карта\s+№\s*\d+[^\n]*\n\s*([^\n]{5,80})/i)
+      ?? text.match(/Источник\s+рецептуры[^\n]*\n[^\n]*\n\s*([^\n]{5,80})/i);
     const extractedDish = dishMatch?.[1]?.trim();
     if (templateCards.length === 1 && extractedDish && !templateCards[0].dishName) {
       templateCards = [{ ...templateCards[0], dishName: extractedDish }];

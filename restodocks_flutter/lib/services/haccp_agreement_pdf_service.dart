@@ -4,6 +4,9 @@ import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import '../models/establishment.dart';
+import '../models/employee.dart';
+
 /// Генерация PDF «Соглашение с сотрудником» о признании ввода данных под логином
 /// личной подписью (Простая Электронная Подпись).
 class HaccpAgreementPdfService {
@@ -26,7 +29,7 @@ class HaccpAgreementPdfService {
     return _theme!;
   }
 
-  /// Текст соглашения для печати и подписания.
+  /// Текст соглашения для печати и подписания (без подписей в конце).
   static const String agreementBody = '''
 Настоящим удостоверяет, что ввод данных в электронные журналы и учётные формы системы Restodocks под своим учётным логином (логин и пароль) признаётся им равнозначным собственноручной подписи в соответствии с:
 
@@ -35,14 +38,33 @@ class HaccpAgreementPdfService {
 — Техническим регламентом Таможенного союза ТР ТС 021/2011 "О безопасности пищевой продукции" (действует на всей территории ЕАЭС).
 
 Работник обязуется соблюдать порядок учёта и не разглашать данные для входа в систему.
-
-_____________________ / ____________________
-   (подпись работника)         (расшифровка)
 ''';
 
-  static Future<Uint8List> buildAgreementPdfBytes() async {
+  static String _employerPosition(Employee emp) {
+    if (emp.positionRole != null && emp.positionRole!.isNotEmpty) {
+      const roleToPosition = {
+        'owner': 'Генеральный директор',
+        'executive_chef': 'Шеф-повар',
+        'sous_chef': 'Су-шеф',
+        'bar_manager': 'Менеджер бара',
+        'floor_manager': 'Менеджер зала',
+        'general_manager': 'Управляющий',
+      };
+      return roleToPosition[emp.positionRole!] ?? emp.positionRole!;
+    }
+    return emp.hasRole('owner') ? 'Генеральный директор' : 'Представитель работодателя';
+  }
+
+  static Future<Uint8List> buildAgreementPdfBytes({
+    required Establishment establishment,
+    required Employee employerEmployee,
+  }) async {
     final theme = await _getTheme();
     final doc = pw.Document(theme: theme);
+
+    final headerStyle = pw.TextStyle(fontSize: 9, color: PdfColors.grey800);
+    final empPosition = _employerPosition(employerEmployee);
+    final empFullName = '${employerEmployee.fullName}${employerEmployee.surname != null ? ' ${employerEmployee.surname}' : ''}';
 
     doc.addPage(
       pw.Page(
@@ -53,6 +75,24 @@ _____________________ / ____________________
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
+              // Шапка — реквизиты
+              pw.Container(
+                padding: pw.EdgeInsets.only(bottom: 16),
+                decoration: pw.BoxDecoration(
+                  border: pw.Border(bottom: pw.BorderSide(width: 0.5, color: PdfColors.grey400)),
+                ),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text('Организация: ${establishment.name}', style: headerStyle),
+                    if (establishment.innBin != null && establishment.innBin!.isNotEmpty)
+                      pw.Text('ИНН/БИН: ${establishment.innBin}', style: headerStyle),
+                    if (establishment.address != null && establishment.address!.isNotEmpty)
+                      pw.Text('Адрес: ${establishment.address}', style: headerStyle),
+                  ],
+                ),
+              ),
+              pw.SizedBox(height: 16),
               pw.Text(
                 'СОГЛАШЕНИЕ С СОТРУДНИКОМ',
                 style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
@@ -65,7 +105,6 @@ _____________________ / ____________________
               pw.SizedBox(height: 24),
               pw.Text('СОГЛАШЕНИЕ О ПРИЗНАНИИ ЭЛЕКТРОННОЙ ПОДПИСИ', style: textStyle),
               pw.SizedBox(height: 8),
-              // Работник _____ (ФИО полностью) — на всю ширину строки
               pw.Row(
                 children: [
                   pw.Text('Работник ', style: textStyle),
@@ -101,9 +140,24 @@ _____________________ / ____________________
               pw.SizedBox(height: 14),
               pw.Text('дата: «____» ______________ 20____ г.', style: textStyle),
               pw.SizedBox(height: 14),
-              pw.Text(
-                agreementBody,
-                style: textStyle,
+              pw.Text(agreementBody, style: textStyle),
+              pw.Spacer(),
+              // Подписи сторон
+              pw.Container(
+                padding: pw.EdgeInsets.only(top: 24),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text('Работодатель:', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                    pw.SizedBox(height: 4),
+                    pw.Text('$empPosition ___________ / $empFullName ___________ /', style: textStyle),
+                    pw.Text('М.П. (место для печати)', style: pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+                    pw.SizedBox(height: 16),
+                    pw.Text('Работник:', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                    pw.SizedBox(height: 4),
+                    pw.Text('___________ / ___________ /', style: textStyle),
+                  ],
+                ),
               ),
             ],
           );

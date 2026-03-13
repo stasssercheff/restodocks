@@ -101,8 +101,8 @@ Deno.serve(async (req: Request) => {
         const line = cells.join("\t");
         // Пропускаем строки без букв (числа-итоги, разделители)
         if (!/[a-zA-Zа-яА-ЯёЁ]/.test(line)) continue;
-        // Пропускаем слишком длинные строки (описания, примечания)
-        if (line.length > 300) continue;
+        // Пропускаем слишком длинные строки (описания, примечания) — 600 чтобы не отсекать iiko-шапку
+        if (line.length > 600) continue;
         if (cells.every((c) => !c)) continue;
         rows.push(cells);
         if (rows.length >= 5000) break;
