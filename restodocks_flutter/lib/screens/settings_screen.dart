@@ -1591,11 +1591,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ),
                             ...HaccpLogType.values.map((t) {
                               final isOn = enabled.contains(t.code);
-                              return CheckboxListTile(
-                                value: isOn,
-                                onChanged: (v) => config.setEnabled(est.id, t, v ?? false),
+                              return ListTile(
+                                leading: Checkbox(
+                                  value: isOn,
+                                  onChanged: (v) => config.setEnabled(est.id, t, v ?? false),
+                                ),
                                 title: Text(t.displayNameRu, style: const TextStyle(fontSize: 14)),
-                                controlAffinity: ListTileControlAffinity.leading,
+                                onTap: () => config.setEnabled(est.id, t, !isOn),
                               );
                             }),
                           ],
@@ -1621,7 +1623,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       children: [
                         Text(
                           localization.t('haccp_legal_text') ??
-                              'Использование Простой Электронной Подписи (ПЭП) при вводе данных в журналы регламентировано: ФЗ №63 (РФ), Законом об ЭЦП (РК/РБ), ТР ТС 021/2011. Работник признаёт ввод данных под своим логином личной подписью.',
+                              'Легитимность цифровых журналов:\nСогласно СанПиН 2.3/2.4.3590-20 (п. 2.1), допускается ведение производственных журналов в электронном виде. Это применимо ко всей территории РФ и гармонизировано с санитарными нормами стран СНГ.\n\nЮридическая сила подписи (ПЭП):\nВвод данных под уникальным логином и паролем является использованием Простой электронной подписи (ПЭП). Согласно ФЗ №63 (РФ), Законам об ЭЦП (РК, РБ, РУз) и международным стандартам, такая подпись равнозначна собственноручной при наличии внутреннего Соглашения с сотрудником.\n\nМеждународный стандарт безопасности (HACCP):\nСистема соответствует требованиям Технического регламента ТР ТС 021/2011 "О безопасности пищевой продукции", обязывающего предприятия фиксировать критические контрольные точки.\n\nНеизменность данных (Audit Trail):\nRestoDocks фиксирует точное время (Timestamp) каждой записи на сервере. Это исключает фальсификацию данных "задним числом" и подтверждает достоверность учёта перед контролирующими органами.',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                         const SizedBox(height: 16),

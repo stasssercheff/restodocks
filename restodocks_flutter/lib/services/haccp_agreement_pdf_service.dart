@@ -28,18 +28,11 @@ class HaccpAgreementPdfService {
 
   /// Текст соглашения для печати и подписания.
   static const String agreementBody = '''
-СОГЛАШЕНИЕ О ПРИЗНАНИИ ЭЛЕКТРОННОЙ ПОДПИСИ
+Настоящим удостоверяет, что ввод данных в электронные журналы и учётные формы системы Restodocks под своим учётным логином (логин и пароль) признаётся им равнозначным собственноручной подписи в соответствии с:
 
-Работник ____________________________________________ (ФИО полностью)
-должность: ____________________________________________
-дата: «____» ______________ 20____ г.
-
-настоящим удостоверяет, что ввод данных в электронные журналы и учётные формы системы Restodocks под своим учётным логином (логин и пароль) признаётся им равнозначным собственноручной подписи в соответствии с:
-
-— Федеральным законом №63-ФЗ «Об электронной подписи» (РФ);
-— Законом Республики Казахстан «Об электронном документе и электронной цифровой подписи» (применимо в РК);
-— Законом Республики Беларусь «Об электронном документе и электронной цифровой подписи» (применимо в РБ);
-— ТР ТС 021/2011 «О безопасности пищевой продукции» (ЕАЭС).
+— Национальным законодательством об электронной цифровой подписи (включая 63-ФЗ РФ, Закон об ЭЦП РК, РБ, РУз и др. государств СНГ);
+— Международными стандартами безопасности пищевой продукции (HACCP / ХАССП);
+— Техническим регламентом Таможенного союза ТР ТС 021/2011 "О безопасности пищевой продукции" (действует на всей территории ЕАЭС).
 
 Работник обязуется соблюдать порядок учёта и не разглашать данные для входа в систему.
 
@@ -55,25 +48,66 @@ _____________________ / ____________________
       pw.Page(
         pageFormat: PdfPageFormat.a4,
         margin: pw.EdgeInsets.all(40),
-        build: (ctx) => pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Text(
-              'СОГЛАШЕНИЕ С СОТРУДНИКОМ',
-              style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
-            ),
-            pw.SizedBox(height: 8),
-            pw.Text(
-              'О признании ввода данных в электронные журналы личной подписью',
-              style: pw.TextStyle(fontSize: 11),
-            ),
-            pw.SizedBox(height: 24),
-            pw.Text(
-              agreementBody,
-              style: pw.TextStyle(fontSize: 10),
-            ),
-          ],
-        ),
+        build: (ctx) {
+          final textStyle = pw.TextStyle(fontSize: 10);
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text(
+                'СОГЛАШЕНИЕ С СОТРУДНИКОМ',
+                style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+              ),
+              pw.SizedBox(height: 8),
+              pw.Text(
+                'О признании ввода данных в электронные журналы личной подписью',
+                style: pw.TextStyle(fontSize: 11),
+              ),
+              pw.SizedBox(height: 24),
+              pw.Text('СОГЛАШЕНИЕ О ПРИЗНАНИИ ЭЛЕКТРОННОЙ ПОДПИСИ', style: textStyle),
+              pw.SizedBox(height: 8),
+              // Работник _____ (ФИО полностью) — на всю ширину строки
+              pw.Row(
+                children: [
+                  pw.Text('Работник ', style: textStyle),
+                  pw.Expanded(
+                    child: pw.Container(
+                      decoration: pw.BoxDecoration(
+                        border: pw.Border(
+                          bottom: pw.BorderSide(width: 0.5, color: PdfColors.black),
+                        ),
+                      ),
+                      height: 14,
+                    ),
+                  ),
+                  pw.Text(' (ФИО полностью)', style: textStyle),
+                ],
+              ),
+              pw.SizedBox(height: 14),
+              pw.Row(
+                children: [
+                  pw.Text('должность: ', style: textStyle),
+                  pw.Expanded(
+                    child: pw.Container(
+                      decoration: pw.BoxDecoration(
+                        border: pw.Border(
+                          bottom: pw.BorderSide(width: 0.5, color: PdfColors.black),
+                        ),
+                      ),
+                      height: 14,
+                    ),
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 14),
+              pw.Text('дата: «____» ______________ 20____ г.', style: textStyle),
+              pw.SizedBox(height: 14),
+              pw.Text(
+                agreementBody,
+                style: textStyle,
+              ),
+            ],
+          );
+        },
       ),
     );
 
