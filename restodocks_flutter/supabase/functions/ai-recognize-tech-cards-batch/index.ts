@@ -53,6 +53,31 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    // 1. Сначала пробуем парсинг по сохранённым шаблонам (tt_parse_templates) — без AI, без лимитов.
+    // Это обходит 400/401 при прямом запросе к tt_parse_templates с клиента (RLS/auth).
+    const { tryParseByStoredTemplates } = await import("../_shared/try_stored_ttk_templates.ts");
+    const storedCards = await tryParseByStoredTemplates(rows);
+    if (storedCards && storedCards.length > 0) {
+      const normalized = storedCards.map((card) => ({
+        dishName: card.dishName ?? null,
+        technologyText: card.technologyText ?? null,
+        isSemiFinished: card.isSemiFinished ?? undefined,
+        ingredients: (card.ingredients ?? []).map((i) => ({
+          productName: i.productName ?? "",
+          grossGrams: i.grossGrams ?? undefined,
+          netGrams: i.netGrams ?? undefined,
+          unit: i.unit ?? undefined,
+          primaryWastePct: i.primaryWastePct ?? undefined,
+          outputGrams: i.outputGrams ?? undefined,
+          ingredientType: i.ingredientType ?? undefined,
+        })),
+      }));
+      return new Response(JSON.stringify({ cards: normalized }), {
+        status: 200,
+        headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+      });
+    }
+
     const systemPrompt = `You are a tech card (recipe/semi-finished) parser. The document often contains MANY tech cards (50–200+). Your task is to extract ALL of them.
 
 Structure in the table (columns may be in different order or have different names):

@@ -20,7 +20,7 @@ export async function tryParseByStoredTemplates(rows: string[][]): Promise<TtkCa
 
   for (let r = 0; r < rows.length && r < 50; r++) {
     const row = rows[r]?.map((c) => (c ?? "").trim().toLowerCase()) ?? [];
-    if (row.length < 3) continue;
+    if (row.length < 2) continue; // ГОСТ 2-row: "Наименование сырья" | "Расход" — 2 колонки
     const hasKeyword = row.some((c) => KEYWORDS.some((k) => c.includes(k)));
     if (!hasKeyword) continue;
 
@@ -37,8 +37,11 @@ export async function tryParseByStoredTemplates(rows: string[][]): Promise<TtkCa
 
     if (!data) continue;
 
+    // ГОСТ 2-row: signature на row0 (Наименование|Расход), данные с row2; header_row_index=1
+    const headerIdx = (data.header_row_index as number) ?? r;
+
     const list = parseTtkByStoredTemplate(rows, {
-      headerIdx: r,
+      headerIdx,
       nameCol: (data.name_col as number) ?? 0,
       productCol: (data.product_col as number) ?? 1,
       grossCol: (data.gross_col as number) ?? -1,

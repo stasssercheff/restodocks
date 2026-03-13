@@ -83,12 +83,15 @@ class TechCardRecognitionResult {
   final String? technologyText;
   final List<TechCardIngredientLine> ingredients;
   final bool? isSemiFinished;
+  /// Выход готового продукта (г), если задан в файле (строка «Выход»).
+  final double? yieldGrams;
 
   const TechCardRecognitionResult({
     this.dishName,
     this.technologyText,
     this.ingredients = const [],
     this.isSemiFinished,
+    this.yieldGrams,
   });
 }
 

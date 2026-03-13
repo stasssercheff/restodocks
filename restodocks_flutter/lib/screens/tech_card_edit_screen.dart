@@ -1243,6 +1243,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     if (ai.technologyText != null && ai.technologyText!.trim().isNotEmpty) {
       _technologyController.text = ai.technologyText!.trim();
     }
+    if (ai.yieldGrams != null && ai.yieldGrams! > 0) {
+      _portionWeight = ai.yieldGrams!.toDouble();
+    }
     if (ai.isSemiFinished != null) _isSemiFinished = ai.isSemiFinished!;
     final canEdit = context.read<AccountManagerSupabase>().currentEmployee?.canEditChecklistsAndTechCards ?? false;
           final addPlaceholders = canEdit && !widget.forceViewMode;

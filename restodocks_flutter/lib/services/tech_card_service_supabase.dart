@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/dev_log.dart';
 
 import '../models/models.dart';
+import '../utils/product_name_utils.dart';
 import 'ai_service.dart';
 import 'image_service.dart';
 import 'product_store_supabase.dart';
@@ -427,7 +428,16 @@ class TechCardServiceSupabase {
   }
 
   static String _normalizeName(String s) =>
-      s.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+      stripIikoPrefix(s).trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+
+  /// Нечёткое совпадение: продукт в каталоге содержит название ингредиента как префикс.
+  /// Напр. «Кунжут жареный» → «Кунжут жареный белый».
+  static bool _fuzzyPrefixMatch(String ingredientNorm, String catalogNorm) {
+    if (ingredientNorm.isEmpty || catalogNorm.length < ingredientNorm.length) return false;
+    if (catalogNorm == ingredientNorm) return true;
+    return catalogNorm.startsWith(ingredientNorm) &&
+        (ingredientNorm.length == catalogNorm.length || catalogNorm[ingredientNorm.length] == ' ');
+  }
 
   /// Поиск по названию: продукт или ПФ.
   String? _findProductId(
@@ -447,12 +457,24 @@ class TechCardServiceSupabase {
     }
     if (ingredientType == 'product') {
       for (final p in products) {
-        if (_normalizeName(p.name) == norm) return p.id;
+        final pNorm = _normalizeName(p.name);
+        if (pNorm == norm) return p.id;
+      }
+      if (norm.length >= 10) {
+        for (final p in products) {
+          if (_fuzzyPrefixMatch(norm, _normalizeName(p.name))) return p.id;
+        }
       }
       return null;
     }
     for (final p in products) {
-      if (_normalizeName(p.name) == norm) return p.id;
+      final pNorm = _normalizeName(p.name);
+      if (pNorm == norm) return p.id;
+    }
+    if (norm.length >= 10) {
+      for (final p in products) {
+        if (_fuzzyPrefixMatch(norm, _normalizeName(p.name))) return p.id;
+      }
     }
     for (final tc in techCardsPf) {
       if (_normalizeName(tc.name) == norm) return tc.id;
@@ -572,7 +594,7 @@ class TechCardServiceSupabase {
         pricePerKg: pricePerKg,
       ));
     }
-    final yieldVal = ingredients.fold<double>(0.0, (s, i) => s + i.netWeight);
+    final yieldVal = result.yieldGrams ?? ingredients.fold<double>(0.0, (s, i) => s + i.netWeight);
     final techMap = <String, String>{languageCode: result.technologyText?.trim() ?? ''};
     final withIngredients = created.copyWith(
       ingredients: ingredients,

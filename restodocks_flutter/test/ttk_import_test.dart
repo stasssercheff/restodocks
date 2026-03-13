@@ -10,9 +10,11 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:csv/csv.dart';
+import 'package:excel/excel.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:restodocks/services/ai_service.dart';
 import 'package:restodocks/services/ai_service_supabase.dart';
+import 'package:restodocks/services/iiko_xlsx_sanitizer.dart';
 
 void main() {
   group('TTK template parsing', () {
@@ -142,6 +144,28 @@ void main() {
       expect(list[0].ingredients.length, greaterThanOrEqualTo(3));
     });
 
+    test('parseTtkByTemplate пф гц: наименование|Ед.изм|Норма закладки, несколько блоков', () {
+      final rows = [
+        ['Соус для пиццы п/ф', '', '', '', '', '', '', '', ''],
+        ['', 'наименование', 'Ед.изм', 'Норма закладки', '', '', '', 'Технология приготовления'],
+        ['1', 'Томаты с/с', 'кг', '1.1', '', '', ''],
+        ['2', 'Масло оливковое п/ф', 'л', '0.038', '', '', ''],
+        ['3', 'Соль', 'кг', '0.004', '', '', ''],
+        ['Выход', '', 'кг', '0.99', '', '', ''],
+        ['Песто пф', '', '', '', '', '', ''],
+        ['', 'наименование', 'Ед.изм', 'Норма закладки', '', '', ''],
+        ['1', 'Базилик пф', 'кг', '0.038', '', '', ''],
+        ['2', 'Орех грецкий', 'кг', '0.01', '', '', ''],
+        ['Выход', '', 'кг', '0.25', '', '', ''],
+      ];
+      final list = AiServiceSupabase.parseTtkByTemplate(rows);
+      expect(list.length, 2, reason: 'Got: ${list.map((c) => c.dishName).join(", ")}');
+      expect(list[0].dishName, contains('Соус'));
+      expect(list[0].ingredients.length, greaterThanOrEqualTo(3));
+      expect(list[1].dishName, contains('Песто'));
+      expect(list[1].ingredients.length, greaterThanOrEqualTo(2));
+    });
+
     test('parseTtkByTemplate ГОСТ 2-row header (docx Цезарь)', () {
       // Заголовок в 2 строках: row0 Наименование/Расход, row1 Брутто/Нетто
       final rows = [
@@ -250,6 +274,112 @@ void main() {
       final ai = AiServiceSupabase();
       final list = await ai.parseTechCardsFromExcel(bytes);
       expect(list, isNotEmpty, reason: 'Должна распознаться хотя бы 1 карточка');
+    });
+
+    test('parseTechCardsFromExcel пф хц.xlsx (pf_hc fixture)', () async {
+      final bytes = await _loadFixture('pf_hc.xlsx');
+      if (bytes == null) return; // fixture может отсутствовать
+      final ai = AiServiceSupabase();
+      final list = await ai.parseTechCardsFromExcel(bytes);
+      expect(list, isNotEmpty, reason: 'Должна распознаться хотя бы 1 карточка');
+      // Debug: печатаем что получили
+      for (var i = 0; i < list.length; i++) {
+        final c = list[i];
+        final tech = c.technologyText != null && c.technologyText!.length > 20 ? 'yes' : 'no';
+        final yld = c.yieldGrams?.toStringAsFixed(0) ?? '-';
+        // ignore: avoid_print
+        print('  ${i + 1}. ${c.dishName} | ingr:${c.ingredients.length} | tech:$tech | yield:$yld');
+      }
+      // Ожидаем 21 карточку, технология и выход
+      expect(list.length, 21, reason: 'Ожидаем 21 карточку');
+      final withTech = list.where((c) => c.technologyText != null && c.technologyText!.trim().isNotEmpty).length;
+      final withYield = list.where((c) => c.yieldGrams != null && c.yieldGrams! > 0).length;
+      expect(withTech, greaterThan(0), reason: 'Хотя бы часть карточек должна иметь технологию');
+      expect(withYield, greaterThan(0), reason: 'Хотя бы часть карточек должна иметь выход');
+    });
+  });
+
+  group('parseTtkByTemplate pf_hc rows (direct)', () {
+    List<List<String>> _xlsxToRows(Uint8List bytes) {
+      String cellStr(dynamic v) {
+        if (v == null) return '';
+        if (v is num) return v.toString();
+        // excel 4.x: TextCellValue.value can be String or TextSpan
+        if (v.runtimeType.toString().contains('TextCellValue')) {
+          final val = (v as dynamic).value;
+          if (val is String) return val;
+          try {
+            final t = (val as dynamic).text;
+            return t != null ? t.toString() : val.toString();
+          } catch (_) {}
+          return val.toString();
+        }
+        return v.toString();
+      }
+      try {
+        final decodable = IikoXlsxSanitizer.ensureDecodable(bytes);
+        final excel = Excel.decodeBytes(decodable.toList());
+        final sheetName = excel.tables.keys.isNotEmpty ? excel.tables.keys.first : null;
+        if (sheetName == null) return [];
+        final sheet = excel.tables[sheetName]!;
+        final result = <List<String>>[];
+        final rawRows = sheet.rows;
+        if (rawRows.isEmpty && sheet.maxRows > 0) {
+          for (var r = 0; r < sheet.maxRows; r++) {
+            final row = <String>[];
+            for (var c = 0; c < sheet.maxColumns; c++) {
+              final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r));
+              row.add(cellStr(cell.value).trim());
+            }
+            if (row.any((s) => s.trim().isNotEmpty)) result.add(row);
+          }
+        } else {
+          for (final rawRow in rawRows) {
+            final row = rawRow.map((c) => cellStr(c?.value).trim()).toList();
+            if (row.any((s) => s.trim().isNotEmpty)) result.add(row);
+          }
+        }
+        return result;
+      } catch (_) {
+        return [];
+      }
+    }
+
+    test('пф хц из xlsx: Excel.decodeBytes → parseTtkByTemplate', () async {
+      final f = File('test/fixtures/pf_hc.xlsx');
+      if (!await f.exists()) return;
+      final bytes = await f.readAsBytes();
+      expect(bytes.length, greaterThan(100), reason: 'Файл должен быть непустым');
+      final rows = _xlsxToRows(Uint8List.fromList(bytes));
+      expect(rows.length, greaterThanOrEqualTo(5), reason: 'Excel должен вернуть строки (получено ${rows.length}, bytes=${bytes.length})');
+      expect(rows[0][0], contains('Зеленый'), reason: 'Первая строка — название блюда');
+      final list = AiServiceSupabase.parseTtkByTemplate(rows);
+      expect(list, isNotEmpty, reason: 'Парсер должен распознать карточки из Excel-строк');
+      expect(list.length, greaterThanOrEqualTo(5), reason: 'Ожидаем 5+ карточек');
+    });
+
+    test('пф хц структура: Зеленый микс → Сальса → Заправка', () {
+      // Реальная структура из pf_hc.xlsx (первые блоки)
+      final rows = [
+        ['Зеленый микс п/ф', '', '', '', '', '', '', '', ''],
+        ['', 'Наименование продукта', 'Ед.изм', 'Норма', '', '', '', '', 'Технология приготовления'],
+        ['1', 'Шпинат п/ф', 'кг', '0.35', '', '', '', '', 'Зелень промыть в содо-сол'],
+        ['2', 'Руккола п/ф', 'кг', '0.15', '', '', '', '', ''],
+        ['3', 'Айсберг п/ф', 'кг', '0.2', '', '', '', '', ''],
+        ['Выход', '', 'кг', '0.7', '', '', '', '', ''],
+        ['Сальса п/ф', '', '', '', '', '', '', '', ''],
+        ['№', 'Наименование', 'Ед.изм', '', '', '', '', '', ''],
+        ['1', 'Оливки без косточек', 'гр', '100', '', '', '', '', 'Оливки, томаты черри,вяле'],
+        ['2', 'Черри', 'гр', '100', '', '', '', '', ''],
+        ['Выход', '', 'кг', '0.99', '', '', '', '', ''],
+      ];
+      final list = AiServiceSupabase.parseTtkByTemplate(rows);
+      expect(list, isNotEmpty, reason: 'Прямой вызов parseTtkByTemplate должен распознать блоки');
+      expect(list.length, greaterThanOrEqualTo(2), reason: 'Зеленый микс + Сальса минимум');
+      expect(list[0].dishName, contains('Зеленый'));
+      expect(list[0].ingredients.length, greaterThanOrEqualTo(3));
+      expect(list[0].yieldGrams, isNotNull);
+      expect(list[0].yieldGrams! > 0, true);
     });
   });
 }

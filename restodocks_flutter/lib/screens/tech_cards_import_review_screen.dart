@@ -306,6 +306,15 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
   static String _norm(String s) =>
       stripIikoPrefix(s).trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
 
+  /// Нечёткое совпадение: продукт в каталоге содержит название ингредиента как префикс.
+  static bool _fuzzyMatch(String ingredientNorm, String catalogNorm) {
+    if (ingredientNorm.isEmpty || catalogNorm.length < ingredientNorm.length) return false;
+    if (catalogNorm == ingredientNorm) return true;
+    return ingredientNorm.length >= 10 &&
+        catalogNorm.startsWith(ingredientNorm) &&
+        (ingredientNorm.length == catalogNorm.length || catalogNorm[ingredientNorm.length] == ' ');
+  }
+
   Future<void> _createAll() async {
     final acc = context.read<AccountManagerSupabase>();
     final est = acc.establishment;
@@ -323,7 +332,15 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
           .where((tc) => tc.isSemiFinished)
           .map((tc) => (id: tc.id, name: tc.dishName))
           .toList();
-      var productsForMapping = products.map((p) => (id: p.id, name: p.name)).toList();
+      var productsForMapping = <({String id, String name})>[];
+      for (final p in products) {
+        productsForMapping.add((id: p.id, name: p.name));
+        for (final n in p.names?.values ?? []) {
+          if (n.trim().isNotEmpty && n != p.name) {
+            productsForMapping.add((id: p.id, name: n));
+          }
+        }
+      }
       final createdByName = <String, String>{};
       final defCur = est.defaultCurrency;
 
@@ -336,7 +353,10 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
           if (ing.ingredientType == 'semi_finished') continue;
           final norm = _norm(ing.productName);
           if (norm.length < 2) continue;
-          final inProducts = productsForMapping.any((p) => _norm(p.name) == norm);
+          final inProducts = productsForMapping.any((p) {
+            final pNorm = _norm(p.name);
+            return pNorm == norm || _fuzzyMatch(norm, pNorm);
+          });
           final inPf = techCardsPf.any((t) => _norm(t.name) == norm);
           if (!inProducts && !inPf) productNamesToCreate.add(ing.productName.trim());
           if (ing.pricePerKg != null && ing.pricePerKg! > 0 && !priceFromDoc.containsKey(norm)) {

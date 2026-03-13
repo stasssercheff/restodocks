@@ -363,51 +363,73 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
+  static const _maxFilesSingleTtk = 5;
+
   Future<void> _createFromExcel(BuildContext context, LocalizationService loc) async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['xlsx', 'xls', 'csv', 'pdf', 'docx', 'doc'],
       withData: true,
+      allowMultiple: true,
     );
     if (!mounted) return;
     if (result == null || result.files.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('file_not_selected'))));
       return;
     }
-    final file = result.files.single;
-    final bytes = file.bytes;
-    if (bytes == null || bytes.isEmpty) {
+    final files = result.files.where((f) => f.bytes != null && f.bytes!.isNotEmpty).toList();
+    if (files.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('file_read_failed'))));
       return;
     }
-    final uBytes = Uint8List.fromList(bytes);
-    final isPdf = (file.extension?.toLowerCase() ?? '').contains('pdf');
-    setState(() { _loadingExcel = true; _loadingTtkIsPdf = isPdf; });
+    if (files.length > _maxFilesSingleTtk) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(loc.t('ttk_import_max_files') ?? 'Выберите до $_maxFilesSingleTtk файлов (1 файл = 1 ТТК)'),
+      ));
+      return;
+    }
+    setState(() { _loadingExcel = true; _loadingTtkIsPdf = files.any((f) => (f.extension?.toLowerCase() ?? '').contains('pdf')); });
     try {
       final est = context.read<AccountManagerSupabase>().establishment;
       final establishmentId = est?.dataEstablishmentId;
-      List<TechCardRecognitionResult> list;
-      if (isPdf) {
-        list = await context.read<AiService>().parseTechCardsFromPdf(uBytes, establishmentId: establishmentId);
-      } else {
-        list = await context.read<AiService>().parseTechCardsFromExcel(uBytes, establishmentId: establishmentId);
-        if (list.isEmpty) {
-          list = _parseSimpleExcelNames(uBytes);
-        }
-      }
-      if (!mounted) return;
-      if (list.isEmpty) {
-        String msg;
-        if (isPdf && context.read<AiService>() is AiServiceSupabase) {
-          final reason = AiServiceSupabase.lastParseTechCardPdfReason;
-          msg = reason != null ? _pdfFailureMessage(reason, loc) : loc.t('ai_tech_card_pdf_format_hint');
-        } else if (!isPdf && context.read<AiService>() is AiServiceSupabase) {
-          final reason = AiServiceSupabase.lastParseTechCardExcelReason;
-          msg = (reason == 'ai_limit_exceeded' || reason == 'limit_3_per_day')
-              ? loc.t('ai_ttk_limit_3_per_day')
-              : loc.t('ai_tech_card_excel_format_hint');
+      final ai = context.read<AiService>();
+      final allCards = <TechCardRecognitionResult>[];
+      int failedCount = 0;
+      for (final file in files) {
+        final bytes = file.bytes!;
+        final uBytes = Uint8List.fromList(bytes);
+        final isPdf = (file.extension?.toLowerCase() ?? '').contains('pdf');
+        List<TechCardRecognitionResult> list;
+        if (isPdf) {
+          list = await ai.parseTechCardsFromPdf(uBytes, establishmentId: establishmentId);
         } else {
-          msg = loc.t(isPdf ? 'ai_tech_card_pdf_format_hint' : 'ai_tech_card_excel_format_hint');
+          list = await ai.parseTechCardsFromExcel(uBytes, establishmentId: establishmentId);
+          if (list.isEmpty) list = _parseSimpleExcelNames(uBytes);
+        }
+        if (!mounted) return;
+        if (list.isEmpty) {
+          failedCount++;
+          continue;
+        }
+        if (list.length > 1 && files.length > 1) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text((loc.t('ttk_import_multi_card_in_file') ?? 'В файле «%s» несколько карточек — загружайте такие файлы по одному').replaceFirst('%s', file.name)),
+            duration: const Duration(seconds: 5),
+          ));
+          failedCount++;
+          continue;
+        }
+        allCards.addAll(list);
+      }
+      if (allCards.isEmpty) {
+        String msg;
+        if (context.read<AiService>() is AiServiceSupabase) {
+          final reason = AiServiceSupabase.lastParseTechCardExcelReason ?? AiServiceSupabase.lastParseTechCardPdfReason;
+          msg = (reason == 'ai_limit_exceeded' || reason == 'limit_3_per_day')
+              ? (loc.t('ai_ttk_limit_3_per_day') ?? '')
+              : (loc.t('ai_tech_card_excel_format_hint') ?? 'Не удалось распознать ТТК');
+        } else {
+          msg = loc.t('ai_tech_card_excel_format_hint') ?? 'Не удалось распознать ТТК';
         }
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(msg),
@@ -416,15 +438,22 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         ));
         return;
       }
-      if (list.length == 1 && list.first.ingredients.isEmpty) {
+      if (!mounted) return;
+      if (failedCount > 0 && allCards.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text((loc.t('ttk_import_partial') ?? 'Загружено %s из %s файлов').replaceFirst('%s', '${allCards.length}').replaceFirst('%s', '${files.length}')),
+          duration: const Duration(seconds: 3),
+        ));
+      }
+      if (allCards.length == 1 && allCards.first.ingredients.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('ai_tech_card_loaded_names').replaceAll('%s', '${list.length}'))),
+          SnackBar(content: Text(loc.t('ai_tech_card_loaded_names').replaceAll('%s', '1'))),
         );
       }
-      if (list.length == 1) {
-        context.push(widget.department == 'bar' ? '/tech-cards/new?department=bar' : '/tech-cards/new', extra: list.single);
+      if (allCards.length == 1) {
+        context.push(widget.department == 'bar' ? '/tech-cards/new?department=bar' : '/tech-cards/new', extra: allCards.single);
       } else {
-        context.push('/tech-cards/import-review?department=${Uri.encodeComponent(widget.department)}', extra: list);
+        context.push('/tech-cards/import-review?department=${Uri.encodeComponent(widget.department)}', extra: allCards);
       }
     } finally {
       if (mounted) setState(() => _loadingExcel = false);

@@ -13,8 +13,8 @@ import 'package:excel/excel.dart';
 class IikoXlsxSanitizer {
   IikoXlsxSanitizer._();
 
-  /// Удаляет из xlsx кастомные numFmt с id < 164, чтобы excel-пакет смог прочитать файл.
-  /// Возвращает исправленные байты или оригинал при ошибке.
+  /// Исправляет numFmt с id < 164 (Numbers, WPS, Google Sheets) для dart excel пакета.
+  /// Вместо удаления — переназначает id на 164+, т.к. cellXfs ссылаются на старые id.
   static Uint8List sanitizeForExcelPackage(Uint8List bytes) {
     try {
       final arc = ZipDecoder().decodeBytes(bytes);
@@ -23,23 +23,21 @@ class IikoXlsxSanitizer {
 
       var xml = utf8.decode(stylesEntry.content as List<int>);
 
-      // Удаляем все <numFmt numFmtId="N" ... /> где N < 164 (встроенные форматы Excel 0–163).
-      // Dart excel ожидает только custom id >= 164.
-      // Поддержка с namespace (ns0:numFmts) и без.
-      if (xml.contains('numFmts')) {
-        xml = xml.replaceAllMapped(
-          RegExp(r'<\w*:?numFmt\s+numFmtId="(\d+)"[^/]*/>\s*'),
-          (m) {
-            final id = int.tryParse(m.group(1) ?? '') ?? 999;
-            return id < 164 ? '' : m.group(0)!;
-          },
-        );
-        // Обновляем count в numFmts (кол-во оставшихся)
-        final remainingCount = RegExp(r'<\w*:?numFmt\s+numFmtId="\d+"[^/]*/>').allMatches(xml).length;
-        xml = xml.replaceAllMapped(
-          RegExp(r'(<\w*:?numFmts\s+count=")\d+(")'),
-          (m) => '${m.group(1)}$remainingCount${m.group(2)}',
-        );
+      // Собираем numFmt с id < 164 и назначаем им новые id (164, 165, ...)
+      final oldToNew = <int, int>{};
+      var nextId = 164;
+      final numFmtRegex = RegExp(r'<\w*:?numFmt\s+numFmtId="(\d+)"');
+      for (final m in numFmtRegex.allMatches(xml)) {
+        final id = int.tryParse(m.group(1) ?? '') ?? 999;
+        if (id < 164 && !oldToNew.containsKey(id)) {
+          oldToNew[id] = nextId++;
+        }
+      }
+      if (oldToNew.isEmpty) return bytes;
+
+      // Заменяем id в numFmts и во всех numFmtId="N" (cellXfs, cellStyleXfs)
+      for (final e in oldToNew.entries.toList()..sort((a, b) => b.key.compareTo(a.key))) {
+        xml = xml.replaceAll('numFmtId="${e.key}"', 'numFmtId="${e.value}"');
       }
       // Заменяем контент в архиве (files — UnmodifiableListView, используем removeFile)
       final newContent = utf8.encode(xml);
