@@ -38,6 +38,9 @@ class AppProviders {
         ChangeNotifierProvider<NotificationPreferencesService>(
           create: (_) => NotificationPreferencesService(),
         ),
+        ChangeNotifierProvider<HaccpConfigService>(
+          create: (_) => HaccpConfigService(),
+        ),
         ChangeNotifierProvider<InboxViewedService>(
           create: (_) => InboxViewedService(),
         ),
@@ -99,6 +102,9 @@ class AppProviders {
         ),
         Provider<MenuStopGoService>(
           create: (_) => MenuStopGoService(),
+        ),
+        Provider<HaccpLogServiceSupabase>(
+          create: (_) => HaccpLogServiceSupabase(),
         ),
         ChangeNotifierProvider<IikoProductStore>(
           create: (_) => IikoProductStore(),

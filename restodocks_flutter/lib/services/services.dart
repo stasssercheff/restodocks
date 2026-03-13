@@ -41,3 +41,6 @@ export 'inventory_history_service.dart';
 export 'email_service.dart';
 export 'app_toast_service.dart';
 export 'menu_stop_go_service.dart';
+export 'haccp_log_service_supabase.dart';
+export 'haccp_config_service.dart';
+export 'haccp_pdf_export_service.dart';

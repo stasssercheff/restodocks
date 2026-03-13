@@ -288,20 +288,10 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                       ));
                     }, 'gross_$rowIndex'),
 
-                    // % отхода — всегда показываем, в т.ч. 0
-                    _buildNumericCell(ingredient.primaryWastePct.toStringAsFixed(0), (value) {
-                      final waste = double.tryParse(value) ?? 0;
-                      final clampedWaste = waste.clamp(0, 100);
-                      // При изменении % отхода автоматически пересчитываем нетто, выход и стоимость
-                      final net = ingredient.grossWeight > 0 ? ingredient.grossWeight * (1 - clampedWaste / 100) : ingredient.netWeight;
-                      final output = net * (1 - (ingredient.cookingLossPctOverride ?? 0) / 100);
-                      // Стоимость не меняется при изменении отхода - она зависит только от брутто веса
-                      _updateIngredient(rowIndex, ingredient.copyWith(
-                        primaryWastePct: clampedWaste,
-                        netWeight: net,
-                        outputWeight: output,
-                      ));
-                    }, 'waste_$rowIndex'),
+                    // % отхода — рассчитывается таблицей из брутто и нетто (только чтение)
+                    _buildReadOnlyCell(ingredient.grossWeight > 0
+                        ? ((1 - ingredient.netWeight / ingredient.grossWeight) * 100).clamp(0.0, 100.0).toStringAsFixed(0)
+                        : ingredient.primaryWastePct.toStringAsFixed(0)),
 
                     // Нетто
                     _buildNumericCell(ingredient.netWeight == 0 ? '' : ingredient.netWeight.toStringAsFixed(0), (value) {
@@ -350,21 +340,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                       ));
                     }, 'cooking_loss_$rowIndex'),
 
-                    // Выход: при изменении пересчитываем % ужарки по той же логике, что % отхода при вводе нетто: ужарка = (1 − выход/нетто)×100
-                    _buildNumericCell(ingredient.outputWeight == 0 ? '' : ingredient.outputWeight.toStringAsFixed(0), (value) {
-                      final output = double.tryParse(value) ?? 0;
-                      final net = ingredient.netWeight;
-                      if (net > 0 && output >= 0) {
-                        final lossPct = (1.0 - output / net) * 100.0;
-                        final clampedLoss = lossPct.clamp(0.0, 99.9);
-                        _updateIngredient(rowIndex, ingredient.copyWith(
-                          outputWeight: output,
-                          cookingLossPctOverride: clampedLoss,
-                        ));
-                      } else {
-                        _updateIngredient(rowIndex, ingredient.copyWith(outputWeight: output));
-                      }
-                    }, 'output_$rowIndex'),
+                    // Выход — рассчитывается таблицей: нетто × (1 − % ужарки/100) (только чтение)
+                    _buildReadOnlyCell(ingredient.outputWeight == 0 ? '' : ingredient.outputWeight.toStringAsFixed(0)),
 
                     // вес прц — пусто в строках продукта
                     _buildReadOnlyCell(''),

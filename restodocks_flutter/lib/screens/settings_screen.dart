@@ -5,7 +5,10 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../models/haccp_log_type.dart';
 import '../models/models.dart';
+import '../services/haccp_agreement_pdf_service.dart';
+import '../services/inventory_download.dart';
 import '../services/services.dart';
 import '../services/home_layout_config_service.dart';
 import '../services/screen_layout_preference_service.dart';
@@ -32,6 +35,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     _loadOwnerEstablishments();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final acc = context.read<AccountManagerSupabase>();
+      final est = acc.establishment;
+      if (est != null) context.read<HaccpConfigService>().load(est.id);
+    });
   }
 
   Future<void> _loadOwnerEstablishments() async {
@@ -1230,6 +1238,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Future<void> _downloadHaccpAgreement(BuildContext context, LocalizationService loc) async {
+    try {
+      final bytes = await HaccpAgreementPdfService.buildAgreementPdfBytes();
+      await saveFileBytes('haccp_agreement_employee.pdf', bytes);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.t('haccp_agreement_saved') ?? 'PDF сохранён')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${loc.t('error')}: $e')),
+        );
+      }
+    }
+  }
+
   void _showSupportDialog(BuildContext context, LocalizationService loc) {
     showDialog<void>(
       context: context,
@@ -1533,6 +1559,83 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onChanged: (v) => screenPref.setShowTranslationNotifications(v),
               ),
             ),
+            if (currentEmployee.hasRole('owner') ||
+                currentEmployee.department == 'management' ||
+                currentEmployee.hasRole('executive_chef') ||
+                currentEmployee.hasRole('sous_chef') ||
+                currentEmployee.hasRole('bar_manager') ||
+                currentEmployee.hasRole('floor_manager') ||
+                currentEmployee.hasRole('general_manager')) ...[
+              ExpansionTile(
+                initiallyExpanded: false,
+                leading: const Icon(Icons.assignment),
+                title: Text(localization.t('haccp_journals') ?? 'Журналы и ХАССП'),
+                subtitle: Text(
+                  localization.t('haccp_journals_settings_hint') ?? 'Выбор журналов для заведения',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                children: [
+                  Consumer<HaccpConfigService>(
+                    builder: (_, config, __) {
+                      final est = establishment;
+                      if (est == null) return const SizedBox.shrink();
+                      final enabled = config.getEnabledLogTypes(est.id);
+                      return SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(24, 0, 16, 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              localization.t('haccp_enabled_journals') ?? 'Включённые журналы',
+                              style: Theme.of(context).textTheme.titleSmall,
+                            ),
+                            ...HaccpLogType.values.map((t) {
+                              final isOn = enabled.contains(t.code);
+                              return CheckboxListTile(
+                                value: isOn,
+                                onChanged: (v) => config.setEnabled(est.id, t, v ?? false),
+                                title: Text(t.displayNameRu, style: const TextStyle(fontSize: 14)),
+                                controlAffinity: ListTileControlAffinity.leading,
+                              );
+                            }),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+              ExpansionTile(
+                initiallyExpanded: false,
+                leading: const Icon(Icons.gavel),
+                title: Text(localization.t('haccp_legal_legitimacy') ?? 'Юридическая легитимность'),
+                subtitle: Text(
+                  localization.t('haccp_legal_hint') ?? 'ПЭП, ФЗ №63, ТР ТС 021/2011',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          localization.t('haccp_legal_text') ??
+                              'Использование Простой Электронной Подписи (ПЭП) при вводе данных в журналы регламентировано: ФЗ №63 (РФ), Законом об ЭЦП (РК/РБ), ТР ТС 021/2011. Работник признаёт ввод данных под своим логином личной подписью.',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 16),
+                        FilledButton.icon(
+                          onPressed: () => _downloadHaccpAgreement(context, localization),
+                          icon: const Icon(Icons.download),
+                          label: Text(localization.t('haccp_download_agreement') ?? 'Скачать Соглашение с сотрудником (PDF)'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
             ExpansionTile(
               initiallyExpanded: false,
               leading: const Icon(Icons.notifications),

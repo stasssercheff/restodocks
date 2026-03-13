@@ -42,6 +42,7 @@
 ```bash
 cd restodocks_flutter
 npx supabase functions deploy parse-xls-bytes --project-ref osglfptwbuqqmqunttha
+npx supabase functions deploy parse-ttk-by-templates --project-ref osglfptwbuqqmqunttha   # шаблоны без лимита, без AI
 npx supabase functions deploy ai-recognize-tech-cards-batch --project-ref osglfptwbuqqmqunttha
 npx supabase functions deploy ai-parse-tech-cards-pdf --project-ref osglfptwbuqqmqunttha
 ```

@@ -16,6 +16,8 @@ export 'moderation_item.dart';
 export 'translation.dart';
 export 'nomenclature_item.dart';
 export 'inbox_document.dart';
+export 'haccp_log.dart';
+export 'haccp_log_type.dart';
 
 // Виджеты
 export '../widgets/data_safety_indicator.dart';

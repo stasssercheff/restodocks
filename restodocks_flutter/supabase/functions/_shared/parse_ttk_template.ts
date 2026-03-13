@@ -234,9 +234,18 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
   return results;
 }
 
+/** Нормализация ячейки: лишние пробелы, чтобы подпись совпадала с каталогом. */
+function normalizeCellForSignature(s: string): string {
+  return (s ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
 /** Подпись заголовка для сопоставления с каталогом шаблонов */
 export function headerSignature(headerCells: string[]): string {
-  return headerCells.map((c) => (c ?? "").trim().toLowerCase()).filter(Boolean).join("|");
+  const parts = headerCells.map((c) => normalizeCellForSignature(c)).filter(Boolean);
+  return parts.join("|");
 }
 
 /** Парсинг по сохранённому шаблону (индексы колонок заданы явно). */

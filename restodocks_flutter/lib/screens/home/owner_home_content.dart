@@ -20,6 +20,7 @@ class OwnerHomeContent extends StatelessWidget {
       children: [
         // Управление — сверху: сообщения и входящие
         _SectionTitle(title: loc.t('management')),
+        _Tile(icon: Icons.assignment, title: loc.t('haccp_journals') ?? 'Журналы и ХАССП', onTap: () => context.go('/haccp-journals')),
         _Tile(icon: Icons.chat_bubble_outline, title: loc.t('inbox_tab_messages') ?? 'Сообщения', onTap: () => context.go('/notifications?tab=messages')),
         _Tile(icon: Icons.inbox, title: loc.t('inbox'), onTap: () => context.go('/inbox')),
         _Tile(icon: Icons.people, title: loc.t('employees'), onTap: () => context.go('/employees')),

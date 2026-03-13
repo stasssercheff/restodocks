@@ -37,8 +37,10 @@ export async function tryParseByStoredTemplates(rows: string[][]): Promise<TtkCa
 
     if (!data) continue;
 
-    // ГОСТ 2-row: signature на row0 (Наименование|Расход), данные с row2; header_row_index=1
-    const headerIdx = (data.header_row_index as number) ?? r;
+    // r = строка, где нашли заголовок в этом файле. Для 2-row header (ГОСТ): row 0 = Наименование|Расход,
+    // row 1 = Брутто|Нетто — матчим row 0, но данные с row 2. templateHeaderIdx говорит сколько строк заголовка.
+    const templateHeaderIdx = (data.header_row_index as number) ?? 0;
+    const headerIdx = templateHeaderIdx > 0 && r === 0 ? templateHeaderIdx : r;
 
     const list = parseTtkByStoredTemplate(rows, {
       headerIdx,

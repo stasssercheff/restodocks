@@ -37,3 +37,6 @@ export 'suppliers_screen.dart';
 export 'salary_expense_screen.dart';
 export 'admin_screen.dart';
 export 'employee_chat_screen.dart';
+export 'haccp_journals_screen.dart';
+export 'haccp_journal_detail_screen.dart';
+export 'haccp_entry_form_screen.dart';

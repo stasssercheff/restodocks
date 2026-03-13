@@ -577,6 +577,28 @@ class AppRouter {
           ),
 
           GoRoute(
+            path: '/haccp-journals',
+            pageBuilder: (context, state) => _slideTransitionPage(state, const HaccpJournalsScreen()),
+            routes: [
+              GoRoute(
+                path: ':logType',
+                pageBuilder: (context, state) {
+                  final code = state.pathParameters['logType'] ?? '';
+                  return _slideTransitionPage(state, HaccpJournalDetailScreen(logTypeCode: code));
+                },
+                routes: [
+                  GoRoute(
+                    path: 'add',
+                    pageBuilder: (context, state) {
+                      final code = state.pathParameters['logType'] ?? '';
+                      return _slideTransitionPage(state, HaccpEntryFormScreen(logTypeCode: code));
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+          GoRoute(
             path: '/tech-cards',
             pageBuilder: (context, state) {
               final refresh = state.queryParameters['refresh'] == '1';
