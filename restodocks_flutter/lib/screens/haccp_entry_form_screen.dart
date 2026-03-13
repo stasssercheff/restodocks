@@ -35,42 +35,13 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     super.dispose();
   }
 
-  Map<String, dynamic> _buildPayload() {
-    switch (_logType) {
-      case HaccpLogType.healthHygiene:
-      case HaccpLogType.pediculosis:
-        return {'healthy': _healthy, 'note': _getText('note')};
-      case HaccpLogType.uvLamps:
-        return {'hours': _getText('hours'), 'note': _getText('note')};
-      case HaccpLogType.fridgeTemperature:
-        return {'temp': _tempValue, 'equipment': _getText('equipment'), 'note': _getText('note')};
-      case HaccpLogType.warehouseTempHumidity:
-        return {'temp': _tempValue, 'humidity': _humidityValue, 'note': _getText('note')};
-      case HaccpLogType.dishwasherControl:
-        return {'wash_temp_ok': _washTempOk, 'rinse_temp_ok': _rinseTempOk, 'note': _getText('note')};
-      case HaccpLogType.greaseTrapCleaning:
-        return {'done': true, 'note': _getText('note')};
-      case HaccpLogType.finishedProductBrakerage:
-      case HaccpLogType.incomingRawBrakerage:
-        return {'result': _getText('result'), 'product': _getText('product'), 'note': _getText('note')};
-      case HaccpLogType.fryingOil:
-        return {'action': _getText('action'), 'oil_name': _getText('oil_name'), 'note': _getText('note')};
-      case HaccpLogType.foodWaste:
-        return {'weight': _getText('weight'), 'reason': _getText('reason'), 'note': _getText('note')};
-      case HaccpLogType.glassCeramicsBreakage:
-        return {'description': _getText('description'), 'location': _getText('location')};
-      case HaccpLogType.emergencyIncidents:
-        return {'type': _getText('type'), 'duration': _getText('duration'), 'note': _getText('note')};
-      case HaccpLogType.disinsectionDeratization:
-        return {'agent': _getText('agent'), 'company': _getText('company'), 'note': _getText('note')};
-      case HaccpLogType.generalCleaningSchedule:
-        return {'zone': _getText('zone'), 'done': true, 'note': _getText('note')};
-      case HaccpLogType.disinfectantConcentration:
-        return {'agent': _getText('agent'), 'concentration': _getText('concentration'), 'note': _getText('note')};
-    }
-  }
-
   String _getText(String key) => _controllers[key]?.text.trim() ?? '';
+
+  double? _getNum(String key) {
+    final s = _getText(key);
+    if (s.isEmpty) return null;
+    return double.tryParse(s.replaceAll(',', '.'));
+  }
 
   List<Widget> _buildFields() {
     final loc = context.read<LocalizationService>();
@@ -224,14 +195,20 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     final emp = acc.currentEmployee;
     if (est == null || emp == null) return;
 
+    final svc = context.read<HaccpLogServiceSupabase>();
     setState(() => _saving = true);
     try {
-      await context.read<HaccpLogServiceSupabase>().insert(
-            establishmentId: est.id,
-            createdByEmployeeId: emp.id,
-            logType: _logType,
-            payload: _buildPayload(),
-          );
+      switch (_logType.targetTable) {
+        case HaccpLogTable.numeric:
+          await _saveNumeric(svc, est.id, emp.id);
+          break;
+        case HaccpLogTable.status:
+          await _saveStatus(svc, est.id, emp.id);
+          break;
+        case HaccpLogTable.quality:
+          await _saveQuality(svc, est.id, emp.id);
+          break;
+      }
       if (mounted) {
         context.pop({'saved': true});
       }
@@ -244,6 +221,126 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  Future<void> _saveNumeric(HaccpLogServiceSupabase svc, String estId, String empId) async {
+    switch (_logType) {
+      case HaccpLogType.uvLamps:
+        await svc.insertNumeric(
+          establishmentId: estId,
+          createdByEmployeeId: empId,
+          logType: _logType,
+          value1: _getNum('hours') ?? 0,
+          note: _getText('note').isNotEmpty ? _getText('note') : null,
+        );
+        break;
+      case HaccpLogType.fridgeTemperature:
+        await svc.insertNumeric(
+          establishmentId: estId,
+          createdByEmployeeId: empId,
+          logType: _logType,
+          value1: _tempValue,
+          equipment: _getText('equipment').isNotEmpty ? _getText('equipment') : null,
+          note: _getText('note').isNotEmpty ? _getText('note') : null,
+        );
+        break;
+      case HaccpLogType.warehouseTempHumidity:
+        await svc.insertNumeric(
+          establishmentId: estId,
+          createdByEmployeeId: empId,
+          logType: _logType,
+          value1: _tempValue,
+          value2: _humidityValue,
+          note: _getText('note').isNotEmpty ? _getText('note') : null,
+        );
+        break;
+      case HaccpLogType.disinfectantConcentration:
+        await svc.insertNumeric(
+          establishmentId: estId,
+          createdByEmployeeId: empId,
+          logType: _logType,
+          value1: _getNum('concentration') ?? 0,
+          note: _getText('note').isNotEmpty ? _getText('note') : null,
+        );
+        break;
+      default:
+        throw StateError('Unexpected numeric type: $_logType');
+    }
+  }
+
+  Future<void> _saveStatus(HaccpLogServiceSupabase svc, String estId, String empId) async {
+    switch (_logType) {
+      case HaccpLogType.healthHygiene:
+      case HaccpLogType.pediculosis:
+        await svc.insertStatus(
+          establishmentId: estId,
+          createdByEmployeeId: empId,
+          logType: _logType,
+          statusOk: _healthy,
+          note: _getText('note').isNotEmpty ? _getText('note') : null,
+        );
+        break;
+      case HaccpLogType.dishwasherControl:
+        await svc.insertStatus(
+          establishmentId: estId,
+          createdByEmployeeId: empId,
+          logType: _logType,
+          statusOk: _washTempOk,
+          status2Ok: _rinseTempOk,
+          note: _getText('note').isNotEmpty ? _getText('note') : null,
+        );
+        break;
+      case HaccpLogType.greaseTrapCleaning:
+      case HaccpLogType.generalCleaningSchedule:
+        await svc.insertStatus(
+          establishmentId: estId,
+          createdByEmployeeId: empId,
+          logType: _logType,
+          statusOk: true,
+          note: _getText('note').isNotEmpty ? _getText('note') : null,
+        );
+        break;
+      case HaccpLogType.glassCeramicsBreakage:
+        await svc.insertStatus(
+          establishmentId: estId,
+          createdByEmployeeId: empId,
+          logType: _logType,
+          statusOk: true,
+          description: _getText('description').isNotEmpty ? _getText('description') : null,
+          location: _getText('location').isNotEmpty ? _getText('location') : null,
+        );
+        break;
+      case HaccpLogType.emergencyIncidents:
+        await svc.insertStatus(
+          establishmentId: estId,
+          createdByEmployeeId: empId,
+          logType: _logType,
+          statusOk: true,
+          description: _getText('type').isNotEmpty ? _getText('type') : null,
+          note: _getText('note').isNotEmpty ? _getText('note') : null,
+        );
+        break;
+      default:
+        throw StateError('Unexpected status type: $_logType');
+    }
+  }
+
+  Future<void> _saveQuality(HaccpLogServiceSupabase svc, String estId, String empId) async {
+    await svc.insertQuality(
+      establishmentId: estId,
+      createdByEmployeeId: empId,
+      logType: _logType,
+      techCardId: _getText('tech_card_id').isNotEmpty ? _getText('tech_card_id') : null,
+      productName: _getText('product').isNotEmpty ? _getText('product') : null,
+      result: _getText('result').isNotEmpty ? _getText('result') : null,
+      weight: _getNum('weight'),
+      reason: _getText('reason').isNotEmpty ? _getText('reason') : null,
+      action: _getText('action').isNotEmpty ? _getText('action') : null,
+      oilName: _getText('oil_name').isNotEmpty ? _getText('oil_name') : null,
+      agent: _getText('agent').isNotEmpty ? _getText('agent') : null,
+      concentration: _getText('concentration').isNotEmpty ? _getText('concentration') : null,
+      note: _getText('note').isNotEmpty ? _getText('note') : null,
+    );
   }
 
   @override

@@ -109,7 +109,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                loc.t('haccp_export_pdf') ?? 'Экспорт в PDF',
+                loc.t('haccp_save_file') ?? 'Сохранить файл',
                 style: Theme.of(ctx2).textTheme.titleMedium,
               ),
               const SizedBox(height: 16),
@@ -141,7 +141,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
                   Navigator.of(ctx2).pop();
                   await _exportPdf(includeCover: includeCover, includeStitching: includeStitching);
                 },
-                child: Text(loc.t('haccp_export_do') ?? 'Сохранить PDF'),
+                child: Text(loc.t('haccp_save_file') ?? 'Сохранить файл'),
               ),
             ],
           ),
@@ -188,7 +188,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
             onPressed: _showDateRangePicker,
           ),
           IconButton(
-            icon: const Icon(Icons.picture_as_pdf),
+            icon: const Icon(Icons.save_alt),
             onPressed: _showExportOptions,
           ),
         ],
@@ -215,8 +215,13 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
                               Icon(Icons.assignment_outlined, size: 48, color: Theme.of(context).colorScheme.outline),
                               const SizedBox(height: 16),
                               Text(
-                                loc.t('haccp_no_entries') ?? 'Нет записей',
+                                loc.t('haccp_no_entries') ?? 'Записей пока нет',
                                 style: Theme.of(context).textTheme.titleSmall,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                loc.t('haccp_empty_journal_subtitle') ?? 'Добавьте первую запись в журнал',
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
                               ),
                               const SizedBox(height: 8),
                               FilledButton.icon(
@@ -270,26 +275,16 @@ class _LogTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dateStr = DateFormat('dd.MM.yyyy HH:mm').format(log.createdAt);
-    final summary = _payloadSummary(log.payload);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         title: Text(dateStr, style: const TextStyle(fontWeight: FontWeight.w500)),
-        subtitle: summary.isNotEmpty ? Text(summary, maxLines: 2, overflow: TextOverflow.ellipsis) : null,
+        subtitle: Text(log.summaryLine(), maxLines: 2, overflow: TextOverflow.ellipsis),
         trailing: const Icon(Icons.chevron_right),
         onTap: onTap,
       ),
     );
   }
 
-  String _payloadSummary(Map<String, dynamic> p) {
-    final parts = <String>[];
-    for (final e in p.entries) {
-      if (e.value != null && e.value.toString().trim().isNotEmpty) {
-        parts.add('${e.key}: ${e.value}');
-      }
-    }
-    return parts.take(3).join(' · ');
-  }
 }
