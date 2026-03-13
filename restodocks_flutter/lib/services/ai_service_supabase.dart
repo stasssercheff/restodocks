@@ -30,6 +30,9 @@ class AiServiceSupabase implements AiService {
   /// Ошибки парсинга (битые карточки) — показываются на экране просмотра.
   static List<TtkParseError>? lastParseTechCardErrors;
 
+  /// header_signature последнего успешного парсинга (для записи правок пользователя).
+  static String? lastParseHeaderSignature;
+
   /// Преобразует сырую ошибку API (JSON, 429 и т.д.) в понятное пользователю сообщение.
   static String _sanitizeAiError(String raw) {
     if (raw.isEmpty) return 'Неизвестная ошибка';
@@ -213,6 +216,7 @@ class AiServiceSupabase implements AiService {
 
   @override
   Future<List<TechCardRecognitionResult>> parseTechCardsFromExcel(Uint8List xlsxBytes, {String? establishmentId}) async {
+    lastParseHeaderSignature = null;
     try {
       final fmt = _detectFormat(xlsxBytes);
       var rows = <List<String>>[];
@@ -254,7 +258,7 @@ class AiServiceSupabase implements AiService {
           }
           if (merged.isNotEmpty) {
             _saveTemplateFromKeywordParse(allSheets.first, 'xlsx');
-            return merged;
+            return _applyParseCorrections(merged, lastParseHeaderSignature, establishmentId);
           }
         }
         rows = _xlsxToRows(xlsxBytes);
@@ -294,7 +298,7 @@ class AiServiceSupabase implements AiService {
         }
         if (merged.isNotEmpty) {
           _saveTemplateFromKeywordParse(rows, 'docx');
-          return merged;
+          return _applyParseCorrections(merged, lastParseHeaderSignature, establishmentId);
         }
       }
       // 1. СНАЧАЛА — сохранённые шаблоны (файлы, по которым уже были сохранены шаблоны, должны распознаваться по ним).
@@ -333,8 +337,13 @@ class AiServiceSupabase implements AiService {
           _saveTemplateAfterAi(rows, list, source);
         }
       }
-      if (list.isNotEmpty) lastParseTechCardExcelReason = null;
-      return list;
+      if (list.isNotEmpty) {
+        lastParseTechCardExcelReason = null;
+        if (lastParseHeaderSignature == null && rows.isNotEmpty && rows[0].isNotEmpty) {
+          lastParseHeaderSignature = _headerSignature(rows[0].map((c) => c.toString().trim()).toList());
+        }
+      }
+      return _applyParseCorrections(list, lastParseHeaderSignature, establishmentId);
     } catch (_) {
       lastParseTechCardExcelReason = null;
       return [];
@@ -1650,6 +1659,41 @@ class AiServiceSupabase implements AiService {
     return headerCells.map((c) => c.trim().toLowerCase()).where((c) => c.isNotEmpty).join('|');
   }
 
+  /// Применить сохранённые правки (original → corrected) к результатам парсинга.
+  Future<List<TechCardRecognitionResult>> _applyParseCorrections(
+    List<TechCardRecognitionResult> list,
+    String? headerSignature,
+    String? establishmentId,
+  ) async {
+    if (headerSignature == null || headerSignature.isEmpty || list.isEmpty) return list;
+    try {
+      final res = await _client
+          .from('tt_parse_corrections')
+          .select('original_value, corrected_value')
+          .eq('header_signature', headerSignature)
+          .eq('field', 'dish_name');
+      if (res.isEmpty) return list;
+      final map = <String, String>{};
+      for (final r in res) {
+        final orig = (r['original_value'] as String?)?.trim();
+        final corr = (r['corrected_value'] as String?)?.trim();
+        if (orig != null && orig.isNotEmpty && corr != null && corr.isNotEmpty && !map.containsKey(orig)) {
+          map[orig] = corr;
+        }
+      }
+      if (map.isEmpty) return list;
+      return list.map((c) {
+        final name = c.dishName?.trim();
+        if (name == null || name.isEmpty) return c;
+        final corrected = map[name];
+        if (corrected == null) return c;
+        return c.copyWith(dishName: corrected);
+      }).toList();
+    } catch (_) {
+      return list;
+    }
+  }
+
   /// Парсинг по сохранённому шаблону (колонки заданы явно).
   static List<TechCardRecognitionResult> parseTtkByStoredTemplate(
     List<List<String>> rows, {
@@ -1816,6 +1860,8 @@ class AiServiceSupabase implements AiService {
     try {
       final data = await invoke('parse-ttk-by-templates', {'rows': rows});
       if (data == null) return [];
+      final sig = data['header_signature'] as String?;
+      if (sig != null && sig.isNotEmpty) lastParseHeaderSignature = sig;
       final raw = data['cards'];
       if (raw is! List || raw.isEmpty) return [];
       final list = <TechCardRecognitionResult>[];
@@ -1875,6 +1921,7 @@ class AiServiceSupabase implements AiService {
       if (productCol < 0) productCol = 1;
       final sig = _headerSignature(rows[headerIdx].map((c) => c.trim()).toList());
       if (sig.isEmpty) return;
+      lastParseHeaderSignature = sig;
       _client.from('tt_parse_templates').upsert({
         'header_signature': sig,
         'header_row_index': headerIdx,
@@ -1933,7 +1980,7 @@ class AiServiceSupabase implements AiService {
 
       final sig = _headerSignature(rows[bestHeaderIdx].map((c) => c.trim()).toList());
       if (sig.isEmpty) return;
-
+      lastParseHeaderSignature = sig;
       _client.from('tt_parse_templates').upsert({
         'header_signature': sig,
         'header_row_index': bestHeaderIdx,

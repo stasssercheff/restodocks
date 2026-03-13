@@ -425,9 +425,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         String msg;
         if (context.read<AiService>() is AiServiceSupabase) {
           final reason = AiServiceSupabase.lastParseTechCardExcelReason ?? AiServiceSupabase.lastParseTechCardPdfReason;
-          msg = (reason == 'ai_limit_exceeded' || reason == 'limit_3_per_day')
-              ? (loc.t('ai_ttk_limit_3_per_day') ?? '')
-              : (loc.t('ai_tech_card_excel_format_hint') ?? 'Не удалось распознать ТТК');
+          if (reason == 'ai_limit_exceeded' || reason == 'limit_3_per_day') {
+            msg = loc.t('ai_ttk_limit_3_per_day') ?? '';
+          } else if (reason != null && reason.isNotEmpty) {
+            msg = '${loc.t('ai_tech_card_excel_format_hint') ?? 'Не удалось распознать ТТК'} ($reason)';
+          } else {
+            msg = loc.t('ai_tech_card_excel_format_hint') ?? 'Не удалось распознать ТТК';
+          }
         } else {
           msg = loc.t('ai_tech_card_excel_format_hint') ?? 'Не удалось распознать ТТК';
         }
@@ -453,7 +457,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       if (allCards.length == 1) {
         context.push(widget.department == 'bar' ? '/tech-cards/new?department=bar' : '/tech-cards/new', extra: allCards.single);
       } else {
-        context.push('/tech-cards/import-review?department=${Uri.encodeComponent(widget.department)}', extra: allCards);
+        final sig = context.read<AiService>() is AiServiceSupabase ? AiServiceSupabase.lastParseHeaderSignature : null;
+        context.push('/tech-cards/import-review?department=${Uri.encodeComponent(widget.department)}', extra: {'cards': allCards, 'headerSignature': sig});
       }
     } finally {
       if (mounted) setState(() => _loadingExcel = false);

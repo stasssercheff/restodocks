@@ -33,15 +33,15 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const storedCards = await tryParseByStoredTemplates(rows);
-    if (!storedCards || storedCards.length === 0) {
+    const result = await tryParseByStoredTemplates(rows);
+    if (!result || result.cards.length === 0) {
       return new Response(JSON.stringify({ cards: null }), {
         status: 200,
         headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
       });
     }
 
-    const normalized = storedCards.map((card) => ({
+    const normalized = result.cards.map((card) => ({
       dishName: card.dishName ?? null,
       technologyText: card.technologyText ?? null,
       isSemiFinished: card.isSemiFinished ?? undefined,
@@ -56,7 +56,7 @@ Deno.serve(async (req: Request) => {
       })),
     }));
 
-    return new Response(JSON.stringify({ cards: normalized }), {
+    return new Response(JSON.stringify({ cards: normalized, header_signature: result.headerSignature }), {
       status: 200,
       headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
     });

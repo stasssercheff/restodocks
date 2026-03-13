@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/models.dart';
@@ -11,9 +12,10 @@ import '../widgets/app_bar_home_button.dart';
 
 /// Экран просмотра и правки распознанных ТТК перед созданием (пакетный импорт из Excel).
 class TechCardsImportReviewScreen extends StatefulWidget {
-  const TechCardsImportReviewScreen({super.key, required this.cards, this.department = 'kitchen'});
+  const TechCardsImportReviewScreen({super.key, required this.cards, this.headerSignature, this.department = 'kitchen'});
 
   final List<TechCardRecognitionResult> cards;
+  final String? headerSignature;
   final String department;
 
   @override
@@ -101,6 +103,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
     final defaultSections = _isBar ? const ['bar'] : const ['all'];
     _items = widget.cards.map((c) => _ReviewItem(
       result: c,
+      originalDishName: c.dishName,
       category: _inferCategory(c.dishName ?? ''),
       sections: defaultSections,
       isSemiFinished: c.isSemiFinished ?? true,
@@ -276,6 +279,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
     if (result != null && mounted) {
       setState(() => _items[index] = _ReviewItem(
         result: item.result,
+        originalDishName: item.originalDishName,
         category: item.category,
         sections: result,
         isSemiFinished: item.isSemiFinished,
@@ -465,6 +469,25 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
         }
         if (mounted) setState(() => _saveProgress = productNamesToCreate.length + created);
       }
+      // Записать правки для обучения (headerSignature + original -> corrected)
+      final sig = widget.headerSignature;
+      if (sig != null && sig.isNotEmpty) {
+        for (final item in sorted) {
+          final orig = item.originalDishName?.trim() ?? '';
+          final corr = (item.result.dishName ?? '').trim();
+          if (orig.isNotEmpty && corr.isNotEmpty && orig != corr) {
+            try {
+              await Supabase.instance.client.from('tt_parse_corrections').insert({
+                'establishment_id': est.dataEstablishmentId,
+                'header_signature': sig,
+                'field': 'dish_name',
+                'original_value': orig,
+                'corrected_value': corr,
+              });
+            } catch (_) {}
+          }
+        }
+      }
       if (mounted) {
         setState(() => _saving = false);
         if (failed.isEmpty) {
@@ -559,7 +582,24 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                         Row(
                           children: [
                             Expanded(
-                              child: Text(name, style: theme.textTheme.titleMedium),
+                              child: TextFormField(
+                                initialValue: item.result.dishName ?? '',
+                                decoration: InputDecoration(
+                                  hintText: loc.t('tech_cards_import_unnamed'),
+                                  isDense: true,
+                                  border: const OutlineInputBorder(),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                ),
+                                style: theme.textTheme.titleMedium,
+                                enabled: !_saving,
+                                onChanged: (v) => setState(() => _items[index] = _ReviewItem(
+                                      result: item.result.copyWith(dishName: v.trim().isEmpty ? null : v.trim()),
+                                      originalDishName: item.originalDishName,
+                                      category: item.category,
+                                      sections: item.sections,
+                                      isSemiFinished: item.isSemiFinished,
+                                    )),
+                              ),
                             ),
                             TextButton.icon(
                               onPressed: _saving ? null : () {
@@ -585,7 +625,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                               value: _categoryOptions.contains(item.category) ? item.category : 'misc',
                               isDense: true,
                               items: _categoryOptions.map((c) => DropdownMenuItem(value: c, child: Text(_categoryLabel(c, lang)))).toList(),
-                              onChanged: (v) => setState(() => _items[index] = _ReviewItem(result: item.result, category: v ?? item.category, sections: item.sections, isSemiFinished: item.isSemiFinished)),
+                              onChanged: (v) => setState(() => _items[index] = _ReviewItem(result: item.result, originalDishName: item.originalDishName, category: v ?? item.category, sections: item.sections, isSemiFinished: item.isSemiFinished)),
                             ),
                             InkWell(
                               onTap: _saving ? null : () => _showSectionPicker(index),
@@ -615,7 +655,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                                 DropdownMenuItem(value: true, child: Text(loc.t('ttk_semi_finished'))),
                                 DropdownMenuItem(value: false, child: Text(loc.t('ttk_dish'))),
                               ],
-                              onChanged: (v) => setState(() => _items[index] = _ReviewItem(result: item.result, category: item.category, sections: item.sections, isSemiFinished: v ?? item.isSemiFinished)),
+                              onChanged: (v) => setState(() => _items[index] = _ReviewItem(result: item.result, originalDishName: item.originalDishName, category: item.category, sections: item.sections, isSemiFinished: v ?? item.isSemiFinished)),
                             ),
                             Text(
                               loc.t('tech_cards_ingredients_count').replaceAll('%s', '$count'),
@@ -680,12 +720,14 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
 
 class _ReviewItem {
   final TechCardRecognitionResult result;
+  final String? originalDishName;
   final String category;
   final List<String> sections;
   final bool isSemiFinished;
 
   _ReviewItem({
     required this.result,
+    this.originalDishName,
     required this.category,
     this.sections = const ['all'],
     this.isSemiFinished = true,

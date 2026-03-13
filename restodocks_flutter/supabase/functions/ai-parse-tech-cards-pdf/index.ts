@@ -154,7 +154,7 @@ Deno.serve(async (req: Request) => {
     if (templateCards.length === 0 && rows.length >= 2) {
       const { tryParseByStoredTemplates } = await import("../_shared/try_stored_ttk_templates.ts");
       const stored = await tryParseByStoredTemplates(rows);
-      if (stored && stored.length > 0) templateCards = stored;
+      if (stored && stored.cards.length > 0) templateCards = stored.cards;
     }
 
     // Shama.Book / ГОСТ: блюдо в "Проведено контрольное приготовление блюда: XXX" или на след. строке

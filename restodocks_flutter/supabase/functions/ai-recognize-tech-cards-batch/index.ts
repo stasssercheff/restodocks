@@ -56,9 +56,9 @@ Deno.serve(async (req: Request) => {
     // 1. Сначала пробуем парсинг по сохранённым шаблонам (tt_parse_templates) — без AI, без лимитов.
     // Это обходит 400/401 при прямом запросе к tt_parse_templates с клиента (RLS/auth).
     const { tryParseByStoredTemplates } = await import("../_shared/try_stored_ttk_templates.ts");
-    const storedCards = await tryParseByStoredTemplates(rows);
-    if (storedCards && storedCards.length > 0) {
-      const normalized = storedCards.map((card) => ({
+    const storedResult = await tryParseByStoredTemplates(rows);
+    if (storedResult && storedResult.cards.length > 0) {
+      const normalized = storedResult.cards.map((card) => ({
         dishName: card.dishName ?? null,
         technologyText: card.technologyText ?? null,
         isSemiFinished: card.isSemiFinished ?? undefined,

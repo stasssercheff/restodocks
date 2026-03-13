@@ -93,6 +93,22 @@ class TechCardRecognitionResult {
     this.isSemiFinished,
     this.yieldGrams,
   });
+
+  TechCardRecognitionResult copyWith({
+    String? dishName,
+    String? technologyText,
+    List<TechCardIngredientLine>? ingredients,
+    bool? isSemiFinished,
+    double? yieldGrams,
+  }) {
+    return TechCardRecognitionResult(
+      dishName: dishName ?? this.dishName,
+      technologyText: technologyText ?? this.technologyText,
+      ingredients: ingredients ?? this.ingredients,
+      isSemiFinished: isSemiFinished ?? this.isSemiFinished,
+      yieldGrams: yieldGrams ?? this.yieldGrams,
+    );
+  }
 }
 
 /// Ошибка парсинга одной карточки (битая/пропущенная).

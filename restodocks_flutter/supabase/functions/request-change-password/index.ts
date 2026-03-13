@@ -99,7 +99,7 @@ Deno.serve(async (req: Request) => {
     if (employee.auth_user_id) {
       const anonClient = createClient(supabaseUrl, supabaseAnonKey);
       const { error: verifyErr } = await anonClient.auth.signInWithPassword({
-        email: empEmail,
+        email, // auth user's email (from session), not employee.email
         password: old_password,
       });
       oldPasswordValid = !verifyErr;

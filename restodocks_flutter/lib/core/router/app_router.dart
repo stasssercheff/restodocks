@@ -638,10 +638,19 @@ class AppRouter {
           GoRoute(
             path: '/tech-cards/import-review',
             pageBuilder: (context, state) {
-              final list = state.extra as List?;
-              final cards = list != null ? list.map((e) => e as TechCardRecognitionResult).toList() : <TechCardRecognitionResult>[];
+              List<TechCardRecognitionResult> cards;
+              String? headerSignature;
+              final extra = state.extra;
+              if (extra is Map && extra['cards'] is List) {
+                cards = (extra['cards'] as List).map((e) => e as TechCardRecognitionResult).toList();
+                headerSignature = extra['headerSignature'] as String?;
+              } else if (extra is List) {
+                cards = extra.map((e) => e as TechCardRecognitionResult).toList();
+              } else {
+                cards = [];
+              }
               final department = state.queryParameters['department'] ?? 'kitchen';
-              return _slideTransitionPage(state, TechCardsImportReviewScreen(cards: cards, department: department));
+              return _slideTransitionPage(state, TechCardsImportReviewScreen(cards: cards, headerSignature: headerSignature, department: department));
             },
           ),
           GoRoute(

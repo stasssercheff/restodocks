@@ -236,8 +236,10 @@ void main() {
   group('TTK DOCX fixtures (как iiko-бланк — документы из test/fixtures/)', () {
     Future<Uint8List?> _loadFixture(String name) async {
       final f = File('test/fixtures/$name');
-      if (!await f.exists()) return null;
-      return f.readAsBytes();
+      if (await f.exists()) return f.readAsBytes();
+      final f2 = File('test/$name');
+      if (await f2.exists()) return f2.readAsBytes();
+      return null;
     }
 
     test('parseTechCardsFromExcel Техкарта_Салат_Цезарь.docx', () async {
@@ -276,6 +278,17 @@ void main() {
       expect(list, isNotEmpty, reason: 'Должна распознаться хотя бы 1 карточка');
     });
 
+    test('parseTechCardsFromExcel печенная свекла.xls (iiko/1С)', () async {
+      final bytes = await _loadFixture('печенная свекла.xls');
+      if (bytes == null) return; // fixture в test/fixtures/ или test/
+      final ai = AiServiceSupabase();
+      final list = await ai.parseTechCardsFromExcel(bytes);
+      expect(list, isNotEmpty, reason: 'Печеная свекла: должна распознаться карточка. Получено: ${list.length}');
+      final beet = list.where((c) => (c.dishName ?? '').toLowerCase().contains('свекла')).toList();
+      expect(beet, isNotEmpty, reason: 'Название должно содержать Свекла. Получено: ${list.map((c) => c.dishName).join(", ")}');
+      expect(beet.first.ingredients.length, greaterThanOrEqualTo(2), reason: 'Ожидаем ингредиенты (Свекла печеная, Соус и т.д.)');
+    });
+
     test('parseTechCardsFromExcel пф хц.xlsx (pf_hc fixture)', () async {
       final bytes = await _loadFixture('pf_hc.xlsx');
       if (bytes == null) return; // fixture может отсутствовать
@@ -296,6 +309,21 @@ void main() {
       final withYield = list.where((c) => c.yieldGrams != null && c.yieldGrams! > 0).length;
       expect(withTech, greaterThan(0), reason: 'Хотя бы часть карточек должна иметь технологию');
       expect(withYield, greaterThan(0), reason: 'Хотя бы часть карточек должна иметь выход');
+    });
+
+    test('parseTechCardsFromPdf ТК_на_Сливочный_крем (Shama.Book)', () async {
+      final bytes = await _loadFixture('ТК_на_Сливочный_крем_для_мафинов_и_дэкоров_п_ф,_№_.pdf');
+      if (bytes == null) return;
+      final ai = AiServiceSupabase();
+      final list = await ai.parseTechCardsFromPdf(bytes);
+      expect(list, isNotEmpty, reason: 'Сливочный крем: должна распознаться карточка. reason=${AiServiceSupabase.lastParseTechCardPdfReason}');
+      final cream = list.where((c) => (c.dishName ?? '').toLowerCase().contains('крем') || (c.dishName ?? '').toLowerCase().contains('сливоч')).toList();
+      if (cream.isNotEmpty) {
+        expect(cream.first.ingredients.length, greaterThanOrEqualTo(3), reason: 'Ожидаем Сыр, Сахар, Сливки, Соль, ваниль');
+        if (cream.first.technologyText != null && cream.first.technologyText!.length > 20) {
+          expect(cream.first.technologyText, contains('сахар'), reason: 'Технология должна содержать описание приготовления');
+        }
+      }
     });
   });
 

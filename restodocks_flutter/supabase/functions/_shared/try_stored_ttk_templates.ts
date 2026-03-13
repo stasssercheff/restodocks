@@ -9,7 +9,12 @@ import type { TtkCard } from "./parse_ttk_template.ts";
 // Сборник/ГОСТ/Word: "Наименование сырья", "Расход сырья на 1 порцию"
 const KEYWORDS = ["наименование", "продукт", "брутто", "нетто", "название", "сырьё", "ингредиент", "расход сырья"];
 
-export async function tryParseByStoredTemplates(rows: string[][]): Promise<TtkCard[] | null> {
+export interface TryParseResult {
+  cards: TtkCard[];
+  headerSignature: string;
+}
+
+export async function tryParseByStoredTemplates(rows: string[][]): Promise<TryParseResult | null> {
   if (rows.length < 2) return null;
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -52,7 +57,7 @@ export async function tryParseByStoredTemplates(rows: string[][]): Promise<TtkCa
       outputCol: (data.output_col as number) ?? -1,
     });
 
-    if (list.length > 0) return list;
+    if (list.length > 0) return { cards: list, headerSignature: sig };
   }
   return null;
 }
