@@ -68,7 +68,12 @@ Deno.serve(async (req: Request) => {
       })),
     }));
 
-    return new Response(JSON.stringify({ cards: normalized, header_signature: result.headerSignature }), {
+    const sanityIssues = result.sanityIssues ?? [];
+    return new Response(JSON.stringify({
+      cards: normalized,
+      header_signature: result.headerSignature,
+      sanity_issues: sanityIssues,
+    }), {
       status: 200,
       headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
     });

@@ -285,6 +285,12 @@ export function headerSignature(headerCells: string[]): string {
   return parts.join("|");
 }
 
+/** Результат парсинга по шаблону: карточки + предупреждения для дообучения */
+export interface ParseTtkStoredResult {
+  cards: TtkCard[];
+  sanityIssues: string[];
+}
+
 /** Парсинг по сохранённому шаблону (индексы колонок заданы явно). */
 export function parseTtkByStoredTemplate(
   rows: string[][],
@@ -296,10 +302,15 @@ export function parseTtkByStoredTemplate(
     netCol?: number;
     wasteCol?: number;
     outputCol?: number;
+    /** Выученная позиция: смещение строки названия от header (0=header, -1=выше). */
+    dishNameRowOffset?: number;
+    /** Выученная позиция: колонка с названием. */
+    dishNameCol?: number;
   },
-): TtkCard[] {
-  const { headerIdx, nameCol, productCol, grossCol = -1, netCol = -1, wasteCol = -1, outputCol = -1 } = opts;
-  if (rows.length <= headerIdx + 1) return [];
+): ParseTtkStoredResult {
+  const { headerIdx, nameCol, productCol, grossCol = -1, netCol = -1, wasteCol = -1, outputCol = -1, dishNameRowOffset, dishNameCol } = opts;
+  const sanityIssuesSet = new Set<string>();
+  if (rows.length <= headerIdx + 1) return { cards: [], sanityIssues: [] };
 
   let currentDish: string | null = null;
   const currentIngredients: TtkIngredient[] = [];
@@ -326,18 +337,55 @@ export function parseTtkByStoredTemplate(
     return low.includes("органолептическ") || low.includes("внешний вид") || low.includes("консистенция") ||
       low.includes("запах") || low.includes("вкус") || low.includes("цвет");
   };
-  for (let r = 0; r < headerIdx && r < rows.length; r++) {
-    for (const c of rows[r] ?? []) {
-      const s = (c ?? "").trim();
-      if (s.length < 3 || !isValidDish(s)) continue;
-      if (s.endsWith(":")) continue;
-      if (/^\d{1,2}\.\d{1,2}\.\d{2,4}/.test(s)) continue;
-      if (s.toLowerCase().startsWith("технологическая карта")) continue;
-      if (isSkip(s)) continue;
-      currentDish = s;
-      break;
+
+  /** Wide Search: если ячейка пуста — проверить соседние 3 колонки в той же строке */
+  const getCellOrNeighbor = (row: string[], col: number, isValid: (s: string) => boolean): { value: string; usedWideSearch: boolean } => {
+    const primary = (row?.[col] ?? "").trim();
+    if (primary.length >= 2 && isValid(primary)) return { value: primary, usedWideSearch: false };
+    const neighbors = [col - 1, col - 2, col + 1, col + 2].filter((c) => c >= 0 && c < (row?.length ?? 0));
+    for (const c of neighbors) {
+      const v = (row?.[c] ?? "").trim();
+      if (v.length >= 2 && isValid(v)) return { value: v, usedWideSearch: true };
     }
-    if (currentDish != null) break;
+    return { value: "", usedWideSearch: false };
+  };
+
+  // Выученная позиция: берём название из заданной ячейки, при пустоте — Wide Search
+  if (dishNameRowOffset != null && dishNameCol != null) {
+    const nameRow = headerIdx + dishNameRowOffset;
+    if (nameRow >= 0 && nameRow < rows.length) {
+      const row = rows[nameRow];
+      const primary = (row?.[dishNameCol] ?? "").trim();
+      const valid = (s: string) => s.length >= 2 && !isSkip(s) && isValidDish(s);
+      if (primary.length >= 2 && valid(primary)) {
+        currentDish = primary;
+      } else {
+        const { value, usedWideSearch } = getCellOrNeighbor(row ?? [], dishNameCol, (s) => s.length >= 2 && !isSkip(s) && isValidDish(s));
+        if (value) {
+          currentDish = value;
+          if (usedWideSearch) sanityIssuesSet.add("Выученная колонка названия пуста, нашлось в соседней. Рекомендуем дообучение.");
+        } else if (primary === "" && row) {
+          const hasNearby = [dishNameCol - 1, dishNameCol + 1].some((c) => c >= 0 && c < row.length && (row[c] ?? "").trim().length > 0);
+          if (hasNearby) sanityIssuesSet.add("Название в выученной ячейке пусто, рядом есть текст. Дообучение.");
+        }
+      }
+    }
+  }
+  // Эвристика: ищем в строках выше header
+  if (currentDish == null) {
+    for (let r = 0; r < headerIdx && r < rows.length; r++) {
+      for (const c of rows[r] ?? []) {
+        const s = (c ?? "").trim();
+        if (s.length < 3 || !isValidDish(s)) continue;
+        if (s.endsWith(":")) continue;
+        if (/^\d{1,2}\.\d{1,2}\.\d{2,4}/.test(s)) continue;
+        if (s.toLowerCase().startsWith("технологическая карта")) continue;
+        if (isSkip(s)) continue;
+        currentDish = s;
+        break;
+      }
+      if (currentDish != null) break;
+    }
   }
 
   for (let r = headerIdx + 1; r < rows.length; r++) {
@@ -358,11 +406,35 @@ export function parseTtkByStoredTemplate(
       }
     }
     const nameVal = nameCol < cells.length ? cells[nameCol] : "";
-    const productVal = pCol < cells.length ? cells[pCol] : "";
+    let productVal = pCol < cells.length ? cells[pCol] : "";
+    // Wide Search для продукта: если в выученной колонке пусто — соседние 3 ячейки
+    if (!productVal || /^[\d,.\-\s]+$/.test(productVal)) {
+      const isValidProduct = (s: string) => s.length >= 2 && !/^[\d,.\-\s]+$/.test(s) && s.toLowerCase() !== "итого";
+      const neighborCols = [pCol - 1, pCol - 2, pCol + 1, pCol + 2].filter((c) => c >= 0 && c < cells.length);
+      for (const c of neighborCols) {
+        const v = cells[c] ?? "";
+        if (isValidProduct(v)) {
+          productVal = v;
+          if (c !== pCol) sanityIssuesSet.add("Колонка продукта могла сместиться. Дообучение.");
+          break;
+        }
+      }
+    }
     const grossVal = gCol >= 0 && gCol < cells.length ? cells[gCol] : "";
     const netVal = nCol >= 0 && nCol < cells.length ? cells[nCol] : "";
     const wasteVal = wasteCol >= 0 && wasteCol < cells.length ? cells[wasteCol] : "";
     const outputVal = outputCol >= 0 && outputCol < cells.length ? cells[outputCol] : "";
+
+    // Sanity Check: вместо веса — текст
+    const grossNum = parseNum(grossVal);
+    const netNum = parseNum(netVal);
+    if (productVal && (grossVal.trim() || netVal.trim())) {
+      const grossIsText = grossVal.trim().length > 0 && grossNum == null;
+      const netIsText = netVal.trim().length > 0 && netNum == null;
+      if (grossIsText || netIsText) {
+        sanityIssuesSet.add("В колонках брутто/нетто — текст вместо числа. Проверьте формат, дообучение.");
+      }
+    }
 
     if (nameVal.toLowerCase() === "итого" || productVal.toLowerCase() === "итого") {
       flushCard();
@@ -376,8 +448,8 @@ export function parseTtkByStoredTemplate(
     if (productVal) {
       if (currentDish == null && nameVal && isValidDish(nameVal)) currentDish = nameVal;
       let waste = parseNum(wasteVal);
-      const gross = parseNum(grossVal);
-      const net = parseNum(netVal);
+      const gross = grossNum;
+      const net = netNum;
       if (gross != null && gross > 0 && net != null && net < gross && (waste == null || waste === 0)) {
         waste = (1 - net / gross) * 100;
       }
@@ -392,7 +464,7 @@ export function parseTtkByStoredTemplate(
     }
   }
   flushCard();
-  return results;
+  return { cards: results, sanityIssues: [...sanityIssuesSet] };
 }
 
 /**

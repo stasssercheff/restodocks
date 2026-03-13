@@ -187,8 +187,11 @@ Deno.serve(async (req: Request) => {
           ingredientType: undefined,
         })),
       }));
+      // Возвращаем rows для обучения на клиенте (learnDishNamePosition, дообучение)
+      const payload: Record<string, unknown> = { cards: normalized, reason: "template" };
+      if (rows.length >= 2) payload.rows = rows;
       return new Response(
-        JSON.stringify({ cards: normalized, reason: "template" }),
+        JSON.stringify(payload),
         { status: 200, headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" } },
       );
     }

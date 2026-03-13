@@ -33,6 +33,9 @@ class AiServiceSupabase implements AiService {
   /// header_signature последнего успешного парсинга (для записи правок пользователя).
   static String? lastParseHeaderSignature;
 
+  /// Строки последнего парсинга (для обучения: ищем corrected в них и сохраняем позицию).
+  static List<List<String>>? lastParsedRows;
+
   /// Преобразует сырую ошибку API (JSON, 429 и т.д.) в понятное пользователю сообщение.
   static String _sanitizeAiError(String raw) {
     if (raw.isEmpty) return 'Неизвестная ошибка';
@@ -217,6 +220,7 @@ class AiServiceSupabase implements AiService {
   @override
   Future<List<TechCardRecognitionResult>> parseTechCardsFromExcel(Uint8List xlsxBytes, {String? establishmentId}) async {
     lastParseHeaderSignature = null;
+    lastParsedRows = null;
     try {
       final fmt = _detectFormat(xlsxBytes);
       var rows = <List<String>>[];
@@ -258,6 +262,7 @@ class AiServiceSupabase implements AiService {
           }
           if (merged.isNotEmpty) {
             _saveTemplateFromKeywordParse(allSheets.first, 'xlsx');
+            lastParsedRows = allSheets.first;
             return _applyParseCorrections(merged, lastParseHeaderSignature, establishmentId);
           }
         }
@@ -298,6 +303,7 @@ class AiServiceSupabase implements AiService {
         }
         if (merged.isNotEmpty) {
           _saveTemplateFromKeywordParse(rows, 'docx');
+          lastParsedRows = rows;
           return _applyParseCorrections(merged, lastParseHeaderSignature, establishmentId);
         }
       }
@@ -339,11 +345,18 @@ class AiServiceSupabase implements AiService {
       }
       if (list.isNotEmpty) {
         lastParseTechCardExcelReason = null;
+        lastParsedRows = rows;
         if (lastParseHeaderSignature == null && rows.isNotEmpty && rows[0].isNotEmpty) {
           lastParseHeaderSignature = _headerSignature(rows[0].map((c) => c.toString().trim()).toList());
         }
       }
-      return _applyParseCorrections(list, lastParseHeaderSignature, establishmentId);
+      final corrected = await _applyParseCorrections(list, lastParseHeaderSignature, establishmentId);
+      final validationErrors = _validateParsedCards(corrected);
+      if (validationErrors != null) {
+        final existing = lastParseTechCardErrors ?? [];
+        lastParseTechCardErrors = [...existing, ...validationErrors];
+      }
+      return corrected;
     } catch (_) {
       lastParseTechCardExcelReason = null;
       return [];
@@ -422,14 +435,25 @@ class AiServiceSupabase implements AiService {
           list.add(card);
         }
       }
-      // Обучение: сохраняем шаблон PDF для следующих загрузок (rows приходят при успешном AI)
+      // Обучение и метаданные для дообучения: rows приходят при template/stored/AI
       if (list.isNotEmpty) {
         lastParseTechCardPdfReason = null;
         final rowsRaw = data['rows'];
         if (rowsRaw is List && rowsRaw.isNotEmpty) {
           final rows = rowsRaw.map((r) => (r is List ? r : <String>[]).map((c) => c?.toString() ?? '').toList()).toList();
-          if (rows.length >= 2) _saveTemplateAfterAi(rows, list, 'pdf');
+          if (rows.length >= 2) {
+            _saveTemplateAfterAi(rows, list, 'pdf');
+            lastParsedRows = rows;
+            final sig = _headerSignatureFromRows(rows);
+            if (sig != null && sig.isNotEmpty) lastParseHeaderSignature = sig;
+          }
+        } else {
+          lastParsedRows = null;
+          lastParseHeaderSignature = null;
         }
+      } else {
+        lastParsedRows = null;
+        lastParseHeaderSignature = null;
       }
       if (list.isEmpty) lastParseTechCardErrors = null;
       return list;
@@ -1659,6 +1683,24 @@ class AiServiceSupabase implements AiService {
     return headerCells.map((c) => c.trim().toLowerCase()).where((c) => c.isNotEmpty).join('|');
   }
 
+  /// Найти заголовок ТТК в rows и вернуть его подпись (для дообучения).
+  static String? _headerSignatureFromRows(List<List<String>> rows) {
+    const keywords = [
+      'наименование', 'продукт', 'брутто', 'нетто', 'название', 'сырьё', 'ингредиент', 'расход сырья',
+    ];
+    for (var r = 0; r < rows.length && r < 50; r++) {
+      final row = rows[r].map((c) => (c is String ? c : c.toString()).trim().toLowerCase()).toList();
+      if (row.length < 2) continue;
+      final hasKeyword = row.any((c) => keywords.any((k) => c.contains(k)));
+      if (hasKeyword) {
+        final sig = _headerSignature(rows[r].map((c) => (c is String ? c : c.toString()).trim()).toList());
+        if (sig.isNotEmpty) return sig;
+        break;
+      }
+    }
+    return null;
+  }
+
   /// Применить сохранённые правки (original → corrected) к результатам парсинга.
   Future<List<TechCardRecognitionResult>> _applyParseCorrections(
     List<TechCardRecognitionResult> list,
@@ -1854,6 +1896,135 @@ class AiServiceSupabase implements AiService {
     return results;
   }
 
+  /// Обучение: при правке ищем corrected в rows и сохраняем позиции (dish name + колонки).
+  /// [correctedIngredients] — ингредиенты для вывода product_col, gross_col, net_col (опционально).
+  /// [originalDishName] — исходное распознанное название (ищем его, если corrected не найден в rows).
+  static Future<void> learnDishNamePosition(
+    SupabaseClient client,
+    List<List<String>> rows,
+    String headerSignature,
+    String correctedDishName, {
+    List<({String productName, double grossWeight, double netWeight})>? correctedIngredients,
+    String? originalDishName,
+  }) async {
+    if (rows.isEmpty || headerSignature.isEmpty) return;
+    int headerIdx = -1;
+    for (var r = 0; r < rows.length && r < 50; r++) {
+      final sig = _headerSignature(rows[r].map((c) => (c is String ? c : c.toString()).trim()).toList());
+      if (sig == headerSignature) {
+        headerIdx = r;
+        break;
+      }
+    }
+    if (headerIdx < 0) return;
+
+    int dishRowOffset = 0;
+    int dishCol = 0;
+    bool hasDish = false;
+    final searchNames = [correctedDishName.trim(), if (originalDishName != null && originalDishName.trim().isNotEmpty) originalDishName.trim()];
+    for (final candidate in searchNames) {
+      if (candidate.isEmpty) continue;
+      for (var r = 0; r < rows.length && r < 50; r++) {
+        final row = rows[r];
+        for (var c = 0; c < row.length; c++) {
+          final cell = (row[c] is String ? row[c] as String : row[c].toString()).trim();
+          if (cell == candidate || cell.toLowerCase() == candidate.toLowerCase()) {
+            dishRowOffset = r - headerIdx;
+            dishCol = c;
+            hasDish = true;
+            break;
+          }
+        }
+        if (hasDish) break;
+      }
+      if (hasDish) break;
+    }
+
+    int? productCol;
+    int? grossCol;
+    int? netCol;
+    if (correctedIngredients != null && correctedIngredients.isNotEmpty && headerIdx + 1 < rows.length) {
+      final first = correctedIngredients.first;
+      if (first.productName.trim().isNotEmpty) {
+        final dataRow = rows[headerIdx + 1];
+        for (var c = 0; c < dataRow.length; c++) {
+          final cell = (dataRow[c] is String ? dataRow[c] as String : dataRow[c].toString()).trim();
+          if (cell == first.productName.trim() ||
+              cell.toLowerCase() == first.productName.trim().toLowerCase()) {
+            productCol = c;
+            break;
+          }
+        }
+        for (var c = 0; c < dataRow.length; c++) {
+          final cell = (dataRow[c] is String ? dataRow[c] as String : dataRow[c].toString()).trim();
+          final parsed = _parseNum(cell);
+          if (parsed != null && parsed > 0) {
+            final g = first.grossWeight;
+            if ((parsed - g).abs() < 0.01 || (parsed * 1000 - g).abs() < 1) {
+              grossCol = c;
+              break;
+            }
+          }
+        }
+        for (var c = 0; c < dataRow.length; c++) {
+          final cell = (dataRow[c] is String ? dataRow[c] as String : dataRow[c].toString()).trim();
+          final parsed = _parseNum(cell);
+          if (parsed != null && parsed > 0) {
+            final n = first.netWeight;
+            if ((parsed - n).abs() < 0.01 || (parsed * 1000 - n).abs() < 1) {
+              netCol = c;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    if (!hasDish) return; // dish name — обязательное для обучения
+    try {
+      final payload = <String, dynamic>{
+        'header_signature': headerSignature,
+        'dish_name_row_offset': hasDish ? dishRowOffset : 0,
+        'dish_name_col': hasDish ? dishCol : 0,
+      };
+      if (productCol != null) payload['product_col'] = productCol;
+      if (grossCol != null) payload['gross_col'] = grossCol;
+      if (netCol != null) payload['net_col'] = netCol;
+      await client.from('tt_parse_learned_dish_name').upsert(
+        payload,
+        onConflict: 'header_signature',
+      );
+    } catch (_) {}
+  }
+
+  /// Валидация «на лету»: дичь в названии/ингредиентах — пользователь должен проверить.
+  static List<TtkParseError>? _validateParsedCards(List<TechCardRecognitionResult> list) {
+    final errors = <TtkParseError>[];
+    final garbageDish = RegExp(r'органолептическ|внешний вид|консистенция|запах|вкус|цвет|показатели', caseSensitive: false);
+    final numericOnly = RegExp(r'^[\d\s.,\-]+$');
+    for (final c in list) {
+      final name = c.dishName?.trim() ?? '';
+      if (name.isNotEmpty && garbageDish.hasMatch(name)) {
+        errors.add(TtkParseError(dishName: name, error: 'Название похоже на раздел ГОСТ. Проверьте и исправьте.'));
+      }
+      for (final i in c.ingredients) {
+        final p = (i.productName).trim();
+        if (p.isNotEmpty && numericOnly.hasMatch(p)) {
+          errors.add(TtkParseError(dishName: name, error: 'Название продукта «$p» — число. Проверьте колонки.'));
+        }
+        final g = i.grossGrams;
+        final n = i.netGrams;
+        if (g != null && (g.isNaN || g.isInfinite || g < 0)) {
+          errors.add(TtkParseError(dishName: name, error: 'Брутто содержит некорректное значение.'));
+        }
+        if (n != null && (n.isNaN || n.isInfinite || n < 0)) {
+          errors.add(TtkParseError(dishName: name, error: 'Нетто содержит некорректное значение.'));
+        }
+      }
+    }
+    return errors.isEmpty ? null : errors;
+  }
+
   /// Привести rows к гарантированному string[][] для JSON (Edge Function 400 при num/NaN).
   static List<List<String>> _rowsForJson(List<List<String>> rows) {
     return rows.map((r) => r.map((c) {
@@ -1872,6 +2043,13 @@ class AiServiceSupabase implements AiService {
       if (data == null) return [];
       final sig = data['header_signature'] as String?;
       if (sig != null && sig.isNotEmpty) lastParseHeaderSignature = sig;
+      final sanity = data['sanity_issues'];
+      if (sanity is List) {
+        final issues = sanity.whereType<String>().where((s) => s.isNotEmpty).toList();
+        if (issues.isNotEmpty) {
+          lastParseTechCardErrors = issues.map((msg) => TtkParseError(error: msg)).toList();
+        }
+      }
       final raw = data['cards'];
       if (raw is! List || raw.isEmpty) return [];
       final list = <TechCardRecognitionResult>[];

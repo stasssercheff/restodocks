@@ -6,16 +6,18 @@ import 'package:uuid/uuid.dart';
 
 import '../models/models.dart';
 import '../services/ai_service.dart';
+import '../services/ai_service_supabase.dart';
 import '../services/services.dart';
 import '../utils/product_name_utils.dart';
 import '../widgets/app_bar_home_button.dart';
 
 /// Экран просмотра и правки распознанных ТТК перед созданием (пакетный импорт из Excel).
 class TechCardsImportReviewScreen extends StatefulWidget {
-  const TechCardsImportReviewScreen({super.key, required this.cards, this.headerSignature, this.department = 'kitchen'});
+  const TechCardsImportReviewScreen({super.key, required this.cards, this.headerSignature, this.sourceRows, this.department = 'kitchen'});
 
   final List<TechCardRecognitionResult> cards;
   final String? headerSignature;
+  final List<List<String>>? sourceRows;
   final String department;
 
   @override
@@ -469,13 +471,29 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
         }
         if (mounted) setState(() => _saveProgress = productNamesToCreate.length + created);
       }
-      // Записать правки для обучения (headerSignature + original -> corrected)
+      // Обучение: ищем corrected в rows и сохраняем позицию (для парсера)
       final sig = widget.headerSignature;
+      final sourceRows = widget.sourceRows;
       if (sig != null && sig.isNotEmpty) {
         for (final item in sorted) {
           final orig = item.originalDishName?.trim() ?? '';
           final corr = (item.result.dishName ?? '').trim();
-          if (orig.isNotEmpty && corr.isNotEmpty && orig != corr) {
+          final hasIng = item.result.ingredients.any((i) => (i.productName ?? '').trim().isNotEmpty && (i.grossGrams ?? 0) > 0);
+          if ((orig.isNotEmpty || corr.isNotEmpty) && (orig != corr || hasIng)) {
+            if (sourceRows != null && sourceRows.isNotEmpty) {
+              final ing = item.result.ingredients
+                  .where((i) => (i.productName ?? '').trim().isNotEmpty && (i.grossGrams ?? 0) > 0)
+                  .map((i) => (productName: (i.productName ?? '').trim(), grossWeight: i.grossGrams ?? 0, netWeight: i.netGrams ?? i.grossGrams ?? 0))
+                  .toList();
+              await AiServiceSupabase.learnDishNamePosition(
+                Supabase.instance.client,
+                sourceRows,
+                sig,
+                corr,
+                correctedIngredients: ing.isNotEmpty ? ing : null,
+                originalDishName: orig,
+              );
+            }
             try {
               await Supabase.instance.client.from('tt_parse_corrections').insert({
                 'establishment_id': est.dataEstablishmentId,

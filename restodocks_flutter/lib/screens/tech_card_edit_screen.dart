@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -11,6 +12,7 @@ import 'package:provider/provider.dart';
 import '../models/models.dart';
 import '../mixins/auto_save_mixin.dart';
 import '../mixins/input_change_listener_mixin.dart';
+import '../services/ai_service_supabase.dart';
 import '../services/app_toast_service.dart';
 import '../services/services.dart';
 import '../utils/number_format_utils.dart';
@@ -480,12 +482,18 @@ class TechCardEditScreen extends StatefulWidget {
     this.initialCategory,
     this.initialSections,
     this.initialIsSemiFinished,
+    this.initialHeaderSignature,
+    this.initialSourceRows,
   });
 
   /// Пусто для «новой», иначе id существующей ТТК.
   final String techCardId;
   /// Предзаполнение из ИИ (фото/Excel). Используется только при techCardId == 'new'.
   final TechCardRecognitionResult? initialFromAi;
+  /// Подпись заголовка при импорте — для сохранения правок в tt_parse_corrections.
+  final String? initialHeaderSignature;
+  /// Строки при импорте — для обучения (ищем corrected в них, сохраняем позицию).
+  final List<List<String>>? initialSourceRows;
   /// Режим только просмотра (для управляющих кухней — кнопка «Просмотр ТТК»).
   final bool forceViewMode;
   /// Отдел при создании: 'bar' — категории бара, иначе кухни.
@@ -977,6 +985,39 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           if (urls.isNotEmpty) updated = updated.copyWith(photoUrls: urls);
         }
         await svc.saveTechCard(updated, changedByEmployeeId: emp.id, changedByName: emp.fullName);
+        // Обучение: при изменении — ищем corrected в rows, сохраняем позиции (название + колонки)
+        final sig = widget.initialHeaderSignature;
+        final orig = widget.initialFromAi?.dishName?.trim();
+        final sourceRows = widget.initialSourceRows;
+        final shouldLearn = sig != null && sig.isNotEmpty &&
+            sourceRows != null && sourceRows.isNotEmpty &&
+            (orig != null && orig.isNotEmpty && (orig != name || toSaveIngredients.any((i) => !i.isPlaceholder && i.productName.trim().isNotEmpty && i.grossWeight > 0)));
+        if (shouldLearn) {
+          final ingredientsForLearning = toSaveIngredients
+              .where((i) => !i.isPlaceholder && i.productName.trim().isNotEmpty && i.grossWeight > 0)
+              .map((i) => (productName: i.productName.trim(), grossWeight: i.grossWeight, netWeight: i.netWeight))
+              .toList();
+          await AiServiceSupabase.learnDishNamePosition(
+            Supabase.instance.client,
+            sourceRows,
+            sig,
+            name,
+            correctedIngredients: ingredientsForLearning.isNotEmpty ? ingredientsForLearning : null,
+            originalDishName: orig,
+          );
+        }
+        // Правка для подстановки (original → corrected) — если обучение не сработает
+        if (sig != null && sig.isNotEmpty && orig != null && orig.isNotEmpty && orig != name) {
+          try {
+            await Supabase.instance.client.from('tt_parse_corrections').insert({
+              'establishment_id': est.dataEstablishmentId,
+              'header_signature': sig,
+              'field': 'dish_name',
+              'original_value': orig,
+              'corrected_value': name,
+            });
+          } catch (_) {}
+        }
         // Переводим название и технологию фоново. Используем updated (с фото и ингредиентами),
         // иначе перезапись через created удалит photoUrls и ingredients.
         final savedForTranslation = updated;
