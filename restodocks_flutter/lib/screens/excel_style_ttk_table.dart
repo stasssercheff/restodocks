@@ -340,8 +340,24 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                       ));
                     }, 'cooking_loss_$rowIndex'),
 
-                    // Выход — рассчитывается таблицей: нетто × (1 − % ужарки/100) (только чтение)
-                    _buildReadOnlyCell(ingredient.outputWeight == 0 ? '' : ingredient.outputWeight.toStringAsFixed(0)),
+                    // Выход — редактируемо; при вводе пересчёт % ужарки (как нетто → % отхода)
+                    _buildNumericCell(
+                      ingredient.outputWeight == 0 ? '' : ingredient.outputWeight.toStringAsFixed(0),
+                      (value) {
+                        final out = double.tryParse(value?.replaceFirst(',', '.') ?? '') ?? 0;
+                        if (out < 0) return;
+                        final net = ingredient.netWeight;
+                        double lossPct = ingredient.cookingLossPctOverride ?? 0;
+                        if (net > 0 && out <= net) {
+                          lossPct = ((1.0 - out / net) * 100).clamp(0.0, 99.9);
+                        }
+                        _updateIngredient(rowIndex, ingredient.copyWith(
+                          outputWeight: out,
+                          cookingLossPctOverride: lossPct,
+                        ));
+                      },
+                      'output_$rowIndex',
+                    ),
 
                     // вес прц — пусто в строках продукта
                     _buildReadOnlyCell(''),
@@ -603,13 +619,19 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     try {
       final lang = widget.loc.currentLanguageCode;
       if (!widget.canEdit) {
+        final name = _getIngredientDisplayName(ingredient, lang);
         return Container(
           height: 44,
           child: Center(
-            child: Text(
-              _getIngredientDisplayName(ingredient, lang),
-              style: const TextStyle(fontSize: 12),
-              textAlign: TextAlign.center,
+            child: Tooltip(
+              message: name,
+              child: Text(
+                name,
+                style: const TextStyle(fontSize: 12),
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
             ),
           ),
         );
@@ -617,6 +639,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
       if (ingredient.productId != null || ingredient.productName.isNotEmpty ||
           (ingredient.sourceTechCardId != null && ingredient.sourceTechCardId!.isNotEmpty)) {
+        final name = _getIngredientDisplayName(ingredient, lang);
         return InkWell(
           onTap: () {
             // При клике на выбранный продукт открываем dropdown для изменения
@@ -638,10 +661,15 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
             child: Row(
               children: [
                 Expanded(
-                  child: Text(
-                    _getIngredientDisplayName(ingredient, lang),
-                    style: const TextStyle(fontSize: 12),
-                    textAlign: TextAlign.center,
+                  child: Tooltip(
+                    message: name,
+                    child: Text(
+                      name,
+                      style: const TextStyle(fontSize: 12),
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
                   ),
                 ),
                 const Icon(
