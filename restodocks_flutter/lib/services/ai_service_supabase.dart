@@ -1105,6 +1105,63 @@ class AiServiceSupabase implements AiService {
     return RegExp(r'[а-яА-ЯёЁa-zA-Z]{2,}').hasMatch(s);
   }
 
+  /// Органолептика, подзаголовки — не названия блюд.
+  static bool _isSkipForDishName(String s) {
+    final low = s.trim().toLowerCase();
+    return low.contains('органолептическ') ||
+        low.contains('внешний вид') ||
+        low.contains('консистенция') ||
+        low.contains('запах') ||
+        low.contains('вкус') ||
+        low.contains('цвет');
+  }
+
+  /// ГОСТ: убрать строки "3. РЕЦЕПТУРА" перед заголовком таблицы (Наименование, Брутто).
+  static List<List<String>> _skipGostSectionHeaders(List<List<String>> rows) {
+    final gostSection = RegExp(r'^\d+\.\s*рецептура', caseSensitive: false);
+    final filtered = <List<String>>[];
+    var foundHeader = false;
+    for (final row in rows) {
+      if (row.isEmpty) {
+        if (!foundHeader) filtered.add(row);
+        continue;
+      }
+      final first = row.first.trim().toLowerCase();
+      final rowText = row.join(' ').toLowerCase();
+      if (rowText.contains('наименование') || rowText.contains('брутто') || rowText.contains('расход сырья')) {
+        foundHeader = true;
+        filtered.add(row);
+      } else if (!foundHeader && (gostSection.hasMatch(first) || first == 'рецептура') && row.length <= 2) {
+        continue; // пропустить "3. РЕЦЕПТУРА"
+      } else {
+        filtered.add(row);
+      }
+    }
+    return filtered;
+  }
+
+  /// Из объединённой ячейки "Мясная к пенному ... Органолептические показатели: № ..." извлечь название.
+  static String? _extractDishBeforeOrganoleptic(String cell) {
+    final idx = cell.toLowerCase().indexOf('органолептическ');
+    if (idx <= 0) return null;
+    final before = cell.substring(0, idx).trim();
+    if (before.length < 4) return null;
+    // Берем первый осмысленный фрагмент (до "Технологическая карта", "Название на чеке" и т.п.)
+    final stop = RegExp(
+      r'технологическая карта|название на чеке|область применения|хранение|срок хранения',
+      caseSensitive: false,
+    );
+    final stopMatch = stop.firstMatch(before);
+    final segment = stopMatch != null ? before.substring(0, stopMatch.start).trim() : before;
+    final words = segment.split(RegExp(r'\s+')).where((w) => w.length > 1).take(6).toList();
+    if (words.isEmpty) return null;
+    final candidate = words.join(' ').trim();
+    if (candidate.length >= 4 && _isValidDishName(candidate) && !_isSkipForDishName(candidate)) {
+      return candidate;
+    }
+    return null;
+  }
+
   /// Парсинг ТТК по шаблону (Наименование, Продукт, Брутто, Нетто...) — без вызова ИИ.
   /// [errors] — при не null: try-catch на каждую строку, битые карточки в errors, цикл продолжается.
   static List<TechCardRecognitionResult> parseTtkByTemplate(
@@ -1114,6 +1171,9 @@ class AiServiceSupabase implements AiService {
     if (rows.length < 2) return [];
     rows = _expandSingleCellRows(rows);
     if (rows.length < 2) return [];
+
+    // ГОСТ: строка "3. РЕЦЕПТУРА" — пропустить, заголовок в следующей строке
+    rows = _skipGostSectionHeaders(rows);
 
     // Формат «Полное пособие Кухня» / супы.xlsx: блоки [название блюда] [№|Наименование продукта|Вес] [данные] [Выход]
     final polnoePosobie = _tryParsePolnoePosobieFormat(rows);
@@ -1280,17 +1340,28 @@ class AiServiceSupabase implements AiService {
     if (grossCol >= 0 && grossCol < headerRow.length && headerRow[grossCol].contains('кг')) grossColIsKg = true;
     if (netCol >= 0 && netCol < headerRow.length && headerRow[netCol].contains('кг')) netColIsKg = true;
 
-    // Название блюда может быть в строках выше заголовка (DOCX iiko/ГОСТ)
+    // Название блюда может быть в строках выше заголовка или в той же строке (iiko: Мясная к пенному | ... | Органолептические показатели: № ...)
     String? currentDish;
-    for (var r = 0; r < headerIdx && r < rows.length; r++) {
-      for (final c in rows[r]) {
-        final s = c.trim();
+    for (var r = 0; r <= headerIdx && r < rows.length; r++) {
+      final row = rows[r];
+      final limitCol = (r == headerIdx && (productCol > 0 || nameCol > 0))
+          ? (productCol > 0 ? productCol : nameCol)
+          : row.length;
+      for (var ci = 0; ci < row.length && ci < limitCol; ci++) {
+        final s = (row[ci] ?? '').toString().trim();
         if (s.length < 3) continue;
         if (s.endsWith(':')) continue; // "Хранение:", "Область применения:"
         if (RegExp(r'^\d{1,2}\.\d{1,2}\.\d{2,4}').hasMatch(s)) continue; // дата
         if (s.toLowerCase().startsWith('технологическая карта')) continue;
         if (s.toLowerCase().contains('название на чеке') || s.toLowerCase().contains('название чека')) continue;
-        if (s.toLowerCase().contains('органолептическ') || s.toLowerCase().contains('внешний вид') || s.toLowerCase().contains('консистенция') || s.toLowerCase().contains('запах') || s.toLowerCase().contains('вкус') || s.toLowerCase().contains('цвет')) continue;
+        if (_isSkipForDishName(s)) {
+          final extracted = _extractDishBeforeOrganoleptic(s);
+          if (extracted != null) {
+            currentDish = extracted;
+            break;
+          }
+          continue;
+        }
         if (!_isValidDishName(s)) continue;
         currentDish = s;
         break;
@@ -1366,8 +1437,11 @@ class AiServiceSupabase implements AiService {
         final nextC0 = nextRow.isNotEmpty ? nextRow[0].toLowerCase() : '';
         final nextC1 = nextRow.length > 1 ? nextRow[1].toLowerCase() : '';
         if (nextC0 == '№' && nextC1.contains('наименование') && nextC1.contains('продукт')) {
-          final dishInCol0 = cells.isNotEmpty ? cells[0].trim() : '';
-          if (dishInCol0.length >= 3 && _isValidDishName(dishInCol0) && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(dishInCol0) &&
+          var dishInCol0 = cells.isNotEmpty ? cells[0].trim() : '';
+          if (_isSkipForDishName(dishInCol0)) {
+            dishInCol0 = _extractDishBeforeOrganoleptic(dishInCol0) ?? '';
+          }
+          if (dishInCol0.length >= 3 && !_isSkipForDishName(dishInCol0) && _isValidDishName(dishInCol0) && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(dishInCol0) &&
               !RegExp(r'^№$|^выход$|^декор$', caseSensitive: false).hasMatch(dishInCol0)) {
             if (currentDish != null || currentIngredients.isNotEmpty) flushCard();
             currentDish = dishInCol0;
@@ -1401,9 +1475,16 @@ class AiServiceSupabase implements AiService {
         currentDish = (dm != null && dm.isNotEmpty && _isValidDishName(dm)) ? dm : null;
         if (currentDish == null || currentDish!.isEmpty) {
           for (final c in cells) {
-            if (c.length > 2 && _isValidDishName(c) && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(c) && !RegExp(r'ттк|карта|брутто|нетто|наименование').hasMatch(c.toLowerCase())) {
+            if (c.length > 2 && !_isSkipForDishName(c) && _isValidDishName(c) && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(c) && !RegExp(r'ттк|карта|брутто|нетто|наименование').hasMatch(c.toLowerCase())) {
               currentDish = c;
               break;
+            }
+            if (_isSkipForDishName(c)) {
+              final extracted = _extractDishBeforeOrganoleptic(c);
+              if (extracted != null) {
+                currentDish = extracted;
+                break;
+              }
             }
           }
         }

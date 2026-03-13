@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../models/employee.dart';
 import '../models/haccp_log.dart';
 import '../models/haccp_log_type.dart';
 import '../services/services.dart';
@@ -22,6 +23,7 @@ class HaccpJournalDetailScreen extends StatefulWidget {
 
 class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
   List<HaccpLog> _logs = [];
+  List<Employee> _employees = [];
   bool _loading = true;
   DateTime? _dateFrom;
   DateTime? _dateTo;
@@ -36,6 +38,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
     setState(() => _loading = true);
     try {
       final svc = context.read<HaccpLogServiceSupabase>();
+      final emps = await acc.getEmployeesForEstablishment(est.id);
       final logs = await svc.getLogs(
         establishmentId: est.id,
         logType: _logType,
@@ -44,6 +47,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
       );
       if (mounted) setState(() {
         _logs = logs;
+        _employees = emps;
         _loading = false;
       });
     } catch (_) {
@@ -232,13 +236,11 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
                             ],
                           ),
                         )
-                      : ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _logs.length,
-                          itemBuilder: (_, i) {
-                            final log = _logs[i];
-                            return _LogTile(log: log, onTap: () => _openAddForm());
-                          },
+                      : _JournalPagesView(
+                          logs: _logs,
+                          employees: _employees,
+                          showEmployeeInfo: acc.currentEmployee?.canViewDepartment('management') ?? false,
+                          onTap: _openAddForm,
                         ),
                 ),
               ],
@@ -266,25 +268,82 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
   }
 }
 
-class _LogTile extends StatelessWidget {
-  const _LogTile({required this.log, required this.onTap});
+/// Журнальные страницы: группировка по 1 дню, для собственника/управления — ФИО, должность, дата-время.
+class _JournalPagesView extends StatelessWidget {
+  const _JournalPagesView({
+    required this.logs,
+    required this.employees,
+    required this.showEmployeeInfo,
+    required this.onTap,
+  });
 
-  final HaccpLog log;
+  final List<HaccpLog> logs;
+  final List<Employee> employees;
+  final bool showEmployeeInfo;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final dateStr = DateFormat('dd.MM.yyyy HH:mm').format(log.createdAt);
+    final idToEmp = {for (final e in employees) e.id: e};
+    final byDate = <DateTime, List<HaccpLog>>{};
+    for (final log in logs) {
+      final d = DateTime(log.createdAt.year, log.createdAt.month, log.createdAt.day);
+      byDate.putIfAbsent(d, () => []).add(log);
+    }
+    final dates = byDate.keys.toList()..sort((a, b) => b.compareTo(a));
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: dates.length,
+      itemBuilder: (_, i) {
+        final date = dates[i];
+        final dayLogs = byDate[date]!;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: i > 0 ? 16 : 0, bottom: 8),
+              child: Text(
+                DateFormat('dd.MM.yyyy').format(date),
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+              ),
+            ),
+            ...dayLogs.map((log) => _LogTile(
+                  log: log,
+                  employee: showEmployeeInfo ? idToEmp[log.createdByEmployeeId] : null,
+                  onTap: onTap,
+                )),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _LogTile extends StatelessWidget {
+  const _LogTile({required this.log, this.employee, required this.onTap});
+
+  final HaccpLog log;
+  final Employee? employee;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final timeStr = DateFormat('HH:mm').format(log.createdAt);
+    final empLine = employee != null
+        ? '${employee!.fullName}${employee!.surname != null ? ' ${employee!.surname}' : ''}, ${employee!.roleDisplayName} · $timeStr'
+        : DateFormat('dd.MM.yyyy HH:mm').format(log.createdAt);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
-        title: Text(dateStr, style: const TextStyle(fontWeight: FontWeight.w500)),
+        title: Text(empLine, style: const TextStyle(fontWeight: FontWeight.w500)),
         subtitle: Text(log.summaryLine(), maxLines: 2, overflow: TextOverflow.ellipsis),
         trailing: const Icon(Icons.chevron_right),
         onTap: onTap,
       ),
     );
   }
-
 }

@@ -126,19 +126,47 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
   const isValidDishName = (s: string) =>
     s.length >= 4 && !isUnitOrNutrition(s) && /[а-яА-ЯёЁa-zA-Z]{2,}/.test(s);
 
-  // Название блюда часто в первых строках (шапка ТТК до таблицы)
+  const isSkipForDishName = (s: string) => {
+    const low = s.trim().toLowerCase();
+    return low.includes("органолептическ") || low.includes("внешний вид") || low.includes("консистенция") ||
+      low.includes("запах") || low.includes("вкус") || low.includes("цвет") ||
+      (low.includes("показатели") && low.includes("органолепт"));
+  };
+  const extractDishBeforeOrganoleptic = (cell: string): string | null => {
+    const idx = cell.toLowerCase().indexOf("органолептическ");
+    if (idx <= 0) return null;
+    const before = cell.substring(0, idx).trim();
+    if (before.length < 4) return null;
+    const stop = /технологическая карта|название на чеке|область применения|хранение|срок хранения/i;
+    const stopMatch = before.match(stop);
+    const segment = stopMatch ? before.substring(0, stopMatch.index!).trim() : before;
+    const words = segment.split(/\s+/).filter((w) => w.length > 1).slice(0, 6);
+    if (words.length === 0) return null;
+    const candidate = words.join(" ").trim();
+    if (candidate.length >= 4 && isValidDishName(candidate) && !isSkipForDishName(candidate)) return candidate;
+    return null;
+  };
+
+  // Название блюда часто в первых строках или в той же строке, что заголовок (iiko: Мясная к пенному | ... | Органолептические показатели:)
   let initialDish: string | null = null;
   const headerKeys = [...NAME_KEYS, ...PRODUCT_KEYS, ...GROSS_KEYS, ...NET_KEYS, ...WASTE_KEYS, ...OUTPUT_KEYS, ...UNIT_KEYS];
-  for (let r = 0; r < headerIdx && r < rows.length; r++) {
+  const limitCol = headerIdx >= 0 && (nameCol > 0 || productCol > 0) ? Math.min(nameCol > 0 ? nameCol : productCol, 20) : 999;
+  for (let r = 0; r <= headerIdx && r < rows.length; r++) {
     const row = rows[r] ?? [];
-    for (let c = 0; c < row.length; c++) {
+    const colLimit = r === headerIdx ? limitCol : row.length;
+    for (let c = 0; c < row.length && c < colLimit; c++) {
       const cell = (row[c] ?? "").trim();
-      if (cell.length < 3 || !isValidDishName(cell)) continue;
+      if (cell.length < 3) continue;
       if (cell.endsWith(":")) continue;
       if (/^\d{1,2}\.\d{1,2}\.\d{2,4}/.test(cell)) continue;
       if (cell.toLowerCase().startsWith("технологическая карта")) continue;
       if (cell.toLowerCase().includes("название на чеке") || cell.toLowerCase().includes("название чека")) continue;
-      if (cell.toLowerCase().includes("органолептическ") || cell.toLowerCase().includes("внешний вид") || cell.toLowerCase().includes("консистенция") || cell.toLowerCase().includes("запах") || cell.toLowerCase().includes("вкус") || cell.toLowerCase().includes("цвет")) continue;
+      if (isSkipForDishName(cell)) {
+        const extracted = extractDishBeforeOrganoleptic(cell);
+        if (extracted) { initialDish = extracted; break; }
+        continue;
+      }
+      if (!isValidDishName(cell)) continue;
       if (cell.length < 15 && !/[a-zA-Zа-яА-ЯёЁ]{4,}/.test(cell)) continue;
       const lower = cell.toLowerCase();
       if (headerKeys.some((k) => lower.includes(k))) continue;
@@ -293,6 +321,11 @@ export function parseTtkByStoredTemplate(
   const isValidDish = (s: string) =>
     s.length >= 4 && !unitPatterns.test(s.replace(/\s/g, "")) && !/^\d+\s*кдж\)?$/i.test(s) && /[а-яА-ЯёЁa-zA-Z]{2,}/.test(s);
 
+  const isSkip = (s: string) => {
+    const low = s.trim().toLowerCase();
+    return low.includes("органолептическ") || low.includes("внешний вид") || low.includes("консистенция") ||
+      low.includes("запах") || low.includes("вкус") || low.includes("цвет");
+  };
   for (let r = 0; r < headerIdx && r < rows.length; r++) {
     for (const c of rows[r] ?? []) {
       const s = (c ?? "").trim();
@@ -300,6 +333,7 @@ export function parseTtkByStoredTemplate(
       if (s.endsWith(":")) continue;
       if (/^\d{1,2}\.\d{1,2}\.\d{2,4}/.test(s)) continue;
       if (s.toLowerCase().startsWith("технологическая карта")) continue;
+      if (isSkip(s)) continue;
       currentDish = s;
       break;
     }
