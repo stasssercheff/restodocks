@@ -455,22 +455,23 @@ class AiServiceSupabase implements AiService {
       if (list.isNotEmpty) {
         lastParseTechCardPdfReason = null;
         final rowsRaw = data['rows'];
+        String? sig;
         if (rowsRaw is List && rowsRaw.isNotEmpty) {
           final rows = rowsRaw.map((r) => (r is List ? r : <String>[]).map((c) => c?.toString() ?? '').toList()).toList();
           if (rows.length >= 2) {
             _saveTemplateAfterAi(rows, list, 'pdf');
             lastParsedRows = rows;
-            final sig = _headerSignatureFromRows(rows);
+            sig = _headerSignatureFromRows(rows);
             if (sig != null && sig.isNotEmpty) lastParseHeaderSignature = sig;
           }
         } else {
           lastParsedRows = null;
           lastParseHeaderSignature = null;
         }
-      } else {
-        lastParsedRows = null;
-        lastParseHeaderSignature = null;
+        return await _applyParseCorrections(list, sig ?? lastParseHeaderSignature, establishmentId);
       }
+      lastParsedRows = null;
+      lastParseHeaderSignature = null;
       if (list.isEmpty) lastParseTechCardErrors = null;
       return list;
     } catch (e) {

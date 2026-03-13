@@ -332,6 +332,15 @@ export function parseTtkByStoredTemplate(
   const isValidDish = (s: string) =>
     s.length >= 4 && !unitPatterns.test(s.replace(/\s/g, "")) && !/^\d+\s*кдж\)?$/i.test(s) && /[а-яА-ЯёЁa-zA-Z]{2,}/.test(s);
 
+  /** Слова заголовка и мусор — не название блюда и не продукт */
+  const HEADER_WORDS = ["брутто", "нетто", "наименование", "продукт", "сырьё", "расход", "норма", "выход", "ед.изм", "ед изм"];
+  const TRASH_WORDS = ["из", "на", "жидкая", "пищевой"];
+  const isHeaderWord = (s: string) => {
+    const low = s.trim().toLowerCase();
+    if (TRASH_WORDS.includes(low)) return true;
+    return HEADER_WORDS.some((w) => low === w || low.startsWith(w + " ") || low.endsWith(" " + w));
+  };
+
   const isSkip = (s: string) => {
     const low = s.trim().toLowerCase();
     return low.includes("органолептическ") || low.includes("внешний вид") || low.includes("консистенция") ||
@@ -356,7 +365,8 @@ export function parseTtkByStoredTemplate(
     if (nameRow >= 0 && nameRow < rows.length) {
       const row = rows[nameRow];
       const primary = (row?.[dishNameCol] ?? "").trim();
-      const valid = (s: string) => s.length >= 2 && !isSkip(s) && isValidDish(s);
+      const valid = (s: string) =>
+        s.length >= 2 && !isSkip(s) && isValidDish(s) && !isHeaderWord(s);
       if (primary.length >= 2 && valid(primary)) {
         currentDish = primary;
       } else {
@@ -408,8 +418,9 @@ export function parseTtkByStoredTemplate(
     const nameVal = nameCol < cells.length ? cells[nameCol] : "";
     let productVal = pCol < cells.length ? cells[pCol] : "";
     // Wide Search для продукта: если в выученной колонке пусто — соседние 3 ячейки
-    if (!productVal || /^[\d,.\-\s]+$/.test(productVal)) {
-      const isValidProduct = (s: string) => s.length >= 2 && !/^[\d,.\-\s]+$/.test(s) && s.toLowerCase() !== "итого";
+    const isValidProduct = (s: string) =>
+      s.trim().length >= 3 && !/^[\d,.\-\s]+$/.test(s) && s.toLowerCase() !== "итого" && !isHeaderWord(s);
+    if (!productVal || !isValidProduct(productVal)) {
       const neighborCols = [pCol - 1, pCol - 2, pCol + 1, pCol + 2].filter((c) => c >= 0 && c < cells.length);
       for (const c of neighborCols) {
         const v = cells[c] ?? "";
@@ -445,8 +456,8 @@ export function parseTtkByStoredTemplate(
       if (currentDish != null && currentIngredients.length > 0) flushCard();
       currentDish = nameVal;
     }
-    if (productVal) {
-      if (currentDish == null && nameVal && isValidDish(nameVal)) currentDish = nameVal;
+    if (productVal && isValidProduct(productVal)) {
+      if (currentDish == null && nameVal && isValidDish(nameVal) && !isHeaderWord(nameVal)) currentDish = nameVal;
       let waste = parseNum(wasteVal);
       const gross = grossNum;
       const net = netNum;

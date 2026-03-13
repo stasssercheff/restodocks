@@ -72,30 +72,52 @@ export async function tryParseByStoredTemplates(rows: string[][]): Promise<TryPa
   if (learned?.net_col != null) learnedNetCol = learned.net_col as number;
 
   const templateHeaderIdx = (data.header_row_index as number) ?? 0;
-  const allCards: TtkCard[] = [];
-  const allSanityIssues: string[] = [];
+  const headerWords = ["брутто", "нетто", "наименование", "продукт", "сырьё"];
+  const isGarbageCard = (c: { dishName: string | null; ingredients: { productName: string }[] }) => {
+    const dn = (c.dishName ?? "").trim().toLowerCase();
+    if (headerWords.some((w) => dn === w || dn.startsWith(w))) return true;
+    const garbage = c.ingredients.filter((i) => {
+      const p = (i.productName ?? "").trim().toLowerCase();
+      return headerWords.some((w) => p === w) || /^[\d,.\s]+$/.test(p) || p.length <= 2;
+    }).length;
+    return c.ingredients.length > 0 && garbage / c.ingredients.length >= 0.5;
+  };
 
-  for (let i = 0; i < headerIndices.length; i++) {
-    const headerIdx = headerIndices[i];
-    const nextHeader = headerIndices[i + 1] ?? rows.length;
-    const effectiveHeader = templateHeaderIdx > 0 && headerIdx === 0 ? templateHeaderIdx : headerIdx;
-    const startRow = Math.max(0, effectiveHeader + (dishNameRowOffset ?? 0));
-    const blockRows = rows.slice(startRow, nextHeader);
-    const headerIdxInBlock = effectiveHeader - startRow;
+  const parseBlock = (useLearned: boolean) => {
+    const cards: TtkCard[] = [];
+    const issues: string[] = [];
+    for (let i = 0; i < headerIndices.length; i++) {
+      const headerIdx = headerIndices[i];
+      const nextHeader = headerIndices[i + 1] ?? rows.length;
+      const effectiveHeader = templateHeaderIdx > 0 && headerIdx === 0 ? templateHeaderIdx : headerIdx;
+      const dOffset = useLearned ? (dishNameRowOffset ?? 0) : 0;
+      const startRow = Math.max(0, effectiveHeader + dOffset);
+      const blockRows = rows.slice(startRow, nextHeader);
+      const headerIdxInBlock = effectiveHeader - startRow;
+      const res = parseTtkByStoredTemplate(blockRows, {
+        headerIdx: headerIdxInBlock,
+        nameCol: (data.name_col as number) ?? 0,
+        productCol: useLearned ? (learnedProductCol ?? (data.product_col as number) ?? 1) : (data.product_col as number) ?? 1,
+        grossCol: useLearned ? (learnedGrossCol ?? (data.gross_col as number) ?? -1) : (data.gross_col as number) ?? -1,
+        netCol: useLearned ? (learnedNetCol ?? (data.net_col as number) ?? -1) : (data.net_col as number) ?? -1,
+        wasteCol: (data.waste_col as number) ?? -1,
+        outputCol: (data.output_col as number) ?? -1,
+        dishNameRowOffset: useLearned ? dishNameRowOffset ?? undefined : undefined,
+        dishNameCol: useLearned ? dishNameCol ?? undefined : undefined,
+      });
+      cards.push(...res.cards);
+      issues.push(...res.sanityIssues);
+    }
+    return { cards, issues };
+  };
 
-    const result = parseTtkByStoredTemplate(blockRows, {
-      headerIdx: headerIdxInBlock,
-      nameCol: (data.name_col as number) ?? 0,
-      productCol: learnedProductCol ?? (data.product_col as number) ?? 1,
-      grossCol: learnedGrossCol ?? (data.gross_col as number) ?? -1,
-      netCol: learnedNetCol ?? (data.net_col as number) ?? -1,
-      wasteCol: (data.waste_col as number) ?? -1,
-      outputCol: (data.output_col as number) ?? -1,
-      dishNameRowOffset: dishNameRowOffset ?? undefined,
-      dishNameCol: dishNameCol ?? undefined,
-    });
-    allCards.push(...result.cards);
-    allSanityIssues.push(...result.sanityIssues);
+  let { cards: allCards, issues: allSanityIssues } = parseBlock(true);
+  if (allCards.some(isGarbageCard) && (dishNameRowOffset != null || learnedProductCol != null)) {
+    const fallback = parseBlock(false);
+    if (fallback.cards.length > 0 && !fallback.cards.every(isGarbageCard)) {
+      allCards = fallback.cards;
+      allSanityIssues = fallback.issues;
+    }
   }
 
   const uniqueSanity = [...new Set(allSanityIssues)];
