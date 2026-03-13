@@ -302,7 +302,7 @@ class _JournalPagesView extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.only(top: i > 0 ? 16 : 0, bottom: 8),
+              padding: EdgeInsets.only(top: i > 0 ? 16 : 0, bottom: 8),
               child: Text(
                 DateFormat('dd.MM.yyyy').format(date),
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
