@@ -145,6 +145,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 24),
             ],
 
+            // Смена пароля
+            _buildChangePasswordSection(localization),
+            const SizedBox(height: 24),
+
             // Выход
             _buildLogoutSection(localization),
           ],
@@ -483,6 +487,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Widget _buildChangePasswordSection(LocalizationService localization) {
+    return ListTile(
+      leading: const Icon(Icons.lock),
+      title: Text(localization.t('change_password') ?? 'Сменить пароль'),
+      subtitle: Text(localization.t('change_password_hint') ?? 'Введите старый пароль и новый дважды'),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () => _showChangePasswordDialog(context),
+    );
+  }
+
+  void _showChangePasswordDialog(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => _ChangePasswordDialog(
+        onCancel: () => Navigator.of(ctx).pop(),
+        onSuccess: () {
+          Navigator.of(ctx).pop();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                context.read<LocalizationService>().t('change_password_email_sent') ??
+                    'Письмо с подтверждением отправлено. Перейдите по ссылке.',
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildLogoutSection(LocalizationService localization) {
     return ListTile(
       leading: const Icon(Icons.logout, color: Colors.red),
@@ -797,6 +832,154 @@ class _ProfileEditDialogState extends State<_ProfileEditDialog> {
       height: size,
       decoration: BoxDecoration(color: Colors.grey[300], shape: BoxShape.circle),
       child: Icon(Icons.person, size: size * 0.5, color: Colors.grey[600]),
+    );
+  }
+}
+
+/// Диалог смены пароля: старый пароль, новый, подтверждение.
+class _ChangePasswordDialog extends StatefulWidget {
+  const _ChangePasswordDialog({
+    required this.onCancel,
+    required this.onSuccess,
+  });
+
+  final VoidCallback onCancel;
+  final VoidCallback onSuccess;
+
+  @override
+  State<_ChangePasswordDialog> createState() => _ChangePasswordDialogState();
+}
+
+class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _oldController = TextEditingController();
+  final _newController = TextEditingController();
+  final _confirmController = TextEditingController();
+
+  bool _isLoading = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _oldController.dispose();
+    _newController.dispose();
+    _confirmController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    final loc = context.read<LocalizationService>();
+    final result = await context.read<EmailService>().requestChangePassword(
+      oldPassword: _oldController.text,
+      newPassword: _newController.text,
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _isLoading = false;
+      if (result.ok) {
+        widget.onSuccess();
+      } else {
+        final e = result.error;
+        _error = e == 'invalid_old_password'
+            ? (loc.t('invalid_old_password') ?? 'Неверный текущий пароль')
+            : e == 'password_min_6_chars'
+                ? (loc.t('password_min_6') ?? 'Пароль не менее 6 символов')
+                : e == 'invalid_session'
+                    ? (loc.t('session_expired') ?? 'Сессия истекла. Войдите снова.')
+                    : e ?? loc.t('error') ?? 'Ошибка';
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final loc = context.read<LocalizationService>();
+
+    return AlertDialog(
+      title: Text(loc.t('change_password') ?? 'Сменить пароль'),
+      content: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                loc.t('change_password_description') ?? 'Введите текущий пароль и новый дважды. На почту придёт ссылка для подтверждения.',
+                style: theme.textTheme.bodySmall,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _oldController,
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: loc.t('current_password') ?? 'Текущий пароль',
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.lock_outline),
+                ),
+                validator: (v) {
+                  if (v == null || v.isEmpty) return loc.t('password_required') ?? 'Введите пароль';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _newController,
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: loc.t('new_password') ?? 'Новый пароль',
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.lock),
+                ),
+                validator: (v) {
+                  if (v == null || v.length < 6) return loc.t('password_min_6') ?? 'Минимум 6 символов';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _confirmController,
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: loc.t('confirm_password') ?? 'Подтвердите пароль',
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.lock_outline),
+                ),
+                validator: (v) {
+                  if (v != _newController.text) return loc.t('passwords_mismatch') ?? 'Пароли не совпадают';
+                  return null;
+                },
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isLoading ? null : widget.onCancel,
+          child: Text(loc.t('cancel') ?? 'Отмена'),
+        ),
+        FilledButton(
+          onPressed: _isLoading ? null : _submit,
+          child: _isLoading
+              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+              : Text(loc.t('send_confirmation') ?? 'Отправить'),
+        ),
+      ],
     );
   }
 }

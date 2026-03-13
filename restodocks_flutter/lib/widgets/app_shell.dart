@@ -13,6 +13,12 @@ class AppShell extends StatelessWidget {
 
   final Widget child;
 
+  static const _dataAccessRequiredPaths = [
+    '/tech-cards', '/nomenclature', '/inventory', '/checklists',
+    '/product-order', '/menu', '/suppliers', '/order-lists',
+    '/expenses', '/haccp-journals', '/inbox',
+  ];
+
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
@@ -33,8 +39,11 @@ class AppShell extends StatelessWidget {
     final location = GoRouterState.of(context).matchedLocation;
     final selectedIndex = _indexForLocation(location, middleAction, noDataAccess, isKitchenNoData, currentEmployee);
 
+    final isDataRequiredRoute = _dataAccessRequiredPaths.any((p) => location.startsWith(p));
+    final showAccessPendingStub = noDataAccess && isDataRequiredRoute;
+
     return Scaffold(
-      body: child,
+      body: showAccessPendingStub ? _AccessPendingPlaceholder(loc: loc) : child,
       bottomNavigationBar: NavigationBar(
         selectedIndex: selectedIndex,
         onDestinationSelected: (i) => _onTap(context, i, middleAction, noDataAccess, isKitchenNoData, currentEmployee, selectedIndex),
@@ -130,5 +139,46 @@ class AppShell extends StatelessWidget {
       default:
         context.go('/home', extra: extra);
     }
+  }
+}
+
+class _AccessPendingPlaceholder extends StatelessWidget {
+  const _AccessPendingPlaceholder({required this.loc});
+
+  final LocalizationService loc;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.hourglass_empty_rounded,
+              size: 72,
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.6),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              loc.t('account_awaiting_confirmation'),
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              loc.t('account_awaiting_confirmation_subtitle'),
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

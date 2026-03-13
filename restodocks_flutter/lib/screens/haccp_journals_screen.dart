@@ -34,7 +34,7 @@ class _HaccpJournalsScreenState extends State<HaccpJournalsScreen> {
     if (est == null) {
       return Scaffold(
         appBar: AppBar(leading: appBarBackButton(context), title: Text(loc.t('haccp_journals') ?? 'Журналы и ХАССП')),
-        body: const Center(child: Text('Заведение не выбрано')),
+        body: Center(child: Text(loc.t('haccp_establishment_not_selected') ?? 'Заведение не выбрано')),
       );
     }
 
@@ -127,13 +127,13 @@ class _EmptyState extends StatelessWidget {
             Icon(Icons.assignment_outlined, size: 64, color: Theme.of(context).colorScheme.outline),
             const SizedBox(height: 16),
             Text(
-              loc.t('haccp_no_journals_hint') ?? 'Журналы не настроены',
+              loc.t('haccp_no_journals_hint') ?? 'Журналы ХАССП не настроены',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
             Text(
-              loc.t('haccp_configure_in_settings') ?? 'Собственник и сотрудники управления выбирают журналы в Настройках',
+              loc.t('haccp_no_journals_subtitle') ?? loc.t('haccp_configure_in_settings') ?? 'Собственник и сотрудники управления выбирают журналы в Настройках',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),

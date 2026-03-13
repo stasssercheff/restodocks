@@ -105,6 +105,30 @@ class EmailService {
     }
   }
 
+  /// Запросить смену пароля из личного кабинета (старый + новый).
+  /// Требует авторизации. Отправляет письмо со ссылкой, по ссылке — страница смены пароля.
+  Future<({bool ok, String? error})> requestChangePassword({
+    required String oldPassword,
+    required String newPassword,
+  }) async {
+    try {
+      final res = await _client.functions.invoke(
+        'request-change-password',
+        body: {
+          'old_password': oldPassword,
+          'new_password': newPassword,
+        },
+      );
+      if (res.status == 200) {
+        return (ok: true, error: null);
+      }
+      final msg = (res.data as Map?)?['error']?.toString() ?? 'Unknown error';
+      return (ok: false, error: msg);
+    } catch (e) {
+      return (ok: false, error: e.toString());
+    }
+  }
+
   /// Сбросить пароль по токену из письма.
   Future<({bool ok, String? error})> resetPasswordWithToken(String token, String newPassword) async {
     try {
