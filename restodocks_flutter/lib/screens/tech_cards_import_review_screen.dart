@@ -314,6 +314,61 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
   static String _norm(String s) =>
       stripIikoPrefix(s).trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
 
+  /// Топологическая сортировка: сначала листовые ТТК (без ПФ), потом с ПФ. При цикле — fallback.
+  static List<_ReviewItem> _topologicalSortOrFallback(
+    List<_ReviewItem> items,
+    List<({String id, String name})> techCardsPf,
+  ) {
+    final availablePf = <String>{
+      for (final t in techCardsPf) ...[
+        _norm(t.name),
+        if (normalizeForPfMatching(t.name).isNotEmpty) normalizeForPfMatching(t.name),
+      ],
+    };
+    final itemToDeps = <int, Set<String>>{};
+    for (var i = 0; i < items.length; i++) {
+      final deps = <String>{};
+      for (final ing in items[i].result.ingredients) {
+        if (ing.ingredientType != 'semi_finished') continue;
+        final n = normalizeForPfMatching(ing.productName);
+        if (n.isNotEmpty) deps.add(n);
+      }
+      itemToDeps[i] = deps;
+    }
+    final itemToName = <int, String>{};
+    for (var i = 0; i < items.length; i++) {
+      final name = (items[i].result.dishName ?? '').trim();
+      if (name.isNotEmpty) {
+        itemToName[i] = normalizeForPfMatching(name);
+        if (itemToName[i]!.isEmpty) itemToName[i] = _norm(name);
+      }
+    }
+    final result = <_ReviewItem>[];
+    var remaining = List<int>.generate(items.length, (i) => i);
+    var stuck = false;
+    while (remaining.isNotEmpty && !stuck) {
+      final ready = remaining.where((i) {
+        final deps = itemToDeps[i] ?? {};
+        return deps.every((d) => availablePf.contains(d));
+      }).toList();
+      if (ready.isEmpty) {
+        stuck = true;
+        break;
+      }
+      for (final i in ready) {
+        result.add(items[i]);
+        final n = itemToName[i];
+        if (n != null) availablePf.add(n);
+        remaining.remove(i);
+      }
+    }
+    if (stuck || remaining.isNotEmpty) {
+      return List<_ReviewItem>.from(items)
+        ..sort((a, b) => (a.isSemiFinished == b.isSemiFinished) ? 0 : (a.isSemiFinished ? -1 : 1));
+    }
+    return result;
+  }
+
   /// Нечёткое совпадение: продукт в каталоге содержит название ингредиента как префикс.
   static bool _fuzzyMatch(String ingredientNorm, String catalogNorm) {
     if (ingredientNorm.isEmpty || catalogNorm.length < ingredientNorm.length) return false;

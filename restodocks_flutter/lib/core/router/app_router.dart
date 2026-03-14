@@ -19,6 +19,7 @@ import '../../screens/checklist_inbox_detail_screen.dart';
 import '../../screens/iiko_inventory_inbox_detail_screen.dart';
 import '../../screens/inventory_merge_screen.dart';
 import '../../screens/writeoff_inbox_detail_screen.dart';
+import '../../screens/writeoff_summary_inbox_screen.dart';
 import '../../screens/writeoffs_screen.dart';
 import '../../screens/haccp_log_detail_screen.dart';
 import '../../screens/home/expenses_screen.dart';
@@ -389,6 +390,25 @@ class AppRouter {
                   final id = state.pathParameters['id'] ?? '';
                   return _slideTransitionPage(
                       state, WriteoffInboxDetailScreen(documentId: id));
+                },
+              ),
+              GoRoute(
+                path: 'writeoff-summary',
+                pageBuilder: (context, state) {
+                  final extra = state.extra;
+                  List<InboxDocument> docs = [];
+                  String dateLabel = '';
+                  if (extra is Map) {
+                    docs = (extra['documents'] as List<dynamic>?)
+                            ?.whereType<InboxDocument>()
+                            .toList() ??
+                        [];
+                    dateLabel = (extra['dateLabel'] as String?) ?? '';
+                  }
+                  return _slideTransitionPage(
+                    state,
+                    WriteoffSummaryInboxScreen(documents: docs, dateLabel: dateLabel),
+                  );
                 },
               ),
               GoRoute(

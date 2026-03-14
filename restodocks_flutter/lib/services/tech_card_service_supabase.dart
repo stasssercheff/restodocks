@@ -450,10 +450,15 @@ class TechCardServiceSupabase {
     final norm = _normalizeName(productName);
     if (norm.isEmpty) return null;
     if (ingredientType == 'semi_finished') {
-      for (final tc in techCardsPf) {
-        if (_normalizeName(tc.name) == norm) return tc.id;
+      final pfNorm = normalizeForPfMatching(productName);
+      if (pfNorm.isNotEmpty) {
+        for (final tc in techCardsPf) {
+          if (normalizeForPfMatching(tc.name) == pfNorm) return tc.id;
+        }
+        final found = createdByName[pfNorm] ?? createdByName[norm] ?? createdByName[productName.trim()];
+        if (found != null) return found;
       }
-      return createdByName[norm] ?? createdByName[productName.trim()];
+      return null;
     }
     if (ingredientType == 'product') {
       for (final p in products) {
@@ -476,10 +481,13 @@ class TechCardServiceSupabase {
         if (_fuzzyPrefixMatch(norm, _normalizeName(p.name))) return p.id;
       }
     }
+    final pfNorm = normalizeForPfMatching(productName);
     for (final tc in techCardsPf) {
-      if (_normalizeName(tc.name) == norm) return tc.id;
+      if (_normalizeName(tc.name) == norm || (pfNorm.isNotEmpty && normalizeForPfMatching(tc.name) == pfNorm)) {
+        return tc.id;
+      }
     }
-    return createdByName[norm] ?? createdByName[productName.trim()];
+    return createdByName[norm] ?? createdByName[pfNorm] ?? createdByName[productName.trim()];
   }
 
   /// Создание ТТК из результата распознавания ИИ (пакетный импорт).
@@ -609,6 +617,7 @@ class TechCardServiceSupabase {
     if (createdTechCardsByName != null) {
       createdTechCardsByName[_normalizeName(name)] = updated.id;
       createdTechCardsByName[name] = updated.id;
+      if (isPf) createdTechCardsByName[normalizeForPfMatching(name)] = updated.id;
     }
     return updated;
   }

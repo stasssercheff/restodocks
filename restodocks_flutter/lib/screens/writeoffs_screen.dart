@@ -73,6 +73,7 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
   final Map<WriteoffCategory, List<_WriteoffRow>> _rowsByCategory = {};
   final ValueNotifier<int> _rowsVersion = ValueNotifier(0);
   bool _loading = true;
+  List<Product> _cachedProducts = [];
   List<TechCard> _cachedTechCards = [];
 
   @override
@@ -107,8 +108,6 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
 
   @override
   Future<void> restoreState(Map<String, dynamic> data) async {
-    final productStore = context.read<ProductStoreSupabase>();
-    final tcSvc = context.read<TechCardServiceSupabase>();
     final dataEstId = context.read<AccountManagerSupabase>().establishment?.dataEstablishmentId;
     if (dataEstId == null) return;
 
@@ -121,10 +120,8 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
     final raw = data['rowsByCategory'] as Map<String, dynamic>?;
     if (raw == null) return;
 
-    await productStore.loadProducts();
-    await productStore.loadNomenclature(dataEstId);
-    final techCards = await tcSvc.getTechCardsForEstablishment(dataEstId);
-    final products = productStore.getNomenclatureProducts(dataEstId);
+    final products = _cachedProducts;
+    final techCards = _cachedTechCards;
 
     for (final entry in raw.entries) {
       WriteoffCategory? cat;
@@ -175,11 +172,10 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
     final account = context.read<AccountManagerSupabase>();
     final productStore = context.read<ProductStoreSupabase>();
     final tcSvc = context.read<TechCardServiceSupabase>();
-    final est = account.establishment;
-    final dataEstId = est?.dataEstablishmentId;
+    final dataEstId = account.establishment?.dataEstablishmentId;
     if (dataEstId != null) {
-      await productStore.loadProducts();
-      await productStore.loadNomenclature(dataEstId);
+      // Быстрая загрузка только номенклатуры заведения (без всего каталога)
+      _cachedProducts = await productStore.loadNomenclatureProductsDirect(dataEstId);
       _cachedTechCards = await tcSvc.getTechCardsForEstablishment(dataEstId);
     }
     if (mounted) {
@@ -225,15 +221,8 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
   Future<void> _showItemPicker(WriteoffCategory cat) async {
     final loc = context.read<LocalizationService>();
     final account = context.read<AccountManagerSupabase>();
-    final productStore = context.read<ProductStoreSupabase>();
-    final dataEstId = account.establishment?.dataEstablishmentId;
-    if (dataEstId == null) return;
-
-    var products = productStore.getNomenclatureProducts(dataEstId);
-    if (products.isEmpty) {
-      products = await productStore.loadNomenclatureProductsDirect(dataEstId);
-    }
     final emp = account.currentEmployee;
+    final products = _cachedProducts;
     final visibleTc = emp == null
         ? _cachedTechCards
         : _cachedTechCards.where((tc) => emp.canSeeTechCard(tc.sections)).toList();
@@ -588,19 +577,20 @@ class _WriteoffTabContent extends StatelessWidget {
     return (w - scrollWidth).clamp(200.0, 350.0);
   }
 
-  double _colNameWidth(BuildContext context) =>
-      _leftWidth(context) - _colNoWidth - _colGap - _colUnitWidth - _colGap - _colTotalWidth - _colGap;
-
   String _formatQty(double q) {
     if (q == q.truncateToDouble()) return q.toInt().toString();
     return q.toStringAsFixed(1);
   }
+
+  static double _colNameWidthFromLeft(double leftW) =>
+      leftW - _colNoWidth - _colGap - _colUnitWidth - _colGap - _colTotalWidth - _colGap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final lang = loc.currentLanguageCode;
     final leftW = _leftWidth(context);
+    final colNameW = _colNameWidthFromLeft(leftW);
 
     return Column(
       children: [
@@ -638,7 +628,7 @@ class _WriteoffTabContent extends StatelessWidget {
                           children: [
                             SizedBox(width: _colNoWidth, child: Text('#', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
                             SizedBox(width: _colGap),
-                            SizedBox(width: _colNameWidth(context), child: Text(loc.t('inventory_item_name') ?? 'Наименование', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
+                            SizedBox(width: colNameW, child: Text(loc.t('inventory_item_name') ?? 'Наименование', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
                             SizedBox(width: _colGap),
                             SizedBox(width: _colUnitWidth, child: Text(loc.t('inventory_unit') ?? 'Ед.', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
                             SizedBox(width: _colGap),
@@ -666,7 +656,7 @@ class _WriteoffTabContent extends StatelessWidget {
                             row: r,
                             rowIndex: i,
                             rowNumber: rowNum,
-                            leftWidth: leftW,
+                            colNameWidth: colNameW,
                             formatQty: _formatQty,
                             onSetQuantity: onSetQuantity,
                             onRemove: onRemove,
@@ -713,7 +703,7 @@ class _WriteoffDataRow extends StatelessWidget {
     required this.row,
     required this.rowIndex,
     required this.rowNumber,
-    required this.leftWidth,
+    required this.colNameWidth,
     required this.formatQty,
     required this.onSetQuantity,
     required this.onRemove,
@@ -723,7 +713,7 @@ class _WriteoffDataRow extends StatelessWidget {
   final _WriteoffRow row;
   final int rowIndex;
   final int rowNumber;
-  final double leftWidth;
+  final double colNameWidth;
   final String Function(double) formatQty;
   final void Function(int, int, double) onSetQuantity;
   final void Function(int) onRemove;
@@ -748,7 +738,8 @@ class _WriteoffDataRow extends StatelessWidget {
           children: [
           SizedBox(width: _colNoWidth, child: Text('$rowNumber', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant))),
           SizedBox(width: _colGap),
-          Expanded(
+          SizedBox(
+            width: colNameWidth,
             child: Text(
               row.displayName(loc.currentLanguageCode),
               style: theme.textTheme.bodyMedium,

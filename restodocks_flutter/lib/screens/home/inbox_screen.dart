@@ -784,7 +784,7 @@ class _InboxScreenState extends State<InboxScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: dateKeys.expand((dateKey) {
-        final docs = List<InboxDocument>.from(grouped[dateKey]!)
+        final dateDocs = List<InboxDocument>.from(grouped[dateKey]!)
           ..sort((a, b) => (a.employeeName).toLowerCase().compareTo((b.employeeName).toLowerCase()));
         return [
           Padding(
@@ -797,7 +797,18 @@ class _InboxScreenState extends State<InboxScreen> {
               ),
             ),
           ),
-          ...docs.map((doc) => _DocumentTile(document: doc, onDownload: _downloadDocument)),
+          // Сводное списание за дату (для управления)
+          ListTile(
+            leading: const Icon(Icons.summarize),
+            title: Text(loc.t('writeoff_summary') ?? 'Сводное списание'),
+            subtitle: Text(loc.t('writeoff_summary_hint') ?? 'Итого по всем категориям'),
+            onTap: () => context.push('/inbox/writeoff-summary', extra: {
+              'documents': dateDocs,
+              'dateLabel': dateKey,
+            }),
+          ),
+          const Divider(height: 1),
+          ...dateDocs.map((doc) => _DocumentTile(document: doc, onDownload: _downloadDocument)),
         ];
       }).toList(),
     );

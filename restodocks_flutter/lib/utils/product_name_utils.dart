@@ -1,5 +1,20 @@
 /// Утилиты нормализации названий продуктов (iiko-формат и др.)
 
+/// Нормализация для сопоставления ПФ: убирает "ПФ ", "п/ф " и т.п. в начале.
+/// "ПФ чеснок" и "Чеснок" дают один ключ для матчинга.
+String normalizeForPfMatching(String name) {
+  if (name.isEmpty) return name;
+  var s = stripIikoPrefix(name).trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+  const pfPrefixes = ['пф ', 'п/ф ', 'п.ф. ', 'pf '];
+  for (final p in pfPrefixes) {
+    if (s.startsWith(p)) {
+      s = s.substring(p.length).trim();
+      break;
+    }
+  }
+  return s;
+}
+
 /// Убирает префиксы iiko из названия продукта для сопоставления с каталогом и поиска КБЖУ.
 /// "Т." — товар, "ТМЦ" — ТМЦ; часть наименования, но при поиске мешает.
 String stripIikoPrefix(String name) {
