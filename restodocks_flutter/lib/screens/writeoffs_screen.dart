@@ -536,8 +536,9 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
                   ),
                 ),
                 Expanded(
-                  child: _WriteoffTabContent(
-              key: ValueKey('writeoff_${_rowsFor(_selectedCategory).length}'),
+                  child: KeyedSubtree(
+                    key: ValueKey('writeoff_${_rowsFor(_selectedCategory).length}'),
+                    child: _WriteoffTabContent(
               category: _selectedCategory,
               rows: _rowsFor(_selectedCategory),
               maxCols: _maxQuantityColumns(_selectedCategory),
@@ -548,6 +549,7 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
               onSave: () => _save(_selectedCategory),
               loc: loc,
             ),
+                  ),
                 ),
               ],
             ),
