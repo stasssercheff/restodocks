@@ -251,28 +251,55 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
         : techCards.where((tc) => emp.canSeeTechCard(tc.sections)).toList();
 
     if (!mounted) return;
-    final picked = await showModalBottomSheet<_WriteoffPickedItem>(
+    await showDialog<void>(
       context: context,
-      isScrollControlled: true,
       useRootNavigator: true,
-      builder: (ctx) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        maxChildSize: 0.9,
-        minChildSize: 0.3,
-        expand: false,
-        builder: (_, scrollController) => _WriteoffItemPickerSheet(
-          loc: loc,
-          products: products,
-          techCards: visibleTc,
-          scrollController: scrollController,
-          onSelectProduct: (p) => Navigator.of(ctx).pop(_WriteoffPickedItem(product: p)),
-          onSelectTechCard: (tc) => Navigator.of(ctx).pop(_WriteoffPickedItem(techCard: tc)),
+      barrierDismissible: true,
+      builder: (ctx) => Center(
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 24),
+            constraints: BoxConstraints(
+              maxWidth: 480,
+              maxHeight: MediaQuery.of(ctx).size.height * 0.75,
+            ),
+            decoration: BoxDecoration(
+              color: Theme.of(ctx).colorScheme.surface,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black26,
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _WriteoffItemPickerSheet(
+                    loc: loc,
+                    products: products,
+                    techCards: visibleTc,
+                    onSelectProduct: (p) {
+                      _addRow(cat, product: p, techCard: null);
+                      if (ctx.mounted) Navigator.of(ctx).pop();
+                    },
+                    onSelectTechCard: (tc) {
+                      _addRow(cat, product: null, techCard: tc);
+                      if (ctx.mounted) Navigator.of(ctx).pop();
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
-    if (picked != null && mounted) {
-      _addRow(cat, product: picked.product, techCard: picked.techCard);
-    }
   }
 
   Future<void> _save(WriteoffCategory cat) async {
