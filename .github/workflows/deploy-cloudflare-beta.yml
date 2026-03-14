@@ -1,0 +1,84 @@
+# Beta на Cloudflare Pages — деплой при push в staging
+name: Deploy Beta to Cloudflare Pages
+
+on:
+  push:
+    branches: [staging]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: refs/heads/staging
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.38.7"
+          channel: "stable"
+          cache: true
+
+      - name: Create config.json
+        working-directory: restodocks_flutter
+        run: |
+          python3 -c "
+          import os, json
+          p = 'assets/config.json'
+          d = {
+            'SUPABASE_URL': os.environ.get('SUPABASE_URL', ''),
+            'SUPABASE_ANON_KEY': os.environ.get('SUPABASE_ANON_KEY', ''),
+          }
+          with open(p, 'w') as f:
+            json.dump(d, f)
+          print('config.json written')
+          "
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+
+      - name: Flutter build web
+        working-directory: restodocks_flutter
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          flutter pub get
+          dart run flutter_launcher_icons
+          flutter build web --release --no-web-resources-cdn --no-source-maps \
+            --dart-define=SUPABASE_URL="$SUPABASE_URL" \
+            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
+            --dart-define=ENABLE_TTK_IMPORT=false
+
+      - name: Post-build (sw, _redirects, _routes, _headers)
+        working-directory: restodocks_flutter
+        run: |
+          [ -f scripts/sw_cleanup.js ] && cp scripts/sw_cleanup.js build/web/flutter_service_worker.js
+          echo "/*    /index.html   200" > build/web/_redirects
+          echo '{"version":1,"include":["/supabase-auth/*"],"exclude":[]}' > build/web/_routes.json
+          printf '%s\n' '/index.html' '  Cache-Control: no-cache, no-store, must-revalidate' '' '/*.js' '  Cache-Control: public, max-age=31536000, immutable' '' '/*.wasm' '  Cache-Control: public, max-age=31536000, immutable' > build/web/_headers
+
+      - name: Copy Pages Functions (supabase-auth proxy)
+        run: cp -r functions restodocks_flutter/build/web/
+
+      - name: Setup Node (for wrangler/npx)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Verify build output
+        run: |
+          ls -la restodocks_flutter/build/web/ | head -20
+          [ -d restodocks_flutter/build/web/functions ] || echo "WARN: functions dir missing"
+
+      - name: Deploy to Cloudflare Pages (Beta)
+        run: npx wrangler@4.71.0 pages deploy restodocks_flutter/build/web --project-name=restodocks-beta
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

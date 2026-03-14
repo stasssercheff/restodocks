@@ -18,18 +18,21 @@ COMMENT ON TABLE tech_card_custom_categories IS 'Пользовательски�
 ALTER TABLE tech_card_custom_categories ENABLE ROW LEVEL SECURITY;
 
 -- RLS: доступ только для своего заведения
+DROP POLICY IF EXISTS "auth_select_tech_card_custom_categories" ON tech_card_custom_categories;
 CREATE POLICY "auth_select_tech_card_custom_categories" ON tech_card_custom_categories
   FOR SELECT TO authenticated
   USING (
     establishment_id IN (SELECT establishment_id FROM employees WHERE id = auth.uid() OR auth_user_id = auth.uid())
   );
 
+DROP POLICY IF EXISTS "auth_insert_tech_card_custom_categories" ON tech_card_custom_categories;
 CREATE POLICY "auth_insert_tech_card_custom_categories" ON tech_card_custom_categories
   FOR INSERT TO authenticated
   WITH CHECK (
     establishment_id IN (SELECT establishment_id FROM employees WHERE id = auth.uid() OR auth_user_id = auth.uid())
   );
 
+DROP POLICY IF EXISTS "auth_delete_tech_card_custom_categories" ON tech_card_custom_categories;
 CREATE POLICY "auth_delete_tech_card_custom_categories" ON tech_card_custom_categories
   FOR DELETE TO authenticated
   USING (
