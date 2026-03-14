@@ -263,6 +263,7 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
     }
     if (productVal.toLowerCase().includes("выход блюда") || productVal.toLowerCase().startsWith("выход одного")) continue;
     if (productVal.toLowerCase().includes("информация о пищевой") || /информация\s+о\s+пищ/i.test(productVal)) continue;
+    if (productVal.trim().toLowerCase() === "масса") continue;
     const pLow = productVal.toLowerCase();
     if (
       pLow.includes("требования к оформлению") || pLow.includes("требования к подаче") ||
@@ -456,7 +457,8 @@ export function parseTtkByStoredTemplate(
       low.includes("ресторан") || /^ресторан\s*[«""]/.test(low) || low === "блюдо" ||
       /^способ\s*(приготовления|оформления)?$/i.test(low.trim()) ||
       low.includes("информация о пищевой") || /информация\s+о\s+пищ/i.test(low) ||
-      (low.length <= 10 && /кдж|ккал/i.test(low) && !/[а-яё]{4,}/i.test(low));
+      (low.length <= 10 && /кдж|ккал/i.test(low) && !/[а-яё]{4,}/i.test(low)) ||
+      low === "масса";
     const cookingVerbs = /^(взбить|добавить|положить|переложить|использовать|пробить|довести|соединить|перемешать|нарезать|запечь|варить|жарить|тушить|охладить|разогреть)$/i.test(low.trim());
     return base || (fromPdf && cookingVerbs);
   };
