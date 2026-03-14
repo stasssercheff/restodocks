@@ -454,11 +454,27 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           SnackBar(content: Text(loc.t('ai_tech_card_loaded_names').replaceAll('%s', '1'))),
         );
       }
-      if (allCards.length == 1) {
-        context.push(widget.department == 'bar' ? '/tech-cards/new?department=bar' : '/tech-cards/new', extra: allCards.single);
+      final hasValidationErrors = context.read<AiService>() is AiServiceSupabase &&
+          AiServiceSupabase.lastParseTechCardErrors != null &&
+          AiServiceSupabase.lastParseTechCardErrors!.isNotEmpty;
+      if (allCards.length == 1 && !hasValidationErrors) {
+        final sig = context.read<AiService>() is AiServiceSupabase ? AiServiceSupabase.lastParseHeaderSignature : null;
+        final sourceRows = context.read<AiService>() is AiServiceSupabase ? AiServiceSupabase.lastParsedRows : null;
+        final hasMeta = sig != null && sig.isNotEmpty;
+        context.push(
+          widget.department == 'bar' ? '/tech-cards/new?department=bar' : '/tech-cards/new',
+          extra: hasMeta || sourceRows != null
+              ? {'result': allCards.single, 'headerSignature': sig, 'sourceRows': sourceRows}
+              : allCards.single,
+        );
       } else {
         final sig = context.read<AiService>() is AiServiceSupabase ? AiServiceSupabase.lastParseHeaderSignature : null;
-        context.push('/tech-cards/import-review?department=${Uri.encodeComponent(widget.department)}', extra: {'cards': allCards, 'headerSignature': sig});
+        final sourceRows = context.read<AiService>() is AiServiceSupabase ? AiServiceSupabase.lastParsedRows : null;
+        context.push('/tech-cards/import-review?department=${Uri.encodeComponent(widget.department)}', extra: {
+          'cards': allCards,
+          'headerSignature': sig,
+          'sourceRows': sourceRows,
+        });
       }
     } finally {
       if (mounted) setState(() => _loadingExcel = false);

@@ -58,8 +58,9 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _dateFrom = DateTime.now();
-    _dateTo = DateTime.now();
+    final now = DateTime.now();
+    _dateFrom = DateTime(now.year, now.month, 1);
+    _dateTo = now;
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
@@ -72,7 +73,9 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
     if (est == null) return;
 
     final emps = await acc.getEmployeesForEstablishment(est.id);
-    final idToName = {for (final e in emps) e.id: '${e.fullName}${e.surname != null ? ' ${e.surname}' : ''}'};
+    final idToName = {
+      for (final e in emps) e.id: '${e.fullName}${e.surname != null ? ' ${e.surname}' : ''}, ${e.roleDisplayName}',
+    };
 
     final bytes = await HaccpPdfExportService.buildJournalPdf(
       establishmentName: est.name,
@@ -162,9 +165,6 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
     if (fromDay == toDay && fromDay == todayStart) {
       return loc.t('haccp_period_today') ?? 'Сегодня';
     }
-    if (fromDay == toDay) {
-      return DateFormat('dd.MM.yyyy').format(from);
-    }
     return '${DateFormat('dd.MM.yyyy').format(from)} — ${DateFormat('dd.MM.yyyy').format(to)}';
   }
 
@@ -193,21 +193,10 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
                 onTap: () => Navigator.pop(ctx, 'today'),
               ),
               ListTile(
-                leading: const Icon(Icons.date_range),
-                title: Text(loc.t('haccp_period_week') ?? 'Неделя'),
-                subtitle: Text(DateFormat('dd.MM').format(today.subtract(const Duration(days: 6))) + ' — ' + DateFormat('dd.MM.yyyy').format(now)),
-                onTap: () => Navigator.pop(ctx, 'week'),
-              ),
-              ListTile(
                 leading: const Icon(Icons.calendar_month),
-                title: Text(loc.t('haccp_period_month') ?? 'Месяц'),
+                title: Text(loc.t('haccp_period_month_to_today') ?? 'С 1 числа по сегодня'),
                 subtitle: Text('${DateFormat('dd.MM').format(DateTime(now.year, now.month, 1))} — ${DateFormat('dd.MM.yyyy').format(now)}'),
                 onTap: () => Navigator.pop(ctx, 'month'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.edit_calendar),
-                title: Text(loc.t('haccp_period_custom') ?? 'Выбрать диапазон'),
-                onTap: () => Navigator.pop(ctx, 'custom'),
               ),
             ],
           ),
@@ -216,35 +205,8 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
     );
     if (choice == null || !mounted) return;
 
-    DateTime from;
-    DateTime to;
-    if (choice == 'today') {
-      from = today;
-      to = now;
-    } else if (choice == 'week') {
-      from = today.subtract(const Duration(days: 6));
-      to = now;
-    } else if (choice == 'month') {
-      from = DateTime(now.year, now.month, 1);
-      to = now;
-    } else {
-      final fromPicked = await showDatePicker(
-        context: context,
-        initialDate: _dateFrom ?? now,
-        firstDate: DateTime(2020),
-        lastDate: now.add(const Duration(days: 365)),
-      );
-      if (fromPicked == null || !mounted) return;
-      final toPicked = await showDatePicker(
-        context: context,
-        initialDate: _dateTo ?? fromPicked,
-        firstDate: fromPicked,
-        lastDate: now.add(const Duration(days: 365)),
-      );
-      if (toPicked == null || !mounted) return;
-      from = fromPicked;
-      to = toPicked;
-    }
+    final from = choice == 'today' ? today : DateTime(now.year, now.month, 1);
+    final to = now;
     setState(() {
       _dateFrom = from;
       _dateTo = to;
@@ -325,7 +287,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
                           logs: _logs,
                           employees: _employees,
                           showEmployeeInfo: acc.currentEmployee?.canViewDepartment('management') ?? false,
-                          onTap: _openAddForm,
+                          onLogTap: _openLogDetail,
                         ),
                 ),
               ],
@@ -363,21 +325,30 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
     );
     if (result != null && mounted) await _load();
   }
+
+  void _openLogDetail(HaccpLog log) {
+    final idToEmp = {for (final e in _employees) e.id: e};
+    final emp = idToEmp[log.createdByEmployeeId];
+    context.push(
+      '/haccp-journals/${widget.logTypeCode}/view',
+      extra: {'log': log, 'employee': emp},
+    );
+  }
 }
 
-/// Журнальные страницы: группировка по 1 дню, для собственника/управления — ФИО, должность, дата-время.
+/// Журнальные страницы: группировка по 1 дню.
 class _JournalPagesView extends StatelessWidget {
   const _JournalPagesView({
     required this.logs,
     required this.employees,
     required this.showEmployeeInfo,
-    required this.onTap,
+    required this.onLogTap,
   });
 
   final List<HaccpLog> logs;
   final List<Employee> employees;
   final bool showEmployeeInfo;
-  final VoidCallback onTap;
+  final void Function(HaccpLog log) onLogTap;
 
   @override
   Widget build(BuildContext context) {
@@ -390,7 +361,7 @@ class _JournalPagesView extends StatelessWidget {
     final dates = byDate.keys.toList()..sort((a, b) => b.compareTo(a));
 
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       itemCount: dates.length,
       itemBuilder: (_, i) {
         final date = dates[i];
@@ -399,10 +370,10 @@ class _JournalPagesView extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: EdgeInsets.only(top: i > 0 ? 16 : 0, bottom: 8),
+              padding: EdgeInsets.only(top: i > 0 ? 12 : 0, bottom: 4),
               child: Text(
                 DateFormat('dd.MM.yyyy').format(date),
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
                       color: Theme.of(context).colorScheme.primary,
                     ),
               ),
@@ -410,7 +381,7 @@ class _JournalPagesView extends StatelessWidget {
             ...dayLogs.map((log) => _LogTile(
                   log: log,
                   employee: showEmployeeInfo ? idToEmp[log.createdByEmployeeId] : null,
-                  onTap: onTap,
+                  onTap: () => onLogTap(log),
                 )),
           ],
         );
@@ -429,17 +400,58 @@ class _LogTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final timeStr = DateFormat('HH:mm').format(log.createdAt);
-    final empLine = employee != null
-        ? '${employee!.fullName}${employee!.surname != null ? ' ${employee!.surname}' : ''}, ${employee!.roleDisplayName} · $timeStr'
-        : DateFormat('dd.MM.yyyy HH:mm').format(log.createdAt);
+    final summary = log.summaryLine();
+    final empName = employee != null
+        ? '${employee!.fullName}${employee!.surname != null ? ' ${employee!.surname}' : ''}'
+        : null;
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        title: Text(empLine, style: const TextStyle(fontWeight: FontWeight.w500)),
-        subtitle: Text(log.summaryLine(), maxLines: 2, overflow: TextOverflow.ellipsis),
-        trailing: const Icon(Icons.chevron_right),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 44,
+                child: Text(
+                  timeStr,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontFeatures: [const FontFeature.tabularFigures()],
+                      ),
+                ),
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      summary.isNotEmpty ? summary : '—',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (empName != null && empName.isNotEmpty)
+                      Text(
+                        empName,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, size: 20, color: Theme.of(context).colorScheme.onSurfaceVariant),
+            ],
+          ),
+        ),
       ),
     );
   }

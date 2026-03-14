@@ -115,7 +115,9 @@ class _LoginScreenState extends State<LoginScreen> {
           prefixIcon: const Icon(Icons.email),
         ),
         keyboardType: TextInputType.emailAddress,
+        textInputAction: TextInputAction.next,
         autocorrect: false,
+        onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
         validator: (value) {
           if (value == null || value.isEmpty) return loc.t('email_required');
           if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
@@ -134,6 +136,10 @@ class _LoginScreenState extends State<LoginScreen> {
           prefixIcon: const Icon(Icons.lock),
         ),
         obscureText: true,
+        textInputAction: TextInputAction.done,
+        onFieldSubmitted: (_) {
+          if (!_isLoading) _login();
+        },
         validator: (value) {
           if (value == null || value.isEmpty) return loc.t('password_required');
           if (value.length < 6) return loc.t('password_too_short');

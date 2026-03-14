@@ -820,7 +820,12 @@ class AccountManagerSupabase extends ChangeNotifier {
       }
 
       if (res.status != 200) {
-        lastLoginError = (lastLoginError != null ? '$lastLoginError → ' : '') + 'Legacy: ${res.status} ${res.data}';
+        String msg = 'Legacy: ${res.status}';
+        if (res.data is Map) {
+          final d = res.data as Map;
+          msg = (d['message'] ?? d['error'] ?? msg).toString();
+        }
+        lastLoginError = (lastLoginError != null ? '$lastLoginError → ' : '') + msg;
         devLog('🔐 Login: Legacy — Edge Function error: ${res.status}, data=${res.data}');
         return null;
       }

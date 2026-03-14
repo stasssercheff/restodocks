@@ -56,7 +56,18 @@ npx supabase db push --project-ref osglfptwbuqqmqunttha
 cd restodocks_flutter
 npx supabase functions deploy parse-xls-bytes --project-ref osglfptwbuqqmqunttha
 npx supabase functions deploy parse-ttk-by-templates --project-ref osglfptwbuqqmqunttha   # шаблоны без лимита, без AI
+npx supabase functions deploy tt-parse-save-learning --project-ref osglfptwbuqqmqunttha   # обучение парсера (обход RLS)
 npx supabase functions deploy ai-recognize-tech-cards-batch --project-ref osglfptwbuqqmqunttha
 npx supabase functions deploy ai-parse-tech-cards-pdf --project-ref osglfptwbuqqmqunttha
 npx supabase functions deploy request-change-password --project-ref osglfptwbuqqmqunttha
 ```
+
+### Проверка импорта ТТК и обучения на Beta
+
+Чтобы импорт ТТК и обучение работали на Beta-сайте:
+
+1. **Задеплоены функции:**
+   - `parse-ttk-by-templates` — парсинг по шаблонам (без AI)
+   - `tt-parse-save-learning` — сохранение обучения (шаблоны, правки)
+
+2. **Проверка на Beta:** ТТК → Импорт → загрузить Excel. При успехе — карточки на экране редактирования. При правке и сохранении — обучение пишется в `tt_parse_*`. Если обучение не сохранилось — SnackBar покажет «Обучение не сохранилось» и текст ошибки.

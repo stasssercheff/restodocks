@@ -270,6 +270,7 @@ void main() {
       expect(list.first.ingredients.length, greaterThanOrEqualTo(1));
     });
 
+
     test('parseTechCardsFromExcel tehnologicheskie_kartiy_blyud.docx', () async {
       final bytes = await _loadFixture('tehnologicheskie_kartiy_blyud.docx');
       if (bytes == null) return;

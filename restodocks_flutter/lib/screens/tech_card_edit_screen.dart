@@ -1008,15 +1008,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         }
         // Правка для подстановки (original → corrected) — если обучение не сработает
         if (sig != null && sig.isNotEmpty && orig != null && orig.isNotEmpty && orig != name) {
-          try {
-            await Supabase.instance.client.from('tt_parse_corrections').insert({
-              'establishment_id': est.dataEstablishmentId,
-              'header_signature': sig,
-              'field': 'dish_name',
-              'original_value': orig,
-              'corrected_value': name,
-            });
-          } catch (_) {}
+          await AiServiceSupabase.saveLearningCorrection(
+            headerSignature: sig,
+            field: 'dish_name',
+            originalValue: orig,
+            correctedValue: name,
+            establishmentId: est.dataEstablishmentId,
+          );
         }
         // Переводим название и технологию фоново. Используем updated (с фото и ингредиентами),
         // иначе перезапись через created удалит photoUrls и ingredients.
@@ -2938,7 +2936,12 @@ class _TtkTableState extends State<_TtkTable> {
                               alignment: Alignment.centerLeft,
                               child: Row(
                                 children: [
-                                  Expanded(child: Text(_getIngredientDisplayName(ing, lang), style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
+                                  Expanded(
+                                    child: Tooltip(
+                                      message: _getIngredientDisplayName(ing, lang),
+                                      child: Text(_getIngredientDisplayName(ing, lang), style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
+                                    ),
+                                  ),
                                   if (widget.getProductsForDropdown != null && widget.onProductSelectedFromDropdown != null) ...[
                                     const SizedBox(width: 6),
                                     _ProductDropdownInCell(
@@ -2956,7 +2959,7 @@ class _TtkTableState extends State<_TtkTable> {
                             dataCell: true,
                           ),
                         )
-                      : TableCell(child: wrapCell(Container(color: firstColsBg, constraints: const BoxConstraints(minHeight: 44), padding: _cellPad, alignment: Alignment.centerLeft, child: Text(_getIngredientDisplayName(ing, lang), style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)), fillColor: firstColsBg, dataCell: true)),
+                      : TableCell(child: wrapCell(Container(color: firstColsBg, constraints: const BoxConstraints(minHeight: 44), padding: _cellPad, alignment: Alignment.centerLeft, child: Tooltip(message: _getIngredientDisplayName(ing, lang), child: Text(_getIngredientDisplayName(ing, lang), style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis))), fillColor: firstColsBg, dataCell: true)),
               widget.effectiveCanEdit
                   ? TableCell(
                       child: wrapCell(ConstrainedBox(

@@ -23,3 +23,11 @@ verify_jwt = false
 # auth-send-email: Auth Hook, вызывается Supabase Auth
 [functions.auth-send-email]
 verify_jwt = false
+
+# parse-ttk-by-templates: парсинг ТТК по шаблонам (service_role, без AI)
+[functions.parse-ttk-by-templates]
+verify_jwt = false
+
+# tt-parse-save-learning: обучение парсера ТТК (service_role, обход RLS)
+[functions.tt-parse-save-learning]
+verify_jwt = false

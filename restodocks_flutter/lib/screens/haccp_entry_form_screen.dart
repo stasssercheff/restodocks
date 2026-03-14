@@ -22,6 +22,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
   double _tempValue = 4.0;
   double _humidityValue = 60;
   bool _healthy = true;
+  bool _noArviOk = true;
   bool _washTempOk = true;
   bool _rinseTempOk = true;
   final Map<String, TextEditingController> _controllers = {};
@@ -49,12 +50,28 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
 
     switch (_logType) {
       case HaccpLogType.healthHygiene:
+        list.addAll([
+          SwitchListTile(
+            title: Text(loc.t('haccp_result_exam') ?? 'Результат осмотра (допущен / отстранен)'),
+            subtitle: Text(_healthy ? 'допущен' : 'отстранен', style: TextStyle(color: _healthy ? Colors.green : Colors.orange)),
+            value: _healthy,
+            onChanged: (v) => setState(() => _healthy = v ?? true),
+          ),
+          SwitchListTile(
+            title: Text(loc.t('haccp_no_arvi_ok') ?? 'Отсутствие заболеваний верхних дыхательных путей и гнойничковых заболеваний кожи рук'),
+            subtitle: Text(_noArviOk ? 'Да' : 'Нет', style: TextStyle(color: _noArviOk ? Colors.green : Colors.orange)),
+            value: _noArviOk,
+            onChanged: (v) => setState(() => _noArviOk = v ?? true),
+          ),
+          _textField('note', loc.t('haccp_note') ?? 'Примечание', multiline: true),
+        ]);
+        break;
       case HaccpLogType.pediculosis:
         list.addAll([
           SwitchListTile(
             title: Text(loc.t('haccp_healthy') ?? 'Здоров'),
             value: _healthy,
-            onChanged: (v) => setState(() => _healthy = v),
+            onChanged: (v) => setState(() => _healthy = v ?? true),
           ),
           _textField('note', loc.t('haccp_note') ?? 'Примечание', multiline: true),
         ]);
@@ -283,6 +300,15 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
   Future<void> _saveStatus(HaccpLogServiceSupabase svc, String estId, String empId) async {
     switch (_logType) {
       case HaccpLogType.healthHygiene:
+        await svc.insertStatus(
+          establishmentId: estId,
+          createdByEmployeeId: empId,
+          logType: _logType,
+          statusOk: _healthy,
+          status2Ok: _noArviOk,
+          note: _getText('note').isNotEmpty ? _getText('note') : null,
+        );
+        break;
       case HaccpLogType.pediculosis:
         await svc.insertStatus(
           establishmentId: estId,

@@ -40,3 +40,4 @@ export 'employee_chat_screen.dart';
 export 'haccp_journals_screen.dart';
 export 'haccp_journal_detail_screen.dart';
 export 'haccp_entry_form_screen.dart';
+export 'haccp_log_detail_screen.dart';

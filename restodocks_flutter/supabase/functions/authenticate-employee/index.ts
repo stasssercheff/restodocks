@@ -172,9 +172,12 @@ Deno.serve(async (req: Request) => {
         continue;
       }
 
-      // Связка с Supabase Auth: если auth_user_id пуст — создаём auth user для последующего signIn
-      let authUserCreated = false;
+      // Связка с Supabase Auth: все сотрудники должны иметь auth_user_id. Без него не возвращаем success.
+      let authUserLinked = false;
       if (!emp.auth_user_id) {
+        let linkedAuthUserId: string | null = null;
+
+        // 1. Пробуем создать нового пользователя
         try {
           const { data: newUser, error: createErr } = await supabase.auth.admin.createUser({
             email: emp.email,
@@ -182,22 +185,60 @@ Deno.serve(async (req: Request) => {
             email_confirm: true,
           });
           if (!createErr && newUser?.user?.id) {
-            const { error: updateErr } = await supabase
-              .from("employees")
-              .update({ auth_user_id: newUser.user.id })
-              .eq("id", emp.id);
-            if (!updateErr) {
-              authUserCreated = true;
-              console.log(`[authenticate-employee] Created auth user ${newUser.user.id} for employee ${emp.id}`);
-            } else {
-              console.warn("[authenticate-employee] Failed to update auth_user_id:", updateErr?.message);
-            }
+            linkedAuthUserId = newUser.user.id;
+            console.log(`[authenticate-employee] Created auth user ${linkedAuthUserId} for employee ${emp.id}`);
           } else {
-            console.warn("[authenticate-employee] createUser failed:", createErr?.message);
+            const errMsg = createErr?.message ?? "";
+            const isAlreadyExists = /already|exists|registered|duplicate/i.test(errMsg);
+            if (isAlreadyExists) {
+              // 2. Пользователь уже есть в Auth — ищем и привязываем
+              const { data: listData } = await supabase.auth.admin.listUsers({ perPage: 1000 });
+              const existingUser = listData?.users?.find(
+                (u) => u.email?.toLowerCase() === (emp.email as string)?.toLowerCase()
+              );
+              if (existingUser?.id) {
+                linkedAuthUserId = existingUser.id;
+                const { error: pwdErr } = await supabase.auth.admin.updateUserById(linkedAuthUserId, {
+                  password,
+                });
+                if (pwdErr) {
+                  console.warn("[authenticate-employee] updateUserById (password) failed:", pwdErr.message);
+                } else {
+                  console.log(`[authenticate-employee] Linked existing auth user ${linkedAuthUserId} for employee ${emp.id}`);
+                }
+              }
+            } else {
+              console.warn("[authenticate-employee] createUser failed:", errMsg);
+            }
           }
         } catch (authErr) {
-          console.warn("[authenticate-employee] Auth user creation error (non-blocking):", authErr);
+          console.warn("[authenticate-employee] Auth user creation error:", authErr);
         }
+
+        if (linkedAuthUserId) {
+          const { error: updateErr } = await supabase
+            .from("employees")
+            .update({ auth_user_id: linkedAuthUserId })
+            .eq("id", emp.id);
+          if (!updateErr) {
+            authUserLinked = true;
+          } else {
+            console.error("[authenticate-employee] Failed to update auth_user_id:", updateErr.message);
+          }
+        }
+
+        if (!authUserLinked) {
+          console.error("[authenticate-employee] Cannot link auth user for employee", emp.id, "- refusing login");
+          return new Response(
+            JSON.stringify({
+              error: "auth_link_required",
+              message: "Требуется привязка к Supabase Auth. Обратитесь к администратору или сбросьте пароль.",
+            }),
+            { status: 503, headers: { ...cors, "Content-Type": "application/json" } }
+          );
+        }
+      } else {
+        authUserLinked = true; // уже привязан
       }
 
       // Возвращаем данные БЕЗ password_hash
@@ -206,7 +247,7 @@ Deno.serve(async (req: Request) => {
         employee: employeeWithoutHash,
         establishment: estData,
       };
-      if (authUserCreated) payload.authUserCreated = true;
+      if (authUserLinked) payload.authUserCreated = true; // клиент вызовет signInWithPassword
 
       return new Response(
         JSON.stringify(payload),

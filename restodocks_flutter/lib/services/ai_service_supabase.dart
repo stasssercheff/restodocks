@@ -58,10 +58,12 @@ class AiServiceSupabase implements AiService {
   }
 
   /// Вызов Edge Function с retry при 5xx/сети (proxy/ EarlyDrop).
+  /// При 5xx на последней попытке возвращает res.data (если Map) — для извлечения error/details.
   Future<Map<String, dynamic>?> invoke(String name, Map<String, dynamic> body) async {
     const maxRetries = 3;
     const delays = [500, 1000];
     Object? lastError;
+    Map<String, dynamic>? lastErrorBody;
     for (var attempt = 0; attempt < maxRetries; attempt++) {
       if (attempt > 0) {
         await Future<void>.delayed(Duration(milliseconds: delays[attempt - 1]));
@@ -75,11 +77,12 @@ class AiServiceSupabase implements AiService {
         }
         if (res.status >= 400 && res.status < 500) return null; // 4xx не retry
         lastError = 'HTTP ${res.status}';
+        if (res.data is Map<String, dynamic>) lastErrorBody = res.data as Map<String, dynamic>;
       } catch (e) {
         lastError = e;
       }
     }
-    return null;
+    return lastErrorBody; // чтобы _saveLearningViaEdgeFunction мог извлечь error/details
   }
 
   @override
@@ -293,6 +296,7 @@ class AiServiceSupabase implements AiService {
         final kbzuPattern = RegExp(r'белки|жиры|углеводы|калори|бжу|кбжу|жирн|белк', caseSensitive: false);
         for (final tbl in docxTables) {
           var expanded = _expandSingleCellRows(tbl);
+          expanded = _normalizeRowLengths(expanded);
           if (expanded.length < 2) continue;
           // Таблица КБЖУ (ГОСТ): Белки г, Жиры г — не парсим как ТТК
           final firstRows = expanded.take(3).expand((r) => r).map((c) => c.toLowerCase()).join(' ');
@@ -2122,12 +2126,15 @@ class AiServiceSupabase implements AiService {
       final raw = data['cards'];
       if (raw is! List || raw.isEmpty) return [];
       final list = <TechCardRecognitionResult>[];
+      const headerWords = ['наименование', 'продукт', 'название', 'брутто', 'нетто', 'сырьё'];
       for (final e in raw) {
         if (e is! Map) continue;
         final card = _parseTechCardResult(Map<String, dynamic>.from(e as Map));
-        if (card != null && (card.dishName != null && card.dishName!.isNotEmpty || card.ingredients.isNotEmpty)) {
-          list.add(card);
-        }
+        if (card == null) continue;
+        final dn = (card.dishName ?? '').trim().toLowerCase();
+        final hasName = dn.isNotEmpty && !headerWords.any((w) => dn == w || dn.startsWith('$w '));
+        final hasIng = card.ingredients.any((i) => (i.productName ?? '').trim().length > 2);
+        if (hasName || hasIng) list.add(card);
       }
       return list;
     } catch (e) {
@@ -2141,7 +2148,11 @@ class AiServiceSupabase implements AiService {
     try {
       final data = await invoke('tt-parse-save-learning', payload);
       if (data != null && data['ok'] == true) return;
-      lastLearningError = data?['error']?.toString() ?? data?['details']?.toString() ?? 'Unknown';
+      final err = data?['error']?.toString();
+      final details = data?['details'];
+      lastLearningError = err ?? (details is List
+          ? details.map((e) => e.toString()).join('; ')
+          : details?.toString()) ?? 'Unknown';
       debugPrint('[tt_parse] Edge Function save failed: $lastLearningError');
     } catch (e, st) {
       lastLearningError = e.toString();
