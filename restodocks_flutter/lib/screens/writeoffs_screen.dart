@@ -29,6 +29,13 @@ extension WriteoffCategoryExt on WriteoffCategory {
   String get code => name;
 }
 
+/// Результат выбора в пикере (продукт или ТТК)
+class _WriteoffPickedItem {
+  final Product? product;
+  final TechCard? techCard;
+  _WriteoffPickedItem({this.product, this.techCard});
+}
+
 /// Строка списания: продукт или ТТК + ячейки количества (как в бланке инвентаризации)
 class _WriteoffRow {
   final Product? product;
@@ -230,7 +237,7 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
         : techCards.where((tc) => emp.canSeeTechCard(tc.sections)).toList();
 
     if (!mounted) return;
-    await showDialog<void>(
+    final picked = await showDialog<_WriteoffPickedItem>(
       context: context,
       builder: (ctx) => Dialog(
         child: ConstrainedBox(
@@ -242,22 +249,15 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
             loc: loc,
             products: products,
             techCards: visibleTc,
-            onSelectProduct: (p) {
-              Navigator.of(ctx).pop();
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted) _addRow(cat, product: p);
-              });
-            },
-            onSelectTechCard: (tc) {
-              Navigator.of(ctx).pop();
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted) _addRow(cat, techCard: tc);
-              });
-            },
+            onSelectProduct: (p) => Navigator.of(ctx).pop(_WriteoffPickedItem(product: p)),
+            onSelectTechCard: (tc) => Navigator.of(ctx).pop(_WriteoffPickedItem(techCard: tc)),
           ),
         ),
       ),
     );
+    if (picked != null && mounted) {
+      _addRow(cat, product: picked.product, techCard: picked.techCard);
+    }
   }
 
   Future<void> _save(WriteoffCategory cat) async {
