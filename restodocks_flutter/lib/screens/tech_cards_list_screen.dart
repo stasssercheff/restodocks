@@ -250,10 +250,16 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       if (mounted) {
         setState(() { _list = list; _loading = false; });
         _ensureTechCardTranslations(svc, list);
+        _warmPdfParser();
       }
     } catch (e) {
       if (mounted) setState(() { _error = e.toString(); _loading = false; });
     }
+  }
+
+  void _warmPdfParser() {
+    final ai = context.read<AiService>();
+    if (ai is AiServiceSupabase) ai.warmPdfParser();
   }
 
   Future<void> _ensureTechCardTranslations(TechCardServiceSupabase svc, List<TechCard> cards) async {

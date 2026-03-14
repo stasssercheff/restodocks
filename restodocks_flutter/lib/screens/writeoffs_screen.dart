@@ -222,12 +222,26 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
   void _setQuantity(WriteoffCategory cat, int rowIndex, int colIndex, double value) {
     final rows = _rowsFor(cat);
     if (rowIndex < 0 || rowIndex >= rows.length) return;
-    if (colIndex != 0 && colIndex != 1) return;
+    if (colIndex < 0) return;
     final row = rows[rowIndex];
     while (row.quantities.length <= colIndex) row.quantities.add(0.0);
     row.quantities[colIndex] = value.clamp(0.0, 99999.0);
+    // Динамическое создание ячейки: при вводе в последнюю — добавляем новую
+    if (colIndex == row.quantities.length - 1 && value > 0) {
+      row.quantities.add(0.0);
+    }
     _rowsVersion.value++;
     setState(() {});
+  }
+
+  void _onLastCellFocused(WriteoffCategory cat, int rowIndex) {
+    final rows = _rowsFor(cat);
+    if (rowIndex < 0 || rowIndex >= rows.length) return;
+    final row = rows[rowIndex];
+    row.quantities.add(0.0);
+    _rowsVersion.value++;
+    setState(() {});
+  }
     _saveNow();
   }
 
@@ -623,13 +637,14 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
                     ),
                   ),
                   Expanded(
-                    child: ValueListenableBuilder<int>(
+                      child: ValueListenableBuilder<int>(
                       valueListenable: _rowsVersion,
                       builder: (_, __, ___) => _WriteoffTabContent(
                         category: _selectedCategory,
                         rows: _rowsFor(_selectedCategory),
                         onAdd: () => _showItemPicker(_selectedCategory),
                         onSetQuantity: (ri, ci, v) => _setQuantity(_selectedCategory, ri, ci, v),
+                        onLastCellFocused: (ri) => _onLastCellFocused(_selectedCategory, ri),
                         onRemove: (i) => _removeRow(_selectedCategory, i),
                         onSave: () => _save(_selectedCategory),
                         loc: loc,
@@ -657,7 +672,7 @@ const double _colQtyWidth = 64; // для отображения 4 знаков
 const double _colGap = 6;
 const double _colDeleteWidth = 40;
 
-const int _kFixedQtyCols = 2;
+const int _kMinQtyCols = 2;
 
 class _WriteoffTabContent extends StatelessWidget {
   const _WriteoffTabContent({
@@ -665,6 +680,7 @@ class _WriteoffTabContent extends StatelessWidget {
     required this.rows,
     required this.onAdd,
     required this.onSetQuantity,
+    required this.onLastCellFocused,
     required this.onRemove,
     required this.onSave,
     required this.loc,
@@ -674,13 +690,16 @@ class _WriteoffTabContent extends StatelessWidget {
   final List<_WriteoffRow> rows;
   final VoidCallback onAdd;
   final void Function(int rowIndex, int colIndex, double value) onSetQuantity;
+  final void Function(int rowIndex) onLastCellFocused;
   final void Function(int index) onRemove;
   final VoidCallback onSave;
   final LocalizationService loc;
 
-  double _leftWidth(BuildContext context) {
+  int get _maxQtyCols => rows.isEmpty ? _kMinQtyCols : rows.map((r) => r.quantities.length).reduce((a, b) => a > b ? a : b);
+
+  double _leftWidth(BuildContext context, int maxCols) {
     final w = MediaQuery.of(context).size.width;
-    final scrollWidth = _kFixedQtyCols * (_colQtyWidth + _colGap) + _colDeleteWidth;
+    final scrollWidth = maxCols * (_colQtyWidth + _colGap) + _colDeleteWidth;
     return (w - scrollWidth).clamp(200.0, 350.0);
   }
 
@@ -696,7 +715,8 @@ class _WriteoffTabContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final lang = loc.currentLanguageCode;
-    final leftW = _leftWidth(context);
+    final maxCols = _maxQtyCols;
+    final leftW = _leftWidth(context, maxCols);
     final colNameW = _colNameWidthFromLeft(leftW);
 
     return Column(
@@ -722,7 +742,7 @@ class _WriteoffTabContent extends StatelessWidget {
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Шапка: # | Наименование | Мера | Итого | 1 | 2 | Удалить
+                    // Шапка: # | Наименование | Мера | Итого | 1 | 2 | ... | Удалить
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                       decoration: BoxDecoration(
@@ -741,7 +761,7 @@ class _WriteoffTabContent extends StatelessWidget {
                             SizedBox(width: _colGap),
                             SizedBox(width: _colTotalWidth, child: Text(loc.t('inventory_total') ?? 'Итого', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
                             SizedBox(width: _colGap),
-                            for (var c = 0; c < _kFixedQtyCols; c++) ...[
+                            for (var c = 0; c < maxCols; c++) ...[
                               if (c > 0) SizedBox(width: _colGap),
                               SizedBox(width: _colQtyWidth, child: Center(child: Text('${c + 1}', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold)))),
                             ],
@@ -766,6 +786,7 @@ class _WriteoffTabContent extends StatelessWidget {
                             colNameWidth: colNameW,
                             formatQty: _formatQty,
                             onSetQuantity: onSetQuantity,
+                            onLastCellFocused: onLastCellFocused,
                             onRemove: onRemove,
                             loc: loc,
                           );
@@ -813,6 +834,7 @@ class _WriteoffDataRow extends StatelessWidget {
     required this.colNameWidth,
     required this.formatQty,
     required this.onSetQuantity,
+    required this.onLastCellFocused,
     required this.onRemove,
     required this.loc,
   });
@@ -823,14 +845,14 @@ class _WriteoffDataRow extends StatelessWidget {
   final double colNameWidth;
   final String Function(double) formatQty;
   final void Function(int, int, double) onSetQuantity;
+  final void Function(int) onLastCellFocused;
   final void Function(int) onRemove;
   final LocalizationService loc;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final qty0 = row.quantities.isNotEmpty ? row.quantities[0] : 0.0;
-    final qty1 = row.quantities.length > 1 ? row.quantities[1] : 0.0;
+    final qtyCols = row.quantities.length;
 
     return Container(
       decoration: BoxDecoration(
@@ -859,21 +881,21 @@ class _WriteoffDataRow extends StatelessWidget {
           SizedBox(width: _colGap),
           SizedBox(width: _colTotalWidth, child: Center(child: Text(formatQty(row.total), style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)))),
           SizedBox(width: _colGap),
-          SizedBox(
-            width: _colQtyWidth,
-            child: _QuantityField(
-              value: qty0,
-              onChanged: (v) => onSetQuantity(rowIndex, 0, v),
-            ),
-          ),
-          SizedBox(width: _colGap),
-          SizedBox(
-            width: _colQtyWidth,
-            child: _QuantityField(
-              value: qty1,
-              onChanged: (v) => onSetQuantity(rowIndex, 1, v),
-            ),
-          ),
+          ...List.generate(qtyCols, (c) {
+            final isLast = c == qtyCols - 1;
+            final qty = c < row.quantities.length ? row.quantities[c] : 0.0;
+            return Padding(
+              padding: EdgeInsets.only(right: c < qtyCols - 1 ? _colGap : 0),
+              child: SizedBox(
+                width: _colQtyWidth,
+                child: _QuantityField(
+                  value: qty,
+                  onChanged: (v) => onSetQuantity(rowIndex, c, v),
+                  onFocusLast: isLast ? () => onLastCellFocused(rowIndex) : null,
+                ),
+              ),
+            );
+          }),
           SizedBox(width: _colGap),
           SizedBox(width: _colDeleteWidth, child: IconButton(icon: const Icon(Icons.delete_outline, size: 20), onPressed: () => onRemove(rowIndex), padding: EdgeInsets.zero, constraints: const BoxConstraints())),
         ],
