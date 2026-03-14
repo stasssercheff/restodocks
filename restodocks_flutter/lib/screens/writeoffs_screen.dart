@@ -257,6 +257,7 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
     );
     if (picked != null && mounted) {
       _addRow(cat, product: picked.product, techCard: picked.techCard);
+      if (mounted) setState(() {}); // форсируем перерисовку после добавления
     }
   }
 
@@ -536,6 +537,7 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
                 ),
                 Expanded(
                   child: _WriteoffTabContent(
+              key: ValueKey('writeoff_${_rowsFor(_selectedCategory).length}'),
               category: _selectedCategory,
               rows: _rowsFor(_selectedCategory),
               maxCols: _maxQuantityColumns(_selectedCategory),

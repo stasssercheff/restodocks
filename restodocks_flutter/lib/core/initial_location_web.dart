@@ -121,7 +121,8 @@ String getInitialLocation() {
       } catch (_) {}
     } else {
       // Pathname == '/'. Не восстанавливать промежуточные страницы: /login, /confirm-email, /auth/confirm.
-      final fromStorage = _pathFromSessionStorage() ?? _pathFromDataset();
+      // Приоритет: dataset (из inline script) → sessionStorage → localStorage
+      final fromStorage = _pathFromDataset() ?? _pathFromSessionStorage();
       final isRestorable = fromStorage != null &&
           !fromStorage.startsWith('/login') &&
           !fromStorage.startsWith('/confirm-email') &&
