@@ -312,7 +312,8 @@ class AiServiceSupabase implements AiService {
         }
         if (merged.isNotEmpty) {
           _saveTemplateFromKeywordParse(rows, 'docx');
-          lastParsedRows = rows;
+          // Для обучения: все строки из всех таблиц (карточки могут быть из любой)
+          lastParsedRows = docxTables!.expand((t) => t).toList();
           if (lastParseHeaderSignature == null || lastParseHeaderSignature!.isEmpty) {
             lastParseHeaderSignature = _headerSignatureFromRows(rows);
           }
@@ -1224,7 +1225,10 @@ class AiServiceSupabase implements AiService {
     return low.contains('требования к оформлению') || low.contains('требования к подаче') ||
         low.contains('вес готового блюда') || low.contains('вес готового изделия') ||
         low.contains('в расчете на') || low.contains('порц') ||
-        low.contains('органолептическ') || low == 'итого';
+        low.contains('органолептическ') || low == 'итого' ||
+        (low.contains('хранение') && (low.contains('срок') || low.startsWith('хранение'))) ||
+        RegExp(r'^ед\.?\s*изм\.?$').hasMatch(low) || low == 'ед. изм' || low == 'ед изм' ||
+        RegExp(r'^ресторан\s*[«""]').hasMatch(low);
   }
 
   /// Парсинг ТТК по шаблону (Наименование, Продукт, Брутто, Нетто...) — без вызова ИИ.

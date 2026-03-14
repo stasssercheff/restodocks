@@ -71,6 +71,7 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
     with AutoSaveMixin<WriteoffsScreen> {
   WriteoffCategory _selectedCategory = WriteoffCategory.staff;
   final Map<WriteoffCategory, List<_WriteoffRow>> _rowsByCategory = {};
+  final ValueNotifier<int> _rowsVersion = ValueNotifier(0);
   bool _loading = true;
 
   @override
@@ -81,6 +82,12 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
 
   List<_WriteoffRow> _rowsFor(WriteoffCategory cat) =>
       _rowsByCategory[cat] ??= [];
+
+  @override
+  void dispose() {
+    _rowsVersion.dispose();
+    super.dispose();
+  }
 
   @override
   Map<String, dynamic> getCurrentState() {
@@ -148,7 +155,10 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
         }
       }
     }
-    if (mounted) setState(() {});
+    if (mounted) {
+      _rowsVersion.value++;
+      setState(() {});
+    }
   }
 
   @override
@@ -172,22 +182,22 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
       await tcSvc.getTechCardsForEstablishment(dataEstId);
     }
     if (mounted) {
-      setState(() => _loading = false);
       await restoreDraftNow();
+      if (mounted) setState(() => _loading = false);
     }
   }
 
   void _addRow(WriteoffCategory cat, {Product? product, TechCard? techCard}) {
     if (product == null && techCard == null) return;
-    setState(() {
-      final rows = List<_WriteoffRow>.from(_rowsFor(cat));
-      rows.add(_WriteoffRow(
-        product: product,
-        techCard: techCard,
-        quantities: [0.0, 0.0],
-      ));
-      _rowsByCategory[cat] = rows;
-    });
+    final rows = List<_WriteoffRow>.from(_rowsFor(cat));
+    rows.add(_WriteoffRow(
+      product: product,
+      techCard: techCard,
+      quantities: [0.0, 0.0],
+    ));
+    _rowsByCategory[cat] = rows;
+    _rowsVersion.value++;
+    setState(() {});
     _saveNow();
   }
 
@@ -196,14 +206,18 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
     if (rowIndex < 0 || rowIndex >= rows.length) return;
     final row = rows[rowIndex];
     if (colIndex < 0 || colIndex >= row.quantities.length) return;
-    setState(() => row.quantities[colIndex] = value.clamp(0.0, 99999.0));
+    row.quantities[colIndex] = value.clamp(0.0, 99999.0);
+    _rowsVersion.value++;
+    setState(() {});
     _saveNow();
   }
 
   void _addQuantityCell(WriteoffCategory cat, int rowIndex) {
     final rows = _rowsFor(cat);
     if (rowIndex < 0 || rowIndex >= rows.length) return;
-    setState(() => rows[rowIndex].quantities.add(0.0));
+    rows[rowIndex].quantities.add(0.0);
+    _rowsVersion.value++;
+    setState(() {});
     _saveNow();
   }
 
@@ -214,10 +228,10 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
   }
 
   void _removeRow(WriteoffCategory cat, int index) {
-    setState(() {
-      final rows = _rowsFor(cat);
-      if (index >= 0 && index < rows.length) rows.removeAt(index);
-    });
+    final rows = _rowsFor(cat);
+    if (index >= 0 && index < rows.length) rows.removeAt(index);
+    _rowsVersion.value++;
+    setState(() {});
     _saveNow();
   }
 
@@ -237,27 +251,27 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
         : techCards.where((tc) => emp.canSeeTechCard(tc.sections)).toList();
 
     if (!mounted) return;
-    final picked = await showDialog<_WriteoffPickedItem>(
+    final picked = await showModalBottomSheet<_WriteoffPickedItem>(
       context: context,
-      builder: (ctx) => Dialog(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: 480,
-            maxHeight: MediaQuery.of(ctx).size.height * 0.75,
-          ),
-          child: _WriteoffItemPickerSheet(
-            loc: loc,
-            products: products,
-            techCards: visibleTc,
-            onSelectProduct: (p) => Navigator.of(ctx).pop(_WriteoffPickedItem(product: p)),
-            onSelectTechCard: (tc) => Navigator.of(ctx).pop(_WriteoffPickedItem(techCard: tc)),
-          ),
+      isScrollControlled: true,
+      useRootNavigator: true,
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        maxChildSize: 0.9,
+        minChildSize: 0.3,
+        expand: false,
+        builder: (_, scrollController) => _WriteoffItemPickerSheet(
+          loc: loc,
+          products: products,
+          techCards: visibleTc,
+          scrollController: scrollController,
+          onSelectProduct: (p) => Navigator.of(ctx).pop(_WriteoffPickedItem(product: p)),
+          onSelectTechCard: (tc) => Navigator.of(ctx).pop(_WriteoffPickedItem(techCard: tc)),
         ),
       ),
     );
     if (picked != null && mounted) {
       _addRow(cat, product: picked.product, techCard: picked.techCard);
-      if (mounted) setState(() {}); // форсируем перерисовку после добавления
     }
   }
 
@@ -402,10 +416,10 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
         }
       } catch (_) {}
       // Очистить заполненные строки после успешного сохранения
-      setState(() {
-        final rows = _rowsFor(cat);
-        rows.removeWhere((r) => r.total > 0);
-      });
+      final rows = _rowsFor(cat);
+      rows.removeWhere((r) => r.total > 0);
+      _rowsVersion.value++;
+      setState(() {});
     }
   }
 
@@ -536,9 +550,9 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
                   ),
                 ),
                 Expanded(
-                  child: KeyedSubtree(
-                    key: ValueKey('writeoff_${_rowsFor(_selectedCategory).length}'),
-                    child: _WriteoffTabContent(
+                  child: ValueListenableBuilder<int>(
+                    valueListenable: _rowsVersion,
+                    builder: (_, __, ___) => _WriteoffTabContent(
               category: _selectedCategory,
               rows: _rowsFor(_selectedCategory),
               maxCols: _maxQuantityColumns(_selectedCategory),
@@ -890,6 +904,7 @@ class _WriteoffItemPickerSheet extends StatefulWidget {
     required this.loc,
     required this.products,
     required this.techCards,
+    this.scrollController,
     required this.onSelectProduct,
     required this.onSelectTechCard,
   });
@@ -897,6 +912,7 @@ class _WriteoffItemPickerSheet extends StatefulWidget {
   final LocalizationService loc;
   final List<Product> products;
   final List<TechCard> techCards;
+  final ScrollController? scrollController;
   final void Function(Product) onSelectProduct;
   final void Function(TechCard) onSelectTechCard;
 
@@ -980,6 +996,7 @@ class _WriteoffItemPickerSheetState extends State<_WriteoffItemPickerSheet> {
         Flexible(
           child: _segment == 0
               ? ListView.builder(
+                  controller: widget.scrollController,
                   itemCount: _filteredProducts.length,
                   itemBuilder: (_, i) {
                     final p = _filteredProducts[i];
@@ -990,6 +1007,7 @@ class _WriteoffItemPickerSheetState extends State<_WriteoffItemPickerSheet> {
                   },
                 )
               : ListView.builder(
+                  controller: widget.scrollController,
                   itemCount: _filteredTechCards.length,
                   itemBuilder: (_, i) {
                     final t = _filteredTechCards[i];

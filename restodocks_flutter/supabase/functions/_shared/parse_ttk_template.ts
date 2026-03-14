@@ -239,7 +239,10 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
       pLow.includes("требования к оформлению") || pLow.includes("требования к подаче") ||
       pLow.includes("вес готового блюда") || pLow.includes("вес готового изделия") ||
       pLow.includes("в расчете на") || pLow.includes("порц") ||
-      pLow.includes("органолептическ") || /^итого\s*$/.test(pLow.trim())
+      pLow.includes("органолептическ") || /^итого\s*$/.test(pLow.trim()) ||
+      (pLow.includes("хранение") && (pLow.includes("срок") || pLow.startsWith("хранение"))) ||
+      /^ед\.?\s*изм\.?$/i.test(pLow.trim()) || pLow === "ед. изм" || pLow === "ед изм" ||
+      /^ресторан\s*[«""]/.test(pLow)
     ) continue;
 
     // Строка с названием блюда (начало новой карточки)

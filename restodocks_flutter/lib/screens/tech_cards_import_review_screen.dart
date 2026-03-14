@@ -456,8 +456,9 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
         if (mounted) setState(() => _saveProgress = productNamesToCreate.length + created);
       }
       // Обучение: обратный маппинг — по скорректированным данным находим колонки в исходнике
-      final sig = widget.headerSignature;
-      final sourceRows = widget.sourceRows;
+      final sig = widget.headerSignature ?? AiServiceSupabase.lastParseHeaderSignature;
+      final sourceRows = widget.sourceRows ?? AiServiceSupabase.lastParsedRows;
+      debugPrint('[tt_parse] save: sig=${sig?.isEmpty ?? true ? "null/empty" : "ok"} sourceRows=${sourceRows?.length ?? 0}');
       if (sig != null && sig.isNotEmpty) {
         if (sourceRows != null && sourceRows.isNotEmpty) {
           final cardsForLearning = sorted
