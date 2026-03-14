@@ -104,7 +104,9 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
         unitCol = c;
       }
     }
-    if (headerIdx >= 0 && (nameCol >= 0 || productCol >= 0)) break;
+    // Shama: «Наименование» в строке 0, «Брутто/Нетто/Выход» — в строке 1. Не выходить, пока не найдём колонки весов или не просмотрели 3 строки.
+    const hasWeights = grossCol >= 0 || netCol >= 0 || outputCol >= 0;
+    if (headerIdx >= 0 && (nameCol >= 0 || productCol >= 0) && (hasWeights || r >= 2)) break;
   }
 
   if (headerIdx < 0 || (nameCol < 0 && productCol < 0)) {
@@ -130,6 +132,12 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
 
   if (nameCol < 0) nameCol = 0;
   if (productCol < 0) productCol = 1;
+  // Shama: двухстрочный заголовок — колонки весов могут не найтись. Fallback: № | Продукт | Брутто | Нетто | Выход
+  if (grossCol < 0 && netCol < 0) {
+    grossCol = 2;
+    netCol = 3;
+    if (outputCol < 0) outputCol = 4;
+  }
 
   // Единицы измерения и КБЖУ — не названия блюд (PDF даёт "г", "кДж)" и т.п.)
   const UNIT_PATTERNS = /^(г|кг|мл|л|шт|кдж\)?|ккал\)?)$/i;
