@@ -205,27 +205,13 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
   void _setQuantity(WriteoffCategory cat, int rowIndex, int colIndex, double value) {
     final rows = _rowsFor(cat);
     if (rowIndex < 0 || rowIndex >= rows.length) return;
+    if (colIndex != 0 && colIndex != 1) return;
     final row = rows[rowIndex];
-    if (colIndex < 0 || colIndex >= row.quantities.length) return;
+    while (row.quantities.length <= colIndex) row.quantities.add(0.0);
     row.quantities[colIndex] = value.clamp(0.0, 99999.0);
     _rowsVersion.value++;
     setState(() {});
     _saveNow();
-  }
-
-  void _addQuantityCell(WriteoffCategory cat, int rowIndex) {
-    final rows = _rowsFor(cat);
-    if (rowIndex < 0 || rowIndex >= rows.length) return;
-    rows[rowIndex].quantities.add(0.0);
-    _rowsVersion.value++;
-    setState(() {});
-    _saveNow();
-  }
-
-  int _maxQuantityColumns(WriteoffCategory cat) {
-    final rows = _rowsFor(cat);
-    if (rows.isEmpty) return 2;
-    return rows.map((r) => r.quantities.length).fold<int>(2, (a, b) => a > b ? a : b);
   }
 
   void _removeRow(WriteoffCategory cat, int index) {
@@ -553,10 +539,8 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
                     builder: (_, __, ___) => _WriteoffTabContent(
               category: _selectedCategory,
               rows: _rowsFor(_selectedCategory),
-              maxCols: _maxQuantityColumns(_selectedCategory),
               onAdd: () => _showItemPicker(_selectedCategory),
               onSetQuantity: (ri, ci, v) => _setQuantity(_selectedCategory, ri, ci, v),
-              onAddQuantityCell: (ri) => _addQuantityCell(_selectedCategory, ri),
               onRemove: (i) => _removeRow(_selectedCategory, i),
               onSave: () => _save(_selectedCategory),
               loc: loc,
@@ -577,14 +561,14 @@ const double _colQtyWidth = 48;
 const double _colGap = 6;
 const double _colDeleteWidth = 40;
 
+const int _kFixedQtyCols = 2;
+
 class _WriteoffTabContent extends StatelessWidget {
   const _WriteoffTabContent({
     required this.category,
     required this.rows,
-    required this.maxCols,
     required this.onAdd,
     required this.onSetQuantity,
-    required this.onAddQuantityCell,
     required this.onRemove,
     required this.onSave,
     required this.loc,
@@ -592,19 +576,16 @@ class _WriteoffTabContent extends StatelessWidget {
 
   final WriteoffCategory category;
   final List<_WriteoffRow> rows;
-  final int maxCols;
   final VoidCallback onAdd;
   final void Function(int rowIndex, int colIndex, double value) onSetQuantity;
-  final void Function(int rowIndex) onAddQuantityCell;
   final void Function(int index) onRemove;
   final VoidCallback onSave;
   final LocalizationService loc;
 
   double _leftWidth(BuildContext context) {
     final w = MediaQuery.of(context).size.width;
-    final scrollWidth = maxCols * (_colQtyWidth + _colGap) + _colDeleteWidth;
-    // Минимум 280, чтобы колонка «Наименование» имела ~130px (иначе продукт не виден)
-    return (w - scrollWidth).clamp(280.0, 380.0);
+    final scrollWidth = _kFixedQtyCols * (_colQtyWidth + _colGap) + _colDeleteWidth;
+    return (w - scrollWidth).clamp(200.0, 350.0);
   }
 
   double _colNameWidth(BuildContext context) =>
@@ -644,38 +625,33 @@ class _WriteoffTabContent extends StatelessWidget {
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Шапка: # | Наименование | Мера | Итого | 1 | 2 | 3 | ...
+                    // Шапка: # | Наименование | Мера | Итого | 1 | 2 | Удалить
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                       decoration: BoxDecoration(
                         border: Border(bottom: BorderSide(color: theme.dividerColor)),
                         color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
                       ),
-                      child: Row(
-                        children: [
-                          SizedBox(width: _colNoWidth, child: Text('#', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
-                          SizedBox(width: _colGap),
-                          SizedBox(width: _colNameWidth(context), child: Text(loc.t('inventory_item_name') ?? 'Наименование', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
-                          SizedBox(width: _colGap),
-                          SizedBox(width: _colUnitWidth, child: Text(loc.t('inventory_unit') ?? 'Ед.', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
-                          SizedBox(width: _colGap),
-                          SizedBox(width: _colTotalWidth, child: Text(loc.t('inventory_total') ?? 'Итого', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
-                          SizedBox(width: _colGap),
-                          Expanded(
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: Row(
-                                children: [
-                                  for (var c = 0; c < maxCols; c++) ...[
-                                    if (c > 0) SizedBox(width: _colGap),
-                                    SizedBox(width: _colQtyWidth, child: Center(child: Text('${c + 1}', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold)))),
-                                  ],
-                                  SizedBox(width: _colDeleteWidth),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            SizedBox(width: _colNoWidth, child: Text('#', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+                            SizedBox(width: _colGap),
+                            SizedBox(width: _colNameWidth(context), child: Text(loc.t('inventory_item_name') ?? 'Наименование', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
+                            SizedBox(width: _colGap),
+                            SizedBox(width: _colUnitWidth, child: Text(loc.t('inventory_unit') ?? 'Ед.', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
+                            SizedBox(width: _colGap),
+                            SizedBox(width: _colTotalWidth, child: Text(loc.t('inventory_total') ?? 'Итого', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+                            SizedBox(width: _colGap),
+                            for (var c = 0; c < _kFixedQtyCols; c++) ...[
+                              if (c > 0) SizedBox(width: _colGap),
+                              SizedBox(width: _colQtyWidth, child: Center(child: Text('${c + 1}', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold)))),
+                            ],
+                            SizedBox(width: _colGap),
+                            SizedBox(width: _colDeleteWidth),
+                          ],
+                        ),
                       ),
                     ),
                     Expanded(
@@ -686,17 +662,15 @@ class _WriteoffTabContent extends StatelessWidget {
                           final r = rows[i];
                           final rowNum = i + 1;
                           return _WriteoffDataRow(
+                            key: ValueKey('row_${r.product?.id ?? r.techCard?.id}_$i'),
                             row: r,
                             rowIndex: i,
                             rowNumber: rowNum,
-                            maxCols: maxCols,
                             leftWidth: leftW,
                             formatQty: _formatQty,
                             onSetQuantity: onSetQuantity,
-                            onAddQuantityCell: onAddQuantityCell,
                             onRemove: onRemove,
                             loc: loc,
-                            isLastRow: i == rows.length - 1,
                           );
                         },
                       ),
@@ -735,96 +709,77 @@ class _WriteoffTabContent extends StatelessWidget {
 
 class _WriteoffDataRow extends StatelessWidget {
   const _WriteoffDataRow({
+    super.key,
     required this.row,
     required this.rowIndex,
     required this.rowNumber,
-    required this.maxCols,
     required this.leftWidth,
     required this.formatQty,
     required this.onSetQuantity,
-    required this.onAddQuantityCell,
     required this.onRemove,
     required this.loc,
-    required this.isLastRow,
   });
 
   final _WriteoffRow row;
   final int rowIndex;
   final int rowNumber;
-  final int maxCols;
   final double leftWidth;
   final String Function(double) formatQty;
   final void Function(int, int, double) onSetQuantity;
-  final void Function(int) onAddQuantityCell;
   final void Function(int) onRemove;
   final LocalizationService loc;
-  final bool isLastRow;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final qtyCols = row.quantities.length;
+    final qty0 = row.quantities.isNotEmpty ? row.quantities[0] : 0.0;
+    final qty1 = row.quantities.length > 1 ? row.quantities[1] : 0.0;
 
     return Container(
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
         color: rowNumber.isEven ? theme.colorScheme.surface : theme.colorScheme.surfaceContainerLowest.withOpacity(0.5),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Фиксированная левая часть
-          SizedBox(
-            width: leftWidth,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: Row(
-                children: [
-                  SizedBox(width: _colNoWidth, child: Text('$rowNumber', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant))),
-                  SizedBox(width: _colGap),
-                  Expanded(
-                    child: Text(
-                      row.displayName(loc.currentLanguageCode),
-                      style: theme.textTheme.bodyMedium,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  SizedBox(width: _colGap),
-                  SizedBox(width: _colUnitWidth, child: Text(_unitDisplay(row.unit, loc.currentLanguageCode), style: theme.textTheme.bodySmall, overflow: TextOverflow.ellipsis)),
-                  SizedBox(width: _colGap),
-                  SizedBox(width: _colTotalWidth, child: Center(child: Text(formatQty(row.total), style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)))),
-                  SizedBox(width: _colGap),
-                ],
-              ),
-            ),
-          ),
-          // Скроллируемые ячейки количества + удалить
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+          SizedBox(width: _colNoWidth, child: Text('$rowNumber', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant))),
+          SizedBox(width: _colGap),
           Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  for (var c = 0; c < qtyCols; c++) ...[
-                    if (c > 0) SizedBox(width: _colGap),
-                    SizedBox(
-                      width: _colQtyWidth,
-                      child: Center(
-                        child: _QuantityField(
-                          key: ValueKey('qty_${rowIndex}_$c'),
-                          value: row.quantities[c],
-                          onChanged: (v) => onSetQuantity(rowIndex, c, v),
-                          onFocusLast: c == qtyCols - 1 ? () => onAddQuantityCell(rowIndex) : null,
-                        ),
-                      ),
-                    ),
-                  ],
-                  SizedBox(width: _colDeleteWidth, child: IconButton(icon: const Icon(Icons.delete_outline, size: 20), onPressed: () => onRemove(rowIndex), padding: EdgeInsets.zero, constraints: const BoxConstraints())),
-                ],
-              ),
+            child: Text(
+              row.displayName(loc.currentLanguageCode),
+              style: theme.textTheme.bodyMedium,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
+          SizedBox(width: _colGap),
+          SizedBox(width: _colUnitWidth, child: Text(_unitDisplay(row.unit, loc.currentLanguageCode), style: theme.textTheme.bodySmall, overflow: TextOverflow.ellipsis)),
+          SizedBox(width: _colGap),
+          SizedBox(width: _colTotalWidth, child: Center(child: Text(formatQty(row.total), style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)))),
+          SizedBox(width: _colGap),
+          SizedBox(
+            width: _colQtyWidth,
+            child: _QuantityField(
+              value: qty0,
+              onChanged: (v) => onSetQuantity(rowIndex, 0, v),
+            ),
+          ),
+          SizedBox(width: _colGap),
+          SizedBox(
+            width: _colQtyWidth,
+            child: _QuantityField(
+              value: qty1,
+              onChanged: (v) => onSetQuantity(rowIndex, 1, v),
+            ),
+          ),
+          SizedBox(width: _colGap),
+          SizedBox(width: _colDeleteWidth, child: IconButton(icon: const Icon(Icons.delete_outline, size: 20), onPressed: () => onRemove(rowIndex), padding: EdgeInsets.zero, constraints: const BoxConstraints())),
         ],
+        ),
       ),
     );
   }
