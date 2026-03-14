@@ -157,6 +157,8 @@ mixin AutoSaveMixin<T extends StatefulWidget> on State<T> {
     } else if (draftKey.startsWith('tech_card_edit_')) {
       final id = draftKey.replaceFirst('tech_card_edit_', '');
       await _draftStorage.saveTechCardEditDraft(id, data);
+    } else if (draftKey == 'writeoffs') {
+      await _draftStorage.saveWriteoffsDraft(data);
     }
   }
 
@@ -176,6 +178,8 @@ mixin AutoSaveMixin<T extends StatefulWidget> on State<T> {
     } else if (draftKey.startsWith('tech_card_edit_')) {
       final id = draftKey.replaceFirst('tech_card_edit_', '');
       return await _draftStorage.loadTechCardEditDraft(id);
+    } else if (draftKey == 'writeoffs') {
+      return await _draftStorage.loadWriteoffsDraft();
     }
     return null;
   }
@@ -196,6 +200,8 @@ mixin AutoSaveMixin<T extends StatefulWidget> on State<T> {
     } else if (draftKey.startsWith('tech_card_edit_')) {
       final id = draftKey.replaceFirst('tech_card_edit_', '');
       await _draftStorage.clearTechCardEditDraft(id);
+    } else if (draftKey == 'writeoffs') {
+      await _draftStorage.clearWriteoffsDraft();
     }
   }
 
@@ -215,6 +221,8 @@ mixin AutoSaveMixin<T extends StatefulWidget> on State<T> {
     } else if (draftKey.startsWith('tech_card_edit_')) {
       final data = await _loadFromStorage();
       return data != null;
+    } else if (draftKey == 'writeoffs') {
+      return await _draftStorage.hasWriteoffsDraft();
     }
     return false;
   }

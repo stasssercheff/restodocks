@@ -174,6 +174,45 @@ class DraftStorageService {
     } catch (_) {}
   }
 
+  // ── Списания ──────────────────────────────────────────────────────────────────
+
+  static const String _writeoffsKey = 'draft_writeoffs';
+
+  Future<void> saveWriteoffsDraft(Map<String, dynamic> data) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_writeoffsKey, jsonEncode(data));
+    } catch (e) {
+      devLog('Failed to save writeoffs draft: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>?> loadWriteoffsDraft() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final s = prefs.getString(_writeoffsKey);
+      return s != null ? jsonDecode(s) as Map<String, dynamic> : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<void> clearWriteoffsDraft() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_writeoffsKey);
+    } catch (_) {}
+  }
+
+  Future<bool> hasWriteoffsDraft() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.containsKey(_writeoffsKey);
+    } catch (_) {
+      return false;
+    }
+  }
+
   // ── iiko-инвентаризация ──────────────────────────────────────────────────────
 
   static const String _iikoInventoryKey = 'draft_iiko_inventory';
