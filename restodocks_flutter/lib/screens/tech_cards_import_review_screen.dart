@@ -494,23 +494,34 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                 originalDishName: orig,
               );
             }
-            try {
-              await Supabase.instance.client.from('tt_parse_corrections').insert({
-                'establishment_id': est.dataEstablishmentId,
-                'header_signature': sig,
-                'field': 'dish_name',
-                'original_value': orig,
-                'corrected_value': corr,
-              });
-            } catch (_) {}
+            await AiServiceSupabase.saveLearningCorrection(
+              headerSignature: sig,
+              field: 'dish_name',
+              originalValue: orig,
+              correctedValue: corr,
+              establishmentId: est.dataEstablishmentId,
+            );
           }
         }
       }
       if (mounted) {
         setState(() => _saving = false);
         if (failed.isEmpty) {
+          var msg = loc.t('tech_cards_import_created').replaceAll('%s', '$created');
+          if (AiServiceSupabase.lastLearningError != null) {
+            msg += ' ${loc.t('ttk_learn_error_hint') ?? '(Обучение не сохранилось)'}';
+            final err = AiServiceSupabase.lastLearningError!;
+            if (err.length <= 120) {
+              msg += ' $err';
+            } else {
+              msg += ' ${err.substring(0, 117)}...';
+            }
+          }
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(loc.t('tech_cards_import_created').replaceAll('%s', '$created'))),
+            SnackBar(
+              content: Text(msg),
+              duration: AiServiceSupabase.lastLearningError != null ? const Duration(seconds: 8) : const Duration(seconds: 4),
+            ),
           );
           context.go('/tech-cards/${widget.department}?refresh=1');
         } else {

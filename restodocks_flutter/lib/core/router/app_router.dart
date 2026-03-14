@@ -20,6 +20,7 @@ import '../../screens/iiko_inventory_inbox_detail_screen.dart';
 import '../../screens/inventory_merge_screen.dart';
 import '../../screens/writeoff_inbox_detail_screen.dart';
 import '../../screens/writeoffs_screen.dart';
+import '../../screens/haccp_log_detail_screen.dart';
 import '../../screens/home/expenses_screen.dart';
 import '../../screens/home/department_placeholder_screen.dart';
 import '../../screens/supabase_test_screen.dart';
