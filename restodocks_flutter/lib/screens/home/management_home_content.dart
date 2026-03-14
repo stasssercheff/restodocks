@@ -82,6 +82,7 @@ class ManagementHomeContent extends StatelessWidget {
           ),
         if (showNomenclature)
           _Tile(icon: Icons.assignment, title: loc.t('nomenclature'), onTap: () => context.go('/nomenclature/$dept')),
+        _Tile(icon: Icons.add_business, title: loc.t('suppliers') ?? loc.t('order_tab_suppliers') ?? 'Поставщики', onTap: () => context.push('/suppliers/$dept')),
         _Tile(icon: Icons.shopping_cart, title: loc.t('product_order'), onTap: () => context.go('/product-order?department=${_deptForRoute(employee.department)}')),
         _Tile(icon: Icons.assignment, title: loc.t('inventory_blank'), onTap: () => context.push('/inventory')),
         _Tile(icon: Icons.remove_circle_outline, title: loc.t('writeoffs') ?? 'Списания', onTap: () => context.push('/writeoffs')),

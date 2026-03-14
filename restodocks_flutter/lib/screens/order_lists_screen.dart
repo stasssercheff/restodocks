@@ -101,16 +101,6 @@ class _OrderListsScreenState extends State<OrderListsScreen> {
       appBar: AppBar(
         leading: widget.embedded ? null : appBarBackButton(context),
         title: Text(loc.t('product_order')),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add_business),
-            tooltip: loc.t('order_create_supplier') ?? 'Создать поставщика',
-            onPressed: () async {
-              await context.push('/product-order/new?department=${widget.department}');
-              if (mounted) _load();
-            },
-          ),
-        ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())

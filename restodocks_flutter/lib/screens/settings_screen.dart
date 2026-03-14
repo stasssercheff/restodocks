@@ -751,7 +751,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (!showBanquet) {
       order = order.where((id) => id != HomeTileId.banquetMenu && id != HomeTileId.banquetTtk).toList();
     }
-    order = order.where((id) => id != HomeTileId.suppliers).toList();
     final tileLabels = <HomeTileId, String>{
       HomeTileId.messages: loc.t('inbox_tab_messages') ?? 'Сообщения',
       HomeTileId.schedule: loc.t('schedule'),

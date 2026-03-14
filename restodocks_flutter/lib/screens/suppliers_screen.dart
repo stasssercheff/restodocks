@@ -109,14 +109,6 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
         title: Text('${loc.t('order_tab_suppliers') ?? 'Поставщики'} — $_departmentLabel'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () async {
-              await context.push('/product-order/new?department=${widget.department}');
-              if (mounted) _load();
-            },
-            tooltip: loc.t('order_create_supplier') ?? 'Создать поставщика',
-          ),
-          IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loading ? null : _load,
             tooltip: loc.t('refresh'),
@@ -219,7 +211,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
               const SizedBox(height: 8),
               Text(
                 loc.t('order_suppliers_empty_hint') ??
-                    'Создайте поставщика в разделе «Заказ продуктов» — «Поставщики»',
+                    'Создайте поставщика в разделе "Поставщики".',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
