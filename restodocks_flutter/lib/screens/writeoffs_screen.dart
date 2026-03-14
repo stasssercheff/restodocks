@@ -243,7 +243,12 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
     final dataEstId = account.establishment?.dataEstablishmentId;
     if (dataEstId == null) return;
 
-    final products = productStore.getNomenclatureProducts(dataEstId);
+    await productStore.loadProducts();
+    await productStore.loadNomenclature(dataEstId);
+    var products = productStore.getNomenclatureProducts(dataEstId);
+    if (products.isEmpty) {
+      products = await productStore.loadNomenclatureProductsDirect(dataEstId);
+    }
     final techCards = await tcSvc.getTechCardsForEstablishment(dataEstId);
     final emp = account.currentEmployee;
     final visibleTc = emp == null
@@ -251,6 +256,12 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
         : techCards.where((tc) => emp.canSeeTechCard(tc.sections)).toList();
 
     if (!mounted) return;
+    if (products.isEmpty && visibleTc.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('no_products') ?? 'Нет продуктов в номенклатуре')),
+      );
+      return;
+    }
     await showDialog<void>(
       context: context,
       useRootNavigator: true,
@@ -277,10 +288,9 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _WriteoffItemPickerSheet(
+              child: SizedBox(
+                height: MediaQuery.of(ctx).size.height * 0.7,
+                child: _WriteoffItemPickerSheet(
                     loc: loc,
                     products: products,
                     techCards: visibleTc,
@@ -293,7 +303,6 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
                       if (ctx.mounted) Navigator.of(ctx).pop();
                     },
                   ),
-                ],
               ),
             ),
           ),
@@ -991,7 +1000,8 @@ class _WriteoffItemPickerSheetState extends State<_WriteoffItemPickerSheet> {
     final lang = widget.loc.currentLanguageCode;
 
     return Column(
-      mainAxisSize: MainAxisSize.min,
+      mainAxisSize: MainAxisSize.max,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
           padding: const EdgeInsets.all(16),

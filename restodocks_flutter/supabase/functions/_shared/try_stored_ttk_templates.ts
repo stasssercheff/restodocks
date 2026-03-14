@@ -24,7 +24,7 @@ export async function tryParseByStoredTemplates(rows: string[][]): Promise<TryPa
 
   const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
 
-  // Находим первый заголовок с шаблоном
+  // Находим первый заголовок с шаблоном (точное совпадение или prefix)
   let firstSig: string | null = null;
   let data: Record<string, unknown> | null = null;
   for (let r = 0; r < rows.length && r < 100; r++) {
@@ -35,7 +35,21 @@ export async function tryParseByStoredTemplates(rows: string[][]): Promise<TryPa
     const headerRow = rows[r]?.map((c) => (c ?? "").trim()) ?? [];
     const sig = headerSignature(headerRow);
     if (!sig) continue;
-    const res = await supabase.from("tt_parse_templates").select("header_row_index, name_col, product_col, gross_col, net_col, waste_col, output_col").eq("header_signature", sig).limit(1).maybeSingle();
+    let res = await supabase.from("tt_parse_templates").select("header_signature, header_row_index, name_col, product_col, gross_col, net_col, waste_col, output_col, technology_col").eq("header_signature", sig).limit(1).maybeSingle();
+    if (!res.data) {
+      const all = await supabase.from("tt_parse_templates").select("header_signature, header_row_index, name_col, product_col, gross_col, net_col, waste_col, output_col, technology_col");
+      const templates = (all.data ?? []) as Array<Record<string, unknown>>;
+      const sigPrefix6 = sig.split("|").slice(0, 6).join("|");
+      const match = templates.find((t) => {
+        const ts = (t.header_signature as string) ?? "";
+        if (sig === ts || sig.startsWith(ts + "|") || ts.startsWith(sig + "|")) return true;
+        const tsPrefix6 = ts.split("|").slice(0, 6).join("|");
+        return sigPrefix6 && tsPrefix6 && (sigPrefix6 === tsPrefix6 || sig.startsWith(tsPrefix6 + "|"));
+      });
+      if (match) {
+        res = { data: match };
+      }
+    }
     if (res.data) {
       firstSig = sig;
       data = res.data;
@@ -57,10 +71,12 @@ export async function tryParseByStoredTemplates(rows: string[][]): Promise<TryPa
   let learnedProductCol: number | null = null;
   let learnedGrossCol: number | null = null;
   let learnedNetCol: number | null = null;
+  let learnedTechnologyCol: number | null = null;
+  const learnedSig = (data?.header_signature as string) ?? firstSig;
   const { data: learned } = await supabase
     .from("tt_parse_learned_dish_name")
-    .select("dish_name_row_offset, dish_name_col, product_col, gross_col, net_col")
-    .eq("header_signature", firstSig)
+    .select("dish_name_row_offset, dish_name_col, product_col, gross_col, net_col, technology_col")
+    .eq("header_signature", learnedSig)
     .limit(1)
     .maybeSingle();
   if (learned?.dish_name_row_offset != null && learned?.dish_name_col != null) {
@@ -70,6 +86,7 @@ export async function tryParseByStoredTemplates(rows: string[][]): Promise<TryPa
   if (learned?.product_col != null) learnedProductCol = learned.product_col as number;
   if (learned?.gross_col != null) learnedGrossCol = learned.gross_col as number;
   if (learned?.net_col != null) learnedNetCol = learned.net_col as number;
+  if (learned?.technology_col != null) learnedTechnologyCol = learned.technology_col as number;
 
   const templateHeaderIdx = (data.header_row_index as number) ?? 0;
   const headerWords = ["брутто", "нетто", "наименование", "продукт", "сырьё"];
@@ -99,10 +116,12 @@ export async function tryParseByStoredTemplates(rows: string[][]): Promise<TryPa
         headerIdx: headerIdxInBlock,
         nameCol: (data.name_col as number) ?? 0,
         productCol: useLearned ? (learnedProductCol ?? (data.product_col as number) ?? 1) : (data.product_col as number) ?? 1,
+        // gross/net — из learned (после ручных правок) или шаблона. Wide Search подхватит при пустых ячейках
         grossCol: useLearned ? (learnedGrossCol ?? (data.gross_col as number) ?? -1) : (data.gross_col as number) ?? -1,
         netCol: useLearned ? (learnedNetCol ?? (data.net_col as number) ?? -1) : (data.net_col as number) ?? -1,
         wasteCol: (data.waste_col as number) ?? -1,
         outputCol: (data.output_col as number) ?? -1,
+        technologyCol: useLearned ? (learnedTechnologyCol ?? (data.technology_col as number) ?? -1) : (data.technology_col as number) ?? -1,
         dishNameRowOffset: useLearned ? dishNameRowOffset ?? undefined : undefined,
         dishNameCol: useLearned ? dishNameCol ?? undefined : undefined,
       });

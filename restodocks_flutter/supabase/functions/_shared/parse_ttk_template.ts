@@ -37,6 +37,8 @@ export interface TtkCard {
   technologyText: string | null;
   ingredients: TtkIngredient[];
   isSemiFinished: boolean | null;
+  /** Выход (г) — из строки «итого» / «выход». Для блюд = вес порции. */
+  yieldGrams?: number | null;
 }
 
 /**
@@ -192,13 +194,14 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
   let currentDish: string | null = initialDish;
   const currentIngredients: TtkIngredient[] = [];
 
-  const flushCard = () => {
+  const flushCard = (yieldGrams?: number | null) => {
     if (currentDish != null && (currentDish.length > 0 || currentIngredients.length > 0)) {
       results.push({
         dishName: currentDish || null,
         technologyText: null,
         ingredients: [...currentIngredients],
         isSemiFinished: (currentDish ?? "").toLowerCase().includes("пф"),
+        yieldGrams: yieldGrams ?? undefined,
       });
     }
     currentIngredients.length = 0;
@@ -229,7 +232,9 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
     const outputVal = outputCol >= 0 && outputCol < cells.length ? cells[outputCol] : "";
 
     if (nameVal.toLowerCase() === "итого" || productVal.toLowerCase() === "итого" || productVal.toLowerCase().startsWith("всего")) {
-      flushCard();
+      let outG = parseNum(outputVal);
+      if (outputColIsKg && outG != null && outG > 0 && outG < 100) outG = outG * 1000;
+      flushCard(outG);
       currentDish = null;
       continue;
     }
@@ -239,10 +244,11 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
       pLow.includes("требования к оформлению") || pLow.includes("требования к подаче") ||
       pLow.includes("вес готового блюда") || pLow.includes("вес готового изделия") ||
       pLow.includes("в расчете на") || pLow.includes("порц") ||
-      pLow.includes("органолептическ") || /^итого\s*$/.test(pLow.trim()) ||
-      (pLow.includes("хранение") && (pLow.includes("срок") || pLow.startsWith("хранение"))) ||
-      /^ед\.?\s*изм\.?$/i.test(pLow.trim()) || pLow === "ед. изм" || pLow === "ед изм" ||
-      /^ресторан\s*[«""]/.test(pLow)
+      pLow.includes("органолептическ") || pLow.includes("органолет") || /^итого\s*$/.test(pLow.trim()) ||
+      pLow.includes("хранение") || pLow.startsWith("срок хранен") ||
+      /^ед\.?\s*изм\.?\.?$/i.test(pLow.trim()) || /^ед\s*изм/i.test(pLow) ||
+      pLow.includes("ресторан") || /^ресторан\s*[«""]/.test(pLow) || pLow === "блюдо" ||
+      /^способ\s*(приготовления|оформления)?$/i.test(pLow.trim())
     ) continue;
 
     // Строка с названием блюда (начало новой карточки)
@@ -252,7 +258,7 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
       !/^[\d\s.,]+$/.test(nameVal) &&
       !productVal
     ) {
-      if (currentDish != null && currentIngredients.length > 0) flushCard();
+      if (currentDish != null && currentIngredients.length > 0) flushCard(undefined);
       currentDish = nameVal;
     }
 
@@ -261,6 +267,10 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
       if (currentDish == null && nameVal && isValidDishName(nameVal)) currentDish = nameVal;
       let gross = parseNum(grossVal);
       let net = parseNum(netVal);
+      // iiko DOCX: gross==net==100 — часто "брутто в ед. изм", а строка с названием блюда ("Мясная к пенному") — не продукт
+      const both100 = gross != null && net != null && gross > 99 && gross < 101 && Math.abs(gross - net) < 0.01;
+      const looksLikeDishName = /^[а-яА-ЯёЁ\s]+\s+к\s+[а-яА-ЯёЁ\s]+$/.test(productVal.trim()) && productVal.trim().length < 30;
+      if (both100 && looksLikeDishName) continue;
       let outputG = parseNum(outputVal);
       if (grossColIsKg && gross != null && gross > 0 && gross < 100) gross = gross * 1000;
       if (netColIsKg && net != null && net > 0 && net < 100) net = net * 1000;
@@ -286,7 +296,7 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
       } as TtkIngredient);
     }
   }
-  flushCard();
+  flushCard(undefined);
 
   return results;
 }
@@ -322,30 +332,40 @@ export function parseTtkByStoredTemplate(
     netCol?: number;
     wasteCol?: number;
     outputCol?: number;
+    /** Колонка «Технология приготовления» — собираем текст по строкам. */
+    technologyCol?: number;
     /** Выученная позиция: смещение строки названия от header (0=header, -1=выше). */
     dishNameRowOffset?: number;
     /** Выученная позиция: колонка с названием. */
     dishNameCol?: number;
   },
 ): ParseTtkStoredResult {
-  const { headerIdx, nameCol, productCol, grossCol = -1, netCol = -1, wasteCol = -1, outputCol = -1, dishNameRowOffset, dishNameCol } = opts;
+  const { headerIdx, nameCol, productCol, grossCol = -1, netCol = -1, wasteCol = -1, outputCol = -1, technologyCol = -1, dishNameRowOffset, dishNameCol } = opts;
   const sanityIssuesSet = new Set<string>();
   if (rows.length <= headerIdx + 1) return { cards: [], sanityIssues: [] };
+
+  const headerRow = rows[headerIdx]?.map((c) => (c ?? "").trim().toLowerCase()) ?? [];
+  const grossColIsKg = grossCol >= 0 && grossCol < headerRow.length && headerRow[grossCol]?.includes("кг");
+  const netColIsKg = netCol >= 0 && netCol < headerRow.length && headerRow[netCol]?.includes("кг");
 
   let currentDish: string | null = null;
   const currentIngredients: TtkIngredient[] = [];
   const results: TtkCard[] = [];
+  let technologyParts: string[] = [];
 
-  const flushCard = () => {
+  const flushCard = (yieldGrams?: number | null) => {
     if (currentDish != null && (currentDish.length > 0 || currentIngredients.length > 0)) {
+      const techText = technologyParts.filter((s) => s.length > 15 && !/требования к оформлению|требования к подаче/i.test(s)).join("\n").trim() || null;
       results.push({
         dishName: currentDish || null,
-        technologyText: null,
+        technologyText: techText || null,
         ingredients: [...currentIngredients],
         isSemiFinished: (currentDish ?? "").toLowerCase().includes("пф"),
+        yieldGrams: yieldGrams ?? undefined,
       });
     }
     currentIngredients.length = 0;
+    technologyParts = [];
   };
 
   const unitPatterns = /^(г|кг|мл|л|шт|кдж|ккал|кдж\)|ккал\))$/i;
@@ -365,6 +385,18 @@ export function parseTtkByStoredTemplate(
     const low = s.trim().toLowerCase();
     return low.includes("органолептическ") || low.includes("внешний вид") || low.includes("консистенция") ||
       low.includes("запах") || low.includes("вкус") || low.includes("цвет");
+  };
+
+  const isJunkProductName = (s: string) => {
+    const low = s.trim().toLowerCase();
+    return low.includes("требования к оформлению") || low.includes("требования к подаче") ||
+      low.includes("вес готового блюда") || low.includes("вес готового изделия") ||
+      low.includes("в расчете на") || low.includes("порц") ||
+      low.includes("органолептическ") || low.includes("органолет") || /^итого\s*$/.test(low.trim()) ||
+      low.includes("хранение") || low.startsWith("срок хранен") ||
+      /^ед\.?\s*изм\.?\.?$/i.test(low.trim()) || /^ед\s*изм/i.test(low) ||
+      low.includes("ресторан") || /^ресторан\s*[«""]/.test(low) || low === "блюдо" ||
+      /^способ\s*(приготовления|оформления)?$/i.test(low.trim());
   };
 
   /** Wide Search: если ячейка пуста — проверить соседние 3 колонки в той же строке */
@@ -451,14 +483,42 @@ export function parseTtkByStoredTemplate(
         }
       }
     }
-    const grossVal = gCol >= 0 && gCol < cells.length ? cells[gCol] : "";
-    const netVal = nCol >= 0 && nCol < cells.length ? cells[nCol] : "";
+    let grossVal = gCol >= 0 && gCol < cells.length ? cells[gCol] : "";
+    let netVal = nCol >= 0 && nCol < cells.length ? cells[nCol] : "";
+    // DOCX/Word: merged cells → колонки смещены. Если в выученных колонках пусто — ищем число в строке
+    if ((!grossVal.trim() || !netVal.trim()) && productVal && isValidProduct(productVal) && cells.length >= 3) {
+      const numCells: { col: number; val: string; num: number }[] = [];
+      for (let c = 2; c < Math.min(cells.length, 10); c++) {
+        if (c === pCol) continue;
+        const v = (cells[c] ?? "").trim();
+        const n = parseNum(v);
+        // Пропускаем № (1,2,3...) — берём только веса (0.01-5 кг или 10+ г)
+        if (n != null && n > 0 && (n < 1 || n >= 10) && n < 1000) numCells.push({ col: c, val: v, num: n });
+      }
+      if (numCells.length >= 1 && !grossVal.trim()) grossVal = numCells[0].val;
+      if (numCells.length >= 2 && !netVal.trim()) netVal = numCells[1].val;
+      else if (numCells.length >= 1 && !netVal.trim()) netVal = numCells[0].val;
+    }
     const wasteVal = wasteCol >= 0 && wasteCol < cells.length ? cells[wasteCol] : "";
     const outputVal = outputCol >= 0 && outputCol < cells.length ? cells[outputCol] : "";
+    const techVal = technologyCol >= 0 && technologyCol < cells.length ? cells[technologyCol] : "";
+    if (techVal.trim().length > 15) technologyParts.push(techVal.trim());
 
     // Sanity Check: вместо веса — текст
-    const grossNum = parseNum(grossVal);
-    const netNum = parseNum(netVal);
+    let grossNum = parseNum(grossVal);
+    let netNum = parseNum(netVal);
+    const unitCell = (productCol === 1 && cells.length > 2) ? (cells[2] ?? "").trim().toLowerCase() : "";
+    // кг/л → г/мл; шт не конвертируем. "0,150" (европ. формат) = кг
+    const rowUnitIsKgOrL = unitCell.includes("кг") || unitCell === "kg" || unitCell.includes("л") || unitCell === "l";
+    const grossRawLooksLikeKg = /^\s*0[,.]\d{1,3}\s*$/.test(grossVal.trim());
+    const netRawLooksLikeKg = /^\s*0[,.]\d{1,3}\s*$/.test(netVal.trim());
+    const shouldConvertKg = (v: number | null) => v != null && v > 0 && v < 100;
+    if (grossColIsKg && shouldConvertKg(grossNum)) grossNum = grossNum! * 1000;
+    else if (rowUnitIsKgOrL && shouldConvertKg(grossNum)) grossNum = grossNum! * 1000;
+    else if (grossRawLooksLikeKg && shouldConvertKg(grossNum)) grossNum = grossNum! * 1000;
+    if (netColIsKg && shouldConvertKg(netNum)) netNum = netNum! * 1000;
+    else if (rowUnitIsKgOrL && shouldConvertKg(netNum)) netNum = netNum! * 1000;
+    else if (netRawLooksLikeKg && shouldConvertKg(netNum)) netNum = netNum! * 1000;
     if (productVal && (grossVal.trim() || netVal.trim())) {
       const grossIsText = grossVal.trim().length > 0 && grossNum == null;
       const netIsText = netVal.trim().length > 0 && netNum == null;
@@ -468,33 +528,41 @@ export function parseTtkByStoredTemplate(
     }
 
     if (nameVal.toLowerCase() === "итого" || productVal.toLowerCase() === "итого") {
-      flushCard();
+      let outG = parseNum(outputVal);
+      const outputColIsKgStored = outputCol >= 0 && outputCol < headerRow.length && headerRow[outputCol]?.includes("кг");
+      if (outputColIsKgStored && outG != null && outG > 0 && outG < 100) outG = outG * 1000;
+      flushCard(outG);
       currentDish = null;
       continue;
     }
     if (nameVal && isValidDish(nameVal) && !/^[\d\s.,]+$/.test(nameVal) && !productVal) {
-      if (currentDish != null && currentIngredients.length > 0) flushCard();
+      if (currentDish != null && currentIngredients.length > 0) flushCard(undefined);
       currentDish = nameVal;
     }
-    if (productVal && isValidProduct(productVal)) {
+    if (productVal && isValidProduct(productVal) && !isJunkProductName(productVal)) {
       if (currentDish == null && nameVal && isValidDish(nameVal) && !isHeaderWord(nameVal)) currentDish = nameVal;
+      const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
+      if (currentDish != null && norm(productVal) === norm(currentDish)) continue;
       let waste = parseNum(wasteVal);
       const gross = grossNum;
       const net = netNum;
-      if (gross != null && gross > 0 && net != null && net < gross && (waste == null || waste === 0)) {
-        waste = (1 - net / gross) * 100;
-      }
+      const both100 = gross != null && net != null && gross > 99 && gross < 101 && Math.abs((gross - net)) < 0.01;
+      const looksLikeDishName = /^[а-яА-ЯёЁ\s]+\s+к\s+[а-яА-ЯёЁ\s]+$/.test(productVal.trim()) && productVal.trim().length < 30;
+      if (both100 && looksLikeDishName) continue;
+      let outputG = parseNum(outputVal);
+      const outputColIsKg = outputCol >= 0 && outputCol < headerRow.length && headerRow[outputCol]?.includes("кг");
+      if (outputColIsKg && outputG != null && outputG > 0 && outputG < 100) outputG = outputG * 1000;
       currentIngredients.push({
         productName: productVal,
-        grossGrams: gross,
-        netGrams: net,
+        grossGrams: grossNum,
+        netGrams: netNum,
         primaryWastePct: waste,
-        outputGrams: parseNum(outputVal),
+        outputGrams: outputG,
         unit: "g",
       });
     }
   }
-  flushCard();
+  flushCard(undefined);
   return { cards: results, sanityIssues: [...sanityIssuesSet] };
 }
 

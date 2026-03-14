@@ -1225,10 +1225,11 @@ class AiServiceSupabase implements AiService {
     return low.contains('требования к оформлению') || low.contains('требования к подаче') ||
         low.contains('вес готового блюда') || low.contains('вес готового изделия') ||
         low.contains('в расчете на') || low.contains('порц') ||
-        low.contains('органолептическ') || low == 'итого' ||
-        (low.contains('хранение') && (low.contains('срок') || low.startsWith('хранение'))) ||
-        RegExp(r'^ед\.?\s*изм\.?$').hasMatch(low) || low == 'ед. изм' || low == 'ед изм' ||
-        RegExp(r'^ресторан\s*[«""]').hasMatch(low);
+        low.contains('органолептическ') || low.contains('органолет') || low == 'итого' ||
+        low.contains('хранение') || low.startsWith('срок хранен') ||
+        RegExp(r'^ед\.?\s*изм\.?\.?$').hasMatch(low) || RegExp(r'^ед\s*изм').hasMatch(low) ||
+        low.contains('ресторан') || RegExp(r'^ресторан\s*[«""]').hasMatch(low) || low == 'блюдо' ||
+        RegExp(r'^способ\s*(приготовления|оформления)?$').hasMatch(low);
   }
 
   /// Парсинг ТТК по шаблону (Наименование, Продукт, Брутто, Нетто...) — без вызова ИИ.
@@ -1640,11 +1641,13 @@ class AiServiceSupabase implements AiService {
         var net = _parseNum(netVal);
         var output = _parseNum(outputVal);
         final unitCell = unitCol >= 0 && unitCol < cells.length ? cells[unitCol].trim().toLowerCase() : '';
-        final unitIsKg = unitCell.contains('кг') || unitCell == 'kg';
-        if (grossColIsKg || (unitIsKg && gross != null && gross > 0 && gross < 100)) {
+        final unitIsKgOrL = unitCell.contains('кг') || unitCell == 'kg' || unitCell.contains('л') || unitCell == 'l';
+        final grossRawLooksLikeKg = RegExp(r'^\s*0[,.]\d{1,3}\s*$').hasMatch(grossVal.trim());
+        final netRawLooksLikeKg = RegExp(r'^\s*0[,.]\d{1,3}\s*$').hasMatch(netVal.trim());
+        if (grossColIsKg || unitIsKgOrL || grossRawLooksLikeKg) {
           if (gross != null && gross > 0 && gross < 100) gross = gross * 1000;
         }
-        if (netColIsKg || (unitIsKg && net != null && net > 0 && net < 100)) {
+        if (netColIsKg || unitIsKgOrL || netRawLooksLikeKg) {
           if (net != null && net > 0 && net < 100) net = net * 1000;
         }
         var outputG = output;
@@ -1661,6 +1664,11 @@ class AiServiceSupabase implements AiService {
         String cleanName = productVal.replaceFirst(RegExp(r'^Т\.\s*', caseSensitive: false), '').replaceFirst(RegExp(r'^П/Ф\s*', caseSensitive: false), '').trim();
         if (cleanName.isEmpty) cleanName = productVal;
         if (_isJunkProductName(cleanName)) return false;
+        // iiko DOCX: при gross==net==100 часто читаем «брутто в ед. изм» вместо кг; строка с названием блюда («Мясная к пенному») — не продукт
+        final gEq = gross != null && net != null && (gross - net).abs() < 0.01;
+        final both100 = gEq && gross! > 99 && gross < 101;
+        final looksLikeDishName = RegExp(r'^[а-яА-ЯёЁ\s]+\s+к\s+[а-яА-ЯёЁ\s]+$').hasMatch(cleanName) && cleanName.length < 30;
+        if (both100 && looksLikeDishName) return false;
         final isPf = RegExp(r'^П/Ф\s', caseSensitive: false).hasMatch(productVal);
         final effectiveNet = net ?? gross; // Норма закладки — одно значение
         currentIngredients.add(TechCardIngredientLine(
@@ -1766,6 +1774,7 @@ class AiServiceSupabase implements AiService {
       String dishName,
       String? originalDishName,
       List<({String productName, double grossWeight, double netWeight})> ingredients,
+      String? technologyText,
     })> correctedCards,
   ) async {
     if (rows.isEmpty || headerSignature.isEmpty || correctedCards.isEmpty) return;
@@ -1785,6 +1794,7 @@ class AiServiceSupabase implements AiService {
     final productColVotes = <int, int>{};
     final grossColVotes = <int, int>{};
     final netColVotes = <int, int>{};
+    final technologyColVotes = <int, int>{};
 
     String _norm(String s) => stripIikoPrefix(s).trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
     bool _productMatch(String corrected, String cell) {
@@ -1857,6 +1867,25 @@ class AiServiceSupabase implements AiService {
           if (foundNetCol != null) netColVotes[foundNetCol] = (netColVotes[foundNetCol] ?? 0) + 1;
         }
       }
+
+      // Колонка технологии: ищем ячейку, текст которой совпадает с пользовательской технологией
+      final techText = card.technologyText?.trim();
+      if (techText != null && techText.length >= 20) {
+        final techNorm = _norm(techText);
+        final techChunk = techNorm.length >= 40 ? techNorm.substring(0, 40) : techNorm;
+        for (var r = headerIdx; r < rows.length && r < headerIdx + 200; r++) {
+          final row = rows[r];
+          for (var c = 0; c < row.length; c++) {
+            final cell = (row[c] is String ? row[c] as String : row[c].toString()).trim();
+            if (cell.length < 20) continue;
+            final cellNorm = _norm(cell);
+            if (techNorm.contains(cellNorm) || cellNorm.contains(techChunk)) {
+              technologyColVotes[c] = (technologyColVotes[c] ?? 0) + 1;
+              break;
+            }
+          }
+        }
+      }
     }
 
     int? bestProductCol;
@@ -1871,6 +1900,10 @@ class AiServiceSupabase implements AiService {
     if (netColVotes.isNotEmpty) {
       bestNetCol = netColVotes.entries.reduce((a, b) => a.value >= b.value ? a : b).key;
     }
+    int? bestTechnologyCol;
+    if (technologyColVotes.isNotEmpty) {
+      bestTechnologyCol = technologyColVotes.entries.reduce((a, b) => a.value >= b.value ? a : b).key;
+    }
 
     try {
       final payload = <String, dynamic>{
@@ -1881,10 +1914,11 @@ class AiServiceSupabase implements AiService {
       if (bestProductCol != null) payload['product_col'] = bestProductCol;
       if (bestGrossCol != null) payload['gross_col'] = bestGrossCol;
       if (bestNetCol != null) payload['net_col'] = bestNetCol;
-      if (!hasDish && bestProductCol == null) return; // нечего сохранять
+      if (bestTechnologyCol != null) payload['technology_col'] = bestTechnologyCol;
+      if (!hasDish && bestProductCol == null && bestTechnologyCol == null) return; // нечего сохранять
       final res = await client.functions.invoke('tt-parse-save-learning', body: {'learned_dish_name': payload});
       if (res.status >= 200 && res.status < 300) {
-        devLog('[tt_parse] learned columns: sig=$headerSignature product=$bestProductCol gross=$bestGrossCol net=$bestNetCol');
+        devLog('[tt_parse] learned columns: sig=$headerSignature product=$bestProductCol gross=$bestGrossCol net=$bestNetCol technology=$bestTechnologyCol');
       } else {
         final err = (res.data as Map?)?['error'] ?? res.data ?? 'HTTP ${res.status}';
         lastLearningError = err.toString();
@@ -2135,6 +2169,7 @@ class AiServiceSupabase implements AiService {
   /// Обучение: при правке ищем corrected в rows и сохраняем позиции (dish name + колонки).
   /// [correctedIngredients] — ингредиенты для вывода product_col, gross_col, net_col (опционально).
   /// [originalDishName] — исходное распознанное название (ищем его, если corrected не найден в rows).
+  /// [technologyText] — технология (в т.ч. ручной ввод) — для маппинга technology_col.
   /// Устаревший вызов — делегирует в learnColumnMappingFromCorrections (обратная совместимость).
   static Future<void> learnDishNamePosition(
     SupabaseClient client,
@@ -2143,6 +2178,7 @@ class AiServiceSupabase implements AiService {
     String correctedDishName, {
     List<({String productName, double grossWeight, double netWeight})>? correctedIngredients,
     String? originalDishName,
+    String? technologyText,
   }) async {
     await learnColumnMappingFromCorrections(
       client,
@@ -2152,6 +2188,7 @@ class AiServiceSupabase implements AiService {
         dishName: correctedDishName,
         originalDishName: originalDishName,
         ingredients: correctedIngredients ?? [],
+        technologyText: technologyText,
       )],
     );
   }
@@ -2211,6 +2248,15 @@ class AiServiceSupabase implements AiService {
       }
       final raw = data['cards'];
       if (raw is! List || raw.isEmpty) return [];
+      if (raw.isNotEmpty) {
+        final c = raw.first as Map<String, dynamic>?;
+        final ing = (c?['ingredients'] as List?)?.cast<Map<String, dynamic>>().take(5) ?? [];
+        final g = ing.map((i) {
+          final n = (i['productName'] ?? '').toString();
+          return '${n.length > 15 ? n.substring(0, 15) : n}: ${i['grossGrams']}';
+        }).join('; ');
+        debugPrint('[tt_parse] EF returned: ${raw.length} cards, first ingr grossGrams: $g');
+      }
       final list = <TechCardRecognitionResult>[];
       const headerWords = ['наименование', 'продукт', 'название', 'брутто', 'нетто', 'сырьё'];
       for (final e in raw) {
@@ -2395,6 +2441,7 @@ class AiServiceSupabase implements AiService {
       technologyText: data['technologyText'] as String?,
       ingredients: ingredients,
       isSemiFinished: data['isSemiFinished'] as bool?,
+      yieldGrams: data['yieldGrams'] != null ? (data['yieldGrams'] as num).toDouble() : null,
     );
   }
 

@@ -465,7 +465,8 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
               .where((item) {
                 final corr = (item.result.dishName ?? '').trim();
                 final hasIng = item.result.ingredients.any((i) => (i.productName ?? '').trim().isNotEmpty && (i.grossGrams ?? 0) > 0);
-                return corr.isNotEmpty || hasIng;
+                final hasTech = (item.result.technologyText ?? '').trim().length >= 20;
+                return corr.isNotEmpty || hasIng || hasTech;
               })
               .map((item) => (
                     dishName: (item.result.dishName ?? '').trim(),
@@ -478,8 +479,9 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                               netWeight: i.netGrams ?? i.grossGrams ?? 0,
                             ))
                         .toList(),
+                    technologyText: item.result.technologyText?.trim(),
                   ))
-              .where((c) => c.dishName.isNotEmpty || c.ingredients.isNotEmpty)
+              .where((c) => c.dishName.isNotEmpty || c.ingredients.isNotEmpty || (c.technologyText != null && c.technologyText!.length >= 20))
               .toList();
           if (cardsForLearning.isNotEmpty) {
             await AiServiceSupabase.learnColumnMappingFromCorrections(
@@ -574,6 +576,31 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                   Expanded(
                     child: Text(
                       loc.t('tech_cards_import_review_check_banner'),
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (_items.length > 1) ...[
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.lightbulb_outline, size: 20, color: theme.colorScheme.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      loc.t('ttk_import_multi_format_hint') ?? 'Excel и Word: ТТК должны быть в одном столбце и одинаковой формы.',
                       style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface),
                     ),
                   ),

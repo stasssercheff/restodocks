@@ -600,7 +600,11 @@ class TechCardServiceSupabase {
       ingredients: ingredients,
       technologyLocalized: techMap,
     );
-    final updated = TechCard.withYieldValue(withIngredients, yieldVal > 0 ? yieldVal : 100);
+    var updated = TechCard.withYieldValue(withIngredients, yieldVal > 0 ? yieldVal : 100);
+    // ТТК блюдо: вес порции = выход (вес итого из таблицы)
+    if (!isPf && yieldVal > 0) {
+      updated = updated.copyWith(portionWeight: yieldVal);
+    }
     await saveTechCard(updated, changedByEmployeeId: createdBy, changedByName: createdByName);
     if (createdTechCardsByName != null) {
       createdTechCardsByName[_normalizeName(name)] = updated.id;

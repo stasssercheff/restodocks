@@ -57,20 +57,21 @@ Deno.serve(async (req: Request) => {
       const t = body.template as Record<string, unknown>;
       const sig = t.header_signature as string;
       if (sig) {
-        const { error } = await supabase.from("tt_parse_templates").upsert(
-          {
-            header_signature: sig,
-            header_row_index: t.header_row_index ?? 0,
-            name_col: t.name_col ?? 0,
-            product_col: t.product_col ?? 1,
-            gross_col: t.gross_col ?? -1,
-            net_col: t.net_col ?? -1,
-            waste_col: t.waste_col ?? -1,
-            output_col: t.output_col ?? -1,
-            source: t.source ?? null,
-          },
-          { onConflict: "header_signature" }
-        );
+        const payload: Record<string, unknown> = {
+          header_signature: sig,
+          header_row_index: t.header_row_index ?? 0,
+          name_col: t.name_col ?? 0,
+          product_col: t.product_col ?? 1,
+          gross_col: t.gross_col ?? -1,
+          net_col: t.net_col ?? -1,
+          waste_col: t.waste_col ?? -1,
+          output_col: t.output_col ?? -1,
+          source: t.source ?? null,
+        };
+        if (t.technology_col != null) payload.technology_col = t.technology_col;
+        const { error } = await supabase.from("tt_parse_templates").upsert(payload, {
+          onConflict: "header_signature",
+        });
         if (error) {
           console.error("[tt-parse-save-learning] template upsert error:", error);
           errors.push(`template: ${error.message}`);
@@ -91,6 +92,7 @@ Deno.serve(async (req: Request) => {
         if (l.product_col != null) payload.product_col = l.product_col;
         if (l.gross_col != null) payload.gross_col = l.gross_col;
         if (l.net_col != null) payload.net_col = l.net_col;
+        if (l.technology_col != null) payload.technology_col = l.technology_col;
         const { error } = await supabase.from("tt_parse_learned_dish_name").upsert(payload, {
           onConflict: "header_signature",
         });

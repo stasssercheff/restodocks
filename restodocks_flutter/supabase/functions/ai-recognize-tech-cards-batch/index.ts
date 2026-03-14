@@ -62,6 +62,7 @@ Deno.serve(async (req: Request) => {
         dishName: card.dishName ?? null,
         technologyText: card.technologyText ?? null,
         isSemiFinished: card.isSemiFinished ?? undefined,
+        yieldGrams: card.yieldGrams ?? undefined,
         ingredients: (card.ingredients ?? []).map((i) => ({
           productName: i.productName ?? "",
           grossGrams: i.grossGrams ?? undefined,

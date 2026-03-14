@@ -761,6 +761,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
             } else if (widget.initialSections != null && widget.initialSections!.isEmpty) {
               _selectedSections = [];
             }
+            // ТТК блюдо: вес порции = выход (вес итого из парсинга)
+            if (!_isSemiFinished && ai.yieldGrams != null && ai.yieldGrams! > 0) {
+              _portionWeight = ai.yieldGrams!.toDouble();
+            }
             _ingredients.clear();
             for (final line in ai.ingredients) {
               if (line.productName.trim().isEmpty) continue;
@@ -947,7 +951,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       return;
     }
     final toSaveIngredients = _ingredients.where((i) => !i.isPlaceholder).toList();
-    final yieldVal = toSaveIngredients.isEmpty ? 0.0 : toSaveIngredients.fold(0.0, (s, i) => s + i.netWeight);
+    // ТТК блюдо: вес выхода = вес порции (1 порция)
+    final yieldVal = !_isSemiFinished
+        ? _portionWeight
+        : (toSaveIngredients.isEmpty ? 0.0 : toSaveIngredients.fold(0.0, (s, i) => s + i.netWeight));
     final category = _selectedCategory;
     final curLang = context.read<LocalizationService>().currentLanguageCode;
     final tc = _techCard;
@@ -1004,6 +1011,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
             name,
             correctedIngredients: ingredientsForLearning.isNotEmpty ? ingredientsForLearning : null,
             originalDishName: orig,
+            technologyText: _technologyController.text.trim(),
           );
         }
         // Правка для подстановки (original → corrected) — если обучение не сработает

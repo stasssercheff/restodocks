@@ -46,7 +46,14 @@ Deno.serve(async (req: Request) => {
     );
 
     const result = await tryParseByStoredTemplates(rows);
+    if (result && result.cards.length > 0) {
+      const first = result.cards[0];
+      const ingr = (first?.ingredients ?? []).slice(0, 5).map((i) => `${i.productName?.slice(0, 15)}: gross=${i.grossGrams} net=${i.netGrams}`);
+      console.log("[parse-ttk] cards=" + result.cards.length + " dish=" + (first?.dishName ?? "") + " ingr=" + JSON.stringify(ingr));
+    }
     if (!result || result.cards.length === 0) {
+      const headerRow = rows.find((r) => r.some((c) => /наименование|брутто|продукт/i.test(String(c))));
+      console.log("[parse-ttk] no match: rows=" + rows.length + " header_sample=" + (headerRow?.slice(0, 5).join("|") ?? ""));
       return new Response(JSON.stringify({ cards: null }), {
         status: 200,
         headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
@@ -57,6 +64,7 @@ Deno.serve(async (req: Request) => {
       dishName: card.dishName ?? null,
       technologyText: card.technologyText ?? null,
       isSemiFinished: card.isSemiFinished ?? undefined,
+      yieldGrams: card.yieldGrams ?? undefined,
       ingredients: (card.ingredients ?? []).map((i) => ({
         productName: i.productName ?? "",
         grossGrams: i.grossGrams ?? undefined,

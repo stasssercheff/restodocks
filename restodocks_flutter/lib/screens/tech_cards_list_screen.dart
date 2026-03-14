@@ -363,9 +363,34 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
-  static const _maxFilesSingleTtk = 5;
+  static const _maxFilesSingleTtk = 10;
 
   Future<void> _createFromExcel(BuildContext context, LocalizationService loc) async {
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final l = ctx.read<LocalizationService>();
+        return AlertDialog(
+          title: Text(l.t('ttk_import_file') ?? 'Импорт ТТК'),
+          content: Text(
+            l.t('ttk_import_multi_format_hint') ?? 'Excel и Word: ТТК должны быть в одном столбце и одинаковой формы. Иначе система не распознает.',
+            style: Theme.of(ctx).textTheme.bodyMedium,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(l.t('cancel') ?? 'Отмена'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(l.t('ttk_import_select_files') ?? 'Выбрать файлы'),
+            ),
+          ],
+        );
+      },
+    );
+    if (!mounted || proceed != true) return;
+
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['xlsx', 'xls', 'csv', 'pdf', 'docx', 'doc'],
@@ -679,32 +704,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
               ),
             ),
           ),
-          ...?[
-            if (canEdit)
-              AbsorbPointer(
-                absorbing: _loading,
-                child: PopupMenuButton<String>(
-                  icon: Icon(Icons.add, color: _loading ? Theme.of(context).disabledColor : null),
-                  tooltip: loc.t('create_tech_card'),
-                  onSelected: (value) async {
-                    if (value == 'new') {
-                      context.push(widget.department == 'bar' ? '/tech-cards/new?department=bar' : '/tech-cards/new');
-                    } else if (value == 'excel') {
-                      await _createFromExcel(context, loc);
-                    } else if (value == 'text') {
-                      await _createFromText(context, loc);
-                    }
-                  },
-                  itemBuilder: (_) => [
-                    PopupMenuItem(value: 'new', child: Text(loc.t('create_tech_card'))),
-                    if (FeatureFlags.ttkImportEnabled)
-                      PopupMenuItem(value: 'excel', child: Text(loc.t('ai_tech_card_from_excel'))),
-                    if (FeatureFlags.ttkImportEnabled)
-                      PopupMenuItem(value: 'text', child: Text(loc.t('ttk_import_text') ?? 'Вставить из текста')),
-                  ],
-                ),
-              ),
-          ].where((_) => true),
+          if (canEdit)
+            IconButton(
+              icon: Icon(Icons.add, color: _loading ? Theme.of(context).disabledColor : null),
+              tooltip: loc.t('create_tech_card'),
+              onPressed: _loading ? null : () => context.push(widget.department == 'bar' ? '/tech-cards/new?department=bar' : '/tech-cards/new'),
+            ),
           if (canEdit && FeatureFlags.ttkImportEnabled)
             PopupMenuButton<String>(
               icon: const Icon(Icons.upload),
@@ -813,13 +818,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
             ),
         ],
       ),
-      floatingActionButton: canEdit
-          ? FloatingActionButton(
-              onPressed: _loading ? null : () => context.push(widget.department == 'bar' ? '/tech-cards/new?department=bar' : '/tech-cards/new'),
-              child: const Icon(Icons.add),
-              tooltip: loc.t('create_tech_card'),
-            )
-          : null,
+      floatingActionButton: null,
     );
   }
 
