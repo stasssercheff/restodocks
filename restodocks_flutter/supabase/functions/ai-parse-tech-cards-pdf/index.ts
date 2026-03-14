@@ -178,18 +178,28 @@ Deno.serve(async (req: Request) => {
       if (stored && stored.cards.length > 0) templateCards = stored.cards;
     }
 
-    // Shama.Book / ГОСТ: блюдо в "Проведено контрольное приготовление блюда: XXX" или на след. строке
-    // Shama.Book: "Технологическая карта № 2510 от 09.10.2024 Сливочный крем для мафинов и дэкоров п/ф"
+    // ГОСТ / типовые ТТК: блюдо в канонических блоках — приоритет над парсером по таблице
     const dishMatch = text.match(/Проведено\s+контрольное\s+приготовление\s+блюда\s*:?\s*\n?\s*([^\n]+?)(?:\n|$)/i)
       ?? text.match(/Наименование\s+блюда[^:]*:\s*([^\n]+)/i)
-      ?? text.match(/Технологическая\s+карта\s+№\s*\d+[^\n]*\n\s*([^\n]{5,80})/i)
-      ?? text.match(/Источник\s+рецептуры[^\n]*\n[^\n]*\n\s*([^\n]{5,80})/i);
-    const extractedDish = dishMatch?.[1]?.trim();
-    if (templateCards.length === 1 && extractedDish && !templateCards[0].dishName) {
-      templateCards = [{ ...templateCards[0], dishName: extractedDish }];
-    } else if (templateCards.length >= 1 && extractedDish && templateCards.every((c) => !c.dishName)) {
-      templateCards = templateCards.map((c, i) => (i === 0 ? { ...c, dishName: extractedDish } : c));
+      ?? null;
+    const techCardMatches = [...text.matchAll(/Технологическая\s+карта\s+№\s*\d+[^\n]*\n\s*([^\n]{5,80})/gi)];
+    const sourceMatches = [...text.matchAll(/Источник\s+рецептуры[^\n]*\n[^\n]*\n\s*([^\n]{5,80})/gi)];
+    const extractedDishes: string[] = dishMatch ? [dishMatch[1].trim()] : techCardMatches.map((m) => m[1].trim());
+    if (extractedDishes.length === 0 && sourceMatches.length > 0) extractedDishes.push(...sourceMatches.map((m) => m[1].trim()));
+    const isValidExtracted = (s: string) => s.length >= 4 && !/^\d+[,.\s]*$/.test(s);
+    if (templateCards.length >= 1 && extractedDishes.some(isValidExtracted)) {
+      templateCards = templateCards.map((c, i) => {
+        const d = extractedDishes[i] ?? extractedDishes[0];
+        return (d && isValidExtracted(d)) ? { ...c, dishName: d } : c;
+      });
     }
+    const isFragmentDish = (s: string) => {
+      const t = (s ?? "").trim();
+      if (!t || t.includes(" ")) return false;
+      if (t.length > 8) return false;
+      return /(ов|ей|ий|овь)$/i.test(t);
+    };
+    templateCards = templateCards.filter((c) => !(c.ingredients.length === 0 && c.dishName && isFragmentDish(c.dishName)));
     if (templateCards.length > 0) {
       // Шаблон или каталог сработал — AI не используется, лимит не применяется
       const normalized = templateCards.map((card) => ({
