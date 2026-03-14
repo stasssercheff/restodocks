@@ -25,7 +25,7 @@ import 'excel_style_ttk_table.dart';
 /// Отображение для сотрудников (режим просмотра, !effectiveCanEdit) должно соответствовать референсу:
 /// https://github.com/stasssercheff/shbb326 — kitchen/kitchen/ttk/Preps (ТТК ПФ), dish (карточки блюд), sv (су-вид).
 
-/// Поле выбора категории: при нажатии открывает список с «Свой вариант» сверху и крестиком удаления у своих.
+/// Поле выбора категории: выпадающий список с «Свой вариант» сверху. Удаление своих — через «Управление».
 class _CategoryPickerField extends StatelessWidget {
   const _CategoryPickerField({
     required this.selectedCategory,
@@ -36,6 +36,7 @@ class _CategoryPickerField extends StatelessWidget {
     required this.onCategorySelected,
     required this.onAddCustom,
     required this.onRefreshCustom,
+    required this.onManageCustom,
     required this.loc,
   });
   final String selectedCategory;
@@ -46,7 +47,11 @@ class _CategoryPickerField extends StatelessWidget {
   final void Function(String) onCategorySelected;
   final Future<void> Function() onAddCustom;
   final Future<void> Function() onRefreshCustom;
+  final Future<void> Function() onManageCustom;
   final LocalizationService loc;
+
+  static const String _addValue = '__add_custom__';
+  static const String _manageValue = '__manage_custom__';
 
   @override
   Widget build(BuildContext context) {
@@ -56,100 +61,48 @@ class _CategoryPickerField extends StatelessWidget {
         child: Text(categoryLabel(selectedCategory), overflow: TextOverflow.ellipsis),
       );
     }
-    return InkWell(
-      onTap: () => _showPicker(context),
-      borderRadius: BorderRadius.circular(8),
-      child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: loc.t('category'),
-          isDense: true,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-          suffixIcon: const Icon(Icons.arrow_drop_down),
+    final validValues = [...categoryOptions, ...customCategories.map((c) => 'custom:${c.id}')];
+    final displayValue = _addValue != selectedCategory && _manageValue != selectedCategory && validValues.contains(selectedCategory)
+        ? selectedCategory
+        : (categoryOptions.isNotEmpty ? categoryOptions.first : 'misc');
+    return DropdownButtonFormField<String>(
+      value: displayValue,
+      decoration: InputDecoration(labelText: loc.t('category'), isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
+      items: [
+        DropdownMenuItem(
+          value: _addValue,
+          child: Row(
+            children: [
+              Icon(Icons.add_circle_outline, size: 20, color: Theme.of(context).colorScheme.primary),
+              const SizedBox(width: 8),
+              Text(loc.t('ttk_add_custom_category') ?? 'Свой вариант', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.w500)),
+            ],
+          ),
         ),
-        child: Text(categoryLabel(selectedCategory), overflow: TextOverflow.ellipsis),
-      ),
-    );
-  }
-
-  Future<void> _showPicker(BuildContext context) async {
-    final tcSvc = context.read<TechCardServiceSupabase>();
-    final est = context.read<AccountManagerSupabase>().establishment;
-    if (est == null) return;
-    final theme = Theme.of(context);
-
-    await showModalBottomSheet(
-      context: context,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx2, setModal) {
-            return DraggableScrollableSheet(
-              initialChildSize: 0.5,
-              minChildSize: 0.3,
-              maxChildSize: 0.9,
-              expand: false,
-              builder: (_, scrollController) {
-                return Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                  child: ListView(
-                    controller: scrollController,
-                    children: [
-                      ListTile(
-                        leading: Icon(Icons.add_circle_outline, color: theme.colorScheme.primary),
-                        title: Text(loc.t('ttk_add_custom_category') ?? 'Свой вариант', style: TextStyle(fontWeight: FontWeight.w600, color: theme.colorScheme.primary)),
-                        onTap: () async {
-                          Navigator.of(ctx).pop();
-                          await onAddCustom();
-                        },
-                      ),
-                      const Divider(),
-                      ...categoryOptions.map((c) => ListTile(
-                        title: Text(categoryLabel(c)),
-                        selected: c == selectedCategory,
-                        onTap: () {
-                          onCategorySelected(c);
-                          Navigator.of(ctx).pop();
-                        },
-                      )),
-                      if (customCategories.isNotEmpty) ...[
-                        const Divider(),
-                        ...customCategories.map((c) {
-                          final catValue = 'custom:${c.id}';
-                          return ListTile(
-                            title: Text(c.name),
-                            trailing: IconButton(
-                              icon: const Icon(Icons.close, size: 20),
-                              onPressed: () async {
-                                final count = await tcSvc.countTechCardsUsingCustomCategory(est.dataEstablishmentId, c.id);
-                                if (!ctx.mounted) return;
-                                if (count > 0) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text((loc.t('ttk_custom_category_in_use') ?? 'Используется в %s ТТК — удалить нельзя').replaceAll('%s', '$count'))),
-                                  );
-                                  return;
-                                }
-                                final ok = await tcSvc.deleteCustomCategory(est.dataEstablishmentId, c.id);
-                                if (!ctx.mounted) return;
-                                if (ok) {
-                                  await onRefreshCustom();
-                                  Navigator.of(ctx).pop();
-                                }
-                              },
-                            ),
-                            selected: catValue == selectedCategory,
-                            onTap: () {
-                              onCategorySelected(catValue);
-                              Navigator.of(ctx).pop();
-                            },
-                          );
-                        }),
-                      ],
-                    ],
-                  ),
-                );
-              },
-            );
-          },
-        );
+        ...categoryOptions.map((c) => DropdownMenuItem(value: c, child: Text(categoryLabel(c)))),
+        ...customCategories.map((c) => DropdownMenuItem(value: 'custom:${c.id}', child: Text(c.name))),
+        if (customCategories.isNotEmpty)
+          DropdownMenuItem(
+            value: _manageValue,
+            child: Row(
+              children: [
+                Icon(Icons.settings, size: 18, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
+                const SizedBox(width: 8),
+                Text(loc.t('ttk_manage_custom_categories') ?? 'Управление', style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
+              ],
+            ),
+          ),
+      ],
+      onChanged: (v) async {
+        if (v == _addValue) {
+          await onAddCustom();
+          return;
+        }
+        if (v == _manageValue) {
+          await onManageCustom();
+          return;
+        }
+        if (v != null) onCategorySelected(v);
       },
     );
   }
@@ -1136,7 +1089,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     if (category == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('error') ?? 'Ошибка')),
+          SnackBar(
+            content: Text(loc.t('ttk_custom_category_save_error') ?? 'Не удалось сохранить. Проверьте, что в Supabase применена миграция tech_card_custom_categories.'),
+            duration: const Duration(seconds: 4),
+          ),
         );
       }
       return;
@@ -1151,6 +1107,55 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       _selectedCategory = category;
     });
     _scheduleDraftSave();
+  }
+
+  Future<void> _showManageCustomCategoriesDialog() async {
+    final loc = context.read<LocalizationService>();
+    final est = context.read<AccountManagerSupabase>().establishment;
+    if (est == null) return;
+    final list = [..._customCategories];
+    if (list.isEmpty) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('ttk_no_custom_categories') ?? 'Нет своих категорий')));
+      return;
+    }
+    final tcSvc = context.read<TechCardServiceSupabase>();
+    if (!mounted) return;
+    await showModalBottomSheet(
+      context: context,
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(loc.t('ttk_manage_custom_categories') ?? 'Управление своими категориями', style: Theme.of(ctx).textTheme.titleMedium),
+            const SizedBox(height: 12),
+            ...list.map((c) => ListTile(
+              title: Text(c.name),
+              trailing: IconButton(
+                icon: const Icon(Icons.close, size: 20),
+                onPressed: () async {
+                  final count = await tcSvc.countTechCardsUsingCustomCategory(est.dataEstablishmentId, c.id);
+                  if (!ctx.mounted) return;
+                  if (count > 0) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text((loc.t('ttk_custom_category_in_use') ?? 'Используется в %s ТТК — удалить нельзя').replaceAll('%s', '$count'))),
+                    );
+                    return;
+                  }
+                  final ok = await tcSvc.deleteCustomCategory(est.dataEstablishmentId, c.id);
+                  if (!ctx.mounted) return;
+                  if (ok) {
+                    await _refreshCustomCategories();
+                    Navigator.of(ctx).pop();
+                  }
+                },
+              ),
+            )),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _refreshCustomCategories() async {
@@ -2467,6 +2472,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                     onCategorySelected: (v) { setState(() => _selectedCategory = v); _scheduleDraftSave(); },
                     onAddCustom: _showAddCustomCategoryDialog,
                     onRefreshCustom: _refreshCustomCategories,
+                    onManageCustom: _showManageCustomCategoriesDialog,
                     loc: loc,
                   ),
                   const SizedBox(height: 12),
@@ -2537,6 +2543,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                             onCategorySelected: (v) { setState(() => _selectedCategory = v); _scheduleDraftSave(); },
                             onAddCustom: _showAddCustomCategoryDialog,
                             onRefreshCustom: _refreshCustomCategories,
+                            onManageCustom: _showManageCustomCategoriesDialog,
                             loc: loc,
                           ),
                         ),

@@ -73,6 +73,7 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
   final Map<WriteoffCategory, List<_WriteoffRow>> _rowsByCategory = {};
   final ValueNotifier<int> _rowsVersion = ValueNotifier(0);
   bool _loading = true;
+  List<TechCard> _cachedTechCards = [];
 
   @override
   String get draftKey => 'writeoffs';
@@ -179,7 +180,7 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
     if (dataEstId != null) {
       await productStore.loadProducts();
       await productStore.loadNomenclature(dataEstId);
-      await tcSvc.getTechCardsForEstablishment(dataEstId);
+      _cachedTechCards = await tcSvc.getTechCardsForEstablishment(dataEstId);
     }
     if (mounted) {
       await restoreDraftNow();
@@ -239,68 +240,35 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
     final loc = context.read<LocalizationService>();
     final account = context.read<AccountManagerSupabase>();
     final productStore = context.read<ProductStoreSupabase>();
-    final tcSvc = context.read<TechCardServiceSupabase>();
     final dataEstId = account.establishment?.dataEstablishmentId;
     if (dataEstId == null) return;
 
-    await productStore.loadProducts();
-    await productStore.loadNomenclature(dataEstId);
     var products = productStore.getNomenclatureProducts(dataEstId);
     if (products.isEmpty) {
       products = await productStore.loadNomenclatureProductsDirect(dataEstId);
     }
-    final techCards = await tcSvc.getTechCardsForEstablishment(dataEstId);
     final emp = account.currentEmployee;
     final visibleTc = emp == null
-        ? techCards
-        : techCards.where((tc) => emp.canSeeTechCard(tc.sections)).toList();
+        ? _cachedTechCards
+        : _cachedTechCards.where((tc) => emp.canSeeTechCard(tc.sections)).toList();
 
     if (!mounted) return;
-    await showDialog<void>(
+    await showModalBottomSheet<void>(
       context: context,
-      useRootNavigator: true,
-      barrierDismissible: true,
-      builder: (ctx) => Center(
-        child: Material(
-          color: Colors.transparent,
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 24),
-            constraints: BoxConstraints(
-              maxWidth: 480,
-              maxHeight: MediaQuery.of(ctx).size.height * 0.75,
-            ),
-            decoration: BoxDecoration(
-              color: Theme.of(ctx).colorScheme.surface,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black26,
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: SizedBox(
-                height: MediaQuery.of(ctx).size.height * 0.7,
-                child: _WriteoffItemPickerSheet(
-                    loc: loc,
-                    products: products,
-                    techCards: visibleTc,
-                    onSelectProduct: (p) {
-                      _addRow(cat, product: p, techCard: null);
-                      if (ctx.mounted) Navigator.of(ctx).pop();
-                    },
-                    onSelectTechCard: (tc) {
-                      _addRow(cat, product: null, techCard: tc);
-                      if (ctx.mounted) Navigator.of(ctx).pop();
-                    },
-                  ),
-              ),
-            ),
-          ),
-        ),
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (ctx) => _WriteoffItemPickerSheet(
+        loc: loc,
+        products: products,
+        techCards: visibleTc,
+        onSelectProduct: (p) {
+          _addRow(cat, product: p, techCard: null);
+          if (ctx.mounted) Navigator.of(ctx).pop();
+        },
+        onSelectTechCard: (tc) {
+          _addRow(cat, product: null, techCard: tc);
+          if (ctx.mounted) Navigator.of(ctx).pop();
+        },
       ),
     );
   }
@@ -993,66 +961,71 @@ class _WriteoffItemPickerSheetState extends State<_WriteoffItemPickerSheet> {
   Widget build(BuildContext context) {
     final lang = widget.loc.currentLanguageCode;
 
-    return Column(
-      mainAxisSize: MainAxisSize.max,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SegmentedButton<int>(
-                segments: [
-                  ButtonSegment(value: 0, label: Text(widget.loc.t('writeoff_type_product') ?? 'Продукт')),
-                  ButtonSegment(value: 1, label: Text(widget.loc.t('writeoff_type_pf') ?? 'ТТК ПФ')),
-                  ButtonSegment(value: 2, label: Text(widget.loc.t('writeoff_type_dish') ?? 'ТТК Блюдо')),
-                ],
-                selected: {_segment},
-                onSelectionChanged: (s) => setState(() => _segment = s.first),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                decoration: InputDecoration(
-                  labelText: widget.loc.t('search'),
-                  prefixIcon: const Icon(Icons.search),
-                  border: const OutlineInputBorder(),
+    return DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      minChildSize: 0.3,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (_, scrollController) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SegmentedButton<int>(
+                  segments: [
+                    ButtonSegment(value: 0, label: Text(widget.loc.t('writeoff_type_product') ?? 'Продукт')),
+                    ButtonSegment(value: 1, label: Text(widget.loc.t('writeoff_type_pf') ?? 'ТТК ПФ')),
+                    ButtonSegment(value: 2, label: Text(widget.loc.t('writeoff_type_dish') ?? 'ТТК Блюдо')),
+                  ],
+                  selected: {_segment},
+                  onSelectionChanged: (s) => setState(() => _segment = s.first),
                 ),
-                onChanged: (v) => setState(() => _query = v),
-              ),
-            ],
+                const SizedBox(height: 8),
+                TextField(
+                  decoration: InputDecoration(
+                    labelText: widget.loc.t('search'),
+                    prefixIcon: const Icon(Icons.search),
+                    border: const OutlineInputBorder(),
+                  ),
+                  onChanged: (v) => setState(() => _query = v),
+                ),
+              ],
+            ),
           ),
-        ),
-        const Divider(height: 1),
-        Flexible(
-          child: _segment == 0
-              ? ListView.builder(
-                  controller: widget.scrollController,
-                  itemCount: _filteredProducts.length,
-                  itemBuilder: (_, i) {
-                    final p = _filteredProducts[i];
-                    return ListTile(
-                      title: Text(p.getLocalizedName(lang)),
-                      onTap: () => widget.onSelectProduct(p),
-                    );
-                  },
-                )
-              : ListView.builder(
-                  controller: widget.scrollController,
-                  itemCount: _filteredTechCards.length,
-                  itemBuilder: (_, i) {
-                    final t = _filteredTechCards[i];
-                    return ListTile(
-                      title: Text(t.getDisplayNameInLists(lang)),
-                      subtitle: Text(t.isSemiFinished
-                          ? (widget.loc.t('writeoff_type_pf') ?? 'ПФ')
-                          : (widget.loc.t('writeoff_type_dish') ?? 'Блюдо')),
-                      onTap: () => widget.onSelectTechCard(t),
-                    );
-                  },
-                ),
-        ),
-      ],
+          const Divider(height: 1),
+          Expanded(
+            child: _segment == 0
+                ? ListView.builder(
+                    controller: scrollController,
+                    itemCount: _filteredProducts.length,
+                    itemBuilder: (_, i) {
+                      final p = _filteredProducts[i];
+                      return ListTile(
+                        title: Text(p.getLocalizedName(lang)),
+                        onTap: () => widget.onSelectProduct(p),
+                      );
+                    },
+                  )
+                : ListView.builder(
+                    controller: scrollController,
+                    itemCount: _filteredTechCards.length,
+                    itemBuilder: (_, i) {
+                      final t = _filteredTechCards[i];
+                      return ListTile(
+                        title: Text(t.getDisplayNameInLists(lang)),
+                        subtitle: Text(t.isSemiFinished
+                            ? (widget.loc.t('writeoff_type_pf') ?? 'ПФ')
+                            : (widget.loc.t('writeoff_type_dish') ?? 'Блюдо')),
+                        onTap: () => widget.onSelectTechCard(t),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }

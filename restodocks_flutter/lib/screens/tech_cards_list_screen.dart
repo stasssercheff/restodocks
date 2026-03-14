@@ -476,8 +476,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           final reason = AiServiceSupabase.lastParseTechCardExcelReason ?? AiServiceSupabase.lastParseTechCardPdfReason;
           if (reason == 'ai_limit_exceeded' || reason == 'limit_3_per_day') {
             msg = loc.t('ai_ttk_limit_3_per_day') ?? '';
+          } else if (reason == 'timeout_or_network') {
+            msg = loc.t('ai_ttk_pdf_timeout') ?? (loc.t('ai_tech_card_pdf_format_hint') ?? 'Таймаут загрузки PDF');
+          } else if (reason != null && reason.startsWith('extraction_failed')) {
+            msg = loc.t('ai_ttk_pdf_extraction_failed') ?? (loc.t('ai_tech_card_pdf_format_hint') ?? 'Не удалось извлечь текст из PDF');
+          } else if (reason == 'empty_text') {
+            msg = loc.t('ai_ttk_pdf_empty_text') ?? (loc.t('ai_tech_card_pdf_format_hint') ?? 'PDF без текста');
           } else if (reason != null && reason.isNotEmpty) {
-            msg = '${loc.t('ai_tech_card_excel_format_hint') ?? 'Не удалось распознать ТТК'} ($reason)';
+            msg = '${loc.t(failedCount == files.length && files.any((f) => (f.extension ?? '').toLowerCase().contains('pdf')) ? 'ai_tech_card_pdf_format_hint' : 'ai_tech_card_excel_format_hint') ?? 'Не удалось распознать ТТК'} ($reason)';
           } else {
             msg = loc.t('ai_tech_card_excel_format_hint') ?? 'Не удалось распознать ТТК';
           }

@@ -1,4 +1,4 @@
-import 'dart:async' show unawaited;
+import 'dart:async' show unawaited, TimeoutException;
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -416,19 +416,24 @@ class AiServiceSupabase implements AiService {
     return rows;
   }
 
+  /// Таймаут парсинга PDF (извлечение текста + шаблон/AI). Supabase EF ~60s, плюс cold start.
+  static const _pdfParseTimeout = Duration(seconds: 90);
+
   @override
   Future<List<TechCardRecognitionResult>> parseTechCardsFromPdf(Uint8List pdfBytes, {String? establishmentId}) async {
     lastParseTechCardPdfReason = null;
     try {
       final body = <String, dynamic>{'pdfBase64': base64Encode(pdfBytes)};
       if (establishmentId != null && establishmentId.isNotEmpty) body['establishmentId'] = establishmentId;
-      var data = await invoke('ai-parse-tech-cards-pdf', body);
+      var data = await invoke('ai-parse-tech-cards-pdf', body)
+          .timeout(_pdfParseTimeout, onTimeout: () => null);
       for (var retry = 0; data == null && retry < 2; retry++) {
         await Future<void>.delayed(Duration(milliseconds: retry == 0 ? 1500 : 3000));
-        data = await invoke('ai-parse-tech-cards-pdf', body);
+        data = await invoke('ai-parse-tech-cards-pdf', body)
+            .timeout(_pdfParseTimeout, onTimeout: () => null);
       }
       if (data == null) {
-        lastParseTechCardPdfReason = 'invoke_null';
+        lastParseTechCardPdfReason = 'timeout_or_network';
         return [];
       }
       lastParseTechCardPdfReason = data['reason'] as String? ?? (data['error'] as String?);
