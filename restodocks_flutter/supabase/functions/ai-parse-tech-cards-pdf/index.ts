@@ -16,6 +16,7 @@ const PDF_GARBAGE_PRODUCT_NAMES = new Set([
   "из", "на", "в", "пищевой", "сроки", "жирности", "готовой", "порцию", "порций",
   "сырья", "полуфабрикатов", "ед.изм", "ед изм", "единица", "итого",
   "взбить", "добавить", "положить", "переложить", "использовать", "пробить", "довести", "соединить", "перемешать",
+  "кдж", "ккал", "белки", "жиры", "углеводы", "калорийность",
 ]);
 function isGarbageProductName(name: string): boolean {
   const low = name.trim().toLowerCase();
@@ -26,6 +27,8 @@ function isGarbageProductName(name: string): boolean {
   if (/^(срок|сроки|хранен|реализац)/.test(low)) return true;
   if (/^способ\s*(приготовления|оформления)?/i.test(low)) return true;
   if (low.includes("технологическ") && low.length < 25) return true;
+  if (/информация\s+о\s+пищ/i.test(low)) return true;
+  if (low.length <= 10 && /кдж|ккал/i.test(low) && !/[а-яё]{4,}/i.test(low)) return true;
   return false;
 }
 function filterGarbageIngredients<T extends { productName: string }>(ingredients: T[]): T[] {

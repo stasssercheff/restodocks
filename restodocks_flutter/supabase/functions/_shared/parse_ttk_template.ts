@@ -207,7 +207,7 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
   const flushCard = (yieldGrams?: number | null) => {
     if (currentDish != null && (currentDish.length > 0 || currentIngredients.length > 0)) {
       const techText = technologyParts
-        .filter((s) => s.length > 15 && !/^технологический процесс|допустимые сроки|условия и сроки/i.test(s.trim()))
+        .filter((s) => s.length > 15 && !/^технологический процесс|допустимые сроки|условия и сроки|информация о пищевой/i.test(s.trim()))
         .join("\n")
         .trim() || null;
       results.push({
@@ -254,6 +254,7 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
       continue;
     }
     if (productVal.toLowerCase().includes("выход блюда") || productVal.toLowerCase().startsWith("выход одного")) continue;
+    if (productVal.toLowerCase().includes("информация о пищевой") || /информация\s+о\s+пищ/i.test(productVal)) continue;
     const pLow = productVal.toLowerCase();
     if (
       pLow.includes("требования к оформлению") || pLow.includes("требования к подаче") ||
@@ -269,10 +270,18 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
 
     const rowText = cells.join(" ").trim();
     const rowTextLow = rowText.toLowerCase();
-    if (rowTextLow.includes("технологический процесс") || rowTextLow.includes("допустимые сроки") || rowTextLow.includes("использовать для")) {
+    if (
+      rowTextLow.includes("технологический процесс") || rowTextLow.includes("допустимые сроки") || rowTextLow.includes("использовать для") ||
+      rowTextLow.includes("информация о пищевой ценности") || /информация\s+о\s+пищ/i.test(rowTextLow)
+    ) {
       inTechnologySection = true;
     }
-    if (productVal && (productVal.includes("технологический процесс") || productVal.includes("допустимые сроки") || productVal.includes("использовать для"))) {
+    if (
+      productVal && (
+        productVal.includes("технологический процесс") || productVal.includes("допустимые сроки") || productVal.includes("использовать для") ||
+        productVal.includes("информация о пищевой") || /информация\s+о\s+пищ/i.test(productVal)
+      )
+    ) {
       inTechnologySection = true;
     }
     if (inTechnologySection && rowText.length > 20 && !/^допустимые сроки\s/i.test(rowTextLow)) {
@@ -297,6 +306,7 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
       if (currentDish == null && nameVal && isValidDishName(nameVal)) currentDish = nameVal;
       let gross = parseNum(grossVal);
       let net = parseNum(netVal);
+      if ((gross != null && gross > 100000) || (net != null && net > 100000)) continue;
       // iiko DOCX: gross==net==100 — часто "брутто в ед. изм", а строка с названием блюда ("Мясная к пенному") — не продукт
       const both100 = gross != null && net != null && gross > 99 && gross < 101 && Math.abs(gross - net) < 0.01;
       const looksLikeDishName = /^[а-яА-ЯёЁ\s]+\s+к\s+[а-яА-ЯёЁ\s]+$/.test(productVal.trim()) && productVal.trim().length < 30;
@@ -388,7 +398,7 @@ export function parseTtkByStoredTemplate(
 
   const flushCard = (yieldGrams?: number | null) => {
     if (currentDish != null && (currentDish.length > 0 || currentIngredients.length > 0)) {
-      const techText = technologyParts.filter((s) => s.length > 15 && !/требования к оформлению|требования к подаче/i.test(s)).join("\n").trim() || null;
+      const techText = technologyParts.filter((s) => s.length > 15 && !/требования к оформлению|требования к подаче|информация о пищевой/i.test(s)).join("\n").trim() || null;
       results.push({
         dishName: currentDish || null,
         technologyText: techText || null,
@@ -436,7 +446,9 @@ export function parseTtkByStoredTemplate(
       low.includes("хранение") || low.startsWith("срок хранен") ||
       /^ед\.?\s*изм\.?\.?$/i.test(low.trim()) || /^ед\s*изм/i.test(low) ||
       low.includes("ресторан") || /^ресторан\s*[«""]/.test(low) || low === "блюдо" ||
-      /^способ\s*(приготовления|оформления)?$/i.test(low.trim());
+      /^способ\s*(приготовления|оформления)?$/i.test(low.trim()) ||
+      low.includes("информация о пищевой") || /информация\s+о\s+пищ/i.test(low) ||
+      (low.length <= 10 && /кдж|ккал/i.test(low) && !/[а-яё]{4,}/i.test(low));
     const cookingVerbs = /^(взбить|добавить|положить|переложить|использовать|пробить|довести|соединить|перемешать|нарезать|запечь|варить|жарить|тушить|охладить|разогреть)$/i.test(low.trim());
     return base || (fromPdf && cookingVerbs);
   };
@@ -578,10 +590,10 @@ export function parseTtkByStoredTemplate(
       continue;
     }
     const rowText = cells.join(" ").toLowerCase();
-    if (fromPdf && (rowText.includes("технологический процесс") || rowText.includes("допустимые сроки") || rowText.includes("использовать для"))) {
+    if (fromPdf && (rowText.includes("технологический процесс") || rowText.includes("допустимые сроки") || rowText.includes("использовать для") || rowText.includes("информация о пищевой ценности") || /информация\s+о\s+пищ/i.test(rowText))) {
       inTechnologySection = true;
     }
-    if (fromPdf && productVal && (productVal.includes("технологический процесс") || productVal.includes("допустимые сроки") || productVal.includes("использовать для"))) {
+    if (fromPdf && productVal && (productVal.includes("технологический процесс") || productVal.includes("допустимые сроки") || productVal.includes("использовать для") || productVal.includes("информация о пищевой") || /информация\s+о\s+пищ/i.test(productVal))) {
       inTechnologySection = true;
     }
     if ((!fromPdf || !inTechnologySection) && nameVal && isValidDish(nameVal) && !isLikelyFragment(nameVal) && !/^[\d\s.,]+$/.test(nameVal) && !productVal) {
@@ -589,6 +601,7 @@ export function parseTtkByStoredTemplate(
       currentDish = nameVal;
     }
     if (productVal && (!fromPdf || !inTechnologySection) && isValidProduct(productVal) && !isJunkProductName(productVal)) {
+      if ((grossNum != null && grossNum > 100000) || (netNum != null && netNum > 100000)) continue;
       if (currentDish == null && nameVal && isValidDish(nameVal) && !isHeaderWord(nameVal) && !isLikelyFragment(nameVal)) currentDish = nameVal;
       const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
       if (currentDish != null && norm(productVal) === norm(currentDish)) continue;
