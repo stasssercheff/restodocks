@@ -383,35 +383,19 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
         final norm = _norm(normalizedName);
         if (productsForMapping.any((p) => _norm(p.name) == norm)) continue;
 
-        double? calories;
-        double? protein;
-        double? fat;
-        double? carbs;
-        bool? containsGluten;
-        bool? containsLactose;
-        try {
-          final nutrition = await NutritionApiService.fetchNutrition(normalizedName);
-          if (nutrition != null && nutrition.hasData) {
-            calories = nutrition.calories;
-            protein = nutrition.protein;
-            fat = nutrition.fat;
-            carbs = nutrition.carbs;
-            containsGluten = nutrition.containsGluten;
-            containsLactose = nutrition.containsLactose;
-          }
-        } catch (_) {}
-
+        // Не вызываем Nutrition API при массовом импорте — сохраняет 3–4 минуты при 20+ продуктах.
+        // КБЖУ можно подтянуть потом из номенклатуры.
         final product = Product(
           id: const Uuid().v4(),
           name: normalizedName,
           category: 'manual',
           names: null,
-          calories: calories,
-          protein: protein,
-          fat: fat,
-          carbs: carbs,
-          containsGluten: containsGluten,
-          containsLactose: containsLactose,
+          calories: null,
+          protein: null,
+          fat: null,
+          carbs: null,
+          containsGluten: null,
+          containsLactose: null,
           unit: 'g',
           basePrice: null,
           currency: defCur,
@@ -563,21 +547,18 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
               margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
-                color: theme.colorScheme.errorContainer.withValues(alpha: 0.5),
+                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: theme.colorScheme.error.withValues(alpha: 0.3)),
+                border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.info_outline, size: 20, color: theme.colorScheme.error),
+                  Icon(Icons.info_outline, size: 20, color: theme.colorScheme.primary),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '${loc.t('tech_cards_import_review_loaded') ?? 'Загружено'} ${widget.cards.length} блюд. '
-                      '${_parseErrors!.length} ${_parseErrors!.length == 1 ? 'блюдо' : 'блюд'} '
-                      '${loc.t('tech_cards_import_review_requires_manual') ?? 'требует ручной правки'}: '
-                      '${_parseErrors!.map((e) => e.dishName ?? '—').where((s) => s != '—').take(3).join(', ')}${_parseErrors!.length > 3 ? '...' : ''}',
-                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onErrorContainer),
+                      loc.t('tech_cards_import_review_check_banner'),
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface),
                     ),
                   ),
                 ],

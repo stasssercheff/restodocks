@@ -1218,6 +1218,15 @@ class AiServiceSupabase implements AiService {
     return null;
   }
 
+  /// Строки-заголовки и разделители — не ингредиенты (ТРЕБОВАНИЯ К ОФОРМЛЕНИЮ, ИТОГО, вес готового блюда).
+  static bool _isJunkProductName(String s) {
+    final low = s.trim().toLowerCase();
+    return low.contains('требования к оформлению') || low.contains('требования к подаче') ||
+        low.contains('вес готового блюда') || low.contains('вес готового изделия') ||
+        low.contains('в расчете на') || low.contains('порц') ||
+        low.contains('органолептическ') || low == 'итого';
+  }
+
   /// Парсинг ТТК по шаблону (Наименование, Продукт, Брутто, Нетто...) — без вызова ИИ.
   /// [errors] — при не null: try-catch на каждую строку, битые карточки в errors, цикл продолжается.
   static List<TechCardRecognitionResult> parseTtkByTemplate(
@@ -1576,7 +1585,7 @@ class AiServiceSupabase implements AiService {
           final shiftedGross = gCol + 1 < cells.length ? cells[gCol + 1] : '';
           final shiftedNet = gCol + 3 < cells.length ? cells[gCol + 3] : (nCol < cells.length ? cells[nCol] : '');
           if (shiftedProduct.isNotEmpty && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(shiftedProduct) &&
-              shiftedProduct.toLowerCase() != 'итого' &&
+              !_isJunkProductName(shiftedProduct) &&
               (RegExp(r'\d').hasMatch(shiftedGross) || RegExp(r'\d').hasMatch(shiftedNet))) {
             final sg = _parseNum(shiftedGross);
             final sn = _parseNum(shiftedNet);
@@ -1632,6 +1641,7 @@ class AiServiceSupabase implements AiService {
         else if (unitCell.contains('шт') || unitCell == 'pcs') unit = 'pcs';
         String cleanName = productVal.replaceFirst(RegExp(r'^Т\.\s*', caseSensitive: false), '').replaceFirst(RegExp(r'^П/Ф\s*', caseSensitive: false), '').trim();
         if (cleanName.isEmpty) cleanName = productVal;
+        if (_isJunkProductName(cleanName)) return false;
         final isPf = RegExp(r'^П/Ф\s', caseSensitive: false).hasMatch(productVal);
         final effectiveNet = net ?? gross; // Норма закладки — одно значение
         currentIngredients.add(TechCardIngredientLine(
@@ -1879,7 +1889,7 @@ class AiServiceSupabase implements AiService {
           final shiftedGross = gCol + 1 < cells.length ? cells[gCol + 1] : '';
           final shiftedNet = gCol + 3 < cells.length ? cells[gCol + 3] : (nCol < cells.length ? cells[nCol] : '');
           if (shiftedProduct.isNotEmpty && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(shiftedProduct) &&
-              shiftedProduct.toLowerCase() != 'итого' &&
+              !_isJunkProductName(shiftedProduct) &&
               (RegExp(r'\d').hasMatch(shiftedGross) || RegExp(r'\d').hasMatch(shiftedNet))) {
             final sg = _parseNum(shiftedGross);
             final sn = _parseNum(shiftedNet);
@@ -1947,6 +1957,7 @@ class AiServiceSupabase implements AiService {
         if (gross != null && gross > 0 && net != null && net > 0 && net < gross && (waste == null || waste == 0)) {
           waste = (1.0 - net / gross) * 100.0;
         }
+        if (!_isJunkProductName(productVal)) {
         currentIngredients.add(TechCardIngredientLine(
           productName: productVal,
           grossGrams: gross,
@@ -1955,6 +1966,7 @@ class AiServiceSupabase implements AiService {
           primaryWastePct: waste,
           unit: 'g',
         ));
+        }
       }
     }
     flushCard();

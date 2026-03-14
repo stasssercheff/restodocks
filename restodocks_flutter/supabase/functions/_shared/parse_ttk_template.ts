@@ -224,6 +224,13 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
       continue;
     }
     if (productVal.toLowerCase().includes("выход блюда") || productVal.toLowerCase().startsWith("выход одного")) continue;
+    const pLow = productVal.toLowerCase();
+    if (
+      pLow.includes("требования к оформлению") || pLow.includes("требования к подаче") ||
+      pLow.includes("вес готового блюда") || pLow.includes("вес готового изделия") ||
+      pLow.includes("в расчете на") || pLow.includes("порц") ||
+      pLow.includes("органолептическ") || /^итого\s*$/.test(pLow.trim())
+    ) continue;
 
     // Строка с названием блюда (начало новой карточки)
     if (
