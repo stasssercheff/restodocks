@@ -91,7 +91,8 @@ export async function tryParseByStoredTemplates(rows: string[][]): Promise<TryPa
       const nextHeader = headerIndices[i + 1] ?? rows.length;
       const effectiveHeader = templateHeaderIdx > 0 && headerIdx === 0 ? templateHeaderIdx : headerIdx;
       const dOffset = useLearned ? (dishNameRowOffset ?? 0) : 0;
-      const startRow = Math.max(0, effectiveHeader + dOffset);
+      // Первый блок: включаем leading rows (0..headerIdx-1) — там «Мясная к пенному», «Цезарь» и т.п.
+      const startRow = i === 0 ? 0 : Math.max(0, effectiveHeader + dOffset);
       const blockRows = rows.slice(startRow, nextHeader);
       const headerIdxInBlock = effectiveHeader - startRow;
       const res = parseTtkByStoredTemplate(blockRows, {
