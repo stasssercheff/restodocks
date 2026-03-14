@@ -603,7 +603,8 @@ class _WriteoffTabContent extends StatelessWidget {
   double _leftWidth(BuildContext context) {
     final w = MediaQuery.of(context).size.width;
     final scrollWidth = maxCols * (_colQtyWidth + _colGap) + _colDeleteWidth;
-    return (w - scrollWidth).clamp(180.0, 320.0);
+    // Минимум 280, чтобы колонка «Наименование» имела ~130px (иначе продукт не виден)
+    return (w - scrollWidth).clamp(280.0, 380.0);
   }
 
   double _colNameWidth(BuildContext context) =>
