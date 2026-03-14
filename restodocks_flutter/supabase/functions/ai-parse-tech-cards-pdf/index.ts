@@ -102,7 +102,7 @@ Deno.serve(async (req: Request) => {
     }
     const { PDFParse } = await import("npm:pdf-parse");
     const { chatText } = await import("../_shared/ai_provider.ts");
-    const { pdfTextToRows, parseTtkByTemplate } = await import("../_shared/parse_ttk_template.ts");
+    const { pdfMergeContinuationLines, pdfTextToRows, parseTtkByTemplate } = await import("../_shared/parse_ttk_template.ts");
     const { parseKkOp1 } = await import("../_shared/parse_kk_op1.ts");
 
     let bytes: Uint8Array;
@@ -168,8 +168,9 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // 1. Шаблонный парсинг (встроенные ключевые слова)
-    const rows = pdfTextToRows(text);
+    // 1. Шаблонный парсинг: склеиваем многострочные ячейки PDF, затем в rows
+    const mergedText = pdfMergeContinuationLines(text);
+    const rows = pdfTextToRows(mergedText);
     let templateCards = rows.length >= 2 ? parseTtkByTemplate(rows) : [];
 
     // 2. Если встроенный шаблон не сработал — пробуем каталог (сохранённые шаблоны после AI/Excel)

@@ -535,7 +535,7 @@ export function parseTtkByStoredTemplate(
         const v = (cells[c] ?? "").trim();
         const n = parseNum(v);
         // Пропускаем № (1,2,3...) — берём только веса (0.01-5 кг или 10+ г)
-        if (n != null && n > 0 && (n < 1 || n >= 10) && n < 1000) numCells.push({ col: c, val: v, num: n });
+        if (n != null && n > 0 && n < 10000) numCells.push({ col: c, val: v, num: n });
       }
       if (numCells.length >= 1 && !grossVal.trim()) grossVal = numCells[0].val;
       if (numCells.length >= 2 && !netVal.trim()) netVal = numCells[1].val;
@@ -613,6 +613,43 @@ export function parseTtkByStoredTemplate(
   }
   flushCard(undefined);
   return { cards: results, sanityIssues: [...sanityIssuesSet] };
+}
+
+/**
+ * Склеивает многострочные ячейки PDF (Shama.Book и др.): «Сливки 38%» + «жирности» + «160 160...».
+ * Только для PDF.
+ */
+export function pdfMergeContinuationLines(text: string): string {
+  const lines = text.split(/\r\n|\r|\n/).map((l) => l.trim()).filter(Boolean);
+  if (lines.length < 2) return text;
+
+  const merged: string[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    let line = lines[i];
+    let j = i + 1;
+    // Строка неполная: заканчивается на %, ), ,, ( или без весов в конце; следующая — продолжение
+    while (j < lines.length) {
+      const next = lines[j];
+      const trimmed = line.trim();
+      const endsWithContinuation = /[%),\s]$/.test(trimmed) || /[а-яёa-z]$/i.test(trimmed);
+      const trailingNums = line.match(/([\d,.\s]+)$/);
+      const hasTrailingWeights = !!trailingNums && trailingNums[1].trim().split(/\s+/).filter(Boolean).length >= 2;
+      const nextIsContinuation =
+        (next.length <= 25 && !/^\d+\s+[а-яА-Яё]/i.test(next) && !/^технологическ|^допустимые|^информация/i.test(next)) ||
+        /^[а-яёa-z\(\)]/.test(next) ||
+        /^[\d,.\s]+$/.test(next);
+      if (!hasTrailingWeights && (endsWithContinuation || line.length < 30) && nextIsContinuation && j - i < 3) {
+        line = line + " " + next;
+        j++;
+      } else {
+        break;
+      }
+    }
+    merged.push(line);
+    i = j;
+  }
+  return merged.join("\n");
 }
 
 /**
