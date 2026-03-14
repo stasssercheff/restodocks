@@ -25,6 +25,136 @@ import 'excel_style_ttk_table.dart';
 /// Отображение для сотрудников (режим просмотра, !effectiveCanEdit) должно соответствовать референсу:
 /// https://github.com/stasssercheff/shbb326 — kitchen/kitchen/ttk/Preps (ТТК ПФ), dish (карточки блюд), sv (су-вид).
 
+/// Поле выбора категории: при нажатии открывает список с «Свой вариант» сверху и крестиком удаления у своих.
+class _CategoryPickerField extends StatelessWidget {
+  const _CategoryPickerField({
+    required this.selectedCategory,
+    required this.categoryOptions,
+    required this.customCategories,
+    required this.categoryLabel,
+    required this.canEdit,
+    required this.onCategorySelected,
+    required this.onAddCustom,
+    required this.onRefreshCustom,
+    required this.loc,
+  });
+  final String selectedCategory;
+  final List<String> categoryOptions;
+  final List<({String id, String name})> customCategories;
+  final String Function(String) categoryLabel;
+  final bool canEdit;
+  final void Function(String) onCategorySelected;
+  final Future<void> Function() onAddCustom;
+  final Future<void> Function() onRefreshCustom;
+  final LocalizationService loc;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!canEdit) {
+      return InputDecorator(
+        decoration: InputDecoration(labelText: loc.t('category'), isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
+        child: Text(categoryLabel(selectedCategory), overflow: TextOverflow.ellipsis),
+      );
+    }
+    return InkWell(
+      onTap: () => _showPicker(context),
+      borderRadius: BorderRadius.circular(8),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: loc.t('category'),
+          isDense: true,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          suffixIcon: const Icon(Icons.arrow_drop_down),
+        ),
+        child: Text(categoryLabel(selectedCategory), overflow: TextOverflow.ellipsis),
+      ),
+    );
+  }
+
+  Future<void> _showPicker(BuildContext context) async {
+    final tcSvc = context.read<TechCardServiceSupabase>();
+    final est = context.read<AccountManagerSupabase>().establishment;
+    if (est == null) return;
+    final theme = Theme.of(context);
+
+    await showModalBottomSheet(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx2, setModal) {
+            return DraggableScrollableSheet(
+              initialChildSize: 0.5,
+              minChildSize: 0.3,
+              maxChildSize: 0.9,
+              expand: false,
+              builder: (_, scrollController) {
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                  child: ListView(
+                    controller: scrollController,
+                    children: [
+                      ListTile(
+                        leading: Icon(Icons.add_circle_outline, color: theme.colorScheme.primary),
+                        title: Text(loc.t('ttk_add_custom_category') ?? 'Свой вариант', style: TextStyle(fontWeight: FontWeight.w600, color: theme.colorScheme.primary)),
+                        onTap: () async {
+                          Navigator.of(ctx).pop();
+                          await onAddCustom();
+                        },
+                      ),
+                      const Divider(),
+                      ...categoryOptions.map((c) => ListTile(
+                        title: Text(categoryLabel(c)),
+                        selected: c == selectedCategory,
+                        onTap: () {
+                          onCategorySelected(c);
+                          Navigator.of(ctx).pop();
+                        },
+                      )),
+                      if (customCategories.isNotEmpty) ...[
+                        const Divider(),
+                        ...customCategories.map((c) {
+                          final catValue = 'custom:${c.id}';
+                          return ListTile(
+                            title: Text(c.name),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.close, size: 20),
+                              onPressed: () async {
+                                final count = await tcSvc.countTechCardsUsingCustomCategory(est.dataEstablishmentId, c.id);
+                                if (!ctx.mounted) return;
+                                if (count > 0) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text((loc.t('ttk_custom_category_in_use') ?? 'Используется в %s ТТК — удалить нельзя').replaceAll('%s', '$count'))),
+                                  );
+                                  return;
+                                }
+                                final ok = await tcSvc.deleteCustomCategory(est.dataEstablishmentId, c.id);
+                                if (!ctx.mounted) return;
+                                if (ok) {
+                                  await onRefreshCustom();
+                                  Navigator.of(ctx).pop();
+                                }
+                              },
+                            ),
+                            selected: catValue == selectedCategory,
+                            onTap: () {
+                              onCategorySelected(catValue);
+                              Navigator.of(ctx).pop();
+                            },
+                          );
+                        }),
+                      ],
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
 class _EditableShrinkageCell extends StatefulWidget {
   const _EditableShrinkageCell({required this.value, required this.onChanged});
 
@@ -417,7 +547,7 @@ class _EditableCostCellState extends State<_EditableCostCell> {
 }
 
 /// Категории бара (для определения права на продажную цену).
-const _barCategoriesForEdit = {'beverages', 'alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks'};
+const _barCategoriesForEdit = {'beverages', 'alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks', 'zakuska'};
 
 bool _isBarDishTechCard(TechCard tc) =>
     _barCategoriesForEdit.contains(tc.category) || tc.sections.contains('bar');
@@ -518,15 +648,30 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   /// 'photo' | 'excel' — какая кнопка сейчас загружает (чтобы показывать правильный текст).
   final _nameController = TextEditingController();
   /// Кухня: без напитков. Рыба, мясо, птица, заготовка и т.д.
-  static const _kitchenCategoryOptions = ['sauce', 'vegetables', 'zagotovka', 'salad', 'meat', 'seafood', 'poultry', 'side', 'subside', 'bakery', 'dessert', 'decor', 'soup', 'misc', 'banquet', 'catering'];
+  static const _kitchenCategoryOptions = ['sauce', 'vegetables', 'zagotovka', 'salad', 'zakuska', 'meat', 'seafood', 'poultry', 'side', 'subside', 'bakery', 'dessert', 'decor', 'soup', 'misc', 'banquet', 'catering'];
   /// Бар: только напитки и снеки.
-  static const _barCategoryOptions = ['alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks', 'beverages'];
+  static const _barCategoryOptions = ['alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks', 'zakuska', 'beverages'];
 
-  List<String> get _categoryOptions {
-    if (widget.department == 'bar') return _barCategoryOptions;
-    if (_techCard != null && _barCategoryOptions.contains(_techCard!.category)) return _barCategoryOptions;
-    return _kitchenCategoryOptions;
+  /// Отдел для категорий: bar или kitchen.
+  String get _categoryDepartment {
+    if (widget.department == 'bar') return 'bar';
+    if (_techCard != null && _barCategoryOptions.contains(_techCard!.category)) return 'bar';
+    return 'kitchen';
   }
+
+  /// Базовые + пользовательские категории.
+  List<String> get _categoryOptions {
+    final base = _categoryDepartment == 'bar' ? _barCategoryOptions : _kitchenCategoryOptions;
+    final custom = _customCategories.map((c) => 'custom:${c.id}').toList();
+    return [...base, ...custom];
+  }
+
+  /// Пользовательские категории (свой вариант) по отделам.
+  List<({String id, String name})> _customCategoriesKitchen = [];
+  List<({String id, String name})> _customCategoriesBar = [];
+
+  List<({String id, String name})> get _customCategories =>
+      _categoryDepartment == 'bar' ? _customCategoriesBar : _customCategoriesKitchen;
   // Ключи секций: id → (localization_key, requiresPro)
   // Цеха кухни: код → (ключ локализации, requiresPro)
   static const _sectionKeys = <String, (String, bool)>{
@@ -668,6 +813,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   }
 
   String _categoryLabel(String c, String lang) {
+    if (TechCardServiceSupabase.isCustomCategory(c)) {
+      final id = TechCardServiceSupabase.customCategoryId(c);
+      for (final x in _customCategories) {
+        if (x.id == id) return x.name;
+      }
+      return c;
+    }
     final Map<String, Map<String, String>> categoryTranslations = {
       'sauce': {'ru': 'Соус', 'en': 'Sauce'},
       'vegetables': {'ru': 'Овощи', 'en': 'Vegetables'},
@@ -689,6 +841,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       'hot_drinks': {'ru': 'Горячие напитки', 'en': 'Hot drinks'},
       'drinks_pure': {'ru': 'Напитки в чистом виде', 'en': 'Drinks (neat)'},
       'snacks': {'ru': 'Снеки', 'en': 'Snacks'},
+      'zakuska': {'ru': 'Закуска', 'en': 'Appetizer'},
       'banquet': {'ru': 'Банкет', 'en': 'Banquet'},
       'catering': {'ru': 'Кейтеринг', 'en': 'Catering'},
     };
@@ -705,11 +858,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       if (lower.contains('кофе') || lower.contains('чай') || lower.contains('какао') || lower.contains('coffee') || lower.contains('tea') || lower.contains('cocoa')) return 'hot_drinks';
       if (lower.contains('виски') || lower.contains('ром') || lower.contains('водка') || lower.contains('вино') || lower.contains('пиво') || lower.contains('whiskey') || lower.contains('rum') || lower.contains('vodka') || lower.contains('wine') || lower.contains('beer')) return 'drinks_pure';
       if (lower.contains('орех') || lower.contains('чипс') || lower.contains('снек') || lower.contains('nuts') || lower.contains('chips') || lower.contains('snack')) return 'snacks';
+    if (lower.contains('закуск') || lower.contains('appetizer') || lower.contains('antipasti')) return 'zakuska';
     }
     if (lower.contains('соус') || lower.contains('sauce')) return 'sauce';
     if (lower.contains('овощ') || lower.contains('vegetable')) return 'vegetables';
     if (lower.contains('заготовк') || lower.contains('preparation') || lower.contains('подготовк')) return 'zagotovka';
     if (lower.contains('салат') || lower.contains('salad')) return 'salad';
+    if (lower.contains('закуск') || lower.contains('appetizer') || lower.contains('antipasti')) return 'zakuska';
     if (lower.contains('мяс') || lower.contains('meat') || lower.contains('говядин') || lower.contains('свинин') || lower.contains('баран')) return 'meat';
     if (lower.contains('рыб') || lower.contains('fish') || lower.contains('море') || lower.contains('seafood')) return 'seafood';
     if (lower.contains('птиц') || lower.contains('poultry') || lower.contains('куриц') || lower.contains('индейк') || lower.contains('утк') || lower.contains('цыплят')) return 'poultry';
@@ -730,10 +885,15 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       final est = context.read<AccountManagerSupabase>().establishment;
       if (est != null) {
         await context.read<ProductStoreSupabase>().loadNomenclature(est.dataEstablishmentId);
-        final tcs = await context.read<TechCardServiceSupabase>().getTechCardsForEstablishment(est.dataEstablishmentId);
+        final tcSvc = context.read<TechCardServiceSupabase>();
+        final tcs = await tcSvc.getTechCardsForEstablishment(est.dataEstablishmentId);
+        final customKitchen = await tcSvc.getCustomCategories(est.dataEstablishmentId, 'kitchen');
+        final customBar = await tcSvc.getCustomCategories(est.dataEstablishmentId, 'bar');
         if (mounted) {
           _pickerTechCards = _isNew ? tcs : tcs.where((t) => t.id != widget.techCardId).toList();
           _semiFinishedProducts = tcs.where((t) => t.isSemiFinished).toList();
+          _customCategoriesKitchen = customKitchen;
+          _customCategoriesBar = customBar;
           _ensureTechCardTranslations(tcs);
         }
       }
@@ -818,7 +978,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           if (tc != null) {
             _portionWeight = tc.portionWeight;
             _nameController.text = tc.getLocalizedDishName(context.read<LocalizationService>().currentLanguageCode);
-            _selectedCategory = _categoryOptions.contains(tc.category) ? tc.category : 'misc';
+            _selectedCategory = _categoryOptions.contains(tc.category) ? tc.category : 'misc'; // fallback if custom category was deleted
             _selectedSections = List<String>.from(tc.sections);
             _isSemiFinished = tc.isSemiFinished;
             _photoUrls = tc.photoUrls ?? [];
@@ -937,6 +1097,71 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       }
     } catch (_) {}
     if (mounted) setState(() => _technologyTranslating = false);
+  }
+
+  Future<void> _showAddCustomCategoryDialog() async {
+    final loc = context.read<LocalizationService>();
+    final est = context.read<AccountManagerSupabase>().establishment;
+    if (est == null) return;
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: Text(loc.t('ttk_add_custom_category') ?? 'Свой вариант'),
+          content: TextField(
+            controller: controller,
+            decoration: InputDecoration(
+              labelText: loc.t('ttk_custom_category_hint') ?? 'Название своей категории',
+              border: const OutlineInputBorder(),
+            ),
+            autofocus: true,
+            textCapitalization: TextCapitalization.words,
+            onSubmitted: (_) => Navigator.of(ctx).pop(controller.text.trim()),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(loc.t('back') ?? 'Назад')),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+              child: Text(loc.t('save') ?? 'Сохранить'),
+            ),
+          ],
+        );
+      },
+    );
+    final name = result?.trim();
+    if (name == null || name.isEmpty || !mounted) return;
+    final category = await context.read<TechCardServiceSupabase>().addCustomCategory(est.dataEstablishmentId, _categoryDepartment, name);
+    if (!mounted) return;
+    if (category == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.t('error') ?? 'Ошибка')),
+        );
+      }
+      return;
+    }
+    final custom = await context.read<TechCardServiceSupabase>().getCustomCategories(est.dataEstablishmentId, _categoryDepartment);
+    setState(() {
+      if (_categoryDepartment == 'bar') {
+        _customCategoriesBar = custom;
+      } else {
+        _customCategoriesKitchen = custom;
+      }
+      _selectedCategory = category;
+    });
+    _scheduleDraftSave();
+  }
+
+  Future<void> _refreshCustomCategories() async {
+    final est = context.read<AccountManagerSupabase>().establishment;
+    if (est == null) return;
+    final customKitchen = await context.read<TechCardServiceSupabase>().getCustomCategories(est.dataEstablishmentId, 'kitchen');
+    final customBar = await context.read<TechCardServiceSupabase>().getCustomCategories(est.dataEstablishmentId, 'bar');
+    if (mounted) setState(() {
+      _customCategoriesKitchen = customKitchen;
+      _customCategoriesBar = customBar;
+    });
   }
 
   Future<void> _save() async {
@@ -2233,17 +2458,17 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                     ),
                   ),
                   const SizedBox(height: 12),
-                  effectiveCanEdit
-                      ? DropdownButtonFormField<String>(
-                          value: _selectedCategory,
-                          decoration: InputDecoration(labelText: loc.t('category'), isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
-                          items: _categoryOptions.map((c) => DropdownMenuItem(value: c, child: Text(_categoryLabel(c, loc.currentLanguageCode)))).toList(),
-                          onChanged: (v) { setState(() => _selectedCategory = v ?? 'misc'); _scheduleDraftSave(); },
-                        )
-                      : InputDecorator(
-                          decoration: InputDecoration(labelText: loc.t('category'), isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
-                          child: Text(_categoryLabel(_selectedCategory, loc.currentLanguageCode), overflow: TextOverflow.ellipsis),
-                        ),
+                  _CategoryPickerField(
+                    selectedCategory: _categoryOptions.contains(_selectedCategory) ? _selectedCategory : 'misc',
+                    categoryOptions: _categoryDepartment == 'bar' ? _barCategoryOptions : _kitchenCategoryOptions,
+                    customCategories: _customCategories,
+                    categoryLabel: (c) => _categoryLabel(c, loc.currentLanguageCode),
+                    canEdit: effectiveCanEdit,
+                    onCategorySelected: (v) { setState(() => _selectedCategory = v); _scheduleDraftSave(); },
+                    onAddCustom: _showAddCustomCategoryDialog,
+                    onRefreshCustom: _refreshCustomCategories,
+                    loc: loc,
+                  ),
                   const SizedBox(height: 12),
                   _SectionPicker(
                     selected: _selectedSections,
@@ -2302,19 +2527,18 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                         ),
                         const SizedBox(width: 8),
                         SizedBox(
-                          width: 140,
-                          height: 56,
-                          child: effectiveCanEdit
-                              ? DropdownButtonFormField<String>(
-                                  value: _selectedCategory,
-                                  decoration: InputDecoration(labelText: loc.t('category'), isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)), contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
-                                  items: _categoryOptions.map((c) => DropdownMenuItem(value: c, child: Text(_categoryLabel(c, loc.currentLanguageCode)))).toList(),
-                                  onChanged: (v) { setState(() => _selectedCategory = v ?? 'misc'); _scheduleDraftSave(); },
-                                )
-                              : InputDecorator(
-                                  decoration: InputDecoration(labelText: loc.t('category'), isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
-                                  child: Text(_categoryLabel(_selectedCategory, loc.currentLanguageCode), overflow: TextOverflow.ellipsis),
-                                ),
+                          width: 180,
+                          child: _CategoryPickerField(
+                            selectedCategory: _categoryOptions.contains(_selectedCategory) ? _selectedCategory : 'misc',
+                            categoryOptions: _categoryDepartment == 'bar' ? _barCategoryOptions : _kitchenCategoryOptions,
+                            customCategories: _customCategories,
+                            categoryLabel: (c) => _categoryLabel(c, loc.currentLanguageCode),
+                            canEdit: effectiveCanEdit,
+                            onCategorySelected: (v) { setState(() => _selectedCategory = v); _scheduleDraftSave(); },
+                            onAddCustom: _showAddCustomCategoryDialog,
+                            onRefreshCustom: _refreshCustomCategories,
+                            loc: loc,
+                          ),
                         ),
                         const SizedBox(width: 8),
                         SizedBox(

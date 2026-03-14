@@ -50,8 +50,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   }
 
   /// Порядок категорий: кухня (без напитков) и бар (только напитки/снеки)
-  static const _kitchenCategoryOrder = ['sauce', 'vegetables', 'zagotovka', 'salad', 'meat', 'seafood', 'poultry', 'side', 'subside', 'bakery', 'dessert', 'decor', 'soup', 'misc', 'banquet', 'catering'];
-  static const _barCategoryOrder = ['alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks', 'beverages'];
+  static const _kitchenCategoryOrder = ['sauce', 'vegetables', 'zagotovka', 'salad', 'zakuska', 'meat', 'seafood', 'poultry', 'side', 'subside', 'bakery', 'dessert', 'decor', 'soup', 'misc', 'banquet', 'catering'];
+  static const _barCategoryOrder = ['alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks', 'zakuska', 'beverages'];
 
   List<({String category, List<TechCard> cards})> _groupByCategory(List<TechCard> cards) {
     final order = (widget.department == 'bar' || widget.department == 'banquet-catering-bar') ? _barCategoryOrder : _kitchenCategoryOrder;
@@ -148,7 +148,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     }
   }
 
+  /// id -> name для пользовательских категорий (загружаются в _load).
+  final Map<String, String> _customCategoryNames = {};
+
   String _categoryLabel(String c, LocalizationService loc) {
+    if (TechCardServiceSupabase.isCustomCategory(c)) {
+      final id = TechCardServiceSupabase.customCategoryId(c);
+      return _customCategoryNames[id] ?? c;
+    }
     final lang = loc.currentLanguageCode;
     final Map<String, Map<String, String>> categoryTranslations = {
       'sauce': {'ru': 'Соус', 'en': 'Sauce'},
@@ -170,6 +177,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       'hot_drinks': {'ru': 'Горячие напитки', 'en': 'Hot drinks'},
       'drinks_pure': {'ru': 'Напитки в чистом виде', 'en': 'Drinks (neat)'},
       'snacks': {'ru': 'Снеки', 'en': 'Snacks'},
+      'zakuska': {'ru': 'Закуска', 'en': 'Appetizer'},
       'banquet': {'ru': 'Банкет', 'en': 'Banquet'},
       'catering': {'ru': 'Кейтеринг', 'en': 'Catering'},
     };
@@ -202,26 +210,42 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     try {
       final svc = context.read<TechCardServiceSupabase>();
       final all = await svc.getTechCardsForEstablishment(est.dataEstablishmentId);
+      final customKitchen = await svc.getCustomCategories(est.dataEstablishmentId, 'kitchen');
+      final customBar = await svc.getCustomCategories(est.dataEstablishmentId, 'bar');
+      _customCategoryNames.clear();
+      for (final c in customKitchen) _customCategoryNames[c.id] = c.name;
+      for (final c in customBar) _customCategoryNames[c.id] = c.name;
+      final customBarIds = customBar.map((c) => c.id).toSet();
       List<TechCard> list;
       if (widget.department == 'banquet-catering') {
         list = all.where((tc) =>
             tc.category == 'banquet' || tc.category == 'catering').toList();
       } else if (widget.department == 'banquet-catering-bar') {
-        const barCategories = {'beverages', 'alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks'};
+        const barCategories = {'beverages', 'alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks', 'zakuska'};
         list = all.where((tc) =>
             (tc.category == 'banquet' || tc.category == 'catering') &&
             (tc.sections.contains('bar') || tc.sections.contains('all') || barCategories.contains(tc.category))).toList();
       } else if (widget.department == 'bar') {
-        const barCats = {'beverages', 'alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks'};
+        const barCats = {'beverages', 'alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks', 'zakuska'};
         final cat = (String c) => c.isEmpty ? 'misc' : c;
-        list = all.where((tc) =>
-            barCats.contains(cat(tc.category)) || tc.sections.contains('bar')).toList();
+        list = all.where((tc) {
+          final c = cat(tc.category);
+          if (barCats.contains(c)) return true;
+          if (tc.sections.contains('bar')) return true;
+          if (TechCardServiceSupabase.isCustomCategory(tc.category) && customBarIds.contains(TechCardServiceSupabase.customCategoryId(tc.category))) return true;
+          return false;
+        }).toList();
       } else if (widget.department == 'hall') {
         list = []; // Зал не имеет своих ТТК
       } else {
-        const barCats = {'beverages', 'alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks'};
+        const barCats = {'beverages', 'alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks', 'zakuska'};
         final cat = (String c) => c.isEmpty ? 'misc' : c;
-        list = all.where((tc) => !barCats.contains(cat(tc.category))).toList();
+        list = all.where((tc) {
+          final c = cat(tc.category);
+          if (barCats.contains(c)) return false;
+          if (TechCardServiceSupabase.isCustomCategory(tc.category) && customBarIds.contains(TechCardServiceSupabase.customCategoryId(tc.category))) return false;
+          return true;
+        }).toList();
       }
       if (mounted) {
         setState(() { _list = list; _loading = false; });
@@ -861,6 +885,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     // Разделяем список на ПФ и Блюда, фильтруем по поиску, цеху и категории
     final query = _searchController.text.trim().toLowerCase();
     final catOrder = (widget.department == 'bar' || widget.department == 'banquet-catering-bar') ? _barCategoryOrder : _kitchenCategoryOrder;
+    final customCatsInList = _list.map((tc) => tc.category).where(TechCardServiceSupabase.isCustomCategory).toSet().toList();
+    final filterCatOrder = [...catOrder, ...customCatsInList];
     List<TechCard> filterBySearch(List<TechCard> list) {
       if (query.isEmpty) return list;
       final loc = context.read<LocalizationService>();
@@ -1009,7 +1035,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                         ),
                         items: [
                           DropdownMenuItem(value: null, child: Text(loc.t('all') ?? 'Все')),
-                          ...catOrder.map((c) => DropdownMenuItem(
+                          ...filterCatOrder.map((c) => DropdownMenuItem(
                             value: c,
                             child: Text(_categoryLabel(c, loc)),
                           )),

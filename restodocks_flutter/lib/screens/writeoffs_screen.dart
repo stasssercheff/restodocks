@@ -256,12 +256,6 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
         : techCards.where((tc) => emp.canSeeTechCard(tc.sections)).toList();
 
     if (!mounted) return;
-    if (products.isEmpty && visibleTc.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.t('no_products') ?? 'Нет продуктов в номенклатуре')),
-      );
-      return;
-    }
     await showDialog<void>(
       context: context,
       useRootNavigator: true,

@@ -55,14 +55,14 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
 
   /// Кухня: без напитков. Рыба, мясо, птица, заготовка и т.д.
   static const _kitchenCategoryOptions = [
-    'sauce', 'vegetables', 'zagotovka', 'salad', 'meat', 'seafood', 'poultry', 'side', 'subside',
+    'sauce', 'vegetables', 'zagotovka', 'salad', 'zakuska', 'meat', 'seafood', 'poultry', 'side', 'subside',
     'bakery', 'dessert', 'decor', 'soup', 'misc', 'banquet', 'catering',
   ];
 
   /// Бар: только напитки и снеки.
   static const _barCategoryOptions = [
     'alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure',
-    'snacks', 'beverages',
+    'snacks', 'zakuska', 'beverages',
   ];
 
   bool get _isBar => widget.department == 'bar' || widget.department == 'banquet-catering-bar';
@@ -120,11 +120,13 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
       if (lower.contains('кофе') || lower.contains('чай') || lower.contains('какао') || lower.contains('coffee') || lower.contains('tea') || lower.contains('cocoa')) return 'hot_drinks';
       if (lower.contains('виски') || lower.contains('ром') || lower.contains('водка') || lower.contains('вино') || lower.contains('пиво') || lower.contains('whiskey') || lower.contains('rum') || lower.contains('vodka') || lower.contains('wine') || lower.contains('beer')) return 'drinks_pure';
       if (lower.contains('орех') || lower.contains('чипс') || lower.contains('снек') || lower.contains('nuts') || lower.contains('chips') || lower.contains('snack')) return 'snacks';
+      if (lower.contains('закуск') || lower.contains('appetizer') || lower.contains('antipasti')) return 'zakuska';
     }
     if (lower.contains('соус') || lower.contains('sauce')) return 'sauce';
     if (lower.contains('овощ') || lower.contains('vegetable')) return 'vegetables';
     if (lower.contains('заготовк') || lower.contains('preparation') || lower.contains('подготовк')) return 'zagotovka';
     if (lower.contains('салат') || lower.contains('salad')) return 'salad';
+    if (lower.contains('закуск') || lower.contains('appetizer') || lower.contains('antipasti')) return 'zakuska';
     if (lower.contains('мяс') || lower.contains('meat') || lower.contains('говядин') || lower.contains('свинин') || lower.contains('баран')) return 'meat';
     if (lower.contains('рыб') || lower.contains('fish') || lower.contains('море') || lower.contains('seafood')) return 'seafood';
     if (lower.contains('птиц') || lower.contains('poultry') || lower.contains('куриц') || lower.contains('индейк') || lower.contains('утк') || lower.contains('цыплят')) return 'poultry';
@@ -291,7 +293,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
 
   String _categoryLabel(String c, String lang) {
     const ru = {
-      'sauce': 'Соус', 'vegetables': 'Овощи', 'zagotovka': 'Заготовка', 'salad': 'Салат', 'meat': 'Мясо',
+      'sauce': 'Соус', 'vegetables': 'Овощи', 'zagotovka': 'Заготовка', 'salad': 'Салат', 'zakuska': 'Закуска', 'meat': 'Мясо',
       'seafood': 'Рыба', 'poultry': 'Птица', 'side': 'Гарнир', 'subside': 'Подгарнир', 'bakery': 'Выпечка',
       'dessert': 'Десерт', 'decor': 'Декор', 'soup': 'Суп', 'misc': 'Разное',
       'beverages': 'Напитки', 'banquet': 'Банкет', 'catering': 'Кейтеринг',
@@ -299,7 +301,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
       'hot_drinks': 'Горячие напитки', 'drinks_pure': 'Напитки в чистом виде', 'snacks': 'Снеки',
     };
     const en = {
-      'sauce': 'Sauce', 'vegetables': 'Vegetables', 'zagotovka': 'Preparation', 'salad': 'Salad', 'meat': 'Meat',
+      'sauce': 'Sauce', 'vegetables': 'Vegetables', 'zagotovka': 'Preparation', 'salad': 'Salad', 'zakuska': 'Appetizer', 'meat': 'Meat',
       'seafood': 'Seafood', 'poultry': 'Poultry', 'side': 'Side dish', 'subside': 'Sub-side', 'bakery': 'Bakery',
       'dessert': 'Dessert', 'decor': 'Decor', 'soup': 'Soup', 'misc': 'Misc',
       'beverages': 'Beverages', 'banquet': 'Banquet', 'catering': 'Catering',

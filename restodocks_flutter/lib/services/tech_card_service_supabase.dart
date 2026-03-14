@@ -688,4 +688,103 @@ class TechCardServiceSupabase {
       return null;
     }
   }
+
+  // ─── Пользовательские категории ТТК (свой вариант) ─────────────────────────
+
+  static const String _customPrefix = 'custom:';
+
+  static bool isCustomCategory(String category) => category.startsWith(_customPrefix);
+
+  static String customCategoryId(String category) =>
+      category.startsWith(_customPrefix) ? category.substring(_customPrefix.length) : '';
+
+  /// Загрузить пользовательские категории для заведения и отдела (kitchen | bar).
+  /// Возвращает [] если таблица не существует (миграция не применена).
+  Future<List<({String id, String name})>> getCustomCategories(String establishmentId, String department) async {
+    try {
+      final data = await _supabase.client
+          .from('tech_card_custom_categories')
+          .select('id, name')
+          .eq('establishment_id', establishmentId)
+          .eq('department', department)
+          .order('name');
+      return (data as List).map((r) => (id: r['id'] as String, name: r['name'] as String)).toList();
+    } catch (e) {
+      // Таблица может не существовать — миграция не применена. Тогда работаем без своих категорий.
+      devLog('TechCardServiceSupabase.getCustomCategories: $e');
+      return [];
+    }
+  }
+
+  /// Добавить пользовательскую категорию. Возвращает category для tech_cards (custom:uuid).
+  /// null если таблица не существует или ошибка.
+  Future<String?> addCustomCategory(String establishmentId, String department, String name) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return null;
+    try {
+      final row = await _supabase.client
+          .from('tech_card_custom_categories')
+          .insert({
+            'establishment_id': establishmentId,
+            'department': department,
+            'name': trimmed,
+          })
+          .select('id')
+          .single();
+      final id = row['id'] as String?;
+      return id != null ? '$_customPrefix$id' : null;
+    } catch (e) {
+      devLog('TechCardServiceSupabase.addCustomCategory: $e');
+      return null; // Таблица не существует или другая ошибка
+    }
+  }
+
+  /// Количество ТТК, использующих эту пользовательскую категорию.
+  Future<int> countTechCardsUsingCustomCategory(String establishmentId, String customId) async {
+    try {
+      final category = '$_customPrefix$customId';
+      final data = await _supabase.client
+          .from('tech_cards')
+          .select('id')
+          .eq('establishment_id', establishmentId)
+          .eq('category', category);
+      return (data as List).length;
+    } catch (e) {
+      devLog('TechCardServiceSupabase.countTechCardsUsingCustomCategory: $e');
+      return -1; // -1 = ошибка, считаем что нельзя удалить
+    }
+  }
+
+  /// Удалить пользовательскую категорию. Возвращает true при успехе. Нельзя удалить, если есть ТТК с этой категорией.
+  Future<bool> deleteCustomCategory(String establishmentId, String customId) async {
+    final count = await countTechCardsUsingCustomCategory(establishmentId, customId);
+    if (count > 0 || count < 0) return false; // < 0 = ошибка, не удаляем
+    try {
+      await _supabase.client
+          .from('tech_card_custom_categories')
+          .delete()
+          .eq('id', customId)
+          .eq('establishment_id', establishmentId);
+      return true;
+    } catch (e) {
+      devLog('TechCardServiceSupabase.deleteCustomCategory: $e');
+      return false;
+    }
+  }
+
+  /// Получить название пользовательской категории по id (из custom:uuid).
+  Future<String?> getCustomCategoryName(String customId) async {
+    if (customId.isEmpty) return null;
+    try {
+      final row = await _supabase.client
+          .from('tech_card_custom_categories')
+          .select('name')
+          .eq('id', customId)
+          .maybeSingle();
+      return row?['name'] as String?;
+    } catch (e) {
+      devLog('TechCardServiceSupabase.getCustomCategoryName: $e');
+      return null; // Таблица не существует
+    }
+  }
 }

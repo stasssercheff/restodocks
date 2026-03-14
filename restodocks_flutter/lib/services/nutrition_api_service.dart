@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../utils/product_name_utils.dart';
 
@@ -67,19 +68,26 @@ class NutritionApiService {
   }
 
   /// Поиск КБЖУ по названию продукта (с проверкой адекватности).
-  /// Убирает префиксы iiko (Т., ТМЦ) для лучшего поиска в Open Food Facts.
+  /// Через Edge Function fetch-nutrition-off — обход CORS и 504 в DevTools.
   static Future<NutritionResult?> fetchNutrition(String productName) async {
     if (productName.trim().isEmpty) return null;
     final clean = stripIikoPrefix(productName).trim();
     if (clean.isEmpty) return null;
-    final query = Uri.encodeQueryComponent(clean);
-    final url = Uri.parse(
-      '$_baseUrl/cgi/search.pl?search_terms=$query&search_simple=1&action=process&json=1&page_size=15',
-    );
+    Map<String, dynamic>? raw;
     try {
-      final response = await http.get(url).timeout(_timeout);
-      if (response.statusCode != 200) return null;
-      final json = jsonDecode(response.body) as Map<String, dynamic>;
+      final client = Supabase.instance.client;
+      final res = await client.functions
+          .invoke('fetch-nutrition-off', queryParameters: {'q': clean})
+          .timeout(_timeout);
+      if (res.status == 200 && res.data is Map) {
+        raw = Map<String, dynamic>.from(res.data as Map);
+      }
+    } catch (_) {
+      raw = null;
+    }
+    if (raw == null) return null;
+    try {
+      final json = raw;
       final products = json['products'] as List<dynamic>?;
       if (products == null || products.isEmpty) return null;
 

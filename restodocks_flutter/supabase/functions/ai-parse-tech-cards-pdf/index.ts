@@ -10,6 +10,27 @@ function corsHeaders(origin: string | null) {
   };
 }
 
+/** Заголовки таблицы и мусор из блока технологии — не продукты. Только для PDF. */
+const PDF_GARBAGE_PRODUCT_NAMES = new Set([
+  "брутто", "нетто", "наименование", "продукт", "сырьё", "расход", "норма", "выход",
+  "из", "на", "в", "жидкая", "пищевой", "сроки", "жирности", "готовой", "порцию", "порций",
+  "сырья", "полуфабрикатов", "ед.изм", "ед изм", "единица", "итого",
+]);
+function isGarbageProductName(name: string): boolean {
+  const low = name.trim().toLowerCase();
+  if (low.length <= 2) return true;
+  if (/^[\d,.\s\-]+$/.test(low)) return true;
+  if (PDF_GARBAGE_PRODUCT_NAMES.has(low)) return true;
+  if (low === "на" || low === "в" || low === "из") return true;
+  if (/^(срок|сроки|хранен|реализац)/.test(low)) return true;
+  if (/^способ\s*(приготовления|оформления)?/i.test(low)) return true;
+  if (low.includes("технологическ") && low.length < 25) return true;
+  return false;
+}
+function filterGarbageIngredients<T extends { productName: string }>(ingredients: T[]): T[] {
+  return ingredients.filter((i) => !isGarbageProductName(i.productName ?? ""));
+}
+
 const PDF_SYSTEM_PROMPT = `Ты парсер технологических карт (ТТК, рецептов, полуфабрикатов, калькуляционных карт КК ОП-1). На входе — сырой текст из PDF или документа Word (экспорт в текст).
 
 КРИТИЧНО: Если в тексте есть хоть какая-то ТТК (название блюда/ПФ, ингредиенты, технология) — ты ОБЯЗАН извлечь хотя бы одну карточку. Подстраивайся под ЛЮБОЙ формат: Shama.Book, iiko, ГОСТ, КК (форма №ОП-1), Сборник технологических карт (Сборник рецептур), документы Word (кухня, июнь 2012 и т.п.), собственные шаблоны. Не требуй точного соответствия образцу.
@@ -129,7 +150,7 @@ Deno.serve(async (req: Request) => {
         dishName: card.dishName ?? null,
         technologyText: card.technologyText ?? null,
         isSemiFinished: card.isSemiFinished ?? undefined,
-        ingredients: card.ingredients.map((i) => ({
+        ingredients: filterGarbageIngredients(card.ingredients).map((i) => ({
           productName: i.productName,
           grossGrams: i.grossGrams ?? undefined,
           netGrams: i.netGrams ?? undefined,
@@ -175,7 +196,7 @@ Deno.serve(async (req: Request) => {
         dishName: card.dishName ?? null,
         technologyText: card.technologyText ?? null,
         isSemiFinished: card.isSemiFinished ?? undefined,
-        ingredients: card.ingredients.map((i) => ({
+        ingredients: filterGarbageIngredients(card.ingredients).map((i) => ({
           productName: i.productName,
           grossGrams: i.grossGrams ?? undefined,
           netGrams: i.netGrams ?? undefined,
@@ -282,7 +303,7 @@ Deno.serve(async (req: Request) => {
 
     const normalized = cards.map((card) => {
       const c = card as Record<string, unknown>;
-      const ingredients = Array.isArray(c.ingredients)
+      const rawIngredients = Array.isArray(c.ingredients)
         ? (c.ingredients as Record<string, unknown>[]).map((i) => {
             const it = String(i.ingredientType ?? "").toLowerCase();
             const ingredientType = (it === "product" || it === "semi_finished") ? it : undefined;
@@ -299,6 +320,7 @@ Deno.serve(async (req: Request) => {
             };
           })
         : [];
+      const ingredients = filterGarbageIngredients(rawIngredients);
       return {
         dishName: c.dishName != null ? String(c.dishName) : null,
         technologyText: c.technologyText != null ? String(c.technologyText) : null,

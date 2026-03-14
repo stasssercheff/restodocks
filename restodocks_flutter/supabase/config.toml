@@ -31,3 +31,7 @@ verify_jwt = false
 # tt-parse-save-learning: обучение парсера ТТК (service_role, обход RLS)
 [functions.tt-parse-save-learning]
 verify_jwt = false
+
+# fetch-nutrition-off: прокси к Open Food Facts (обход CORS/504 в DevTools)
+[functions.fetch-nutrition-off]
+verify_jwt = false

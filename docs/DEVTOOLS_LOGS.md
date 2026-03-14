@@ -1,5 +1,16 @@
 # DevTools — логи и ошибки в консоли
 
+## Когда показываешь проект (демо, инвесторы)
+
+При открытом DevTools кто-то может подумать «столько ошибок — катастрофа». На практике многие сообщения **ожидаемы** и не означают поломку.
+
+| Сообщение | Что это | Опасно? |
+|-----------|---------|---------|
+| `401 authenticate-employee` | Проверка сессии / повтор логина при неверном пароле | Нет — ожидаемо до входа |
+| `Source Map flutter.js.map SyntaxError` | Flutter не генерирует этот файл, браузер парсит 404 как JSON | Нет — фикс: placeholder в build |
+| `504` / `CORS` на openfoodfacts.org | Open Food Facts иногда отвечает медленно или без CORS | Нет — обход: Edge Function fetch-nutrition-off |
+| `WebGL: non-portable extension` | Браузер/драйвер, не приложение | Нет |
+
 ## Почему много сообщений
 
 - **devLog** и **debugPrint** — выводятся только в **Debug** (разработка). В Release/Production их нет.
@@ -26,9 +37,5 @@
 
 - **Локально:** `flutter run --release` — почти без логов приложения.
 - **Продакшен (Cloudflare):** билд в release, там нет `devLog` и `debugPrint`.
-
-## План аудита логов (по желанию)
-
-- Удалить лишние `debugPrint`/`devLog`.
-- Оборачивать временные логи в `kDebugMode`.
-- Добавить уровень (error/warn/info) и возможность отключать инфо-логи.
+- **flutter.js.map:** Cloudflare build добавляет placeholder — убирает JSON Parse error.
+- **Open Food Facts:** запросы идут через Edge Function fetch-nutrition-off — нет CORS в консоли.

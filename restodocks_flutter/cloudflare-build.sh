@@ -43,6 +43,10 @@ if [ -f scripts/sw_cleanup.js ]; then
   cp scripts/sw_cleanup.js build/web/flutter_service_worker.js
 fi
 
+# Flutter.js ссылается на flutter.js.map, но Flutter его не генерирует → 404 и JSON Parse error в DevTools.
+# Пустой source map убирает красную ошибку при показе проекта.
+echo '{"version":3,"sources":[],"names":[],"mappings":""}' > build/web/flutter.js.map
+
 echo "/*    /index.html   200" > build/web/_redirects
 
 # Pages Functions: только /supabase-auth/* — остальное статика
