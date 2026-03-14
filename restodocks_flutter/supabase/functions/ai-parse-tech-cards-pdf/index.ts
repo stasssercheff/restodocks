@@ -1,6 +1,7 @@
 // Supabase Edge Function: распознавание ТТК из PDF
 // Динамический импорт unpdf/AI — ускоряет cold start, warm-запрос возвращается сразу
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { isStructuralProductName } from "../_shared/parse_ttk_template.ts";
 
 function corsHeaders(origin: string | null) {
   return {
@@ -10,29 +11,12 @@ function corsHeaders(origin: string | null) {
   };
 }
 
-/** Заголовки таблицы и мусор из блока технологии — не продукты. Только для PDF. */
-const PDF_GARBAGE_PRODUCT_NAMES = new Set([
-  "брутто", "нетто", "наименование", "продукт", "сырьё", "расход", "норма", "выход",
-  "из", "на", "в", "пищевой", "сроки", "жирности", "готовой", "порцию", "порций",
-  "сырья", "полуфабрикатов", "ед.изм", "ед изм", "единица", "итого", "масса",
-  "взбить", "добавить", "положить", "переложить", "использовать", "пробить", "довести", "соединить", "перемешать",
-  "кдж", "ккал", "белки", "жиры", "углеводы", "калорийность",
-]);
-function isGarbageProductName(name: string): boolean {
-  const low = name.trim().toLowerCase();
-  if (low.length <= 2) return true;
-  if (/^[\d,.\s\-]+$/.test(low)) return true;
-  if (PDF_GARBAGE_PRODUCT_NAMES.has(low)) return true;
-  if (low === "на" || low === "в" || low === "из") return true;
-  if (/^(срок|сроки|хранен|реализац)/.test(low)) return true;
-  if (/^способ\s*(приготовления|оформления)?/i.test(low)) return true;
-  if (low.includes("технологическ") && low.length < 25) return true;
-  if (/информация\s+о\s+пищ/i.test(low)) return true;
-  if (low.length <= 10 && /кдж|ккал/i.test(low) && !/[а-яё]{4,}/i.test(low)) return true;
-  return false;
-}
-function filterGarbageIngredients<T extends { productName: string }>(ingredients: T[]): T[] {
-  return ingredients.filter((i) => !isGarbageProductName(i.productName ?? ""));
+/** Фильтр мусорных ингредиентов — та же семантика, что в parse_ttk_template (структурные слова ≠ ингредиенты) */
+function filterGarbageIngredients<T extends { productName: string }>(
+  ingredients: T[],
+  isStructural: (s: string) => boolean,
+): T[] {
+  return ingredients.filter((i) => !isStructural(i.productName ?? ""));
 }
 
 const PDF_SYSTEM_PROMPT = `Ты парсер технологических карт (ТТК, рецептов, полуфабрикатов, калькуляционных карт КК ОП-1). На входе — сырой текст из PDF или документа Word (экспорт в текст).
@@ -154,7 +138,7 @@ Deno.serve(async (req: Request) => {
         dishName: card.dishName ?? null,
         technologyText: card.technologyText ?? null,
         isSemiFinished: card.isSemiFinished ?? undefined,
-        ingredients: filterGarbageIngredients(card.ingredients).map((i) => ({
+        ingredients: filterGarbageIngredients(card.ingredients, (s) => isStructuralProductName(s, true)).map((i) => ({
           productName: i.productName,
           grossGrams: i.grossGrams ?? undefined,
           netGrams: i.netGrams ?? undefined,
@@ -214,7 +198,7 @@ Deno.serve(async (req: Request) => {
         technologyText: card.technologyText ?? null,
         isSemiFinished: card.isSemiFinished ?? undefined,
         yieldGrams: extractedYield ?? card.yieldGrams ?? undefined,
-        ingredients: filterGarbageIngredients(card.ingredients).map((i) => ({
+        ingredients: filterGarbageIngredients(card.ingredients, (s) => isStructuralProductName(s, true)).map((i) => ({
           productName: i.productName,
           grossGrams: i.grossGrams ?? undefined,
           netGrams: i.netGrams ?? undefined,
@@ -338,7 +322,7 @@ Deno.serve(async (req: Request) => {
             };
           })
         : [];
-      const ingredients = filterGarbageIngredients(rawIngredients);
+      const ingredients = filterGarbageIngredients(rawIngredients, (s) => isStructuralProductName(s, true));
       return {
         dishName: c.dishName != null ? String(c.dishName) : null,
         technologyText: c.technologyText != null ? String(c.technologyText) : null,

@@ -1,7 +1,57 @@
 /**
  * Парсинг ТТК по шаблону — без AI.
  * Ищет заголовки (Продукт, Брутто, Нетто...) и извлекает данные по найденным колонкам.
+ *
+ * Логика (не под каждый файл):
+ * 1. Границы секций: строка с маркером (Техн. карта №, Выход на 1 порцию, Масса полуфабриката,
+ *    Информация о пищевой, Технологический процесс, Допустимые сроки) = конец таблицы ингредиентов.
+ * 2. Строка продукта валидна только ДО первой границы.
+ * 3. Структурные слова (заголовки колонок, названия секций) ≠ ингредиенты — по семантике, не по списку.
+ * 4. Числа: gross/net > 100000 г = мусор (КБЖУ, склейки).
  */
+
+/** Строка с маркером новой секции — конец таблицы ингредиентов (Shama, ГОСТ и др.) */
+const SECTION_BOUNDARY_REGEX = /технологическая\s+карта\s+№|выход\s+на\s+1\s+порцию|масса\s+полуфабриката|информация\s+о\s+пищевой|технологический\s+процесс|допустимые\s+сроки/i;
+
+/** Заголовки колонок и названия секций — не продукты. Точное совпадение или начало фразы. */
+const STRUCTURAL_WORDS = new Set([
+  "брутто", "нетто", "расход", "норма", "выход", "наименование", "продукт", "сырьё", "сырья",
+  "ед.изм", "ед изм", "единица", "итого", "масса", "блюдо", "ресторан",
+  "порцию", "порций", "хранение", "белки", "жиры", "углеводы", "калорийность",
+  "полуфабрикатов", "жирности", "готовой",
+]);
+/** Фразы секций/метаданных в ячейке продукта */
+const STRUCTURAL_PHRASES = [
+  /требования\s+к\s+оформлению/i, /требования\s+к\s+подаче/i, /вес\s+готового\s+(блюда|изделия)/i,
+  /в\s+расчёте\s+на/i, /информация\s+о\s+пищ/i, /^итого\s*$/i, /срок\s+хранен/i,
+  /^ед\.?\s*изм/i, /способ\s*(приготовления|оформления)?$/i, /ресторан\s*[«""]/i,
+  /органолептическ/i,
+];
+/** Глаголы технологии (императив) — не продукты. */
+const COOKING_VERBS = /^(взбить|добавить|положить|переложить|использовать|пробить|довести|соединить|перемешать|нарезать|запечь|варить|жарить|тушить|охладить|разогреть)$/i;
+
+export function isStructuralProductName(s: string, fromPdf: boolean): boolean {
+  const low = (s ?? "").trim().toLowerCase();
+  if (low.length <= 2 || /^[\d,.\s\-]+$/.test(low)) return true;
+  const word = low.replace(/\s+/g, " ");
+  if (STRUCTURAL_WORDS.has(word)) return true;
+  for (const re of STRUCTURAL_PHRASES) {
+    if (re.test(word)) return true;
+  }
+  if (fromPdf && COOKING_VERBS.test(word)) return true;
+  if (fromPdf && word.length <= 10 && /кдж|ккал/i.test(word) && !/[а-яё]{4,}/i.test(word)) return true;
+  return false;
+}
+
+/** Индекс первой строки с границей секции (конец таблицы). */
+function findTableEndRow(rows: string[][], fromRow: number): number {
+  for (let r = fromRow; r < rows.length && r < fromRow + 200; r++) {
+    const row = rows[r] ?? [];
+    const text = row.map((c) => (c ?? "").trim()).join(" ").toLowerCase();
+    if (SECTION_BOUNDARY_REGEX.test(text)) return r;
+  }
+  return rows.length;
+}
 
 const NAME_KEYS = ["наименование", "название", "блюдо", "пф", "name", "dish"];
 const PRODUCT_KEYS = ["продукт", "сырьё", "сырья", "ингредиент", "product", "ingredient"];
@@ -209,8 +259,8 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
   const results: TtkCard[] = [];
   let currentDish: string | null = initialDish;
   const currentIngredients: TtkIngredient[] = [];
-  let inTechnologySection = false;
   const technologyParts: string[] = [];
+  const tableEndRow = findTableEndRow(rows, headerIdx + 1);
 
   const flushCard = (yieldGrams?: number | null) => {
     if (currentDish != null && (currentDish.length > 0 || currentIngredients.length > 0)) {
@@ -254,6 +304,13 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
     const wasteVal = wasteCol >= 0 && wasteCol < cells.length ? cells[wasteCol] : "";
     const outputVal = outputCol >= 0 && outputCol < cells.length ? cells[outputCol] : "";
 
+    const rowText = cells.join(" ").trim();
+    const rowTextLow = rowText.toLowerCase();
+    const isPastTable = r >= tableEndRow;
+    if (isPastTable && rowText.length > 20 && !/^допустимые сроки\s/i.test(rowTextLow)) {
+      technologyParts.push(rowText);
+    }
+
     if (nameVal.toLowerCase() === "итого" || productVal.toLowerCase() === "итого" || productVal.toLowerCase().startsWith("всего")) {
       let outG = parseNum(outputVal);
       if (outputColIsKg && outG != null && outG > 0 && outG < 100) outG = outG * 1000;
@@ -261,45 +318,12 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
       currentDish = null;
       continue;
     }
+    if (isPastTable) continue;
+    if (isStructuralProductName(productVal, true)) continue;
     if (productVal.toLowerCase().includes("выход блюда") || productVal.toLowerCase().startsWith("выход одного")) continue;
-    if (productVal.toLowerCase().includes("информация о пищевой") || /информация\s+о\s+пищ/i.test(productVal)) continue;
-    if (productVal.trim().toLowerCase() === "масса") continue;
-    const pLow = productVal.toLowerCase();
-    if (
-      pLow.includes("требования к оформлению") || pLow.includes("требования к подаче") ||
-      pLow.includes("вес готового блюда") || pLow.includes("вес готового изделия") ||
-      pLow.includes("в расчете на") || pLow.includes("порц") ||
-      pLow.includes("органолептическ") || pLow.includes("органолет") || /^итого\s*$/.test(pLow.trim()) ||
-      pLow.includes("хранение") || pLow.startsWith("срок хранен") ||
-      /^ед\.?\s*изм\.?\.?$/i.test(pLow.trim()) || /^ед\s*изм/i.test(pLow) ||
-      pLow.includes("ресторан") || /^ресторан\s*[«""]/.test(pLow) || pLow === "блюдо" ||
-      /^способ\s*(приготовления|оформления)?$/i.test(pLow.trim()) ||
-      /^(взбить|добавить|положить|переложить|использовать|пробить|довести|соединить|перемешать|нарезать|запечь|варить|жарить|тушить|охладить|разогреть)$/i.test(pLow.trim())
-    ) continue;
 
-    const rowText = cells.join(" ").trim();
-    const rowTextLow = rowText.toLowerCase();
+    // Строка с названием блюда (начало новой карточки)
     if (
-      rowTextLow.includes("технологический процесс") || rowTextLow.includes("допустимые сроки") || rowTextLow.includes("использовать для") ||
-      rowTextLow.includes("информация о пищевой ценности") || /информация\s+о\s+пищ/i.test(rowTextLow)
-    ) {
-      inTechnologySection = true;
-    }
-    if (
-      productVal && (
-        productVal.includes("технологический процесс") || productVal.includes("допустимые сроки") || productVal.includes("использовать для") ||
-        productVal.includes("информация о пищевой") || /информация\s+о\s+пищ/i.test(productVal)
-      )
-    ) {
-      inTechnologySection = true;
-    }
-    if (inTechnologySection && rowText.length > 20 && !/^допустимые сроки\s/i.test(rowTextLow)) {
-      technologyParts.push(rowText);
-    }
-
-    // Строка с названием блюда (начало новой карточки) — не из блока технологии и не фрагмент
-    if (
-      !inTechnologySection &&
       nameVal &&
       isValidDishName(nameVal) &&
       !isLikelyFragment(nameVal) &&
@@ -310,8 +334,8 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
       currentDish = nameVal;
     }
 
-    // Строка с продуктом (ингредиент) — не из блока технологии (взбить, добавить и т.п.)
-    if (productVal && !inTechnologySection) {
+    // Строка с продуктом (ингредиент) — только до границы секции
+    if (productVal) {
       if (currentDish == null && nameVal && isValidDishName(nameVal)) currentDish = nameVal;
       let gross = parseNum(grossVal);
       let net = parseNum(netVal);
@@ -403,7 +427,7 @@ export function parseTtkByStoredTemplate(
   const currentIngredients: TtkIngredient[] = [];
   const results: TtkCard[] = [];
   let technologyParts: string[] = [];
-  let inTechnologySection = false;
+  const tableEndRow = findTableEndRow(rows, headerIdx + 1);
 
   const flushCard = (yieldGrams?: number | null) => {
     if (currentDish != null && (currentDish.length > 0 || currentIngredients.length > 0)) {
@@ -446,22 +470,7 @@ export function parseTtkByStoredTemplate(
       low.includes("запах") || low.includes("вкус") || low.includes("цвет");
   };
 
-  const isJunkProductName = (s: string) => {
-    const low = s.trim().toLowerCase();
-    const base = low.includes("требования к оформлению") || low.includes("требования к подаче") ||
-      low.includes("вес готового блюда") || low.includes("вес готового изделия") ||
-      low.includes("в расчете на") || low.includes("порц") ||
-      low.includes("органолептическ") || low.includes("органолет") || /^итого\s*$/.test(low.trim()) ||
-      low.includes("хранение") || low.startsWith("срок хранен") ||
-      /^ед\.?\s*изм\.?\.?$/i.test(low.trim()) || /^ед\s*изм/i.test(low) ||
-      low.includes("ресторан") || /^ресторан\s*[«""]/.test(low) || low === "блюдо" ||
-      /^способ\s*(приготовления|оформления)?$/i.test(low.trim()) ||
-      low.includes("информация о пищевой") || /информация\s+о\s+пищ/i.test(low) ||
-      (low.length <= 10 && /кдж|ккал/i.test(low) && !/[а-яё]{4,}/i.test(low)) ||
-      low === "масса";
-    const cookingVerbs = /^(взбить|добавить|положить|переложить|использовать|пробить|довести|соединить|перемешать|нарезать|запечь|варить|жарить|тушить|охладить|разогреть)$/i.test(low.trim());
-    return base || (fromPdf && cookingVerbs);
-  };
+  const isJunkProductName = (s: string) => fromPdf ? isStructuralProductName(s, true) : isStructuralProductName(s, false);
 
   /** Wide Search: если ячейка пуста — проверить соседние 3 колонки в той же строке */
   const getCellOrNeighbor = (row: string[], col: number, isValid: (s: string) => boolean): { value: string; usedWideSearch: boolean } => {
@@ -600,17 +609,12 @@ export function parseTtkByStoredTemplate(
       continue;
     }
     const rowText = cells.join(" ").toLowerCase();
-    if (fromPdf && (rowText.includes("технологический процесс") || rowText.includes("допустимые сроки") || rowText.includes("использовать для") || rowText.includes("информация о пищевой ценности") || /информация\s+о\s+пищ/i.test(rowText))) {
-      inTechnologySection = true;
-    }
-    if (fromPdf && productVal && (productVal.includes("технологический процесс") || productVal.includes("допустимые сроки") || productVal.includes("использовать для") || productVal.includes("информация о пищевой") || /информация\s+о\s+пищ/i.test(productVal))) {
-      inTechnologySection = true;
-    }
-    if ((!fromPdf || !inTechnologySection) && nameVal && isValidDish(nameVal) && !isLikelyFragment(nameVal) && !/^[\d\s.,]+$/.test(nameVal) && !productVal) {
+    const isPastTable = fromPdf && r >= tableEndRow;
+    if ((!fromPdf || !isPastTable) && nameVal && isValidDish(nameVal) && !isLikelyFragment(nameVal) && !/^[\d\s.,]+$/.test(nameVal) && !productVal) {
       if (currentDish != null && currentIngredients.length > 0) flushCard(undefined);
       currentDish = nameVal;
     }
-    if (productVal && (!fromPdf || !inTechnologySection) && isValidProduct(productVal) && !isJunkProductName(productVal)) {
+    if (productVal && (!fromPdf || !isPastTable) && isValidProduct(productVal) && !isJunkProductName(productVal)) {
       if ((grossNum != null && grossNum > 100000) || (netNum != null && netNum > 100000)) continue;
       if (currentDish == null && nameVal && isValidDish(nameVal) && !isHeaderWord(nameVal) && !isLikelyFragment(nameVal)) currentDish = nameVal;
       const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
