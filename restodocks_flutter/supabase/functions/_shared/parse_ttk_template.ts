@@ -298,11 +298,29 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
       }
     }
     const nameVal = nameCol < cells.length ? cells[nameCol] : "";
-    const productVal = pCol < cells.length ? cells[pCol] : "";
-    const grossVal = gCol >= 0 && gCol < cells.length ? cells[gCol] : "";
-    const netVal = nCol >= 0 && nCol < cells.length ? cells[nCol] : "";
+    let productVal = pCol < cells.length ? cells[pCol] : "";
+    let weightStartCol = -1;
+    if (productVal && cells.length > pCol + 4) {
+      const parts: string[] = [productVal];
+      for (let c = pCol + 1; c < cells.length - 2; c++) {
+        const a = parseNum(cells[c] ?? "");
+        const b = parseNum(cells[c + 1] ?? "");
+        if (a != null && b != null && a > 0 && a <= 10000 && b > 0 && b <= 10000) {
+          weightStartCol = c;
+          if (parts.length > 1) productVal = parts.join(" ");
+          break;
+        }
+        const v = cells[c] ?? "";
+        if (v.length >= 2 && !/^[\d,.\-\s]+$/.test(v)) parts.push(v);
+      }
+    }
+    const gColEff = weightStartCol >= 0 ? weightStartCol : (gCol >= 0 ? gCol : -1);
+    const nColEff = weightStartCol >= 0 ? weightStartCol + 1 : nCol;
+    const oColEff = weightStartCol >= 0 ? weightStartCol + 2 : outputCol;
+    const grossVal = gColEff >= 0 && gColEff < cells.length ? cells[gColEff] : "";
+    const netVal = nColEff >= 0 && nColEff < cells.length ? cells[nColEff] : "";
     const wasteVal = wasteCol >= 0 && wasteCol < cells.length ? cells[wasteCol] : "";
-    const outputVal = outputCol >= 0 && outputCol < cells.length ? cells[outputCol] : "";
+    const outputVal = (oColEff >= 0 && oColEff < cells.length ? cells[oColEff] : "") || (outputCol >= 0 && outputCol < cells.length ? cells[outputCol] : "");
 
     const rowText = cells.join(" ").trim();
     const rowTextLow = rowText.toLowerCase();
