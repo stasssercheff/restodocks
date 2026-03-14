@@ -16,6 +16,7 @@ enum HomeTileId {
   checklists,
   nomenclature,
   inventory,
+  writeoffs,
 }
 
 extension HomeTileIdExt on HomeTileId {

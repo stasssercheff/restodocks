@@ -97,6 +97,7 @@ class StaffHomeContent extends StatelessWidget {
         onTap: () => context.go('/nomenclature/${_deptForRoute(employee.department)}'),
       ),
       HomeTileId.inventory: _Tile(icon: Icons.assignment, title: loc.t('inventory_blank'), onTap: () => context.push('/inventory')),
+      HomeTileId.writeoffs: _Tile(icon: Icons.remove_circle_outline, title: loc.t('writeoffs') ?? 'Списания', onTap: () => context.push('/writeoffs')),
     };
     final showChecklists = employee.department == 'kitchen' || employee.department == 'bar' || employee.department == 'dining_room';
     final showNomenclature = employee.department == 'kitchen' || employee.department == 'bar' || employee.department == 'hall' || employee.department == 'dining_room';

@@ -15,6 +15,8 @@ enum DocumentType {
   checklistSubmission,
   /// Чеклист с пропущенным сроком выполнения (не выполнен к дедлайну).
   checklistMissedDeadline,
+  /// Списание (персонал, проработка, порча, брекераж, отказ гостя)
+  writeoff,
 }
 
 /// Модель документа во входящих
@@ -74,6 +76,8 @@ class InboxDocument extends Equatable {
         return Icons.checklist;
       case DocumentType.checklistMissedDeadline:
         return Icons.warning_amber;
+      case DocumentType.writeoff:
+        return Icons.remove_circle_outline;
     }
   }
 
@@ -97,6 +101,18 @@ class InboxDocument extends Equatable {
         return loc.t('doc_type_shift_confirmation');
       case DocumentType.checklistMissedDeadline:
         return title;
+      case DocumentType.writeoff:
+        final date = metadata?['header']?['date']?.toString() ?? '';
+        final cat = metadata?['category']?.toString() ?? '';
+        final catName = switch (cat) {
+          'staff' => loc.t('writeoff_category_staff') ?? 'Персонал',
+          'workingThrough' => loc.t('writeoff_category_working') ?? 'Проработка',
+          'spoilage' => loc.t('writeoff_category_spoilage') ?? 'Порча',
+          'breakage' => loc.t('writeoff_category_breakage') ?? 'Брекераж',
+          'guestRefusal' => loc.t('writeoff_category_guest_refusal') ?? 'Отказ гостя',
+          _ => cat,
+        };
+        return '${loc.t('writeoffs') ?? 'Списания'} ($catName) $date';
     }
   }
 
@@ -115,6 +131,8 @@ class InboxDocument extends Equatable {
         return loc.t('doc_type_checklist');
       case DocumentType.checklistMissedDeadline:
         return loc.t('inbox_msg_checklist_not_done') ?? 'Чеклист не выполнен';
+      case DocumentType.writeoff:
+        return loc.t('writeoffs') ?? 'Списания';
     }
   }
 

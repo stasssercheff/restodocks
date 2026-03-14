@@ -41,4 +41,5 @@ const _$DocumentTypeEnumMap = {
   DocumentType.shiftConfirmation: 'shiftConfirmation',
   DocumentType.checklistSubmission: 'checklistSubmission',
   DocumentType.checklistMissedDeadline: 'checklistMissedDeadline',
+  DocumentType.writeoff: 'writeoff',
 };

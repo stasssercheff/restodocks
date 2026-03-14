@@ -84,6 +84,7 @@ class ManagementHomeContent extends StatelessWidget {
           _Tile(icon: Icons.assignment, title: loc.t('nomenclature'), onTap: () => context.go('/nomenclature/$dept')),
         _Tile(icon: Icons.shopping_cart, title: loc.t('product_order'), onTap: () => context.go('/product-order?department=${_deptForRoute(employee.department)}')),
         _Tile(icon: Icons.assignment, title: loc.t('inventory_blank'), onTap: () => context.push('/inventory')),
+        _Tile(icon: Icons.remove_circle_outline, title: loc.t('writeoffs') ?? 'Списания', onTap: () => context.push('/writeoffs')),
         if ((isChef || roles.contains('sous_chef')) && screenPref.showBanquetCatering) ...[
           const SizedBox(height: 8),
           ExpandableBanquetSection(loc: loc, department: 'kitchen'),

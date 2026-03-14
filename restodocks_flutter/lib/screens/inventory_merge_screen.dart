@@ -73,12 +73,14 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
     final selected = _sortedDocs.where((d) => _selectedIds.contains(d.id)).toList();
     final standards = selected.where((d) => d.type == DocumentType.inventory).toList();
     final iikoList = selected.where((d) => d.type == DocumentType.iikoInventory).toList();
+    final writeoffList = selected.where((d) => d.type == DocumentType.writeoff).toList();
 
-    if (standards.isNotEmpty && iikoList.isNotEmpty) {
+    final typeCount = (standards.isNotEmpty ? 1 : 0) + (iikoList.isNotEmpty ? 1 : 0) + (writeoffList.isNotEmpty ? 1 : 0);
+    if (typeCount > 1) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_loc.t('inventory_merge_same_type') ?? 'Объединяйте только стандартные бланки или только iiko отдельно'),
+            content: Text(_loc.t('inventory_merge_same_type') ?? 'Объединяйте только бланки одного типа'),
           ),
         );
       }
@@ -89,6 +91,136 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
       await _mergeStandardAndSave(standards);
     } else if (iikoList.isNotEmpty) {
       await _mergeIikoAndSave(iikoList);
+    } else if (writeoffList.isNotEmpty) {
+      await _mergeWriteoffAndSave(writeoffList);
+    }
+  }
+
+  Future<void> _mergeWriteoffAndSave(List<InboxDocument> docs) async {
+    setState(() => _loading = true);
+    String selectedLang = _loc.currentLanguageCode;
+
+    if (!mounted) return;
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx2, setState) => AlertDialog(
+          title: Text(_loc.t('inventory_merge_lang_title') ?? 'Язык сохранения'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                _loc.t('inventory_export_lang') ?? 'Язык сохранения:',
+                style: Theme.of(ctx2).textTheme.titleSmall,
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: LocalizationService.productLanguageCodes.map((code) {
+                  return ChoiceChip(
+                    label: Text(_loc.getLanguageName(code)),
+                    selected: selectedLang == code,
+                    onSelected: (_) => setState(() => selectedLang = code),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text(MaterialLocalizations.of(ctx2).cancelButtonLabel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(selectedLang),
+              child: Text(_loc.t('inventory_merge_save') ?? 'Объединить и сохранить'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    setState(() => _loading = false);
+    if (result == null || !mounted) return;
+
+    final merged = <String, Map<String, dynamic>>{};
+    Map<String, dynamic>? firstHeader;
+    String? firstCategory;
+
+    for (final doc in docs) {
+      final payload = doc.metadata as Map<String, dynamic>? ?? {};
+      firstHeader ??= payload['header'] as Map<String, dynamic>? ?? {};
+      firstCategory ??= payload['category']?.toString();
+      final rows = payload['rows'] as List<dynamic>? ?? [];
+
+      for (final r in rows) {
+        final row = r as Map<String, dynamic>;
+        final key = row['productId']?.toString() ?? '${row['productName']}_${row['unit']}';
+        final total = (row['total'] as num?)?.toDouble() ?? 0.0;
+        if (merged.containsKey(key)) {
+          merged[key]!['total'] = (merged[key]!['total'] as double) + total;
+        } else {
+          merged[key] = {
+            ...row,
+            'total': total,
+            'quantities': [total],
+          };
+        }
+      }
+    }
+
+    final payload = {
+      'type': 'writeoff',
+      'category': firstCategory ?? 'staff',
+      'header': {
+        ...?firstHeader,
+        'date': firstHeader?['date'] ?? DateFormat('yyyy-MM-dd').format(DateTime.now()),
+        'employeeName': docs.map((d) => d.employeeName).join(', '),
+      },
+      'rows': merged.values.toList(),
+      'sourceLang': result,
+      'mergeMetadata': _buildMergeMetadata(docs),
+    };
+
+    try {
+      final excel = Excel.createExcel();
+      final sheet = excel['Списание'];
+      sheet.appendRow([
+        TextCellValue(_loc.t('inventory_excel_number')),
+        TextCellValue(_loc.t('inventory_item_name')),
+        TextCellValue(_loc.t('inventory_unit')),
+        TextCellValue(_loc.t('inventory_excel_total')),
+      ]);
+      final sorted = merged.values.toList();
+      sorted.sort((a, b) => (a['productName']?.toString() ?? '').compareTo(b['productName']?.toString() ?? ''));
+      for (var i = 0; i < sorted.length; i++) {
+        final r = sorted[i];
+        sheet.appendRow([
+          IntCellValue(i + 1),
+          TextCellValue(r['productName']?.toString() ?? ''),
+          TextCellValue(r['unit']?.toString() ?? ''),
+          DoubleCellValue(r['total'] as double),
+        ]);
+      }
+      excel.setDefaultSheet('Списание');
+      final out = excel.encode();
+      if (out != null && out.isNotEmpty) {
+        final header = payload['header'] as Map<String, dynamic>?;
+        final dateStr = header?['date']?.toString() ?? DateTime.now().toIso8601String().split('T').first;
+        await saveFileBytes('writeoff_merged_$dateStr.xlsx', out);
+        await _saveMergedToInbox(payload);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(_loc.t('inventory_excel_downloaded') ?? 'Файл сохранён')),
+          );
+          Navigator.of(context).pop(true);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+      }
     }
   }
 

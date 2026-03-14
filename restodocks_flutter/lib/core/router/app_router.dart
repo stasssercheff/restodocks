@@ -18,6 +18,8 @@ import '../../screens/order_inbox_detail_screen.dart';
 import '../../screens/checklist_inbox_detail_screen.dart';
 import '../../screens/iiko_inventory_inbox_detail_screen.dart';
 import '../../screens/inventory_merge_screen.dart';
+import '../../screens/writeoff_inbox_detail_screen.dart';
+import '../../screens/writeoffs_screen.dart';
 import '../../screens/home/expenses_screen.dart';
 import '../../screens/home/department_placeholder_screen.dart';
 import '../../screens/supabase_test_screen.dart';
@@ -245,6 +247,11 @@ class AppRouter {
         },
       ),
 
+      // Списания — без нижней панели
+      GoRoute(
+        path: '/writeoffs',
+        pageBuilder: (context, state) => _slideTransitionPage(state, const WriteoffsScreen()),
+      ),
       // Инвентаризация — без нижней панели
       GoRoute(
         path: '/inventory',
@@ -376,6 +383,14 @@ class AppRouter {
                 },
               ),
               GoRoute(
+                path: 'writeoff/:id',
+                pageBuilder: (context, state) {
+                  final id = state.pathParameters['id'] ?? '';
+                  return _slideTransitionPage(
+                      state, WriteoffInboxDetailScreen(documentId: id));
+                },
+              ),
+              GoRoute(
                 path: 'chat/:employeeId',
                 pageBuilder: (context, state) {
                   final employeeId = state.pathParameters['employeeId'] ?? '';
@@ -393,7 +408,8 @@ class AppRouter {
                         .cast<InboxDocument>()
                         .where((d) =>
                             d.type == DocumentType.inventory ||
-                            d.type == DocumentType.iikoInventory)
+                            d.type == DocumentType.iikoInventory ||
+                            d.type == DocumentType.writeoff)
                         .toList();
                   }
                   return _slideTransitionPage(
@@ -594,6 +610,20 @@ class AppRouter {
                       return _slideTransitionPage(state, HaccpEntryFormScreen(logTypeCode: code));
                     },
                   ),
+                  GoRoute(
+                    path: 'view',
+                    pageBuilder: (context, state) {
+                      final extra = state.extra;
+                      if (extra is! Map) return _slideTransitionPage(state, const SizedBox());
+                      final log = extra['log'];
+                      final employee = extra['employee'];
+                      if (log == null) return _slideTransitionPage(state, const SizedBox());
+                      return _slideTransitionPage(
+                        state,
+                        HaccpLogDetailScreen(log: log as HaccpLog, employee: employee as Employee?),
+                      );
+                    },
+                  ),
                 ],
               ),
             ],
@@ -615,12 +645,19 @@ class AppRouter {
               String? initialCategory;
               List<String>? initialSections;
               bool? initialIsSemiFinished;
+              String? initialHeaderSignature;
+              List<List<String>>? initialSourceRows;
               final extra = state.extra;
               if (extra is Map) {
                 initialFromAi = extra['result'] as TechCardRecognitionResult?;
                 initialCategory = extra['category'] as String?;
                 initialSections = (extra['sections'] as List?)?.cast<String>();
                 initialIsSemiFinished = extra['isSemiFinished'] as bool?;
+                initialHeaderSignature = extra['headerSignature'] as String?;
+                final raw = extra['sourceRows'];
+                initialSourceRows = raw is List && raw.isNotEmpty && raw.first is List
+                    ? (raw as List).map((e) => (e as List).map((c) => (c ?? '').toString()).toList()).toList()
+                    : null;
               } else if (extra is TechCardRecognitionResult) {
                 initialFromAi = extra;
               }
@@ -632,6 +669,8 @@ class AppRouter {
                 initialCategory: initialCategory,
                 initialSections: initialSections,
                 initialIsSemiFinished: initialIsSemiFinished,
+                initialHeaderSignature: initialHeaderSignature,
+                initialSourceRows: initialSourceRows,
               ));
             },
           ),
@@ -640,17 +679,22 @@ class AppRouter {
             pageBuilder: (context, state) {
               List<TechCardRecognitionResult> cards;
               String? headerSignature;
+              List<List<String>>? sourceRows;
               final extra = state.extra;
               if (extra is Map && extra['cards'] is List) {
                 cards = (extra['cards'] as List).map((e) => e as TechCardRecognitionResult).toList();
                 headerSignature = extra['headerSignature'] as String?;
+                final raw = extra['sourceRows'];
+                sourceRows = raw is List && raw.isNotEmpty && raw.first is List
+                    ? (raw as List).map((e) => (e as List).map((c) => (c ?? '').toString()).toList()).toList()
+                    : null;
               } else if (extra is List) {
                 cards = extra.map((e) => e as TechCardRecognitionResult).toList();
               } else {
                 cards = [];
               }
               final department = state.queryParameters['department'] ?? 'kitchen';
-              return _slideTransitionPage(state, TechCardsImportReviewScreen(cards: cards, headerSignature: headerSignature, department: department));
+              return _slideTransitionPage(state, TechCardsImportReviewScreen(cards: cards, headerSignature: headerSignature, sourceRows: sourceRows, department: department));
             },
           ),
           GoRoute(

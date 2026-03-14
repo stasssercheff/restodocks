@@ -26,13 +26,13 @@ class InboxScreen extends StatefulWidget {
 }
 
 /// Типы вкладок во входящих (для сотрудников)
-enum _InboxTab { checklist, order, inventory, iikoInventory, messages, notifications }
+enum _InboxTab { checklist, order, inventory, iikoInventory, writeoff, messages, notifications }
 
 /// Вкладки по подразделениям (для собственника)
 enum _InboxDeptTab { kitchen, bar, hall }
 
 /// Типы документов для 2-го яруса вкладок (собственник)
-enum _InboxTypeTab { checklist, order, inventory, iikoInventory, messages, notifications }
+enum _InboxTypeTab { checklist, order, inventory, iikoInventory, writeoff, messages, notifications }
 
 class _InboxScreenState extends State<InboxScreen> {
   late InboxService _inboxService;
@@ -111,6 +111,7 @@ class _InboxScreenState extends State<InboxScreen> {
       tabs.add(_InboxTab.order);
       if (isOwner || isManagement) {
         tabs.add(_InboxTab.inventory);
+        tabs.add(_InboxTab.writeoff);
         if (employee.hasRole('executive_chef') || employee.hasRole('owner')) {
           tabs.add(_InboxTab.iikoInventory);
         }
@@ -191,14 +192,16 @@ class _InboxScreenState extends State<InboxScreen> {
     await context.read<InboxViewedService>().addViewedBatch(estId, ids);
   }
 
-  /// Кнопка объединения только на вкладках «Инвентаризация стандарт» и «Инвентаризация iiko».
+  /// Кнопка объединения на вкладках инвентаризации и списаний.
   bool _isInventoryMergeTabSelected(bool isOwner) {
     if (isOwner) {
       return _selectedTypeTab == _InboxTypeTab.inventory ||
-          _selectedTypeTab == _InboxTypeTab.iikoInventory;
+          _selectedTypeTab == _InboxTypeTab.iikoInventory ||
+          _selectedTypeTab == _InboxTypeTab.writeoff;
     }
     return _selectedTab == _InboxTab.inventory ||
-        _selectedTab == _InboxTab.iikoInventory;
+        _selectedTab == _InboxTab.iikoInventory ||
+        _selectedTab == _InboxTab.writeoff;
   }
 
   /// Бланки для объединения: только того типа, что выбрана на вкладке (инвентаризация стандарт или iiko).
@@ -234,6 +237,7 @@ class _InboxScreenState extends State<InboxScreen> {
         _InboxTypeTab.order => DocumentType.productOrder,
         _InboxTypeTab.inventory => DocumentType.inventory,
         _InboxTypeTab.iikoInventory => DocumentType.iikoInventory,
+        _InboxTypeTab.writeoff => DocumentType.writeoff,
         _InboxTypeTab.messages => DocumentType.checklistMissedDeadline,
         _InboxTypeTab.checklist => DocumentType.checklistSubmission, // unreachable, handled above
         _InboxTypeTab.notifications => DocumentType.checklistMissedDeadline, // unreachable, handled above
@@ -252,6 +256,8 @@ class _InboxScreenState extends State<InboxScreen> {
         return _documents.where((d) => d.type == DocumentType.inventory).toList();
       case _InboxTab.iikoInventory:
         return _documents.where((d) => d.type == DocumentType.iikoInventory).toList();
+      case _InboxTab.writeoff:
+        return _documents.where((d) => d.type == DocumentType.writeoff).toList();
       case _InboxTab.messages:
         return _documents.where((d) => d.type == DocumentType.checklistMissedDeadline).toList();
       case _InboxTab.notifications:
@@ -339,7 +345,9 @@ class _InboxScreenState extends State<InboxScreen> {
                                     ? _buildEmptyState(loc)
                                     : _isChecklistsTab(isOwner)
                                         ? _buildChecklistsGroupedList(loc)
-                                        : _buildDocumentsList()),
+                                        : _isWriteoffTab(isOwner)
+                                            ? _buildWriteoffsGroupedList(loc)
+                                            : _buildDocumentsList()),
           ),
         ],
       ),
@@ -406,6 +414,8 @@ class _InboxScreenState extends State<InboxScreen> {
         return docsByDept.where((d) => d.type == DocumentType.inventory).length;
       case _InboxTypeTab.iikoInventory:
         return docsByDept.where((d) => d.type == DocumentType.iikoInventory).length;
+      case _InboxTypeTab.writeoff:
+        return docsByDept.where((d) => d.type == DocumentType.writeoff).length;
       case _InboxTypeTab.notifications:
         final delUnviewed = _deletionNotifications.where((n) => !viewed.contains('del_${n.id}')).length;
         return docsByDept.where((d) => d.type == DocumentType.checklistMissedDeadline).length + delUnviewed;
@@ -428,6 +438,8 @@ class _InboxScreenState extends State<InboxScreen> {
         return docsUnviewed.where((d) => d.type == DocumentType.inventory).length;
       case _InboxTab.iikoInventory:
         return docsUnviewed.where((d) => d.type == DocumentType.iikoInventory).length;
+      case _InboxTab.writeoff:
+        return docsUnviewed.where((d) => d.type == DocumentType.writeoff).length;
       case _InboxTab.notifications:
         final delUnviewed = _deletionNotifications.where((n) => !viewed.contains('del_${n.id}')).length;
         return docsUnviewed.where((d) => d.type == DocumentType.checklistMissedDeadline).length + delUnviewed;
@@ -515,6 +527,7 @@ class _InboxScreenState extends State<InboxScreen> {
             _buildTypeChip(_InboxTypeTab.order, loc.t('inbox_tab_order') ?? 'Заказы', loc),
             const SizedBox(width: 8),
             _buildTypeChip(_InboxTypeTab.inventory, loc.t('inbox_tab_inventory') ?? 'Инвентаризация', loc),
+            _buildTypeChip(_InboxTypeTab.writeoff, loc.t('writeoffs') ?? 'Списания', loc),
             if (!isBarOrHall) ...[
               const SizedBox(width: 8),
               _buildTypeChip(_InboxTypeTab.iikoInventory, loc.t('iiko_inventory_title') ?? 'Инвентаризация iiko', loc),
@@ -561,6 +574,8 @@ class _InboxScreenState extends State<InboxScreen> {
         return loc.t('inbox_tab_inventory');
       case _InboxTab.iikoInventory:
         return loc.t('iiko_inventory_title') ?? 'Инвентаризация iiko';
+      case _InboxTab.writeoff:
+        return loc.t('writeoffs') ?? 'Списания';
       case _InboxTab.messages:
         return loc.t('inbox_tab_messages') ?? 'Сообщения';
       case _InboxTab.notifications:
@@ -738,6 +753,50 @@ class _InboxScreenState extends State<InboxScreen> {
   bool _isChecklistsTab(bool isOwner) {
     if (isOwner) return _selectedTypeTab == _InboxTypeTab.checklist;
     return _selectedTab == _InboxTab.checklist;
+  }
+
+  bool _isWriteoffTab(bool isOwner) {
+    if (isOwner) return _selectedTypeTab == _InboxTypeTab.writeoff;
+    return _selectedTab == _InboxTab.writeoff;
+  }
+
+  /// Списания с группировкой по датам
+  Widget _buildWriteoffsGroupedList(LocalizationService loc) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildMarkAllViewedButton(loc),
+        Expanded(child: _buildWriteoffsGroupedListContent(loc)),
+      ],
+    );
+  }
+
+  Widget _buildWriteoffsGroupedListContent(LocalizationService loc) {
+    final docs = _filteredDocuments;
+    final fmtDate = (DateTime d) => '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}';
+    final grouped = <String, List<InboxDocument>>{};
+    for (final doc in docs) {
+      final dateKey = fmtDate(doc.createdAt);
+      grouped.putIfAbsent(dateKey, () => []).add(doc);
+    }
+    final dateKeys = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: dateKeys.expand((dateKey) => [
+        Padding(
+          padding: const EdgeInsets.only(top: 16, bottom: 8),
+          child: Text(
+            dateKey,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+        ),
+        ...grouped[dateKey]!.map((doc) => _DocumentTile(document: doc, onDownload: _downloadDocument)),
+      ]).toList(),
+    );
   }
 
   /// Чеклисты с группировкой: Просроченные, затем по цеху → дате → сотруднику
@@ -1026,6 +1085,8 @@ class _DocumentTile extends StatelessWidget {
                 _markDocumentViewed(context);
                 if (document.type == DocumentType.inventory) {
                   context.push('/inbox/inventory/${document.id}');
+                } else if (document.type == DocumentType.writeoff) {
+                  context.push('/inbox/writeoff/${document.id}');
                 } else if (document.type == DocumentType.productOrder) {
                   context.push('/inbox/order/${document.id}');
                 } else if (document.type == DocumentType.checklistSubmission) {
@@ -1083,6 +1144,10 @@ class _DocumentTile extends StatelessWidget {
     _markDocumentViewed(context);
     if (document.type == DocumentType.inventory) {
       context.push('/inbox/inventory/${document.id}');
+      return;
+    }
+    if (document.type == DocumentType.writeoff) {
+      context.push('/inbox/writeoff/${document.id}');
       return;
     }
     if (document.type == DocumentType.productOrder) {

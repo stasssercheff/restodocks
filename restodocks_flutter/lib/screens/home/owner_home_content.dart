@@ -33,6 +33,7 @@ class OwnerHomeContent extends StatelessWidget {
         _Tile(icon: Icons.description, title: loc.t('ttk_kitchen'), onTap: () => context.go('/tech-cards/kitchen')),
         _Tile(icon: Icons.assignment, title: loc.t('nomenclature'), onTap: () => context.go('/nomenclature/kitchen')),
         _Tile(icon: Icons.shopping_cart, title: loc.t('product_order'), onTap: () => context.go('/product-order?department=kitchen')),
+        _Tile(icon: Icons.remove_circle_outline, title: loc.t('writeoffs') ?? 'Списания', onTap: () => context.push('/writeoffs')),
         _Tile(icon: Icons.checklist, title: loc.t('checklists'), onTap: () => context.go('/checklists?department=kitchen')),
 
         const SizedBox(height: 16),
@@ -42,6 +43,7 @@ class OwnerHomeContent extends StatelessWidget {
         _Tile(icon: Icons.description, title: loc.t('ttk_bar') ?? 'ТТК бара', onTap: () => context.go('/tech-cards/bar')),
         _Tile(icon: Icons.assignment, title: loc.t('nomenclature'), onTap: () => context.go('/nomenclature/bar')),
         _Tile(icon: Icons.shopping_cart, title: loc.t('product_order'), onTap: () => context.go('/product-order?department=bar')),
+        _Tile(icon: Icons.remove_circle_outline, title: loc.t('writeoffs') ?? 'Списания', onTap: () => context.push('/writeoffs')),
         _Tile(icon: Icons.checklist, title: loc.t('checklists'), onTap: () => context.go('/checklists?department=bar')),
 
         const SizedBox(height: 16),
@@ -50,6 +52,7 @@ class OwnerHomeContent extends StatelessWidget {
         _Tile(icon: Icons.restaurant_menu, title: loc.t('menu'), onTap: () => context.go('/menu/hall')),
         _Tile(icon: Icons.checklist, title: loc.t('checklists'), onTap: () => context.go('/checklists?department=hall')),
         _Tile(icon: Icons.shopping_cart, title: loc.t('product_order'), onTap: () => context.go('/product-order?department=hall')),
+        _Tile(icon: Icons.remove_circle_outline, title: loc.t('writeoffs') ?? 'Списания', onTap: () => context.push('/writeoffs')),
 
         if (screenPref.showBanquetCatering) ...[
           const SizedBox(height: 16),

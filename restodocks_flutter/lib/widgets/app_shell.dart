@@ -108,6 +108,7 @@ class AppShell extends StatelessWidget {
         location.startsWith('/tech-cards') ||
         location.startsWith('/product-order') ||
         location.startsWith('/inventory') ||
+        location.startsWith('/writeoffs') ||
         location.startsWith('/menu') ||
         location.startsWith('/nomenclature') ||
         location.startsWith('/expenses')) {
