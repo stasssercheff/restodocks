@@ -1,5 +1,6 @@
 import 'package:excel/excel.dart' hide Border, TextSpan;
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
@@ -72,9 +73,13 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
   WriteoffCategory _selectedCategory = WriteoffCategory.staff;
   final Map<WriteoffCategory, List<_WriteoffRow>> _rowsByCategory = {};
   final ValueNotifier<int> _rowsVersion = ValueNotifier(0);
+  final ValueNotifier<int> _savedListVersion = ValueNotifier(0);
   bool _loading = true;
+  List<Map<String, dynamic>> _savedWriteoffs = [];
+  bool _savedListLoading = false;
   List<Product> _cachedProducts = [];
   List<TechCard> _cachedTechCards = [];
+  bool _showSavedList = false;
 
   @override
   String get draftKey => 'writeoffs';
@@ -88,7 +93,23 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
   @override
   void dispose() {
     _rowsVersion.dispose();
+    _savedListVersion.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadSavedWriteoffs() async {
+    final estId = context.read<AccountManagerSupabase>().establishment?.id;
+    if (estId == null) return;
+    setState(() => _savedListLoading = true);
+    try {
+      final raw = await InventoryDocumentService().listForEstablishment(estId);
+      _savedWriteoffs = raw.where((d) {
+        final p = d['payload'] as Map<String, dynamic>?;
+        return p?['type']?.toString() == 'writeoff';
+      }).toList();
+    } finally {
+      if (mounted) setState(() => _savedListLoading = false);
+    }
   }
 
   @override
@@ -174,12 +195,12 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
     final tcSvc = context.read<TechCardServiceSupabase>();
     final dataEstId = account.establishment?.dataEstablishmentId;
     if (dataEstId != null) {
-      // Быстрая загрузка только номенклатуры заведения (без всего каталога)
       _cachedProducts = await productStore.loadNomenclatureProductsDirect(dataEstId);
       _cachedTechCards = await tcSvc.getTechCardsForEstablishment(dataEstId);
     }
     if (mounted) {
       await restoreDraftNow();
+      await _loadSavedWriteoffs();
       if (mounted) setState(() => _loading = false);
     }
   }
@@ -375,23 +396,14 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
       return;
     }
 
-    // 3. Сохранение Excel
     if (mounted) {
-      try {
-        final bytes = _buildExcelBytes(payload, loc);
-        if (bytes != null && bytes.isNotEmpty) {
-          final date = payload['header']?['date'] ?? DateTime.now().toIso8601String().split('T').first;
-          final catStr = cat.code;
-          await saveFileBytes('writeoff_${catStr}_$date.xlsx', bytes);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(loc.t('inventory_excel_downloaded') ?? 'Документ сохранён')),
-          );
-        }
-      } catch (_) {}
-      // Очистить заполненные строки после успешного сохранения
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('writeoff_saved_to_list') ?? 'Сохранено на экран')),
+      );
       final rows = _rowsFor(cat);
       rows.removeWhere((r) => r.total > 0);
       _rowsVersion.value++;
+      _savedListVersion.value++;
       setState(() {});
     }
   }
@@ -477,6 +489,82 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
     }
   }
 
+  Widget _buildSavedList(LocalizationService loc) {
+    if (_savedListLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    final fmtDate = (DateTime d) => '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}';
+    final grouped = <String, Map<String, List<Map<String, dynamic>>>>{};
+    for (final doc in _savedWriteoffs) {
+      final createdAt = doc['created_at'] != null
+          ? (DateTime.tryParse(doc['created_at'].toString()) ?? DateTime.now()).toLocal()
+          : DateTime.now();
+      final dateKey = fmtDate(createdAt);
+      final payload = doc['payload'] as Map<String, dynamic>? ?? {};
+      final cat = payload['category']?.toString() ?? 'staff';
+      grouped.putIfAbsent(dateKey, () => {});
+      grouped[dateKey]!.putIfAbsent(cat, () => []);
+      grouped[dateKey]![cat]!.add(doc);
+    }
+    final dateKeys = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
+    if (dateKeys.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.folder_open, size: 64, color: Theme.of(context).colorScheme.outline),
+            const SizedBox(height: 16),
+            Text(
+              loc.t('writeoff_saved_empty') ?? 'Нет сохранённых списаний',
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+            ),
+          ],
+        ),
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: _loadSavedWriteoffs,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: dateKeys.expand((dateKey) {
+          final cats = grouped[dateKey]!;
+          final catOrder = ['staff', 'workingThrough', 'spoilage', 'breakage', 'guestRefusal'];
+          return [
+            Padding(
+              padding: const EdgeInsets.only(top: 16, bottom: 8),
+              child: Text(
+                dateKey,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+            ),
+            ...catOrder.where((c) => cats.containsKey(c)).expand((cat) {
+              final docs = cats[cat]!..sort((a, b) => (b['created_at'] ?? '').toString().compareTo((a['created_at'] ?? '').toString()));
+              return docs.map((doc) {
+                final payload = doc['payload'] as Map<String, dynamic>? ?? {};
+                final header = payload['header'] as Map<String, dynamic>? ?? {};
+                final emp = header['employeeName'] ?? '—';
+                final rows = payload['rows'] as List<dynamic>? ?? [];
+                final totalItems = rows.length;
+                return ListTile(
+                  leading: const Icon(Icons.description_outlined),
+                  title: Text(_tabLabel(WriteoffCategory.values.firstWhere(
+                    (c) => c.code == cat,
+                    orElse: () => WriteoffCategory.staff,
+                  ), loc)),
+                  subtitle: Text('$emp • $totalItems ${loc.t('inventory_pos') ?? 'поз.'}'),
+                  onTap: () => context.push('/inbox/writeoff/${doc['id']}'),
+                );
+              });
+            }),
+          ];
+        }).toList(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
@@ -493,49 +581,68 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 220),
-                      child: DropdownButtonFormField<WriteoffCategory>(
-                        value: _selectedCategory,
-                        decoration: InputDecoration(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
+                  child: SegmentedButton<bool>(
+                    segments: [
+                      ButtonSegment(value: false, label: Text(loc.t('writeoff_create') ?? 'Создать')),
+                      ButtonSegment(value: true, label: Text(loc.t('writeoff_saved') ?? 'Сохранённые')),
+                    ],
+                    selected: {_showSavedList},
+                    onSelectionChanged: (s) async {
+                      final show = s.first;
+                      setState(() => _showSavedList = show);
+                      if (show) await _loadSavedWriteoffs();
+                    },
+                  ),
+                ),
+                if (!_showSavedList) ...[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 220),
+                        child: DropdownButtonFormField<WriteoffCategory>(
+                          value: _selectedCategory,
+                          decoration: InputDecoration(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                           ),
-                        ),
-                        isExpanded: true,
-                        alignment: Alignment.center,
-                        selectedItemBuilder: (context) => WriteoffCategory.values
-                            .map((c) => Center(child: Text(_tabLabel(c, loc))))
-                            .toList(),
-                        items: WriteoffCategory.values.map((c) {
-                          return DropdownMenuItem(
+                          isExpanded: true,
+                          alignment: Alignment.center,
+                          selectedItemBuilder: (context) => WriteoffCategory.values
+                              .map((c) => Center(child: Text(_tabLabel(c, loc))))
+                              .toList(),
+                          items: WriteoffCategory.values.map((c) => DropdownMenuItem(
                             value: c,
                             child: Text(_tabLabel(c, loc)),
-                          );
-                        }).toList(),
-                        onChanged: (v) {
-                          if (v != null) setState(() => _selectedCategory = v);
-                        },
+                          )).toList(),
+                          onChanged: (v) {
+                            if (v != null) setState(() => _selectedCategory = v);
+                          },
+                        ),
                       ),
                     ),
                   ),
-                ),
-                Expanded(
-                  child: ValueListenableBuilder<int>(
-                    valueListenable: _rowsVersion,
-                    builder: (_, __, ___) => _WriteoffTabContent(
-              category: _selectedCategory,
-              rows: _rowsFor(_selectedCategory),
-              onAdd: () => _showItemPicker(_selectedCategory),
-              onSetQuantity: (ri, ci, v) => _setQuantity(_selectedCategory, ri, ci, v),
-              onRemove: (i) => _removeRow(_selectedCategory, i),
-              onSave: () => _save(_selectedCategory),
-              loc: loc,
-            ),
+                  Expanded(
+                    child: ValueListenableBuilder<int>(
+                      valueListenable: _rowsVersion,
+                      builder: (_, __, ___) => _WriteoffTabContent(
+                        category: _selectedCategory,
+                        rows: _rowsFor(_selectedCategory),
+                        onAdd: () => _showItemPicker(_selectedCategory),
+                        onSetQuantity: (ri, ci, v) => _setQuantity(_selectedCategory, ri, ci, v),
+                        onRemove: (i) => _removeRow(_selectedCategory, i),
+                        onSave: () => _save(_selectedCategory),
+                        loc: loc,
+                      ),
+                    ),
                   ),
-                ),
+                ] else
+                  Expanded(
+                    child: ValueListenableBuilder<int>(
+                      valueListenable: _savedListVersion,
+                      builder: (_, __, ___) => _buildSavedList(loc),
+                    ),
+                  ),
               ],
             ),
     );
@@ -546,7 +653,7 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
 const double _colNoWidth = 28;
 const double _colUnitWidth = 48;
 const double _colTotalWidth = 56;
-const double _colQtyWidth = 48;
+const double _colQtyWidth = 64; // для отображения 4 знаков
 const double _colGap = 6;
 const double _colDeleteWidth = 40;
 
@@ -833,9 +940,11 @@ class _QuantityFieldState extends State<_QuantityField> {
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       decoration: const InputDecoration(
         border: OutlineInputBorder(),
-        contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
         isDense: true,
+        counterText: '',
       ),
+      style: const TextStyle(fontFeatures: [FontFeature.tabularFigures()]),
       onChanged: (v) {
         final n = double.tryParse(v.replaceAll(',', '.')) ?? 0;
         widget.onChanged(n);

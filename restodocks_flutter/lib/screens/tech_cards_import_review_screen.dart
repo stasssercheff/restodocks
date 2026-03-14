@@ -358,9 +358,9 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
       for (final i in ready) {
         result.add(items[i]);
         final n = itemToName[i];
-        if (n != null) availablePf.add(n);
-        remaining.remove(i);
+        if (n != null && n.isNotEmpty) availablePf.add(n);
       }
+      remaining = remaining.where((i) => !ready.contains(i)).toList();
     }
     if (stuck || remaining.isNotEmpty) {
       return List<_ReviewItem>.from(items)
@@ -420,7 +420,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
             final pNorm = _norm(p.name);
             return pNorm == norm || _fuzzyMatch(norm, pNorm);
           });
-          final inPf = techCardsPf.any((t) => _norm(t.name) == norm);
+          final inPf = techCardsPf.any((t) => _norm(t.name) == norm || normalizeForPfMatching(t.name) == norm);
           if (!inProducts && !inPf) productNamesToCreate.add(ing.productName.trim());
           if (ing.pricePerKg != null && ing.pricePerKg! > 0 && !priceFromDoc.containsKey(norm)) {
             priceFromDoc[norm] = ing.pricePerKg!;
@@ -482,8 +482,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
         }
       }
 
-      final sorted = List<_ReviewItem>.from(_items)
-        ..sort((a, b) => (a.isSemiFinished == b.isSemiFinished) ? 0 : (a.isSemiFinished ? -1 : 1));
+      final sorted = _topologicalSortOrFallback(_items, techCardsPf);
 
       int created = 0;
       final failed = <({String name, String error})>[];
