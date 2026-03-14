@@ -2,7 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const DEEPL_URL = "https://api-free.deepl.com/v2/translate";
-const SUPPORTED_LANGS = ["ru", "en", "es", "tr"];
+const SUPPORTED_LANGS = ["ru", "en", "es", "tr", "vi"];
 
 function corsHeaders(origin: string | null) {
   return {
