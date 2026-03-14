@@ -455,29 +455,44 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
         }
         if (mounted) setState(() => _saveProgress = productNamesToCreate.length + created);
       }
-      // Обучение: ищем corrected в rows и сохраняем позицию (для парсера)
+      // Обучение: обратный маппинг — по скорректированным данным находим колонки в исходнике
       final sig = widget.headerSignature;
       final sourceRows = widget.sourceRows;
       if (sig != null && sig.isNotEmpty) {
+        if (sourceRows != null && sourceRows.isNotEmpty) {
+          final cardsForLearning = sorted
+              .where((item) {
+                final corr = (item.result.dishName ?? '').trim();
+                final hasIng = item.result.ingredients.any((i) => (i.productName ?? '').trim().isNotEmpty && (i.grossGrams ?? 0) > 0);
+                return corr.isNotEmpty || hasIng;
+              })
+              .map((item) => (
+                    dishName: (item.result.dishName ?? '').trim(),
+                    originalDishName: item.originalDishName?.trim(),
+                    ingredients: item.result.ingredients
+                        .where((i) => (i.productName ?? '').trim().isNotEmpty && (i.grossGrams ?? 0) > 0)
+                        .map((i) => (
+                              productName: (i.productName ?? '').trim(),
+                              grossWeight: i.grossGrams ?? 0,
+                              netWeight: i.netGrams ?? i.grossGrams ?? 0,
+                            ))
+                        .toList(),
+                  ))
+              .where((c) => c.dishName.isNotEmpty || c.ingredients.isNotEmpty)
+              .toList();
+          if (cardsForLearning.isNotEmpty) {
+            await AiServiceSupabase.learnColumnMappingFromCorrections(
+              Supabase.instance.client,
+              sourceRows,
+              sig,
+              cardsForLearning,
+            );
+          }
+        }
         for (final item in sorted) {
           final orig = item.originalDishName?.trim() ?? '';
           final corr = (item.result.dishName ?? '').trim();
-          final hasIng = item.result.ingredients.any((i) => (i.productName ?? '').trim().isNotEmpty && (i.grossGrams ?? 0) > 0);
-          if ((orig.isNotEmpty || corr.isNotEmpty) && (orig != corr || hasIng)) {
-            if (sourceRows != null && sourceRows.isNotEmpty) {
-              final ing = item.result.ingredients
-                  .where((i) => (i.productName ?? '').trim().isNotEmpty && (i.grossGrams ?? 0) > 0)
-                  .map((i) => (productName: (i.productName ?? '').trim(), grossWeight: i.grossGrams ?? 0, netWeight: i.netGrams ?? i.grossGrams ?? 0))
-                  .toList();
-              await AiServiceSupabase.learnDishNamePosition(
-                Supabase.instance.client,
-                sourceRows,
-                sig,
-                corr,
-                correctedIngredients: ing.isNotEmpty ? ing : null,
-                originalDishName: orig,
-              );
-            }
+          if (orig.isNotEmpty && corr.isNotEmpty && orig != corr) {
             await AiServiceSupabase.saveLearningCorrection(
               headerSignature: sig,
               field: 'dish_name',

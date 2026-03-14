@@ -5,9 +5,9 @@
 
 const NAME_KEYS = ["наименование", "название", "блюдо", "пф", "name", "dish"];
 const PRODUCT_KEYS = ["продукт", "сырьё", "сырья", "ингредиент", "product", "ingredient"];
-// Сборник/ГОСТ: "Расход сырья на 1 порцию", "Наименование сырья", "Брутто", "Нетто"
-const GROSS_KEYS = ["брутто", "бр", "вес брутто", "вес гр", "вес гр/шт", "расход сырья", "расход", "норма", "норма закладки", "масса", "gross"];
-const NET_KEYS = ["нетто", "нт", "вес нетто", "net"];
+// iiko DOCX: "Вес брутто, кг" приоритетнее "Брутто в ед. изм."
+const GROSS_KEYS = ["вес брутто", "масса брутто", "брутто", "бр", "вес гр", "вес гр/шт", "расход сырья", "расход", "норма", "норма закладки", "масса", "gross"];
+const NET_KEYS = ["вес нетто", "масса нетто", "нетто", "нт", "net"];
 const WASTE_KEYS = ["отход", "отх", "waste", "процент отхода"];
 // Сборник/ГОСТ: "Выход готовой продукции"
 const OUTPUT_KEYS = ["выход", "вес готового", "вес готового продукта", "выход готовой продукции", "готовый", "output"];
@@ -73,11 +73,21 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
       }
       if (GROSS_KEYS.some((k) => cell.includes(k))) {
         headerIdx = r;
-        grossCol = c;
+        const isBruttoInEdIzm = cell.includes("брутто") && (cell.includes("в ед") || cell.includes("ед.изм") || cell.includes("ед изм")) && !cell.includes("вес брутто") && !cell.includes("масса брутто");
+        if (isBruttoInEdIzm) {
+          if (grossCol < 0) grossCol = c;
+        } else {
+          if (grossCol < 0 || cell.includes("кг")) grossCol = c;
+        }
       }
       if (NET_KEYS.some((k) => cell.includes(k))) {
         headerIdx = r;
-        netCol = c;
+        const isNettoInEdIzm = cell.includes("нетто") && (cell.includes("в ед") || cell.includes("ед.изм") || cell.includes("ед изм")) && !cell.includes("вес нетто") && !cell.includes("масса нетто");
+        if (isNettoInEdIzm) {
+          if (netCol < 0) netCol = c;
+        } else {
+          if (netCol < 0 || cell.includes("кг")) netCol = c;
+        }
       }
       if (WASTE_KEYS.some((k) => cell.includes(k))) {
         headerIdx = r;

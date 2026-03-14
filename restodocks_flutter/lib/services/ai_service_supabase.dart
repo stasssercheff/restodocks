@@ -1254,8 +1254,9 @@ class AiServiceSupabase implements AiService {
 
     final nameKeys = ['наименование', 'название', 'блюдо', 'пф', 'набор', 'name', 'dish'];
     final productKeys = ['продукт', 'продукты', 'сырьё', 'сырья', 'ингредиент', 'product', 'ingredient'];
-    final grossKeys = ['брутто', 'бр', 'вес брутто', 'вес гр', '1 порция', 'расход', 'норма', 'норма закладки', 'масса', 'gross'];
-    final netKeys = ['нетто', 'нт', 'вес нетто', 'net'];
+    // iiko DOCX: "Вес брутто, кг" приоритетнее "Брутто в ед. изм."
+    final grossKeys = ['вес брутто', 'масса брутто', 'брутто', 'бр', 'вес гр', '1 порция', 'расход', 'норма', 'норма закладки', 'масса', 'gross'];
+    final netKeys = ['вес нетто', 'масса нетто', 'нетто', 'нт', 'net'];
     final wasteKeys = ['отход', 'отх', 'waste', 'процент отхода'];
     final outputKeys = ['выход', 'вес готового', 'вес готового продукта', 'готовый', 'output'];
     final unitKeys = ['ед. изм', 'ед изм', 'единица', 'unit'];
@@ -1295,15 +1296,25 @@ class AiServiceSupabase implements AiService {
         for (final k in grossKeys) {
           if (cell.contains(k)) {
             headerIdx = r;
-            // Предпочитаем колонку с "кг" (Вес брутто, кг вместо Брутто в ед. изм.)
-            if (grossCol < 0 || cell.contains('кг')) grossCol = c;
+            // "Брутто в ед. изм." — единицы г/шт, не кг; iiko: предпочитаем "Вес брутто, кг"
+            final isBruttoInEdIzm = cell.contains('брутто') && (cell.contains('в ед') || cell.contains('ед.изм') || cell.contains('ед изм')) && !cell.contains('вес брутто') && !cell.contains('масса брутто');
+            if (isBruttoInEdIzm) {
+              if (grossCol < 0) grossCol = c; // только если лучшей колонки нет
+            } else {
+              if (grossCol < 0 || cell.contains('кг')) grossCol = c;
+            }
             break;
           }
         }
         for (final k in netKeys) {
           if (cell.contains(k)) {
             headerIdx = r;
-            if (netCol < 0 || cell.contains('кг')) netCol = c;
+            final isNettoInEdIzm = cell.contains('нетто') && (cell.contains('в ед') || cell.contains('ед.изм') || cell.contains('ед изм')) && !cell.contains('вес нетто') && !cell.contains('масса нетто');
+            if (isNettoInEdIzm) {
+              if (netCol < 0) netCol = c;
+            } else {
+              if (netCol < 0 || cell.contains('кг')) netCol = c;
+            }
             break;
           }
         }
@@ -1366,8 +1377,10 @@ class AiServiceSupabase implements AiService {
             productCol = foundProductCol;
             for (var c = foundProductCol + 1; c < row.length && c < 12; c++) {
               final h = row[c].trim().toLowerCase();
-              if (h.contains('брутто') && (grossCol < 0 || h.contains('кг'))) grossCol = c;
-              if (h.contains('нетто') && (netCol < 0 || h.contains('кг'))) netCol = c;
+              final brEd = h.contains('брутто') && (h.contains('в ед') || h.contains('ед.изм')) && !h.contains('вес брутто');
+              final ntEd = h.contains('нетто') && (h.contains('в ед') || h.contains('ед.изм')) && !h.contains('вес нетто');
+              if (h.contains('брутто') && (brEd ? grossCol < 0 : (grossCol < 0 || h.contains('кг')))) grossCol = c;
+              if (h.contains('нетто') && (ntEd ? netCol < 0 : (netCol < 0 || h.contains('кг')))) netCol = c;
               if ((h.contains('вес гр') || h.contains('1 порция') || h.contains('вес брутто')) && grossCol < 0) grossCol = c;
             }
             if (grossCol < 0 && row.length >= foundProductCol + 2) grossCol = foundProductCol + 1;
@@ -1382,9 +1395,11 @@ class AiServiceSupabase implements AiService {
           productCol = 1;
           for (var c = 2; c < row.length && c < 12; c++) {
             final h = row[c].trim().toLowerCase();
-            if (h.contains('брутто') && (grossCol < 0 || h.contains('кг'))) grossCol = c;
-            if (h.contains('нетто') && (netCol < 0 || h.contains('кг'))) netCol = c;
-            if ((h.contains('вес гр') || h.contains('1 порция')) && grossCol < 0) grossCol = c;
+            final brEd = h.contains('брутто') && (h.contains('в ед') || h.contains('ед.изм')) && !h.contains('вес брутто');
+            final ntEd = h.contains('нетто') && (h.contains('в ед') || h.contains('ед.изм')) && !h.contains('вес нетто');
+            if (h.contains('брутто') && (brEd ? grossCol < 0 : (grossCol < 0 || h.contains('кг')))) grossCol = c;
+            if (h.contains('нетто') && (ntEd ? netCol < 0 : (netCol < 0 || h.contains('кг')))) netCol = c;
+            if ((h.contains('вес гр') || h.contains('1 порция') || h.contains('вес брутто')) && grossCol < 0) grossCol = c;
           }
           if (grossCol < 0 && row.length >= 3) grossCol = 2;
           if (netCol < 0 && row.length >= 5) netCol = 3;
@@ -1737,6 +1752,146 @@ class AiServiceSupabase implements AiService {
   /// Последняя ошибка при обучении (для диагностики).
   static String? lastLearningError;
 
+  /// Обратный маппинг: по скорректированным данным находим источник в rows и сохраняем колонки.
+  /// Вызывать после сохранения импорта — один раз со всеми карточками для голосования.
+  static Future<void> learnColumnMappingFromCorrections(
+    SupabaseClient client,
+    List<List<String>> rows,
+    String headerSignature,
+    List<({
+      String dishName,
+      String? originalDishName,
+      List<({String productName, double grossWeight, double netWeight})> ingredients,
+    })> correctedCards,
+  ) async {
+    if (rows.isEmpty || headerSignature.isEmpty || correctedCards.isEmpty) return;
+    int headerIdx = -1;
+    for (var r = 0; r < rows.length && r < 80; r++) {
+      final sig = _headerSignature(rows[r].map((c) => (c is String ? c : c.toString()).trim()).toList());
+      if (sig == headerSignature) {
+        headerIdx = r;
+        break;
+      }
+    }
+    if (headerIdx < 0) return;
+
+    int dishRowOffset = 0;
+    int dishCol = 0;
+    bool hasDish = false;
+    final productColVotes = <int, int>{};
+    final grossColVotes = <int, int>{};
+    final netColVotes = <int, int>{};
+
+    String _norm(String s) => stripIikoPrefix(s).trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+    bool _productMatch(String corrected, String cell) {
+      final cn = _norm(corrected);
+      final cellNorm = _norm(cell);
+      if (cn.isEmpty || cellNorm.isEmpty) return false;
+      return cn == cellNorm || cellNorm.contains(cn) || cn.contains(cellNorm);
+    }
+    bool _numMatches(double? parsed, double weight) {
+      if (parsed == null || parsed <= 0) return false;
+      if ((parsed - weight).abs() < 0.02) return true; // г
+      if ((parsed * 1000 - weight).abs() < 2) return true; // кг
+      return false;
+    }
+
+    for (final card in correctedCards) {
+      final dishName = card.dishName.trim();
+      final origName = card.originalDishName?.trim();
+      for (final candidate in [dishName, if (origName != null && origName.isNotEmpty) origName]) {
+        if (candidate.isEmpty) continue;
+        for (var r = 0; r < rows.length && r < 80; r++) {
+          final row = rows[r];
+          for (var c = 0; c < row.length; c++) {
+            final cell = (row[c] is String ? row[c] as String : row[c].toString()).trim();
+            if (cell == candidate || cell.toLowerCase() == candidate.toLowerCase() || _productMatch(candidate, cell)) {
+              dishRowOffset = r - headerIdx;
+              dishCol = c;
+              hasDish = true;
+              break;
+            }
+          }
+          if (hasDish) break;
+        }
+        if (hasDish) break;
+      }
+
+      for (final ing in card.ingredients) {
+        final pName = ing.productName.trim();
+        if (pName.isEmpty) continue;
+        int? foundProductCol, foundGrossCol, foundNetCol;
+        for (var r = headerIdx + 1; r < rows.length && r < headerIdx + 200; r++) {
+          final row = rows[r];
+          for (var c = 0; c < row.length; c++) {
+            final cell = (row[c] is String ? row[c] as String : row[c].toString()).trim();
+            if (!_productMatch(pName, cell)) continue;
+            foundProductCol = c;
+            for (var gc = 0; gc < row.length; gc++) {
+              if (gc == c) continue;
+              final pn = _parseNum(row[gc] is String ? row[gc] as String : row[gc].toString());
+              if (_numMatches(pn, ing.grossWeight)) {
+                foundGrossCol = gc;
+                break;
+              }
+            }
+            for (var nc = 0; nc < row.length; nc++) {
+              if (nc == c) continue;
+              final pn = _parseNum(row[nc] is String ? row[nc] as String : row[nc].toString());
+              if (_numMatches(pn, ing.netWeight)) {
+                foundNetCol = nc;
+                break;
+              }
+            }
+            break;
+          }
+          if (foundProductCol != null) break;
+        }
+        if (foundProductCol != null) {
+          productColVotes[foundProductCol] = (productColVotes[foundProductCol] ?? 0) + 1;
+          if (foundGrossCol != null) grossColVotes[foundGrossCol] = (grossColVotes[foundGrossCol] ?? 0) + 1;
+          if (foundNetCol != null) netColVotes[foundNetCol] = (netColVotes[foundNetCol] ?? 0) + 1;
+        }
+      }
+    }
+
+    int? bestProductCol;
+    int? bestGrossCol;
+    int? bestNetCol;
+    if (productColVotes.isNotEmpty) {
+      bestProductCol = productColVotes.entries.reduce((a, b) => a.value >= b.value ? a : b).key;
+    }
+    if (grossColVotes.isNotEmpty) {
+      bestGrossCol = grossColVotes.entries.reduce((a, b) => a.value >= b.value ? a : b).key;
+    }
+    if (netColVotes.isNotEmpty) {
+      bestNetCol = netColVotes.entries.reduce((a, b) => a.value >= b.value ? a : b).key;
+    }
+
+    try {
+      final payload = <String, dynamic>{
+        'header_signature': headerSignature,
+        'dish_name_row_offset': hasDish ? dishRowOffset : 0,
+        'dish_name_col': hasDish ? dishCol : 0,
+      };
+      if (bestProductCol != null) payload['product_col'] = bestProductCol;
+      if (bestGrossCol != null) payload['gross_col'] = bestGrossCol;
+      if (bestNetCol != null) payload['net_col'] = bestNetCol;
+      if (!hasDish && bestProductCol == null) return; // нечего сохранять
+      final res = await client.functions.invoke('tt-parse-save-learning', body: {'learned_dish_name': payload});
+      if (res.status >= 200 && res.status < 300) {
+        devLog('[tt_parse] learned columns: sig=$headerSignature product=$bestProductCol gross=$bestGrossCol net=$bestNetCol');
+      } else {
+        final err = (res.data as Map?)?['error'] ?? res.data ?? 'HTTP ${res.status}';
+        lastLearningError = err.toString();
+        debugPrint('[tt_parse] learnColumnMapping failed: $err');
+      }
+    } catch (e, st) {
+      lastLearningError = e.toString();
+      devLog('[tt_parse] learnColumnMapping failed: $e\n$st');
+    }
+  }
+
   /// Сохранить правку (correction) через Edge Function. Вызывается из экранов импорта/редактирования.
   static Future<void> saveLearningCorrection({
     required String headerSignature,
@@ -1976,6 +2131,7 @@ class AiServiceSupabase implements AiService {
   /// Обучение: при правке ищем corrected в rows и сохраняем позиции (dish name + колонки).
   /// [correctedIngredients] — ингредиенты для вывода product_col, gross_col, net_col (опционально).
   /// [originalDishName] — исходное распознанное название (ищем его, если corrected не найден в rows).
+  /// Устаревший вызов — делегирует в learnColumnMappingFromCorrections (обратная совместимость).
   static Future<void> learnDishNamePosition(
     SupabaseClient client,
     List<List<String>> rows,
@@ -1984,102 +2140,16 @@ class AiServiceSupabase implements AiService {
     List<({String productName, double grossWeight, double netWeight})>? correctedIngredients,
     String? originalDishName,
   }) async {
-    if (rows.isEmpty || headerSignature.isEmpty) return;
-    int headerIdx = -1;
-    for (var r = 0; r < rows.length && r < 50; r++) {
-      final sig = _headerSignature(rows[r].map((c) => (c is String ? c : c.toString()).trim()).toList());
-      if (sig == headerSignature) {
-        headerIdx = r;
-        break;
-      }
-    }
-    if (headerIdx < 0) return;
-
-    int dishRowOffset = 0;
-    int dishCol = 0;
-    bool hasDish = false;
-    final searchNames = [correctedDishName.trim(), if (originalDishName != null && originalDishName.trim().isNotEmpty) originalDishName.trim()];
-    for (final candidate in searchNames) {
-      if (candidate.isEmpty) continue;
-      for (var r = 0; r < rows.length && r < 50; r++) {
-        final row = rows[r];
-        for (var c = 0; c < row.length; c++) {
-          final cell = (row[c] is String ? row[c] as String : row[c].toString()).trim();
-          if (cell == candidate || cell.toLowerCase() == candidate.toLowerCase()) {
-            dishRowOffset = r - headerIdx;
-            dishCol = c;
-            hasDish = true;
-            break;
-          }
-        }
-        if (hasDish) break;
-      }
-      if (hasDish) break;
-    }
-
-    int? productCol;
-    int? grossCol;
-    int? netCol;
-    if (correctedIngredients != null && correctedIngredients.isNotEmpty && headerIdx + 1 < rows.length) {
-      final first = correctedIngredients.first;
-      if (first.productName.trim().isNotEmpty) {
-        final dataRow = rows[headerIdx + 1];
-        for (var c = 0; c < dataRow.length; c++) {
-          final cell = (dataRow[c] is String ? dataRow[c] as String : dataRow[c].toString()).trim();
-          if (cell == first.productName.trim() ||
-              cell.toLowerCase() == first.productName.trim().toLowerCase()) {
-            productCol = c;
-            break;
-          }
-        }
-        for (var c = 0; c < dataRow.length; c++) {
-          final cell = (dataRow[c] is String ? dataRow[c] as String : dataRow[c].toString()).trim();
-          final parsed = _parseNum(cell);
-          if (parsed != null && parsed > 0) {
-            final g = first.grossWeight;
-            if ((parsed - g).abs() < 0.01 || (parsed * 1000 - g).abs() < 1) {
-              grossCol = c;
-              break;
-            }
-          }
-        }
-        for (var c = 0; c < dataRow.length; c++) {
-          final cell = (dataRow[c] is String ? dataRow[c] as String : dataRow[c].toString()).trim();
-          final parsed = _parseNum(cell);
-          if (parsed != null && parsed > 0) {
-            final n = first.netWeight;
-            if ((parsed - n).abs() < 0.01 || (parsed * 1000 - n).abs() < 1) {
-              netCol = c;
-              break;
-            }
-          }
-        }
-      }
-    }
-
-    if (!hasDish) return; // dish name — обязательное для обучения
-    try {
-      final payload = <String, dynamic>{
-        'header_signature': headerSignature,
-        'dish_name_row_offset': hasDish ? dishRowOffset : 0,
-        'dish_name_col': hasDish ? dishCol : 0,
-      };
-      if (productCol != null) payload['product_col'] = productCol;
-      if (grossCol != null) payload['gross_col'] = grossCol;
-      if (netCol != null) payload['net_col'] = netCol;
-      final res = await client.functions.invoke('tt-parse-save-learning', body: {'learned_dish_name': payload});
-      if (res.status >= 200 && res.status < 300) {
-        devLog('[tt_parse] learned dish_name: sig=$headerSignature offset=$dishRowOffset col=$dishCol');
-      } else {
-        final err = (res.data as Map?)?['error'] ?? res.data ?? 'HTTP ${res.status}';
-        AiServiceSupabase.lastLearningError = err.toString();
-        debugPrint('[tt_parse] learnDishNamePosition failed: $err');
-      }
-    } catch (e, st) {
-      AiServiceSupabase.lastLearningError = e.toString();
-      devLog('[tt_parse] learnDishNamePosition failed: $e\n$st');
-      debugPrint('[tt_parse] learnDishNamePosition failed: $e');
-    }
+    await learnColumnMappingFromCorrections(
+      client,
+      rows,
+      headerSignature,
+      [(
+        dishName: correctedDishName,
+        originalDishName: originalDishName,
+        ingredients: correctedIngredients ?? [],
+      )],
+    );
   }
 
   /// Валидация «на лету»: дичь в названии/ингредиентах — пользователь должен проверить.
