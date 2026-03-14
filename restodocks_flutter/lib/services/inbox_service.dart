@@ -87,9 +87,12 @@ class InboxService {
         final payloadType = payload['type']?.toString() ?? '';
         final isIiko = payloadType == 'iiko_inventory';
         final isWriteoff = payloadType == 'writeoff';
-        final docDept = isIiko
+        var docDept = isIiko
             ? 'kitchen'
             : (header['department']?.toString() ?? _mapSectionToDepartment(currentEmployee.department));
+        docDept = _mapSectionToDepartment(docDept);
+        // Списания: если отдел management — показываем в Кухне, чтобы были видны во входящих
+        if (isWriteoff && docDept == 'management') docDept = 'kitchen';
 
         DocumentType docType;
         String docTitle;
@@ -191,9 +194,10 @@ class InboxService {
     }
   }
 
-  /// Маппинг секции на отдел
+  /// Маппинг секции на отдел (kitchen, bar, hall — для фильтра входящих; management — скрыт)
   String _mapSectionToDepartment(String section) {
     switch (section.toLowerCase()) {
+      case 'kitchen':
       case 'hot_kitchen':
       case 'cold_kitchen':
       case 'confectionery':
@@ -202,6 +206,7 @@ class InboxService {
         return 'bar';
       case 'hall':
       case 'service':
+      case 'dining_room':
         return 'hall';
       default:
         return 'management';

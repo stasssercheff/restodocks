@@ -42,8 +42,10 @@ class _WriteoffRow {
   final Product? product;
   final TechCard? techCard;
   final List<double> quantities;
+  /// Переопределение единицы (г/шт и т.д.) — null = продукт/ТТК по умолчанию
+  final String? unitOverride;
 
-  _WriteoffRow({this.product, this.techCard, List<double>? quantities})
+  _WriteoffRow({this.product, this.techCard, List<double>? quantities, this.unitOverride})
       : quantities = quantities ?? [0.0, 0.0],
         assert(product != null || techCard != null);
 
@@ -56,6 +58,7 @@ class _WriteoffRow {
   }
 
   String get unit {
+    if (unitOverride != null && unitOverride!.isNotEmpty) return unitOverride!;
     if (product != null) return product!.unit ?? 'g';
     return 'pcs'; // ТТК — порции
   }
@@ -122,6 +125,7 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
           'productId': r.product?.id,
           'techCardId': r.techCard?.id,
           'quantities': r.quantities,
+          'unitOverride': r.unitOverride,
         }).toList(),
       )),
     };
@@ -157,6 +161,7 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
         final productId = m['productId'] as String?;
         final techCardId = m['techCardId'] as String?;
         final qtyList = (m['quantities'] as List<dynamic>?)?.map((e) => (e as num).toDouble()).toList() ?? [0.0, 0.0];
+        final unitOverride = m['unitOverride'] as String?;
         Product? p;
         TechCard? tc;
         if (productId != null) {
@@ -170,7 +175,7 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
           }
         }
         if (p != null || tc != null) {
-          _rowsFor(cat).add(_WriteoffRow(product: p, techCard: tc, quantities: List<double>.from(qtyList)));
+          _rowsFor(cat).add(_WriteoffRow(product: p, techCard: tc, quantities: List<double>.from(qtyList), unitOverride: unitOverride));
         }
       }
     }
@@ -243,6 +248,22 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
     setState(() {});
   }
 
+  void _setUnit(WriteoffCategory cat, int rowIndex, String unit) {
+    final rows = _rowsFor(cat);
+    if (rowIndex < 0 || rowIndex >= rows.length) return;
+    final row = rows[rowIndex];
+    final baseUnit = row.product != null ? (row.product!.unit ?? 'g') : 'pcs';
+    rows[rowIndex] = _WriteoffRow(
+      product: row.product,
+      techCard: row.techCard,
+      quantities: List<double>.from(row.quantities),
+      unitOverride: unit == baseUnit ? null : unit,
+    );
+    _rowsVersion.value++;
+    setState(() {});
+    _saveNow();
+  }
+
   void _removeRow(WriteoffCategory cat, int index) {
     final rows = _rowsFor(cat);
     if (index >= 0 && index < rows.length) rows.removeAt(index);
@@ -293,50 +314,10 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
       return;
     }
 
-    // 1. Выбор языка
-    String selectedLang = loc.currentLanguageCode;
-    final langResult = await showDialog<String>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx2, setState) => AlertDialog(
-          title: Text(loc.t('writeoff_save_lang_title') ?? 'Язык сохранения'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                loc.t('inventory_export_lang') ?? 'Язык сохранения:',
-                style: Theme.of(ctx2).textTheme.titleSmall,
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                children: LocalizationService.productLanguageCodes.map((code) {
-                  return ChoiceChip(
-                    label: Text(loc.getLanguageName(code)),
-                    selected: selectedLang == code,
-                    onSelected: (_) => setState(() => selectedLang = code),
-                  );
-                }).toList(),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: Text(MaterialLocalizations.of(ctx2).cancelButtonLabel),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(ctx).pop(selectedLang),
-              child: Text(loc.t('save') ?? 'Сохранить'),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (langResult == null || !mounted) return;
+    // Язык при сохранении в систему — текущий язык приложения (выбор языка только при экспорте в файл)
+    final lang = loc.currentLanguageCode;
 
-    // 2. Комментарий (сохраняется в документе, переводится при экспорте)
+    // Комментарий (сохраняется в документе, переводится при экспорте)
     String comment = '';
     if (mounted) {
       comment = await showDialog<String>(
@@ -376,13 +357,16 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
 
     final chefs = await account.getExecutiveChefsForEstablishment(establishment.id);
     final chef = chefs.isNotEmpty ? chefs.first : null;
+    // Для списаний — всегда валидный получатель: шеф или создатель (чтобы документ попал во Входящие)
+    final recipientId = chef?.id ?? employee.id;
+    final recipientEmail = chef?.email ?? '';
 
     final payload = _buildPayload(
       establishment: establishment,
       employee: employee,
       category: cat,
       rows: rows,
-      lang: langResult,
+      lang: lang,
     );
     if (comment.isNotEmpty) {
       payload['comment'] = comment;
@@ -393,8 +377,8 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
     final docSaved = await docService.save(
       establishmentId: establishment.id,
       createdByEmployeeId: employee.id,
-      recipientChefId: chef?.id ?? '',
-      recipientEmail: chef?.email ?? '',
+      recipientChefId: recipientId,
+      recipientEmail: recipientEmail,
       payload: payload,
     );
 
@@ -642,6 +626,7 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
                         rows: _rowsFor(_selectedCategory),
                         onAdd: () => _showItemPicker(_selectedCategory),
                         onSetQuantity: (ri, ci, v) => _setQuantity(_selectedCategory, ri, ci, v),
+                        onSetUnit: (ri, u) => _setUnit(_selectedCategory, ri, u),
                         onLastCellFocused: (ri) => _onLastCellFocused(_selectedCategory, ri),
                         onRemove: (i) => _removeRow(_selectedCategory, i),
                         onSave: () => _save(_selectedCategory),
@@ -665,6 +650,7 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
 // Ширины колонок как в бланке инвентаризации
 const double _colNoWidth = 28;
 const double _colUnitWidth = 48;
+const double _colUnitCellWidth = 56; // для дропдауна выбора единицы
 const double _colTotalWidth = 56;
 const double _colQtyWidth = 64; // для отображения 4 знаков
 const double _colGap = 6;
@@ -678,6 +664,7 @@ class _WriteoffTabContent extends StatelessWidget {
     required this.rows,
     required this.onAdd,
     required this.onSetQuantity,
+    required this.onSetUnit,
     required this.onLastCellFocused,
     required this.onRemove,
     required this.onSave,
@@ -688,6 +675,7 @@ class _WriteoffTabContent extends StatelessWidget {
   final List<_WriteoffRow> rows;
   final VoidCallback onAdd;
   final void Function(int rowIndex, int colIndex, double value) onSetQuantity;
+  final void Function(int rowIndex, String unit) onSetUnit;
   final void Function(int rowIndex) onLastCellFocused;
   final void Function(int index) onRemove;
   final VoidCallback onSave;
@@ -695,27 +683,28 @@ class _WriteoffTabContent extends StatelessWidget {
 
   int get _maxQtyCols => rows.isEmpty ? _kMinQtyCols : rows.map((r) => r.quantities.length).reduce((a, b) => a > b ? a : b);
 
-  double _leftWidth(BuildContext context, int maxCols) {
-    final w = MediaQuery.of(context).size.width;
-    final scrollWidth = maxCols * (_colQtyWidth + _colGap) + _colDeleteWidth;
-    return (w - scrollWidth).clamp(200.0, 350.0);
+  /// Ширина фиксированной части: #, Наименование, Мера, Итого (без движения при скролле)
+  double _leftWidth(BuildContext context) {
+    final w = MediaQuery.sizeOf(context).width;
+    final base = (w * 0.42).clamp(140.0, 220.0);
+    return base + _colGap + _colTotalWidth;
   }
+
+  double _colNameWidth(BuildContext context) =>
+      _leftWidth(context) - _colNoWidth - _colGap - _colUnitCellWidth - _colGap - _colTotalWidth;
 
   String _formatQty(double q) {
     if (q == q.truncateToDouble()) return q.toInt().toString();
     return q.toStringAsFixed(1);
   }
 
-  static double _colNameWidthFromLeft(double leftW) =>
-      leftW - _colNoWidth - _colGap - _colUnitWidth - _colGap - _colTotalWidth - _colGap;
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final lang = loc.currentLanguageCode;
     final maxCols = _maxQtyCols;
-    final leftW = _leftWidth(context, maxCols);
-    final colNameW = _colNameWidthFromLeft(leftW);
+    final leftW = _leftWidth(context);
+    final colNameW = _colNameWidth(context);
 
     return Column(
       children: [
@@ -740,34 +729,55 @@ class _WriteoffTabContent extends StatelessWidget {
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Шапка: # | Наименование | Мера | Итого | 1 | 2 | ... | Удалить
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                      decoration: BoxDecoration(
-                        border: Border(bottom: BorderSide(color: theme.dividerColor)),
-                        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                      ),
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            SizedBox(width: _colNoWidth, child: Text('#', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
-                            SizedBox(width: _colGap),
-                            SizedBox(width: colNameW, child: Text(loc.t('inventory_item_name') ?? 'Наименование', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
-                            SizedBox(width: _colGap),
-                            SizedBox(width: _colUnitWidth, child: Text(loc.t('inventory_unit') ?? 'Ед.', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
-                            SizedBox(width: _colGap),
-                            SizedBox(width: _colTotalWidth, child: Text(loc.t('inventory_total') ?? 'Итого', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
-                            SizedBox(width: _colGap),
-                            for (var c = 0; c < maxCols; c++) ...[
-                              if (c > 0) SizedBox(width: _colGap),
-                              SizedBox(width: _colQtyWidth, child: Center(child: Text('${c + 1}', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold)))),
+                    // Шапка: фиксировано слева (#, Наименование, Мера, Итого) | скролл справа (1, 2, ... Удалить)
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: leftW,
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                          decoration: BoxDecoration(
+                            border: Border(
+                              right: BorderSide(color: theme.dividerColor.withOpacity(0.5)),
+                              bottom: BorderSide(color: theme.dividerColor),
+                            ),
+                            color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                          ),
+                          child: Row(
+                            children: [
+                              SizedBox(width: _colNoWidth, child: Text('#', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+                              SizedBox(width: _colGap),
+                              SizedBox(width: colNameW, child: Text(loc.t('inventory_item_name') ?? 'Наименование', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
+                              SizedBox(width: _colGap),
+                              SizedBox(width: _colUnitCellWidth, child: Text(loc.t('inventory_unit') ?? 'Ед.', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
+                              SizedBox(width: _colGap),
+                              SizedBox(width: _colTotalWidth, child: Text(loc.t('inventory_total') ?? 'Итого', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
                             ],
-                            SizedBox(width: _colGap),
-                            SizedBox(width: _colDeleteWidth),
-                          ],
+                          ),
                         ),
-                      ),
+                        Expanded(
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                              decoration: BoxDecoration(
+                                border: Border(bottom: BorderSide(color: theme.dividerColor)),
+                                color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                              ),
+                              child: Row(
+                                children: [
+                                  for (var c = 0; c < maxCols; c++) ...[
+                                    if (c > 0) SizedBox(width: _colGap),
+                                    SizedBox(width: _colQtyWidth, child: Center(child: Text('${c + 1}', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold)))),
+                                  ],
+                                  SizedBox(width: _colGap),
+                                  SizedBox(width: _colDeleteWidth),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     Expanded(
                       child: ListView.builder(
@@ -776,14 +786,16 @@ class _WriteoffTabContent extends StatelessWidget {
                         itemBuilder: (_, i) {
                           final r = rows[i];
                           final rowNum = i + 1;
-                          return _WriteoffDataRow(
+                          return _WriteoffRowTile(
                             key: ValueKey('row_${r.product?.id ?? r.techCard?.id}_$i'),
                             row: r,
                             rowIndex: i,
                             rowNumber: rowNum,
+                            leftWidth: leftW,
                             colNameWidth: colNameW,
                             formatQty: _formatQty,
                             onSetQuantity: onSetQuantity,
+                            onSetUnit: onSetUnit,
                             onLastCellFocused: onLastCellFocused,
                             onRemove: onRemove,
                             loc: loc,
@@ -823,15 +835,76 @@ class _WriteoffTabContent extends StatelessWidget {
   }
 }
 
-class _WriteoffDataRow extends StatelessWidget {
-  const _WriteoffDataRow({
+/// Выбор единицы измерения: г, кг, мл, л, шт (если продукт с gramsPerPiece), упак. (если packageWeightGrams).
+class _WriteoffUnitDropdown extends StatelessWidget {
+  const _WriteoffUnitDropdown({
+    required this.row,
+    required this.lang,
+    required this.theme,
+    required this.onChanged,
+  });
+
+  final _WriteoffRow row;
+  final String lang;
+  final ThemeData theme;
+  final void Function(String) onChanged;
+
+  static const List<String> _baseUnits = ['g', 'kg', 'ml', 'l'];
+
+  static List<String> _allowedUnits(_WriteoffRow r) {
+    if (r.techCard != null) return ['pcs', 'g', 'kg']; // ТТК — порции, можно взвесить
+    final p = r.product;
+    if (p == null) return _baseUnits;
+    final options = List<String>.from(_baseUnits);
+    final hasGpp = p.gramsPerPiece != null && p.gramsPerPiece! > 0;
+    if (hasGpp) options.addAll(['pcs', 'шт']);
+    final hasPkg = p.packageWeightGrams != null && p.packageWeightGrams! > 0;
+    if (hasPkg) {
+      options.add('pkg');
+      options.add('btl');
+    }
+    return options;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final options = _allowedUnits(row);
+    final current = row.unit.trim().toLowerCase();
+    final match = options.where((u) => u.toLowerCase() == current).firstOrNull;
+    final displayValue = match ?? options.first;
+    return DropdownButtonHideUnderline(
+      child: DropdownButton<String>(
+        value: displayValue,
+        isDense: true,
+        isExpanded: true,
+        items: options.map((u) => DropdownMenuItem(
+          value: u,
+          child: Text(
+            u == 'pkg' ? (lang == 'ru' ? 'упак.' : 'pkg')
+                : u == 'btl' ? (lang == 'ru' ? 'бутылка' : 'bottle')
+                : _unitDisplay(u, lang),
+            style: theme.textTheme.bodySmall,
+            overflow: TextOverflow.ellipsis,
+          ),
+        )).toList(),
+        onChanged: (v) => v != null ? onChanged(v) : null,
+      ),
+    );
+  }
+}
+
+/// Строка списания: фиксировано слева (продукт, мера, итого), ячейки количества скроллятся влево-вправо.
+class _WriteoffRowTile extends StatefulWidget {
+  const _WriteoffRowTile({
     super.key,
     required this.row,
     required this.rowIndex,
     required this.rowNumber,
+    required this.leftWidth,
     required this.colNameWidth,
     required this.formatQty,
     required this.onSetQuantity,
+    required this.onSetUnit,
     required this.onLastCellFocused,
     required this.onRemove,
     required this.loc,
@@ -840,64 +913,143 @@ class _WriteoffDataRow extends StatelessWidget {
   final _WriteoffRow row;
   final int rowIndex;
   final int rowNumber;
+  final double leftWidth;
   final double colNameWidth;
   final String Function(double) formatQty;
   final void Function(int, int, double) onSetQuantity;
+  final void Function(int, String) onSetUnit;
   final void Function(int) onLastCellFocused;
   final void Function(int) onRemove;
   final LocalizationService loc;
 
   @override
+  State<_WriteoffRowTile> createState() => _WriteoffRowTileState();
+}
+
+class _WriteoffRowTileState extends State<_WriteoffRowTile> {
+  final ScrollController _hScroll = ScrollController();
+
+  @override
+  void dispose() {
+    _hScroll.dispose();
+    super.dispose();
+  }
+
+  void _scrollToEnd() {
+    void doScroll() {
+      if (_hScroll.hasClients) {
+        _hScroll.animateTo(
+          _hScroll.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
+      }
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      doScroll();
+      Future.delayed(const Duration(milliseconds: 350), doScroll);
+    });
+  }
+
+  @override
+  void didUpdateWidget(_WriteoffRowTile old) {
+    super.didUpdateWidget(old);
+    if (old.row.quantities.length < widget.row.quantities.length) {
+      _scrollToEnd();
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final row = widget.row;
     final qtyCols = row.quantities.length;
 
-    return Container(
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
-        color: rowNumber.isEven ? theme.colorScheme.surface : theme.colorScheme.surfaceContainerLowest.withOpacity(0.5),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-          SizedBox(width: _colNoWidth, child: Text('$rowNumber', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant))),
-          SizedBox(width: _colGap),
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
           SizedBox(
-            width: colNameWidth,
-            child: Text(
-              row.displayName(loc.currentLanguageCode),
-              style: theme.textTheme.bodyMedium,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+            width: widget.leftWidth,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              decoration: BoxDecoration(
+                border: Border(
+                  right: BorderSide(color: theme.dividerColor.withOpacity(0.5)),
+                  bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5)),
+                ),
+                color: widget.rowNumber.isEven ? theme.colorScheme.surface : theme.colorScheme.surfaceContainerLowest.withOpacity(0.5),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  SizedBox(width: _colNoWidth, child: Text('${widget.rowNumber}', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant))),
+                  SizedBox(width: _colGap),
+                  Expanded(
+                    child: Text(
+                      row.displayName(widget.loc.currentLanguageCode),
+                      style: theme.textTheme.bodyMedium,
+                      maxLines: 4,
+                      overflow: TextOverflow.ellipsis,
+                      softWrap: true,
+                    ),
+                  ),
+                  SizedBox(width: _colGap),
+                  SizedBox(
+                    width: _colUnitCellWidth,
+                    child: _WriteoffUnitDropdown(
+                      row: row,
+                      lang: widget.loc.currentLanguageCode,
+                      theme: theme,
+                      onChanged: (u) => widget.onSetUnit(widget.rowIndex, u),
+                    ),
+                  ),
+                  SizedBox(width: _colGap),
+                  Container(
+                    width: _colTotalWidth,
+                    alignment: Alignment.center,
+                    child: Text(widget.formatQty(row.total), style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+                  ),
+                ],
+              ),
             ),
           ),
-          SizedBox(width: _colGap),
-          SizedBox(width: _colUnitWidth, child: Text(_unitDisplay(row.unit, loc.currentLanguageCode), style: theme.textTheme.bodySmall, overflow: TextOverflow.ellipsis)),
-          SizedBox(width: _colGap),
-          SizedBox(width: _colTotalWidth, child: Center(child: Text(formatQty(row.total), style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)))),
-          SizedBox(width: _colGap),
-          ...List.generate(qtyCols, (c) {
-            final isLast = c == qtyCols - 1;
-            final qty = c < row.quantities.length ? row.quantities[c] : 0.0;
-            return Padding(
-              padding: EdgeInsets.only(right: c < qtyCols - 1 ? _colGap : 0),
-              child: SizedBox(
-                width: _colQtyWidth,
-                child: _QuantityField(
-                  value: qty,
-                  onChanged: (v) => onSetQuantity(rowIndex, c, v),
-                  onFocusLast: isLast ? () => onLastCellFocused(rowIndex) : null,
+          Expanded(
+            child: SingleChildScrollView(
+              controller: _hScroll,
+              scrollDirection: Axis.horizontal,
+              physics: const ClampingScrollPhysics(),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                decoration: BoxDecoration(
+                  border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
+                  color: widget.rowNumber.isEven ? theme.colorScheme.surface : theme.colorScheme.surfaceContainerLowest.withOpacity(0.5),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    ...List.generate(qtyCols, (c) {
+                      final isLast = c == qtyCols - 1;
+                      final qty = c < row.quantities.length ? row.quantities[c] : 0.0;
+                      return Padding(
+                        padding: EdgeInsets.only(right: c < qtyCols - 1 ? _colGap : _colGap),
+                        child: SizedBox(
+                          width: _colQtyWidth,
+                          child: _QuantityField(
+                            value: qty,
+                            onChanged: (v) => widget.onSetQuantity(widget.rowIndex, c, v),
+                            onFocusLast: isLast ? () => widget.onLastCellFocused(widget.rowIndex) : null,
+                          ),
+                        ),
+                      );
+                    }),
+                    SizedBox(width: _colDeleteWidth, child: IconButton(icon: const Icon(Icons.delete_outline, size: 20), onPressed: () => widget.onRemove(widget.rowIndex), padding: EdgeInsets.zero, constraints: const BoxConstraints())),
+                  ],
                 ),
               ),
-            );
-          }),
-          SizedBox(width: _colGap),
-          SizedBox(width: _colDeleteWidth, child: IconButton(icon: const Icon(Icons.delete_outline, size: 20), onPressed: () => onRemove(rowIndex), padding: EdgeInsets.zero, constraints: const BoxConstraints())),
+            ),
+          ),
         ],
-        ),
       ),
     );
   }
