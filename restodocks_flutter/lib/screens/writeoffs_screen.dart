@@ -173,11 +173,13 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
   void _addRow(WriteoffCategory cat, {Product? product, TechCard? techCard}) {
     if (product == null && techCard == null) return;
     setState(() {
-      _rowsFor(cat).add(_WriteoffRow(
+      final rows = List<_WriteoffRow>.from(_rowsFor(cat));
+      rows.add(_WriteoffRow(
         product: product,
         techCard: techCard,
         quantities: [0.0, 0.0],
       ));
+      _rowsByCategory[cat] = rows;
     });
     _saveNow();
   }
@@ -241,12 +243,16 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
             products: products,
             techCards: visibleTc,
             onSelectProduct: (p) {
-              _addRow(cat, product: p);
               Navigator.of(ctx).pop();
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) _addRow(cat, product: p);
+              });
             },
             onSelectTechCard: (tc) {
-              _addRow(cat, techCard: tc);
               Navigator.of(ctx).pop();
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) _addRow(cat, techCard: tc);
+              });
             },
           ),
         ),
@@ -409,7 +415,6 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
     required List<_WriteoffRow> rows,
     required String lang,
   }) {
-    final loc = context.read<LocalizationService>();
     final header = {
       'establishmentName': establishment.name,
       'employeeName': employee.fullName,
@@ -417,7 +422,9 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
       'date': DateFormat('yyyy-MM-dd').format(DateTime.now()),
       'timeEnd': DateFormat('HH:mm').format(DateTime.now()),
     };
-    final payloadRows = rows.map((r) => {
+    final sorted = List<_WriteoffRow>.from(rows)
+      ..sort((a, b) => a.displayName(lang).toLowerCase().compareTo(b.displayName(lang).toLowerCase()));
+    final payloadRows = sorted.map((r) => {
       'productId': r.product?.id ?? 'pf_${r.techCard!.id}',
       'productName': r.displayName(lang),
       'unit': r.unit,
@@ -437,8 +444,8 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
     try {
       final excel = Excel.createExcel();
       final sheet = excel['Списание'];
-      final header = payload['header'] as Map<String, dynamic>? ?? {};
-      final rows = payload['rows'] as List<dynamic>? ?? [];
+      var rows = (payload['rows'] as List<dynamic>? ?? []).map((e) => e as Map<String, dynamic>).toList();
+      rows = rows..sort((a, b) => (a['productName']?.toString() ?? '').toLowerCase().compareTo((b['productName']?.toString() ?? '').toLowerCase()));
       sheet.appendRow([
         TextCellValue(loc.t('inventory_excel_number') ?? '#'),
         TextCellValue(loc.t('inventory_item_name') ?? 'Наименование'),
@@ -490,45 +497,45 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
       appBar: AppBar(
         leading: appBarBackButton(context),
         title: Text(loc.t('writeoffs') ?? 'Списания'),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(48),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 220),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<WriteoffCategory>(
-                      value: _selectedCategory,
-                      isExpanded: true,
-                      icon: const Icon(Icons.arrow_drop_down),
-                  items: WriteoffCategory.values.map((c) {
-                    return DropdownMenuItem(
-                      value: c,
-                      child: Text(_tabLabel(c, loc)),
-                    );
-                  }).toList(),
-                  onChanged: (v) {
-                    if (v != null) setState(() => _selectedCategory = v);
-                  },
-                ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : _WriteoffTabContent(
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 220),
+                      child: DropdownButtonFormField<WriteoffCategory>(
+                        value: _selectedCategory,
+                        decoration: InputDecoration(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        isExpanded: true,
+                        alignment: Alignment.center,
+                        selectedItemBuilder: (context) => WriteoffCategory.values
+                            .map((c) => Center(child: Text(_tabLabel(c, loc))))
+                            .toList(),
+                        items: WriteoffCategory.values.map((c) {
+                          return DropdownMenuItem(
+                            value: c,
+                            child: Text(_tabLabel(c, loc)),
+                          );
+                        }).toList(),
+                        onChanged: (v) {
+                          if (v != null) setState(() => _selectedCategory = v);
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: _WriteoffTabContent(
               category: _selectedCategory,
               rows: _rowsFor(_selectedCategory),
               maxCols: _maxQuantityColumns(_selectedCategory),
@@ -538,6 +545,9 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
               onRemove: (i) => _removeRow(_selectedCategory, i),
               onSave: () => _save(_selectedCategory),
               loc: loc,
+            ),
+                ),
+              ],
             ),
     );
   }
@@ -895,29 +905,38 @@ class _WriteoffItemPickerSheetState extends State<_WriteoffItemPickerSheet> {
   String _query = '';
 
   List<Product> get _filteredProducts {
-    if (_query.isEmpty) return widget.products;
-    final q = _query.toLowerCase();
     final lang = widget.loc.currentLanguageCode;
-    return widget.products
-        .where((p) =>
-            p.name.toLowerCase().contains(q) ||
-            p.getLocalizedName(lang).toLowerCase().contains(q))
-        .toList();
+    var list = widget.products;
+    if (_query.isNotEmpty) {
+      final q = _query.toLowerCase();
+      list = list
+          .where((p) =>
+              p.name.toLowerCase().contains(q) ||
+              p.getLocalizedName(lang).toLowerCase().contains(q))
+          .toList();
+    }
+    list = List<Product>.from(list)
+      ..sort((a, b) => a.getLocalizedName(lang).toLowerCase().compareTo(b.getLocalizedName(lang).toLowerCase()));
+    return list;
   }
 
   List<TechCard> get _filteredTechCards {
+    final lang = widget.loc.currentLanguageCode;
     final pf = _segment == 1;
     final dish = _segment == 2;
     var list = widget.techCards;
     if (pf) list = list.where((t) => t.isSemiFinished).toList();
     if (dish) list = list.where((t) => !t.isSemiFinished).toList();
-    if (_query.isEmpty) return list;
-    final q = _query.toLowerCase();
-    final lang = widget.loc.currentLanguageCode;
-    return list
-        .where((t) =>
-            t.getDisplayNameInLists(lang).toLowerCase().contains(q))
-        .toList();
+    if (_query.isNotEmpty) {
+      final q = _query.toLowerCase();
+      list = list
+          .where((t) =>
+              t.getDisplayNameInLists(lang).toLowerCase().contains(q))
+          .toList();
+    }
+    list = List<TechCard>.from(list)
+      ..sort((a, b) => a.getDisplayNameInLists(lang).toLowerCase().compareTo(b.getDisplayNameInLists(lang).toLowerCase()));
+    return list;
   }
 
   @override
