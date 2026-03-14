@@ -15,7 +15,8 @@ export interface TryParseResult {
   sanityIssues?: string[];
 }
 
-export async function tryParseByStoredTemplates(rows: string[][]): Promise<TryParseResult | null> {
+export async function tryParseByStoredTemplates(rows: string[][], options?: { fromPdf?: boolean }): Promise<TryParseResult | null> {
+  const fromPdf = options?.fromPdf === true;
   if (rows.length < 2) return null;
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -116,7 +117,6 @@ export async function tryParseByStoredTemplates(rows: string[][]): Promise<TryPa
         headerIdx: headerIdxInBlock,
         nameCol: (data.name_col as number) ?? 0,
         productCol: useLearned ? (learnedProductCol ?? (data.product_col as number) ?? 1) : (data.product_col as number) ?? 1,
-        // gross/net — из learned (после ручных правок) или шаблона. Wide Search подхватит при пустых ячейках
         grossCol: useLearned ? (learnedGrossCol ?? (data.gross_col as number) ?? -1) : (data.gross_col as number) ?? -1,
         netCol: useLearned ? (learnedNetCol ?? (data.net_col as number) ?? -1) : (data.net_col as number) ?? -1,
         wasteCol: (data.waste_col as number) ?? -1,
@@ -124,6 +124,7 @@ export async function tryParseByStoredTemplates(rows: string[][]): Promise<TryPa
         technologyCol: useLearned ? (learnedTechnologyCol ?? (data.technology_col as number) ?? -1) : (data.technology_col as number) ?? -1,
         dishNameRowOffset: useLearned ? dishNameRowOffset ?? undefined : undefined,
         dishNameCol: useLearned ? dishNameCol ?? undefined : undefined,
+        fromPdf,
       });
       cards.push(...res.cards);
       issues.push(...res.sanityIssues);

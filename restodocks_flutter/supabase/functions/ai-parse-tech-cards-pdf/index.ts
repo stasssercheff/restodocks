@@ -13,8 +13,9 @@ function corsHeaders(origin: string | null) {
 /** Заголовки таблицы и мусор из блока технологии — не продукты. Только для PDF. */
 const PDF_GARBAGE_PRODUCT_NAMES = new Set([
   "брутто", "нетто", "наименование", "продукт", "сырьё", "расход", "норма", "выход",
-  "из", "на", "в", "жидкая", "пищевой", "сроки", "жирности", "готовой", "порцию", "порций",
+  "из", "на", "в", "пищевой", "сроки", "жирности", "готовой", "порцию", "порций",
   "сырья", "полуфабрикатов", "ед.изм", "ед изм", "единица", "итого",
+  "взбить", "добавить", "положить", "переложить", "использовать", "пробить", "довести", "соединить", "перемешать",
 ]);
 function isGarbageProductName(name: string): boolean {
   const low = name.trim().toLowerCase();
@@ -174,7 +175,7 @@ Deno.serve(async (req: Request) => {
     // 2. Если встроенный шаблон не сработал — пробуем каталог (сохранённые шаблоны после AI/Excel)
     if (templateCards.length === 0 && rows.length >= 2) {
       const { tryParseByStoredTemplates } = await import("../_shared/try_stored_ttk_templates.ts");
-      const stored = await tryParseByStoredTemplates(rows);
+      const stored = await tryParseByStoredTemplates(rows, { fromPdf: true });
       if (stored && stored.cards.length > 0) templateCards = stored.cards;
     }
 
@@ -200,12 +201,15 @@ Deno.serve(async (req: Request) => {
       return /(ов|ей|ий|овь)$/i.test(t);
     };
     templateCards = templateCards.filter((c) => !(c.ingredients.length === 0 && c.dishName && isFragmentDish(c.dishName)));
+    const yieldMatch = text.match(/Выход\s+на\s+1\s+порцию\s*:\s*(\d+)\s*г/i);
+    const extractedYield = yieldMatch ? parseInt(yieldMatch[1], 10) : undefined;
     if (templateCards.length > 0) {
       // Шаблон или каталог сработал — AI не используется, лимит не применяется
       const normalized = templateCards.map((card) => ({
         dishName: card.dishName ?? null,
         technologyText: card.technologyText ?? null,
         isSemiFinished: card.isSemiFinished ?? undefined,
+        yieldGrams: extractedYield ?? card.yieldGrams ?? undefined,
         ingredients: filterGarbageIngredients(card.ingredients).map((i) => ({
           productName: i.productName,
           grossGrams: i.grossGrams ?? undefined,
