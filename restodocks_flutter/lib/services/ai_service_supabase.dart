@@ -1,6 +1,8 @@
+import 'dart:async' show unawaited;
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:archive/archive.dart';
 import 'package:csv/csv.dart';
 import 'package:excel/excel.dart' hide Border;
@@ -1718,19 +1720,58 @@ class AiServiceSupabase implements AiService {
     return null;
   }
 
+  /// Последняя ошибка при обучении (для диагностики).
+  static String? lastLearningError;
+
+  /// Сохранить правку (correction) через Edge Function. Вызывается из экранов импорта/редактирования.
+  static Future<void> saveLearningCorrection({
+    required String headerSignature,
+    required String field,
+    required String correctedValue,
+    String? originalValue,
+    String? establishmentId,
+  }) async {
+    lastLearningError = null;
+    try {
+      final client = Supabase.instance.client;
+      final res = await client.functions.invoke('tt-parse-save-learning', body: {
+        'correction': {
+          'header_signature': headerSignature,
+          'field': field,
+          'original_value': originalValue,
+          'corrected_value': correctedValue,
+          'establishment_id': establishmentId,
+        },
+      });
+      if (res.status >= 200 && res.status < 300) {
+        devLog('[tt_parse] correction saved: $originalValue -> $correctedValue');
+      } else {
+        final err = (res.data as Map?)?['error'] ?? res.data ?? 'HTTP ${res.status}';
+        lastLearningError = err.toString();
+        debugPrint('[tt_parse] correction insert failed: $err');
+      }
+    } catch (e, st) {
+      lastLearningError = e.toString();
+      devLog('[tt_parse] correction insert failed: $e\n$st');
+      debugPrint('[tt_parse] correction insert failed: $e');
+    }
+  }
+
   /// Применить сохранённые правки (original → corrected) к результатам парсинга.
   Future<List<TechCardRecognitionResult>> _applyParseCorrections(
     List<TechCardRecognitionResult> list,
     String? headerSignature,
     String? establishmentId,
   ) async {
+    lastLearningError = null;
     if (headerSignature == null || headerSignature.isEmpty || list.isEmpty) return list;
     try {
-      final res = await _client
+      final raw = await _client
           .from('tt_parse_corrections')
           .select('original_value, corrected_value')
           .eq('header_signature', headerSignature)
           .eq('field', 'dish_name');
+      final res = raw is List ? raw : (raw as dynamic).data as List? ?? [];
       if (res.isEmpty) return list;
       final map = <String, String>{};
       for (final r in res) {
@@ -1748,7 +1789,10 @@ class AiServiceSupabase implements AiService {
         if (corrected == null) return c;
         return c.copyWith(dishName: corrected);
       }).toList();
-    } catch (_) {
+    } catch (e, st) {
+      lastLearningError = e.toString();
+      devLog('[tt_parse] apply corrections: $e\n$st');
+      debugPrint('[tt_parse] apply corrections: $e'); // В release тоже в консоль браузера
       return list;
     }
   }
@@ -2007,11 +2051,19 @@ class AiServiceSupabase implements AiService {
       if (productCol != null) payload['product_col'] = productCol;
       if (grossCol != null) payload['gross_col'] = grossCol;
       if (netCol != null) payload['net_col'] = netCol;
-      await client.from('tt_parse_learned_dish_name').upsert(
-        payload,
-        onConflict: 'header_signature',
-      );
-    } catch (_) {}
+      final res = await client.functions.invoke('tt-parse-save-learning', body: {'learned_dish_name': payload});
+      if (res.status >= 200 && res.status < 300) {
+        devLog('[tt_parse] learned dish_name: sig=$headerSignature offset=$dishRowOffset col=$dishCol');
+      } else {
+        final err = (res.data as Map?)?['error'] ?? res.data ?? 'HTTP ${res.status}';
+        AiServiceSupabase.lastLearningError = err.toString();
+        debugPrint('[tt_parse] learnDishNamePosition failed: $err');
+      }
+    } catch (e, st) {
+      AiServiceSupabase.lastLearningError = e.toString();
+      devLog('[tt_parse] learnDishNamePosition failed: $e\n$st');
+      debugPrint('[tt_parse] learnDishNamePosition failed: $e');
+    }
   }
 
   /// Валидация «на лету»: дичь в названии/ингредиентах — пользователь должен проверить.
@@ -2084,6 +2136,20 @@ class AiServiceSupabase implements AiService {
     }
   }
 
+  /// Сохранить обучение через Edge Function (service_role, обход RLS)
+  Future<void> _saveLearningViaEdgeFunction(Map<String, dynamic> payload) async {
+    try {
+      final data = await invoke('tt-parse-save-learning', payload);
+      if (data != null && data['ok'] == true) return;
+      lastLearningError = data?['error']?.toString() ?? data?['details']?.toString() ?? 'Unknown';
+      debugPrint('[tt_parse] Edge Function save failed: $lastLearningError');
+    } catch (e, st) {
+      lastLearningError = e.toString();
+      devLog('[tt_parse] Edge Function save error: $e\n$st');
+      debugPrint('[tt_parse] Edge Function save error: $e');
+    }
+  }
+
   /// Сохранить шаблон при успешном парсинге по ключевым словам (без AI). Повторная загрузка — из каталога.
   void _saveTemplateFromKeywordParse(List<List<String>> rows, String source) {
     try {
@@ -2127,17 +2193,19 @@ class AiServiceSupabase implements AiService {
       final sig = _headerSignature(rows[headerIdx].map((c) => c.trim()).toList());
       if (sig.isEmpty) return;
       lastParseHeaderSignature = sig;
-      _client.from('tt_parse_templates').upsert({
-        'header_signature': sig,
-        'header_row_index': headerIdx,
-        'name_col': nameCol,
-        'product_col': productCol,
-        'gross_col': grossCol >= 0 ? grossCol : -1,
-        'net_col': netCol >= 0 ? netCol : -1,
-        'waste_col': wasteCol >= 0 ? wasteCol : -1,
-        'output_col': outputCol >= 0 ? outputCol : -1,
-        'source': source,
-      }, onConflict: 'header_signature').then((_) {}).catchError((_) {});
+      unawaited(_saveLearningViaEdgeFunction({
+        'template': {
+          'header_signature': sig,
+          'header_row_index': headerIdx,
+          'name_col': nameCol,
+          'product_col': productCol,
+          'gross_col': grossCol >= 0 ? grossCol : -1,
+          'net_col': netCol >= 0 ? netCol : -1,
+          'waste_col': wasteCol >= 0 ? wasteCol : -1,
+          'output_col': outputCol >= 0 ? outputCol : -1,
+          'source': source,
+        },
+      }).then((_) => devLog('[tt_parse] template saved: sig=$sig (keyword)')));
     } catch (_) {}
   }
 
@@ -2186,17 +2254,19 @@ class AiServiceSupabase implements AiService {
       final sig = _headerSignature(rows[bestHeaderIdx].map((c) => c.trim()).toList());
       if (sig.isEmpty) return;
       lastParseHeaderSignature = sig;
-      _client.from('tt_parse_templates').upsert({
-        'header_signature': sig,
-        'header_row_index': bestHeaderIdx,
-        'name_col': bestProductCol,
-        'product_col': bestProductCol,
-        'gross_col': grossCol,
-        'net_col': netCol,
-        'waste_col': -1,
-        'output_col': -1,
-        'source': source,
-      }, onConflict: 'header_signature').then((_) {}).catchError((_) {});
+      unawaited(_saveLearningViaEdgeFunction({
+        'template': {
+          'header_signature': sig,
+          'header_row_index': bestHeaderIdx,
+          'name_col': bestProductCol,
+          'product_col': bestProductCol,
+          'gross_col': grossCol,
+          'net_col': netCol,
+          'waste_col': -1,
+          'output_col': -1,
+          'source': source,
+        },
+      }).then((_) => devLog('[tt_parse] template saved: sig=$sig (ai)')));
     } catch (_) {}
   }
 
