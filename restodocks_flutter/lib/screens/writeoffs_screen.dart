@@ -242,8 +242,6 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
     _rowsVersion.value++;
     setState(() {});
   }
-    _saveNow();
-  }
 
   void _removeRow(WriteoffCategory cat, int index) {
     final rows = _rowsFor(cat);
