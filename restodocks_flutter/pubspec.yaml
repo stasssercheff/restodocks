@@ -33,6 +33,10 @@ dependencies:
   image: ^4.0.0
   cached_network_image: ^3.2.3
 
+  # Rich text editor
+  flutter_quill: ^11.5.0
+  flutter_quill_extensions: ^11.0.0
+
   # Localization
   flutter_localizations:
     sdk: flutter

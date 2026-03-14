@@ -18,6 +18,7 @@ export 'nomenclature_item.dart';
 export 'inbox_document.dart';
 export 'haccp_log.dart';
 export 'haccp_log_type.dart';
+export 'establishment_document.dart';
 
 // Виджеты
 export '../widgets/data_safety_indicator.dart';

@@ -57,6 +57,11 @@ class StaffHomeContent extends StatelessWidget {
         title: loc.t('inbox_tab_messages') ?? 'Сообщения',
         onTap: () => context.go('/notifications?tab=messages'),
       ),
+      HomeTileId.documentation: _Tile(
+        icon: Icons.description_outlined,
+        title: loc.t('documentation') ?? 'Документация',
+        onTap: () => context.go('/documentation'),
+      ),
       HomeTileId.schedule: _Tile(
         icon: Icons.calendar_month,
         title: loc.t('schedule'),

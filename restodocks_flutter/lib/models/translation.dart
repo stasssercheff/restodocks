@@ -7,6 +7,7 @@ enum TranslationEntityType {
   checklist,
   inventory,
   ui,
+  document,
 }
 
 extension TranslationEntityTypeExtension on TranslationEntityType {

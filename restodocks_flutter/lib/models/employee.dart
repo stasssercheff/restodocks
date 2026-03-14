@@ -319,6 +319,16 @@ class Employee extends Equatable {
     return hasRole('executive_chef') || hasRole('sous_chef');
   }
 
+  /// Создание и редактирование документации: владелец и менеджмент (шеф, су-шеф, барменеджер, менеджер зала, управляющий)
+  bool get canEditDocumentation =>
+      hasRole('owner') ||
+      hasRole('executive_chef') ||
+      hasRole('sous_chef') ||
+      hasRole('bar_manager') ||
+      hasRole('floor_manager') ||
+      hasRole('general_manager') ||
+      department == 'management';
+
   /// Видит ли сотрудник конкретную ТТК кухни по цехам.
   /// sections == [] → скрыто, видят только шеф/су-шеф/владелец.
   /// sections == ['all'] → видят все (кухни и управление).

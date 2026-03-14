@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_quill/flutter_quill.dart';
 
 import 'core/url_strategy_stub.dart'
     if (dart.library.html) 'core/url_strategy_web.dart' as url_strategy;
@@ -101,6 +102,7 @@ class RestodocksApp extends StatelessWidget {
               GlobalMaterialLocalizations.delegate,
               GlobalWidgetsLocalizations.delegate,
               GlobalCupertinoLocalizations.delegate,
+              FlutterQuillLocalizations.delegate,
             ],
             routerConfig: AppRouter.router,
             builder: (context, child) => WebLocationCorrection(child: child),

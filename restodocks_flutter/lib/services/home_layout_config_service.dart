@@ -7,6 +7,7 @@ const _keyPrefix = 'restodocks_home_layout_';
 enum HomeTileId {
   messages,
   schedule,
+  documentation,
   productOrder,
   suppliers,
   menu,

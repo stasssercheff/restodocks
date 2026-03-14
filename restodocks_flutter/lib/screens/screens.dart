@@ -41,3 +41,6 @@ export 'haccp_journals_screen.dart';
 export 'haccp_journal_detail_screen.dart';
 export 'haccp_entry_form_screen.dart';
 export 'haccp_log_detail_screen.dart';
+export 'documentation_screen.dart';
+export 'documentation_edit_screen.dart';
+export 'documentation_view_screen.dart';

@@ -60,6 +60,9 @@ class AppProviders {
         Provider<ChecklistServiceSupabase>(
           create: (_) => ChecklistServiceSupabase(),
         ),
+        Provider<DocumentationServiceSupabase>(
+          create: (_) => DocumentationServiceSupabase(),
+        ),
         Provider<ChecklistSubmissionService>(
           create: (_) => ChecklistSubmissionService(),
         ),

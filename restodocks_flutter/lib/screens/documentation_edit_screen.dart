@@ -1,0 +1,359 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_quill/flutter_quill.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+
+import '../models/models.dart';
+import '../services/documentation_image_upload_service.dart';
+import '../services/services.dart';
+import '../widgets/app_bar_home_button.dart';
+import '../widgets/documentation_rich_text_editor.dart';
+
+/// Создание или редактирование документа. Владелец и менеджмент.
+class DocumentationEditScreen extends StatefulWidget {
+  const DocumentationEditScreen({super.key, required this.documentId});
+
+  final String documentId;
+
+  @override
+  State<DocumentationEditScreen> createState() => _DocumentationEditScreenState();
+}
+
+class _DocumentationEditScreenState extends State<DocumentationEditScreen> {
+  EstablishmentDocument? _doc;
+  bool _loading = true;
+  bool _saving = false;
+  String? _error;
+  late final TextEditingController _nameController;
+  late final TextEditingController _topicController;
+  late final QuillController _quillController;
+  DocumentVisibilityType _visibilityType = DocumentVisibilityType.all;
+  List<String> _visibilityIds = [];
+  List<Employee> _employees = [];
+
+  bool get _isNew => widget.documentId == 'new';
+
+  static const _departmentCodes = ['kitchen', 'bar', 'hall', 'management'];
+  static const _sectionCodes = [
+    'hot_kitchen', 'cold_kitchen', 'grill', 'pizza', 'sushi',
+    'prep', 'pastry', 'bakery', 'cleaning', 'banquet_catering',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController();
+    _topicController = TextEditingController();
+    _quillController = QuillController.basic(
+      config: QuillControllerConfig(
+        clipboardConfig: QuillClipboardConfig(
+          enableExternalRichPaste: true,
+          onImagePaste: (bytes) async {
+            final url = await DocumentationImageUploadService.uploadImage(bytes);
+            return url;
+          },
+        ),
+      ),
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _topicController.dispose();
+    _quillController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    final acc = context.read<AccountManagerSupabase>();
+    final est = acc.establishment;
+    final emp = acc.currentEmployee;
+    if (est == null || emp == null) {
+      setState(() {
+        _loading = false;
+        _error = 'Нет заведения или сотрудника';
+      });
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      List<Employee> emps = await acc.getEmployeesForEstablishment(est.id);
+      EstablishmentDocument? doc;
+      if (!_isNew) {
+        doc = await context.read<DocumentationServiceSupabase>().getDocumentById(widget.documentId);
+      }
+      if (mounted) {
+        setState(() {
+          _employees = emps;
+          _doc = doc;
+          _loading = false;
+          if (doc != null) {
+            _nameController.text = doc.name;
+            _topicController.text = doc.topic ?? '';
+            _quillController.document = documentFromBody(doc.body);
+            _visibilityType = doc.visibilityType;
+            _visibilityIds = List.from(doc.visibilityIds);
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _save() async {
+    final acc = context.read<AccountManagerSupabase>();
+    final est = acc.establishment;
+    final emp = acc.currentEmployee;
+    if (est == null || emp == null) return;
+    final name = _nameController.text.trim();
+    if (name.isEmpty) {
+      final loc = context.read<LocalizationService>();
+      AppToastService.show(loc.t('documentation_name_required') ?? 'Введите название');
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      final svc = context.read<DocumentationServiceSupabase>();
+      final loc = context.read<LocalizationService>();
+      if (_isNew) {
+        await svc.createDocument(
+          establishmentId: est.id,
+          createdBy: emp.id,
+          name: name,
+          topic: _topicController.text.trim().isEmpty ? null : _topicController.text.trim(),
+          visibilityType: _visibilityType,
+          visibilityIds: _visibilityIds,
+          body: bodyFromDocument(_quillController.document),
+        );
+        AppToastService.show(loc.t('documentation_created') ?? 'Документ создан');
+      } else {
+        final updated = _doc!.copyWith(
+          name: name,
+          topic: _topicController.text.trim().isEmpty ? null : _topicController.text.trim(),
+          visibilityType: _visibilityType,
+          visibilityIds: _visibilityIds,
+          body: bodyFromDocument(_quillController.document),
+        );
+        await svc.updateDocument(updated);
+        AppToastService.show(loc.t('documentation_updated') ?? 'Документ обновлён');
+      }
+      if (mounted) context.pop();
+    } catch (e) {
+      if (mounted) {
+        AppToastService.show(e.toString());
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  String _getDepartmentLabel(String code, LocalizationService loc) {
+    switch (code) {
+      case 'kitchen': return loc.t('kitchen') ?? 'Кухня';
+      case 'bar': return loc.t('bar') ?? 'Бар';
+      case 'hall': return loc.t('dining_room') ?? 'Зал';
+      case 'management': return loc.t('management') ?? 'Управление';
+      default: return code;
+    }
+  }
+
+  String _getSectionLabel(String code, LocalizationService loc) {
+    final s = KitchenSection.fromCode(code);
+    return s?.getLocalizedName(loc.currentLanguageCode) ?? code;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = context.watch<LocalizationService>();
+    final acc = context.watch<AccountManagerSupabase>();
+    final emp = acc.currentEmployee;
+    final canEdit = emp?.canEditDocumentation ?? false;
+
+    if (!canEdit) {
+      return Scaffold(
+        appBar: AppBar(leading: appBarBackButton(context), title: Text(loc.t('documentation') ?? 'Документация')),
+        body: Center(child: Text(loc.t('access_denied') ?? 'Доступ запрещён')),
+      );
+    }
+
+    if (_loading) {
+      return Scaffold(
+        appBar: AppBar(leading: appBarBackButton(context), title: Text(loc.t('documentation') ?? 'Документация')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_error != null && !_isNew && _doc == null) {
+      return Scaffold(
+        appBar: AppBar(leading: appBarBackButton(context), title: Text(loc.t('documentation') ?? 'Документация')),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(_error!),
+              const SizedBox(height: 16),
+              FilledButton(onPressed: () => context.pop(), child: Text(loc.t('back') ?? 'Назад')),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        leading: appBarBackButton(context),
+        title: Text(_isNew ? (loc.t('documentation_create') ?? 'Создать документ') : (loc.t('documentation_edit') ?? 'Редактировать')),
+        actions: [
+          if (!_isNew && _doc != null)
+            IconButton(
+              icon: const Icon(Icons.delete_outline),
+              onPressed: _saving ? null : () => _confirmDelete(loc),
+            ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              controller: _nameController,
+              decoration: InputDecoration(
+                labelText: loc.t('documentation_name') ?? 'Название',
+                border: const OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _topicController,
+              decoration: InputDecoration(
+                labelText: loc.t('documentation_topic') ?? 'Тема',
+                border: const OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(loc.t('documentation_visibility') ?? 'Кому отображается', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<DocumentVisibilityType>(
+              value: _visibilityType,
+              decoration: const InputDecoration(border: OutlineInputBorder()),
+              items: [
+                DropdownMenuItem(value: DocumentVisibilityType.all, child: Text(loc.t('documentation_visibility_all') ?? 'Всем')),
+                DropdownMenuItem(value: DocumentVisibilityType.department, child: Text(loc.t('documentation_visibility_department') ?? 'Подразделения')),
+                DropdownMenuItem(value: DocumentVisibilityType.section, child: Text(loc.t('documentation_visibility_section') ?? 'Цеха')),
+                DropdownMenuItem(value: DocumentVisibilityType.employee, child: Text(loc.t('documentation_visibility_employee') ?? 'Сотрудникам')),
+              ],
+              onChanged: (v) => setState(() {
+                _visibilityType = v ?? DocumentVisibilityType.all;
+                _visibilityIds = [];
+              }),
+            ),
+            if (_visibilityType == DocumentVisibilityType.department) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: _departmentCodes.map((code) {
+                  final selected = _visibilityIds.contains(code);
+                  return FilterChip(
+                    label: Text(_getDepartmentLabel(code, loc)),
+                    selected: selected,
+                    onSelected: (v) => setState(() {
+                      if (v) _visibilityIds.add(code);
+                      else _visibilityIds.remove(code);
+                    }),
+                  );
+                }).toList(),
+              ),
+            ],
+            if (_visibilityType == DocumentVisibilityType.section) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: _sectionCodes.map((code) {
+                  final selected = _visibilityIds.contains(code);
+                  return FilterChip(
+                    label: Text(_getSectionLabel(code, loc)),
+                    selected: selected,
+                    onSelected: (v) => setState(() {
+                      if (v) _visibilityIds.add(code);
+                      else _visibilityIds.remove(code);
+                    }),
+                  );
+                }).toList(),
+              ),
+            ],
+            if (_visibilityType == DocumentVisibilityType.employee) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: _employees.map((e) {
+                  final selected = _visibilityIds.contains(e.id);
+                  return FilterChip(
+                    label: Text(e.fullName),
+                    selected: selected,
+                    onSelected: (v) => setState(() {
+                      if (v) _visibilityIds.add(e.id);
+                      else _visibilityIds.remove(e.id);
+                    }),
+                  );
+                }).toList(),
+              ),
+            ],
+            const SizedBox(height: 16),
+            Text(loc.t('documentation_body') ?? 'Текст документа', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
+            DocumentationRichTextEditor(
+              controller: _quillController,
+              readOnly: false,
+              minHeight: 250,
+            ),
+            const SizedBox(height: 24),
+            FilledButton(
+              onPressed: _saving ? null : _save,
+              child: _saving ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2)) : Text(loc.t('save') ?? 'Сохранить'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmDelete(LocalizationService loc) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('documentation_delete_confirm') ?? 'Удалить документ?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(loc.t('cancel') ?? 'Отмена')),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(loc.t('delete') ?? 'Удалить')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted || _doc == null) return;
+    setState(() => _saving = true);
+    try {
+      await context.read<DocumentationServiceSupabase>().deleteDocument(_doc!.id);
+      if (mounted) {
+        AppToastService.show(loc.t('documentation_deleted') ?? 'Документ удалён');
+        context.pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _saving = false);
+        AppToastService.show(e.toString());
+      }
+    }
+  }
+}

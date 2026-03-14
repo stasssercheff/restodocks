@@ -614,6 +614,32 @@ class AppRouter {
           ),
 
           GoRoute(
+            path: '/documentation',
+            pageBuilder: (context, state) => _slideTransitionPage(state, const DocumentationScreen()),
+            routes: [
+              GoRoute(
+                path: 'new',
+                pageBuilder: (context, state) => _slideTransitionPage(state, const DocumentationEditScreen(documentId: 'new')),
+              ),
+              GoRoute(
+                path: ':id',
+                pageBuilder: (context, state) {
+                  final id = state.pathParameters['id'] ?? '';
+                  return _slideTransitionPage(state, DocumentationViewScreen(documentId: id));
+                },
+                routes: [
+                  GoRoute(
+                    path: 'edit',
+                    pageBuilder: (context, state) {
+                      final id = state.pathParameters['id'] ?? '';
+                      return _slideTransitionPage(state, DocumentationEditScreen(documentId: id));
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+          GoRoute(
             path: '/haccp-journals',
             pageBuilder: (context, state) => _slideTransitionPage(state, const HaccpJournalsScreen()),
             routes: [

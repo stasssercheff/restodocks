@@ -754,6 +754,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final tileLabels = <HomeTileId, String>{
       HomeTileId.messages: loc.t('inbox_tab_messages') ?? 'Сообщения',
       HomeTileId.schedule: loc.t('schedule'),
+      HomeTileId.documentation: loc.t('documentation') ?? 'Документация',
       HomeTileId.productOrder: loc.t('product_order'),
       HomeTileId.suppliers: loc.t('suppliers') ?? loc.t('order_tab_suppliers') ?? 'Поставщики',
       HomeTileId.menu: loc.t('menu'),
@@ -763,6 +764,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       HomeTileId.checklists: loc.t('checklists'),
       HomeTileId.nomenclature: loc.t('nomenclature'),
       HomeTileId.inventory: loc.t('inventory_blank'),
+      HomeTileId.writeoffs: loc.t('writeoffs') ?? 'Списания',
     };
     showDialog<void>(
       context: context,
@@ -1612,13 +1614,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onChanged: (v) => screenPref.setShowTranslationNotifications(v),
               ),
             ),
-            if (currentEmployee.hasRole('owner') ||
-                currentEmployee.department == 'management' ||
-                currentEmployee.hasRole('executive_chef') ||
-                currentEmployee.hasRole('sous_chef') ||
-                currentEmployee.hasRole('bar_manager') ||
-                currentEmployee.hasRole('floor_manager') ||
-                currentEmployee.hasRole('general_manager')) ...[
+            // Скрыто: Журналы и ХАССП, Юридическая легитимность (if (false) — не удалять)
+            if (false &&
+                (currentEmployee.hasRole('owner') ||
+                    currentEmployee.department == 'management' ||
+                    currentEmployee.hasRole('executive_chef') ||
+                    currentEmployee.hasRole('sous_chef') ||
+                    currentEmployee.hasRole('bar_manager') ||
+                    currentEmployee.hasRole('floor_manager') ||
+                    currentEmployee.hasRole('general_manager'))) ...[
               ExpansionTile(
                 initiallyExpanded: false,
                 leading: const Icon(Icons.assignment),
