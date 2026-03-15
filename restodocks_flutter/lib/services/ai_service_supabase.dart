@@ -419,6 +419,9 @@ class AiServiceSupabase implements AiService {
   /// Таймаут парсинга PDF (извлечение текста + шаблон/AI). Supabase EF ~60s, плюс cold start.
   static const _pdfParseTimeout = Duration(seconds: 90);
 
+  /// Заглушка для совместимости с tech_cards_list_screen (прогрев PDF EF добавлен позже eb9659f).
+  void warmPdfParser() {}
+
   @override
   Future<List<TechCardRecognitionResult>> parseTechCardsFromPdf(Uint8List pdfBytes, {String? establishmentId}) async {
     lastParseTechCardPdfReason = null;
