@@ -17,6 +17,8 @@ import '../services/ai_service_supabase.dart';
 import '../services/services.dart';
 import '../services/excel_export_service.dart';
 
+enum _TtkImportMode { single, multi }
+
 /// Список ТТК заведения. Создание и переход к редактированию.
 class TechCardsListScreen extends StatefulWidget {
   const TechCardsListScreen({super.key, this.department = 'kitchen', this.embedded = false});
@@ -394,8 +396,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
 
   static const _maxFilesSingleTtk = 10;
   static const _maxFilesMultiTtk = 10;
-
-  enum _TtkImportMode { single, multi }
 
   Future<void> _createFromExcel(BuildContext context, LocalizationService loc) async {
     _TtkImportMode dialogMode = _TtkImportMode.single;
