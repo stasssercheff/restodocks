@@ -2,7 +2,6 @@ import 'dart:typed_data';
 
 import 'package:excel/excel.dart' hide Border;
 
-import '../core/feature_flags.dart';
 import '../utils/number_format_utils.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -746,7 +745,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
               tooltip: loc.t('create_tech_card'),
               onPressed: _loading ? null : () => context.push(widget.department == 'bar' ? '/tech-cards/new?department=bar' : '/tech-cards/new'),
             ),
-          if (canEdit && FeatureFlags.ttkImportEnabled)
+          if (canEdit)
             PopupMenuButton<String>(
               icon: const Icon(Icons.upload),
               tooltip: loc.t('ttk_import_file'),

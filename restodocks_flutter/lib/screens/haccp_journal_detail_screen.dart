@@ -64,33 +64,48 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
+  /// Экспорт PDF: титульный лист + страницы за выбранный период + заключительный лист.
   Future<void> _exportPdf({
-    bool includeCover = true,
-    bool includeStitching = true,
+    required DateTime dateFrom,
+    required DateTime dateTo,
   }) async {
     final acc = context.read<AccountManagerSupabase>();
     final est = acc.establishment;
     if (est == null) return;
+
+    final loc = context.read<LocalizationService>();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('haccp_pdf_preparing') ?? 'Подготовка PDF...')),
+      );
+    }
 
     final emps = await acc.getEmployeesForEstablishment(est.id);
     final idToName = {
       for (final e in emps) e.id: '${e.fullName}${e.surname != null ? ' ${e.surname}' : ''}, ${e.roleDisplayName}',
     };
 
+    final svc = context.read<HaccpLogServiceSupabase>();
+    final logsForPeriod = await svc.getLogs(
+      establishmentId: est.id,
+      logType: _logType,
+      from: dateFrom,
+      to: dateTo,
+    );
+
     final bytes = await HaccpPdfExportService.buildJournalPdf(
       establishmentName: est.name,
       journalTitle: _logType.displayNameRu,
       sanpinRef: _logType.sanpinRef,
       logType: _logType,
-      logs: _logs,
+      logs: logsForPeriod,
       employeeIdToName: idToName,
-      dateFrom: _dateFrom ?? DateTime.now(),
-      dateTo: _dateTo ?? DateTime.now(),
-      includeCover: includeCover,
-      includeStitchingSheet: includeStitching,
+      dateFrom: dateFrom,
+      dateTo: dateTo,
+      includeCover: true,
+      includeStitchingSheet: true,
     );
 
-    final loc = context.read<LocalizationService>();
     final dateStr = DateFormat('yyyyMMdd').format(DateTime.now());
     final safeCode = _logType.code.replaceAll(RegExp(r'[^a-z0-9]'), '_');
     await saveFileBytes('haccp_${safeCode}_$dateStr.pdf', bytes);
@@ -101,60 +116,220 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
     }
   }
 
+  /// Три варианта периода экспорта: 1) весь месяц, 2) с 1 числа по сегодня, 3) с даты по дату.
   Future<void> _showExportOptions() async {
     final loc = context.read<LocalizationService>();
-    var includeCover = true;
-    var includeStitching = true;
+    final now = DateTime.now();
 
-    await showModalBottomSheet<void>(
+    final choice = await showModalBottomSheet<String>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx2, setModal) => Padding(
+      builder: (ctx) => SafeArea(
+        child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                loc.t('haccp_save_file') ?? 'Сохранить файл',
-                style: Theme.of(ctx2).textTheme.titleMedium,
+                loc.t('haccp_save_file') ?? 'Сохранить журнал в PDF',
+                style: Theme.of(ctx).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                loc.t('haccp_pdf_period_hint') ?? 'Титульный лист, страницы за период, заключительный лист.',
+                style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                    ),
               ),
               const SizedBox(height: 16),
-              CheckboxListTile(
-                value: includeCover,
-                onChanged: (v) {
-                  setModal(() => includeCover = v ?? true);
-                },
-                title: Text(loc.t('haccp_pdf_cover') ?? 'Титульный лист'),
-                subtitle: Text(
-                  loc.t('haccp_pdf_cover_hint') ?? 'Название организации, даты',
-                  style: Theme.of(ctx2).textTheme.bodySmall,
-                ),
+              ListTile(
+                leading: const Icon(Icons.calendar_month),
+                title: Text(loc.t('haccp_pdf_period_full_month') ?? 'Весь месяц'),
+                subtitle: Text(loc.t('haccp_pdf_period_full_month_hint') ?? 'Выбор месяца — с 1 по последнее число'),
+                onTap: () => Navigator.pop(ctx, 'full_month'),
               ),
-              CheckboxListTile(
-                value: includeStitching,
-                onChanged: (v) {
-                  setModal(() => includeStitching = v ?? true);
-                },
-                title: Text(loc.t('haccp_pdf_stitching') ?? 'Лист прошивки'),
-                subtitle: Text(
-                  loc.t('haccp_pdf_stitching_hint') ?? '«Пронумеровано и прошнуровано»',
-                  style: Theme.of(ctx2).textTheme.bodySmall,
-                ),
+              ListTile(
+                leading: const Icon(Icons.today),
+                title: Text(loc.t('haccp_pdf_period_month_to_today') ?? 'С 1 числа по сегодня'),
+                subtitle: Text('${DateFormat('dd.MM').format(DateTime(now.year, now.month, 1))} — ${DateFormat('dd.MM.yyyy').format(now)}'),
+                onTap: () => Navigator.pop(ctx, 'month_to_today'),
               ),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: () async {
-                  Navigator.of(ctx2).pop();
-                  await _exportPdf(includeCover: includeCover, includeStitching: includeStitching);
-                },
-                child: Text(loc.t('haccp_save_file') ?? 'Сохранить файл'),
+              ListTile(
+                leading: const Icon(Icons.date_range),
+                title: Text(loc.t('haccp_pdf_period_custom') ?? 'С выбранной даты по выбранную дату'),
+                onTap: () => Navigator.pop(ctx, 'custom'),
               ),
             ],
           ),
         ),
       ),
     );
+    if (choice == null || !mounted) return;
+
+    DateTime dateFrom;
+    DateTime dateTo;
+
+    if (choice == 'month_to_today') {
+      dateFrom = DateTime(now.year, now.month, 1);
+      dateTo = now;
+      await _exportPdf(dateFrom: dateFrom, dateTo: dateTo);
+      return;
+    }
+
+    if (choice == 'full_month') {
+      final picked = await _pickMonth(context);
+      if (picked == null || !mounted) return;
+      dateFrom = DateTime(picked.year, picked.month, 1);
+      dateTo = DateTime(picked.year, picked.month + 1, 0); // last day of month
+      await _exportPdf(dateFrom: dateFrom, dateTo: dateTo);
+      return;
+    }
+
+    if (choice == 'custom') {
+      final range = await _pickDateRange(context);
+      if (range == null || !mounted) return;
+      dateFrom = range.$1;
+      dateTo = range.$2;
+      await _exportPdf(dateFrom: dateFrom, dateTo: dateTo);
+    }
+  }
+
+  Future<DateTime?> _pickMonth(BuildContext context) async {
+    final now = DateTime.now();
+    var year = now.year;
+    var month = now.month;
+    return showModalBottomSheet<DateTime>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx2, setState) {
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    context.read<LocalizationService>().t('haccp_pdf_period_full_month') ?? 'Весь месяц',
+                    style: Theme.of(ctx2).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.chevron_left),
+                        onPressed: () => setState(() {
+                          if (month == 1) {
+                            year--;
+                            month = 12;
+                          } else {
+                            month--;
+                          }
+                        }),
+                      ),
+                      SizedBox(
+                        width: 180,
+                        child: Text(
+                          '${_monthName(month)} $year',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(ctx2).textTheme.titleLarge,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.chevron_right),
+                        onPressed: () => setState(() {
+                          if (month == 12) {
+                            year++;
+                            month = 1;
+                          } else {
+                            month++;
+                          }
+                        }),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(ctx, DateTime(year, month, 1)),
+                    child: Text(context.read<LocalizationService>().t('ok') ?? 'OK'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  static const _monthNames = [
+    'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+    'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь',
+  ];
+  String _monthName(int month) => _monthNames[month - 1];
+
+  Future<(DateTime, DateTime)?> _pickDateRange(BuildContext context) async {
+    final now = DateTime.now();
+    var from = DateTime(now.year, now.month, 1);
+    var to = now;
+    final result = await showModalBottomSheet<(DateTime, DateTime)>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx2, setState) {
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    context.read<LocalizationService>().t('haccp_pdf_period_custom') ?? 'Период',
+                    style: Theme.of(ctx2).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 16),
+                  ListTile(
+                    title: Text(DateFormat('dd.MM.yyyy').format(from)),
+                    subtitle: const Text('Дата начала'),
+                    trailing: const Icon(Icons.calendar_today),
+                    onTap: () async {
+                      final d = await showDatePicker(
+                        context: context,
+                        initialDate: from,
+                        firstDate: DateTime(2020),
+                        lastDate: now,
+                      );
+                      if (d != null) setState(() { from = d; if (from.isAfter(to)) to = from; });
+                    },
+                  ),
+                  ListTile(
+                    title: Text(DateFormat('dd.MM.yyyy').format(to)),
+                    subtitle: const Text('Дата окончания'),
+                    trailing: const Icon(Icons.calendar_today),
+                    onTap: () async {
+                      final d = await showDatePicker(
+                        context: context,
+                        initialDate: to,
+                        firstDate: from,
+                        lastDate: now,
+                      );
+                      if (d != null) setState(() => to = d);
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(ctx, (from, to)),
+                    child: Text(context.read<LocalizationService>().t('ok') ?? 'OK'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+    return result;
   }
 
   String _formatDateRange(DateTime from, DateTime to, LocalizationService loc) {
@@ -198,12 +373,43 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
                 subtitle: Text('${DateFormat('dd.MM').format(DateTime(now.year, now.month, 1))} — ${DateFormat('dd.MM.yyyy').format(now)}'),
                 onTap: () => Navigator.pop(ctx, 'month'),
               ),
+              ListTile(
+                leading: const Icon(Icons.calendar_view_month),
+                title: Text(loc.t('haccp_pdf_period_full_month') ?? 'Весь месяц'),
+                onTap: () => Navigator.pop(ctx, 'full_month'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.date_range),
+                title: Text(loc.t('haccp_pdf_period_custom') ?? 'С даты по дату'),
+                onTap: () => Navigator.pop(ctx, 'custom'),
+              ),
             ],
           ),
         ),
       ),
     );
     if (choice == null || !mounted) return;
+
+    if (choice == 'full_month') {
+      final picked = await _pickMonth(context);
+      if (picked == null || !mounted) return;
+      setState(() {
+        _dateFrom = DateTime(picked.year, picked.month, 1);
+        _dateTo = DateTime(picked.year, picked.month + 1, 0);
+      });
+      _load();
+      return;
+    }
+    if (choice == 'custom') {
+      final range = await _pickDateRange(context);
+      if (range == null || !mounted) return;
+      setState(() {
+        _dateFrom = range.$1;
+        _dateTo = range.$2;
+      });
+      _load();
+      return;
+    }
 
     final from = choice == 'today' ? today : DateTime(now.year, now.month, 1);
     final to = now;

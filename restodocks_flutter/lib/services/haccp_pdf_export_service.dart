@@ -47,10 +47,33 @@ class HaccpPdfExportService {
       );
 
   static const _sanpinHealthHygiene = 'Приложение № 1 к СанПиН 2.3/2.4.3590-20';
-  static const _titleHealthHygiene = 'ГИГИЕНИЧЕСКИЙ ЖУРНАЛ (СОТРУДНИКИ)';
 
-  /// Гигиенический журнал: макет по Приложению № 1 СанПиН 2.3/2.4.3590-20.
-  /// Графы: № п/п, Дата, Ф.И.О., Должность, подпись об отсутствии инфекц., подпись об отсутствии ОРВИ/гнойничк., результат осмотра (допущен/отстранен), подпись ответственного.
+  /// Официальные названия и подписи по рекомендуемым формам (как на образцах).
+  static String _pdfTitle(HaccpLogType logType) {
+    return switch (logType) {
+      HaccpLogType.healthHygiene => 'Гигиенический журнал',
+      HaccpLogType.fridgeTemperature => 'Журнал учета температурного режима холодильного оборудования',
+      HaccpLogType.warehouseTempHumidity => 'Журнал учета температурного режима холодильного оборудования и учета микроклимата складских помещений',
+      HaccpLogType.fryingOil => 'Журнал учета использования фритюрных жиров',
+      HaccpLogType.finishedProductBrakerage => 'Журнал бракеража готовой продукции',
+      HaccpLogType.incomingRawBrakerage => 'Журнал бракеража скоропортящейся пищевой продукции',
+      _ => logType.displayNameRu,
+    };
+  }
+
+  static String _pdfFooter(HaccpLogType logType) {
+    return switch (logType) {
+      HaccpLogType.healthHygiene => 'Рекомендуемая форма гигиенического журнала',
+      HaccpLogType.fridgeTemperature => 'Рекомендуемая форма журнала контроля температуры',
+      HaccpLogType.warehouseTempHumidity => 'Рекомендуемая форма журнала контроля влажности и температуры',
+      HaccpLogType.fryingOil => 'Рекомендованная форма контроля замены фритюрных жиров',
+      HaccpLogType.finishedProductBrakerage => 'Рекомендуемая форма журнала бракеража готовой продукции',
+      HaccpLogType.incomingRawBrakerage => 'Рекомендуемая форма журнала бракеража скоропортящейся пищевой продукции',
+      _ => 'Рекомендуемая форма журнала',
+    };
+  }
+
+  /// Гигиенический журнал: макет по образцу — графы как в рекомендуемой форме.
   static pw.Widget _buildHealthHygienePage({
     required String establishmentName,
     required List<HaccpLog> logs,
@@ -97,12 +120,12 @@ class HaccpPdfExportService {
         children: [
           _headerCell('№ п/п'),
           _headerCell('Дата'),
-          _headerCell('Ф.И.О. работника\n(последнее при наличии)'),
+          _headerCell('ФИО сотрудника'),
           _headerCell('Должность'),
-          _headerCell('Подпись сотрудника об отсутствии признаков инфекционных заболеваний у сотрудника и членов семьи'),
+          _headerCell('Подпись сотрудника об отсутствии признаков инфекционных заболеваний у сотрудника и членов его семьи'),
           _headerCell('Подпись сотрудника об отсутствии заболеваний верхних дыхательных путей и гнойничковых заболеваний кожи рук и открытых поверхностей тела'),
-          _headerCell('Результат осмотра\n(допущен / отстранен)'),
-          _headerCell('Подпись медицинского работника\n(ответственного лица)'),
+          _headerCell('Результат осмотра медицинским работником (ответственным лицом) (допущен / отстранен)'),
+          _headerCell('Подпись медицинского работника (ответственного лица)'),
         ],
       ),
     ];
@@ -151,9 +174,14 @@ class HaccpPdfExportService {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.stretch,
       children: [
-        pw.Text(establishmentName, style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
-        pw.SizedBox(height: 16),
         pw.Table(border: tableBorder, columnWidths: colWidths, children: headerRows),
+        pw.SizedBox(height: 12),
+        pw.Center(
+          child: pw.Text(
+            'Рекомендуемая форма гигиенического журнала',
+            style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
+          ),
+        ),
       ],
     );
   }
@@ -164,6 +192,212 @@ class HaccpPdfExportService {
           child: pw.Text(text, style: pw.TextStyle(fontSize: 8), textAlign: pw.TextAlign.center),
         ),
       );
+
+  static pw.TableBorder get _tableBorder {
+    const b = pw.BorderSide(color: PdfColors.black, width: 0.5);
+    return pw.TableBorder(left: b, top: b, right: b, bottom: b, horizontalInside: b, verticalInside: b);
+  }
+
+  static pw.Widget _headerCellSmall(String text) => pw.Padding(
+        padding: pw.EdgeInsets.all(2),
+        child: pw.Center(
+          child: pw.Text(text, style: pw.TextStyle(fontSize: 5, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.center),
+        ),
+      );
+
+  /// Журнал температуры в холодильном оборудовании: помещение, оборудование, дни 1–30 (образец).
+  static pw.Widget _buildFridgeTemperaturePage({
+    required String establishmentName,
+    required List<HaccpLog> logs,
+    required DateTime dateFrom,
+    required DateTime dateTo,
+  }) {
+    const dayCount = 30;
+    final byEquipment = <String, Map<int, double>>{};
+    for (final log in logs) {
+      if (log.equipment == null || log.equipment!.isEmpty) continue;
+      final day = log.createdAt.day;
+      byEquipment.putIfAbsent(log.equipment!, () => {})[day] = log.value1 ?? 0;
+    }
+    final equipmentList = byEquipment.keys.toList()..sort();
+    if (equipmentList.isEmpty) equipmentList.add('—');
+
+    final colWidths = <int, pw.TableColumnWidth>{
+      0: const pw.FlexColumnWidth(1.2),
+      1: const pw.FlexColumnWidth(1.5),
+      ...List.generate(dayCount, (i) => i + 2).asMap().map((i, _) => MapEntry(i + 2, const pw.FlexColumnWidth(0.35))),
+    };
+
+    final rows = <pw.TableRow>[
+      pw.TableRow(
+        decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+        children: [
+          _headerCellSmall('Наименование производственного помещения'),
+          _headerCellSmall('Наименование холодильного оборудования'),
+          ...List.generate(dayCount, (d) => _headerCellSmall('${d + 1}')),
+        ],
+      ),
+      ...equipmentList.map((equip) {
+        final dayValues = byEquipment[equip] ?? {};
+        return pw.TableRow(
+          children: [
+            _tableCell(equipmentList.isNotEmpty && equip == equipmentList.first ? establishmentName : ''),
+            _tableCell(equip),
+            ...List.generate(dayCount, (d) {
+              final v = dayValues[d + 1];
+              return _tableCell(v != null ? v.toStringAsFixed(0) : '');
+            }),
+          ],
+        );
+      }),
+    ];
+    while (rows.length < 8) {
+      rows.add(pw.TableRow(
+        children: [
+          _tableCell(''),
+          _tableCell(''),
+          ...List.generate(dayCount, (_) => _tableCell('')),
+        ],
+      ));
+    }
+
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+      children: [
+        pw.Table(border: _tableBorder, columnWidths: colWidths, children: rows),
+        pw.SizedBox(height: 10),
+        pw.Center(child: pw.Text(_pdfFooter(HaccpLogType.fridgeTemperature), style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
+      ],
+    );
+  }
+
+  /// Журнал температурного режима: построчно по образцу docx (Дата, Время, Помещение/камера, Показатель сухой °С, Показатель влажности %, Ответственное лицо).
+  static pw.Widget _buildTemperatureRowBasedPage({
+    required String establishmentName,
+    required List<HaccpLog> logs,
+    required Map<String, String> employeeIdToName,
+    required DateFormat dateTimeFmt,
+    required bool includeHumidity,
+  }) {
+    final headerCells = <pw.Widget>[
+      _headerCellSmall('№ п/п'),
+      _headerCellSmall('Дата'),
+      _headerCellSmall('Время'),
+      _headerCellSmall('Помещение/камера'),
+      _headerCellSmall('Показатель сухой, °С'),
+    ];
+    if (includeHumidity) {
+      headerCells.add(_headerCellSmall('Показатель влажности, %'));
+    }
+    headerCells.add(_headerCellSmall('Ответственное лицо'));
+    headerCells.add(_headerCellSmall('Подпись'));
+
+    final colCount = headerCells.length;
+    final colWidths = <int, pw.TableColumnWidth>{
+      for (var i = 0; i < colCount; i++) i: const pw.FlexColumnWidth(1.2),
+    };
+
+    final rows = <pw.TableRow>[
+      pw.TableRow(
+        decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+        children: headerCells,
+      ),
+    ];
+    final dateFmt = DateFormat('dd.MM.yyyy');
+    final timeFmt = DateFormat('HH:mm');
+    for (var i = 0; i < logs.length; i++) {
+      final log = logs[i];
+      final cells = <pw.Widget>[
+        _tableCell('${i + 1}'),
+        _tableCell(dateFmt.format(log.createdAt)),
+        _tableCell(timeFmt.format(log.createdAt)),
+        _tableCell(log.equipment ?? establishmentName),
+        _tableCell(log.value1 != null ? log.value1!.toStringAsFixed(1) : ''),
+      ];
+      if (includeHumidity) {
+        cells.add(_tableCell(log.value2 != null ? log.value2!.toStringAsFixed(0) : ''));
+      }
+      cells.add(_tableCell(employeeIdToName[log.createdByEmployeeId] ?? ''));
+      cells.add(_tableCell(''));
+      rows.add(pw.TableRow(children: cells));
+    }
+    const emptyRows = 15;
+    for (var i = logs.length; i < emptyRows; i++) {
+      rows.add(pw.TableRow(
+        children: List.generate(colCount, (j) => _tableCell(j == 0 ? '${i + 1}' : '')),
+      ));
+    }
+
+    return pw.Table(border: _tableBorder, columnWidths: colWidths, children: rows);
+  }
+
+  /// Журнал температуры и влажности на складе: № п/п, помещение, дни 1–30 (формат «+22 / 45%»).
+  static pw.Widget _buildWarehouseTempHumidityPage({
+    required String establishmentName,
+    required List<HaccpLog> logs,
+    required DateTime dateFrom,
+    required DateTime dateTo,
+  }) {
+    const dayCount = 30;
+    final byDay = <int, (double?, double?)>{};
+    for (final log in logs) {
+      final day = log.createdAt.day;
+      byDay[day] = (log.value1, log.value2);
+    }
+
+    final colWidths = <int, pw.TableColumnWidth>{
+      0: const pw.FlexColumnWidth(0.4),
+      1: const pw.FlexColumnWidth(1.5),
+      ...List.generate(dayCount, (i) => i + 2).asMap().map((i, _) => MapEntry(i + 2, const pw.FlexColumnWidth(0.4))),
+    };
+
+    String cellStr(int day) {
+      final v = byDay[day];
+      if (v == null) return '';
+      final t = v.$1;
+      final h = v.$2;
+      if (t != null && h != null) return '+${t.toStringAsFixed(0)} / ${h.toStringAsFixed(0)}%';
+      if (t != null) return '+${t.toStringAsFixed(0)}';
+      if (h != null) return '${h.toStringAsFixed(0)}%';
+      return '';
+    }
+
+    final rows = <pw.TableRow>[
+      pw.TableRow(
+        decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+        children: [
+          _headerCellSmall('№ п/п'),
+          _headerCellSmall('Наименование складского помещения'),
+          ...List.generate(dayCount, (d) => _headerCellSmall('${d + 1}')),
+        ],
+      ),
+      pw.TableRow(
+        children: [
+          _tableCell('1'),
+          _tableCell(establishmentName),
+          ...List.generate(dayCount, (d) => _tableCell(cellStr(d + 1))),
+        ],
+      ),
+    ];
+    for (var r = 2; r <= 5; r++) {
+      rows.add(pw.TableRow(
+        children: [
+          _tableCell('$r'),
+          _tableCell(''),
+          ...List.generate(dayCount, (_) => _tableCell('')),
+        ],
+      ));
+    }
+
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+      children: [
+        pw.Table(border: _tableBorder, columnWidths: colWidths, children: rows),
+        pw.SizedBox(height: 10),
+        pw.Center(child: pw.Text(_pdfFooter(HaccpLogType.warehouseTempHumidity), style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
+      ],
+    );
+  }
 
   /// Параметры экспорта.
   static Future<Uint8List> buildJournalPdf({
@@ -185,7 +419,7 @@ class HaccpPdfExportService {
 
     final isHealthHygiene = logType == HaccpLogType.healthHygiene;
     final sanpin = isHealthHygiene ? _sanpinHealthHygiene : sanpinRef;
-    final title = isHealthHygiene ? _titleHealthHygiene : journalTitle.toUpperCase();
+    final title = _pdfTitle(logType);
 
     if (includeCover) {
       doc.addPage(
@@ -227,25 +461,70 @@ class HaccpPdfExportService {
       doc.addPage(
         pw.Page(
           pageFormat: PdfPageFormat.a4,
-          margin: pw.EdgeInsets.fromLTRB(24, 50, 24, 40),
+          margin: pw.EdgeInsets.fromLTRB(24, 40, 24, 50),
           build: (ctx) => pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.stretch,
             children: [
-              pw.Align(
-                alignment: pw.Alignment.centerRight,
-                child: pw.Text(sanpin, style: pw.TextStyle(fontSize: 8)),
-              ),
-              pw.SizedBox(height: 8),
               pw.Center(
-                child: pw.Text(title, style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+                child: pw.Text(title, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
               ),
-              pw.SizedBox(height: 24),
+              pw.SizedBox(height: 16),
               _buildHealthHygienePage(
                 establishmentName: establishmentName,
                 logs: logs,
                 employeeIdToName: employeeIdToName,
                 dateTimeFmt: dateTimeFmt,
               ),
+            ],
+          ),
+        ),
+      );
+    } else if (logType == HaccpLogType.fridgeTemperature) {
+      doc.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: pw.EdgeInsets.fromLTRB(20, 40, 20, 50),
+          build: (ctx) => pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+            children: [
+              pw.Center(
+                child: pw.Text(title, style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+              ),
+              pw.SizedBox(height: 8),
+              _buildTemperatureRowBasedPage(
+                establishmentName: establishmentName,
+                logs: logs,
+                employeeIdToName: employeeIdToName,
+                dateTimeFmt: dateTimeFmt,
+                includeHumidity: false,
+              ),
+              pw.SizedBox(height: 10),
+              pw.Center(child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
+            ],
+          ),
+        ),
+      );
+    } else if (logType == HaccpLogType.warehouseTempHumidity) {
+      doc.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: pw.EdgeInsets.fromLTRB(20, 40, 20, 50),
+          build: (ctx) => pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+            children: [
+              pw.Center(
+                child: pw.Text(title, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+              ),
+              pw.SizedBox(height: 8),
+              _buildTemperatureRowBasedPage(
+                establishmentName: establishmentName,
+                logs: logs,
+                employeeIdToName: employeeIdToName,
+                dateTimeFmt: dateTimeFmt,
+                includeHumidity: true,
+              ),
+              pw.SizedBox(height: 10),
+              pw.Center(child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
             ],
           ),
         ),
@@ -262,15 +541,10 @@ class HaccpPdfExportService {
           header: (ctx) => pw.Column(
             mainAxisSize: pw.MainAxisSize.min,
             children: [
-              pw.Align(
-                alignment: pw.Alignment.centerRight,
-                child: pw.Text(sanpinRef, style: pw.TextStyle(fontSize: 8)),
-              ),
-              pw.SizedBox(height: 4),
               pw.Center(
                 child: pw.Text(
-                  journalTitle.toUpperCase(),
-                  style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
+                  title,
+                  style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
                 ),
               ),
               pw.SizedBox(height: 4),
@@ -278,6 +552,12 @@ class HaccpPdfExportService {
                 child: pw.Text(establishmentName, style: pw.TextStyle(fontSize: 9)),
               ),
             ],
+          ),
+          footer: (ctx) => pw.Center(
+            child: pw.Text(
+              _pdfFooter(logType),
+              style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
+            ),
           ),
           build: (ctx) {
             final rows = <pw.TableRow>[
@@ -394,19 +674,19 @@ class HaccpPdfExportService {
 
   static String _humanKey(String key) {
     const m = {
-      'value1': 'Значение 1',
+      'value1': 'Температура °C',
       'value2': 'Влажность %',
-      'equipment': 'Оборудование',
-      'status': 'Статус',
-      'status2': 'Статус 2',
+      'equipment': 'Наименование холодильного оборудования',
+      'status': 'Результат осмотра (допущен/отстранен)',
+      'status2': 'Органолептическая оценка',
       'description': 'Описание',
-      'location': 'Место',
-      'product': 'Продукция',
-      'result': 'Результат',
-      'weight': 'Вес',
-      'reason': 'Причина',
-      'action': 'Действие',
-      'oil_name': 'Масло',
+      'location': 'Место (цех)',
+      'product': 'Наименование готового блюда / Наименование',
+      'result': 'Результаты органолептической оценки / Результат бракеража',
+      'weight': 'Вес, кг',
+      'reason': 'Причина списания',
+      'action': 'Действие (замена/долив)',
+      'oil_name': 'Вид фритюрного жира (марка масла)',
       'agent': 'Средство',
       'concentration': 'Концентрация',
       'note': 'Примечание',

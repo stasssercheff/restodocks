@@ -1652,8 +1652,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onChanged: (v) => screenPref.setShowTranslationNotifications(v),
               ),
             ),
-            // Скрыто: Журналы и ХАССП, Юридическая легитимность (if (false) — не удалять)
-            if (false &&
+            // Beta: Журналы и ХАССП, Юридическая легитимность
+            if (const bool.fromEnvironment('IS_BETA', defaultValue: false) &&
                 (currentEmployee.hasRole('owner') ||
                     currentEmployee.department == 'management' ||
                     currentEmployee.hasRole('executive_chef') ||
