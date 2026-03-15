@@ -89,7 +89,7 @@ Deno.serve(async (req: Request) => {
     }
     const { PDFParse } = await import("npm:pdf-parse");
     const { chatText } = await import("../_shared/ai_provider.ts");
-    const { pdfMergeContinuationLines, pdfTextToRows, parseTtkByTemplate } = await import("../_shared/parse_ttk_template.ts");
+    const { pdfMergeContinuationLines, pdfTextToRows, parseTtkByTemplate, parseTtkGreedy } = await import("../_shared/parse_ttk_template.ts");
     const { parseKkOp1 } = await import("../_shared/parse_kk_op1.ts");
 
     let bytes: Uint8Array;
@@ -189,6 +189,11 @@ Deno.serve(async (req: Request) => {
       return /(ов|ей|ий|овь)$/i.test(t);
     };
     templateCards = templateCards.filter((c) => !(c.ingredients.length === 0 && c.dishName && isFragmentDish(c.dishName)));
+    // 2b. Жадный fallback — хоть что-то для обучения, пользователь поправит
+    if (templateCards.length === 0 && rows.length >= 2) {
+      const greedyCards = parseTtkGreedy(rows, text);
+      if (greedyCards.length > 0) templateCards = greedyCards;
+    }
     const yieldMatch = text.match(/Выход\s+на\s+1\s+порцию\s*:\s*(\d+)\s*г/i);
     const extractedYield = yieldMatch ? parseInt(yieldMatch[1], 10) : undefined;
     if (templateCards.length > 0) {

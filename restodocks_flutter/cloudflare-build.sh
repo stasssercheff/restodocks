@@ -37,7 +37,8 @@ ENABLE_TTK="${ENABLE_TTK_IMPORT:-false}"
 flutter build web --release --no-web-resources-cdn \
   --dart-define=SUPABASE_URL="$SUPABASE_URL" \
   --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
-  --dart-define=ENABLE_TTK_IMPORT="$ENABLE_TTK"
+  --dart-define=ENABLE_TTK_IMPORT="$ENABLE_TTK" \
+  --dart-define=IS_BETA=true
 
 if [ -f scripts/sw_cleanup.js ]; then
   cp scripts/sw_cleanup.js build/web/flutter_service_worker.js

@@ -8,7 +8,7 @@ const TIMEOUT_MS = 8000;
 function corsHeaders(origin: string | null) {
   return {
     "Access-Control-Allow-Origin": origin || "*",
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   };
 }
@@ -18,7 +18,7 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders(origin) });
   }
-  if (req.method !== "GET") {
+  if (req.method !== "GET" && req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
       headers: { ...corsHeaders(origin), "Content-Type": "application/json" },
@@ -26,7 +26,15 @@ Deno.serve(async (req: Request) => {
   }
 
   const url = new URL(req.url);
-  const q = url.searchParams.get("q")?.trim();
+  let q = url.searchParams.get("q")?.trim();
+  if (!q && req.method === "POST") {
+    try {
+      const body = await req.json() as Record<string, unknown>;
+      q = (body?.q as string)?.trim() ?? null;
+    } catch {
+      q = null;
+    }
+  }
   if (!q || q.length > 200) {
     return new Response(
       JSON.stringify({ error: "Query parameter q required (max 200 chars)" }),

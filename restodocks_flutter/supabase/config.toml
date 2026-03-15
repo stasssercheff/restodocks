@@ -35,3 +35,11 @@ verify_jwt = false
 # fetch-nutrition-off: прокси к Open Food Facts (обход CORS/504 в DevTools)
 [functions.fetch-nutrition-off]
 verify_jwt = false
+
+# get-training-video-url: URL видео по IP — RU → Supabase Storage, остальные → YouTube
+[functions.get-training-video-url]
+verify_jwt = false
+
+# auto-translate-product: вызывается из приложения и скриптов batch_translate (anon key)
+[functions.auto-translate-product]
+verify_jwt = false

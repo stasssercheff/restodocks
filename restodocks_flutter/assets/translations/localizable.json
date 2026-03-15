@@ -2626,7 +2626,11 @@
     "order_suppliers_empty_hint": "Create a supplier — enter name, contacts and product list from nomenclature",
     "order_products_count": "products",
     "order_delete_supplier_confirm": "Delete supplier",
-    "order_delete_order_confirm": "Delete order list"
+    "order_delete_order_confirm": "Delete order list",
+    "requisites": "Company details",
+    "requisites_hint": "For the employee agreement form",
+    "notification_settings": "Notifications",
+    "notification_settings_hint": "Notification types and which are enabled"
   },
   "es": {
     "app_name": "Restodocks",
@@ -6505,6 +6509,10 @@
     "order_suppliers_empty_hint": "Tạo nhà cung cấp - nhập tên, địa chỉ liên hệ và danh sách sản phẩm theo danh pháp",
     "order_products_count": "các sản phẩm",
     "order_delete_supplier_confirm": "Xóa nhà cung cấp",
-    "order_delete_order_confirm": "Xóa danh sách đơn hàng"
+    "order_delete_order_confirm": "Xóa danh sách đơn hàng",
+    "requisites": "Thông tin công ty",
+    "requisites_hint": "Cho mẫu thỏa thuận với nhân viên",
+    "notification_settings": "Thông báo",
+    "notification_settings_hint": "Loại thông báo và những gì được bật"
   }
 }

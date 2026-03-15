@@ -1108,7 +1108,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     'Сотрудники настройка': 'https://youtu.be/bGVJtSdpid0',
     'Смена роли собственника': 'https://youtu.be/nkk9BpyIkuQ',
     'Инвента iiko выгрузка бланка': 'https://youtu.be/rFXg9gJ5qUw',
-    'Инвентаризации IIKO слияние': 'https://youtu.be/tJvjUcNRnsc',
+    'Инвентаризации IIKO слияние_1': 'VFSGL0Zj7fc',
+    'Инвентаризации IIKO слияние_2': 'WQruFDlDQ',
     'График правка': 'https://youtu.be/sF26hjgdjO8',
     'Сообщения': 'https://youtu.be/zgH9ITDHU4U',
     'Сообщения с переводом': 'https://youtu.be/ZICdajkAbNY',
@@ -1119,7 +1120,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
     'Загрузка продуктов текст из таблицы': 'https://youtu.be/tYsFlIll954',
   };
 
+  /// Извлекает video ID из URL или возвращает как есть, если уже ID (напр. tJvjUcNRnsc-1)
+  static String? _videoId(String urlOrId) {
+    final s = urlOrId.trim();
+    if (s.isEmpty) return null;
+    if (!s.contains('://')) return s; // уже ID
+    final uri = Uri.tryParse(s);
+    if (uri == null) return null;
+    if (uri.host.contains('youtu.be') && uri.pathSegments.isNotEmpty) {
+      return uri.pathSegments.first;
+    }
+    return uri.queryParameters['v'];
+  }
+
+  static String _fallbackYoutubeUrl(String urlOrId) {
+    final id = _videoId(urlOrId);
+    if (id == null) return urlOrId;
+    final baseId = id.contains('-') ? id.split('-').first : id;
+    return 'https://youtu.be/$baseId';
+  }
+
   void _showTrainingDialog(BuildContext context, LocalizationService loc) {
+    final accountManager = context.read<AccountManagerSupabase>();
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1135,9 +1157,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 trailing: const Icon(Icons.open_in_new, size: 18),
                 dense: true,
                 onTap: () async {
-                  final uri = Uri.parse(e.value);
-                  if (await canLaunchUrl(uri)) {
-                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  final videoId = _videoId(e.value);
+                  String? url = _fallbackYoutubeUrl(e.value);
+                  if (videoId != null) {
+                    try {
+                      final res = await accountManager.supabase.client.functions.invoke(
+                        'get-training-video-url',
+                        queryParameters: {'id': videoId},
+                      );
+                      if (res.status == 200 && res.data is Map) {
+                        final data = res.data as Map<String, dynamic>;
+                        url = data['url']?.toString();
+                      }
+                    } catch (_) {}
+                  }
+                  if (url != null) {
+                    final uri = Uri.parse(url);
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    }
                   }
                 },
               );
@@ -1739,14 +1777,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => _showClearNomenclatureConfirm(context, localization),
               ),
-              // Временно (Beta): удалить все ТТК
-              ListTile(
-                leading: const Icon(Icons.restaurant_menu, color: Colors.orange),
-                title: Text(localization.t('clear_all_ttk') ?? 'Удалить все ТТК'),
-                subtitle: const Text('Временно для тестов (Beta)'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => _showClearAllTtkConfirm(context, localization),
-              ),
+              // Только в Beta: удалить все ТТК (в Prod не показывается)
+              if (const bool.fromEnvironment('IS_BETA', defaultValue: false))
+                ListTile(
+                  leading: const Icon(Icons.restaurant_menu, color: Colors.orange),
+                  title: Text(localization.t('clear_all_ttk') ?? 'Удалить все ТТК'),
+                  subtitle: const Text('Временно для тестов (Beta)'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _showClearAllTtkConfirm(context, localization),
+                ),
             ],
             if (currentEmployee.hasRole('owner')) ...[
               // 1. Должность — добавляемая должность для собственника (не «собственник»)

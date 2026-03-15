@@ -26,6 +26,8 @@ const STRUCTURAL_PHRASES = [
   /в\s+расчёте\s+на/i, /информация\s+о\s+пищ/i, /^итого\s*$/i, /срок\s+хранен/i,
   /^ед\.?\s*изм/i, /способ\s*(приготовления|оформления)?$/i, /ресторан\s*[«""]/i,
   /органолептическ/i,
+  // Shama: фрагменты заголовка таблицы «Расход сырья и п/ф на 1 порцию, г» и «на 10 порций, г»
+  /^порцию[,]?\s*г/i, /^порций[,]?\s*(г|$)/i, /порцию,?\s*г\s+расход/i, /^расход\s+с/i, /расход\s+сырья/i,
 ];
 /** Глаголы технологии (императив) — не продукты. */
 const COOKING_VERBS = /^(взбить|добавить|положить|переложить|использовать|пробить|довести|соединить|перемешать|нарезать|запечь|варить|жарить|тушить|охладить|разогреть)$/i;
@@ -45,10 +47,15 @@ export function isStructuralProductName(s: string, fromPdf: boolean): boolean {
 
 /** Индекс первой строки с границей секции (конец таблицы). */
 function findTableEndRow(rows: string[][], fromRow: number): number {
+  const MIN_DATA_ROWS = 3; // Shama: metadata может быть извлечён до таблицы (порядок PDF)
   for (let r = fromRow; r < rows.length && r < fromRow + 200; r++) {
     const row = rows[r] ?? [];
     const text = row.map((c) => (c ?? "").trim()).join(" ").toLowerCase();
-    if (SECTION_BOUNDARY_REGEX.test(text)) return r;
+    if (!SECTION_BOUNDARY_REGEX.test(text)) continue;
+    const dataRowsCount = r - fromRow;
+    // Shama: метаданные и заголовки секций могут быть извлечены ДО таблицы ингредиентов
+    if (dataRowsCount < MIN_DATA_ROWS && /технологическая\s+карта\s+№|выход\s+на\s+1\s+порцию|масса\s+полуфабриката|информация\s+о\s+пищевой|технологический\s+процесс/i.test(text)) continue;
+    return r;
   }
   return rows.length;
 }
@@ -160,11 +167,12 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
   }
 
   if (headerIdx < 0 || (nameCol < 0 && productCol < 0)) {
-    for (let r = 0; r < rows.length && r < 15; r++) {
+    for (let r = 0; r < rows.length && r < 20; r++) {
       const row = rows[r] ?? [];
       const c0 = (row[0] ?? "").trim().toLowerCase();
       const c1 = (row[1] ?? "").trim();
-      if ((c0 === "№" || c0 === "n" || /^\d+$/.test(c0)) && c1.length >= 2 && !/^[\d,.\s]+$/.test(c1)) {
+      const hasProductLike = c1.length >= 2 && /[а-яА-ЯёЁa-zA-Z]/.test(c1) && !/^[\d,.\s]+$/.test(c1);
+      if ((c0 === "№" || c0 === "n" || /^\d+$/.test(c0)) && hasProductLike) {
         headerIdx = r;
         nameCol = 1;
         productCol = 1;
@@ -264,8 +272,20 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
 
   const flushCard = (yieldGrams?: number | null) => {
     if (currentDish != null && (currentDish.length > 0 || currentIngredients.length > 0)) {
+      const cleanTechPart = (raw: string): string | null => {
+        const s = raw.trim();
+        if (s.length <= 15) return null;
+        if (/^допустимые сроки|информация о пищевой/i.test(s)) return null;
+        // Shama: «Технологический процесс... условия и сроки реализации» + рецепт — сохраняем рецепт
+        const afterHeader = s.replace(/^технологический процесс[^.]*\.?\s*/i, "")
+          .replace(/^изготовления,?\s*оформления\s+и\s+подачи[^,]*,?\s*/i, "")
+          .replace(/^условия и сроки реализации\.?\s*/i, "")
+          .trim();
+        return afterHeader.length > 15 ? afterHeader : (/^технологическ|^условия и сроки/i.test(s) ? null : s);
+      };
       const techText = technologyParts
-        .filter((s) => s.length > 15 && !/^технологический процесс|допустимые сроки|условия и сроки|информация о пищевой/i.test(s.trim()))
+        .map(cleanTechPart)
+        .filter((s): s is string => s != null && s.length > 0)
         .join("\n")
         .trim() || null;
       results.push({
@@ -302,10 +322,14 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
     let weightStartCol = -1;
     if (productVal && cells.length > pCol + 4) {
       const parts: string[] = [productVal];
+      const productText = productVal.toLowerCase();
       for (let c = pCol + 1; c < cells.length - 2; c++) {
         const a = parseNum(cells[c] ?? "");
         const b = parseNum(cells[c + 1] ?? "");
         if (a != null && b != null && a > 0 && a <= 10000 && b > 0 && b <= 10000) {
+          // Shama: product can contain form size (на 1200 тесто) — skip block if gross appears in product
+          const looksLikeFormSize = /\b\d{3,4}\b/.test(productText) && new RegExp(`\\b${Math.round(a)}\\b`).test(productText);
+          if (looksLikeFormSize) continue;
           weightStartCol = c;
           if (parts.length > 1) productVal = parts.join(" ");
           break;
@@ -363,6 +387,17 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
       const looksLikeDishName = /^[а-яА-ЯёЁ\s]+\s+к\s+[а-яА-ЯёЁ\s]+$/.test(productVal.trim()) && productVal.trim().length < 30;
       if (both100 && looksLikeDishName) continue;
       let outputG = parseNum(outputVal);
+      // Shama: electricity row — gross=5, net=5, output=50 (кВт·ч). If output equals gross when gross≤20, look for larger value
+      if (gross != null && net != null && gross === net && gross <= 20 && (outputG == null || outputG <= gross)) {
+        const oCol = weightStartCol >= 0 ? weightStartCol + 2 : outputCol;
+        for (let c = Math.max(oCol, 0) + 1; c < cells.length; c++) {
+          const v = parseNum(cells[c] ?? "");
+          if (v != null && v > gross && v <= 1000) {
+            outputG = v;
+            break;
+          }
+        }
+      }
       if (grossColIsKg && gross != null && gross > 0 && gross < 100) gross = gross * 1000;
       if (netColIsKg && net != null && net > 0 && net < 100) net = net * 1000;
       if (outputColIsKg && outputG != null && outputG > 0 && outputG < 100) outputG = outputG * 1000;
@@ -390,6 +425,64 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
   flushCard(undefined);
 
   return results;
+}
+
+/** Жадный fallback: извлекает ингредиенты без заголовка. Для обучения — хоть что-то, пользователь поправит. */
+export function parseTtkGreedy(rows: string[][], rawText: string): TtkCard[] {
+  if (rows.length < 2) return [];
+  const dishName =
+    rawText.match(/Технологическая\s+карта\s+№\s*\d+[^\n]*\n\s*([^\n]{4,80})/i)?.[1]?.trim() ||
+    rawText.match(/Наименование[^:]*:\s*([^\n]+)/i)?.[1]?.trim() ||
+    null;
+  const techMatch = rawText.match(/Технологический\s+процесс[\s\S]*?([\s\S]{50,600}?)(?=Допустимые сроки|$)/i);
+  const technologyText = techMatch ? techMatch[1].replace(/\s+/g, " ").trim().slice(0, 2000) : null;
+
+  const ingredients: TtkIngredient[] = [];
+  const boundaryRe = /технологическая\s+карта\s+№|выход\s+на\s+1\s+порцию|масса\s+полуфабриката|информация\s+о\s+пищевой|технологический\s+процесс|допустимые\s+сроки/i;
+
+  for (let r = 0; r < rows.length && r < 80; r++) {
+    const cells = (rows[r] ?? []).map((c) => (c ?? "").trim()).filter(Boolean);
+    if (cells.length < 3) continue;
+    const rowText = cells.join(" ").toLowerCase();
+    if (boundaryRe.test(rowText)) break;
+
+    let productVal = "";
+    let gross: number | null = null;
+    let net: number | null = null;
+    let output: number | null = null;
+    for (let c = 0; c < cells.length - 2; c++) {
+      const a = parseNum(cells[c]);
+      const b = parseNum(cells[c + 1]);
+      if (a != null && b != null && a > 0 && a <= 100000 && b > 0 && b <= 100000) {
+        const before = cells.slice(0, c).filter((x) => x && !/^[\d,.\s\-]+$/.test(x)).join(" ").trim();
+        if (before.length >= 3 && !isStructuralProductName(before, true)) {
+          productVal = before;
+          gross = a;
+          net = b;
+          output = parseNum(cells[c + 2] ?? "") ?? b;
+          break;
+        }
+      }
+    }
+    if (productVal && gross != null && net != null) {
+      ingredients.push({
+        productName: productVal.replace(/^Т\.\s*/i, "").replace(/^П\/Ф\s*/i, "").trim(),
+        grossGrams: gross,
+        netGrams: net,
+        primaryWastePct: null,
+        outputGrams: output ?? net,
+        unit: "g",
+      } as TtkIngredient);
+    }
+  }
+
+  if (ingredients.length < 1) return [];
+  return [{
+    dishName: dishName && dishName.length >= 2 ? dishName : "Блюдо",
+    technologyText,
+    ingredients,
+    isSemiFinished: (dishName ?? "").toLowerCase().includes("пф"),
+  }];
 }
 
 /** Нормализация ячейки: лишние пробелы, чтобы подпись совпадала с каталогом. */
@@ -679,12 +772,19 @@ export function pdfMergeContinuationLines(text: string): string {
       const trimmed = line.trim();
       const endsWithContinuation = /[%),\s]$/.test(trimmed) || /[а-яёa-z]$/i.test(trimmed);
       const trailingNums = line.match(/([\d,.\s]+)$/);
-      const hasTrailingWeights = !!trailingNums && trailingNums[1].trim().split(/\s+/).filter(Boolean).length >= 2;
+      const trailingCount = trailingNums ? trailingNums[1].trim().split(/\s+/).filter(Boolean).length : 0;
+      const hasTrailingWeights = trailingCount >= 2;
+      // Shama: row "2 электричество 5 5" + next "50 5 50 50" — merge (output and 10-portion block on next line)
+      const trailingOnlyTwo = trailingCount === 2;
+      const nextAllNumbers = /^[\d,.\s]+$/.test(next) && next.trim().split(/\s+/).filter(Boolean).length >= 2;
       const nextIsContinuation =
         (next.length <= 25 && !/^\d+\s+[а-яА-Яё]/i.test(next) && !/^технологическ|^допустимые|^информация/i.test(next)) ||
-        /^[а-яёa-z\(\)]/.test(next) ||
+        (/^[а-яёa-z\(\)]/.test(next) && !/^технологическ/i.test(trimmed)) ||
+        nextAllNumbers ||
         /^[\d,.\s]+$/.test(next);
-      if (!hasTrailingWeights && (endsWithContinuation || line.length < 30) && nextIsContinuation && j - i < 3) {
+      const mergeContinuation = !hasTrailingWeights && (endsWithContinuation || line.length < 30) && nextIsContinuation && j - i < 3;
+      const mergeShamaWeights = trailingOnlyTwo && nextAllNumbers && j - i < 2;
+      if ((mergeContinuation || mergeShamaWeights) && nextIsContinuation) {
         line = line + " " + next;
         j++;
       } else {

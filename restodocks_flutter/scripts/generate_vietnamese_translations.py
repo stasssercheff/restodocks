@@ -47,6 +47,12 @@ def translate_batch(texts: list[str], fallbacks: list[str], use_batch: bool = Tr
 def main():
     root = Path(__file__).parent.parent
     path = root / "assets/translations/localizable.json"
+    # Бэкап перед переводом
+    from datetime import datetime
+    bak = path.with_suffix(f".json.bak.{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+    import shutil
+    shutil.copy(path, bak)
+    print(f"Backup: {bak.name}")
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
@@ -59,7 +65,7 @@ def main():
     keys = list(en.keys())
     print(f"Translating {len(keys)} keys to Vietnamese...")
 
-    batch_size = 15
+    batch_size = 50
     for i in range(0, len(keys), batch_size):
         batch_keys = keys[i : i + batch_size]
         batch_values = [str(en[k]) for k in batch_keys]
@@ -68,13 +74,17 @@ def main():
             vi[k] = v if v else str(en[k])
         print(f"  {min(i + batch_size, len(keys))}/{len(keys)} done")
         if i + batch_size < len(keys):
-            time.sleep(1.5)
+            time.sleep(0.5)
 
-    data["vi"] = vi
+    # Слияние: сохраняем существующие ключи vi, новые переводы перезаписывают
+    existing_vi = data.get("vi") or {}
+    merged = {**existing_vi, **vi}
+    data["vi"] = merged
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-    print(f"Done. Vietnamese section has {len(vi)} keys.")
+    preserved = len(merged) - len(vi)
+    print(f"Done. Vietnamese: {len(vi)} translated, {max(0, preserved)} preserved, total {len(merged)} keys.")
 
 
 if __name__ == "__main__":

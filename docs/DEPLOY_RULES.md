@@ -60,6 +60,7 @@ npx supabase functions deploy tt-parse-save-learning --project-ref osglfptwbuqqm
 npx supabase functions deploy ai-recognize-tech-cards-batch --project-ref osglfptwbuqqmqunttha
 npx supabase functions deploy ai-parse-tech-cards-pdf --project-ref osglfptwbuqqmqunttha
 npx supabase functions deploy request-change-password --project-ref osglfptwbuqqmqunttha
+npx supabase functions deploy get-training-video-url --project-ref osglfptwbuqqmqunttha   # RU → Supabase Storage, остальные → YouTube
 ```
 
 ### Проверка импорта ТТК и обучения на Beta

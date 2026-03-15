@@ -58,11 +58,19 @@ async function translateWithDeepL(
 
   if (!res.ok) {
     console.error("[auto-translate-product] DeepL error:", res.status, await res.text());
+    // Fallback для vi: MyMemory API (бесплатно, без ключа)
+    if (tgt === "VI") {
+      const fallback = await translateWithMyMemory(text.trim(), src, "vi");
+      if (fallback) return fallback;
+    }
     return null;
   }
 
   const data = await res.json() as { translations?: Array<{ text?: string }> };
-  const translated = data?.translations?.[0]?.text?.trim();
+  let translated = data?.translations?.[0]?.text?.trim();
+  if (!translated && tgt === "VI") {
+    translated = await translateWithMyMemory(text.trim(), src, "vi");
+  }
   if (!translated) return null;
 
   // Сохраняем в кэш (если таблица есть)
@@ -74,6 +82,21 @@ async function translateWithDeepL(
   } catch (_) {}
 
   return translated;
+}
+
+/** MyMemory fallback для vi когда DeepL недоступен. Лимит ~1000 слов/день. */
+async function translateWithMyMemory(text: string, src: string, tgt: string): Promise<string | null> {
+  const srcCode = src === "RU" ? "ru" : src === "EN" ? "en" : src === "ES" ? "es" : src === "TR" ? "tr" : "en";
+  try {
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${srcCode}|${tgt}`;
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    const j = await r.json() as { responseData?: { translatedText?: string } };
+    return j?.responseData?.translatedText?.trim() || null;
+  } catch (e) {
+    console.log("[auto-translate-product] MyMemory fallback err:", (e as Error)?.message);
+    return null;
+  }
 }
 
 Deno.serve(async (req: Request) => {
@@ -90,7 +113,7 @@ Deno.serve(async (req: Request) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
-  let body: { product_id?: string; batch?: boolean };
+  let body: { product_id?: string; batch?: boolean; force_langs?: string[] };
   try {
     body = await req.json();
   } catch {
@@ -99,8 +122,15 @@ Deno.serve(async (req: Request) => {
 
   // Режим batch: переводим продукты постранично (limit/offset для обхода таймаута)
   if (body.batch) {
-    const limit = (body as { batch: boolean; limit?: number; offset?: number }).limit ?? 50;
-    const offset = (body as { batch: boolean; limit?: number; offset?: number }).offset ?? 0;
+    const batchBody = body as {
+      batch: boolean;
+      limit?: number;
+      offset?: number;
+      force_langs?: string[];
+    };
+    const limit = batchBody.limit ?? 50;
+    const offset = batchBody.offset ?? 0;
+    const forceLangs = new Set((batchBody.force_langs ?? []).map((l: string) => l.toLowerCase()));
 
     const { data: products, error } = await supabase
       .from("products")
@@ -131,8 +161,10 @@ Deno.serve(async (req: Request) => {
 
       for (const targetLang of SUPPORTED_LANGS) {
         if (targetLang === sourceLang) continue;
-        // Пропускаем если уже переведено и не совпадает с исходным
-        if (updatedNames[targetLang]?.trim() && updatedNames[targetLang] !== sourceText) continue;
+        // Пропускаем если уже переведено (если не force_langs)
+        const skipExisting = !forceLangs.has(targetLang) &&
+          updatedNames[targetLang]?.trim() && updatedNames[targetLang] !== sourceText;
+        if (skipExisting) continue;
 
         const result = await translateWithDeepL(sourceText, sourceLang, targetLang, deeplKey, supabase);
         if (result && result !== sourceText) {
@@ -189,12 +221,15 @@ Deno.serve(async (req: Request) => {
   const sourceText = names[sourceLang]?.trim() || name;
   const updatedNames: Record<string, string> = { ...names, [sourceLang]: sourceText };
   let needsUpdate = false;
+  const forceLangs = new Set((body.force_langs ?? []).map((l: string) => l.toLowerCase()));
 
   console.log("[auto-translate-product] sourceLang:", sourceLang, "sourceText:", sourceText?.slice(0, 30));
 
   for (const targetLang of SUPPORTED_LANGS) {
     if (targetLang === sourceLang) continue;
-    if (updatedNames[targetLang]?.trim() && updatedNames[targetLang] !== sourceText) continue;
+    const skipExisting = !forceLangs.has(targetLang) &&
+      updatedNames[targetLang]?.trim() && updatedNames[targetLang] !== sourceText;
+    if (skipExisting) continue;
 
     const result = await translateWithDeepL(sourceText, sourceLang, targetLang, deeplKey, supabase);
     if (result && result !== sourceText) {

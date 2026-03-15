@@ -7,6 +7,7 @@
 | Сообщение | Что это | Опасно? |
 |-----------|---------|---------|
 | `401 authenticate-employee` | Проверка сессии / повтор логина при неверном пароле | Нет — ожидаемо до входа |
+| `405 fetch-nutrition-off` | Клиент вызывал POST, функция ожидала только GET | Исправлено: функция принимает GET и POST |
 | `Source Map flutter.js.map SyntaxError` | Flutter не генерирует этот файл, браузер парсит 404 как JSON | Нет — фикс: placeholder в build |
 | `504` / `CORS` на openfoodfacts.org | Open Food Facts иногда отвечает медленно или без CORS | Нет — обход: Edge Function fetch-nutrition-off |
 | `WebGL: non-portable extension` | Браузер/драйвер, не приложение | Нет |
