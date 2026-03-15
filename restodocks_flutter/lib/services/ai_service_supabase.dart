@@ -255,18 +255,22 @@ class AiServiceSupabase implements AiService {
             if (expanded.length < 2) continue;
             final firstRows = expanded.take(3).expand((r) => r).map((c) => c.toLowerCase()).join(' ');
             if (kbzuPattern.hasMatch(firstRows) && expanded.length <= 6 && !firstRows.contains('брутто') && !firstRows.contains('нетто')) continue;
-            var part = await _tryParseByStoredTemplates(expanded);
-            if (part.isEmpty) {
-              final excelErrors = <TtkParseError>[];
-              part = AiServiceSupabase.parseTtkByTemplate(expanded, errors: excelErrors);
-              if (part.isEmpty) part = AiServiceSupabase._tryParseKkFromRows(expanded);
+            // пф хц/пф гц: много блоков [название][заголовок][данные][Выход] — парсим Dart-парсером, иначе EF может вернуть одну карточку со всеми строками
+            var part = AiServiceSupabase._tryParsePfGcFormat(expanded);
+            if (part.length < 2) {
+              part = await _tryParseByStoredTemplates(expanded);
+              if (part.isEmpty) {
+                final excelErrors = <TtkParseError>[];
+                part = AiServiceSupabase.parseTtkByTemplate(expanded, errors: excelErrors);
+                if (part.isEmpty) part = AiServiceSupabase._tryParseKkFromRows(expanded);
+              }
             }
             final multiBlock = AiServiceSupabase._tryParseMultiColumnBlocks(expanded);
             if (_shouldPreferMultiBlock(part, multiBlock)) part = multiBlock;
             merged.addAll(part);
           }
           if (merged.isNotEmpty) {
-            _saveTemplateFromKeywordParse(allSheets.first, 'xlsx');
+            await _saveTemplateFromKeywordParse(allSheets.first, 'xlsx');
             lastParsedRows = allSheets.first;
             if (lastParseHeaderSignature == null || lastParseHeaderSignature!.isEmpty) {
               lastParseHeaderSignature = _headerSignatureFromRows(allSheets.first);
@@ -311,7 +315,7 @@ class AiServiceSupabase implements AiService {
           merged.addAll(part);
         }
         if (merged.isNotEmpty) {
-          _saveTemplateFromKeywordParse(rows, 'docx');
+          await _saveTemplateFromKeywordParse(rows, 'docx');
           // ГОСТ DOCX: извлечь технологию из раздела «4. ТЕХНОЛОГИЧЕСКИЙ ПРОЦЕСС» и подставить во все карточки, где её ещё нет
           final docxTech = _docxExtractTechnology(xlsxBytes);
           if (docxTech != null && docxTech.length >= 20) {
@@ -328,15 +332,16 @@ class AiServiceSupabase implements AiService {
           return _applyParseCorrections(merged, lastParseHeaderSignature, establishmentId);
         }
       }
-      // 1. СНАЧАЛА — сохранённые шаблоны (файлы, по которым уже были сохранены шаблоны, должны распознаваться по ним).
+      // Для одного листа (xls/csv): если Dart-парсер дал карточки с составом — предпочитаем его (шаблон мог дать только название).
       lastParseTechCardErrors = null;
-      var list = await _tryParseByStoredTemplates(rows);
-      // 2. Только если шаблон не найден — эвристики: parseTtkByTemplate, КК.
+      final excelErrors = <TtkParseError>[];
+      final listByTemplate = AiServiceSupabase.parseTtkByTemplate(rows, errors: excelErrors);
+      if (excelErrors.isNotEmpty) lastParseTechCardErrors = excelErrors;
+      final listByStored = await _tryParseByStoredTemplates(rows);
+      final hasTemplateWithIngredients = listByTemplate.isNotEmpty && listByTemplate.any((c) => c.ingredients.isNotEmpty);
+      var list = (hasTemplateWithIngredients || listByStored.isEmpty) ? listByTemplate : listByStored;
       if (list.isEmpty) {
-        final excelErrors = <TtkParseError>[];
-        list = AiServiceSupabase.parseTtkByTemplate(rows, errors: excelErrors);
-        if (excelErrors.isNotEmpty) lastParseTechCardErrors = excelErrors;
-        if (list.isEmpty) list = AiServiceSupabase._tryParseKkFromRows(rows);
+        list = AiServiceSupabase._tryParseKkFromRows(rows);
         final multiBlock = AiServiceSupabase._tryParseMultiColumnBlocks(rows);
         if (_shouldPreferMultiBlock(list, multiBlock)) list = multiBlock;
       }
@@ -361,7 +366,7 @@ class AiServiceSupabase implements AiService {
         }
         // 4. Обучение: сохраняем шаблон для следующих загрузок того же формата
         if (list.isNotEmpty) {
-          _saveTemplateAfterAi(rows, list, source);
+          await _saveTemplateAfterAi(rows, list, source);
         }
       }
       if (list.isNotEmpty) {
@@ -403,7 +408,7 @@ class AiServiceSupabase implements AiService {
       if (list.isEmpty) list = AiServiceSupabase._tryParseKkFromRows(expanded);
     }
     if (list.isNotEmpty) {
-      _saveTemplateFromKeywordParse(expanded, 'text');
+      await _saveTemplateFromKeywordParse(expanded, 'text');
       lastParsedRows = expanded;
       if (lastParseHeaderSignature == null || lastParseHeaderSignature!.isEmpty) {
         lastParseHeaderSignature = _headerSignatureFromRows(expanded);
@@ -482,7 +487,7 @@ class AiServiceSupabase implements AiService {
         if (rowsRaw is List && rowsRaw.isNotEmpty) {
           final rows = rowsRaw.map((r) => (r is List ? r : <String>[]).map((c) => c?.toString() ?? '').toList()).toList();
           if (rows.length >= 2) {
-            _saveTemplateAfterAi(rows, list, 'pdf');
+            await _saveTemplateAfterAi(rows, list, 'pdf');
             lastParsedRows = rows;
             sig = _headerSignatureFromRows(rows);
             if (sig != null && sig.isNotEmpty) lastParseHeaderSignature = sig;
@@ -1028,22 +1033,50 @@ class AiServiceSupabase implements AiService {
         r++;
         continue;
       }
-      if (r + 1 >= rows.length) break;
-      final headerRow = rows[r + 1].map((c) => (c ?? '').toString().trim()).toList();
+      List<String> headerRow;
+      int dataStartR;
+      // Вариант 1: заголовок в следующей строке (классический пф хц)
+      if (r + 1 < rows.length) {
+        final nextRow = rows[r + 1].map((c) => (c ?? '').toString().trim()).toList();
+        final h0 = nextRow.isNotEmpty ? nextRow[0].trim().toLowerCase() : '';
+        final h1 = nextRow.length > 1 ? nextRow[1].trim().toLowerCase() : '';
+        final h2 = nextRow.length > 2 ? nextRow[2].trim().toLowerCase() : '';
+        final h3 = nextRow.length > 3 ? nextRow[3].trim().toLowerCase() : '';
+        final hasNormInHeader = h3.contains('норма') || h3.contains('закладк') || h2.contains('норма');
+        final firstCellOk = h0.isEmpty || h0 == '№' || (h0.contains('наименование') && (h0.contains('продукт') || h0.contains('сырья')));
+        final headerOk = firstCellOk &&
+            (h1.contains('наименование') || h1.contains('ед') || h2.contains('ед')) &&
+            (h2.contains('ед') || h2.contains('изм') || h2.contains('норма') || h3.contains('норма') || h3.contains('закладк'));
+        if (headerOk || (hasNormInHeader && (h1.contains('наименование') || h0.contains('наименование')))) {
+          headerRow = nextRow;
+          dataStartR = r + 2;
+        } else {
+          headerRow = [];
+          dataStartR = -1;
+        }
+      } else {
+        headerRow = [];
+        dataStartR = -1;
+      }
+      // Вариант 2: заголовок в той же строке, что и название (xlsx: название в A1, Наименование продукта|Ед.изм|Норма в B1..F1)
+      if (dataStartR < 0 && row.length >= 3) {
+        final rest = row.sublist(1).map((c) => c.toLowerCase()).toList();
+        final hasNaimen = rest.any((c) => c.contains('наименование') && (c.contains('продукт') || c.contains('сырья')));
+        final hasEdNorm = rest.any((c) => c.contains('ед') || c.contains('изм') || c.contains('норма') || c.contains('закладк'));
+        if (hasNaimen && hasEdNorm) {
+          headerRow = row.sublist(1);
+          dataStartR = r + 1;
+        }
+      }
+      if (dataStartR < 0 || headerRow.isEmpty) {
+        r++;
+        continue;
+      }
       final h0 = headerRow.isNotEmpty ? headerRow[0].trim().toLowerCase() : '';
       final h1 = headerRow.length > 1 ? headerRow[1].trim().toLowerCase() : '';
       final h2 = headerRow.length > 2 ? headerRow[2].trim().toLowerCase() : '';
       final h3 = headerRow.length > 3 ? headerRow[3].trim().toLowerCase() : '';
       final hasNormInHeader = h3.contains('норма') || h3.contains('закладк') || h2.contains('норма');
-      // Заголовок: (пусто/№/«Наименование продукта») + наименование/ед.изм + норма/ед
-      final firstCellOk = h0.isEmpty || h0 == '№' || (h0.contains('наименование') && (h0.contains('продукт') || h0.contains('сырья')));
-      final headerOk = firstCellOk &&
-          (h1.contains('наименование') || h1.contains('ед') || h2.contains('ед')) &&
-          (h2.contains('ед') || h2.contains('изм') || h2.contains('норма') || h3.contains('норма') || h3.contains('закладк'));
-      if (!headerOk && !(hasNormInHeader && (h1.contains('наименование') || h0.contains('наименование')))) {
-        r++;
-        continue;
-      }
       int techColByHeader = -1;
       for (var i = 0; i < headerRow.length; i++) {
         if (headerRow[i].toLowerCase().contains('технол')) {
@@ -1055,7 +1088,7 @@ class AiServiceSupabase implements AiService {
       final ingredients = <TechCardIngredientLine>[];
       String? technologyText;
       double? outputGrams;
-      var dataR = r + 2;
+      var dataR = dataStartR;
       while (dataR < rows.length) {
         final dr = rows[dataR].map((c) => (c ?? '').toString().trim()).toList();
         if (dr.every((c) => c.isEmpty)) { dataR++; continue; }
@@ -1324,7 +1357,7 @@ class AiServiceSupabase implements AiService {
 
     // Динамическая детекция колонок: находим строку-заголовок с Наименование, Брутто, Нетто
     for (var r = 0; r < rows.length && r < 25; r++) {
-      final row = rows[r].map((c) => c.trim().toLowerCase()).toList();
+      final row = rows[r].map((c) => (c is String ? c : c?.toString() ?? '').trim().toLowerCase()).toList();
       for (var c = 0; c < row.length; c++) {
         final cell = row[c];
         if (cell.isEmpty) continue;
@@ -1795,7 +1828,91 @@ class AiServiceSupabase implements AiService {
       r++;
     }
     flushCard();
+    // Резерв для iiko/1С (печенная свекла.xls): если получилась одна карточка только с названием — пробуем явный поиск заголовка №|Наименование продукта|…|Вес брутто, кг|Вес нетто
+    if (results.length == 1 &&
+        results.single.ingredients.isEmpty &&
+        results.single.dishName != null &&
+        results.single.dishName!.trim().isNotEmpty) {
+      final iiko = _tryParseIikoStyleFallback(rows, results.single.dishName!);
+      if (iiko.isNotEmpty && iiko.first.ingredients.isNotEmpty) return iiko;
+    }
     return results;
+  }
+
+  /// Резервный парсинг формата iiko/1С: № | Наименование продукта | Ед. изм. | Брутто в ед. изм. | Вес брутто, кг | Вес нетто… | Вес готового… | Технология
+  static List<TechCardRecognitionResult> _tryParseIikoStyleFallback(List<List<String>> rows, String dishName) {
+    if (rows.length < 3) return [];
+    int headerIdx = -1;
+    int productCol = 1;
+    int grossCol = 4;
+    int netCol = 5;
+    int outputCol = 6;
+    for (var r = 0; r < rows.length && r < 30; r++) {
+      final row = rows[r].map((c) => (c is String ? c : c?.toString() ?? '').trim()).toList();
+      if (row.length < 6) continue;
+      final c0 = row[0].toLowerCase();
+      final hasNum = c0 == '№' || c0 == 'n' || RegExp(r'^\d+$').hasMatch(c0);
+      bool hasProduct = false;
+      bool hasBrutto = false;
+      bool hasNetto = false;
+      for (var c = 1; c < row.length && c < 10; c++) {
+        final h = row[c].toLowerCase();
+        if (h.contains('наименование') && h.contains('продукт')) hasProduct = true;
+        if (h.contains('брутто') || h.contains('вес брутто')) hasBrutto = true;
+        if (h.contains('нетто') || h.contains('вес нетто')) hasNetto = true;
+      }
+      if (hasNum && hasProduct && hasBrutto && hasNetto) {
+        headerIdx = r;
+        for (var c = 1; c < row.length && c < 10; c++) {
+          final h = row[c].toLowerCase();
+          if (h.contains('наименование') && h.contains('продукт')) productCol = c;
+          if ((h.contains('вес брутто') || h.contains('брутто')) && h.contains('кг')) grossCol = c;
+          if ((h.contains('вес нетто') || h.contains('нетто')) && (h.contains('кг') || h.contains('п/ф'))) netCol = c;
+          if (h.contains('вес готового') || (h.contains('выход') && c > netCol)) outputCol = c;
+        }
+        break;
+      }
+    }
+    if (headerIdx < 0) return [];
+    final headerRow = rows[headerIdx].map((c) => (c is String ? c : c?.toString() ?? '').trim().toLowerCase()).toList();
+    final grossIsKg = grossCol < headerRow.length && headerRow[grossCol].contains('кг');
+    final netIsKg = netCol < headerRow.length && headerRow[netCol].contains('кг');
+    final ingredients = <TechCardIngredientLine>[];
+    for (var r = headerIdx + 1; r < rows.length; r++) {
+      final cells = rows[r].map((c) => (c is String ? c : c?.toString() ?? '').trim()).toList();
+      if (cells.length <= productCol) continue;
+      final c0 = cells[0].toLowerCase();
+      if (c0 == 'итого' || c0.startsWith('всего') || (c0.contains('вес готового') && cells.length < 5)) break;
+      if (!RegExp(r'^\d+$').hasMatch(c0)) continue;
+      final productVal = cells.length > productCol ? cells[productCol].trim() : '';
+      if (productVal.isEmpty || productVal.length < 2) continue;
+      var gross = _parseNum(cells.length > grossCol ? cells[grossCol] : '');
+      var net = _parseNum(cells.length > netCol ? cells[netCol] : '');
+      var output = outputCol < cells.length ? _parseNum(cells[outputCol]) : null;
+      if (grossIsKg && gross != null && gross > 0 && gross < 100) gross = gross * 1000;
+      if (netIsKg && net != null && net > 0 && net < 100) net = net * 1000;
+      if (output != null && output > 0 && output < 100 && outputCol < headerRow.length && headerRow[outputCol].contains('кг')) output = output * 1000;
+      if ((gross == null || gross <= 0) && (net == null || net <= 0)) continue;
+      final cleanName = productVal.replaceFirst(RegExp(r'^Т\.\s*', caseSensitive: false), '').replaceFirst(RegExp(r'^П/Ф\s*', caseSensitive: false), '').trim();
+      if (cleanName.isEmpty || _isJunkProductName(cleanName)) continue;
+      ingredients.add(TechCardIngredientLine(
+        productName: cleanName,
+        grossGrams: gross ?? net ?? 0,
+        netGrams: net ?? gross ?? 0,
+        outputGrams: output,
+        primaryWastePct: null,
+        unit: 'g',
+        ingredientType: RegExp(r'^П/Ф\s', caseSensitive: false).hasMatch(productVal) ? 'semi_finished' : 'product',
+      ));
+    }
+    if (ingredients.isEmpty) return [];
+    return [
+      TechCardRecognitionResult(
+        dishName: dishName,
+        ingredients: ingredients,
+        isSemiFinished: dishName.toLowerCase().contains('пф'),
+      ),
+    ];
   }
 
   /// Безопасный парсинг числа: «0.5 кг», «1/2 шт», запятые, пробелы. Никогда не бросает.
@@ -2404,7 +2521,7 @@ class AiServiceSupabase implements AiService {
   }
 
   /// Сохранить шаблон при успешном парсинге по ключевым словам (без AI). Повторная загрузка — из каталога.
-  void _saveTemplateFromKeywordParse(List<List<String>> rows, String source) {
+  Future<void> _saveTemplateFromKeywordParse(List<List<String>> rows, String source) async {
     try {
       int headerIdx = -1;
       int nameCol = -1, productCol = -1, grossCol = -1, netCol = -1, wasteCol = -1, outputCol = -1;
@@ -2446,7 +2563,7 @@ class AiServiceSupabase implements AiService {
       final sig = _headerSignature(rows[headerIdx].map((c) => c.trim()).toList());
       if (sig.isEmpty) return;
       lastParseHeaderSignature = sig;
-      unawaited(_saveLearningViaEdgeFunction({
+      await _saveLearningViaEdgeFunction({
         'template': {
           'header_signature': sig,
           'header_row_index': headerIdx,
@@ -2458,11 +2575,12 @@ class AiServiceSupabase implements AiService {
           'output_col': outputCol >= 0 ? outputCol : -1,
           'source': source,
         },
-      }).then((_) => devLog('[tt_parse] template saved: sig=$sig (keyword)')));
+      });
+      devLog('[tt_parse] template saved: sig=$sig (keyword)');
     } catch (_) {}
   }
 
-  void _saveTemplateAfterAi(List<List<String>> rows, List<TechCardRecognitionResult> cards, String source) {
+  Future<void> _saveTemplateAfterAi(List<List<String>> rows, List<TechCardRecognitionResult> cards, String source) async {
     try {
       final allNames = cards.expand((c) => c.ingredients.map((i) => stripIikoPrefix(i.productName).trim().toLowerCase())).where((s) => s.length > 2).toSet().toList();
       if (allNames.isEmpty) return;
@@ -2507,7 +2625,7 @@ class AiServiceSupabase implements AiService {
       final sig = _headerSignature(rows[bestHeaderIdx].map((c) => c.trim()).toList());
       if (sig.isEmpty) return;
       lastParseHeaderSignature = sig;
-      unawaited(_saveLearningViaEdgeFunction({
+      await _saveLearningViaEdgeFunction({
         'template': {
           'header_signature': sig,
           'header_row_index': bestHeaderIdx,
@@ -2519,7 +2637,8 @@ class AiServiceSupabase implements AiService {
           'output_col': -1,
           'source': source,
         },
-      }).then((_) => devLog('[tt_parse] template saved: sig=$sig (ai)')));
+      });
+      devLog('[tt_parse] template saved: sig=$sig (ai)');
     } catch (_) {}
   }
 
