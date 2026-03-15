@@ -392,12 +392,9 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
   return results;
 }
 
-/** Нормализация ячейки: лишние пробелы, чтобы подпись совпадала с каталогом. */
+/** Нормализация ячейки для подписи. Должна совпадать с _headerSignature в Dart (только trim + toLowerCase), иначе сохранённое обучение не находится при парсинге. */
 function normalizeCellForSignature(s: string): string {
-  return (s ?? "")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, " ");
+  return (s ?? "").trim().toLowerCase();
 }
 
 /** Подпись заголовка для сопоставления с каталогом шаблонов */
