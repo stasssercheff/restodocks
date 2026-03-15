@@ -886,12 +886,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
               final net = line.netGrams ?? line.grossGrams ?? gross;
               final unit = line.unit?.trim().isNotEmpty == true ? line.unit! : 'g';
               final wastePct = (line.primaryWastePct ?? 0).clamp(0.0, 99.9);
+              final outG = line.outputGrams != null && line.outputGrams! > 0 ? line.outputGrams! : 0.0;
               _ingredients.add(TTIngredient(
                 id: DateTime.now().millisecondsSinceEpoch.toString() + _ingredients.length.toString(),
                 productId: null,
                 productName: line.productName.trim(),
                 grossWeight: gross > 0 ? gross : 100,
                 netWeight: net > 0 ? net : (gross > 0 ? gross : 100),
+                outputWeight: outG,
                 unit: unit,
                 primaryWastePct: wastePct,
                 cookingLossPctOverride: line.cookingLossPct != null ? line.cookingLossPct!.clamp(0.0, 99.9) : null,
@@ -1533,10 +1535,11 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     if (ai.technologyText != null && ai.technologyText!.trim().isNotEmpty) {
       _technologyController.text = ai.technologyText!.trim();
     }
-    if (ai.yieldGrams != null && ai.yieldGrams! > 0) {
+    if (ai.isSemiFinished != null) _isSemiFinished = ai.isSemiFinished!;
+    // ТТК блюдо: вес порции = выход из парсинга (для ПФ не подставляем)
+    if (!_isSemiFinished && ai.yieldGrams != null && ai.yieldGrams! > 0) {
       _portionWeight = ai.yieldGrams!.toDouble();
     }
-    if (ai.isSemiFinished != null) _isSemiFinished = ai.isSemiFinished!;
     final canEdit = context.read<AccountManagerSupabase>().currentEmployee?.canEditChecklistsAndTechCards ?? false;
           final addPlaceholders = canEdit && !widget.forceViewMode;
     final hadPlaceholder = _ingredients.isNotEmpty && _ingredients.last.isPlaceholder;
@@ -1546,6 +1549,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         if (line.productName.trim().isEmpty) continue;
         final gross = line.grossGrams ?? 0.0;
         final net = line.netGrams ?? line.grossGrams ?? gross;
+        final outG = line.outputGrams != null && line.outputGrams! > 0 ? line.outputGrams! : 0.0;
         final unit = line.unit?.trim().isNotEmpty == true ? line.unit! : 'g';
         final wastePct = (line.primaryWastePct ?? 0).clamp(0.0, 99.9);
         _ingredients.add(TTIngredient(
@@ -1554,6 +1558,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           productName: line.productName.trim(),
           grossWeight: gross > 0 ? gross : 100,
           netWeight: net > 0 ? net : (gross > 0 ? gross : 100),
+          outputWeight: outG,
           unit: unit,
           primaryWastePct: wastePct,
           cookingLossPctOverride: line.cookingLossPct != null ? line.cookingLossPct!.clamp(0.0, 99.9) : null,

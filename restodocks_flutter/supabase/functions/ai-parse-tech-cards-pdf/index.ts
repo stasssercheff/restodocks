@@ -48,12 +48,12 @@ const PDF_SYSTEM_PROMPT = `Ты парсер технологических ка
 
 Форматы: ГОСТ 31987-2012, СТБ 1210, Сборник: таблица "Наименование сырья" + "Расход сырья на 1 порцию" (г, мл) с колонками Брутто/Нетто; строка "Выход готовой продукции" (г). Варианты по сезону (Свекла до 01.01 / с 01.01) — брать оба или основной.
 
-Структура бывает разной: название в заголовке или отдельной строке; таблица с колонками № / Наименование / Продукт / Сырьё / Брутто / Нетто / Расход / Норма / Цена / Сумма; числа в граммах или кг (запятая как десятичный разделитель). Для grossGrams/netGrams бери любые подходящие числа (брутто, нетто, норма в кг×1000). ingredientType: "product" — сырьё (Т.); "semi_finished" — ПФ (П/Ф). isSemiFinished: true если в названии "ПФ".
+Структура бывает разной: название в заголовке или отдельной строке; таблица с колонками № / Наименование / Продукт / Сырьё / Брутто / Нетто / Выход / Расход / Норма / Цена / Сумма; числа в граммах или кг (запятая как десятичный разделитель). Для grossGrams/netGrams бери любые подходящие числа (брутто, нетто, норма в кг×1000). Если в таблице есть колонка «Выход» (г) — заполняй outputGrams для каждого ингредиента. Если в документе есть строка «Выход на 1 порцию: X г» или «Выход готовой продукции: X г» — заполняй yieldGrams в карточке (для блюда это вес порции). ingredientType: "product" — сырьё (Т.); "semi_finished" — ПФ (П/Ф). isSemiFinished: true если в названии "ПФ".
 
 Если есть КК (калькуляционная карта) с ценами — извлекай pricePerKg (цена за кг или за л, руб.) для каждого ингредиента. Это важно для расчёта себестоимости.
 
 Верни ТОЛЬКО валидный JSON, без markdown и обёрток:
-{ "cards": [ { "dishName": string, "technologyText": string|null, "isSemiFinished": boolean|null, "ingredients": [ { "productName": string, "grossGrams": number|null, "netGrams": number|null, "primaryWastePct": number|null, "cookingMethod": string|null, "cookingLossPct": number|null, "unit": string|null, "ingredientType": "product"|"semi_finished"|null, "pricePerKg": number|null } ] } ] }
+{ "cards": [ { "dishName": string, "technologyText": string|null, "isSemiFinished": boolean|null, "yieldGrams": number|null, "ingredients": [ { "productName": string, "grossGrams": number|null, "netGrams": number|null, "outputGrams": number|null, "primaryWastePct": number|null, "cookingMethod": string|null, "cookingLossPct": number|null, "unit": string|null, "ingredientType": "product"|"semi_finished"|null, "pricePerKg": number|null } ] } ] }
 
 Если нет ни одной карточки: { "cards": [] }`;
 
@@ -221,12 +221,7 @@ Deno.serve(async (req: Request) => {
       const normalized = templateCards.map((card) => {
         const filtered = filterGarbageIngredients(card.ingredients, (s) => isStructuralProductName(s, true));
         const noDishName = dropIngredientsMatchingDishName(filtered, card.dishName);
-        return {
-        dishName: card.dishName ?? null,
-        technologyText: card.technologyText ?? null,
-        isSemiFinished: card.isSemiFinished ?? undefined,
-        yieldGrams: extractedYield ?? card.yieldGrams ?? undefined,
-        ingredients: noDishName.map((i) => ({
+        let ingredients = noDishName.map((i) => ({
           productName: i.productName,
           grossGrams: i.grossGrams ?? undefined,
           netGrams: i.netGrams ?? undefined,
@@ -236,7 +231,17 @@ Deno.serve(async (req: Request) => {
           cookingMethod: undefined,
           cookingLossPct: undefined,
           ingredientType: undefined,
-        })),
+        }));
+        // Shama: если в тексте явно «Выход на 1 порцию: 25 г» — использовать для единственного ингредиента (приоритет над колонкой таблицы)
+        if (extractedYield != null && extractedYield > 0 && ingredients.length === 1) {
+          ingredients = [{ ...ingredients[0], outputGrams: extractedYield }];
+        }
+        return {
+        dishName: card.dishName ?? null,
+        technologyText: card.technologyText ?? null,
+        isSemiFinished: card.isSemiFinished ?? undefined,
+        yieldGrams: extractedYield ?? card.yieldGrams ?? undefined,
+        ingredients,
         };
       });
       // Возвращаем rows для обучения на клиенте (learnDishNamePosition, дообучение)
@@ -332,6 +337,10 @@ Deno.serve(async (req: Request) => {
     // Возвращаем rows для обучения шаблонов на клиенте (когда AI успешно распарсил)
     const rowsForLearning = rows.length >= 2 && cards.length > 0 ? rows : undefined;
 
+    // Выход на 1 порцию из текста (для AI-пути; для шаблона уже учтён выше)
+    const yieldMatchAi = text.match(/Выход\s+на\s+1\s+порцию\s*:\s*(\d+)\s*г/i);
+    const extractedYieldAi = yieldMatchAi ? parseInt(yieldMatchAi[1], 10) : undefined;
+
     const normalized = cards.map((card) => {
       const c = card as Record<string, unknown>;
       const dishName = c.dishName != null ? String(c.dishName) : null;
@@ -343,6 +352,7 @@ Deno.serve(async (req: Request) => {
               productName: String(i.productName ?? ""),
               grossGrams: i.grossGrams != null ? Number(i.grossGrams) : undefined,
               netGrams: i.netGrams != null ? Number(i.netGrams) : undefined,
+              outputGrams: i.outputGrams != null ? Number(i.outputGrams) : undefined,
               unit: i.unit != null ? String(i.unit) : undefined,
               cookingMethod: i.cookingMethod != null ? String(i.cookingMethod) : undefined,
               primaryWastePct: i.primaryWastePct != null ? Number(i.primaryWastePct) : undefined,
@@ -353,12 +363,16 @@ Deno.serve(async (req: Request) => {
           })
         : [];
       const filtered = filterGarbageIngredients(rawIngredients, (s) => isStructuralProductName(s, true));
-      const ingredients = dropIngredientsMatchingDishName(filtered, dishName);
+      let ingredients = dropIngredientsMatchingDishName(filtered, dishName);
+      if (extractedYieldAi != null && extractedYieldAi > 0 && ingredients.length === 1 && (ingredients[0].outputGrams == null || ingredients[0].outputGrams === 0)) {
+        ingredients = [{ ...ingredients[0], outputGrams: extractedYieldAi }];
+      }
       return {
         dishName,
         technologyText: c.technologyText != null ? String(c.technologyText) : null,
         ingredients,
         isSemiFinished: typeof c.isSemiFinished === "boolean" ? c.isSemiFinished : undefined,
+        yieldGrams: extractedYieldAi ?? (c.yieldGrams != null ? Number(c.yieldGrams) : undefined),
       };
     });
 

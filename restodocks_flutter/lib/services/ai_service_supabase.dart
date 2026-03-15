@@ -345,6 +345,26 @@ class AiServiceSupabase implements AiService {
         final multiBlock = AiServiceSupabase._tryParseMultiColumnBlocks(rows);
         if (_shouldPreferMultiBlock(list, multiBlock)) list = multiBlock;
       }
+      // 2b. iiko/1С (печенная свекла.xls): если 0 карточек — пробуем извлечь название из первых строк и парсить по iiko-заголовку
+      if (list.isEmpty && rows.length >= 4) {
+        String? extractedDish;
+        for (var r = 0; r < rows.length && r < 15; r++) {
+          for (final cell in rows[r]) {
+            final s = (cell is String ? cell : cell?.toString() ?? '').trim();
+            if (s.length >= 10 && s.length <= 120 && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(s) &&
+                !RegExp(r'^(№|наименование|брутто|нетто|технология|органолептическ|хранение|область)', caseSensitive: false).hasMatch(s) &&
+                !s.toLowerCase().contains('название на чеке')) {
+              extractedDish = s;
+              break;
+            }
+          }
+          if (extractedDish != null) break;
+        }
+        if (extractedDish != null) {
+          final iiko = AiServiceSupabase._tryParseIikoStyleFallback(rows, extractedDish);
+          if (iiko.isNotEmpty && iiko.first.ingredients.isNotEmpty) list = iiko;
+        }
+      }
       // 3. Только если и там пусто — вызываем AI (лимит 3/день)
       if (list.isEmpty) {
         lastParseTechCardExcelReason = null;
@@ -1549,7 +1569,7 @@ class AiServiceSupabase implements AiService {
     final currentIngredients = <TechCardIngredientLine>[];
     String? currentTechnologyText;
 
-    void flushCard() {
+    void flushCard({double? yieldGrams}) {
       if (currentDish != null && (currentDish!.isNotEmpty || currentIngredients.isNotEmpty)) {
         final tech = currentTechnologyText?.trim();
         results.add(TechCardRecognitionResult(
@@ -1557,6 +1577,7 @@ class AiServiceSupabase implements AiService {
           technologyText: tech != null && tech.length >= 15 ? tech : null,
           ingredients: List.from(currentIngredients),
           isSemiFinished: currentDish?.toLowerCase().contains('пф') ?? false,
+          yieldGrams: yieldGrams,
         ));
       }
       currentIngredients.clear();
@@ -1601,10 +1622,16 @@ class AiServiceSupabase implements AiService {
         }
       }
 
-      // Выход — завершение карточки (формат «Полное пособие Кухня», супы.xlsx)
+      // Выход — завершение карточки (формат «Полное пособие Кухня», супы.xlsx). Парсим значение выхода для веса порции (блюдо).
       final c0 = cells.isNotEmpty ? cells[0].trim().toLowerCase() : '';
       if (c0 == 'выход') {
-        flushCard();
+        double? outG;
+        if (outputCol >= 0 && outputCol < cells.length) {
+          outG = _parseNum(cells[outputCol]);
+        }
+        if (outG == null && cells.length > 1) outG = _parseNum(cells[1]);
+        if (outG != null && outG > 0 && outG < 100) outG = outG * 1000; // кг → г
+        flushCard(yieldGrams: outG);
         currentDish = null;
         return true;
       }
@@ -1641,9 +1668,11 @@ class AiServiceSupabase implements AiService {
       }
       // Повтор заголовка №|Наименование продукта — пропуск (второй блок и далее)
       if (c0 == '№' && productVal.toLowerCase().contains('наименование') && productVal.toLowerCase().contains('продукт')) return true;
-      // Точки отсечения: Итого и Технология
+      // Точки отсечения: Итого и Технология. Парсим выход из колонки Выход для веса порции (блюдо).
       if (nameVal.toLowerCase() == 'итого' || productVal.toLowerCase() == 'итого' || productVal.toLowerCase().startsWith('всего')) {
-        flushCard();
+        double? outG = _parseNum(outputVal);
+        if (outG != null && outG > 0 && outG < 100) outG = outG * 1000; // кг → г
+        flushCard(yieldGrams: outG);
         currentDish = null;
         return true;
       }
@@ -1847,27 +1876,29 @@ class AiServiceSupabase implements AiService {
     int grossCol = 4;
     int netCol = 5;
     int outputCol = 6;
-    for (var r = 0; r < rows.length && r < 30; r++) {
+    for (var r = 0; r < rows.length && r < 35; r++) {
       final row = rows[r].map((c) => (c is String ? c : c?.toString() ?? '').trim()).toList();
-      if (row.length < 6) continue;
+      if (row.length < 4) continue;
       final c0 = row[0].toLowerCase();
-      final hasNum = c0 == '№' || c0 == 'n' || RegExp(r'^\d+$').hasMatch(c0);
+      // № в первой ячейке или в любой (xls с объединёнными ячейками — первая может быть пустой)
+      final hasNum = c0 == '№' || c0 == 'n' || RegExp(r'^\d+$').hasMatch(c0) ||
+          (c0.isEmpty && row.length > 1 && (row[1].toLowerCase() == '№' || row[1].toLowerCase() == 'n' || RegExp(r'^\d+$').hasMatch(row[1].trim())));
       bool hasProduct = false;
       bool hasBrutto = false;
       bool hasNetto = false;
-      for (var c = 1; c < row.length && c < 10; c++) {
+      for (var c = 1; c < row.length && c < 12; c++) {
         final h = row[c].toLowerCase();
         if (h.contains('наименование') && h.contains('продукт')) hasProduct = true;
         if (h.contains('брутто') || h.contains('вес брутто')) hasBrutto = true;
-        if (h.contains('нетто') || h.contains('вес нетто')) hasNetto = true;
+        if (h.contains('нетто') || h.contains('вес нетто') || (h.contains('п/ф') && h.contains('кг'))) hasNetto = true;
       }
       if (hasNum && hasProduct && hasBrutto && hasNetto) {
         headerIdx = r;
-        for (var c = 1; c < row.length && c < 10; c++) {
+        for (var c = 1; c < row.length && c < 12; c++) {
           final h = row[c].toLowerCase();
           if (h.contains('наименование') && h.contains('продукт')) productCol = c;
-          if ((h.contains('вес брутто') || h.contains('брутто')) && h.contains('кг')) grossCol = c;
-          if ((h.contains('вес нетто') || h.contains('нетто')) && (h.contains('кг') || h.contains('п/ф'))) netCol = c;
+          if ((h.contains('вес брутто') || h.contains('брутто')) && (h.contains('кг') || h.contains('ед'))) grossCol = c;
+          if ((h.contains('вес нетто') || h.contains('нетто') || h.contains('п/ф')) && (h.contains('кг') || h.contains('п/ф'))) netCol = c;
           if (h.contains('вес готового') || (h.contains('выход') && c > netCol)) outputCol = c;
         }
         break;
@@ -1883,8 +1914,12 @@ class AiServiceSupabase implements AiService {
       if (cells.length <= productCol) continue;
       final c0 = cells[0].toLowerCase();
       if (c0 == 'итого' || c0.startsWith('всего') || (c0.contains('вес готового') && cells.length < 5)) break;
-      if (!RegExp(r'^\d+$').hasMatch(c0)) continue;
-      final productVal = cells.length > productCol ? cells[productCol].trim() : '';
+      // Номер строки в первой ячейке или во второй (xls с объединённой первой колонкой)
+      final firstIsNum = RegExp(r'^\d+$').hasMatch(c0);
+      final secondIsNum = cells.length > 1 && RegExp(r'^\d+$').hasMatch(cells[1].trim());
+      if (!firstIsNum && !(c0.isEmpty && secondIsNum)) continue;
+      final int pCol = (c0.isEmpty && secondIsNum && cells.length > 2) ? 2 : productCol;
+      final productVal = cells.length > pCol ? cells[pCol].trim() : '';
       if (productVal.isEmpty || productVal.length < 2) continue;
       var gross = _parseNum(cells.length > grossCol ? cells[grossCol] : '');
       var net = _parseNum(cells.length > netCol ? cells[netCol] : '');
@@ -2247,12 +2282,13 @@ class AiServiceSupabase implements AiService {
     final currentIngredients = <TechCardIngredientLine>[];
     final results = <TechCardRecognitionResult>[];
 
-    void flushCard() {
+    void flushCard({double? yieldGrams}) {
       if (currentDish != null && (currentDish!.isNotEmpty || currentIngredients.isNotEmpty)) {
         results.add(TechCardRecognitionResult(
           dishName: currentDish,
           ingredients: List.from(currentIngredients),
           isSemiFinished: currentDish?.toLowerCase().contains('пф') ?? false,
+          yieldGrams: yieldGrams,
         ));
       }
       currentIngredients.clear();
@@ -2294,7 +2330,9 @@ class AiServiceSupabase implements AiService {
       final outputVal = outputCol >= 0 && outputCol < cells.length ? cells[outputCol] : '';
 
       if (nameVal.toLowerCase() == 'итого' || productVal.toLowerCase() == 'итого') {
-        flushCard();
+        double? outG = _parseNum(outputVal);
+        if (outG != null && outG > 0 && outG < 100) outG = outG * 1000;
+        flushCard(yieldGrams: outG);
         currentDish = null;
         continue;
       }
