@@ -1622,14 +1622,21 @@ class AiServiceSupabase implements AiService {
         }
       }
 
-      // Выход — завершение карточки (формат «Полное пособие Кухня», супы.xlsx). Парсим значение выхода для веса порции (блюдо).
+      // Выход — завершение карточки (формат «Полное пособие Кухня», ГОСТ «Выход блюда (в граммах): 190»). Парсим значение выхода для веса порции (блюдо).
       final c0 = cells.isNotEmpty ? cells[0].trim().toLowerCase() : '';
-      if (c0 == 'выход') {
+      final isYieldRow = c0 == 'выход' || (c0.contains('выход') && (c0.contains('блюда') || c0.contains('грамм') || c0.contains('порцию') || c0.contains('готовой')));
+      if (isYieldRow) {
         double? outG;
         if (outputCol >= 0 && outputCol < cells.length) {
           outG = _parseNum(cells[outputCol]);
         }
         if (outG == null && cells.length > 1) outG = _parseNum(cells[1]);
+        if (outG == null) {
+          for (var i = 1; i < cells.length && i < 5; i++) {
+            outG = _parseNum(cells[i]);
+            if (outG != null && outG > 0) break;
+          }
+        }
         if (outG != null && outG > 0 && outG < 100) outG = outG * 1000; // кг → г
         flushCard(yieldGrams: outG);
         currentDish = null;
