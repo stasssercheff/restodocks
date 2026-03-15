@@ -187,7 +187,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
     // Добавляем строку "Итого"
     final totalOutput = indexedRows.map((e) => e.value).where((ing) => ing.productName.isNotEmpty).fold<double>(0, (s, ing) => s + ing.outputWeight);
-    final totalCost = indexedRows.map((e) => e.value).where((ing) => ing.productName.isNotEmpty).fold<double>(0, (s, ing) => s + ing.cost);
+    final totalCost = indexedRows.map((e) => e.value).where((ing) => ing.productName.isNotEmpty).fold<double>(0, (s, ing) => s + ing.effectiveCost);
 
     // Расчет итоговой стоимости
     final costPerKgFinishedProduct = widget.isSemiFinished

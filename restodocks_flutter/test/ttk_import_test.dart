@@ -180,7 +180,24 @@ void main() {
       expect(list[0].ingredients.length, 3);
       expect(list[0].ingredients.any((i) => i.productName.contains('Куриное')), true);
       expect(list[0].ingredients.any((i) => i.productName.contains('Хлеб')), true);
-      expect(list[0].ingredients.firstWhere((i) => i.productName.contains('Куриное')).grossGrams, 70);
+      final chicken = list[0].ingredients.firstWhere((i) => i.productName.contains('Куриное'));
+      expect(chicken.grossGrams, 70);
+      expect(chicken.netGrams, 50);
+      expect(list[0].ingredients.firstWhere((i) => i.productName.contains('Хлеб')).netGrams, 20);
+    });
+
+    test('parseTtkByTemplate Яйца 1 шт брутто / 26 г нетто → 50 г брутто, 26 г нетто', () {
+      final rows = [
+        ['Наименование сырья и продуктов', 'Расход сырья на 1 порцию'],
+        ['', 'Брутто', 'Нетто'],
+        ['Яйца', '1', '26'],
+      ];
+      final list = AiServiceSupabase.parseTtkByTemplate(rows);
+      expect(list, isNotEmpty);
+      expect(list[0].ingredients.length, 1);
+      expect(list[0].ingredients.first.productName.toLowerCase(), contains('яйц'));
+      expect(list[0].ingredients.first.grossGrams, 50);
+      expect(list[0].ingredients.first.netGrams, 26);
     });
 
     test('format detection routes DOCX/OLE/CSV correctly', () async {

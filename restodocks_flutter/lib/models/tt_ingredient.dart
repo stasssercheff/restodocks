@@ -88,6 +88,10 @@ class TTIngredient extends Equatable {
   @JsonKey(name: 'cost_currency')
   final String? costCurrency;
 
+  /// Стоимость для отображения: сохранённая cost или расчёт из pricePerKg × нетто (кг).
+  double get effectiveCost =>
+      cost > 0 ? cost : (pricePerKg != null && netWeight > 0 ? pricePerKg! * netWeight / 1000 : 0);
+
   const TTIngredient({
     required this.id,
     this.productId,

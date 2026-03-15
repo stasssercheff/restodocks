@@ -20,12 +20,13 @@ const STRUCTURAL_WORDS = new Set([
   "порцию", "порций", "хранение", "белки", "жиры", "углеводы", "калорийность",
   "полуфабрикатов", "жирности", "готовой",
 ]);
-/** Фразы секций/метаданных в ячейке продукта */
+/** Фразы секций/метаданных в ячейке продукта — не ингредиенты. Совпадает с фильтрами в Dart. */
 const STRUCTURAL_PHRASES = [
   /требования\s+к\s+оформлению/i, /требования\s+к\s+подаче/i, /вес\s+готового\s+(блюда|изделия)/i,
   /в\s+расчёте\s+на/i, /информация\s+о\s+пищ/i, /^итого\s*$/i, /срок\s+хранен/i,
   /^ед\.?\s*изм/i, /способ\s*(приготовления|оформления)?$/i, /ресторан\s*[«""]/i,
   /органолептическ/i,
+  /^хранение\s*:/i, /^область\s+применения/i, /название\s+на\s+чеке/i,
 ];
 /** Глаголы технологии (императив) — не продукты. */
 const COOKING_VERBS = /^(взбить|добавить|положить|переложить|использовать|пробить|довести|соединить|перемешать|нарезать|запечь|варить|жарить|тушить|охладить|разогреть)$/i;
@@ -33,6 +34,7 @@ const COOKING_VERBS = /^(взбить|добавить|положить|пере
 export function isStructuralProductName(s: string, fromPdf: boolean): boolean {
   const low = (s ?? "").trim().toLowerCase();
   if (low.length <= 2 || /^[\d,.\s\-]+$/.test(low)) return true;
+  if (low === "хранение:" || low.startsWith("хранение:") || low.includes("область применения") || low.includes("название на чеке")) return true;
   const word = low.replace(/\s+/g, " ");
   if (STRUCTURAL_WORDS.has(word)) return true;
   for (const re of STRUCTURAL_PHRASES) {
@@ -355,6 +357,8 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
     // Строка с продуктом (ингредиент) — только до границы секции
     if (productVal) {
       if (currentDish == null && nameVal && isValidDishName(nameVal)) currentDish = nameVal;
+      const norm = (s: string) => s.trim().toLowerCase();
+      if (currentDish != null && norm(productVal) === norm(currentDish)) continue;
       let gross = parseNum(grossVal);
       let net = parseNum(netVal);
       if ((gross != null && gross > 100000) || (net != null && net > 100000)) continue;
@@ -397,9 +401,23 @@ function normalizeCellForSignature(s: string): string {
   return (s ?? "").trim().toLowerCase();
 }
 
-/** Подпись заголовка для сопоставления с каталогом шаблонов */
+/** Ячейка похожа на заголовок колонки (брутто, нетто, наименование...), а не на название блюда. Совпадает с Dart _isStructuralHeaderCell. */
+function isStructuralHeaderCell(cell: string): boolean {
+  const low = (cell ?? "").trim().toLowerCase();
+  if (!low || low.length > 80) return false;
+  if (/^[а-яА-ЯёЁ\s]+\s+к\s+[а-яА-ЯёЁ\s]+$/.test((cell ?? "").trim()) && (cell ?? "").trim().length < 35) return false;
+  const structural = [
+    "наименование", "продукт", "брутто", "нетто", "название", "сырьё", "ингредиент", "расход", "норма",
+    "ед.изм", "ед изм", "единица", "отход", "выход", "№", "n",
+  ];
+  return structural.some((k) => low.includes(k)) || low === "бр" || low === "нт";
+}
+
+/** Подпись заголовка для сопоставления с каталогом шаблонов. Только структурные ячейки (колонки), чтобы один формат таблицы давал одну подпись у разных файлов и обучение применялось ко всем. */
 export function headerSignature(headerCells: string[]): string {
-  const parts = headerCells.map((c) => normalizeCellForSignature(c)).filter(Boolean);
+  const normalized = headerCells.map((c) => normalizeCellForSignature(c)).filter(Boolean);
+  const structural = normalized.filter((c) => isStructuralHeaderCell(c));
+  const parts = structural.length > 0 ? structural : normalized;
   return parts.join("|");
 }
 

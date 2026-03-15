@@ -679,6 +679,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   List<String> _photoUrls = [];
   /// Фото, выбранные для новой ТТК до первого сохранения (загружаем после create)
   List<Uint8List> _pendingPhotoBytes = [];
+  bool _saving = false;
 
   bool get _isNew => widget.techCardId.isEmpty || widget.techCardId == 'new';
 
@@ -1180,6 +1181,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('dish_name_required_ttk'))));
       return;
     }
+    if (_saving) return;
+    if (mounted) {
+      setState(() => _saving = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('ttk_saving') ?? 'Сохранение...'), duration: const Duration(seconds: 2)),
+      );
+    }
     final toSaveIngredients = _ingredients.where((i) => !i.isPlaceholder).toList();
     // ТТК блюдо: вес выхода = вес порции (1 порция)
     final yieldVal = !_isSemiFinished
@@ -1299,6 +1307,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           } catch (_) {}
         });
         if (mounted) {
+          setState(() => _saving = false);
           await clearDraft();
           AppToastService.show(loc.t('tech_card_created'));
           context.go('/tech-cards?refresh=1');
@@ -1363,13 +1372,17 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           } catch (_) {}
         });
         if (mounted) {
+          setState(() => _saving = false);
           await clearDraft();
           AppToastService.show(context.read<LocalizationService>().t('save') + ' ✓');
           context.go('/tech-cards?refresh=1');
         }
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))));
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))));
+      }
     }
   }
 
@@ -2408,7 +2421,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         leading: appBarBackButton(context),
         title: Text(_isNew ? loc.t('create_tech_card') : (_techCard?.getDisplayNameInLists(loc.currentLanguageCode) ?? loc.t('tech_cards'))),
         actions: [
-          if (effectiveCanEdit) IconButton(icon: const Icon(Icons.save), onPressed: _save, tooltip: loc.t('save'), style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
+          if (effectiveCanEdit) IconButton(icon: _saving ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.save), onPressed: _saving ? null : _save, tooltip: loc.t('save'), style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
           if (effectiveCanEdit && !_isNew) IconButton(icon: const Icon(Icons.delete_outline), onPressed: () => _confirmDelete(context, loc), tooltip: loc.t('delete_tech_card'), style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
           // Кнопка экспорта текущей ТТК
           if (!_isNew && _techCard != null) IconButton(
@@ -2847,8 +2860,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                         Row(
                           children: [
                             FilledButton(
-                              onPressed: _save,
-                              child: Text(loc.t('save')),
+                              onPressed: _saving ? null : _save,
+                              child: _saving ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Theme.of(context).colorScheme.onPrimary)) : Text(loc.t('save')),
                               style: FilledButton.styleFrom(minimumSize: const Size(120, 48), padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14)),
                             ),
                             const SizedBox(width: 16),
@@ -2992,7 +3005,7 @@ class _TtkTableState extends State<_TtkTable> {
     final lang = loc.currentLanguageCode;
     final ingredients = widget.ingredients;
     final totalNet = ingredients.fold<double>(0, (s, ing) => s + ing.netWeight);
-    final totalCost = ingredients.fold<double>(0, (s, ing) => s + ing.cost);
+    final totalCost = ingredients.fold<double>(0, (s, ing) => s + ing.effectiveCost);
     final totalCalories = ingredients.fold<double>(0, (s, ing) => s + ing.finalCalories);
     final totalProtein = ingredients.fold<double>(0, (s, ing) => s + ing.finalProtein);
     final totalFat = ingredients.fold<double>(0, (s, ing) => s + ing.finalFat);
@@ -3122,7 +3135,7 @@ class _TtkTableState extends State<_TtkTable> {
           final proc = ing.cookingProcessId != null ? CookingProcess.findById(ing.cookingProcessId!) : null;
           final estId = context.read<AccountManagerSupabase>().establishment?.id;
           final estPrice = product != null && estId != null ? widget.productStore.getEstablishmentPrice(product.id, estId)?.$1 : null;
-          final pricePerUnit = estPrice ?? (ing.netWeight > 0 ? ing.cost * 1000 / ing.netWeight : 0.0);
+          final pricePerUnit = estPrice ?? (ing.netWeight > 0 ? ing.effectiveCost * 1000 / ing.netWeight : 0.0);
           final isFirstRow = i == 0;
           return TableRow(
             decoration: BoxDecoration(color: cellBg),
@@ -3373,7 +3386,7 @@ class _TtkTableState extends State<_TtkTable> {
                         child: Padding(
                           padding: _cellPad,
                           child: _EditableCostCell(
-                            cost: ing.cost,
+                            cost: ing.effectiveCost,
                             symbol: sym,
                             onChanged: (v) {
                               if (v != null && v >= 0) widget.onUpdate(i, ing.copyWith(cost: v));
@@ -3382,9 +3395,9 @@ class _TtkTableState extends State<_TtkTable> {
                         ),
                       )),
                     )
-                  : _cell(NumberFormatUtils.formatDecimal(ing.cost)),
+                  : _cell(NumberFormatUtils.formatDecimal(ing.effectiveCost)),
               // Цена за 1 кг/шт блюда (по ингредиенту: стоимость за кг при выходе)
-              _cell(_outputForPrice(ing) > 0 ? NumberFormatUtils.formatDecimal(ing.cost * 1000 / _outputForPrice(ing)) : ''),
+              _cell(_outputForPrice(ing) > 0 ? NumberFormatUtils.formatDecimal(ing.effectiveCost * 1000 / _outputForPrice(ing)) : ''),
               // Колонка «Технология» — только в первой строке контент, в остальных пустая ячейка
               isFirstRow && widget.technologyController != null
                   ? TableCell(

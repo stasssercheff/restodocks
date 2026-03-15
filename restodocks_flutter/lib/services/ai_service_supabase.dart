@@ -312,7 +312,12 @@ class AiServiceSupabase implements AiService {
         }
         if (merged.isNotEmpty) {
           _saveTemplateFromKeywordParse(rows, 'docx');
-          // Для обучения: все строки из всех таблиц (карточки могут быть из любой)
+          // ГОСТ DOCX: извлечь технологию из раздела «4. ТЕХНОЛОГИЧЕСКИЙ ПРОЦЕСС» и подставить в первую карточку
+          final docxTech = _docxExtractTechnology(xlsxBytes);
+          if (docxTech != null && docxTech.length >= 20 && merged.isNotEmpty) {
+            final first = merged.first;
+            merged[0] = first.copyWith(technologyText: docxTech);
+          }
           lastParsedRows = docxTables!.expand((t) => t).toList();
           if (lastParseHeaderSignature == null || lastParseHeaderSignature!.isEmpty) {
             lastParseHeaderSignature = _headerSignatureFromRows(rows);
@@ -525,6 +530,37 @@ class AiServiceSupabase implements AiService {
     } catch (_) {
       return [];
     }
+  }
+
+  /// Из DOCX извлекает текст раздела «4. ТЕХНОЛОГИЧЕСКИЙ ПРОЦЕСС» до «5. ТРЕБОВАНИЯ» или «6. ПОКАЗАТЕЛИ».
+  String? _docxExtractTechnology(Uint8List bytes) {
+    try {
+      final archive = ZipDecoder().decodeBytes(bytes);
+      final doc = archive.findFile('word/document.xml');
+      if (doc == null) return null;
+      final xml = XmlDocument.parse(utf8.decode(doc.content as List<int>));
+      final paras = xml.descendants.whereType<XmlElement>().where((e) => e.localName == 'p');
+      final startMark = RegExp(r'^\d*\.?\s*технологический\s+процесс', caseSensitive: false);
+      final stopMark = RegExp(r'^\d+\.\s*(требования|показатели|пищевая|органолептическ)', caseSensitive: false);
+      final lines = <String>[];
+      var found = false;
+      for (final p in paras) {
+        final texts = p.descendants.whereType<XmlElement>().where((e) => e.localName == 't').map((e) => e.innerText).toList();
+        final line = texts.join('').trim();
+        if (line.isEmpty) continue;
+        if (startMark.hasMatch(line)) {
+          found = true;
+          continue;
+        }
+        if (found) {
+          if (stopMark.hasMatch(line)) break;
+          lines.add(line);
+        }
+      }
+      if (lines.isEmpty) return null;
+      return lines.join('\n').trim();
+    } catch (_) {}
+    return null;
   }
 
   /// Параграфы перед первой таблицей (название блюда в ГОСТ docx: «Салат Цезарь» и т.п.)
@@ -1297,7 +1333,8 @@ class AiServiceSupabase implements AiService {
         }
         for (final k in productKeys) {
           if (cell.contains(k)) {
-            // "Расход сырья на 1 порцию" — группа числовых колонок, не колонка продуктов
+            // "Расход сырья на 1 порцию" — заголовок группы колонок (Брутто/Нетто), не колонка наименований (ГОСТ 2-row header)
+            if (cell.contains('расход') && cell.contains('сырья') && (cell.contains('на 1 порцию') || cell.contains('порцию'))) break;
             final isNumericHeader = grossKeys.any((g) => cell.contains(g)) || netKeys.any((n) => cell.contains(n));
             if (!isNumericHeader) {
               headerIdx = r;
@@ -1424,7 +1461,7 @@ class AiServiceSupabase implements AiService {
     if (headerIdx < 0 || (nameCol < 0 && productCol < 0)) return [];
 
     if (nameCol < 0) nameCol = 0;
-    if (productCol < 0) productCol = 1;
+    if (productCol < 0) productCol = (nameCol >= 0 ? nameCol : 1);
 
     // Запомнили индексы: nameCol, productCol, grossCol, netCol — читаем данные СТРОГО по ним
 
@@ -1634,6 +1671,17 @@ class AiServiceSupabase implements AiService {
       }
       if (productVal.toLowerCase().contains('выход блюда') || productVal.toLowerCase().startsWith('выход одного')) return true;
       if (productVal.toLowerCase() == 'декор') return true; // секция, не ингредиент
+      // Секции DOCX — не ингредиенты (Хранение:, Область применения:, Срок Хранения:, Название на чеке и т.д.)
+      final pLow = productVal.trim().toLowerCase();
+      if (pLow == 'хранение:' || pLow.startsWith('хранение:') ||
+          pLow.contains('область применения') || pLow.startsWith('срок хранен') ||
+          pLow.contains('название на чеке') || pLow.contains('органолептическ')) return true;
+      final nLow = nameVal.trim().toLowerCase();
+      if (nLow == 'хранение:' || nLow.startsWith('хранение:') || nLow.startsWith('срок хранен') ||
+          nLow.contains('область применения') || nLow.contains('название на чеке') || nLow.contains('органолептическ')) return true;
+      // Название блюда в ячейке продукта (дубликат заголовка) — не добавлять как ингредиент
+      if (currentDish != null && productVal.trim().isNotEmpty &&
+          (productVal.trim() == currentDish || productVal.trim() == currentDish!.trim())) return true;
       // Пропускаем, если productVal — только цифры/пробелы (ошибочная колонка)
       if (RegExp(r'^[\d\s\.\,\-\+]+$').hasMatch(productVal)) return true;
       // Мусор: пусто в Наименовании (продукт/название)
@@ -1677,6 +1725,10 @@ class AiServiceSupabase implements AiService {
         final both100 = gEq && gross! > 99 && gross < 101;
         final looksLikeDishName = RegExp(r'^[а-яА-ЯёЁ\s]+\s+к\s+[а-яА-ЯёЁ\s]+$').hasMatch(cleanName) && cleanName.length < 30;
         if (both100 && looksLikeDishName) return false;
+        // Яйца: в карте часто 1 шт брутто, 26 г нетто (съедобная часть). Приводим к граммам: ~50 г брутто на 1 шт.
+        if (cleanName.toLowerCase().contains('яйц') && gross == 1 && net != null && net >= 20 && net <= 60) {
+          gross = 50.0;
+        }
         final isPf = RegExp(r'^П/Ф\s', caseSensitive: false).hasMatch(productVal);
         final effectiveNet = net ?? gross; // Норма закладки — одно значение
         currentIngredients.add(TechCardIngredientLine(
@@ -1747,11 +1799,29 @@ class AiServiceSupabase implements AiService {
     return double.tryParse(cleaned);
   }
 
-  static String _headerSignature(List<String> headerCells) {
-    return headerCells.map((c) => c.trim().toLowerCase()).where((c) => c.isNotEmpty).join('|');
+  /// Ячейка похожа на заголовок колонки (брутто, нетто, наименование...), а не на название блюда.
+  static bool _isStructuralHeaderCell(String cell) {
+    final low = cell.trim().toLowerCase();
+    if (low.isEmpty || low.length > 80) return false;
+    if (RegExp(r'^[а-яА-ЯёЁ\s]+\s+к\s+[а-яА-ЯёЁ\s]+$').hasMatch(cell.trim()) && cell.trim().length < 35) return false;
+    const structural = [
+      'наименование', 'продукт', 'брутто', 'нетто', 'название', 'сырьё', 'ингредиент', 'расход', 'норма',
+      'ед.изм', 'ед изм', 'единица', 'отход', 'выход', '№', 'n',
+    ];
+    return structural.any((k) => low.contains(k)) || low == 'бр' || low == 'нт';
   }
 
-  /// Найти заголовок ТТК в rows и вернуть его подпись (для дообучения).
+  static String _headerSignature(List<String> headerCells) {
+    final structural = headerCells
+        .map((c) => c.trim().toLowerCase())
+        .where((c) => c.isNotEmpty && _isStructuralHeaderCell(c));
+    if (structural.isEmpty) return headerCells.map((c) => c.trim().toLowerCase()).where((c) => c.isNotEmpty).join('|');
+    return structural.join('|');
+  }
+
+  /// Найти заголовок ТТК в rows и вернуть его подпись (для дообучения). Подпись строится только из
+  /// структурных ячеек (колонки брутто/нетто/наименование и т.д.), чтобы один и тот же формат таблицы
+  /// давал одну подпись у разных файлов (Мясная к пенному / Мясная к ХУЮ) и обучение применялось ко всем.
   static String? _headerSignatureFromRows(List<List<String>> rows) {
     const keywords = [
       'наименование', 'продукт', 'брутто', 'нетто', 'название', 'сырьё', 'ингредиент', 'расход сырья',
