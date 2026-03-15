@@ -1,0 +1,7 @@
+# RestoDocks — robots.txt
+# https://restodocks.com
+
+User-agent: *
+Allow: /
+
+Sitemap: https://restodocks.com/sitemap.xml
