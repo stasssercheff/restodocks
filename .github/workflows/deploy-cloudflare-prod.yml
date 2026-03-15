@@ -56,7 +56,8 @@ jobs:
           flutter build web --release --no-web-resources-cdn --no-source-maps \
             --dart-define=SUPABASE_URL="$SUPABASE_URL" \
             --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
-            --dart-define=ENABLE_TTK_IMPORT=true
+            --dart-define=ENABLE_TTK_IMPORT=true \
+            --dart-define=IS_BETA=false
 
       - name: Post-build (sw, _redirects, _routes, _headers)
         working-directory: restodocks_flutter
