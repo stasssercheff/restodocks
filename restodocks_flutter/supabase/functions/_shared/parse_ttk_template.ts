@@ -2,12 +2,20 @@
  * Парсинг ТТК по шаблону — без AI.
  * Ищет заголовки (Продукт, Брутто, Нетто...) и извлекает данные по найденным колонкам.
  *
+ * Принцип: карточки формируются по формату и структуре таблицы. Подпись заголовка (headerSignature)
+ * строится только из структурных ячеек (колонки), поэтому один и тот же формат в разных файлах
+ * даёт одну подпись — обучение применяется ко всем таким файлам. При разборе строк принимаются
+ * только строки, соответствующие структуре: в колонках весов — числа, в колонке продукта — название,
+ * хотя бы один вес задан; иначе строка считается футером/метаданными и пропускается.
+ *
  * Логика (не под каждый файл):
  * 1. Границы секций: строка с маркером (Техн. карта №, Выход на 1 порцию, Масса полуфабриката,
  *    Информация о пищевой, Технологический процесс, Допустимые сроки) = конец таблицы ингредиентов.
  * 2. Строка продукта валидна только ДО первой границы.
  * 3. Структурные слова (заголовки колонок, названия секций) ≠ ингредиенты — по семантике, не по списку.
- * 4. Числа: gross/net > 100000 г = мусор (КБЖУ, склейки).
+ * 4. По структуре: в ячейках брутто/нетто — только числа; если там текст (фраза) — строка не ингредиент.
+ * 5. Строка ингредиента должна иметь хотя бы один вес (брутто или нетто) > 0.
+ * 6. Числа: gross/net > 100000 г = мусор (КБЖУ, склейки).
  */
 
 /** Строка с маркером новой секции — конец таблицы ингредиентов (Shama, ГОСТ и др.) */
@@ -23,10 +31,11 @@ const STRUCTURAL_WORDS = new Set([
 /** Фразы секций/метаданных в ячейке продукта — не ингредиенты. Совпадает с фильтрами в Dart. */
 const STRUCTURAL_PHRASES = [
   /требования\s+к\s+оформлению/i, /требования\s+к\s+подаче/i, /вес\s+готового\s+(блюда|изделия)/i,
-  /в\s+расчёте\s+на/i, /информация\s+о\s+пищ/i, /^итого\s*$/i, /срок\s+хранен/i,
+  /в\s+расч[её]те\s+на/i, /информация\s+о\s+пищ/i, /^итого\s*$/i, /срок\s+хранен/i,
   /^ед\.?\s*изм/i, /способ\s*(приготовления|оформления)?$/i, /ресторан\s*[«""]/i,
   /органолептическ/i,
   /^хранение\s*:/i, /^область\s+применения/i, /название\s+на\s+чеке/i,
+  /\d[\d\s,.]*\s*порц/i, /^порц\s*$/i,
 ];
 /** Глаголы технологии (императив) — не продукты. */
 const COOKING_VERBS = /^(взбить|добавить|положить|переложить|использовать|пробить|довести|соединить|перемешать|нарезать|запечь|варить|жарить|тушить|охладить|разогреть)$/i;
@@ -34,6 +43,7 @@ const COOKING_VERBS = /^(взбить|добавить|положить|пере
 export function isStructuralProductName(s: string, fromPdf: boolean): boolean {
   const low = (s ?? "").trim().toLowerCase();
   if (low.length <= 2 || /^[\d,.\s\-]+$/.test(low)) return true;
+  if (low.includes("порц")) return true; // "1,000 порц", "вес в расчете на N порц"
   if (low === "хранение:" || low.startsWith("хранение:") || low.includes("область применения") || low.includes("название на чеке")) return true;
   const word = low.replace(/\s+/g, " ");
   if (STRUCTURAL_WORDS.has(word)) return true;
@@ -354,8 +364,11 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
       currentDish = nameVal;
     }
 
-    // Строка с продуктом (ингредиент) — только до границы секции
+    // Строка с продуктом (ингредиент) — только до границы секции; по структуре таблицы колонки весов — числа
     if (productVal) {
+      const grossValLooksLikeText = grossVal.trim().length > 12 && /[а-яёa-z]{3,}/i.test(grossVal);
+      const netValLooksLikeText = netVal.trim().length > 12 && /[а-яёa-z]{3,}/i.test(netVal);
+      if (grossValLooksLikeText || netValLooksLikeText) continue;
       if (currentDish == null && nameVal && isValidDishName(nameVal)) currentDish = nameVal;
       const norm = (s: string) => s.trim().toLowerCase();
       if (currentDish != null && norm(productVal) === norm(currentDish)) continue;
@@ -380,6 +393,7 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
       else if (unitCell.includes("шт") || unitCell === "pcs") unit = "pcs";
       const cleanName = productVal.replace(/^Т\.\s*/i, "").replace(/^П\/Ф\s*/i, "").trim() || productVal;
       const isPf = /^П\/Ф\s/i.test(productVal);
+      if ((gross == null || gross <= 0) && (net == null || net <= 0)) continue;
       currentIngredients.push({
         productName: cleanName,
         grossGrams: gross,
@@ -610,6 +624,11 @@ export function parseTtkByStoredTemplate(
     const techVal = technologyCol >= 0 && technologyCol < cells.length ? cells[technologyCol] : "";
     if (techVal.trim().length > 15) technologyParts.push(techVal.trim());
 
+    // По структуре таблицы: в колонках брутто/нетто — числа, не текст (футер, объединённые ячейки)
+    const grossValLooksLikeText = grossVal.trim().length > 12 && /[а-яёa-z]{3,}/i.test(grossVal);
+    const netValLooksLikeText = netVal.trim().length > 12 && /[а-яёa-z]{3,}/i.test(netVal);
+    if (productVal && (grossValLooksLikeText || netValLooksLikeText)) continue;
+
     // Sanity Check: вместо веса — текст
     let grossNum = parseNum(grossVal);
     let netNum = parseNum(netVal);
@@ -649,6 +668,7 @@ export function parseTtkByStoredTemplate(
     }
     if (productVal && (!fromPdf || !isPastTable) && isValidProduct(productVal) && !isJunkProductName(productVal)) {
       if ((grossNum != null && grossNum > 100000) || (netNum != null && netNum > 100000)) continue;
+      if ((grossNum == null || grossNum <= 0) && (netNum == null || netNum <= 0)) continue;
       if (currentDish == null && nameVal && isValidDish(nameVal) && !isHeaderWord(nameVal) && !isLikelyFragment(nameVal)) currentDish = nameVal;
       const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
       if (currentDish != null && norm(productVal) === norm(currentDish)) continue;

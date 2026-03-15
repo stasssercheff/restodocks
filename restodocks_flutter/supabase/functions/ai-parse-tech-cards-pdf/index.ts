@@ -19,6 +19,27 @@ function filterGarbageIngredients<T extends { productName: string }>(
   return ingredients.filter((i) => !isStructural(i.productName ?? ""));
 }
 
+/** Нормализация для сравнения названия продукта и названия блюда (без лишних пробелов, регистра) */
+function normForDishMatch(s: string): string {
+  return (s ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/** Убрать из списка ингредиентов те, у которых название совпадает с названием блюда карточки (Shama.Book и др.: название попадает в таблицу как строка) */
+function dropIngredientsMatchingDishName<T extends { productName: string }>(
+  ingredients: T[],
+  dishName: string | null | undefined,
+): T[] {
+  if (!dishName || !dishName.trim()) return ingredients;
+  const dishNorm = normForDishMatch(dishName);
+  if (!dishNorm) return ingredients;
+  return ingredients.filter((i) => {
+    const p = normForDishMatch(i.productName ?? "");
+    if (p === dishNorm) return false;
+    if (p.length >= 10 && dishNorm.length >= 10 && (p.includes(dishNorm) || dishNorm.includes(p))) return false;
+    return true;
+  });
+}
+
 const PDF_SYSTEM_PROMPT = `Ты парсер технологических карт (ТТК, рецептов, полуфабрикатов, калькуляционных карт КК ОП-1). На входе — сырой текст из PDF или документа Word (экспорт в текст).
 
 КРИТИЧНО: Если в тексте есть хоть какая-то ТТК (название блюда/ПФ, ингредиенты, технология) — ты ОБЯЗАН извлечь хотя бы одну карточку. Подстраивайся под ЛЮБОЙ формат: Shama.Book, iiko, ГОСТ, КК (форма №ОП-1), Сборник технологических карт (Сборник рецептур), документы Word (кухня, июнь 2012 и т.п.), собственные шаблоны. Не требуй точного соответствия образцу.
@@ -134,11 +155,14 @@ Deno.serve(async (req: Request) => {
     // 0. КК (калькуляционная карта ОП-1) — формат с ценами
     const kkCards = parseKkOp1(text);
     if (kkCards.length > 0) {
-      const normalized = kkCards.map((card) => ({
+      const normalized = kkCards.map((card) => {
+        const filtered = filterGarbageIngredients(card.ingredients, (s) => isStructuralProductName(s, true));
+        const noDishName = dropIngredientsMatchingDishName(filtered, card.dishName);
+        return {
         dishName: card.dishName ?? null,
         technologyText: card.technologyText ?? null,
         isSemiFinished: card.isSemiFinished ?? undefined,
-        ingredients: filterGarbageIngredients(card.ingredients, (s) => isStructuralProductName(s, true)).map((i) => ({
+        ingredients: noDishName.map((i) => ({
           productName: i.productName,
           grossGrams: i.grossGrams ?? undefined,
           netGrams: i.netGrams ?? undefined,
@@ -148,7 +172,8 @@ Deno.serve(async (req: Request) => {
           pricePerKg: i.pricePerKg ?? undefined,
           ingredientType: (i as { ingredientType?: string }).ingredientType ?? undefined,
         })),
-      }));
+        };
+      });
       return new Response(
         JSON.stringify({ cards: normalized, reason: "kk_op1" }),
         { status: 200, headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" } },
@@ -193,12 +218,15 @@ Deno.serve(async (req: Request) => {
     const extractedYield = yieldMatch ? parseInt(yieldMatch[1], 10) : undefined;
     if (templateCards.length > 0) {
       // Шаблон или каталог сработал — AI не используется, лимит не применяется
-      const normalized = templateCards.map((card) => ({
+      const normalized = templateCards.map((card) => {
+        const filtered = filterGarbageIngredients(card.ingredients, (s) => isStructuralProductName(s, true));
+        const noDishName = dropIngredientsMatchingDishName(filtered, card.dishName);
+        return {
         dishName: card.dishName ?? null,
         technologyText: card.technologyText ?? null,
         isSemiFinished: card.isSemiFinished ?? undefined,
         yieldGrams: extractedYield ?? card.yieldGrams ?? undefined,
-        ingredients: filterGarbageIngredients(card.ingredients, (s) => isStructuralProductName(s, true)).map((i) => ({
+        ingredients: noDishName.map((i) => ({
           productName: i.productName,
           grossGrams: i.grossGrams ?? undefined,
           netGrams: i.netGrams ?? undefined,
@@ -209,7 +237,8 @@ Deno.serve(async (req: Request) => {
           cookingLossPct: undefined,
           ingredientType: undefined,
         })),
-      }));
+        };
+      });
       // Возвращаем rows для обучения на клиенте (learnDishNamePosition, дообучение)
       const payload: Record<string, unknown> = { cards: normalized, reason: "template" };
       if (rows.length >= 2) payload.rows = rows;
@@ -305,6 +334,7 @@ Deno.serve(async (req: Request) => {
 
     const normalized = cards.map((card) => {
       const c = card as Record<string, unknown>;
+      const dishName = c.dishName != null ? String(c.dishName) : null;
       const rawIngredients = Array.isArray(c.ingredients)
         ? (c.ingredients as Record<string, unknown>[]).map((i) => {
             const it = String(i.ingredientType ?? "").toLowerCase();
@@ -322,9 +352,10 @@ Deno.serve(async (req: Request) => {
             };
           })
         : [];
-      const ingredients = filterGarbageIngredients(rawIngredients, (s) => isStructuralProductName(s, true));
+      const filtered = filterGarbageIngredients(rawIngredients, (s) => isStructuralProductName(s, true));
+      const ingredients = dropIngredientsMatchingDishName(filtered, dishName);
       return {
-        dishName: c.dishName != null ? String(c.dishName) : null,
+        dishName,
         technologyText: c.technologyText != null ? String(c.technologyText) : null,
         ingredients,
         isSemiFinished: typeof c.isSemiFinished === "boolean" ? c.isSemiFinished : undefined,

@@ -3005,14 +3005,25 @@ class _TtkTableState extends State<_TtkTable> {
     final lang = loc.currentLanguageCode;
     final ingredients = widget.ingredients;
     final totalNet = ingredients.fold<double>(0, (s, ing) => s + ing.netWeight);
-    final totalCost = ingredients.fold<double>(0, (s, ing) => s + ing.effectiveCost);
+    final accountManagerForEst = context.read<AccountManagerSupabase>();
+    final estId = accountManagerForEst.establishment?.id;
+    // Итого по стоимости: effectiveCost или, если нет — цена заведения × нетто (чтобы не показывать 0₫ при привязанной номенклатуре)
+    double resolvedCost(TTIngredient ing) {
+      if (ing.effectiveCost > 0) return ing.effectiveCost;
+      final product = widget.productStore.findProductForIngredient(ing.productId, ing.productName);
+      if (product != null && estId != null && ing.netWeight > 0) {
+        final price = widget.productStore.getEstablishmentPrice(product.id, estId)?.$1;
+        if (price != null && price > 0) return price * ing.netWeight / 1000;
+      }
+      return 0;
+    }
+    final totalCost = ingredients.fold<double>(0, (s, ing) => s + resolvedCost(ing));
     final totalCalories = ingredients.fold<double>(0, (s, ing) => s + ing.finalCalories);
     final totalProtein = ingredients.fold<double>(0, (s, ing) => s + ing.finalProtein);
     final totalFat = ingredients.fold<double>(0, (s, ing) => s + ing.finalFat);
     final totalCarbs = ingredients.fold<double>(0, (s, ing) => s + ing.finalCarbs);
-    final accountManager = context.read<AccountManagerSupabase>();
-    final est = accountManager.establishment;
-    final sym = est?.currencySymbol ?? Establishment.currencySymbolFor(est?.defaultCurrency ?? accountManager.currentEmployee?.currency ?? 'VND');
+    final est = accountManagerForEst.establishment;
+    final sym = est?.currencySymbol ?? Establishment.currencySymbolFor(est?.defaultCurrency ?? accountManagerForEst.currentEmployee?.currency ?? 'VND');
 
     final hasDeleteCol = widget.effectiveCanEdit;
     // Порядок колонок как в образце. Ширины подобраны так, чтобы вся строка с полями ввода помещалась на экране без горизонтальной прокрутки.

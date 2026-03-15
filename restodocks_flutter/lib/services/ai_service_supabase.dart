@@ -312,11 +312,14 @@ class AiServiceSupabase implements AiService {
         }
         if (merged.isNotEmpty) {
           _saveTemplateFromKeywordParse(rows, 'docx');
-          // ГОСТ DOCX: извлечь технологию из раздела «4. ТЕХНОЛОГИЧЕСКИЙ ПРОЦЕСС» и подставить в первую карточку
+          // ГОСТ DOCX: извлечь технологию из раздела «4. ТЕХНОЛОГИЧЕСКИЙ ПРОЦЕСС» и подставить во все карточки, где её ещё нет
           final docxTech = _docxExtractTechnology(xlsxBytes);
-          if (docxTech != null && docxTech.length >= 20 && merged.isNotEmpty) {
-            final first = merged.first;
-            merged[0] = first.copyWith(technologyText: docxTech);
+          if (docxTech != null && docxTech.length >= 20) {
+            for (var i = 0; i < merged.length; i++) {
+              final c = merged[i];
+              final hasTech = (c.technologyText ?? '').trim().length >= 20;
+              if (!hasTech) merged[i] = c.copyWith(technologyText: docxTech);
+            }
           }
           lastParsedRows = docxTables!.expand((t) => t).toList();
           if (lastParseHeaderSignature == null || lastParseHeaderSignature!.isEmpty) {
@@ -1032,10 +1035,12 @@ class AiServiceSupabase implements AiService {
       final h2 = headerRow.length > 2 ? headerRow[2].trim().toLowerCase() : '';
       final h3 = headerRow.length > 3 ? headerRow[3].trim().toLowerCase() : '';
       final hasNormInHeader = h3.contains('норма') || h3.contains('закладк') || h2.contains('норма');
-      final headerOk = (h0.isEmpty || h0 == '№') &&
-          h1.contains('наименование') &&
-          (h2.contains('ед') || h2.contains('изм'));
-      if (!headerOk && !(hasNormInHeader && h1.contains('наименование'))) {
+      // Заголовок: (пусто/№/«Наименование продукта») + наименование/ед.изм + норма/ед
+      final firstCellOk = h0.isEmpty || h0 == '№' || (h0.contains('наименование') && (h0.contains('продукт') || h0.contains('сырья')));
+      final headerOk = firstCellOk &&
+          (h1.contains('наименование') || h1.contains('ед') || h2.contains('ед')) &&
+          (h2.contains('ед') || h2.contains('изм') || h2.contains('норма') || h3.contains('норма') || h3.contains('закладк'));
+      if (!headerOk && !(hasNormInHeader && (h1.contains('наименование') || h0.contains('наименование')))) {
         r++;
         continue;
       }
@@ -1075,9 +1080,11 @@ class AiServiceSupabase implements AiService {
         if (product.toLowerCase().contains('наименование') && product.toLowerCase().contains('продукт')) {
           dataR++; continue;
         }
-        // Вариант без Ед.изм: Наименование | Норма | Технология — норма в col prodCol+1
+        // Вариант без Ед.изм: Наименование | Норма | Технология — норма в col prodCol+1; иначе №|продукт|ед.изм|норма
+        final h1H = headerRow.length > 1 ? headerRow[1].toLowerCase() : '';
         final h2 = headerRow.length > 2 ? headerRow[2].toLowerCase() : '';
-        final normInCol2 = h2.contains('норма') && !h2.contains('ед') && !h2.contains('изм');
+        final hasUnitCol = h1H.contains('ед') || h1H.contains('изм') || h2.contains('ед') || h2.contains('изм');
+        final normInCol2 = h2.contains('норма') && !h2.contains('ед') && !h2.contains('изм') && !hasUnitCol;
         final unitCol = normInCol2 ? -1 : prodCol + 1;
         final normCol = normInCol2 ? prodCol + 1 : prodCol + 2;
         final techCol = hasTechCol ? techColByHeader : prodCol + 3;
@@ -1299,7 +1306,7 @@ class AiServiceSupabase implements AiService {
 
     final results = <TechCardRecognitionResult>[];
     int headerIdx = -1;
-    int nameCol = -1, productCol = -1, grossCol = -1, netCol = -1, wasteCol = -1, outputCol = -1;
+    int nameCol = -1, productCol = -1, grossCol = -1, netCol = -1, wasteCol = -1, outputCol = -1, techCol = -1;
 
     final nameKeys = ['наименование', 'название', 'блюдо', 'пф', 'набор', 'name', 'dish'];
     final productKeys = ['продукт', 'продукты', 'сырьё', 'сырья', 'ингредиент', 'product', 'ingredient'];
@@ -1309,6 +1316,7 @@ class AiServiceSupabase implements AiService {
     final wasteKeys = ['отход', 'отх', 'waste', 'процент отхода'];
     final outputKeys = ['выход', 'вес готового', 'вес готового продукта', 'готовый', 'output'];
     final unitKeys = ['ед. изм', 'ед изм', 'единица', 'unit'];
+    final technologyKeys = ['технология', 'приготовления', 'способ приготовления', 'technology'];
 
     int unitCol = -1;
     bool grossColIsKg = false;
@@ -1386,6 +1394,13 @@ class AiServiceSupabase implements AiService {
           if (cell.contains(k)) {
             headerIdx = r;
             unitCol = c;
+            break;
+          }
+        }
+        for (final k in technologyKeys) {
+          if (cell.contains(k)) {
+            headerIdx = r;
+            techCol = c;
             break;
           }
         }
@@ -1499,20 +1514,25 @@ class AiServiceSupabase implements AiService {
       if (currentDish != null) break;
     }
     final currentIngredients = <TechCardIngredientLine>[];
+    String? currentTechnologyText;
 
     void flushCard() {
       if (currentDish != null && (currentDish!.isNotEmpty || currentIngredients.isNotEmpty)) {
+        final tech = currentTechnologyText?.trim();
         results.add(TechCardRecognitionResult(
           dishName: currentDish,
+          technologyText: tech != null && tech.length >= 15 ? tech : null,
           ingredients: List.from(currentIngredients),
           isSemiFinished: currentDish?.toLowerCase().contains('пф') ?? false,
         ));
       }
       currentIngredients.clear();
+      currentTechnologyText = null;
     }
 
     void clearCurrentCard() {
       currentIngredients.clear();
+      currentTechnologyText = null;
       currentDish = null;
     }
 
@@ -1541,6 +1561,12 @@ class AiServiceSupabase implements AiService {
       final netVal = nCol >= 0 && nCol < cells.length ? cells[nCol] : '';
       final wasteVal = wasteCol >= 0 && wasteCol < cells.length ? cells[wasteCol] : '';
       final outputVal = outputCol >= 0 && outputCol < cells.length ? cells[outputCol] : '';
+      if (techCol >= 0 && techCol < cells.length) {
+        final techVal = cells[techCol].trim();
+        if (techVal.length > 15 && !RegExp(r'^технология\s|наименование|брутто|нетто', caseSensitive: false).hasMatch(techVal)) {
+          currentTechnologyText = (currentTechnologyText != null ? '$currentTechnologyText\n' : '') + techVal;
+        }
+      }
 
       // Выход — завершение карточки (формат «Полное пособие Кухня», супы.xlsx)
       final c0 = cells.isNotEmpty ? cells[0].trim().toLowerCase() : '';
@@ -1686,6 +1712,10 @@ class AiServiceSupabase implements AiService {
       if (RegExp(r'^[\d\s\.\,\-\+]+$').hasMatch(productVal)) return true;
       // Мусор: пусто в Наименовании (продукт/название)
       if (productVal.trim().isEmpty && nameVal.trim().isEmpty) return true;
+      // По структуре таблицы: в колонках брутто/нетто должны быть числа, не текст (футер, объединённые ячейки)
+      final grossCellLooksLikeText = gCol >= 0 && grossVal.trim().length > 12 && RegExp(r'[а-яА-ЯёЁa-zA-Z]{3,}').hasMatch(grossVal);
+      final netCellLooksLikeText = nCol >= 0 && netVal.trim().length > 12 && RegExp(r'[а-яА-ЯёЁa-zA-Z]{3,}').hasMatch(netVal);
+      if (grossCellLooksLikeText || netCellLooksLikeText) return true;
       // Мусор: нет цифр в Брутто (и в Нетто) — строка без веса
       final hasDigitsInGross = gCol >= 0 && RegExp(r'\d').hasMatch(grossVal);
       final hasDigitsInNet = nCol >= 0 && RegExp(r'\d').hasMatch(netVal);
@@ -1720,6 +1750,8 @@ class AiServiceSupabase implements AiService {
         String cleanName = productVal.replaceFirst(RegExp(r'^Т\.\s*', caseSensitive: false), '').replaceFirst(RegExp(r'^П/Ф\s*', caseSensitive: false), '').trim();
         if (cleanName.isEmpty) cleanName = productVal;
         if (_isJunkProductName(cleanName)) return false;
+        // По структуре: строка ингредиента должна иметь хотя бы один вес (брутто или нетто)
+        if ((gross == null || gross <= 0) && (net == null || net <= 0)) return false;
         // iiko DOCX: при gross==net==100 часто читаем «брутто в ед. изм» вместо кг; строка с названием блюда («Мясная к пенному») — не продукт
         final gEq = gross != null && net != null && (gross - net).abs() < 0.01;
         final both100 = gEq && gross! > 99 && gross < 101;
@@ -2346,7 +2378,7 @@ class AiServiceSupabase implements AiService {
         final hasIng = card.ingredients.any((i) => (i.productName ?? '').trim().length > 2);
         if (hasName || hasIng) list.add(card);
       }
-      return list;
+      return _applyEggGrossFix(list);
     } catch (e) {
       devLog('parse-ttk-by-templates: $e');
       return [];
@@ -2489,6 +2521,33 @@ class AiServiceSupabase implements AiService {
         },
       }).then((_) => devLog('[tt_parse] template saved: sig=$sig (ai)')));
     } catch (_) {}
+  }
+
+  /// После парсинга (в т.ч. из EF): яйца 1 шт брутто, 26 г нетто → 50 г брутто.
+  static List<TechCardRecognitionResult> _applyEggGrossFix(List<TechCardRecognitionResult> list) {
+    return list.map((card) {
+      final fixed = card.ingredients.map((i) {
+        final name = (i.productName ?? '').trim().toLowerCase();
+        final gross = i.grossGrams;
+        final net = i.netGrams;
+        if (name.contains('яйц') && gross == 1 && net != null && net >= 20 && net <= 60) {
+          return TechCardIngredientLine(
+            productName: i.productName,
+            grossGrams: 50.0,
+            netGrams: i.netGrams,
+            outputGrams: i.outputGrams,
+            unit: i.unit,
+            cookingMethod: i.cookingMethod,
+            primaryWastePct: i.primaryWastePct,
+            cookingLossPct: i.cookingLossPct,
+            ingredientType: i.ingredientType,
+            pricePerKg: i.pricePerKg,
+          );
+        }
+        return i;
+      }).toList();
+      return card.ingredients == fixed ? card : card.copyWith(ingredients: fixed);
+    }).toList();
   }
 
   TechCardRecognitionResult? _parseTechCardResult(Map<String, dynamic>? data) {
