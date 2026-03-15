@@ -419,38 +419,18 @@ class AiServiceSupabase implements AiService {
   /// Таймаут парсинга PDF (извлечение текста + шаблон/AI). Supabase EF ~60s, плюс cold start.
   static const _pdfParseTimeout = Duration(seconds: 90);
 
-  /// Прогрев Edge Function (cold start) — вызывать при открытии списка ТТК.
-  Future<void> warmPdfParser() async {
-    try {
-      await invoke('ai-parse-tech-cards-pdf', {'pdfBase64': 'warm'})
-          .timeout(const Duration(seconds: 8), onTimeout: () => null);
-    } catch (_) {}
-  }
-
   @override
   Future<List<TechCardRecognitionResult>> parseTechCardsFromPdf(Uint8List pdfBytes, {String? establishmentId}) async {
     lastParseTechCardPdfReason = null;
     try {
       final body = <String, dynamic>{'pdfBase64': base64Encode(pdfBytes)};
       if (establishmentId != null && establishmentId.isNotEmpty) body['establishmentId'] = establishmentId;
-      const maxAttempts = 3;
-      Map<String, dynamic>? data;
-      for (var attempt = 0; attempt < maxAttempts; attempt++) {
+      var data = await invoke('ai-parse-tech-cards-pdf', body)
+          .timeout(_pdfParseTimeout, onTimeout: () => null);
+      for (var retry = 0; data == null && retry < 2; retry++) {
+        await Future<void>.delayed(Duration(milliseconds: retry == 0 ? 1500 : 3000));
         data = await invoke('ai-parse-tech-cards-pdf', body)
             .timeout(_pdfParseTimeout, onTimeout: () => null);
-        if (data == null) {
-          if (attempt < maxAttempts - 1) {
-            await Future<void>.delayed(Duration(milliseconds: attempt == 0 ? 2000 : 3500));
-            continue;
-          }
-          lastParseTechCardPdfReason = 'timeout_or_network';
-          return [];
-        }
-        final raw = data['cards'];
-        if (raw is List && raw.isNotEmpty) break;
-        if (attempt < maxAttempts - 1) {
-          await Future<void>.delayed(Duration(milliseconds: 2500));
-        }
       }
       if (data == null) {
         lastParseTechCardPdfReason = 'timeout_or_network';
