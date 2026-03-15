@@ -1,11 +1,11 @@
 {
-    "name": "restodocks",
-    "short_name": "restodocks",
+    "name": "RestoDocks — Smart Kitchen & Inventory",
+    "short_name": "RestoDocks",
     "start_url": ".",
     "display": "fullscreen",
     "background_color": "#AD292C",
     "theme_color": "#AD292C",
-    "description": "RestoDocks — Умная система управления ресторанным бизнесом",
+    "description": "Professional restaurant tool. Smart recipe import, inventory merging, food cost tracking.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
