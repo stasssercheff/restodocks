@@ -393,32 +393,74 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   }
 
   static const _maxFilesSingleTtk = 10;
+  static const _maxFilesMultiTtk = 10;
+
+  enum _TtkImportMode { single, multi }
 
   Future<void> _createFromExcel(BuildContext context, LocalizationService loc) async {
-    final proceed = await showDialog<bool>(
+    _TtkImportMode dialogMode = _TtkImportMode.single;
+    final mode = await showDialog<_TtkImportMode>(
       context: context,
       builder: (ctx) {
         final l = ctx.read<LocalizationService>();
-        return AlertDialog(
-          title: Text(l.t('ttk_import_file') ?? 'Импорт ТТК'),
-          content: Text(
-            l.t('ttk_import_multi_format_hint') ?? 'Excel и Word: ТТК должны быть в одном столбце и одинаковой формы. Иначе система не распознает.',
-            style: Theme.of(ctx).textTheme.bodyMedium,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text(l.t('cancel') ?? 'Отмена'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(ctx).pop(true),
-              child: Text(l.t('ttk_import_select_files') ?? 'Выбрать файлы'),
-            ),
-          ],
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text(l.t('ttk_import_file') ?? 'Импорт ТТК'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    RadioListTile<_TtkImportMode>(
+                      value: _TtkImportMode.single,
+                      groupValue: dialogMode,
+                      onChanged: (_) => setState(() => dialogMode = _TtkImportMode.single),
+                      title: Text(l.t('ttk_import_mode_single') ?? 'Одна ТТК в документе'),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 48, bottom: 8),
+                      child: Text(
+                        l.t('ttk_import_mode_single_hint') ?? 'Можно выбрать до 10 файлов (в каждом файле — одна карточка).',
+                        style: Theme.of(ctx).textTheme.bodySmall,
+                      ),
+                    ),
+                    RadioListTile<_TtkImportMode>(
+                      value: _TtkImportMode.multi,
+                      groupValue: dialogMode,
+                      onChanged: (_) => setState(() => dialogMode = _TtkImportMode.multi),
+                      title: Text(l.t('ttk_import_mode_multi') ?? 'Несколько ТТК в документе'),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 48),
+                      child: Text(
+                        l.t('ttk_import_multi_format_hint') ?? 'Excel и Word: карточки — друг под другом, в один столбец (не рядом в 2 колонки). Одинаковая разметка: у каждой ТТК те же колонки (название, продукты, вес, технология). Иначе система не распознает.',
+                        style: Theme.of(ctx).textTheme.bodySmall,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(null),
+                  child: Text(l.t('cancel') ?? 'Отмена'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(ctx).pop(dialogMode),
+                  child: Text(l.t('ttk_import_select_files') ?? 'Выбрать файлы'),
+                ),
+              ],
+            );
+          },
         );
       },
     );
-    if (!mounted || proceed != true) return;
+    if (!mounted || mode == null) return;
 
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
@@ -436,9 +478,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('file_read_failed'))));
       return;
     }
-    if (files.length > _maxFilesSingleTtk) {
+    final maxFiles = mode == _TtkImportMode.single ? _maxFilesSingleTtk : _maxFilesMultiTtk;
+    if (files.length > maxFiles) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(loc.t('ttk_import_max_files') ?? 'Выберите до $_maxFilesSingleTtk файлов (1 файл = 1 ТТК)'),
+        content: Text(mode == _TtkImportMode.single
+            ? (loc.t('ttk_import_max_files') ?? 'Выберите до $_maxFilesSingleTtk файлов (1 файл = 1 ТТК)')
+            : (loc.t('ttk_import_max_files_multi') ?? 'Выберите до $_maxFilesMultiTtk файлов')),
       ));
       return;
     }
@@ -465,7 +510,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           failedCount++;
           continue;
         }
-        if (list.length > 1 && files.length > 1) {
+        if (mode == _TtkImportMode.single && list.length > 1) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text((loc.t('ttk_import_multi_card_in_file') ?? 'В файле «%s» несколько карточек — загружайте такие файлы по одному').replaceFirst('%s', file.name)),
             duration: const Duration(seconds: 5),
