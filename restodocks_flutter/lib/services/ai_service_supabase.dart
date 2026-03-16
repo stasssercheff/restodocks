@@ -1022,12 +1022,27 @@ class AiServiceSupabase implements AiService {
       }
       final ingredients = <TechCardIngredientLine>[];
       String? technologyText;
+      double? yieldGrams;
       var dataRow = r + 2;
       while (dataRow < rows.length) {
         final dr = rows[dataRow].map((c) => (c ?? '').toString().trim()).toList();
         if (dr.every((c) => c.isEmpty)) { dataRow++; continue; }
         final d0 = dr.isNotEmpty ? dr[0].toLowerCase() : '';
-        if (d0 == 'выход') break;
+        if (d0 == 'выход') {
+          // Извлечь значение выхода (400, 420/70 → 420, 600/100/20 → 600) для веса порции
+          for (var i = 1; i < dr.length && i < 5; i++) {
+            final v = _parseNum(dr[i]);
+            if (v != null && v > 0) {
+              yieldGrams = v < 100 ? v * 1000 : v; // кг → г
+              break;
+            }
+            if (dr[i].contains('/')) {
+              final first = _parseNum(dr[i].split('/').first.trim());
+              if (first != null && first > 0) { yieldGrams = first < 100 ? first * 1000 : first; break; }
+            }
+          }
+          break;
+        }
         if (d0 == '№' && dr.length > 1 && dr[1].toLowerCase().contains('наименование')) break;
         final product = dr.length > 1 ? dr[1].trim() : '';
         final grossStr = dr.length > 2 ? dr[2].trim() : '';
@@ -1037,11 +1052,15 @@ class AiServiceSupabase implements AiService {
         } else {
           final rowText = dr.join(' ');
           if (rowText.toLowerCase().contains('технология')) {
+            int? techCol;
+            for (var ci = 0; ci < dr.length; ci++) {
+              if (dr[ci].toLowerCase().contains('технология')) { techCol = ci; break; }
+            }
             final techParts = <String>[];
-            for (var c = 0; c < dr.length; c++) {
-              final cell = dr[c].trim();
-              if (cell.isEmpty || cell.toLowerCase().contains('технология')) continue;
-              if (cell.length > 10 && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(cell)) techParts.add(cell);
+            for (var ci = (techCol != null ? techCol! + 1 : 0); ci < dr.length; ci++) {
+              final cell = dr[ci].trim();
+              if (cell.isEmpty) continue;
+              if (cell.length > 15 && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(cell) && _parseNum(cell) == null) techParts.add(cell);
             }
             if (techParts.isNotEmpty) {
               technologyText = (technologyText != null ? '$technologyText\n' : '') + techParts.join(' ');
@@ -1052,7 +1071,7 @@ class AiServiceSupabase implements AiService {
             continue;
           }
           if (technologyText != null) {
-            final more = dr.where((c) => c.length > 15 && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(c)).join(' ').trim();
+            final more = dr.where((c) => c.length > 15 && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(c) && _parseNum(c.trim()) == null).join(' ').trim();
             if (more.isNotEmpty) {
               technologyText = (technologyText!.isEmpty ? '' : '$technologyText\n') + more;
               dataRow++;
@@ -1060,7 +1079,21 @@ class AiServiceSupabase implements AiService {
             }
           }
         }
-        if (product.isEmpty) { dataRow++; continue; }
+        // Строка без продукта, но с длинным текстом (технология в отдельной строке/ячейке после ингредиентов)
+        if (product.isEmpty) {
+          final techFromRow = dr.where((c) {
+            final t = c.trim();
+            return t.length > 20 && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(t) && _parseNum(t) == null &&
+                !RegExp(r'^№$|^выход$|^декор$', caseSensitive: false).hasMatch(t.toLowerCase());
+          }).join(' ').trim();
+          if (techFromRow.isNotEmpty) {
+            technologyText = (technologyText != null ? '$technologyText\n' : '') + techFromRow;
+            dataRow++;
+            continue;
+          }
+          dataRow++;
+          continue;
+        }
         if (product.toLowerCase() == 'декор') { dataRow++; continue; }
         final gross = _parseNum(grossStr);
         if (gross == null && !RegExp(r'\d').hasMatch(grossStr)) { dataRow++; continue; }
@@ -1087,6 +1120,7 @@ class AiServiceSupabase implements AiService {
           ingredients: ingredients,
           isSemiFinished: dishName.toLowerCase().contains('пф'),
           technologyText: technologyText?.trim().isNotEmpty == true ? technologyText!.trim() : null,
+          yieldGrams: yieldGrams,
         ));
       }
       r = dataRow;
@@ -1740,11 +1774,42 @@ class AiServiceSupabase implements AiService {
         return true;
       }
       final rowText = cells.join(' ').toLowerCase();
+      // Строка «Технология приготовления» — собираем текст из этой строки (ячейки после заголовка) и не сбрасываем карточку
       if (RegExp(r'^технология\s|^технология\s*:|технология\s+приготовления').hasMatch(rowText) ||
           (rowText.trim().startsWith('технология') && cells.length <= 3)) {
-        flushCard();
-        currentDish = null;
-        return true; // skip — у каждой карточки своя технология, конец ингредиентов
+        int? techCol;
+        for (var ci = 0; ci < cells.length; ci++) {
+          if (cells[ci].toLowerCase().contains('технология')) { techCol = ci; break; }
+        }
+        if (techCol != null && techCol + 1 < cells.length) {
+          final parts = <String>[];
+          for (var ci = techCol + 1; ci < cells.length; ci++) {
+            final cell = cells[ci].trim();
+            if (cell.length > 15 && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(cell) && _parseNum(cell) == null) {
+              parts.add(cell);
+            }
+          }
+          if (parts.isNotEmpty) {
+            currentTechnologyText = (currentTechnologyText != null ? '$currentTechnologyText\n' : '') + parts.join(' ');
+          }
+        }
+        if (currentTechnologyText == null) currentTechnologyText = '';
+        return true; // skip строку заголовка технологии
+      }
+      // Продолжение технологии: строка без ингредиента, но с длинным текстом (рецепт в отдельной строке)
+      if (currentTechnologyText != null &&
+          productVal.isEmpty &&
+          nameVal.trim().isEmpty &&
+          (gCol < 0 || _parseNum(grossVal) == null) &&
+          (nCol < 0 || _parseNum(netVal) == null)) {
+        final textParts = cells.where((c) {
+          final t = c.trim();
+          return t.length > 20 && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(t) && _parseNum(t) == null;
+        }).toList();
+        if (textParts.isNotEmpty) {
+          currentTechnologyText = (currentTechnologyText!.isEmpty ? '' : '$currentTechnologyText\n') + textParts.join(' ');
+          return true;
+        }
       }
       // Парсер-сканер: начало новой карточки — ищем в полном содержимом строки (не только nameCol)
       // ТТК №, Карта №, Технол. карта №, Рецепт №, Т.к. №, Наименование блюда

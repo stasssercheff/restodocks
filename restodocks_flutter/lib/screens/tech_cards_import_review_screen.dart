@@ -158,6 +158,21 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
     );
   }
 
+  /// Текст баннера об ошибках: с перечислением карточек, если есть названия.
+  String _formatParseErrorsBanner(LocalizationService loc) {
+    if (_parseErrors == null || _parseErrors!.isEmpty) return '';
+    final names = _parseErrors!
+        .map((e) => e.dishName?.trim())
+        .where((n) => n != null && n.isNotEmpty)
+        .toSet()
+        .toList();
+    if (names.isNotEmpty) {
+      final template = loc.t('tech_cards_import_parse_errors_banner_with_names') ?? 'Обнаружены ошибки распознавания в карточках: %s. Проверьте их ниже.';
+      return template.replaceFirst('%s', names.join(', '));
+    }
+    return loc.t('tech_cards_import_parse_errors_banner') ?? 'Обнаружены ошибки распознавания. Проверьте карточки ниже.';
+  }
+
   String _inferCategory(String dishName) {
     final lower = dishName.toLowerCase();
     if (_isBar) {
@@ -355,6 +370,26 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
       'hot_drinks': 'Hot drinks', 'drinks_pure': 'Drinks (neat)', 'snacks': 'Snacks',
     };
     return (lang == 'ru' ? ru : en)[c] ?? c;
+  }
+
+  /// Показывать подсказку «подстроить % отхода», если в карточке задан выход и он не совпадает с суммой выходов ингредиентов.
+  bool _shouldShowAdjustWasteHint(_ReviewItem item) {
+    final yield = item.result.yieldGrams;
+    if (yield == null || yield <= 0) return false;
+    final sum = item.result.ingredients.fold<double>(
+      0, (s, i) => s + (i.outputGrams ?? i.netGrams ?? i.grossGrams ?? 0),
+    );
+    return sum > 0 && (sum - yield).abs() > 1;
+  }
+
+  String _formatAdjustWasteHint(_ReviewItem item, LocalizationService loc) {
+    final yield = item.result.yieldGrams ?? 0;
+    final sum = item.result.ingredients.fold<double>(
+      0, (s, i) => s + (i.outputGrams ?? i.netGrams ?? i.grossGrams ?? 0),
+    );
+    final template = loc.t('tech_cards_import_adjust_waste_hint') ??
+        'Выход в карточке %s г, сумма ингредиентов %s г. В редакторе можно подстроить % отхода под целевой выход.';
+    return template.replaceFirst('%s', yield.toStringAsFixed(0)).replaceFirst('%s', sum.toStringAsFixed(0));
   }
 
   static String _norm(String s) =>
@@ -708,37 +743,13 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                 border: Border.all(color: theme.colorScheme.error.withValues(alpha: 0.3)),
               ),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Icon(Icons.warning_amber_rounded, size: 20, color: theme.colorScheme.error),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      loc.t('tech_cards_import_parse_errors_banner') ?? 'Обнаружены ошибки распознавания. Проверьте карточки ниже.',
-                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-          if (_items.length > 1) ...[
-            Container(
-              width: double.infinity,
-              margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.lightbulb_outline, size: 20, color: theme.colorScheme.primary),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      loc.t('ttk_import_multi_format_hint') ?? 'Excel и Word: ТТК должны быть в одном столбце и одинаковой формы.',
+                      _formatParseErrorsBanner(loc),
                       style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface),
                     ),
                   ),
@@ -805,6 +816,19 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                           ],
                         ),
                         const SizedBox(height: 8),
+                        // Подсказка подстроить % отхода, если выход из карточки не совпадает с суммой ингредиентов
+                        if (_shouldShowAdjustWasteHint(item)) ...[
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Text(
+                              _formatAdjustWasteHint(item, loc),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.primary,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ),
+                        ],
                         Wrap(
                           spacing: 12,
                           runSpacing: 8,
