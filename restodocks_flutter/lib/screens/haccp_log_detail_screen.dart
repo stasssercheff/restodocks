@@ -19,9 +19,9 @@ class HaccpLogDetailScreen extends StatelessWidget {
   final HaccpLog log;
   final Employee? employee;
 
-  static const _dateFmt = DateFormat('dd.MM.yyyy');
-  static const _dateTimeFmt = DateFormat('dd.MM.yyyy HH:mm');
-  static const _timeFmt = DateFormat('HH:mm');
+  static final _dateFmt = DateFormat('dd.MM.yyyy');
+  static final _dateTimeFmt = DateFormat('dd.MM.yyyy HH:mm');
+  static final _timeFmt = DateFormat('HH:mm');
 
   Widget _header(String text) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
