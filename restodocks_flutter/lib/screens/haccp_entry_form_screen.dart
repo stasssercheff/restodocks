@@ -28,6 +28,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
   bool _saving = false;
   DateTime? _expiryDate;
   DateTime? _dateSold;
+  /// Разрешение к реализации: true = разрешено, false = запрещено, null = не выбрано.
+  bool? _approvalToSell;
 
   HaccpLogType? get _logType {
     final t = HaccpLogType.fromCode(widget.logTypeCode);
@@ -87,6 +89,39 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       ),
       maxLines: multiline ? 2 : 1,
       keyboardType: keyboardType,
+    );
+  }
+
+  /// Селектор «Разрешение к реализации»: разрешено / запрещено.
+  Widget _approvalSelector() {
+    return DropdownButtonFormField<bool>(
+      value: _approvalToSell,
+      decoration: const InputDecoration(
+        border: OutlineInputBorder(),
+        isDense: true,
+      ),
+      hint: const Text('Выберите'),
+      items: const [
+        DropdownMenuItem(value: true, child: Text('разрешено')),
+        DropdownMenuItem(value: false, child: Text('запрещено')),
+      ],
+      onChanged: (v) => setState(() => _approvalToSell = v),
+    );
+  }
+
+  /// Подпись — ФИО сотрудника из учётной записи (только отображение).
+  Widget _signatureFromAccount() {
+    return Consumer<AccountManagerSupabase>(
+      builder: (_, acc, __) {
+        final emp = acc.currentEmployee;
+        final name = emp != null
+            ? (emp.surname != null ? '${emp.surname} ${emp.fullName}' : emp.fullName)
+            : '—';
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Text(name, style: const TextStyle(fontSize: 13)),
+        );
+      },
     );
   }
 
@@ -279,8 +314,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
             _tableCell(_textField('time_brakerage', 'Время (например 12:00)')),
             _tableCell(_textField('product', loc.t('haccp_product') ?? 'Наименование блюда')),
             _tableCell(_textField('result', loc.t('haccp_result') ?? 'Результат оценки', multiline: true)),
-            _tableCell(_textField('approval_to_sell', 'Разрешение')),
-            _tableCell(_textField('commission_signatures', 'Подписи')),
+            _tableCell(_approvalSelector()),
+            _tableCell(_signatureFromAccount()),
             _tableCell(_textField('weighing_result', 'Взвешивание')),
             _tableCell(_textField('note', loc.t('haccp_note') ?? 'Примечание')),
           ],
@@ -344,7 +379,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               },
               child: Text(_dateSold != null ? DateFormat('dd.MM.yyyy').format(_dateSold!) : 'Выбрать'),
             )),
-            _tableCell(const Text('—')), // подпись при сохранении = текущий пользователь
+            _tableCell(_signatureFromAccount()),
             _tableCell(_textField('note', loc.t('haccp_note') ?? 'Прим.')),
           ],
         ),
@@ -459,6 +494,13 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
   }
 
   Future<void> _saveQuality(HaccpLogServiceSupabase svc, String estId, String empId) async {
+    final emp = context.read<AccountManagerSupabase>().currentEmployee;
+    final signatureName = emp != null
+        ? (emp.surname != null ? '${emp.surname} ${emp.fullName}' : emp.fullName)
+        : null;
+    final approvalStr = _logType == HaccpLogType.finishedProductBrakerage && _approvalToSell != null
+        ? (_approvalToSell! ? 'разрешено' : 'запрещено')
+        : null;
     await svc.insertQuality(
       establishmentId: estId,
       createdByEmployeeId: empId,
@@ -466,8 +508,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       productName: _getText('product').isNotEmpty ? _getText('product') : null,
       result: _getText('result').isNotEmpty ? _getText('result') : null,
       timeBrakerage: _getText('time_brakerage').isNotEmpty ? _getText('time_brakerage') : null,
-      approvalToSell: _getText('approval_to_sell').isNotEmpty ? _getText('approval_to_sell') : null,
-      commissionSignatures: _getText('commission_signatures').isNotEmpty ? _getText('commission_signatures') : null,
+      approvalToSell: approvalStr ?? (_getText('approval_to_sell').isNotEmpty ? _getText('approval_to_sell') : null),
+      commissionSignatures: signatureName,
       weighingResult: _getText('weighing_result').isNotEmpty ? _getText('weighing_result') : null,
       packaging: _getText('packaging').isNotEmpty ? _getText('packaging') : null,
       manufacturerSupplier: _getText('manufacturer_supplier').isNotEmpty ? _getText('manufacturer_supplier') : null,

@@ -294,7 +294,10 @@ class HaccpLogDetailScreen extends StatelessWidget {
           const SizedBox(height: 8),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            child: _buildTableForType(context, establishmentName),
+            child: SizedBox(
+              width: 1200,
+              child: _buildTableForType(context, establishmentName),
+            ),
           ),
           const SizedBox(height: 24),
           Container(
