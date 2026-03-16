@@ -1652,15 +1652,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onChanged: (v) => screenPref.setShowTranslationNotifications(v),
               ),
             ),
-            // Beta: Журналы и ХАССП, Юридическая легитимность
-            if (const bool.fromEnvironment('IS_BETA', defaultValue: false) &&
-                (currentEmployee.hasRole('owner') ||
-                    currentEmployee.department == 'management' ||
-                    currentEmployee.hasRole('executive_chef') ||
-                    currentEmployee.hasRole('sous_chef') ||
-                    currentEmployee.hasRole('bar_manager') ||
-                    currentEmployee.hasRole('floor_manager') ||
-                    currentEmployee.hasRole('general_manager'))) ...[
+            // Журналы и ХАССП, Юридическая легитимность — для руководителей (всегда, без IS_BETA).
+            if (currentEmployee.hasRole('owner') ||
+                currentEmployee.department == 'management' ||
+                currentEmployee.hasRole('executive_chef') ||
+                currentEmployee.hasRole('sous_chef') ||
+                currentEmployee.hasRole('bar_manager') ||
+                currentEmployee.hasRole('floor_manager') ||
+                currentEmployee.hasRole('general_manager')) ...[
               ExpansionTile(
                 initiallyExpanded: false,
                 leading: const Icon(Icons.assignment),
