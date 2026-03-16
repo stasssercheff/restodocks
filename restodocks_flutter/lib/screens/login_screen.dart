@@ -38,6 +38,17 @@ class _LoginScreenState extends State<LoginScreen> {
         if (mounted) _loadRememberedCredentials();
       });
     });
+    // Enter в любом поле (в т.ч. после автозаполнения браузером, когда фокус в email) — вход
+    HardwareKeyboard.instance.addHandler(_handleKeyEvent);
+  }
+
+  bool _handleKeyEvent(KeyEvent event) {
+    if (event is! KeyDownEvent) return false;
+    final key = event.logicalKey;
+    if (key != LogicalKeyboardKey.enter && key != LogicalKeyboardKey.numpadEnter) return false;
+    if (!mounted || _isLoading) return false;
+    _login();
+    return false; // не перехватываем, чтобы поле тоже могло обработать при необходимости
   }
 
   Future<void> _loadRememberedCredentials() async {
@@ -55,6 +66,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -117,7 +129,9 @@ class _LoginScreenState extends State<LoginScreen> {
         keyboardType: TextInputType.emailAddress,
         textInputAction: TextInputAction.next,
         autocorrect: false,
-        onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
+        onFieldSubmitted: (_) {
+          if (!_isLoading) _login();
+        },
         validator: (value) {
           if (value == null || value.isEmpty) return loc.t('email_required');
           if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
@@ -224,6 +238,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _login() async {
+    if (_isLoading) return;
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
