@@ -660,12 +660,13 @@ class _JournalTableView extends StatelessWidget {
         child: Text(text, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600)),
       );
 
-  Widget _cell(String text) => Container(
+  Widget _cell(String text, {Color? color}) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
         decoration: BoxDecoration(
+          color: color != null ? color.withValues(alpha: 0.15) : null,
           border: Border(right: BorderSide(color: Colors.grey.shade400), bottom: BorderSide(color: Colors.grey.shade400)),
         ),
-        child: Text(text, style: const TextStyle(fontSize: 11)),
+        child: Text(text, style: TextStyle(fontSize: 11, color: color ?? Colors.black)),
       );
 
   Widget _wrapTap(Widget child, HaccpLog log) => Material(
@@ -690,22 +691,27 @@ class _JournalTableView extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Приложение № 3 к СанПиН 2.3/2.4.3590-20',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.primary),
-              ),
-              if (logType == HaccpLogType.warehouseTempHumidity && warehousePremisesName != null) ...[
-                const SizedBox(height: 4),
-                Text(
-                  'Наименование складского помещения: $warehousePremisesName',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+          child: logType == HaccpLogType.warehouseTempHumidity
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Приложение № 3 к СанПиН 2.3/2.4.3590-20',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.primary),
+                    ),
+                    if (warehousePremisesName != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Наименование складского помещения: $warehousePremisesName',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ],
+                )
+              : Text(
+                  'Рекомендуемый образец',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(color: Theme.of(context).colorScheme.primary),
                 ),
-              ],
-            ],
-          ),
         ),
         Expanded(
           child: SingleChildScrollView(
@@ -781,8 +787,14 @@ class _JournalTableView extends StatelessWidget {
     final rows = <TableRow>[
       TableRow(
         children: [
-          _header('№'), _header('Дата'), _header('Ф.И.О.'), _header('Должность'),
-          _header('Подпись (инф.забол.)'), _header('Подпись (ОРВИ/кожа)'), _header('Результат'), _header('Подпись'),
+          _header('№ п/п'),
+          _header('Дата'),
+          _header('Ф. И. О. работника (последнее при наличии)'),
+          _header('Должность'),
+          _header('Подпись сотрудника об отсутствии признаков инфекционных заболеваний у сотрудника и членов семьи'),
+          _header('Подпись сотрудника об отсутствии заболеваний верхних дыхательных путей и гнойничковых заболеваний кожи рук и открытых поверхностей тела'),
+          _header('Результат осмотра медицинским работником (ответственным лицом) (допущен / отстранен)'),
+          _header('Подпись медицинского работника (ответственного лица)'),
         ],
       ),
       ...logs.asMap().entries.map((e) {
@@ -841,32 +853,62 @@ class _JournalTableView extends StatelessWidget {
     );
   }
 
-  Widget _buildWarehouseTable(Map<String, Employee> idToEmp) {
+  /// Приложение № 3: 5 обязательных колонок. При просмотре «Все» — 6-я колонка «Помещение». Подсветка красным при t>25°C или влажность>75%.
+  Widget _buildWarehouseTable(Map<String, Employee> idToEmp, Map<String, String> idToName) {
+    final showPremisesColumn = warehousePremisesName == null;
     final rows = <TableRow>[
       TableRow(
         children: [
-          _header('№'), _header('Помещение'), _header('Дата'), _header('Температура °C'), _header('Влажность %'),
+          _header('№ п/п'),
+          if (showPremisesColumn) _header('Наименование складского помещения'),
+          _header('Дата'),
+          _header('Температура, °C'),
+          _header('Относительная влажность, %'),
+          _header('Подпись ответственного лица'),
         ],
       ),
       ...logs.asMap().entries.map((e) {
         final log = e.value;
-        final temp = log.value1 != null ? '+${log.value1!.toStringAsFixed(0)}' : '—';
-        final hum = log.value2 != null ? '${log.value2!.toStringAsFixed(0)}%' : '—';
+        final tempVal = log.value1;
+        final humVal = log.value2;
+        final tempOut = tempVal != null ? '${tempVal.toStringAsFixed(0)}' : '—';
+        final humOut = humVal != null ? '${humVal.toStringAsFixed(0)}%' : '—';
+        final tempAlert = tempVal != null && tempVal > 25;
+        final humAlert = humVal != null && humVal > 75;
+        Widget tempCell = _cell(tempOut);
+        if (tempAlert) tempCell = _cell(tempOut, color: Colors.red);
+        Widget humCell = _cell(humOut);
+        if (humAlert) humCell = _cell(humOut, color: Colors.red);
+        final sign = idToName[log.createdByEmployeeId] ?? '—';
         return TableRow(
           children: [
             _wrapTap(_cell('${e.key + 1}'), log),
-            _wrapTap(_cell(establishmentName), log),
+            if (showPremisesColumn) _wrapTap(_cell(log.equipment ?? '—'), log),
             _wrapTap(_cell(_dateFmt.format(log.createdAt)), log),
-            _wrapTap(_cell(temp), log),
-            _wrapTap(_cell(hum), log),
+            _wrapTap(tempCell, log),
+            _wrapTap(humCell, log),
+            _wrapTap(_cell(sign), log),
           ],
         );
       }),
     ];
     return Table(
-      columnWidths: const {
-        0: FlexColumnWidth(0.4), 1: FlexColumnWidth(1.2), 2: FlexColumnWidth(1), 3: FlexColumnWidth(0.7), 4: FlexColumnWidth(0.7),
-      },
+      columnWidths: showPremisesColumn
+          ? const {
+              0: FlexColumnWidth(0.4),
+              1: FlexColumnWidth(1.5),
+              2: FlexColumnWidth(1),
+              3: FlexColumnWidth(0.7),
+              4: FlexColumnWidth(0.8),
+              5: FlexColumnWidth(1.2),
+            }
+          : const {
+              0: FlexColumnWidth(0.4),
+              1: FlexColumnWidth(1.2),
+              2: FlexColumnWidth(0.8),
+              3: FlexColumnWidth(0.7),
+              4: FlexColumnWidth(1.2),
+            },
       border: TableBorder.all(color: Colors.grey),
       children: rows,
     );
