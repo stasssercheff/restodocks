@@ -703,6 +703,7 @@ class HaccpPdfExportService {
       doc.addPage(
         pw.Page(
           pageFormat: PdfPageFormat.a4,
+          orientation: pw.PageOrientation.landscape,
           margin: pw.EdgeInsets.fromLTRB(20, 40, 20, 50),
           build: (ctx) => pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.stretch,
@@ -736,6 +737,7 @@ class HaccpPdfExportService {
       doc.addPage(
         pw.Page(
           pageFormat: PdfPageFormat.a4,
+          orientation: pw.PageOrientation.landscape,
           margin: pw.EdgeInsets.fromLTRB(20, 40, 20, 50),
           build: (ctx) => pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.stretch,
@@ -801,6 +803,7 @@ class HaccpPdfExportService {
       doc.addPage(
         pw.Page(
           pageFormat: PdfPageFormat.a4,
+          orientation: pw.PageOrientation.landscape,
           margin: pw.EdgeInsets.fromLTRB(16, 40, 16, 50),
           build: (ctx) => pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.stretch,
@@ -833,6 +836,7 @@ class HaccpPdfExportService {
       doc.addPage(
         pw.Page(
           pageFormat: PdfPageFormat.a4,
+          orientation: pw.PageOrientation.landscape,
           margin: pw.EdgeInsets.fromLTRB(16, 40, 16, 50),
           build: (ctx) => pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.stretch,

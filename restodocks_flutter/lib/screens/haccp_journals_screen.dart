@@ -57,24 +57,6 @@ class _HaccpJournalsScreenState extends State<HaccpJournalsScreen> {
       appBar: AppBar(
         leading: appBarBackButton(context),
         title: Text(loc.t('haccp_journals') ?? 'Журналы и ХАССП'),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(28),
-          child: SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'По форме СанПиН 2.3/2.4.3590-20 (Приложения 1–5)',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ) ?? const TextStyle(fontSize: 12),
-                ),
-              ),
-            ),
-          ),
-        ),
       ),
       body: journals.isEmpty
           ? _EmptyState(
