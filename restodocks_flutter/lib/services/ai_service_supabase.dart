@@ -289,7 +289,7 @@ class AiServiceSupabase implements AiService {
         // Специальный формат «Полное пособие Кухня» / супы.xlsx:
         // один лист, блоки [Название] [№|Наименование продукта|Вес гр/шт] [ингредиенты] [Выход] + технология текстом.
         // Для него надёжнее всего работает Dart-парсер _tryParsePolnoePosobieFormat, который умеет вытаскивать технологию.
-        if (rows.isNotEmpty && sheetIndex != null) {
+        if (rows.isNotEmpty) {
           final polnoe = _tryParsePolnoePosobieFormat(rows);
           if (polnoe.isNotEmpty) {
             lastParsedRows = rows;
@@ -302,6 +302,18 @@ class AiServiceSupabase implements AiService {
         }
       }
       if (rows.isEmpty) rows = _csvToRows(xlsxBytes);
+      // CSV-формат "Наименование,Продукт,Брутто,...,Технология" (как в ттк.csv)
+      if (rows.isNotEmpty) {
+        final csvWithTech = AiServiceSupabase._tryParseCsvWithTechnologyColumn(rows);
+        if (csvWithTech.isNotEmpty) {
+          lastParsedRows = rows;
+          lastParseHeaderSignature = _headerSignatureFromRows(rows) ??
+              (rows.isNotEmpty && rows[0].isNotEmpty
+                  ? _headerSignature(rows[0].map((c) => c.toString().trim()).toList())
+                  : null);
+          return _applyParseCorrections(csvWithTech, lastParseHeaderSignature, establishmentId);
+        }
+      }
       if (rows.isEmpty && fmt != 'docx') {
         docxTables = _docxToAllTables(xlsxBytes);
         if (docxTables.isNotEmpty) {
@@ -2055,6 +2067,120 @@ class AiServiceSupabase implements AiService {
       final iiko = _tryParseIikoStyleFallback(rows, results.single.dishName!);
       if (iiko.isNotEmpty && iiko.first.ingredients.isNotEmpty) return iiko;
     }
+    return results;
+  }
+
+  /// Специальный парсер CSV-формата "Наименование,Продукт,Брутто,...,Технология"
+  /// как в ттк.csv: каждая строка с непустым "Наименование" = начало новой карты,
+  /// ингредиенты идут до строки "Итого", технология лежит в последнем столбце.
+  static List<TechCardRecognitionResult> _tryParseCsvWithTechnologyColumn(
+      List<List<String>> rows) {
+    if (rows.length < 2) return [];
+    final header = rows.first.map((c) => (c ?? '').toString().trim().toLowerCase()).toList();
+    final nameCol = header.indexWhere((c) => c == 'наименование');
+    final productCol = header.indexWhere((c) => c == 'продукт');
+    final bruttoCol = header.indexWhere((c) => c == 'брутто');
+    final nettoCol = header.indexWhere((c) => c == 'нетто');
+    final yieldCol = header.indexWhere((c) => c == 'выход');
+    final techCol = header.indexWhere((c) => c == 'технология');
+    if (nameCol < 0 || productCol < 0 || bruttoCol < 0 || techCol < 0) return [];
+
+    final results = <TechCardRecognitionResult>[];
+    String? currentDish;
+    final currentIngredients = <TechCardIngredientLine>[];
+    String? currentTech;
+    double? currentYield;
+
+    void flush() {
+      if (currentDish != null && currentDish!.trim().isNotEmpty && currentIngredients.isNotEmpty) {
+        results.add(
+          TechCardRecognitionResult(
+            dishName: currentDish,
+            ingredients: List.from(currentIngredients),
+            isSemiFinished: currentDish!.toLowerCase().contains('пф'),
+            technologyText: currentTech != null && currentTech!.trim().length > 10
+                ? currentTech!.trim()
+                : null,
+            yieldGrams: currentYield,
+          ),
+        );
+      }
+      currentDish = null;
+      currentIngredients.clear();
+      currentTech = null;
+      currentYield = null;
+    }
+
+    for (var r = 1; r < rows.length; r++) {
+      final row = rows[r].map((c) => (c ?? '').toString().trim()).toList();
+      if (row.isEmpty || row.every((c) => c.isEmpty)) continue;
+
+      final name = nameCol < row.length ? row[nameCol] : '';
+      final product = productCol < row.length ? row[productCol] : '';
+      final bruttoStr = bruttoCol < row.length ? row[bruttoCol] : '';
+      final nettoStr = nettoCol >= 0 && nettoCol < row.length ? row[nettoCol] : '';
+      final yieldStr = yieldCol >= 0 && yieldCol < row.length ? row[yieldCol] : '';
+      final techStr = techCol < row.length ? row[techCol] : '';
+
+      final lowName = name.toLowerCase();
+      final lowProduct = product.toLowerCase();
+
+      // Строка "Итого" завершает текущую карту
+      if (lowProduct == 'итого' || lowName == 'итого') {
+        final y = _parseNum(yieldStr);
+        if (y != null && y > 0) {
+          currentYield = y < 100 ? y * 1000 : y;
+        }
+        flush();
+        continue;
+      }
+
+      // Новая карта: непустое "Наименование"
+      if (name.isNotEmpty) {
+        // если уже что-то собирали — сохранить предыдущую
+        if (currentDish != null && currentIngredients.isNotEmpty) {
+          flush();
+        }
+        currentDish = name;
+        // Технология может быть уже в первой строке
+        if (techStr.isNotEmpty) {
+          currentTech = techStr;
+        }
+      } else {
+        // Продолжение технологии в последующих строках того же блока
+        if (techStr.isNotEmpty) {
+          if (currentTech == null || currentTech!.isEmpty) {
+            currentTech = techStr;
+          } else {
+            currentTech = '$currentTech\n$techStr';
+          }
+        }
+      }
+
+      // Строка ингредиента: есть продукт и брутто
+      if (product.isNotEmpty && lowProduct != 'итого') {
+        final g = _parseNum(bruttoStr);
+        var n = _parseNum(nettoStr);
+        if (g == null && n == null) continue;
+        final gross = g ?? n ?? 0;
+        if (gross <= 0) continue;
+        n ??= gross;
+
+        currentIngredients.add(
+          TechCardIngredientLine(
+            productName: product,
+            grossGrams: gross,
+            netGrams: n,
+            outputGrams: n,
+            primaryWastePct: null,
+            unit: 'g',
+            ingredientType:
+                RegExp(r'^пф\s', caseSensitive: false).hasMatch(product) ? 'semi_finished' : 'product',
+          ),
+        );
+      }
+    }
+    flush();
     return results;
   }
 
