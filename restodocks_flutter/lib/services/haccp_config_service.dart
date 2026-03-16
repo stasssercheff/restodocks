@@ -51,9 +51,10 @@ class HaccpConfigService extends ChangeNotifier {
     }
   }
 
-  /// Сохранить настройки (массив кодов).
+  /// Сохранить настройки (массив кодов). Сохраняются только коды поддерживаемых журналов (СанПиН 1–5 + фритюрные жиры).
   Future<void> save(String establishmentId, Set<String> enabledLogTypes) async {
-    final list = enabledLogTypes.toList()..sort();
+    final supportedCodes = HaccpLogType.supportedInApp.map((t) => t.code).toSet();
+    final list = enabledLogTypes.where((code) => supportedCodes.contains(code)).toList()..sort();
     await _supabase.client.from('establishment_haccp_config').upsert(
           {
             'establishment_id': establishmentId,
@@ -77,10 +78,10 @@ class HaccpConfigService extends ChangeNotifier {
     await save(establishmentId, current);
   }
 
-  /// Список включённых журналов в порядке групп.
+  /// Список включённых журналов (СанПиН 1–5 + фритюрные жиры) в порядке для UI.
   List<HaccpLogType> getEnabledJournalsOrdered(String establishmentId) {
     final enabled = getEnabledLogTypes(establishmentId);
-    return HaccpLogType.values.where((t) => enabled.contains(t.code)).toList()
+    return HaccpLogType.supportedInApp.where((t) => enabled.contains(t.code)).toList()
       ..sort((a, b) {
         final g = a.group.compareTo(b.group);
         if (g != 0) return g;

@@ -38,7 +38,13 @@ class _HaccpJournalsScreenState extends State<HaccpJournalsScreen> {
       );
     }
 
-    final journals = config.getEnabledJournalsOrdered(est.id);
+    List<HaccpLogType> journals;
+    try {
+      journals = config.getEnabledJournalsOrdered(est.id);
+      journals = journals.where((t) => HaccpLogType.supportedInApp.contains(t)).toList();
+    } catch (_) {
+      journals = [];
+    }
     final isOwnerOrManagement = acc.currentEmployee?.hasRole('owner') == true ||
         acc.currentEmployee?.department == 'management' ||
         acc.currentEmployee?.hasRole('executive_chef') == true ||
@@ -52,16 +58,19 @@ class _HaccpJournalsScreenState extends State<HaccpJournalsScreen> {
         leading: appBarBackButton(context),
         title: Text(loc.t('haccp_journals') ?? 'Журналы и ХАССП'),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(32),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'По форме СанПиН 2.3/2.4.3590-20 (Приложения 1–5)',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+          preferredSize: const Size.fromHeight(28),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'По форме СанПиН 2.3/2.4.3590-20 (Приложения 1–5)',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ) ?? const TextStyle(fontSize: 12),
+                ),
               ),
             ),
           ),
@@ -92,7 +101,7 @@ class _HaccpJournalsScreenState extends State<HaccpJournalsScreen> {
     );
   }
 
-  /// Иконки только для 5 журналов СанПиН (Приложения 1–5).
+  /// Иконки для поддерживаемых журналов (СанПиН 1–5 + фритюрные жиры).
   static IconData _iconForType(HaccpLogType t) {
     switch (t) {
       case HaccpLogType.healthHygiene:
@@ -103,6 +112,8 @@ class _HaccpJournalsScreenState extends State<HaccpJournalsScreen> {
       case HaccpLogType.finishedProductBrakerage:
       case HaccpLogType.incomingRawBrakerage:
         return Icons.fact_check;
+      case HaccpLogType.fryingOil:
+        return Icons.oil_barrel;
       default:
         return Icons.assignment;
     }
@@ -141,7 +152,7 @@ class _EmptyState extends StatelessWidget {
               FilledButton.icon(
                 onPressed: onConfigure,
                 icon: const Icon(Icons.settings),
-                label: Text(loc.t('settings')),
+                label: Text(loc.t('settings') ?? 'Настройки'),
               ),
             ],
           ],

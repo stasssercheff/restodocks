@@ -133,6 +133,13 @@ class HaccpLogServiceSupabase {
     String? storageConditions,
     DateTime? expiryDate,
     DateTime? dateSold,
+    String? organolepticStart,
+    String? fryingEquipmentType,
+    String? fryingProductType,
+    String? fryingEndTime,
+    String? organolepticEnd,
+    double? carryOverKg,
+    double? utilizedKg,
     String? note,
   }) async {
     final map = <String, dynamic>{
@@ -161,6 +168,13 @@ class HaccpLogServiceSupabase {
     if (storageConditions != null) map['storage_conditions'] = storageConditions;
     if (expiryDate != null) map['expiry_date'] = expiryDate.toIso8601String();
     if (dateSold != null) map['date_sold'] = dateSold.toIso8601String();
+    if (organolepticStart != null) map['organoleptic_start'] = organolepticStart;
+    if (fryingEquipmentType != null) map['frying_equipment_type'] = fryingEquipmentType;
+    if (fryingProductType != null) map['frying_product_type'] = fryingProductType;
+    if (fryingEndTime != null) map['frying_end_time'] = fryingEndTime;
+    if (organolepticEnd != null) map['organoleptic_end'] = organolepticEnd;
+    if (carryOverKg != null) map['carry_over_kg'] = carryOverKg;
+    if (utilizedKg != null) map['utilized_kg'] = utilizedKg;
     final row = await _supabase.client.from('haccp_quality_logs').insert(map).select().single();
     return HaccpLog.fromQualityJson(Map<String, dynamic>.from(row));
   }

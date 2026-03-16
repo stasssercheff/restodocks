@@ -253,8 +253,42 @@ class HaccpLogDetailScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildFryingOilTable(BuildContext context) {
+    return Table(
+      columnWidths: const {
+        0: FlexColumnWidth(1.2), 1: FlexColumnWidth(1), 2: FlexColumnWidth(1.2), 3: FlexColumnWidth(1),
+        4: FlexColumnWidth(1), 5: FlexColumnWidth(0.8), 6: FlexColumnWidth(1.2), 7: FlexColumnWidth(0.7),
+        8: FlexColumnWidth(0.7), 9: FlexColumnWidth(1),
+      },
+      border: TableBorder.all(color: Colors.grey),
+      children: [
+        TableRow(
+          children: [
+            _header('Дата (час) начала'), _header('Вид жира'), _header('Оценка на начало'),
+            _header('Оборудование'), _header('Вид продукции'), _header('Время окончания'),
+            _header('Оценка по окончании'), _header('Переходящий остаток, кг'), _header('Утилизировано, кг'), _header('Контролёр'),
+          ],
+        ),
+        TableRow(
+          children: [
+            _cell(_dateTimeFmt.format(log.createdAt)),
+            _cell(log.oilName ?? '—'),
+            _cell(log.organolepticStart ?? '—'),
+            _cell(log.fryingEquipmentType ?? '—'),
+            _cell(log.fryingProductType ?? '—'),
+            _cell(log.fryingEndTime ?? '—'),
+            _cell(log.organolepticEnd ?? '—'),
+            _cell(log.carryOverKg != null ? log.carryOverKg!.toStringAsFixed(2) : '—'),
+            _cell(log.utilizedKg != null ? log.utilizedKg!.toStringAsFixed(2) : '—'),
+            _cell(log.commissionSignatures ?? employee?.fullName ?? '—'),
+          ],
+        ),
+      ],
+    );
+  }
+
   Widget _buildTableForType(BuildContext context, String establishmentName) {
-    if (!HaccpLogType.sanpinOnly.contains(log.logType)) {
+    if (!HaccpLogType.supportedInApp.contains(log.logType)) {
       return const SizedBox.shrink();
     }
     switch (log.logType) {
@@ -268,6 +302,8 @@ class HaccpLogDetailScreen extends StatelessWidget {
         return _buildFinishedProductBrakerageTable(context);
       case HaccpLogType.incomingRawBrakerage:
         return _buildIncomingRawBrakerageTable(context);
+      case HaccpLogType.fryingOil:
+        return _buildFryingOilTable(context);
       default:
         return const SizedBox.shrink();
     }

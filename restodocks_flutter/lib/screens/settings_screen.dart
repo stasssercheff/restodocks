@@ -1684,7 +1684,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               localization.t('haccp_enabled_journals') ?? 'Включённые журналы',
                               style: Theme.of(context).textTheme.titleSmall,
                             ),
-                            ...HaccpLogType.values.map((t) {
+                            ...HaccpLogType.supportedInApp.map((t) {
                               final isOn = enabled.contains(t.code);
                               return ListTile(
                                 leading: Checkbox(

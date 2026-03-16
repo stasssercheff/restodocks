@@ -29,7 +29,7 @@ enum HaccpLogType {
   final String sanpinRef;
   final HaccpLogTable targetTable;
 
-  /// Журналы по рекомендуемым образцам СанПиН 2.3/2.4.3590-20 (Приложения 1–5). Только они показываются в настройках и в списке журналов.
+  /// Журналы по рекомендуемым образцам СанПиН 2.3/2.4.3590-20 (Приложения 1–5).
   static const List<HaccpLogType> sanpinOnly = [
     HaccpLogType.healthHygiene,
     HaccpLogType.fridgeTemperature,
@@ -37,6 +37,9 @@ enum HaccpLogType {
     HaccpLogType.finishedProductBrakerage,
     HaccpLogType.incomingRawBrakerage,
   ];
+
+  /// СанПиН (1–5) + журнал фритюрных жиров (Приложение 8). Показываются в настройках и в списке журналов.
+  static List<HaccpLogType> get supportedInApp => [...sanpinOnly, HaccpLogType.fryingOil];
 
   static HaccpLogType? fromCode(String? code) {
     if (code == null || code.isEmpty) return null;

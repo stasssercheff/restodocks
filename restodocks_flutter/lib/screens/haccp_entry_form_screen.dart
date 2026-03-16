@@ -33,7 +33,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
 
   HaccpLogType? get _logType {
     final t = HaccpLogType.fromCode(widget.logTypeCode);
-    return t != null && HaccpLogType.sanpinOnly.contains(t) ? t : null;
+    return t != null && HaccpLogType.supportedInApp.contains(t) ? t : null;
   }
 
   @override
@@ -387,6 +387,55 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     );
   }
 
+  /// Форма по макету Приложения 8: Учёт фритюрных жиров.
+  Widget _buildFryingOilForm(LocalizationService loc) {
+    return Table(
+      columnWidths: const {
+        0: FlexColumnWidth(1.2),
+        1: FlexColumnWidth(1),
+        2: FlexColumnWidth(1.2),
+        3: FlexColumnWidth(1),
+        4: FlexColumnWidth(1),
+        5: FlexColumnWidth(0.8),
+        6: FlexColumnWidth(1.2),
+        7: FlexColumnWidth(0.7),
+        8: FlexColumnWidth(0.7),
+        9: FlexColumnWidth(1),
+      },
+      border: TableBorder.all(color: Theme.of(context).dividerColor),
+      children: [
+        TableRow(
+          children: [
+            _tableHeaderCell('Дата (час) начала использования жира'),
+            _tableHeaderCell('Вид фритюрного жира'),
+            _tableHeaderCell('Органолептическая оценка на начало жарки'),
+            _tableHeaderCell('Тип жарочного оборудования'),
+            _tableHeaderCell('Вид продукции'),
+            _tableHeaderCell('Время окончания жарки'),
+            _tableHeaderCell('Органолептическая оценка по окончании жарки'),
+            _tableHeaderCell('Переходящий остаток, кг'),
+            _tableHeaderCell('Утилизированный жир, кг'),
+            _tableHeaderCell('Должность, Ф.И.О. контролера'),
+          ],
+        ),
+        TableRow(
+          children: [
+            _tableCell(Text(DateFormat('dd.MM.yyyy HH:mm').format(DateTime.now()))),
+            _tableCell(_textField('oil_name', 'Вид жира')),
+            _tableCell(_textField('organoleptic_start', 'Оценка на начало', multiline: true)),
+            _tableCell(_textField('frying_equipment_type', 'Тип оборудования')),
+            _tableCell(_textField('frying_product_type', 'Вид продукции')),
+            _tableCell(_textField('frying_end_time', 'Время (например 14:00)')),
+            _tableCell(_textField('organoleptic_end', 'Оценка по окончании', multiline: true)),
+            _tableCell(_textField('carry_over_kg', 'кг', keyboardType: TextInputType.number)),
+            _tableCell(_textField('utilized_kg', 'кг', keyboardType: TextInputType.number)),
+            _tableCell(_signatureFromAccount()),
+          ],
+        ),
+      ],
+    );
+  }
+
   Widget _buildFormByType(LocalizationService loc) {
     switch (_logType) {
       case HaccpLogType.healthHygiene:
@@ -399,6 +448,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         return _buildFinishedProductBrakerageForm(loc);
       case HaccpLogType.incomingRawBrakerage:
         return _buildIncomingRawBrakerageForm(loc);
+      case HaccpLogType.fryingOil:
+        return _buildFryingOilForm(loc);
       default:
         return const SizedBox.shrink();
     }
@@ -501,6 +552,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     final approvalStr = _logType == HaccpLogType.finishedProductBrakerage && _approvalToSell != null
         ? (_approvalToSell! ? 'разрешено' : 'запрещено')
         : null;
+    final isFryingOil = _logType == HaccpLogType.fryingOil;
     await svc.insertQuality(
       establishmentId: estId,
       createdByEmployeeId: empId,
@@ -517,6 +569,14 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       documentNumber: _getText('document_number').isNotEmpty ? _getText('document_number') : null,
       storageConditions: _getText('storage_conditions').isNotEmpty ? _getText('storage_conditions') : null,
       dateSold: _dateSold,
+      oilName: isFryingOil && _getText('oil_name').isNotEmpty ? _getText('oil_name') : null,
+      organolepticStart: isFryingOil && _getText('organoleptic_start').isNotEmpty ? _getText('organoleptic_start') : null,
+      fryingEquipmentType: isFryingOil && _getText('frying_equipment_type').isNotEmpty ? _getText('frying_equipment_type') : null,
+      fryingProductType: isFryingOil && _getText('frying_product_type').isNotEmpty ? _getText('frying_product_type') : null,
+      fryingEndTime: isFryingOil && _getText('frying_end_time').isNotEmpty ? _getText('frying_end_time') : null,
+      organolepticEnd: isFryingOil && _getText('organoleptic_end').isNotEmpty ? _getText('organoleptic_end') : null,
+      carryOverKg: isFryingOil ? _getNum('carry_over_kg') : null,
+      utilizedKg: isFryingOil ? _getNum('utilized_kg') : null,
       note: _getText('note').isNotEmpty ? _getText('note') : null,
     );
   }

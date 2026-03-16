@@ -57,6 +57,7 @@ class HaccpPdfExportService {
       HaccpLogType.warehouseTempHumidity => 'Журнал учета температуры и влажности в складских помещениях',
       HaccpLogType.finishedProductBrakerage => 'Журнал бракеража готовой пищевой продукции',
       HaccpLogType.incomingRawBrakerage => 'Журнал бракеража скоропортящейся пищевой продукции',
+      HaccpLogType.fryingOil => 'Журнал учета использования фритюрных жиров',
       _ => logType.displayNameRu,
     };
   }
@@ -69,6 +70,7 @@ class HaccpPdfExportService {
       HaccpLogType.warehouseTempHumidity => 'Приложение № 3 к СанПиН 2.3/2.4.3590-20',
       HaccpLogType.finishedProductBrakerage => 'Приложение № 4 к СанПиН 2.3/2.4.3590-20',
       HaccpLogType.incomingRawBrakerage => 'Приложение № 5 к СанПиН 2.3/2.4.3590-20',
+      HaccpLogType.fryingOil => 'Приложение № 8 к СанПиН 2.3/2.4.3590-20',
       _ => 'СанПиН 2.3/2.4.3590-20',
     };
   }
@@ -506,6 +508,64 @@ class HaccpPdfExportService {
     return pw.Table(border: _tableBorder, columnWidths: colWidths, children: dataRows);
   }
 
+  /// Приложение 8: Журнал учета использования фритюрных жиров — макет как в образце.
+  static pw.Widget _buildFryingOilPage({
+    required List<HaccpLog> logs,
+    required Map<String, String> employeeIdToName,
+    required DateFormat dateTimeFmt,
+  }) {
+    final colWidths = <int, pw.TableColumnWidth>{
+      0: const pw.FlexColumnWidth(1),
+      1: const pw.FlexColumnWidth(0.8),
+      2: const pw.FlexColumnWidth(0.9),
+      3: const pw.FlexColumnWidth(0.9),
+      4: const pw.FlexColumnWidth(0.8),
+      5: const pw.FlexColumnWidth(0.6),
+      6: const pw.FlexColumnWidth(0.9),
+      7: const pw.FlexColumnWidth(0.5),
+      8: const pw.FlexColumnWidth(0.5),
+      9: const pw.FlexColumnWidth(0.8),
+    };
+    final headerRow = pw.TableRow(
+      decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+      children: [
+        _headerCellSmall('Дата (час) начала использования жира'),
+        _headerCellSmall('Вид фритюрного жира'),
+        _headerCellSmall('Органолептическая оценка на начало жарки'),
+        _headerCellSmall('Тип жарочного оборудования'),
+        _headerCellSmall('Вид продукции'),
+        _headerCellSmall('Время окончания жарки'),
+        _headerCellSmall('Органолептическая оценка по окончании жарки'),
+        _headerCellSmall('Переходящий остаток, кг'),
+        _headerCellSmall('Утилизированный жир, кг'),
+        _headerCellSmall('Должность, Ф.И.О. контролера'),
+      ],
+    );
+    final dataRows = <pw.TableRow>[headerRow];
+    final rowCount = logs.isEmpty ? 15 : logs.length;
+    for (var i = 0; i < rowCount; i++) {
+      final log = i < logs.length ? logs[i] : null;
+      final empName = log != null ? (log.commissionSignatures ?? employeeIdToName[log.createdByEmployeeId] ?? '') : '';
+      dataRows.add(
+        pw.TableRow(
+          children: [
+            _tableCell(log != null ? dateTimeFmt.format(log.createdAt) : ''),
+            _tableCell(log?.oilName ?? ''),
+            _tableCell(log?.organolepticStart ?? ''),
+            _tableCell(log?.fryingEquipmentType ?? ''),
+            _tableCell(log?.fryingProductType ?? ''),
+            _tableCell(log?.fryingEndTime ?? ''),
+            _tableCell(log?.organolepticEnd ?? ''),
+            _tableCell(log?.carryOverKg != null ? log!.carryOverKg!.toStringAsFixed(2) : ''),
+            _tableCell(log?.utilizedKg != null ? log!.utilizedKg!.toStringAsFixed(2) : ''),
+            _tableCell(empName),
+          ],
+        ),
+      );
+    }
+    return pw.Table(border: _tableBorder, columnWidths: colWidths, children: dataRows);
+  }
+
   /// Параметры экспорта.
   static Future<Uint8List> buildJournalPdf({
     required String establishmentName,
@@ -722,6 +782,38 @@ class HaccpPdfExportService {
               ),
               pw.SizedBox(height: 8),
               _buildBrakerageIncomingRawPage(
+                logs: logs,
+                employeeIdToName: employeeIdToName,
+                dateTimeFmt: dateTimeFmt,
+              ),
+              pw.SizedBox(height: 10),
+              pw.Center(child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
+            ],
+          ),
+        ),
+      );
+    } else if (logType == HaccpLogType.fryingOil) {
+      doc.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: pw.EdgeInsets.fromLTRB(16, 40, 16, 50),
+          build: (ctx) => pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+            children: [
+              pw.Align(
+                alignment: pw.Alignment.centerRight,
+                child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9)),
+              ),
+              pw.SizedBox(height: 4),
+              pw.Center(
+                child: pw.Text('Рекомендуемая форма контроля замены фритюрных жиров', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+              ),
+              pw.SizedBox(height: 4),
+              pw.Center(
+                child: pw.Text(title, style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+              ),
+              pw.SizedBox(height: 8),
+              _buildFryingOilPage(
                 logs: logs,
                 employeeIdToName: employeeIdToName,
                 dateTimeFmt: dateTimeFmt,

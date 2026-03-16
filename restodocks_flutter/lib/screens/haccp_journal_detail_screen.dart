@@ -28,9 +28,13 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
   DateTime? _dateFrom;
   DateTime? _dateTo;
 
-  HaccpLogType get _logType => HaccpLogType.fromCode(widget.logTypeCode) ?? HaccpLogType.healthHygiene;
+  HaccpLogType? get _logType {
+    final t = HaccpLogType.fromCode(widget.logTypeCode);
+    return t != null && HaccpLogType.supportedInApp.contains(t) ? t : null;
+  }
 
   Future<void> _load() async {
+    if (_logType == null) return;
     final acc = context.read<AccountManagerSupabase>();
     final est = acc.establishment;
     if (est == null) return;
@@ -41,7 +45,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
       final emps = await acc.getEmployeesForEstablishment(est.id);
       final logs = await svc.getLogs(
         establishmentId: est.id,
-        logType: _logType,
+        logType: _logType!,
         from: _dateFrom,
         to: _dateTo,
       );
@@ -69,6 +73,8 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
     required DateTime dateFrom,
     required DateTime dateTo,
   }) async {
+    final logType = _logType;
+    if (logType == null) return;
     final acc = context.read<AccountManagerSupabase>();
     final est = acc.establishment;
     if (est == null) return;
@@ -88,16 +94,16 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
     final svc = context.read<HaccpLogServiceSupabase>();
     final logsForPeriod = await svc.getLogs(
       establishmentId: est.id,
-      logType: _logType,
+      logType: logType,
       from: dateFrom,
       to: dateTo,
     );
 
     final bytes = await HaccpPdfExportService.buildJournalPdf(
       establishmentName: est.name,
-      journalTitle: _logType.displayNameRu,
-      sanpinRef: _logType.sanpinRef,
-      logType: _logType,
+      journalTitle: logType.displayNameRu,
+      sanpinRef: logType.sanpinRef,
+      logType: logType,
       logs: logsForPeriod,
       employeeIdToName: idToName,
       dateFrom: dateFrom,
@@ -107,7 +113,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
     );
 
     final dateStr = DateFormat('yyyyMMdd').format(DateTime.now());
-    final safeCode = _logType.code.replaceAll(RegExp(r'[^a-z0-9]'), '_');
+    final safeCode = logType.code.replaceAll(RegExp(r'[^a-z0-9]'), '_');
     await saveFileBytes('haccp_${safeCode}_$dateStr.pdf', bytes);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -425,11 +431,50 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
     final loc = context.watch<LocalizationService>();
     final acc = context.watch<AccountManagerSupabase>();
     final est = acc.establishment;
+    final logType = _logType;
+
+    if (logType == null) {
+      return Scaffold(
+        appBar: AppBar(
+          leading: appBarBackButton(context),
+          title: const Text('Журнал'),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.info_outline, size: 48, color: Theme.of(context).colorScheme.outline),
+                const SizedBox(height: 16),
+                Text(
+                  'Этот журнал больше не поддерживается.',
+                  style: Theme.of(context).textTheme.titleMedium,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Используются только журналы по СанПиН 2.3/2.4.3590-20 (Приложения 1–5).',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                FilledButton.icon(
+                  onPressed: () => context.pop(),
+                  icon: const Icon(Icons.arrow_back),
+                  label: const Text('К списку журналов'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text(_logType.displayNameRu),
+        title: Text(logType.displayNameRu),
         actions: [
           IconButton(
             icon: const Icon(Icons.date_range),
@@ -490,7 +535,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
                           ),
                         )
                       : _JournalTableView(
-                          logType: _logType,
+                          logType: logType,
                           establishmentName: est?.name ?? '—',
                           logs: _logs,
                           employees: _employees,
@@ -593,7 +638,7 @@ class _JournalTableView extends StatelessWidget {
     final idToName = {
       for (final e in employees) e.id: '${e.fullName}${e.surname != null ? ' ${e.surname}' : ''}, ${e.roleDisplayName}',
     };
-    if (!HaccpLogType.sanpinOnly.contains(logType)) {
+    if (!HaccpLogType.supportedInApp.contains(logType)) {
       return const Center(child: Text('Неизвестный тип журнала'));
     }
     return Column(
@@ -634,9 +679,46 @@ class _JournalTableView extends StatelessWidget {
         return _buildBrakerageFinishedTable(idToName);
       case HaccpLogType.incomingRawBrakerage:
         return _buildBrakerageIncomingTable(idToEmp, idToName);
+      case HaccpLogType.fryingOil:
+        return _buildFryingOilTable(idToName);
       default:
         return const SizedBox.shrink();
     }
+  }
+
+  Widget _buildFryingOilTable(Map<String, String> idToName) {
+    final rows = <TableRow>[
+      TableRow(
+        children: [
+          _header('Дата (час) начала'), _header('Вид жира'), _header('Оценка на начало'),
+          _header('Оборудование'), _header('Вид продукции'), _header('Время окончания жарки'),
+          _header('Оценка по окончании'), _header('Переходящий остаток, кг'), _header('Утилизировано, кг'), _header('Контролёр'),
+        ],
+      ),
+      ...logs.map((log) => TableRow(
+            children: [
+              _wrapTap(_cell(_dateTimeFmt.format(log.createdAt)), log),
+              _wrapTap(_cell(log.oilName ?? '—'), log),
+              _wrapTap(_cell(log.organolepticStart ?? '—'), log),
+              _wrapTap(_cell(log.fryingEquipmentType ?? '—'), log),
+              _wrapTap(_cell(log.fryingProductType ?? '—'), log),
+              _wrapTap(_cell(log.fryingEndTime ?? '—'), log),
+              _wrapTap(_cell(log.organolepticEnd ?? '—'), log),
+              _wrapTap(_cell(log.carryOverKg != null ? log.carryOverKg!.toStringAsFixed(2) : '—'), log),
+              _wrapTap(_cell(log.utilizedKg != null ? log.utilizedKg!.toStringAsFixed(2) : '—'), log),
+              _wrapTap(_cell(log.commissionSignatures ?? idToName[log.createdByEmployeeId] ?? '—'), log),
+            ],
+          )),
+    ];
+    return Table(
+      columnWidths: const {
+        0: FlexColumnWidth(1), 1: FlexColumnWidth(0.8), 2: FlexColumnWidth(0.8), 3: FlexColumnWidth(0.8),
+        4: FlexColumnWidth(0.7), 5: FlexColumnWidth(0.6), 6: FlexColumnWidth(0.8), 7: FlexColumnWidth(0.5),
+        8: FlexColumnWidth(0.5), 9: FlexColumnWidth(0.8),
+      },
+      border: TableBorder.all(color: Colors.grey),
+      children: rows,
+    );
   }
 
   Widget _buildHealthHygieneTable(Map<String, Employee> idToEmp) {

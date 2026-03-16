@@ -43,6 +43,14 @@ class HaccpLog {
   final String? storageConditions;
   final DateTime? expiryDate;
   final DateTime? dateSold;
+  // Учёт фритюрных жиров (Приложение 8)
+  final String? organolepticStart;
+  final String? fryingEquipmentType;
+  final String? fryingProductType;
+  final String? fryingEndTime;
+  final String? organolepticEnd;
+  final double? carryOverKg;
+  final double? utilizedKg;
 
   final String? note;
 
@@ -80,6 +88,13 @@ class HaccpLog {
     this.storageConditions,
     this.expiryDate,
     this.dateSold,
+    this.organolepticStart,
+    this.fryingEquipmentType,
+    this.fryingProductType,
+    this.fryingEndTime,
+    this.organolepticEnd,
+    this.carryOverKg,
+    this.utilizedKg,
     this.note,
   });
 
@@ -181,6 +196,13 @@ class HaccpLog {
       storageConditions: json['storage_conditions']?.toString(),
       expiryDate: _parseDateTime(json['expiry_date']),
       dateSold: _parseDateTime(json['date_sold']),
+      organolepticStart: json['organoleptic_start']?.toString(),
+      fryingEquipmentType: json['frying_equipment_type']?.toString(),
+      fryingProductType: json['frying_product_type']?.toString(),
+      fryingEndTime: json['frying_end_time']?.toString(),
+      organolepticEnd: json['organoleptic_end']?.toString(),
+      carryOverKg: _parseNum(json['carry_over_kg']),
+      utilizedKg: _parseNum(json['utilized_kg']),
       note: json['note']?.toString(),
     );
   }
