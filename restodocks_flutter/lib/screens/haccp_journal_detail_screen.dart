@@ -491,7 +491,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
                         )
                       : _JournalTableView(
                           logType: _logType,
-                          establishmentName: est.name,
+                          establishmentName: est?.name ?? '—',
                           logs: _logs,
                           employees: _employees,
                           onLogTap: _openLogDetail,
