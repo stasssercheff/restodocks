@@ -23,32 +23,30 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _passwordFocusNode = FocusNode();
 
   bool _isLoading = false;
   String? _errorMessage;
   bool _rememberCredentials = true;
   bool _isUnconfirmedEmail = false;
   bool _isSendingLink = false;
+  DateTime? _passwordFieldFocusedAt;
 
   @override
   void initState() {
     super.initState();
+    _passwordFocusNode.addListener(_onPasswordFocusChange);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Future.delayed(const Duration(milliseconds: 300), () {
         if (mounted) _loadRememberedCredentials();
       });
     });
-    // Enter в любом поле (в т.ч. после автозаполнения браузером, когда фокус в email) — вход
-    HardwareKeyboard.instance.addHandler(_handleKeyEvent);
   }
 
-  bool _handleKeyEvent(KeyEvent event) {
-    if (event is! KeyDownEvent) return false;
-    final key = event.logicalKey;
-    if (key != LogicalKeyboardKey.enter && key != LogicalKeyboardKey.numpadEnter) return false;
-    if (!mounted || _isLoading) return false;
-    _login();
-    return false; // не перехватываем, чтобы поле тоже могло обработать при необходимости
+  void _onPasswordFocusChange() {
+    if (_passwordFocusNode.hasFocus) {
+      _passwordFieldFocusedAt = DateTime.now();
+    }
   }
 
   Future<void> _loadRememberedCredentials() async {
@@ -66,7 +64,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
-    HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
+    _passwordFocusNode.removeListener(_onPasswordFocusChange);
+    _passwordFocusNode.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -141,6 +140,7 @@ class _LoginScreenState extends State<LoginScreen> {
       const SizedBox(height: 16),
       TextFormField(
         controller: _passwordController,
+        focusNode: _passwordFocusNode,
         autofillHints: const [AutofillHints.password],
         decoration: InputDecoration(
           labelText: loc.t('password'),
@@ -149,7 +149,14 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         obscureText: true,
         textInputAction: TextInputAction.done,
-        // Не вызываем _login() в onFieldSubmitted: при автозаполнении браузер может отправить submit поля и запустить вход без подтверждения. Вход только по явному Enter (HardwareKeyboard) или по кнопке «Войти».
+        onFieldSubmitted: (_) {
+          if (_isLoading) return;
+          // Вход только если пользователь сам нажал Enter: не сразу после фокуса (автозаполнение браузера вызывает submit без Enter).
+          final focusedAt = _passwordFieldFocusedAt;
+          if (focusedAt == null) return; // поле не получало фокус — скорее всего submit от автозаполнения
+          if (DateTime.now().difference(focusedAt).inMilliseconds < 500) return;
+          _login();
+        },
         validator: (value) {
           if (value == null || value.isEmpty) return loc.t('password_required');
           if (value.length < 6) return loc.t('password_too_short');
