@@ -729,6 +729,22 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   @override
   Future<void> restoreState(Map<String, dynamic> data) async {
     if (data['techCardId'] != widget.techCardId) return;
+    // При открытии из импорта иногда остаётся пустой черновик (например, после сбоя/непереданного extra).
+    // Чтобы не затирать распознанные данные, игнорируем «пустой» черновик для импорт‑карточек.
+    if (widget.initialFromAi != null) {
+      final name = (data['name'] as String? ?? '').trim();
+      final tech = (data['technology'] as String? ?? '').trim();
+      final rawIng = data['ingredients'];
+      final hasAnyIngredientName = rawIng is List
+          ? rawIng.any((e) {
+              if (e is! Map) return false;
+              final m = Map<String, dynamic>.from(e);
+              return (m['productName'] as String? ?? '').trim().isNotEmpty;
+            })
+          : false;
+      final looksEmpty = name.isEmpty && tech.isEmpty && !hasAnyIngredientName;
+      if (looksEmpty) return;
+    }
     if (!mounted) return;
     setState(() {
       _nameController.text = data['name'] as String? ?? '';
@@ -899,16 +915,38 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       final est = context.read<AccountManagerSupabase>().establishment;
       if (est != null) {
         await context.read<ProductStoreSupabase>().loadNomenclature(est.dataEstablishmentId);
-        final tcSvc = context.read<TechCardServiceSupabase>();
-        final tcs = await tcSvc.getTechCardsForEstablishment(est.dataEstablishmentId);
-        final customKitchen = await tcSvc.getCustomCategories(est.dataEstablishmentId, 'kitchen');
-        final customBar = await tcSvc.getCustomCategories(est.dataEstablishmentId, 'bar');
-        if (mounted) {
-          _pickerTechCards = _isNew ? tcs : tcs.where((t) => t.id != widget.techCardId).toList();
-          _semiFinishedProducts = tcs.where((t) => t.isSemiFinished).toList();
-          _customCategoriesKitchen = customKitchen;
-          _customCategoriesBar = customBar;
-          _ensureTechCardTranslations(tcs);
+        // Оптимизация UX: при создании из импорта (initialFromAi) не блокируем первый рендер загрузкой всех ТТК/категорий.
+        // Эти данные нужны в основном для пикеров/справочников и могут догрузиться фоном.
+        if (!(_isNew && widget.initialFromAi != null)) {
+          final tcSvc = context.read<TechCardServiceSupabase>();
+          final tcs = await tcSvc.getTechCardsForEstablishment(est.dataEstablishmentId);
+          final customKitchen = await tcSvc.getCustomCategories(est.dataEstablishmentId, 'kitchen');
+          final customBar = await tcSvc.getCustomCategories(est.dataEstablishmentId, 'bar');
+          if (mounted) {
+            _pickerTechCards = _isNew ? tcs : tcs.where((t) => t.id != widget.techCardId).toList();
+            _semiFinishedProducts = tcs.where((t) => t.isSemiFinished).toList();
+            _customCategoriesKitchen = customKitchen;
+            _customCategoriesBar = customBar;
+            _ensureTechCardTranslations(tcs);
+          }
+        } else {
+          // Фоновая догрузка, чтобы дальше работали подбор ПФ/категорий без задержки при открытии.
+          () async {
+            try {
+              final tcSvc = context.read<TechCardServiceSupabase>();
+              final tcs = await tcSvc.getTechCardsForEstablishment(est.dataEstablishmentId);
+              final customKitchen = await tcSvc.getCustomCategories(est.dataEstablishmentId, 'kitchen');
+              final customBar = await tcSvc.getCustomCategories(est.dataEstablishmentId, 'bar');
+              if (!mounted) return;
+              setState(() {
+                _pickerTechCards = _isNew ? tcs : tcs.where((t) => t.id != widget.techCardId).toList();
+                _semiFinishedProducts = tcs.where((t) => t.isSemiFinished).toList();
+                _customCategoriesKitchen = customKitchen;
+                _customCategoriesBar = customBar;
+              });
+              _ensureTechCardTranslations(tcs);
+            } catch (_) {}
+          }();
         }
       }
       if (_isNew) {

@@ -275,7 +275,11 @@ class AiServiceSupabase implements AiService {
         // Для него надёжнее всего работает Dart-парсер _tryParsePolnoePosobieFormat, который умеет вытаскивать технологию.
         if (rows.isNotEmpty) {
           final polnoe = _tryParsePolnoePosobieFormat(rows);
-          if (polnoe.isNotEmpty) {
+          // Важно: если спец‑парсер распознал лишь небольшую часть блоков, не останавливаемся на нём,
+          // а продолжаем общий пайплайн (шаблоны/мульти‑блоки), чтобы не получить «парсится только 3–4 карточки».
+          final expectedBlocks = _countPolnoePosobieBlocks(rows);
+          final acceptPolnoe = polnoe.isNotEmpty && (expectedBlocks <= 0 || polnoe.length >= (expectedBlocks * 0.5).ceil());
+          if (acceptPolnoe) {
             lastParsedRows = rows;
             if (lastParseHeaderSignature == null || lastParseHeaderSignature!.isEmpty) {
               lastParseHeaderSignature = _headerSignatureFromRows(rows) ??
@@ -1085,6 +1089,21 @@ class AiServiceSupabase implements AiService {
       while (dataRow < rows.length) {
         final dr = rows[dataRow].map((c) => (c ?? '').toString().trim()).toList();
         if (dr.every((c) => c.isEmpty)) { dataRow++; continue; }
+        // Начало следующего блока: [Название] а следующая строка — заголовок №|Наименование продукта.
+        // Если не остановиться здесь, можно «съесть» следующий суп как текст технологии текущего.
+        if (dr.isNotEmpty) {
+          final maybeDish = dr[0].trim();
+          final looksLikeDishName = maybeDish.length >= 3 &&
+              RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(maybeDish) &&
+              !RegExp(r'^№$|^выход$|^декор$|^итого$', caseSensitive: false).hasMatch(maybeDish.toLowerCase());
+          if (looksLikeDishName && dataRow + 1 < rows.length) {
+            final nr = rows[dataRow + 1].map((c) => (c ?? '').toString().trim()).toList();
+            final n0 = nr.isNotEmpty ? nr[0].trim().toLowerCase() : '';
+            final n1 = nr.length > 1 ? nr[1].toLowerCase() : '';
+            final headerOk = (n0 == '№' || n0.isEmpty) && n1.contains('наименование') && n1.contains('продукт');
+            if (headerOk) break;
+          }
+        }
         final d0 = dr.isNotEmpty ? dr[0].toLowerCase() : '';
         if (d0 == 'выход') {
           // Извлечь значение выхода (400, 420/70 → 420, 600/100/20 → 600) для веса порции
@@ -1207,6 +1226,24 @@ class AiServiceSupabase implements AiService {
       r = dataRow;
     }
     return results;
+  }
+
+  /// Подсчитать количество блоков в формате «Полное пособие»/супы: строка названия + следующая строка заголовка «№|Наименование продукта».
+  static int _countPolnoePosobieBlocks(List<List<String>> rows) {
+    var count = 0;
+    for (var r = 0; r + 1 < rows.length; r++) {
+      final row = rows[r].map((c) => (c ?? '').toString().trim()).toList();
+      final nextRow = rows[r + 1].map((c) => (c ?? '').toString().trim()).toList();
+      if (row.isEmpty || nextRow.isEmpty) continue;
+      final dish = row.isNotEmpty ? row[0].trim() : '';
+      if (dish.length < 3 || !RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(dish)) continue;
+      if (RegExp(r'^№$|^выход$|^декор$|^итого$', caseSensitive: false).hasMatch(dish.toLowerCase())) continue;
+      final n0 = nextRow.isNotEmpty ? nextRow[0].trim().toLowerCase() : '';
+      final n1 = nextRow.length > 1 ? nextRow[1].toLowerCase() : '';
+      final headerOk = (n0 == '№' || n0.isEmpty) && n1.contains('наименование') && n1.contains('продукт');
+      if (headerOk) count++;
+    }
+    return count;
   }
 
   /// пф гц / пф хц: блоки [название п/ф] [""|№|наименование|Ед.изм|Норма…] [№|продукт|ед|норма|технология]... [Выход]
