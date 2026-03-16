@@ -734,11 +734,15 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                             ),
                             TextButton.icon(
                               onPressed: _saving ? null : () {
+                                final sig = widget.headerSignature ?? AiServiceSupabase.lastParseHeaderSignature;
+                                final rows = widget.sourceRows ?? AiServiceSupabase.lastParsedRows;
                                 context.push('/tech-cards/new', extra: {
                                   'result': item.result,
                                   'category': item.category,
                                   'sections': _normalizeSections(item.sections),
                                   'isSemiFinished': item.isSemiFinished,
+                                  if (sig != null && sig.isNotEmpty) 'headerSignature': sig,
+                                  if (rows != null && rows.isNotEmpty) 'sourceRows': rows,
                                 });
                               },
                               icon: const Icon(Icons.open_in_new, size: 18),

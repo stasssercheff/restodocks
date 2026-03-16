@@ -333,6 +333,13 @@ class AiServiceSupabase implements AiService {
           if (lastParseHeaderSignature == null || lastParseHeaderSignature!.isEmpty) {
             lastParseHeaderSignature = _headerSignatureFromRows(rows);
           }
+          final yieldFromRows = _extractYieldFromRows(lastParsedRows!);
+          if (yieldFromRows != null && yieldFromRows > 0) {
+            for (var i = 0; i < merged.length; i++) {
+              final c = merged[i];
+              if (c.yieldGrams == null || c.yieldGrams! <= 0) merged[i] = c.copyWith(yieldGrams: yieldFromRows);
+            }
+          }
           return _applyParseCorrections(merged, lastParseHeaderSignature, establishmentId);
         }
       }
@@ -399,6 +406,10 @@ class AiServiceSupabase implements AiService {
         if (lastParseHeaderSignature == null || lastParseHeaderSignature!.isEmpty) {
           lastParseHeaderSignature = _headerSignatureFromRows(rows) ??
               (rows.isNotEmpty && rows[0].isNotEmpty ? _headerSignature(rows[0].map((c) => c.toString().trim()).toList()) : null);
+        }
+        final yieldFromRows = _extractYieldFromRows(rows);
+        if (yieldFromRows != null && yieldFromRows > 0) {
+          list = list.map((c) => c.yieldGrams == null || c.yieldGrams! <= 0 ? c.copyWith(yieldGrams: yieldFromRows) : c).toList();
         }
       }
       final corrected = await _applyParseCorrections(list, lastParseHeaderSignature, establishmentId);
@@ -2030,6 +2041,39 @@ class AiServiceSupabase implements AiService {
         final sig = _headerSignature(rows[r].map((c) => (c is String ? c : c.toString()).trim()).toList());
         if (sig.isNotEmpty) return sig;
         break;
+      }
+    }
+    return null;
+  }
+
+  /// Извлечь «Выход блюда (в граммах): 190» из rows (ГОСТ и др.) для подстановки в вес порции.
+  static double? _extractYieldFromRows(List<List<String>> rows) {
+    final yieldNum = RegExp(r'(\d{2,4})\s*г');
+    final anyNum = RegExp(r'\b(\d{2,4})\b');
+    for (var r = 0; r < rows.length && r < 80; r++) {
+      final row = rows[r];
+      for (var c = 0; c < row.length; c++) {
+        final s = (row[c] is String ? row[c] as String : row[c].toString()).trim().toLowerCase();
+        if (s.isEmpty) continue;
+        if (s.contains('выход') && (s.contains('грамм') || s.contains('г)'))) {
+          final m = yieldNum.firstMatch(s);
+          if (m != null) {
+            final n = double.tryParse(m.group(1) ?? '');
+            if (n != null && n >= 10 && n <= 5000) return n;
+          }
+        }
+        if (s.contains('выход блюда') || s.contains('выход готовой')) {
+          final m = anyNum.firstMatch(s);
+          if (m != null) {
+            final n = double.tryParse(m.group(1) ?? '');
+            if (n != null && n >= 10 && n <= 5000) return n;
+          }
+          for (var j = c + 1; j < row.length && j < c + 4; j++) {
+            final next = (row[j] is String ? row[j] as String : row[j].toString()).trim();
+            final nn = double.tryParse(next.replaceAll(',', '.'));
+            if (nn != null && nn >= 10 && nn <= 5000) return nn;
+          }
+        }
       }
     }
     return null;
