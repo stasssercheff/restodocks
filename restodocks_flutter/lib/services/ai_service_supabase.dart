@@ -433,6 +433,12 @@ class AiServiceSupabase implements AiService {
           list = list.map((c) => c.yieldGrams == null || c.yieldGrams! <= 0 ? c.copyWith(yieldGrams: yieldFromRows) : c).toList();
         }
       }
+      // Постобработка технологии: для форматов типа «Полное пособие» пытаемся
+      // дополнительно подтянуть технологию только из соответствующих колонок,
+      // не трогая ингредиенты и выход.
+      if (rows.isNotEmpty) {
+        list = _mergeTechnologyFromPolnoePosobie(rows, list);
+      }
       final corrected = await _applyParseCorrections(list, lastParseHeaderSignature, establishmentId);
       final validationErrors = _validateParsedCards(corrected);
       if (validationErrors != null) {
@@ -996,6 +1002,42 @@ class AiServiceSupabase implements AiService {
       if (nameVal.isNotEmpty && !RegExp(r'^[\d\s.,]+$').hasMatch(nameVal) && low != 'итого') return r;
     }
     return rows.length;
+  }
+
+  /// Дополнительно подтянуть технологию из формата «Полное пособие»,
+  /// не трогая ингредиенты и выход. Работает поверх уже распарсенных карточек.
+  static List<TechCardRecognitionResult> _mergeTechnologyFromPolnoePosobie(
+    List<List<String>> rows,
+    List<TechCardRecognitionResult> cards,
+  ) {
+    if (rows.isEmpty || cards.isEmpty) return cards;
+    final parsed = _tryParsePolnoePosobieFormat(rows);
+    if (parsed.isEmpty) return cards;
+
+    String _norm(String s) => s.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+
+    final techByName = <String, String>{};
+    for (final c in parsed) {
+      final name = (c.dishName ?? '').trim();
+      final tech = (c.technologyText ?? '').trim();
+      if (name.isEmpty || tech.length < 20) continue;
+      final key = _norm(name);
+      // Не перезаписываем, если уже есть технология для этого названия
+      techByName.putIfAbsent(key, () => tech);
+    }
+    if (techByName.isEmpty) return cards;
+
+    return cards.map((c) {
+      final existingTech = (c.technologyText ?? '').trim();
+      final name = (c.dishName ?? '').trim();
+      if (name.isEmpty) return c;
+      final key = _norm(name);
+      final tech = techByName[key];
+      if (tech == null) return c;
+      // Не трогаем карточки, где уже есть внятная технология
+      if (existingTech.length >= 20) return c;
+      return c.copyWith(technologyText: tech);
+    }).toList();
   }
 
   /// Формат «Полное пособие Кухня» / супы.xlsx: [название] [№|Наименование продукта|Вес] [ингредиенты] [Выход] — повтор блоков.
