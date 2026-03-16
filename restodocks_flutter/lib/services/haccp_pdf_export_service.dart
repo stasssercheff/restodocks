@@ -492,7 +492,7 @@ class HaccpPdfExportService {
             _tableCell(log?.productName ?? ''),
             _tableCell(log?.packaging ?? ''),
             _tableCell(log?.manufacturerSupplier ?? ''),
-            _tableCell(log != null && log.quantityKg != null ? log.quantityKg!.toStringAsFixed(2) : ''),
+            _tableCell(log?.quantityKg != null ? log!.quantityKg!.toStringAsFixed(2) : ''),
             _tableCell(log?.documentNumber ?? ''),
             _tableCell(log?.result ?? ''),
             _tableCell(log?.storageConditions ?? ''),
