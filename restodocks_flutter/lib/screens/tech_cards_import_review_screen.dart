@@ -94,12 +94,36 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
   int _saveProgress = 0;
   int _saveTotal = 0;
 
+  /// Поиск по названию ТТК до сохранения (фильтр отображения).
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
   /// Ошибки парсинга (битые карточки) — берём из сервиса и очищаем
   List<TtkParseError>? _parseErrors;
+
+  /// Индексы в _items, проходящие фильтр поиска по названию.
+  List<int> get _filteredIndices {
+    if (_searchQuery.isEmpty) return List.generate(_items.length, (i) => i);
+    final q = _searchQuery.toLowerCase();
+    return List.generate(_items.length, (i) => i)
+        .where((i) => (_items[i].result.dishName ?? '').toLowerCase().contains(q))
+        .toList();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
     super.initState();
+    _searchController.addListener(() {
+      if (_searchQuery != _searchController.text.trim()) {
+        setState(() => _searchQuery = _searchController.text.trim());
+      }
+    });
     _parseErrors = AiServiceSupabase.lastParseTechCardErrors;
     if (_parseErrors != null) AiServiceSupabase.lastParseTechCardErrors = null;
     final defaultSections = _isBar ? const ['bar'] : const ['all'];
@@ -637,23 +661,59 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
       ),
       body: Column(
         children: [
+          // Поиск по названию ТТК — сразу под шапкой, до сохранения
+          if (_items.length > 1) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  labelText: loc.t('tech_cards_import_search_hint') ?? 'Поиск по названию ТТК',
+                  hintText: loc.t('tech_cards_import_search_hint') ?? 'Введите часть названия...',
+                  prefixIcon: const Icon(Icons.search, size: 22),
+                  isDense: true,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                ),
+                onChanged: (v) => setState(() => _searchQuery = v.trim()),
+              ),
+            ),
+            if (_searchQuery.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Text(
+                  (loc.t('tech_cards_import_search_count') ?? 'Показано: %s из %s')
+                      .replaceFirst('%s', '${_filteredIndices.length}')
+                      .replaceFirst('%s', '${_items.length}'),
+                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                ),
+              ),
+          ],
+          // Одно сообщение сверху: полная подсказка (вместо дублирующего короткого баннера)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Text(
+              loc.t('tech_cards_import_review_hint'),
+              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+          ),
           if (_parseErrors != null && _parseErrors!.isNotEmpty) ...[
             Container(
               width: double.infinity,
-              margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              margin: const EdgeInsets.fromLTRB(16, 0, 16, 0),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
+                color: theme.colorScheme.errorContainer.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.3)),
+                border: Border.all(color: theme.colorScheme.error.withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.info_outline, size: 20, color: theme.colorScheme.primary),
+                  Icon(Icons.warning_amber_rounded, size: 20, color: theme.colorScheme.error),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      loc.t('tech_cards_import_review_check_banner'),
+                      loc.t('tech_cards_import_parse_errors_banner') ?? 'Обнаружены ошибки распознавания. Проверьте карточки ниже.',
                       style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface),
                     ),
                   ),
@@ -686,19 +746,13 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
               ),
             ),
           ],
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text(
-              loc.t('tech_cards_import_review_hint'),
-              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-            ),
-          ),
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-              itemCount: _items.length,
+              itemCount: _filteredIndices.length,
               itemBuilder: (context, index) {
-                final item = _items[index];
+                final realIndex = _filteredIndices[index];
+                final item = _items[realIndex];
                 final name = item.result.dishName?.trim().isEmpty != false
                     ? loc.t('tech_cards_import_unnamed')
                     : (item.result.dishName ?? '').trim();
@@ -723,7 +777,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                                 ),
                                 style: theme.textTheme.titleMedium,
                                 enabled: !_saving,
-                                onChanged: (v) => setState(() => _items[index] = _ReviewItem(
+                                onChanged: (v) => setState(() => _items[realIndex] = _ReviewItem(
                                       result: item.result.copyWith(dishName: v.trim().isEmpty ? null : v.trim()),
                                       originalDishName: item.originalDishName,
                                       category: item.category,
@@ -737,10 +791,10 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                                 final sig = widget.headerSignature ?? AiServiceSupabase.lastParseHeaderSignature;
                                 final rows = widget.sourceRows ?? AiServiceSupabase.lastParsedRows;
                                 context.push('/tech-cards/new', extra: {
-                                  'result': item.result,
-                                  'category': item.category,
-                                  'sections': _normalizeSections(item.sections),
-                                  'isSemiFinished': item.isSemiFinished,
+                                  'result': _items[realIndex].result,
+                                  'category': _items[realIndex].category,
+                                  'sections': _normalizeSections(_items[realIndex].sections),
+                                  'isSemiFinished': _items[realIndex].isSemiFinished,
                                   if (sig != null && sig.isNotEmpty) 'headerSignature': sig,
                                   if (rows != null && rows.isNotEmpty) 'sourceRows': rows,
                                 });
@@ -760,10 +814,10 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                               value: _categoryOptions.contains(item.category) ? item.category : 'misc',
                               isDense: true,
                               items: _categoryOptions.map((c) => DropdownMenuItem(value: c, child: Text(_categoryLabel(c, lang)))).toList(),
-                              onChanged: (v) => setState(() => _items[index] = _ReviewItem(result: item.result, originalDishName: item.originalDishName, category: v ?? item.category, sections: item.sections, isSemiFinished: item.isSemiFinished)),
+                              onChanged: (v) => setState(() => _items[realIndex] = _ReviewItem(result: item.result, originalDishName: item.originalDishName, category: v ?? item.category, sections: item.sections, isSemiFinished: item.isSemiFinished)),
                             ),
                             InkWell(
-                              onTap: _saving ? null : () => _showSectionPicker(index),
+                              onTap: _saving ? null : () => _showSectionPicker(realIndex),
                               borderRadius: BorderRadius.circular(8),
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -790,7 +844,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                                 DropdownMenuItem(value: true, child: Text(loc.t('ttk_semi_finished'))),
                                 DropdownMenuItem(value: false, child: Text(loc.t('ttk_dish'))),
                               ],
-                              onChanged: (v) => setState(() => _items[index] = _ReviewItem(result: item.result, originalDishName: item.originalDishName, category: item.category, sections: item.sections, isSemiFinished: v ?? item.isSemiFinished)),
+                              onChanged: (v) => setState(() => _items[realIndex] = _ReviewItem(result: item.result, originalDishName: item.originalDishName, category: item.category, sections: item.sections, isSemiFinished: v ?? item.isSemiFinished)),
                             ),
                             Text(
                               loc.t('tech_cards_ingredients_count').replaceAll('%s', '$count'),

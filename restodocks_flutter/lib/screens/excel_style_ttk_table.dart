@@ -394,7 +394,11 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   const SizedBox.shrink(), // % отхода
                   const SizedBox.shrink(), // Нетто
                   const SizedBox.shrink(), // Способ
-                  _buildTotalCell('${totalOutput.toStringAsFixed(0)}г'), // Выход
+                  _buildTotalCell(
+                    widget.weightPerPortion > 0
+                        ? '${widget.weightPerPortion.toStringAsFixed(0)}г'
+                        : '${totalOutput.toStringAsFixed(0)}г',
+                  ), // Выход: вес порции из файла или сумма выходов
                   // вес прц — редактируемое поле в итого
                   widget.canEdit && widget.onWeightPerPortionChanged != null
                       ? _buildNumericCell(

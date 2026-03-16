@@ -362,10 +362,14 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
     if (isStructuralProductName(productVal, true)) continue;
     if (productVal.toLowerCase().includes("выход блюда") || productVal.toLowerCase().startsWith("выход одного")) continue;
 
-    // Строка с названием блюда (начало новой карточки). «Выход» — не название блюда.
+    // Строка с названием блюда (начало новой карточки). «Выход» — не название. Строка с весом (число в брутто/нетто) — ингредиент.
+    const grossNumPrev = parseNum(grossVal);
+    const netNumPrev = parseNum(netVal);
+    const rowHasWeight = (grossNumPrev != null && grossNumPrev > 0) || (netNumPrev != null && netNumPrev > 0);
     if (
       nameVal &&
       nameVal.trim().toLowerCase() !== "выход" &&
+      !rowHasWeight &&
       isValidDishName(nameVal) &&
       !isLikelyFragment(nameVal) &&
       !/^[\d\s.,]+$/.test(nameVal) &&
@@ -421,9 +425,9 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
   return results;
 }
 
-/** Нормализация ячейки для подписи. Должна совпадать с _headerSignature в Dart (только trim + toLowerCase), иначе сохранённое обучение не находится при парсинге. */
+/** Нормализация ячейки для подписи. Совпадает с _headerSignature в Dart: trim, toLowerCase, схлопывание пробелов — чтобы один формат не дублировался из‑за пробелов. */
 function normalizeCellForSignature(s: string): string {
-  return (s ?? "").trim().toLowerCase();
+  return (s ?? "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 /** Ячейка похожа на заголовок колонки (брутто, нетто, наименование...), а не на название блюда. Совпадает с Dart _isStructuralHeaderCell. */
@@ -683,14 +687,16 @@ export function parseTtkByStoredTemplate(
     }
     const rowText = cells.join(" ").toLowerCase();
     const isPastTable = fromPdf && r >= tableEndRow;
-    if ((!fromPdf || !isPastTable) && nameVal && nameVal.trim().toLowerCase() !== "выход" && isValidDish(nameVal) && !isLikelyFragment(nameVal) && !/^[\d\s.,]+$/.test(nameVal) && !productVal) {
+    const rowHasWeightStored = (grossNum != null && grossNum > 0) || (netNum != null && netNum > 0);
+    if ((!fromPdf || !isPastTable) && nameVal && nameVal.trim().toLowerCase() !== "выход" && !rowHasWeightStored && isValidDish(nameVal) && !isLikelyFragment(nameVal) && !/^[\d\s.,]+$/.test(nameVal) && !productVal) {
       if (currentDish != null && currentIngredients.length > 0) flushCard(undefined);
       currentDish = nameVal;
     }
     if (productVal && (!fromPdf || !isPastTable) && isValidProduct(productVal) && !isJunkProductName(productVal)) {
       if ((grossNum != null && grossNum > 100000) || (netNum != null && netNum > 100000)) continue;
       if ((grossNum == null || grossNum <= 0) && (netNum == null || netNum <= 0)) continue;
-      if (currentDish == null && nameVal && nameVal.trim().toLowerCase() !== "выход" && isValidDish(nameVal) && !isHeaderWord(nameVal) && !isLikelyFragment(nameVal)) currentDish = nameVal;
+      const hasWeight = (grossNum != null && grossNum > 0) || (netNum != null && netNum > 0);
+      if (currentDish == null && nameVal && nameVal.trim().toLowerCase() !== "выход" && !hasWeight && isValidDish(nameVal) && !isHeaderWord(nameVal) && !isLikelyFragment(nameVal)) currentDish = nameVal;
       const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
       if (currentDish != null && norm(productVal) === norm(currentDish)) continue;
       let waste = parseNum(wasteVal);

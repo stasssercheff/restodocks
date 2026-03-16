@@ -1644,8 +1644,43 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     _autoFillBruttoFromNomenclature();
   }
 
+  /// Подстроить % отхода у всех ингредиентов так, чтобы сумма выходов = [targetOutput] г.
+  /// Один общий процент отхода: (1 - w/100) * sum(gross_i * (1 - loss_i/100)) = target => w = 100*(1 - target/denom).
+  void _adjustWasteToMatchOutput(double targetOutput) {
+    if (targetOutput <= 0) return;
+    final productStore = context.read<ProductStoreSupabase>();
+    final valid = _ingredients.where((i) => i.productName.trim().isNotEmpty).toList();
+    if (valid.isEmpty) return;
 
+    double denominator = 0;
+    for (final ing in valid) {
+      final grossG = CulinaryUnits.toGrams(ing.grossWeight, ing.unit, gramsPerPiece: ing.gramsPerPiece ?? 50);
+      final lossPct = ing.cookingLossPctOverride ?? CookingProcess.findById(ing.cookingProcessId ?? '')?.weightLossPercentage ?? 0;
+      denominator += grossG * (1.0 - lossPct.clamp(0.0, 99.9) / 100.0);
+    }
+    if (denominator <= 0) return;
+    double w = 100.0 * (1.0 - targetOutput / denominator);
+    w = w.clamp(0.0, 99.9);
 
+    final newList = <TTIngredient>[];
+    for (var i = 0; i < _ingredients.length; i++) {
+      final ing = _ingredients[i];
+      if (ing.productName.trim().isEmpty) {
+        newList.add(ing);
+        continue;
+      }
+      final product = productStore.findProductForIngredient(ing.productId, ing.productName);
+      final process = ing.cookingProcessId != null ? CookingProcess.findById(ing.cookingProcessId!) : null;
+      var updated = ing.updatePrimaryWastePct(w, product, process);
+      updated = updated.copyWith(outputWeight: updated.netWeight);
+      newList.add(updated);
+    }
+    setState(() {
+      _ingredients.clear();
+      _ingredients.addAll(newList);
+    });
+    _scheduleDraftSave();
+  }
 
   /// Загрузить номенклатуру и вернуть список продуктов (для выпадающего списка в ячейке).
   Future<List<Product>> _getProductsForDropdown() async {
@@ -2735,6 +2770,42 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                       const SizedBox(height: 4),
                       Text(loc.t('tt_missing_products').replaceFirst('%s', missingNames.join(', ')), style: const TextStyle(fontSize: 12)),
                     ],
+                  ),
+                );
+              },
+            ),
+            // Кнопка «Подстроить отход под выход» — когда задан вес порции из ТТК и сумма выходов не совпадает
+            Builder(
+              builder: (context) {
+                final totalOutput = _ingredients.where((i) => i.productName.trim().isNotEmpty).fold<double>(0, (s, i) => s + i.outputWeight);
+                final showAdjust = effectiveCanEdit &&
+                    _portionWeight > 0 &&
+                    totalOutput > 0 &&
+                    (totalOutput - _portionWeight).abs() > 1;
+                if (!showAdjust) return const SizedBox.shrink();
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: TextButton.icon(
+                    icon: const Icon(Icons.tune, size: 18),
+                    label: Text(loc.t('ttk_adjust_waste_to_output') ?? 'Подстроить % отхода под целевой выход'),
+                    onPressed: () async {
+                      final ok = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: Text(loc.t('ttk_adjust_waste_title') ?? 'Подстроить отход'),
+                          content: Text(
+                            (loc.t('ttk_adjust_waste_confirm') ?? 'Подстроить процент отхода у всех ингредиентов, чтобы итоговый выход был %s г? Текущая сумма выходов: %s г.')
+                                .replaceFirst('%s', _portionWeight.toStringAsFixed(0))
+                                .replaceFirst('%s', totalOutput.toStringAsFixed(0)),
+                          ),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel)),
+                            FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(loc.t('ok') ?? 'Да')),
+                          ],
+                        ),
+                      );
+                      if (ok == true && mounted) _adjustWasteToMatchOutput(_portionWeight);
+                    },
                   ),
                 );
               },

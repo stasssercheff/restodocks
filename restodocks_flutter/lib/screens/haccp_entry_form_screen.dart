@@ -236,45 +236,95 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     );
   }
 
-  /// Форма по макету Приложения 3: Журнал учета температуры и влажности в складских помещениях.
+  /// Форма по макету Приложения 3: 5 обязательных колонок. Наименование помещения — в шапке журнала (сохраняется в записи).
   Widget _buildWarehouseTempHumidityForm(LocalizationService loc) {
-    return Table(
-      columnWidths: const {
-        0: FlexColumnWidth(0.5),
-        1: FlexColumnWidth(1.5),
-        2: FlexColumnWidth(1),
-        3: FlexColumnWidth(1),
-      },
-      border: TableBorder.all(color: Theme.of(context).dividerColor),
+    _controllers['warehouse_premises'] ??= TextEditingController();
+    final tempOutOfRange = _tempValue > 25;
+    final humidityOutOfRange = _humidityValue > 75;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        TableRow(
-          children: [
-            _tableHeaderCell('№ п/п'),
-            _tableHeaderCell('Наименование складского помещения'),
-            _tableHeaderCell('Температура °C'),
-            _tableHeaderCell('Влажность %'),
-          ],
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: TextFormField(
+            controller: _controllers['warehouse_premises'],
+            decoration: InputDecoration(
+              labelText: 'Наименование складского помещения',
+              hintText: 'Например: Склад сухих продуктов, Овощной цех',
+              border: const OutlineInputBorder(),
+              isDense: true,
+            ),
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return 'Укажите помещение';
+              return null;
+            },
+          ),
         ),
-        TableRow(
+        Table(
+          columnWidths: const {
+            0: FlexColumnWidth(0.5),
+            1: FlexColumnWidth(1.2),
+            2: FlexColumnWidth(1),
+            3: FlexColumnWidth(1.2),
+            4: FlexColumnWidth(1.2),
+          },
+          border: TableBorder.all(color: Theme.of(context).dividerColor),
           children: [
-            _tableCell(const Text('1')),
-            _tableCell(Consumer<AccountManagerSupabase>(
-              builder: (_, acc, __) => Text(acc.establishment?.name ?? '—'),
-            )),
-            _tableCell(Column(
-              mainAxisSize: MainAxisSize.min,
+            TableRow(
               children: [
-                Text('${_tempValue.toStringAsFixed(1)}'),
-                Slider(value: _tempValue, min: -5, max: 30, divisions: 70, onChanged: (v) => setState(() => _tempValue = v)),
+                _tableHeaderCell('№ п/п'),
+                _tableHeaderCell('Дата'),
+                _tableHeaderCell('Температура, °C'),
+                _tableHeaderCell('Относительная влажность, %'),
+                _tableHeaderCell('Подпись ответственного лица'),
               ],
-            )),
-            _tableCell(Column(
-              mainAxisSize: MainAxisSize.min,
+            ),
+            TableRow(
               children: [
-                Text('${_humidityValue.toStringAsFixed(0)}%'),
-                Slider(value: _humidityValue, min: 20, max: 90, divisions: 70, onChanged: (v) => setState(() => _humidityValue = v)),
+                _tableCell(const Text('1')),
+                _tableCell(Text(DateFormat('dd.MM.yyyy').format(DateTime.now()))),
+                _tableCell(Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _tempValue.toStringAsFixed(0),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: tempOutOfRange ? Colors.red : null,
+                      ),
+                    ),
+                    Slider(
+                      value: _tempValue,
+                      min: -5,
+                      max: 35,
+                      divisions: 80,
+                      onChanged: (v) => setState(() => _tempValue = v),
+                    ),
+                  ],
+                )),
+                _tableCell(Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '${_humidityValue.toStringAsFixed(0)}%',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: humidityOutOfRange ? Colors.red : null,
+                      ),
+                    ),
+                    Slider(
+                      value: _humidityValue,
+                      min: 20,
+                      max: 95,
+                      divisions: 75,
+                      onChanged: (v) => setState(() => _humidityValue = v),
+                    ),
+                  ],
+                )),
+                _tableCell(_signatureFromAccount()),
               ],
-            )),
+            ),
           ],
         ),
       ],
@@ -521,6 +571,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
           logType: _logType!,
           value1: _tempValue,
           value2: _humidityValue,
+          equipment: _getText('warehouse_premises').trim().isNotEmpty ? _getText('warehouse_premises').trim() : null,
           note: _getText('note').isNotEmpty ? _getText('note') : null,
         );
         break;

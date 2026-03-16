@@ -1,6 +1,8 @@
 /**
  * Попытка парсинга ТТК по каталогу сохранённых шаблонов (tt_parse_templates).
  * При повторной загрузке того же формата — без AI.
+ * Каталог постоянно растёт: клиент при первом парсинге нового формата (keyword/AI) сохраняет шаблон
+ * через tt-parse-save-learning; при правках на экране проверки — learned_dish_name и corrections.
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { headerSignature, parseTtkByStoredTemplate } from "./parse_ttk_template.ts";

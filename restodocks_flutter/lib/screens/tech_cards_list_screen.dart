@@ -502,7 +502,18 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         if (isPdf) {
           list = await ai.parseTechCardsFromPdf(uBytes, establishmentId: establishmentId);
         } else {
-          list = await ai.parseTechCardsFromExcel(uBytes, establishmentId: establishmentId);
+          int? sheetIndex;
+          if (ai is AiServiceSupabase) {
+            final sheetNames = await AiServiceSupabase.getExcelSheetNames(uBytes);
+            if (sheetNames.length > 1 && mounted) {
+              sheetIndex = await _showSheetPicker(context, loc, file.name, sheetNames);
+              if (!mounted) return;
+              if (sheetIndex == null) continue; // пользователь отменил
+            } else if (sheetNames.length == 1) {
+              sheetIndex = 0;
+            }
+          }
+          list = await ai.parseTechCardsFromExcel(uBytes, establishmentId: establishmentId, sheetIndex: sheetIndex);
           if (list.isEmpty) list = _parseSimpleExcelNames(uBytes);
         }
         if (!mounted) return;
@@ -649,6 +660,51 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     } finally {
       if (mounted) setState(() => _loadingExcel = false);
     }
+  }
+
+  /// Диалог выбора листа Excel при нескольких листах в файле. Возвращает индекс (0-based) или null при отмене.
+  static Future<int?> _showSheetPicker(BuildContext context, LocalizationService loc, String fileName, List<String> sheetNames) async {
+    return showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('ttk_import_select_sheet') ?? 'Выберите лист'),
+        content: SizedBox(
+          width: 320,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                (loc.t('ttk_import_select_sheet_hint') ?? 'В файле «%s» несколько листов. Импортировать за раз можно только один лист.')
+                    .replaceFirst('%s', fileName),
+                style: Theme.of(ctx).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 16),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: List.generate(sheetNames.length, (i) {
+                      final name = sheetNames[i].isEmpty ? '${loc.t('ttk_sheet') ?? 'Лист'} ${i + 1}' : sheetNames[i];
+                      return ListTile(
+                        title: Text(name),
+                        onTap: () => Navigator.of(ctx).pop(i),
+                      );
+                    }),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null),
+            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+          ),
+        ],
+      ),
+    );
   }
 
   static String _pdfFailureMessage(String reason, LocalizationService loc) {

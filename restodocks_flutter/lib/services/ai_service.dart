@@ -202,7 +202,8 @@ abstract class AiService {
 
   /// Парсинг всех ТТК из одного документа Excel (несколько карточек в одном файле).
   /// [establishmentId] — для учёта лимита AI (3/день). Шаблонный парсинг без лимита.
-  Future<List<TechCardRecognitionResult>> parseTechCardsFromExcel(Uint8List xlsxBytes, {String? establishmentId});
+  /// [sheetIndex] — для .xlsx с несколькими листами: парсить только этот лист (0-based). null = все листы или первый.
+  Future<List<TechCardRecognitionResult>> parseTechCardsFromExcel(Uint8List xlsxBytes, {String? establishmentId, int? sheetIndex});
 
   /// Парсинг ТТК из PDF (извлечение текста + ИИ).
   /// [establishmentId] — для учёта лимита AI (3/день). Шаблонный парсинг без лимита.
@@ -255,7 +256,7 @@ class AiServiceStub implements AiService {
       null;
 
   @override
-  Future<List<TechCardRecognitionResult>> parseTechCardsFromExcel(Uint8List xlsxBytes, {String? establishmentId}) async =>
+  Future<List<TechCardRecognitionResult>> parseTechCardsFromExcel(Uint8List xlsxBytes, {String? establishmentId, int? sheetIndex}) async =>
       [];
 
   @override

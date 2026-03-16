@@ -27,6 +27,8 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
   bool _loading = true;
   DateTime? _dateFrom;
   DateTime? _dateTo;
+  /// Для Приложения 3: выбранное помещение (null = «Все»).
+  String? _selectedWarehousePremises;
 
   HaccpLogType? get _logType {
     final t = HaccpLogType.fromCode(widget.logTypeCode);
@@ -508,6 +510,42 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
                       ],
                     ),
                   ),
+                if (logType == HaccpLogType.warehouseTempHumidity && _logs.isNotEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                    child: Row(
+                      children: [
+                        Text(
+                          'Наименование складского помещения:',
+                          style: Theme.of(context).textTheme.labelLarge,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: DropdownButton<String>(
+                            value: _selectedWarehousePremises ?? 'Все',
+                            isExpanded: true,
+                            items: [
+                              const DropdownMenuItem(value: 'Все', child: Text('Все помещения')),
+                              ...(() {
+                                final list = _logs
+                                    .map((e) => e.equipment)
+                                    .whereType<String>()
+                                    .where((s) => s.trim().isNotEmpty)
+                                    .toSet()
+                                    .toList();
+                                list.sort();
+                                return list.map((s) => DropdownMenuItem<String>(value: s, child: Text(s)));
+                              })(),
+                            ],
+                            onChanged: (v) => setState(() {
+                              _selectedWarehousePremises = (v == null || v == 'Все') ? null : v;
+                            }),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 Expanded(
                   child: _logs.isEmpty
                       ? Center(
@@ -537,9 +575,12 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
                       : _JournalTableView(
                           logType: logType,
                           establishmentName: est?.name ?? '—',
-                          logs: _logs,
+                          logs: logType == HaccpLogType.warehouseTempHumidity && _selectedWarehousePremises != null
+                              ? _logs.where((l) => l.equipment == _selectedWarehousePremises).toList()
+                              : _logs,
                           employees: _employees,
                           onLogTap: _openLogDetail,
+                          warehousePremisesName: logType == HaccpLogType.warehouseTempHumidity ? _selectedWarehousePremises : null,
                         ),
                 ),
               ],
@@ -588,7 +629,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
   }
 }
 
-/// Список записей журнала в виде таблицы по макету СанПиН (Приложения 1–5).
+/// Список записей журнала в виде таблицы по макету СанПиН (Приложения 1–5 и 8).
 class _JournalTableView extends StatelessWidget {
   const _JournalTableView({
     required this.logType,
@@ -596,6 +637,7 @@ class _JournalTableView extends StatelessWidget {
     required this.logs,
     required this.employees,
     required this.onLogTap,
+    this.warehousePremisesName,
   });
 
   final HaccpLogType logType;
@@ -603,6 +645,8 @@ class _JournalTableView extends StatelessWidget {
   final List<HaccpLog> logs;
   final List<Employee> employees;
   final void Function(HaccpLog log) onLogTap;
+  /// Для Приложения 3: наименование помещения (в шапке). Если null при «Все» — в таблице колонка «Помещение».
+  final String? warehousePremisesName;
 
   static final _dateFmt = DateFormat('dd.MM.yyyy');
   static final _dateTimeFmt = DateFormat('dd.MM.yyyy HH:mm');
@@ -646,9 +690,21 @@ class _JournalTableView extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-          child: Text(
-            'Рекомендуемый образец',
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(color: Theme.of(context).colorScheme.primary),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Приложение № 3 к СанПиН 2.3/2.4.3590-20',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.primary),
+              ),
+              if (logType == HaccpLogType.warehouseTempHumidity && warehousePremisesName != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Наименование складского помещения: $warehousePremisesName',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                ),
+              ],
+            ],
           ),
         ),
         Expanded(
@@ -674,7 +730,7 @@ class _JournalTableView extends StatelessWidget {
       case HaccpLogType.fridgeTemperature:
         return _buildFridgeTable(idToEmp);
       case HaccpLogType.warehouseTempHumidity:
-        return _buildWarehouseTable(idToEmp);
+        return _buildWarehouseTable(idToEmp, idToName);
       case HaccpLogType.finishedProductBrakerage:
         return _buildBrakerageFinishedTable(idToName);
       case HaccpLogType.incomingRawBrakerage:
