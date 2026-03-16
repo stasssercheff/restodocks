@@ -2073,6 +2073,14 @@ class AiServiceSupabase implements AiService {
             final nn = double.tryParse(next.replaceAll(',', '.'));
             if (nn != null && nn >= 10 && nn <= 5000) return nn;
           }
+          // ГОСТ: число выхода часто в следующей строке
+          if (r + 1 < rows.length) {
+            for (var j = 0; j < (rows[r + 1]?.length ?? 0) && j < 5; j++) {
+              final next = (rows[r + 1]![j] is String ? rows[r + 1]![j] as String : rows[r + 1]![j].toString()).trim();
+              final nn = double.tryParse(next.replaceAll(',', '.'));
+              if (nn != null && nn >= 10 && nn <= 5000) return nn;
+            }
+          }
         }
       }
     }

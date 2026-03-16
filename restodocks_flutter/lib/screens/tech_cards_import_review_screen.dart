@@ -110,8 +110,8 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
       sections: defaultSections,
       isSemiFinished: c.isSemiFinished ?? true,
     )).toList();
-    if (AiServiceSupabase.lastParseWasFirstTimeFormat) {
-      AiServiceSupabase.lastParseWasFirstTimeFormat = false;
+    // Напоминание при каждом открытии экрана проверки импорта (не только при первом формате).
+    if (widget.cards.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _showFirstTimeImportNotice());
     }
   }
