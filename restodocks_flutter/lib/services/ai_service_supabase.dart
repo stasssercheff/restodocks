@@ -2586,7 +2586,12 @@ class AiServiceSupabase implements AiService {
           final n = (i['productName'] ?? '').toString();
           return '${n.length > 15 ? n.substring(0, 15) : n}: ${i['grossGrams']}';
         }).join('; ');
+        final net = ing.map((i) {
+          final name = (i['productName'] ?? '').toString();
+          return '${name.length > 15 ? name.substring(0, 15) : name}: ${i['netGrams']}';
+        }).join('; ');
         debugPrint('[tt_parse] EF returned: ${raw.length} cards, first ingr grossGrams: $g');
+        debugPrint('[tt_parse] EF first ingr netGrams: $net');
       }
       final list = <TechCardRecognitionResult>[];
       const headerWords = ['наименование', 'продукт', 'название', 'брутто', 'нетто', 'сырьё'];
@@ -2635,6 +2640,7 @@ class AiServiceSupabase implements AiService {
       const netKeys = ['нетто', 'нт', 'вес нетто', 'net'];
       const wasteKeys = ['отход', 'отх', 'waste', 'процент отхода'];
       const outputKeys = ['выход', 'вес готового', 'готовый', 'output'];
+      // Сканируем минимум 3 строки: ГОСТ 2-row header — «Брутто»/«Нетто» во второй строке.
       for (var r = 0; r < rows.length; r++) {
         final row = rows[r].map((c) => c.trim().toLowerCase()).toList();
         for (var c = 0; c < row.length; c++) {
@@ -2659,11 +2665,15 @@ class AiServiceSupabase implements AiService {
             if (cell.contains(k)) { headerIdx = r; outputCol = c; break; }
           }
         }
-        if (headerIdx >= 0 && (nameCol >= 0 || productCol >= 0)) break;
+        // Не выходить по первой строке: у ГОСТ «Брутто»/«Нетто» во второй строке.
+        final hasNameOrProduct = headerIdx >= 0 && (nameCol >= 0 || productCol >= 0);
+        final hasWeights = grossCol >= 0 || netCol >= 0;
+        if (hasNameOrProduct && (hasWeights || r >= 2)) break;
       }
       if (headerIdx < 0 || (nameCol < 0 && productCol < 0)) return;
       if (nameCol < 0) nameCol = 0;
-      if (productCol < 0) productCol = 1;
+      // ГОСТ 2-row: наименование и продукт в одной колонке — иначе при парсинге пропускается первая колонка с весом.
+      if (productCol < 0) productCol = nameCol >= 0 ? nameCol : 1;
       final sig = _headerSignature(rows[headerIdx].map((c) => c.trim()).toList());
       if (sig.isEmpty) return;
       lastParseHeaderSignature = sig;
@@ -2753,13 +2763,14 @@ class AiServiceSupabase implements AiService {
         final name = (i.productName ?? '').trim().toLowerCase();
         final gross = i.grossGrams;
         final net = i.netGrams;
+        // Яйца: храним 50 г брутто (для веса), unit=шт — в UI покажем «1 шт», стоимость за 1 шт.
         if (name.contains('яйц') && gross == 1 && net != null && net >= 20 && net <= 60) {
           return TechCardIngredientLine(
             productName: i.productName,
             grossGrams: 50.0,
             netGrams: i.netGrams,
             outputGrams: i.outputGrams,
-            unit: i.unit,
+            unit: 'шт',
             cookingMethod: i.cookingMethod,
             primaryWastePct: i.primaryWastePct,
             cookingLossPct: i.cookingLossPct,

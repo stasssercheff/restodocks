@@ -257,6 +257,7 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
         continue;
       }
       if (!isValidDishName(cell)) continue;
+      if (cell.trim().toLowerCase() === "выход") continue;
       if (cell.length < 15 && !/[a-zA-Zа-яА-ЯёЁ]{4,}/.test(cell)) continue;
       const lower = cell.toLowerCase();
       if (headerKeys.some((k) => lower.includes(k))) continue;
@@ -348,13 +349,23 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
       currentDish = null;
       continue;
     }
+    // Строка «Выход» + число — конец карточки (формат супы.xlsx и др.)
+    if (nameVal.trim().toLowerCase() === "выход" || productVal.trim().toLowerCase() === "выход") {
+      let outG = parseNum(grossVal) || parseNum(netVal) || parseNum(outputVal);
+      if (outG == null && cells.length > 1) outG = parseNum(cells[1]);
+      if (outputColIsKg && outG != null && outG > 0 && outG < 100) outG = outG * 1000;
+      flushCard(outG ?? undefined);
+      currentDish = null;
+      continue;
+    }
     if (isPastTable) continue;
     if (isStructuralProductName(productVal, true)) continue;
     if (productVal.toLowerCase().includes("выход блюда") || productVal.toLowerCase().startsWith("выход одного")) continue;
 
-    // Строка с названием блюда (начало новой карточки)
+    // Строка с названием блюда (начало новой карточки). «Выход» — не название блюда.
     if (
       nameVal &&
+      nameVal.trim().toLowerCase() !== "выход" &&
       isValidDishName(nameVal) &&
       !isLikelyFragment(nameVal) &&
       !/^[\d\s.,]+$/.test(nameVal) &&
@@ -369,7 +380,7 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
       const grossValLooksLikeText = grossVal.trim().length > 12 && /[а-яёa-z]{3,}/i.test(grossVal);
       const netValLooksLikeText = netVal.trim().length > 12 && /[а-яёa-z]{3,}/i.test(netVal);
       if (grossValLooksLikeText || netValLooksLikeText) continue;
-      if (currentDish == null && nameVal && isValidDishName(nameVal)) currentDish = nameVal;
+      if (currentDish == null && nameVal && nameVal.trim().toLowerCase() !== "выход" && isValidDishName(nameVal)) currentDish = nameVal;
       const norm = (s: string) => s.trim().toLowerCase();
       if (currentDish != null && norm(productVal) === norm(currentDish)) continue;
       let gross = parseNum(grossVal);
@@ -559,6 +570,7 @@ export function parseTtkByStoredTemplate(
       for (const c of rows[r] ?? []) {
         const s = (c ?? "").trim();
         if (s.length < 3 || !isValidDish(s)) continue;
+        if (s.toLowerCase() === "выход") continue;
         if (s.endsWith(":")) continue;
         if (/^\d{1,2}\.\d{1,2}\.\d{2,4}/.test(s)) continue;
         if (s.toLowerCase().startsWith("технологическая карта")) continue;
@@ -660,16 +672,25 @@ export function parseTtkByStoredTemplate(
       currentDish = null;
       continue;
     }
+    if (nameVal.trim().toLowerCase() === "выход" || productVal.trim().toLowerCase() === "выход") {
+      let outG = parseNum(grossVal) || parseNum(netVal) || parseNum(outputVal);
+      if (outG == null && cells.length > 1) outG = parseNum(cells[1]);
+      const outputColIsKgStored = outputCol >= 0 && outputCol < headerRow.length && headerRow[outputCol]?.includes("кг");
+      if (outputColIsKgStored && outG != null && outG > 0 && outG < 100) outG = outG * 1000;
+      flushCard(outG ?? undefined);
+      currentDish = null;
+      continue;
+    }
     const rowText = cells.join(" ").toLowerCase();
     const isPastTable = fromPdf && r >= tableEndRow;
-    if ((!fromPdf || !isPastTable) && nameVal && isValidDish(nameVal) && !isLikelyFragment(nameVal) && !/^[\d\s.,]+$/.test(nameVal) && !productVal) {
+    if ((!fromPdf || !isPastTable) && nameVal && nameVal.trim().toLowerCase() !== "выход" && isValidDish(nameVal) && !isLikelyFragment(nameVal) && !/^[\d\s.,]+$/.test(nameVal) && !productVal) {
       if (currentDish != null && currentIngredients.length > 0) flushCard(undefined);
       currentDish = nameVal;
     }
     if (productVal && (!fromPdf || !isPastTable) && isValidProduct(productVal) && !isJunkProductName(productVal)) {
       if ((grossNum != null && grossNum > 100000) || (netNum != null && netNum > 100000)) continue;
       if ((grossNum == null || grossNum <= 0) && (netNum == null || netNum <= 0)) continue;
-      if (currentDish == null && nameVal && isValidDish(nameVal) && !isHeaderWord(nameVal) && !isLikelyFragment(nameVal)) currentDish = nameVal;
+      if (currentDish == null && nameVal && nameVal.trim().toLowerCase() !== "выход" && isValidDish(nameVal) && !isHeaderWord(nameVal) && !isLikelyFragment(nameVal)) currentDish = nameVal;
       const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
       if (currentDish != null && norm(productVal) === norm(currentDish)) continue;
       let waste = parseNum(wasteVal);

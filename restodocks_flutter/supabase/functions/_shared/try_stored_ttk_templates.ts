@@ -90,6 +90,25 @@ export async function tryParseByStoredTemplates(rows: string[][], options?: { fr
   if (learned?.technology_col != null) learnedTechnologyCol = learned.technology_col as number;
 
   const templateHeaderIdx = (data.header_row_index as number) ?? 0;
+  const templateGrossCol = (data.gross_col as number) ?? -1;
+  const templateNetCol = (data.net_col as number) ?? -1;
+  // ГОСТ 2-row: колонки из следующей строки («Брутто»/«Нетто»). Нужно когда: -1/-1 или оба равны (ошибочно одна колонка).
+  let inferredGrossCol = -1;
+  let inferredNetCol = -1;
+  if (headerIndices.length > 0) {
+    const nextRowIdx = headerIndices[0] + 1;
+    const nextRow = (rows[nextRowIdx] ?? []).map((c) => (c ?? "").trim().toLowerCase());
+    for (let c = 0; c < nextRow.length; c++) {
+      const cell = nextRow[c];
+      if (cell.includes("брутто") && inferredGrossCol < 0) inferredGrossCol = c;
+      if (cell.includes("нетто") && inferredNetCol < 0) inferredNetCol = c;
+    }
+  }
+  const needInferred = templateGrossCol < 0 || templateNetCol < 0 || templateGrossCol === templateNetCol;
+  const useInferred = needInferred && inferredGrossCol >= 0 && inferredNetCol >= 0 && inferredGrossCol !== inferredNetCol;
+  const effectiveGrossCol = useInferred ? inferredGrossCol : (templateGrossCol >= 0 ? templateGrossCol : inferredGrossCol);
+  const effectiveNetCol = useInferred ? inferredNetCol : (templateNetCol >= 0 ? templateNetCol : inferredNetCol);
+
   const headerWords = ["брутто", "нетто", "наименование", "продукт", "сырьё"];
   const isGarbageCard = (c: { dishName: string | null; ingredients: { productName: string }[] }) => {
     const dn = (c.dishName ?? "").trim().toLowerCase();
@@ -101,24 +120,37 @@ export async function tryParseByStoredTemplates(rows: string[][], options?: { fr
     return c.ingredients.length > 0 && garbage / c.ingredients.length >= 0.5;
   };
 
+  const templateProductCol = (data.product_col as number) ?? 1;
+  const nameCol = (data.name_col as number) ?? 0;
   const parseBlock = (useLearned: boolean) => {
     const cards: TtkCard[] = [];
     const issues: string[] = [];
+    const pColFromTemplate = useLearned ? (learnedProductCol ?? templateProductCol) : templateProductCol;
+    // ГОСТ 2-row: продукт в колонке наименования (0), иначе колонка 1 = брутто и мы пропускаем первый вес.
+    const pCol = inferredGrossCol >= 0 && (templateProductCol === inferredGrossCol || (useLearned && learnedProductCol === inferredGrossCol))
+      ? nameCol
+      : pColFromTemplate;
     for (let i = 0; i < headerIndices.length; i++) {
       const headerIdx = headerIndices[i];
       const nextHeader = headerIndices[i + 1] ?? rows.length;
       const effectiveHeader = templateHeaderIdx > 0 && headerIdx === 0 ? templateHeaderIdx : headerIdx;
       const dOffset = useLearned ? (dishNameRowOffset ?? 0) : 0;
-      // Первый блок: включаем leading rows (0..headerIdx-1) — там «Мясная к пенному», «Цезарь» и т.п.
       const startRow = i === 0 ? 0 : Math.max(0, effectiveHeader + dOffset);
       const blockRows = rows.slice(startRow, nextHeader);
       const headerIdxInBlock = effectiveHeader - startRow;
+      let gCol = useLearned ? (learnedGrossCol ?? effectiveGrossCol) : effectiveGrossCol;
+      let nCol = useLearned ? (learnedNetCol ?? effectiveNetCol) : effectiveNetCol;
+      // Если выученные/шаблонные колонки совпадают (нетто=брутто), а по следующей строке есть две разные — используем их.
+      if (gCol >= 0 && nCol >= 0 && gCol === nCol && effectiveGrossCol >= 0 && effectiveNetCol >= 0 && effectiveGrossCol !== effectiveNetCol) {
+        gCol = effectiveGrossCol;
+        nCol = effectiveNetCol;
+      }
       const res = parseTtkByStoredTemplate(blockRows, {
         headerIdx: headerIdxInBlock,
-        nameCol: (data.name_col as number) ?? 0,
-        productCol: useLearned ? (learnedProductCol ?? (data.product_col as number) ?? 1) : (data.product_col as number) ?? 1,
-        grossCol: useLearned ? (learnedGrossCol ?? (data.gross_col as number) ?? -1) : (data.gross_col as number) ?? -1,
-        netCol: useLearned ? (learnedNetCol ?? (data.net_col as number) ?? -1) : (data.net_col as number) ?? -1,
+        nameCol,
+        productCol: pCol,
+        grossCol: gCol,
+        netCol: nCol,
         wasteCol: (data.waste_col as number) ?? -1,
         outputCol: (data.output_col as number) ?? -1,
         technologyCol: useLearned ? (learnedTechnologyCol ?? (data.technology_col as number) ?? -1) : (data.technology_col as number) ?? -1,

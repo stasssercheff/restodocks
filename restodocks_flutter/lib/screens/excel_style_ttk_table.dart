@@ -276,10 +276,12 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                       final gross = _usesPieces(ingredient)
                           ? CulinaryUnits.toGrams(parsed, ingredient.unit, gramsPerPiece: ingredient.gramsPerPiece ?? 50)
                           : parsed;
-                      // При изменении брутто пересчитываем нетто, выход и стоимость
                       final net = gross * (1 - ingredient.primaryWastePct / 100);
                       final output = net * (1 - (ingredient.cookingLossPctOverride ?? 0) / 100);
-                      final newCost = (ingredient.pricePerKg ?? 0) * (gross / 1000.0);
+                      final qty = _usesPieces(ingredient)
+                          ? (gross / (ingredient.gramsPerPiece ?? 50))
+                          : (gross / 1000.0);
+                      final newCost = (ingredient.pricePerKg ?? 0) * qty;
                       _updateIngredient(rowIndex, ingredient.copyWith(
                         grossWeight: gross,
                         netWeight: net,
@@ -312,7 +314,10 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                         }
                       }
                       final output = net * (1 - (ingredient.cookingLossPctOverride ?? 0) / 100);
-                      final newCost = (ingredient.pricePerKg ?? 0) * (gross / 1000.0);
+                      final qty = _usesPieces(ingredient)
+                          ? (gross / (ingredient.gramsPerPiece ?? 50))
+                          : (gross / 1000.0);
+                      final newCost = (ingredient.pricePerKg ?? 0) * qty;
                       _updateIngredient(rowIndex, ingredient.copyWith(
                         grossWeight: gross,
                         netWeight: net,
@@ -765,11 +770,31 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
               final product = selectedItem.item as Product;
               final establishmentPrice = widget.productStore.getEstablishmentPrice(product.id, widget.establishmentId);
               final pricePerKg = establishmentPrice?.$1 ?? 0.0;
-              final cost = pricePerKg * (ingredient.grossWeight / 1000);
+              var gross = ingredient.grossWeight;
+              var wastePct = ingredient.primaryWastePct;
+              final newGpp = product.gramsPerPiece;
+              final productIsPcs = (product.unit == 'шт' || product.unit == 'pcs') && (newGpp ?? 0) > 0;
+              if (productIsPcs && _usesPieces(ingredient)) {
+                final oldGpp = ingredient.gramsPerPiece ?? 50;
+                if (oldGpp > 0 && (newGpp == null || (newGpp - oldGpp).abs() > 0.01)) {
+                  final gpp = newGpp ?? 50;
+                  final pieces = ingredient.grossWeight / oldGpp;
+                  gross = pieces * gpp;
+                  final net = ingredient.netWeight;
+                  wastePct = gross > 0 ? ((1.0 - net / gross) * 100).clamp(0.0, 99.9) : 0.0;
+                }
+              }
+              final qty = productIsPcs
+                  ? (gross / (newGpp ?? 50))
+                  : (gross / 1000);
+              final cost = pricePerKg * qty;
               var ing = ingredient.copyWith(
                 productId: product.id,
                 productName: product.name,
                 unit: product.unit ?? 'g',
+                gramsPerPiece: product.gramsPerPiece,
+                grossWeight: gross,
+                primaryWastePct: wastePct,
                 pricePerKg: pricePerKg,
                 cost: cost,
               );
@@ -782,11 +807,29 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
               if (p != null) {
                 final establishmentPrice = widget.productStore.getEstablishmentPrice(p.id, widget.establishmentId);
                 final pricePerKg = establishmentPrice?.$1 ?? 0.0;
-                final cost = pricePerKg * (ingredient.grossWeight / 1000);
+                var gross = ingredient.grossWeight;
+                var wastePct = ingredient.primaryWastePct;
+                final newGpp = p.gramsPerPiece;
+                final productIsPcs = (p.unit == 'шт' || p.unit == 'pcs') && (newGpp ?? 0) > 0;
+                if (productIsPcs && _usesPieces(ingredient)) {
+                  final oldGpp = ingredient.gramsPerPiece ?? 50;
+                  if (oldGpp > 0 && (newGpp == null || (newGpp - oldGpp).abs() > 0.01)) {
+                    final gpp = newGpp ?? 50;
+                    final pieces = ingredient.grossWeight / oldGpp;
+                    gross = pieces * gpp;
+                    final net = ingredient.netWeight;
+                    wastePct = gross > 0 ? ((1.0 - net / gross) * 100).clamp(0.0, 99.9) : 0.0;
+                  }
+                }
+                final qty = productIsPcs ? (gross / (newGpp ?? 50)) : (gross / 1000);
+                final cost = pricePerKg * qty;
                 var ing = ingredient.copyWith(
                   productId: p.id,
                   productName: p.name,
                   unit: p.unit ?? 'g',
+                  gramsPerPiece: p.gramsPerPiece,
+                  grossWeight: gross,
+                  primaryWastePct: wastePct,
                   pricePerKg: pricePerKg,
                   cost: cost,
                 );
@@ -980,10 +1023,18 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     );
   }
 
+  /// Количество для расчёта стоимости: кг (г/1000) или шт (г/gramsPerPiece).
+  double _quantityForCost(TTIngredient ing) {
+    if (_usesPieces(ing)) {
+      final gpp = ing.gramsPerPiece ?? 50;
+      return gpp > 0 ? ing.grossWeight / gpp : ing.grossWeight / 1000;
+    }
+    return ing.grossWeight / 1000;
+  }
+
   Widget _buildPricePerKgCell(TTIngredient ingredient) {
-    // Стоимость продукта по брутто (цена за кг * вес брутто в кг)
     final pricePerKg = _resolvePricePerKg(ingredient);
-    final grossCost = pricePerKg * (ingredient.grossWeight / 1000);
+    final grossCost = pricePerKg * _quantityForCost(ingredient);
     final sym = _currencySymbol;
     final fmt = NumberFormatUtils.formatInt(grossCost);
 

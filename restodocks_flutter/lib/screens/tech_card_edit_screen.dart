@@ -818,18 +818,35 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       if ((unit == 'шт' || unit == 'pcs') && gpp != null && gpp > 0) {
         final g = ing.grossWeight;
         final n = ing.netWeight;
+        final oldGpp = ing.gramsPerPiece ?? 50;
+        // Вес 1 шт изменился в номенклатуре — сохраняем нетто, пересчитываем брутто и % отхода
+        if (oldGpp > 0 && (gpp - oldGpp).abs() > 0.01 && g > 0) {
+          final pieces = g / oldGpp;
+          final newGross = pieces * gpp;
+          final newWaste = newGross > 0 ? ((1.0 - n / newGross) * 100).clamp(0.0, 99.9) : 0.0;
+          list.add(ing.copyWith(
+            grossWeight: newGross,
+            gramsPerPiece: gpp,
+            primaryWastePct: newWaste,
+            isNetWeightManual: ing.isNetWeightManual,
+          ));
+          continue;
+        }
         // Брутто в документе часто в штуках (1–25); переводим в граммы по номенклатуре
         if (g > 0 && g <= 25 && g == g.roundToDouble()) {
           final grossGrams = g * gpp;
-          list.add(ing.copyWith(grossWeight: grossGrams));
+          list.add(ing.copyWith(grossWeight: grossGrams, gramsPerPiece: gpp));
           continue;
         }
         // Брутто 0, нетто в штуках (1–20) — подставляем брутто в граммах
         if (g <= 0 && n > 0 && n <= 20 && n == n.roundToDouble()) {
           final grossGrams = n * gpp;
-          list.add(ing.copyWith(grossWeight: grossGrams));
+          list.add(ing.copyWith(grossWeight: grossGrams, gramsPerPiece: gpp));
           continue;
         }
+        if (ing.gramsPerPiece == null) list.add(ing.copyWith(gramsPerPiece: gpp));
+        else list.add(ing);
+        continue;
       }
       // Продукт в граммах: брутто 0 при заполненном нетто — подставляем брутто = нетто (без отхода)
       if (ing.grossWeight <= 0 && ing.netWeight > 0) {
@@ -930,6 +947,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
               final unit = line.unit?.trim().isNotEmpty == true ? line.unit! : 'g';
               final wastePct = (line.primaryWastePct ?? 0).clamp(0.0, 99.9);
               final outG = line.outputGrams != null && line.outputGrams! > 0 ? line.outputGrams! : 0.0;
+              final isEggsPcs = (unit == 'шт' || unit == 'pcs') && line.productName.trim().toLowerCase().contains('яйц');
               _ingredients.add(TTIngredient(
                 id: DateTime.now().millisecondsSinceEpoch.toString() + _ingredients.length.toString(),
                 productId: null,
@@ -938,6 +956,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                 netWeight: net > 0 ? net : (gross > 0 ? gross : 100),
                 outputWeight: outG,
                 unit: unit,
+                gramsPerPiece: isEggsPcs ? 50.0 : null,
                 primaryWastePct: wastePct,
                 cookingLossPctOverride: line.cookingLossPct != null ? line.cookingLossPct!.clamp(0.0, 99.9) : null,
                 isNetWeightManual: line.netGrams != null,
