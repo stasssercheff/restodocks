@@ -1,7 +1,7 @@
 // Supabase Edge Function: распознавание ТТК из PDF
-// Динамический импорт unpdf/AI — ускоряет cold start, warm-запрос возвращается сразу
+// Извлечение текста: unpdf (serverless-оптимизированный PDF.js, малый бандл). Динамический импорт — cold start.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { isStructuralProductName } from "../_shared/parse_ttk_template.ts";
+import { headerSignature, isStructuralProductName, getTechnologyFromRowsUsingColumn } from "../_shared/parse_ttk_template.ts";
 
 function corsHeaders(origin: string | null) {
   return {
@@ -103,12 +103,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Polyfill DOMMatrix — в Deno Edge нет, нужен для pdf-parse/PDF.js
-    if (typeof globalThis.DOMMatrix === "undefined") {
-      const { default: DOMMatrix } = await import("npm:@thednp/dommatrix@2.0.12");
-      (globalThis as unknown as { DOMMatrix: unknown }).DOMMatrix = DOMMatrix;
-    }
-    const { PDFParse } = await import("npm:pdf-parse");
+    const { getDocumentProxy, extractText } = await import("npm:unpdf");
     const { chatText } = await import("../_shared/ai_provider.ts");
     const { pdfMergeContinuationLines, pdfTextToRows, parseTtkByTemplate } = await import("../_shared/parse_ttk_template.ts");
     const { parseKkOp1 } = await import("../_shared/parse_kk_op1.ts");
@@ -130,11 +125,11 @@ Deno.serve(async (req: Request) => {
 
     let text: string;
     try {
-      const parser = new PDFParse({ data: bytes });
-      const result = await parser.getText();
-      await parser.destroy();
-      // Сохраняем переносы строк — нужны для шаблонного парсинга
-      text = (result?.text ?? "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+      const pdf = await getDocumentProxy(bytes);
+      // mergePages: false — иначе unpdf делает .replace(/\s+/g, ' ') и убивает переносы строк, нужные для таблиц
+      const result = await extractText(pdf, { mergePages: false });
+      const pageTexts = (result?.text as string[] | undefined) ?? [];
+      text = pageTexts.join("\n").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : String(e);
       const part = errMsg.slice(0, 200).replace(/["\n\r]/g, " ");
@@ -217,8 +212,34 @@ Deno.serve(async (req: Request) => {
     const yieldMatch = text.match(/Выход\s+на\s+1\s+порцию\s*:\s*(\d+)\s*г/i);
     const extractedYield = yieldMatch ? parseInt(yieldMatch[1], 10) : undefined;
     if (templateCards.length > 0) {
+      // Обогащение технологии из обучения: даже когда шаблон сработал, подставляем выученную колонку (чтобы правки пользователя давали эффект)
+      let learnedTechText = "";
+      try {
+        const KEYWORDS = ["наименование", "продукт", "брутто", "нетто", "название", "сырьё", "ингредиент", "расход сырья"];
+        let firstSig: string | null = null;
+        for (let r = 0; r < rows.length && r < 100; r++) {
+          const row = rows[r]?.map((c) => (c ?? "").trim().toLowerCase()) ?? [];
+          if (row.length < 2) continue;
+          if (!row.some((c) => KEYWORDS.some((k) => c.includes(k)))) continue;
+          const headerRow = rows[r]?.map((c) => (c ?? "").trim()) ?? [];
+          firstSig = headerSignature(headerRow);
+          if (firstSig) break;
+        }
+        if (firstSig) {
+          const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+          const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
+          const { data: learned } = await supabase.from("tt_parse_learned_dish_name").select("technology_col").eq("header_signature", firstSig).limit(1).maybeSingle();
+          const techCol = learned?.technology_col as number | undefined;
+          if (typeof techCol === "number" && techCol >= 0) {
+            learnedTechText = getTechnologyFromRowsUsingColumn(rows, techCol, 1);
+          }
+        }
+      } catch (_) {
+        /* ignore */
+      }
+
       // Шаблон или каталог сработал — AI не используется, лимит не применяется
-      const normalized = templateCards.map((card) => {
+      const normalized = templateCards.map((card, idx) => {
         const filtered = filterGarbageIngredients(card.ingredients, (s) => isStructuralProductName(s, true));
         const noDishName = dropIngredientsMatchingDishName(filtered, card.dishName);
         let ingredients = noDishName.map((i) => ({
@@ -236,9 +257,10 @@ Deno.serve(async (req: Request) => {
         if (extractedYield != null && extractedYield > 0 && ingredients.length === 1) {
           ingredients = [{ ...ingredients[0], outputGrams: extractedYield }];
         }
+        const useLearnedTech = learnedTechText.length > 0 && (idx === 0 || !(card.technologyText ?? "").trim()) && learnedTechText.length >= (card.technologyText ?? "").length;
         return {
         dishName: card.dishName ?? null,
-        technologyText: card.technologyText ?? null,
+        technologyText: useLearnedTech ? learnedTechText : (card.technologyText ?? null),
         isSemiFinished: card.isSemiFinished ?? undefined,
         yieldGrams: extractedYield ?? card.yieldGrams ?? undefined,
         ingredients,

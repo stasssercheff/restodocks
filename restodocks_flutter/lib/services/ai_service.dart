@@ -75,6 +75,32 @@ class TechCardIngredientLine {
     this.ingredientType,
     this.pricePerKg,
   });
+
+  TechCardIngredientLine copyWith({
+    String? productName,
+    double? grossGrams,
+    double? netGrams,
+    double? outputGrams,
+    String? unit,
+    String? cookingMethod,
+    double? primaryWastePct,
+    double? cookingLossPct,
+    String? ingredientType,
+    double? pricePerKg,
+  }) {
+    return TechCardIngredientLine(
+      productName: productName ?? this.productName,
+      grossGrams: grossGrams ?? this.grossGrams,
+      netGrams: netGrams ?? this.netGrams,
+      outputGrams: outputGrams ?? this.outputGrams,
+      unit: unit ?? this.unit,
+      cookingMethod: cookingMethod ?? this.cookingMethod,
+      primaryWastePct: primaryWastePct ?? this.primaryWastePct,
+      cookingLossPct: cookingLossPct ?? this.cookingLossPct,
+      ingredientType: ingredientType ?? this.ingredientType,
+      pricePerKg: pricePerKg ?? this.pricePerKg,
+    );
+  }
 }
 
 /// Результат распознавания ТТК (фото карточки или Excel).
@@ -108,6 +134,33 @@ class TechCardRecognitionResult {
       isSemiFinished: isSemiFinished ?? this.isSemiFinished,
       yieldGrams: yieldGrams ?? this.yieldGrams,
     );
+  }
+
+  /// Подстроить % отхода у всех ингредиентов так, чтобы сумма выходов = [targetOutput] г.
+  /// Один общий процент отхода: (1 - w/100) * sum(gross_i * (1 - loss_i/100)) = target => w = 100*(1 - target/denom).
+  /// Возвращает новый [TechCardRecognitionResult] с обновлёнными primaryWastePct, netGrams, outputGrams; или null, если расчёт невозможен.
+  TechCardRecognitionResult? adjustWasteToMatchOutput(double targetOutput) {
+    if (targetOutput <= 0) return null;
+    final valid = ingredients.where((i) => (i.productName).trim().isNotEmpty && (i.grossGrams ?? 0) > 0).toList();
+    if (valid.isEmpty) return null;
+    double denominator = 0;
+    for (final ing in valid) {
+      final grossG = ing.grossGrams ?? 0;
+      final lossPct = (ing.cookingLossPct ?? 0).clamp(0.0, 99.9);
+      denominator += grossG * (1.0 - lossPct / 100.0);
+    }
+    if (denominator <= 0) return null;
+    double w = 100.0 * (1.0 - targetOutput / denominator);
+    w = w.clamp(0.0, 99.9);
+    final newIngredients = ingredients.map((ing) {
+      if (ing.productName.trim().isEmpty || (ing.grossGrams ?? 0) <= 0) return ing;
+      final grossG = ing.grossGrams!;
+      final lossPct = (ing.cookingLossPct ?? 0).clamp(0.0, 99.9) / 100.0;
+      final newNet = grossG * (1.0 - w / 100.0);
+      final newOutput = newNet * (1.0 - lossPct);
+      return ing.copyWith(primaryWastePct: w, netGrams: newNet, outputGrams: newOutput);
+    }).toList();
+    return copyWith(ingredients: newIngredients);
   }
 }
 

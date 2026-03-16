@@ -370,7 +370,12 @@ class AiServiceSupabase implements AiService {
       if (excelErrors.isNotEmpty) lastParseTechCardErrors = excelErrors;
       final listByStored = await _tryParseByStoredTemplates(rows);
       final hasTemplateWithIngredients = listByTemplate.isNotEmpty && listByTemplate.any((c) => c.ingredients.isNotEmpty);
-      var list = (hasTemplateWithIngredients || listByStored.isEmpty) ? listByTemplate : listByStored;
+      final hasStoredWithIngredients = listByStored.isNotEmpty && listByStored.any((c) => c.ingredients.isNotEmpty);
+      // Приоритет обучению: если для этого формата уже сохранены колонки — используем их результат,
+      // иначе при повторном импорте того же файла снова побеждает встроенный шаблон и правки «не срабатывают».
+      var list = hasStoredWithIngredients
+          ? listByStored
+          : (hasTemplateWithIngredients || listByStored.isEmpty) ? listByTemplate : listByStored;
       if (list.isEmpty) {
         list = AiServiceSupabase._tryParseKkFromRows(rows);
         final multiBlock = AiServiceSupabase._tryParseMultiColumnBlocks(rows);
@@ -442,6 +447,7 @@ class AiServiceSupabase implements AiService {
       if (rows.isNotEmpty) {
         list = _mergeTechnologyFromPolnoePosobie(rows, list);
       }
+      list = await _enrichTechnologyFromLearned(list, rows, lastParseHeaderSignature);
       var corrected = await _applyParseCorrections(list, lastParseHeaderSignature, establishmentId);
       corrected = await _fillTechnologyFromStoredPf(corrected, establishmentId);
       final validationErrors = _validateParsedCards(corrected);
@@ -2457,6 +2463,9 @@ class AiServiceSupabase implements AiService {
   /// Последняя ошибка при обучении (для диагностики).
   static String? lastLearningError;
 
+  /// Сообщение об успешном сохранении обучения (для отображения пользователю).
+  static String? lastLearningSuccess;
+
   /// Обратный маппинг: по скорректированным данным находим источник в rows и сохраняем колонки.
   /// Вызывать после сохранения импорта — один раз со всеми карточками для голосования.
   static Future<void> learnColumnMappingFromCorrections(
@@ -2610,9 +2619,18 @@ class AiServiceSupabase implements AiService {
       if (bestNetCol != null && bestNetCol != bestGrossCol) payload['net_col'] = bestNetCol;
       if (bestTechnologyCol != null) payload['technology_col'] = bestTechnologyCol;
       if (!hasDish && bestProductCol == null && bestTechnologyCol == null) return; // нечего сохранять
+      lastLearningError = null;
+      lastLearningSuccess = null;
       final res = await client.functions.invoke('tt-parse-save-learning', body: {'learned_dish_name': payload});
       if (res.status >= 200 && res.status < 300) {
         devLog('[tt_parse] learned columns: sig=$headerSignature product=$bestProductCol gross=$bestGrossCol net=$bestNetCol technology=$bestTechnologyCol');
+        final parts = <String>[];
+        if (hasDish) parts.add('название блюда');
+        if (bestProductCol != null) parts.add('продукт');
+        if (bestGrossCol != null) parts.add('брутто');
+        if (bestNetCol != null) parts.add('нетто');
+        if (bestTechnologyCol != null) parts.add('технология');
+        lastLearningSuccess = parts.isEmpty ? 'Обучение сохранено.' : 'Обучение сохранено: ${parts.join(", ")} — учтено для следующего импорта этого формата.';
       } else {
         final err = (res.data as Map?)?['error'] ?? res.data ?? 'HTTP ${res.status}';
         lastLearningError = err.toString();
@@ -2620,6 +2638,7 @@ class AiServiceSupabase implements AiService {
       }
     } catch (e, st) {
       lastLearningError = e.toString();
+      lastLearningSuccess = null;
       devLog('[tt_parse] learnColumnMapping failed: $e\n$st');
     }
   }
@@ -2655,6 +2674,61 @@ class AiServiceSupabase implements AiService {
       lastLearningError = e.toString();
       devLog('[tt_parse] correction insert failed: $e\n$st');
       debugPrint('[tt_parse] correction insert failed: $e');
+    }
+  }
+
+  /// Подставить технологию из выученной колонки (tt_parse_learned_dish_name), если парсинг уже дал карточки.
+  /// Так обучение работает и когда побеждает встроенный шаблон (Excel/таблицы).
+  Future<List<TechCardRecognitionResult>> _enrichTechnologyFromLearned(
+    List<TechCardRecognitionResult> list,
+    List<List<String>> rows,
+    String? headerSignature,
+  ) async {
+    if (headerSignature == null || headerSignature.isEmpty || list.isEmpty || rows.length < 2) return list;
+    try {
+      final raw = await _client
+          .from('tt_parse_learned_dish_name')
+          .select('technology_col')
+          .eq('header_signature', headerSignature)
+          .limit(1)
+          .maybeSingle();
+      final techCol = raw is Map ? (raw['technology_col'] as num?)?.toInt() : null;
+      if (techCol == null || techCol < 0) return list;
+      // Граница таблицы: первая строка с маркером (как в parse_ttk_template)
+      final boundaryRegex = RegExp(
+        r'технологическая\s+карта\s+№|выход\s+на\s+1\s+порцию|масса\s+полуфабриката|информация\s+о\s+пищевой|технологический\s+процесс|допустимые\s+сроки',
+        caseSensitive: false,
+      );
+      int tableEndRow = rows.length;
+      for (var r = 1; r < rows.length && r < 200; r++) {
+        final row = rows[r];
+        final text = row.map((c) => (c is String ? c : c.toString()).trim()).join(' ').toLowerCase();
+        if (boundaryRegex.hasMatch(text)) {
+          tableEndRow = r;
+          break;
+        }
+      }
+      final parts = <String>[];
+      for (var r = tableEndRow; r < rows.length; r++) {
+        final row = rows[r];
+        if (techCol >= row.length) continue;
+        final cell = (row[techCol] is String ? row[techCol] as String : row[techCol].toString()).trim();
+        if (cell.length > 15 && !RegExp(r'^допустимые сроки\s|^информация о пищевой', caseSensitive: false).hasMatch(cell)) {
+          parts.add(cell);
+        }
+      }
+      final learnedTech = parts.join('\n').trim();
+      if (learnedTech.isEmpty) return list;
+      return list.asMap().entries.map((e) {
+        final i = e.key;
+        final c = e.value;
+        final useLearned = i == 0 || (c.technologyText ?? '').trim().isEmpty;
+        if (!useLearned || learnedTech.length < (c.technologyText ?? '').length) return c;
+        return c.copyWith(technologyText: learnedTech);
+      }).toList();
+    } catch (e, st) {
+      devLog('[tt_parse] enrichTechnologyFromLearned: $e\n$st');
+      return list;
     }
   }
 

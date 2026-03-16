@@ -372,13 +372,28 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
     return (lang == 'ru' ? ru : en)[c] ?? c;
   }
 
+  /// Сумма выходов ингредиентов карточки (г).
+  static double _ingredientsOutputSum(TechCardRecognitionResult result) {
+    return result.ingredients.fold<double>(
+      0, (s, i) => s + (i.outputGrams ?? i.netGrams ?? i.grossGrams ?? 0),
+    );
+  }
+
+  /// Карточка может участвовать в подстройке отхода: есть ингредиенты с суммой > 0 и (нет выхода / выход не совпадает с суммой).
+  /// Работает при любом формате импорта и любом количестве карточек.
+  bool _canBenefitFromAdjustWaste(_ReviewItem item) {
+    final sum = _ingredientsOutputSum(item.result);
+    if (sum <= 0) return false;
+    final yield = item.result.yieldGrams;
+    if (yield == null || yield <= 0) return true; // формат без поля «Выход» — подстраиваем под сумму
+    return (sum - yield).abs() > 1; // выход задан, но не совпадает
+  }
+
   /// Показывать подсказку «подстроить % отхода», если в карточке задан выход и он не совпадает с суммой выходов ингредиентов.
   bool _shouldShowAdjustWasteHint(_ReviewItem item) {
     final yield = item.result.yieldGrams;
     if (yield == null || yield <= 0) return false;
-    final sum = item.result.ingredients.fold<double>(
-      0, (s, i) => s + (i.outputGrams ?? i.netGrams ?? i.grossGrams ?? 0),
-    );
+    final sum = _ingredientsOutputSum(item.result);
     return sum > 0 && (sum - yield).abs() > 1;
   }
 
@@ -390,6 +405,43 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
     final template = loc.t('tech_cards_import_adjust_waste_hint') ??
         'Выход в карточке %s г, сумма ингредиентов %s г. В редакторе можно подстроить % отхода под целевой выход.';
     return template.replaceFirst('%s', yield.toStringAsFixed(0)).replaceFirst('%s', sum.toStringAsFixed(0));
+  }
+
+  /// Подстроить % отхода под целевой выход для всех карточек (в любом формате, любое количество).
+  /// Если в карточке нет поля «Выход» — целевым выходом считается сумма ингредиентов, затем в карточку записывается yieldGrams.
+  void _adjustWasteForAllCards() {
+    var changed = false;
+    final newItems = <_ReviewItem>[];
+    for (final item in _items) {
+      if (!_canBenefitFromAdjustWaste(item)) {
+        newItems.add(item);
+        continue;
+      }
+      final sum = _ingredientsOutputSum(item.result);
+      final target = item.result.yieldGrams != null && item.result.yieldGrams! > 0
+          ? item.result.yieldGrams!
+          : sum;
+      if (target <= 0) {
+        newItems.add(item);
+        continue;
+      }
+      final adjusted = item.result.adjustWasteToMatchOutput(target);
+      if (adjusted != null) {
+        final hadNoYield = item.result.yieldGrams == null || item.result.yieldGrams! <= 0;
+        final resultWithYield = hadNoYield ? adjusted.copyWith(yieldGrams: target) : adjusted;
+        newItems.add(_ReviewItem(
+          result: resultWithYield,
+          originalDishName: item.originalDishName,
+          category: item.category,
+          sections: item.sections,
+          isSemiFinished: item.isSemiFinished,
+        ));
+        changed = true;
+      } else {
+        newItems.add(item);
+      }
+    }
+    if (changed) setState(() => _items = newItems);
   }
 
   static String _norm(String s) =>
@@ -647,6 +699,9 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
         setState(() => _saving = false);
         if (failed.isEmpty) {
           var msg = loc.t('tech_cards_import_created').replaceAll('%s', '$created');
+          if (AiServiceSupabase.lastLearningSuccess != null) {
+            msg += ' ${AiServiceSupabase.lastLearningSuccess!}';
+          }
           if (AiServiceSupabase.lastLearningError != null) {
             msg += ' ${loc.t('ttk_learn_error_hint') ?? '(Обучение не сохранилось)'}';
             final err = AiServiceSupabase.lastLearningError!;
@@ -659,7 +714,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(msg),
-              duration: AiServiceSupabase.lastLearningError != null ? const Duration(seconds: 8) : const Duration(seconds: 4),
+              duration: AiServiceSupabase.lastLearningError != null ? const Duration(seconds: 8) : (AiServiceSupabase.lastLearningSuccess != null ? const Duration(seconds: 6) : const Duration(seconds: 4)),
             ),
           );
           context.go('/tech-cards/${widget.department}?refresh=1');
@@ -798,17 +853,31 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                               ),
                             ),
                             TextButton.icon(
-                              onPressed: _saving ? null : () {
+                              onPressed: _saving ? null : () async {
                                 final sig = widget.headerSignature ?? AiServiceSupabase.lastParseHeaderSignature;
                                 final rows = widget.sourceRows ?? AiServiceSupabase.lastParsedRows;
-                                context.push('/tech-cards/new', extra: {
-                                  'result': _items[realIndex].result,
-                                  'category': _items[realIndex].category,
-                                  'sections': _normalizeSections(_items[realIndex].sections),
-                                  'isSemiFinished': _items[realIndex].isSemiFinished,
-                                  if (sig != null && sig.isNotEmpty) 'headerSignature': sig,
-                                  if (rows != null && rows.isNotEmpty) 'sourceRows': rows,
-                                });
+                                final result = await context.push<TechCardRecognitionResult?>(
+                                  '/tech-cards/new',
+                                  extra: {
+                                    'result': _items[realIndex].result,
+                                    'category': _items[realIndex].category,
+                                    'sections': _normalizeSections(_items[realIndex].sections),
+                                    'isSemiFinished': _items[realIndex].isSemiFinished,
+                                    if (sig != null && sig.isNotEmpty) 'headerSignature': sig,
+                                    if (rows != null && rows.isNotEmpty) 'sourceRows': rows,
+                                  },
+                                );
+                                if (result != null && mounted) {
+                                  setState(() {
+                                    _items[realIndex] = _ReviewItem(
+                                      result: result,
+                                      originalDishName: _items[realIndex].originalDishName,
+                                      category: _items[realIndex].category,
+                                      sections: _items[realIndex].sections,
+                                      isSemiFinished: _items[realIndex].isSemiFinished,
+                                    );
+                                  });
+                                }
                               },
                               icon: const Icon(Icons.open_in_new, size: 18),
                               label: Text(loc.t('open')),
@@ -911,6 +980,17 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                         ],
                       ),
                     ),
+                  ],
+                  if (!_saving && _items.any(_canBenefitFromAdjustWaste)) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      child: TextButton.icon(
+                        onPressed: _adjustWasteForAllCards,
+                        icon: const Icon(Icons.tune, size: 20),
+                        label: Text(loc.t('tech_cards_import_adjust_waste_all') ?? 'Подстроить % отхода для всех карточек'),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                   ],
                   SizedBox(
                     width: double.infinity,

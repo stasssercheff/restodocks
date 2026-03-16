@@ -55,14 +55,27 @@ export function isStructuralProductName(s: string, fromPdf: boolean): boolean {
   return false;
 }
 
-/** Индекс первой строки с границей секции (конец таблицы). */
-function findTableEndRow(rows: string[][], fromRow: number): number {
+/** Индекс первой строки с границей секции (конец таблицы). Экспорт для обогащения технологии из выученной колонки. */
+export function findTableEndRow(rows: string[][], fromRow: number): number {
   for (let r = fromRow; r < rows.length && r < fromRow + 200; r++) {
     const row = rows[r] ?? [];
     const text = row.map((c) => (c ?? "").trim()).join(" ").toLowerCase();
     if (SECTION_BOUNDARY_REGEX.test(text)) return r;
   }
   return rows.length;
+}
+
+/** Извлечь текст технологии из [rows], начиная с границы таблицы, беря ячейки из колонки [technologyCol]. Для подстановки из обучения. */
+export function getTechnologyFromRowsUsingColumn(rows: string[][], technologyCol: number, fromRow: number): string {
+  if (technologyCol < 0 || rows.length <= fromRow) return "";
+  const tableEndRow = findTableEndRow(rows, fromRow);
+  const parts: string[] = [];
+  for (let r = tableEndRow; r < rows.length; r++) {
+    const row = rows[r] ?? [];
+    const cell = (row[technologyCol] ?? "").trim();
+    if (cell.length > 15 && !/^допустимые сроки\s|^информация о пищевой/i.test(cell)) parts.push(cell);
+  }
+  return parts.join("\n").trim();
 }
 
 const NAME_KEYS = ["наименование", "название", "блюдо", "пф", "name", "dish"];
@@ -341,8 +354,24 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
     if (isPastTable && rowText.length > 20 && !/^допустимые сроки\s/i.test(rowTextLow)) {
       technologyParts.push(rowText);
     }
+    // Строки технологии иногда в PDF идут до «Выход на 1 порцию» — не терять начало инструкции (Shama.Book: «сахар пробить...», «добавить сыр, ванильный экстракт...»)
+    const justBeforeBoundary = r >= tableEndRow - 5 && r < tableEndRow;
+    if (!isPastTable && justBeforeBoundary && rowText.length > 25 && !/^допустимые сроки\s|^информация о пищевой|^технологический процесс\s/i.test(rowTextLow)) {
+      const gw = parseNum(grossVal);
+      const nw = parseNum(netVal);
+      const hasWeight = (gw != null && gw > 0) || (nw != null && nw > 0);
+      const startsWithVerb =
+        /^(соединить|добавить|взбить|перемешать|положить|нарезать|варить|жарить|тушить|охладить|разогреть|довести|пробить|использовать|переложить|ввести|смешать)/i.test(
+          rowText.trim(),
+        );
+      const startsWithNounThenVerb = /^[а-яё\s]{2,35}(пробить|положить|добавить|взбить|переложить|соединить|перемешать)/i.test(rowText.trim());
+      if (!hasWeight && (startsWithVerb || startsWithNounThenVerb)) technologyParts.push(rowText);
+    }
 
     if (nameVal.toLowerCase() === "итого" || productVal.toLowerCase() === "итого" || productVal.toLowerCase().startsWith("всего")) {
+      // В PDF инструкция может быть на одной строке с «Итого» — сохранить хвост как технологию
+      const afterNums = rowText.replace(/^.*?\bитого\s*[\d,.\s]*/i, "").trim();
+      if (afterNums.length > 30 && /[а-яё]/i.test(afterNums)) technologyParts.push(afterNums);
       let outG = parseNum(outputVal);
       if (outputColIsKg && outG != null && outG > 0 && outG < 100) outG = outG * 1000;
       flushCard(outG);
@@ -638,7 +667,8 @@ export function parseTtkByStoredTemplate(
     const wasteVal = wasteCol >= 0 && wasteCol < cells.length ? cells[wasteCol] : "";
     const outputVal = outputCol >= 0 && outputCol < cells.length ? cells[outputCol] : "";
     const techVal = technologyCol >= 0 && technologyCol < cells.length ? cells[technologyCol] : "";
-    if (techVal.trim().length > 15) technologyParts.push(techVal.trim());
+    const isPastTable = r >= tableEndRow;
+    if (isPastTable && techVal.trim().length > 15) technologyParts.push(techVal.trim());
 
     // По структуре таблицы: в колонках брутто/нетто — числа, не текст (футер, объединённые ячейки)
     const grossValLooksLikeText = grossVal.trim().length > 12 && /[а-яёa-z]{3,}/i.test(grossVal);

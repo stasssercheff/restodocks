@@ -10,6 +10,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../models/models.dart';
+import '../services/ai_service.dart';
 import '../mixins/auto_save_mixin.dart';
 import '../mixins/input_change_listener_mixin.dart';
 import '../services/ai_service_supabase.dart';
@@ -1412,8 +1413,36 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         if (mounted) {
           setState(() => _saving = false);
           await clearDraft();
-          AppToastService.show(loc.t('tech_card_created'));
-          context.go('/tech-cards?refresh=1');
+          final createdMsg = loc.t('tech_card_created');
+          if (AiServiceSupabase.lastLearningSuccess != null) {
+            AppToastService.show('$createdMsg ${AiServiceSupabase.lastLearningSuccess!}');
+          } else {
+            AppToastService.show(createdMsg);
+          }
+          if (widget.initialFromAi != null && widget.initialHeaderSignature != null) {
+            final ingredientsForResult = toSaveIngredients
+                .map((i) => TechCardIngredientLine(
+                      productName: i.productName,
+                      grossGrams: i.grossWeight,
+                      netGrams: i.netWeight,
+                      outputGrams: i.outputWeight,
+                      unit: i.unit,
+                      primaryWastePct: i.primaryWastePct,
+                      cookingLossPct: i.cookingLossPctOverride,
+                      ingredientType: i.sourceTechCardId != null ? 'semi_finished' : 'product',
+                    ))
+                .toList();
+            final result = TechCardRecognitionResult(
+              dishName: name,
+              technologyText: _technologyController.text.trim().isEmpty ? null : _technologyController.text.trim(),
+              ingredients: ingredientsForResult,
+              isSemiFinished: _isSemiFinished,
+              yieldGrams: yieldVal > 0 ? yieldVal : null,
+            );
+            if (mounted) context.pop(result);
+          } else {
+            context.go('/tech-cards?refresh=1');
+          }
         }
       } else {
         var photoUrls = List<String>.from(_photoUrls);
