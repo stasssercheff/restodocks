@@ -1115,6 +1115,27 @@ class AiServiceSupabase implements AiService {
         final product = dr.length > 1 ? dr[1].trim() : '';
         final grossStr = dr.length > 2 ? dr[2].trim() : '';
         final looksLikeIngredient = product.isNotEmpty && (RegExp(r'\d').hasMatch(grossStr) || grossStr.toLowerCase().contains('шт'));
+
+        // Строки, где вместе с ингредиентом в конце лежит длинный текст технологии (как в супы.xlsx):
+        // извлекаем текст технологии независимо от того, считаем ли строку ингредиентом.
+        final rowTextLower = dr.join(' ').toLowerCase();
+        final hasTechnologyWord = rowTextLower.contains('технология');
+        final hasLongTextCell = dr.any((c) {
+          final t = c.trim();
+          return t.length > 40 && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(t) && _parseNum(t) == null;
+        });
+        if ((hasTechnologyWord || technologyText != null) && hasLongTextCell) {
+          final techFromRow = dr.where((c) {
+            final t = c.trim();
+            return t.length > 40 && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(t) && _parseNum(t) == null;
+          }).join(' ').trim();
+          if (techFromRow.isNotEmpty) {
+            technologyText = (technologyText != null && technologyText!.isNotEmpty)
+                ? '$technologyText\n$techFromRow'
+                : techFromRow;
+          }
+        }
+
         if (looksLikeIngredient) {
           // Не сбрасываем technologyText — технология может идти до или после ингредиентов
         } else {
