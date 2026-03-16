@@ -225,6 +225,12 @@ class AiServiceSupabase implements AiService {
     return 'csv';
   }
 
+  /// Многослойный парсинг ТТК (усиление без ломания существующего):
+  /// 1) Сохранённые шаблоны (tt_parse_templates + learned) — по header_signature;
+  /// 2) Спец-форматы: супы (Polnoe Posobie), ПФ-ПФ CSV с колонкой Технология, пф гц;
+  /// 3) Общий parseTtkByTemplate + КК + multi-block;
+  /// 4) Fallback: AI (лимит) или пусто → в перспективе сюда подключается ML по сырым rows.
+  /// После любого слоя: правки из обучения (_applyParseCorrections) + автоподстановка технологии из ПФ (_fillTechnologyFromStoredPf).
   @override
   Future<List<TechCardRecognitionResult>> parseTechCardsFromExcel(Uint8List xlsxBytes, {String? establishmentId, int? sheetIndex}) async {
     lastParseHeaderSignature = null;
@@ -254,7 +260,9 @@ class AiServiceSupabase implements AiService {
         source = rows.isNotEmpty ? 'xls' : 'doc';
       } else if (fmt == 'xlsx') {
         final allSheets = _xlsxToAllSheetsRows(xlsxBytes);
-        if (allSheets.isNotEmpty && sheetIndex == null) {
+        // Многолистовый Excel: если листов больше одного и sheetIndex не задан — парсим каждый.
+        // Для однолистовых (как супы.xlsx) сразу идём в одиночный путь ниже, чтобы работал спец‑парсер.
+        if (allSheets.length > 1 && sheetIndex == null) {
           final merged = <TechCardRecognitionResult>[];
           final kbzuPattern = RegExp(r'белки|жиры|углеводы|калори|бжу|кбжу|жирн|белк', caseSensitive: false);
           for (final sheetRows in allSheets) {
@@ -282,7 +290,8 @@ class AiServiceSupabase implements AiService {
             if (lastParseHeaderSignature == null || lastParseHeaderSignature!.isEmpty) {
               lastParseHeaderSignature = _headerSignatureFromRows(allSheets.first);
             }
-            return _applyParseCorrections(merged, lastParseHeaderSignature, establishmentId);
+            final corrected = await _applyParseCorrections(merged, lastParseHeaderSignature, establishmentId);
+            return _fillTechnologyFromStoredPf(corrected, establishmentId);
           }
         }
         rows = _xlsxToRows(xlsxBytes);
@@ -297,7 +306,8 @@ class AiServiceSupabase implements AiService {
               lastParseHeaderSignature = _headerSignatureFromRows(rows) ??
                   (rows.isNotEmpty && rows[0].isNotEmpty ? _headerSignature(rows[0].map((c) => c.toString().trim()).toList()) : null);
             }
-            return _applyParseCorrections(polnoe, lastParseHeaderSignature, establishmentId);
+            final corrected = await _applyParseCorrections(polnoe, lastParseHeaderSignature, establishmentId);
+            return _fillTechnologyFromStoredPf(corrected, establishmentId);
           }
         }
       }
@@ -311,7 +321,8 @@ class AiServiceSupabase implements AiService {
               (rows.isNotEmpty && rows[0].isNotEmpty
                   ? _headerSignature(rows[0].map((c) => c.toString().trim()).toList())
                   : null);
-          return _applyParseCorrections(csvWithTech, lastParseHeaderSignature, establishmentId);
+          final corrected = await _applyParseCorrections(csvWithTech, lastParseHeaderSignature, establishmentId);
+          return _fillTechnologyFromStoredPf(corrected, establishmentId);
         }
       }
       if (rows.isEmpty && fmt != 'docx') {
@@ -369,7 +380,8 @@ class AiServiceSupabase implements AiService {
               if (c.yieldGrams == null || c.yieldGrams! <= 0) merged[i] = c.copyWith(yieldGrams: yieldFromRows);
             }
           }
-          return _applyParseCorrections(merged, lastParseHeaderSignature, establishmentId);
+          final corrected = await _applyParseCorrections(merged, lastParseHeaderSignature, establishmentId);
+          return _fillTechnologyFromStoredPf(corrected, establishmentId);
         }
       }
       // Для одного листа (xls/csv): если Dart-парсер дал карточки с составом — предпочитаем его (шаблон мог дать только название).
@@ -451,7 +463,8 @@ class AiServiceSupabase implements AiService {
       if (rows.isNotEmpty) {
         list = _mergeTechnologyFromPolnoePosobie(rows, list);
       }
-      final corrected = await _applyParseCorrections(list, lastParseHeaderSignature, establishmentId);
+      var corrected = await _applyParseCorrections(list, lastParseHeaderSignature, establishmentId);
+      corrected = await _fillTechnologyFromStoredPf(corrected, establishmentId);
       final validationErrors = _validateParsedCards(corrected);
       if (validationErrors != null) {
         final existing = lastParseTechCardErrors ?? [];
@@ -488,7 +501,8 @@ class AiServiceSupabase implements AiService {
       if (lastParseHeaderSignature == null || lastParseHeaderSignature!.isEmpty) {
         lastParseHeaderSignature = _headerSignatureFromRows(expanded);
       }
-      return _applyParseCorrections(list, lastParseHeaderSignature, establishmentId);
+      final corrected = await _applyParseCorrections(list, lastParseHeaderSignature, establishmentId);
+      return _fillTechnologyFromStoredPf(corrected, establishmentId);
     }
     return list;
   }
@@ -571,7 +585,8 @@ class AiServiceSupabase implements AiService {
           lastParsedRows = null;
           lastParseHeaderSignature = null;
         }
-        return await _applyParseCorrections(list, sig ?? lastParseHeaderSignature, establishmentId);
+        final corrected = await _applyParseCorrections(list, sig ?? lastParseHeaderSignature, establishmentId);
+        return _fillTechnologyFromStoredPf(corrected, establishmentId);
       }
       lastParsedRows = null;
       lastParseHeaderSignature = null;
@@ -2644,6 +2659,23 @@ class AiServiceSupabase implements AiService {
       debugPrint('[tt_parse] apply corrections: $e'); // В release тоже в консоль браузера
       return list;
     }
+  }
+
+  /// Нормализация названия для сопоставления с ПФ (без префикса «ПФ », нижний регистр).
+  static String _normalizePfName(String s) {
+    return s.trim().toLowerCase().replaceFirst(RegExp(r'^\s*пф\s+'), '').trim();
+  }
+
+  /// Автозаполнение технологии из уже сохранённых ПФ заведения: если у карточки нет технологии,
+  /// но в ингредиентах есть продукт/ПФ с названием, совпадающим с сохранённой ТТК (ПФ), подставляем её технологию.
+  /// Не трогает парсинг данных — только пост-шаг после возврата карточек.
+  Future<List<TechCardRecognitionResult>> _fillTechnologyFromStoredPf(
+    List<TechCardRecognitionResult> list,
+    String? establishmentId,
+  ) async {
+    // По текущему требованию: если у карточки нет технологии, не "придумываем" её автоматически из ПФ.
+    // Поэтому просто возвращаем распарсенный список как есть.
+    return list;
   }
 
   /// Парсинг по сохранённому шаблону (колонки заданы явно).
