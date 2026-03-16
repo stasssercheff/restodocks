@@ -47,6 +47,19 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
   DateTime? _dateSold;
   /// Разрешение к реализации: true = разрешено, false = запрещено, null = не выбрано.
   bool? _approvalToSell;
+  /// Журнал медкнижек: даты.
+  DateTime? _medBookValidUntil;
+  DateTime? _medBookIssuedAt;
+  DateTime? _medBookReturnedAt;
+  /// Медосмотры, дезсредства, генуборки, сита.
+  DateTime? _medExamHireDate;
+  DateTime? _medExamDate;
+  DateTime? _medExamNextDate;
+  DateTime? _medExamExclusionDate;
+  DateTime? _disinfReceiptDate;
+  DateTime? _disinfExpiryDate;
+  DateTime? _genCleanDate;
+  DateTime? _sieveCleaningDate;
 
   /// Гигиенический журнал: список сотрудников заведения и строки таблицы (каждая — один сотрудник).
   List<Employee> _healthEmployees = [];
@@ -752,6 +765,93 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     );
   }
 
+  /// Форма по бланку: Журнал учёта личных медицинских книжек (1:1 с бумагой).
+  Widget _buildMedBookForm(LocalizationService loc) {
+    return Table(
+      columnWidths: const {
+        0: FlexColumnWidth(0.4),
+        1: FlexColumnWidth(1.5),
+        2: FlexColumnWidth(1),
+        3: FlexColumnWidth(0.9),
+        4: FlexColumnWidth(1.2),
+        5: FlexColumnWidth(1.2),
+        6: FlexColumnWidth(1.2),
+      },
+      border: TableBorder.all(color: Theme.of(context).dividerColor),
+      children: [
+        TableRow(
+          children: [
+            _tableHeaderCell('№ п/п'),
+            _tableHeaderCell('Фамилия, имя, отчество'),
+            _tableHeaderCell('Должность'),
+            _tableHeaderCell('Номер медицинской книжки'),
+            _tableHeaderCell('Срок действия медицинской книжки'),
+            _tableHeaderCell('Расписка и дата получения медицинской книжки'),
+            _tableHeaderCell('Расписка и дата возврата медицинской книжки'),
+          ],
+        ),
+        TableRow(
+          children: [
+            _tableCell(const Text('1')),
+            _tableCell(_textField('med_book_employee_name', 'Ф. И. О.')),
+            _tableCell(_textField('med_book_position', 'Должность')),
+            _tableCell(_textField('med_book_number', 'Номер медкнижки')),
+            _tableCell(InkWell(
+              onTap: () async {
+                final d = await showDatePicker(
+                  context: context,
+                  initialDate: _medBookValidUntil ?? DateTime.now().add(const Duration(days: 365)),
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime.now().add(const Duration(days: 3650)),
+                );
+                if (d != null) setState(() => _medBookValidUntil = d);
+              },
+              child: Text(_medBookValidUntil != null ? DateFormat('dd.MM.yyyy').format(_medBookValidUntil!) : 'Выбрать дату'),
+            )),
+            _tableCell(Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                InkWell(
+                  onTap: () async {
+                    final d = await showDatePicker(
+                      context: context,
+                      initialDate: _medBookIssuedAt ?? DateTime.now(),
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime.now(),
+                    );
+                    if (d != null) setState(() => _medBookIssuedAt = d);
+                  },
+                  child: Text(_medBookIssuedAt != null ? DateFormat('dd.MM.yyyy').format(_medBookIssuedAt!) : 'Дата получения'),
+                ),
+                _signatureFromAccount(),
+              ],
+            )),
+            _tableCell(Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                InkWell(
+                  onTap: () async {
+                    final d = await showDatePicker(
+                      context: context,
+                      initialDate: _medBookReturnedAt ?? DateTime.now(),
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime.now(),
+                    );
+                    if (d != null) setState(() => _medBookReturnedAt = d);
+                  },
+                  child: Text(_medBookReturnedAt != null ? DateFormat('dd.MM.yyyy').format(_medBookReturnedAt!) : 'Дата возврата'),
+                ),
+                _signatureFromAccount(),
+              ],
+            )),
+          ],
+        ),
+      ],
+    );
+  }
+
   /// Форма по макету Приложения 8: Учёт фритюрных жиров.
   Widget _buildFryingOilForm(LocalizationService loc) {
     return Table(
@@ -804,6 +904,192 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     );
   }
 
+  Widget _buildMedExaminationsForm(LocalizationService loc) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Данные работника', style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: 4),
+        Table(
+          columnWidths: const {0: FlexColumnWidth(1), 1: FlexColumnWidth(1)},
+          border: TableBorder.all(color: Theme.of(context).dividerColor),
+          children: [
+            TableRow(children: [_tableHeaderCell('Ф. И. О.'), _tableHeaderCell('Возраст (дата рождения)')]),
+            TableRow(children: [_tableCell(_textField('med_exam_employee_name', 'Ф. И. О.')), _tableCell(_textField('med_exam_dob', 'Дата рождения'))]),
+            TableRow(children: [_tableHeaderCell('Пол'), _tableHeaderCell('Должность')]),
+            TableRow(children: [_tableCell(_textField('med_exam_gender', 'Пол')), _tableCell(_textField('med_exam_position', 'Должность'))]),
+            TableRow(children: [_tableHeaderCell('Структурное подразделение'), _tableHeaderCell('Дата приёма на работу')]),
+            TableRow(children: [
+              _tableCell(_textField('med_exam_department', 'Подразделение')),
+              _tableCell(_datePickerCell('med_exam_hire_date', _medExamHireDate, (d) => setState(() => _medExamHireDate = d))),
+            ]),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Text('Медицинский осмотр', style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: 4),
+        Table(
+          columnWidths: const {0: FlexColumnWidth(1), 1: FlexColumnWidth(1)},
+          border: TableBorder.all(color: Theme.of(context).dividerColor),
+          children: [
+            TableRow(children: [_tableHeaderCell('Вид (предварительный/периодический)'), _tableHeaderCell('ЛПУ')]),
+            TableRow(children: [_tableCell(_textField('med_exam_type', 'Вид')), _tableCell(_textField('med_exam_institution', 'Лечебное учреждение'))]),
+            TableRow(children: [_tableHeaderCell('Вредный фактор №90'), _tableHeaderCell('Вредный фактор №83')]),
+            TableRow(children: [_tableCell(_textField('med_exam_harmful_1', '№ по приказу 90')), _tableCell(_textField('med_exam_harmful_2', '№ по приказу 83'))]),
+            TableRow(children: [_tableHeaderCell('Дата прохождения'), _tableHeaderCell('Заключение')]),
+            TableRow(children: [
+              _tableCell(_datePickerCell('med_exam_date', _medExamDate, (d) => setState(() => _medExamDate = d))),
+              _tableCell(_textField('med_exam_conclusion', 'Заключение')),
+            ]),
+            TableRow(children: [_tableHeaderCell('Решение работодателя'), _tableHeaderCell('Дата следующего осмотра')]),
+            TableRow(children: [
+              _tableCell(_textField('med_exam_employer_decision', 'Допущен/отстранён/переведён/уволен')),
+              _tableCell(_datePickerCell('med_exam_next_date', _medExamNextDate, (d) => setState(() => _medExamNextDate = d))),
+            ]),
+            TableRow(children: [_tableHeaderCell('Дата исключения из списков'), _tableHeaderCell('Примечание')]),
+            TableRow(children: [
+              _tableCell(_datePickerCell('med_exam_exclusion_date', _medExamExclusionDate, (d) => setState(() => _medExamExclusionDate = d))),
+              _tableCell(_textField('med_exam_note', 'Примечание')),
+            ]),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _datePickerCell(String key, DateTime? value, void Function(DateTime) onDate) {
+    return InkWell(
+      onTap: () async {
+        final d = await showDatePicker(context: context, initialDate: value ?? DateTime.now(), firstDate: DateTime(2020), lastDate: DateTime.now().add(const Duration(days: 3650)));
+        if (d != null) onDate(d);
+      },
+      child: Padding(padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8), child: Text(value != null ? DateFormat('dd.MM.yyyy').format(value) : 'Выбрать дату')),
+    );
+  }
+
+  Widget _buildDisinfectantAccountingForm(LocalizationService loc) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Расчёт потребности в дезинфицирующих средствах', style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: 4),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Table(
+            columnWidths: const {
+              0: FlexColumnWidth(0.6), 1: FlexColumnWidth(0.8), 2: FlexColumnWidth(0.5), 3: FlexColumnWidth(0.5),
+              4: FlexColumnWidth(0.4), 5: FlexColumnWidth(0.5), 6: FlexColumnWidth(0.6), 7: FlexColumnWidth(0.5),
+              8: FlexColumnWidth(0.5), 9: FlexColumnWidth(0.5), 10: FlexColumnWidth(0.5), 11: FlexColumnWidth(0.5), 12: FlexColumnWidth(0.5),
+            },
+            border: TableBorder.all(color: Theme.of(context).dividerColor),
+            children: [
+              TableRow(children: [
+                _tableHeaderCell('Объект'), _tableHeaderCell('Кол-во'), _tableHeaderCell('Площадь м²'), _tableHeaderCell('Вид Т/Г'),
+                _tableHeaderCell('Кратность/мес'), _tableHeaderCell('Дезсредство'), _tableHeaderCell('Конц.%'), _tableHeaderCell('Расход/м²'),
+                _tableHeaderCell('Раствор на 1 обр.'), _tableHeaderCell('Потребность 1 обр.'), _tableHeaderCell('В месяц'), _tableHeaderCell('В год'),
+              ]),
+              TableRow(children: [
+                _tableCell(_textField('disinf_object_name', 'Объект')),
+                _tableCell(_textField('disinf_object_count', 'Кол-во', keyboardType: TextInputType.number)),
+                _tableCell(_textField('disinf_area_sqm', 'м²', keyboardType: TextInputType.number)),
+                _tableCell(_textField('disinf_treatment_type', 'Т/Г')),
+                _tableCell(_textField('disinf_frequency', 'Кратность', keyboardType: TextInputType.number)),
+                _tableCell(_textField('disinf_agent_name', 'Дезсредство')),
+                _tableCell(_textField('disinf_concentration_pct', '%')),
+                _tableCell(_textField('disinf_consumption_per_sqm', 'Расход', keyboardType: TextInputType.number)),
+                _tableCell(_textField('disinf_solution_per_treatment', 'л/кг', keyboardType: TextInputType.number)),
+                _tableCell(_textField('disinf_need_per_treatment', 'л/кг', keyboardType: TextInputType.number)),
+                _tableCell(_textField('disinf_need_per_month', 'л/кг', keyboardType: TextInputType.number)),
+                _tableCell(_textField('disinf_need_per_year', 'л/кг', keyboardType: TextInputType.number)),
+              ]),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text('Поступление дезинфицирующих средств', style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: 4),
+        Table(
+          columnWidths: const {0: FlexColumnWidth(0.5), 1: FlexColumnWidth(1), 2: FlexColumnWidth(0.8), 3: FlexColumnWidth(0.6), 4: FlexColumnWidth(0.6), 5: FlexColumnWidth(1)},
+          border: TableBorder.all(color: Theme.of(context).dividerColor),
+          children: [
+            TableRow(children: [_tableHeaderCell('Дата'), _tableHeaderCell('Наименование'), _tableHeaderCell('Счёт, дата'), _tableHeaderCell('Кол-во'), _tableHeaderCell('Срок годности'), _tableHeaderCell('Ответственный')]),
+            TableRow(children: [
+              _tableCell(_datePickerCell('disinf_receipt_date', _disinfReceiptDate, (d) => setState(() => _disinfReceiptDate = d))),
+              _tableCell(_textField('disinf_agent_name_receipt', 'Наименование')),
+              _tableCell(_textField('disinf_invoice_number', '№ счёта')),
+              _tableCell(_textField('disinf_quantity', 'Кол-во', keyboardType: TextInputType.number)),
+              _tableCell(_datePickerCell('disinf_expiry_date', _disinfExpiryDate, (d) => setState(() => _disinfExpiryDate = d))),
+              _tableCell(_signatureFromAccount()),
+            ]),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEquipmentWashingForm(LocalizationService loc) {
+    return Table(
+      columnWidths: const {
+        0: FlexColumnWidth(0.6), 1: FlexColumnWidth(0.5), 2: FlexColumnWidth(1), 3: FlexColumnWidth(0.9), 4: FlexColumnWidth(0.5),
+        5: FlexColumnWidth(0.9), 6: FlexColumnWidth(0.5), 7: FlexColumnWidth(0.5), 8: FlexColumnWidth(0.8), 9: FlexColumnWidth(0.8),
+      },
+      border: TableBorder.all(color: Theme.of(context).dividerColor),
+      children: [
+        TableRow(children: [
+          _tableHeaderCell('Дата'), _tableHeaderCell('Время мойки'), _tableHeaderCell('Оборудование'), _tableHeaderCell('Моющий раствор'),
+          _tableHeaderCell('Конц.%'), _tableHeaderCell('Дез. раствор'), _tableHeaderCell('Конц.%'), _tableHeaderCell('Ополаскивание t°'),
+          _tableHeaderCell('Ф.И.О. мойщика'), _tableHeaderCell('Контроль'),
+        ]),
+        TableRow(children: [
+          _tableCell(Text(DateFormat('dd.MM.yyyy').format(DateTime.now()))),
+          _tableCell(_textField('wash_time', 'Время')),
+          _tableCell(_textField('wash_equipment_name', 'Оборудование')),
+          _tableCell(_textField('wash_solution_name', 'Моющее')),
+          _tableCell(_textField('wash_solution_concentration_pct', '%')),
+          _tableCell(_textField('wash_disinfectant_name', 'Дез. раствор')),
+          _tableCell(_textField('wash_disinfectant_concentration_pct', '%')),
+          _tableCell(_textField('wash_rinsing_temp', 't°')),
+          _tableCell(_signatureFromAccount()),
+          _tableCell(_textField('wash_controller_signature', 'Контролёр')),
+        ]),
+      ],
+    );
+  }
+
+  Widget _buildGeneralCleaningForm(LocalizationService loc) {
+    return Table(
+      columnWidths: const {0: FlexColumnWidth(0.5), 1: FlexColumnWidth(1.5), 2: FlexColumnWidth(1), 3: FlexColumnWidth(1)},
+      border: TableBorder.all(color: Theme.of(context).dividerColor),
+      children: [
+        TableRow(children: [_tableHeaderCell('№'), _tableHeaderCell('Помещение / зона'), _tableHeaderCell('Дата проведения'), _tableHeaderCell('Ответственный')]),
+        TableRow(children: [
+          _tableCell(const Text('1')),
+          _tableCell(_textField('gen_clean_premises', 'Помещение')),
+          _tableCell(_datePickerCell('gen_clean_date', _genCleanDate, (d) => setState(() => _genCleanDate = d))),
+          _tableCell(_signatureFromAccount()),
+        ]),
+      ],
+    );
+  }
+
+  Widget _buildSieveFilterMagnetForm(LocalizationService loc) {
+    return Table(
+      columnWidths: const {0: FlexColumnWidth(0.5), 1: FlexColumnWidth(1.2), 2: FlexColumnWidth(0.8), 3: FlexColumnWidth(0.8), 4: FlexColumnWidth(0.8), 5: FlexColumnWidth(0.8)},
+      border: TableBorder.all(color: Theme.of(context).dividerColor),
+      children: [
+        TableRow(children: [_tableHeaderCell('№ сита/магнита'), _tableHeaderCell('Наименование / Расположение'), _tableHeaderCell('Состояние'), _tableHeaderCell('Дата очистки'), _tableHeaderCell('ФИО, Подпись'), _tableHeaderCell('Комментарии')]),
+        TableRow(children: [
+          _tableCell(_textField('sieve_no', '№')),
+          _tableCell(_textField('sieve_name_location', 'Наименование')),
+          _tableCell(_textField('sieve_condition', 'Состояние')),
+          _tableCell(_datePickerCell('sieve_cleaning_date', _sieveCleaningDate, (d) => setState(() => _sieveCleaningDate = d))),
+          _tableCell(_signatureFromAccount()),
+          _tableCell(_textField('sieve_comments', 'Комментарии')),
+        ]),
+      ],
+    );
+  }
+
   Widget _buildFormByType(LocalizationService loc) {
     switch (_logType) {
       case HaccpLogType.healthHygiene:
@@ -818,6 +1104,18 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         return _buildIncomingRawBrakerageForm(loc);
       case HaccpLogType.fryingOil:
         return _buildFryingOilForm(loc);
+      case HaccpLogType.medBookRegistry:
+        return _buildMedBookForm(loc);
+      case HaccpLogType.medExaminations:
+        return _buildMedExaminationsForm(loc);
+      case HaccpLogType.disinfectantAccounting:
+        return _buildDisinfectantAccountingForm(loc);
+      case HaccpLogType.equipmentWashing:
+        return _buildEquipmentWashingForm(loc);
+      case HaccpLogType.generalCleaningSchedule:
+        return _buildGeneralCleaningForm(loc);
+      case HaccpLogType.sieveFilterMagnet:
+        return _buildSieveFilterMagnetForm(loc);
       default:
         return const SizedBox.shrink();
     }
@@ -935,6 +1233,12 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         : null;
     final isFryingOil = _logType == HaccpLogType.fryingOil;
     final isFinishedBrakerage = _logType == HaccpLogType.finishedProductBrakerage;
+    final isMedBook = _logType == HaccpLogType.medBookRegistry;
+    final isMedExam = _logType == HaccpLogType.medExaminations;
+    final isDisinf = _logType == HaccpLogType.disinfectantAccounting;
+    final isWash = _logType == HaccpLogType.equipmentWashing;
+    final isGenClean = _logType == HaccpLogType.generalCleaningSchedule;
+    final isSieve = _logType == HaccpLogType.sieveFilterMagnet;
     await svc.insertQuality(
       establishmentId: estId,
       createdByEmployeeId: empId,
@@ -960,8 +1264,69 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       organolepticEnd: isFryingOil && _getText('organoleptic_end').isNotEmpty ? _getText('organoleptic_end') : null,
       carryOverKg: isFryingOil ? _getNum('carry_over_kg') : null,
       utilizedKg: isFryingOil ? _getNum('utilized_kg') : null,
+      medBookEmployeeName: isMedBook && _getText('med_book_employee_name').isNotEmpty ? _getText('med_book_employee_name') : null,
+      medBookPosition: isMedBook && _getText('med_book_position').isNotEmpty ? _getText('med_book_position') : null,
+      medBookNumber: isMedBook && _getText('med_book_number').isNotEmpty ? _getText('med_book_number') : null,
+      medBookValidUntil: isMedBook ? _medBookValidUntil : null,
+      medBookIssuedAt: isMedBook ? _medBookIssuedAt : null,
+      medBookReturnedAt: isMedBook ? _medBookReturnedAt : null,
+      medExamEmployeeName: isMedExam && _getText('med_exam_employee_name').isNotEmpty ? _getText('med_exam_employee_name') : null,
+      medExamDob: isMedExam && _getText('med_exam_dob').isNotEmpty ? _getText('med_exam_dob') : null,
+      medExamGender: isMedExam && _getText('med_exam_gender').isNotEmpty ? _getText('med_exam_gender') : null,
+      medExamPosition: isMedExam && _getText('med_exam_position').isNotEmpty ? _getText('med_exam_position') : null,
+      medExamDepartment: isMedExam && _getText('med_exam_department').isNotEmpty ? _getText('med_exam_department') : null,
+      medExamHireDate: isMedExam ? _medExamHireDate : null,
+      medExamType: isMedExam && _getText('med_exam_type').isNotEmpty ? _getText('med_exam_type') : null,
+      medExamInstitution: isMedExam && _getText('med_exam_institution').isNotEmpty ? _getText('med_exam_institution') : null,
+      medExamHarmful1: isMedExam && _getText('med_exam_harmful_1').isNotEmpty ? _getText('med_exam_harmful_1') : null,
+      medExamHarmful2: isMedExam && _getText('med_exam_harmful_2').isNotEmpty ? _getText('med_exam_harmful_2') : null,
+      medExamDate: isMedExam ? _medExamDate : null,
+      medExamConclusion: isMedExam && _getText('med_exam_conclusion').isNotEmpty ? _getText('med_exam_conclusion') : null,
+      medExamEmployerDecision: isMedExam && _getText('med_exam_employer_decision').isNotEmpty ? _getText('med_exam_employer_decision') : null,
+      medExamNextDate: isMedExam ? _medExamNextDate : null,
+      medExamExclusionDate: isMedExam ? _medExamExclusionDate : null,
+      disinfObjectName: isDisinf && _getText('disinf_object_name').isNotEmpty ? _getText('disinf_object_name') : null,
+      disinfObjectCount: isDisinf ? _getNum('disinf_object_count') : null,
+      disinfAreaSqm: isDisinf ? _getNum('disinf_area_sqm') : null,
+      disinfTreatmentType: isDisinf && _getText('disinf_treatment_type').isNotEmpty ? _getText('disinf_treatment_type') : null,
+      disinfFrequencyPerMonth: isDisinf ? _getInt('disinf_frequency') : null,
+      disinfAgentName: isDisinf && (_getText('disinf_agent_name').isNotEmpty || _getText('disinf_agent_name_receipt').isNotEmpty) ? (_getText('disinf_agent_name').isNotEmpty ? _getText('disinf_agent_name') : _getText('disinf_agent_name_receipt')) : null,
+      disinfConcentrationPct: isDisinf && _getText('disinf_concentration_pct').isNotEmpty ? _getText('disinf_concentration_pct') : null,
+      disinfConsumptionPerSqm: isDisinf ? _getNum('disinf_consumption_per_sqm') : null,
+      disinfSolutionPerTreatment: isDisinf ? _getNum('disinf_solution_per_treatment') : null,
+      disinfNeedPerTreatment: isDisinf ? _getNum('disinf_need_per_treatment') : null,
+      disinfNeedPerMonth: isDisinf ? _getNum('disinf_need_per_month') : null,
+      disinfNeedPerYear: isDisinf ? _getNum('disinf_need_per_year') : null,
+      disinfReceiptDate: isDisinf ? _disinfReceiptDate : null,
+      disinfInvoiceNumber: isDisinf && _getText('disinf_invoice_number').isNotEmpty ? _getText('disinf_invoice_number') : null,
+      disinfQuantity: isDisinf ? _getNum('disinf_quantity') : null,
+      disinfExpiryDate: isDisinf ? _disinfExpiryDate : null,
+      disinfResponsibleName: isDisinf ? signatureName : null,
+      washTime: isWash && _getText('wash_time').isNotEmpty ? _getText('wash_time') : null,
+      washEquipmentName: isWash && _getText('wash_equipment_name').isNotEmpty ? _getText('wash_equipment_name') : null,
+      washSolutionName: isWash && _getText('wash_solution_name').isNotEmpty ? _getText('wash_solution_name') : null,
+      washSolutionConcentrationPct: isWash && _getText('wash_solution_concentration_pct').isNotEmpty ? _getText('wash_solution_concentration_pct') : null,
+      washDisinfectantName: isWash && _getText('wash_disinfectant_name').isNotEmpty ? _getText('wash_disinfectant_name') : null,
+      washDisinfectantConcentrationPct: isWash && _getText('wash_disinfectant_concentration_pct').isNotEmpty ? _getText('wash_disinfectant_concentration_pct') : null,
+      washRinsingTemp: isWash && _getText('wash_rinsing_temp').isNotEmpty ? _getText('wash_rinsing_temp') : null,
+      washControllerSignature: isWash && _getText('wash_controller_signature').isNotEmpty ? _getText('wash_controller_signature') : null,
+      genCleanPremises: isGenClean && _getText('gen_clean_premises').isNotEmpty ? _getText('gen_clean_premises') : null,
+      genCleanDate: isGenClean ? _genCleanDate : null,
+      genCleanResponsible: isGenClean ? signatureName : null,
+      sieveNo: isSieve && _getText('sieve_no').isNotEmpty ? _getText('sieve_no') : null,
+      sieveNameLocation: isSieve && _getText('sieve_name_location').isNotEmpty ? _getText('sieve_name_location') : null,
+      sieveCondition: isSieve && _getText('sieve_condition').isNotEmpty ? _getText('sieve_condition') : null,
+      sieveCleaningDate: isSieve ? _sieveCleaningDate : null,
+      sieveSignature: isSieve ? signatureName : null,
+      sieveComments: isSieve && _getText('sieve_comments').isNotEmpty ? _getText('sieve_comments') : null,
       note: _getText('note').isNotEmpty ? _getText('note') : null,
     );
+  }
+
+  int? _getInt(String key) {
+    final s = _getText(key);
+    if (s.isEmpty) return null;
+    return int.tryParse(s.replaceAll(',', '.'));
   }
 
   @override

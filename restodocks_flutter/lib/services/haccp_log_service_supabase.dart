@@ -140,6 +140,61 @@ class HaccpLogServiceSupabase {
     String? organolepticEnd,
     double? carryOverKg,
     double? utilizedKg,
+    String? medBookEmployeeName,
+    String? medBookPosition,
+    String? medBookNumber,
+    DateTime? medBookValidUntil,
+    DateTime? medBookIssuedAt,
+    DateTime? medBookReturnedAt,
+    String? medExamEmployeeName,
+    String? medExamDob,
+    String? medExamGender,
+    String? medExamPosition,
+    String? medExamDepartment,
+    DateTime? medExamHireDate,
+    String? medExamType,
+    String? medExamInstitution,
+    String? medExamHarmful1,
+    String? medExamHarmful2,
+    DateTime? medExamDate,
+    String? medExamConclusion,
+    String? medExamEmployerDecision,
+    DateTime? medExamNextDate,
+    DateTime? medExamExclusionDate,
+    String? disinfObjectName,
+    double? disinfObjectCount,
+    double? disinfAreaSqm,
+    String? disinfTreatmentType,
+    int? disinfFrequencyPerMonth,
+    String? disinfAgentName,
+    String? disinfConcentrationPct,
+    double? disinfConsumptionPerSqm,
+    double? disinfSolutionPerTreatment,
+    double? disinfNeedPerTreatment,
+    double? disinfNeedPerMonth,
+    double? disinfNeedPerYear,
+    DateTime? disinfReceiptDate,
+    String? disinfInvoiceNumber,
+    double? disinfQuantity,
+    DateTime? disinfExpiryDate,
+    String? disinfResponsibleName,
+    String? washTime,
+    String? washEquipmentName,
+    String? washSolutionName,
+    String? washSolutionConcentrationPct,
+    String? washDisinfectantName,
+    String? washDisinfectantConcentrationPct,
+    String? washRinsingTemp,
+    String? washControllerSignature,
+    String? genCleanPremises,
+    DateTime? genCleanDate,
+    String? genCleanResponsible,
+    String? sieveNo,
+    String? sieveNameLocation,
+    String? sieveCondition,
+    DateTime? sieveCleaningDate,
+    String? sieveSignature,
+    String? sieveComments,
     String? note,
   }) async {
     final map = <String, dynamic>{
@@ -175,6 +230,61 @@ class HaccpLogServiceSupabase {
     if (organolepticEnd != null) map['organoleptic_end'] = organolepticEnd;
     if (carryOverKg != null) map['carry_over_kg'] = carryOverKg;
     if (utilizedKg != null) map['utilized_kg'] = utilizedKg;
+    if (medBookEmployeeName != null) map['med_book_employee_name'] = medBookEmployeeName;
+    if (medBookPosition != null) map['med_book_position'] = medBookPosition;
+    if (medBookNumber != null) map['med_book_number'] = medBookNumber;
+    if (medBookValidUntil != null) map['med_book_valid_until'] = medBookValidUntil.toIso8601String().split('T').first;
+    if (medBookIssuedAt != null) map['med_book_issued_at'] = medBookIssuedAt.toIso8601String().split('T').first;
+    if (medBookReturnedAt != null) map['med_book_returned_at'] = medBookReturnedAt.toIso8601String().split('T').first;
+    if (medExamEmployeeName != null) map['med_exam_employee_name'] = medExamEmployeeName;
+    if (medExamDob != null) map['med_exam_dob'] = medExamDob;
+    if (medExamGender != null) map['med_exam_gender'] = medExamGender;
+    if (medExamPosition != null) map['med_exam_position'] = medExamPosition;
+    if (medExamDepartment != null) map['med_exam_department'] = medExamDepartment;
+    if (medExamHireDate != null) map['med_exam_hire_date'] = medExamHireDate.toIso8601String().split('T').first;
+    if (medExamType != null) map['med_exam_type'] = medExamType;
+    if (medExamInstitution != null) map['med_exam_institution'] = medExamInstitution;
+    if (medExamHarmful1 != null) map['med_exam_harmful_1'] = medExamHarmful1;
+    if (medExamHarmful2 != null) map['med_exam_harmful_2'] = medExamHarmful2;
+    if (medExamDate != null) map['med_exam_date'] = medExamDate.toIso8601String().split('T').first;
+    if (medExamConclusion != null) map['med_exam_conclusion'] = medExamConclusion;
+    if (medExamEmployerDecision != null) map['med_exam_employer_decision'] = medExamEmployerDecision;
+    if (medExamNextDate != null) map['med_exam_next_date'] = medExamNextDate.toIso8601String().split('T').first;
+    if (medExamExclusionDate != null) map['med_exam_exclusion_date'] = medExamExclusionDate.toIso8601String().split('T').first;
+    if (disinfObjectName != null) map['disinf_object_name'] = disinfObjectName;
+    if (disinfObjectCount != null) map['disinf_object_count'] = disinfObjectCount;
+    if (disinfAreaSqm != null) map['disinf_area_sqm'] = disinfAreaSqm;
+    if (disinfTreatmentType != null) map['disinf_treatment_type'] = disinfTreatmentType;
+    if (disinfFrequencyPerMonth != null) map['disinf_frequency_per_month'] = disinfFrequencyPerMonth;
+    if (disinfAgentName != null) map['disinf_agent_name'] = disinfAgentName;
+    if (disinfConcentrationPct != null) map['disinf_concentration_pct'] = disinfConcentrationPct;
+    if (disinfConsumptionPerSqm != null) map['disinf_consumption_per_sqm'] = disinfConsumptionPerSqm;
+    if (disinfSolutionPerTreatment != null) map['disinf_solution_per_treatment'] = disinfSolutionPerTreatment;
+    if (disinfNeedPerTreatment != null) map['disinf_need_per_treatment'] = disinfNeedPerTreatment;
+    if (disinfNeedPerMonth != null) map['disinf_need_per_month'] = disinfNeedPerMonth;
+    if (disinfNeedPerYear != null) map['disinf_need_per_year'] = disinfNeedPerYear;
+    if (disinfReceiptDate != null) map['disinf_receipt_date'] = disinfReceiptDate.toIso8601String().split('T').first;
+    if (disinfInvoiceNumber != null) map['disinf_invoice_number'] = disinfInvoiceNumber;
+    if (disinfQuantity != null) map['disinf_quantity'] = disinfQuantity;
+    if (disinfExpiryDate != null) map['disinf_expiry_date'] = disinfExpiryDate.toIso8601String().split('T').first;
+    if (disinfResponsibleName != null) map['disinf_responsible_name'] = disinfResponsibleName;
+    if (washTime != null) map['wash_time'] = washTime;
+    if (washEquipmentName != null) map['wash_equipment_name'] = washEquipmentName;
+    if (washSolutionName != null) map['wash_solution_name'] = washSolutionName;
+    if (washSolutionConcentrationPct != null) map['wash_solution_concentration_pct'] = washSolutionConcentrationPct;
+    if (washDisinfectantName != null) map['wash_disinfectant_name'] = washDisinfectantName;
+    if (washDisinfectantConcentrationPct != null) map['wash_disinfectant_concentration_pct'] = washDisinfectantConcentrationPct;
+    if (washRinsingTemp != null) map['wash_rinsing_temp'] = washRinsingTemp;
+    if (washControllerSignature != null) map['wash_controller_signature'] = washControllerSignature;
+    if (genCleanPremises != null) map['gen_clean_premises'] = genCleanPremises;
+    if (genCleanDate != null) map['gen_clean_date'] = genCleanDate.toIso8601String().split('T').first;
+    if (genCleanResponsible != null) map['gen_clean_responsible'] = genCleanResponsible;
+    if (sieveNo != null) map['sieve_no'] = sieveNo;
+    if (sieveNameLocation != null) map['sieve_name_location'] = sieveNameLocation;
+    if (sieveCondition != null) map['sieve_condition'] = sieveCondition;
+    if (sieveCleaningDate != null) map['sieve_cleaning_date'] = sieveCleaningDate.toIso8601String().split('T').first;
+    if (sieveSignature != null) map['sieve_signature'] = sieveSignature;
+    if (sieveComments != null) map['sieve_comments'] = sieveComments;
     final row = await _supabase.client.from('haccp_quality_logs').insert(map).select().single();
     return HaccpLog.fromQualityJson(Map<String, dynamic>.from(row));
   }

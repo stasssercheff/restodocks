@@ -58,6 +58,12 @@ class HaccpPdfExportService {
       HaccpLogType.finishedProductBrakerage => 'Журнал бракеража готовой пищевой продукции',
       HaccpLogType.incomingRawBrakerage => 'Журнал бракеража скоропортящейся пищевой продукции',
       HaccpLogType.fryingOil => 'Журнал учета использования фритюрных жиров',
+      HaccpLogType.medBookRegistry => 'Журнал учёта личных медицинских книжек',
+      HaccpLogType.medExaminations => 'Журнал учёта прохождения работниками обязательных предварительных и периодических медицинских осмотров',
+      HaccpLogType.disinfectantAccounting => 'Журнал учёта получения, расхода дезинфицирующих средств и проведения дезинфекционных работ на объекте',
+      HaccpLogType.equipmentWashing => 'Журнал мойки и дезинфекции оборудования',
+      HaccpLogType.generalCleaningSchedule => 'Журнал-график проведения генеральных уборок',
+      HaccpLogType.sieveFilterMagnet => 'Журнал результатов проверки и очистки сит (фильтров) и магнитоуловителей',
       _ => logType.displayNameRu,
     };
   }
@@ -71,6 +77,12 @@ class HaccpPdfExportService {
       HaccpLogType.finishedProductBrakerage => 'Приложение № 4 к СанПиН 2.3/2.4.3590-20',
       HaccpLogType.incomingRawBrakerage => 'Приложение № 5 к СанПиН 2.3/2.4.3590-20',
       HaccpLogType.fryingOil => 'Приложение № 8 к СанПиН 2.3/2.4.3590-20',
+      HaccpLogType.medBookRegistry => 'Рекомендуемая форма учёта',
+      HaccpLogType.medExaminations => 'Рекомендуемая форма учёта',
+      HaccpLogType.disinfectantAccounting => 'Рекомендуемая форма учёта',
+      HaccpLogType.equipmentWashing => 'Рекомендуемая форма учёта',
+      HaccpLogType.generalCleaningSchedule => 'Приложение № 10 к СанПиН 2.3/2.4.3590-20',
+      HaccpLogType.sieveFilterMagnet => 'Рекомендуемая форма учёта',
       _ => 'СанПиН 2.3/2.4.3590-20',
     };
   }
@@ -596,6 +608,112 @@ class HaccpPdfExportService {
     return pw.Table(border: _tableBorder, columnWidths: colWidths, children: dataRows);
   }
 
+  /// Журнал учёта личных медицинских книжек: 7 колонок по бланку.
+  static pw.Widget _buildMedBookPage({
+    required List<HaccpLog> logs,
+    required Map<String, String> employeeIdToName,
+    required DateFormat dateFmt,
+  }) {
+    final colWidths = <int, pw.TableColumnWidth>{
+      0: const pw.FlexColumnWidth(0.4),
+      1: const pw.FlexColumnWidth(1.2),
+      2: const pw.FlexColumnWidth(0.9),
+      3: const pw.FlexColumnWidth(0.8),
+      4: const pw.FlexColumnWidth(0.9),
+      5: const pw.FlexColumnWidth(1),
+      6: const pw.FlexColumnWidth(1),
+    };
+    final headerRow = pw.TableRow(
+      decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+      children: [
+        _headerCellSmall('№ п/п'),
+        _headerCellSmall('Фамилия, имя, отчество'),
+        _headerCellSmall('Должность'),
+        _headerCellSmall('Номер медицинской книжки'),
+        _headerCellSmall('Срок действия медицинской книжки'),
+        _headerCellSmall('Расписка и дата получения медицинской книжки'),
+        _headerCellSmall('Расписка и дата возврата медицинской книжки'),
+      ],
+    );
+    final dataRows = <pw.TableRow>[headerRow];
+    final rowCount = logs.isEmpty ? 20 : logs.length;
+    for (var i = 0; i < rowCount; i++) {
+      final log = i < logs.length ? logs[i] : null;
+      final sign = log != null ? (employeeIdToName[log.createdByEmployeeId] ?? '') : '';
+      final issued = log?.medBookIssuedAt != null ? dateFmt.format(log!.medBookIssuedAt!) : '';
+      final returned = log?.medBookReturnedAt != null ? dateFmt.format(log!.medBookReturnedAt!) : '';
+      dataRows.add(
+        pw.TableRow(
+          children: [
+            _tableCell('${i + 1}'),
+            _tableCell(log?.medBookEmployeeName ?? ''),
+            _tableCell(log?.medBookPosition ?? ''),
+            _tableCell(log?.medBookNumber ?? ''),
+            _tableCell(log?.medBookValidUntil != null ? dateFmt.format(log!.medBookValidUntil!) : ''),
+            _tableCell(issued.isEmpty ? '' : '$issued\n$sign'),
+            _tableCell(returned.isEmpty ? '' : '$returned\n$sign'),
+          ],
+        ),
+      );
+    }
+    return pw.Table(border: _tableBorder, columnWidths: colWidths, children: dataRows);
+  }
+
+  static pw.Widget _buildMedExaminationsPdfPage(List<HaccpLog> logs, Map<String, String> employeeIdToName, DateFormat dateFmt) {
+    final colWidths = <int, pw.TableColumnWidth>{0: const pw.FlexColumnWidth(0.3), 1: const pw.FlexColumnWidth(1), 2: const pw.FlexColumnWidth(0.7), 3: const pw.FlexColumnWidth(0.6), 4: const pw.FlexColumnWidth(0.8), 5: const pw.FlexColumnWidth(0.7), 6: const pw.FlexColumnWidth(0.7)};
+    final headerRow = pw.TableRow(decoration: const pw.BoxDecoration(color: PdfColors.grey300), children: ['№', 'Ф. И. О.', 'Должность', 'Дата осмотра', 'Заключение', 'Решение', 'Подпись'].map((h) => _headerCellSmall(h)).toList());
+    final dataRows = <pw.TableRow>[headerRow];
+    for (var i = 0; i < (logs.isEmpty ? 20 : logs.length); i++) {
+      final log = i < logs.length ? logs[i] : null;
+      dataRows.add(pw.TableRow(children: ['${i + 1}', log?.medExamEmployeeName ?? '', log?.medExamPosition ?? '', log?.medExamDate != null ? dateFmt.format(log!.medExamDate!) : '', log?.medExamConclusion ?? '', log?.medExamEmployerDecision ?? '', log != null ? (employeeIdToName[log.createdByEmployeeId] ?? '') : ''].map((c) => _tableCell(c)).toList()));
+    }
+    return pw.Table(border: _tableBorder, columnWidths: colWidths, children: dataRows);
+  }
+
+  static pw.Widget _buildDisinfectantPdfPage(List<HaccpLog> logs, Map<String, String> employeeIdToName, DateFormat dateFmt) {
+    final colWidths = <int, pw.TableColumnWidth>{0: const pw.FlexColumnWidth(0.6), 1: const pw.FlexColumnWidth(1.2), 2: const pw.FlexColumnWidth(0.5), 3: const pw.FlexColumnWidth(0.6), 4: const pw.FlexColumnWidth(0.8)};
+    final headerRow = pw.TableRow(decoration: const pw.BoxDecoration(color: PdfColors.grey300), children: ['Дата', 'Объект/Дезсредство', 'Кол-во', 'Поступление', 'Ответственный'].map((h) => _headerCellSmall(h)).toList());
+    final dataRows = <pw.TableRow>[headerRow];
+    for (var i = 0; i < (logs.isEmpty ? 20 : logs.length); i++) {
+      final log = i < logs.length ? logs[i] : null;
+      dataRows.add(pw.TableRow(children: [log != null ? dateFmt.format(log.createdAt) : '', log?.disinfObjectName ?? log?.disinfAgentName ?? '', log?.disinfObjectCount?.toString() ?? log?.disinfQuantity?.toString() ?? '', log?.disinfReceiptDate != null ? dateFmt.format(log!.disinfReceiptDate!) : '', log != null ? (log.disinfResponsibleName ?? employeeIdToName[log.createdByEmployeeId] ?? '') : ''].map((c) => _tableCell(c)).toList()));
+    }
+    return pw.Table(border: _tableBorder, columnWidths: colWidths, children: dataRows);
+  }
+
+  static pw.Widget _buildEquipmentWashingPdfPage(List<HaccpLog> logs, Map<String, String> employeeIdToName, DateFormat dateFmt) {
+    final colWidths = <int, pw.TableColumnWidth>{0: const pw.FlexColumnWidth(0.6), 1: const pw.FlexColumnWidth(0.4), 2: const pw.FlexColumnWidth(1), 3: const pw.FlexColumnWidth(0.8), 4: const pw.FlexColumnWidth(0.8), 5: const pw.FlexColumnWidth(0.7)};
+    final headerRow = pw.TableRow(decoration: const pw.BoxDecoration(color: PdfColors.grey300), children: ['Дата', 'Время', 'Оборудование', 'Моющее', 'Дез. раствор', 'Контролёр'].map((h) => _headerCellSmall(h)).toList());
+    final dataRows = <pw.TableRow>[headerRow];
+    for (var i = 0; i < (logs.isEmpty ? 20 : logs.length); i++) {
+      final log = i < logs.length ? logs[i] : null;
+      dataRows.add(pw.TableRow(children: [log != null ? dateFmt.format(log.createdAt) : '', log?.washTime ?? '', log?.washEquipmentName ?? '', log?.washSolutionName ?? '', log?.washDisinfectantName ?? '', log != null ? (log.washControllerSignature ?? employeeIdToName[log.createdByEmployeeId] ?? '') : ''].map((c) => _tableCell(c)).toList()));
+    }
+    return pw.Table(border: _tableBorder, columnWidths: colWidths, children: dataRows);
+  }
+
+  static pw.Widget _buildGeneralCleaningPdfPage(List<HaccpLog> logs, Map<String, String> employeeIdToName, DateFormat dateFmt) {
+    final colWidths = <int, pw.TableColumnWidth>{0: const pw.FlexColumnWidth(0.3), 1: const pw.FlexColumnWidth(1.2), 2: const pw.FlexColumnWidth(0.6), 3: const pw.FlexColumnWidth(0.8)};
+    final headerRow = pw.TableRow(decoration: const pw.BoxDecoration(color: PdfColors.grey300), children: ['№', 'Помещение', 'Дата', 'Ответственный'].map((h) => _headerCellSmall(h)).toList());
+    final dataRows = <pw.TableRow>[headerRow];
+    for (var i = 0; i < (logs.isEmpty ? 20 : logs.length); i++) {
+      final log = i < logs.length ? logs[i] : null;
+      dataRows.add(pw.TableRow(children: ['${i + 1}', log?.genCleanPremises ?? '', log?.genCleanDate != null ? dateFmt.format(log!.genCleanDate!) : '', log != null ? (log.genCleanResponsible ?? employeeIdToName[log.createdByEmployeeId] ?? '') : ''].map((c) => _tableCell(c)).toList()));
+    }
+    return pw.Table(border: _tableBorder, columnWidths: colWidths, children: dataRows);
+  }
+
+  static pw.Widget _buildSieveFilterMagnetPdfPage(List<HaccpLog> logs, Map<String, String> employeeIdToName, DateFormat dateFmt) {
+    final colWidths = <int, pw.TableColumnWidth>{0: const pw.FlexColumnWidth(0.4), 1: const pw.FlexColumnWidth(1), 2: const pw.FlexColumnWidth(0.6), 3: const pw.FlexColumnWidth(0.6), 4: const pw.FlexColumnWidth(0.7), 5: const pw.FlexColumnWidth(0.6)};
+    final headerRow = pw.TableRow(decoration: const pw.BoxDecoration(color: PdfColors.grey300), children: ['№ сита/магнита', 'Наименование', 'Состояние', 'Дата очистки', 'ФИО', 'Комментарии'].map((h) => _headerCellSmall(h)).toList());
+    final dataRows = <pw.TableRow>[headerRow];
+    for (var i = 0; i < (logs.isEmpty ? 20 : logs.length); i++) {
+      final log = i < logs.length ? logs[i] : null;
+      dataRows.add(pw.TableRow(children: [log?.sieveNo ?? '', log?.sieveNameLocation ?? '', log?.sieveCondition ?? '', log?.sieveCleaningDate != null ? dateFmt.format(log!.sieveCleaningDate!) : '', log != null ? (log.sieveSignature ?? employeeIdToName[log.createdByEmployeeId] ?? '') : '', log?.sieveComments ?? ''].map((c) => _tableCell(c)).toList()));
+    }
+    return pw.Table(border: _tableBorder, columnWidths: colWidths, children: dataRows);
+  }
+
   /// Параметры экспорта.
   static Future<Uint8List> buildJournalPdf({
     required String establishmentName,
@@ -865,6 +983,48 @@ class HaccpPdfExportService {
           ),
         ),
       );
+    } else if (logType == HaccpLogType.medBookRegistry) {
+      doc.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: pw.EdgeInsets.fromLTRB(16, 40, 16, 50),
+          build: (ctx) => pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+            children: [
+              pw.Align(
+                alignment: pw.Alignment.centerRight,
+                child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9)),
+              ),
+              pw.SizedBox(height: 4),
+              pw.Center(
+                child: pw.Text('Рекомендуемый образец', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+              ),
+              pw.SizedBox(height: 4),
+              pw.Center(
+                child: pw.Text(title, style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+              ),
+              pw.SizedBox(height: 8),
+              _buildMedBookPage(
+                logs: logs,
+                employeeIdToName: employeeIdToName,
+                dateFmt: dateFmt,
+              ),
+              pw.SizedBox(height: 10),
+              pw.Center(child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
+            ],
+          ),
+        ),
+      );
+    } else if (logType == HaccpLogType.medExaminations) {
+      doc.addPage(pw.Page(pageFormat: PdfPageFormat.a4, margin: pw.EdgeInsets.fromLTRB(16, 40, 16, 50), build: (ctx) => pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [pw.Align(alignment: pw.Alignment.centerRight, child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9))), pw.SizedBox(height: 4), pw.Center(child: pw.Text('Рекомендуемый образец', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold))), pw.SizedBox(height: 4), pw.Center(child: pw.Text(title, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold))), pw.SizedBox(height: 8), _buildMedExaminationsPdfPage(logs, employeeIdToName, dateFmt), pw.SizedBox(height: 10), pw.Center(child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)))])));
+    } else if (logType == HaccpLogType.disinfectantAccounting) {
+      doc.addPage(pw.Page(pageFormat: PdfPageFormat.a4, margin: pw.EdgeInsets.fromLTRB(16, 40, 16, 50), build: (ctx) => pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [pw.Align(alignment: pw.Alignment.centerRight, child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9))), pw.SizedBox(height: 4), pw.Center(child: pw.Text('Рекомендуемый образец', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold))), pw.SizedBox(height: 4), pw.Center(child: pw.Text(title, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold))), pw.SizedBox(height: 8), _buildDisinfectantPdfPage(logs, employeeIdToName, dateFmt), pw.SizedBox(height: 10), pw.Center(child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)))])));
+    } else if (logType == HaccpLogType.equipmentWashing) {
+      doc.addPage(pw.Page(pageFormat: PdfPageFormat.a4, margin: pw.EdgeInsets.fromLTRB(16, 40, 16, 50), build: (ctx) => pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [pw.Align(alignment: pw.Alignment.centerRight, child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9))), pw.SizedBox(height: 4), pw.Center(child: pw.Text('Рекомендуемый образец', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold))), pw.SizedBox(height: 4), pw.Center(child: pw.Text(title, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold))), pw.SizedBox(height: 8), _buildEquipmentWashingPdfPage(logs, employeeIdToName, dateFmt), pw.SizedBox(height: 10), pw.Center(child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)))])));
+    } else if (logType == HaccpLogType.generalCleaningSchedule) {
+      doc.addPage(pw.Page(pageFormat: PdfPageFormat.a4, margin: pw.EdgeInsets.fromLTRB(16, 40, 16, 50), build: (ctx) => pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [pw.Align(alignment: pw.Alignment.centerRight, child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9))), pw.SizedBox(height: 4), pw.Center(child: pw.Text('Рекомендуемый образец', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold))), pw.SizedBox(height: 4), pw.Center(child: pw.Text(title, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold))), pw.SizedBox(height: 8), _buildGeneralCleaningPdfPage(logs, employeeIdToName, dateFmt), pw.SizedBox(height: 10), pw.Center(child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)))])));
+    } else if (logType == HaccpLogType.sieveFilterMagnet) {
+      doc.addPage(pw.Page(pageFormat: PdfPageFormat.a4, margin: pw.EdgeInsets.fromLTRB(16, 40, 16, 50), build: (ctx) => pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [pw.Align(alignment: pw.Alignment.centerRight, child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9))), pw.SizedBox(height: 4), pw.Center(child: pw.Text('Рекомендуемый образец', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold))), pw.SizedBox(height: 4), pw.Center(child: pw.Text(title, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold))), pw.SizedBox(height: 8), _buildSieveFilterMagnetPdfPage(logs, employeeIdToName, dateFmt), pw.SizedBox(height: 10), pw.Center(child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)))])));
     } else {
       final colKeys = logs.isNotEmpty
           ? _collectColumnKeys(logs)

@@ -317,6 +317,45 @@ class HaccpLogDetailScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildMedBookTable(BuildContext context) {
+    final sign = creator != null
+        ? '${creator!.fullName}${creator!.surname != null ? ' ${creator!.surname}' : ''}'
+        : '—';
+    final issued = log.medBookIssuedAt != null ? _dateFmt.format(log.medBookIssuedAt!) : '—';
+    final returned = log.medBookReturnedAt != null ? _dateFmt.format(log.medBookReturnedAt!) : '—';
+    return Table(
+      columnWidths: const {
+        0: FlexColumnWidth(0.4), 1: FlexColumnWidth(1.2), 2: FlexColumnWidth(0.9),
+        3: FlexColumnWidth(0.8), 4: FlexColumnWidth(0.9), 5: FlexColumnWidth(1), 6: FlexColumnWidth(1),
+      },
+      border: TableBorder.all(color: Colors.grey),
+      children: [
+        TableRow(
+          children: [
+            _header('№ п/п'),
+            _header('Фамилия, имя, отчество'),
+            _header('Должность'),
+            _header('Номер медицинской книжки'),
+            _header('Срок действия медицинской книжки'),
+            _header('Расписка и дата получения медицинской книжки'),
+            _header('Расписка и дата возврата медицинской книжки'),
+          ],
+        ),
+        TableRow(
+          children: [
+            _cell('1'),
+            _cell(log.medBookEmployeeName ?? '—'),
+            _cell(log.medBookPosition ?? '—'),
+            _cell(log.medBookNumber ?? '—'),
+            _cell(log.medBookValidUntil != null ? _dateFmt.format(log.medBookValidUntil!) : '—'),
+            _cell('$issued\n$sign'),
+            _cell('$returned\n$sign'),
+          ],
+        ),
+      ],
+    );
+  }
+
   Widget _buildTableForType(BuildContext context, String establishmentName) {
     if (!HaccpLogType.supportedInApp.contains(log.logType)) {
       return const SizedBox.shrink();
@@ -334,9 +373,109 @@ class HaccpLogDetailScreen extends StatelessWidget {
         return _buildIncomingRawBrakerageTable(context);
       case HaccpLogType.fryingOil:
         return _buildFryingOilTable(context);
+      case HaccpLogType.medBookRegistry:
+        return _buildMedBookTable(context);
+      case HaccpLogType.medExaminations:
+        return _buildMedExaminationsTable(context);
+      case HaccpLogType.disinfectantAccounting:
+        return _buildDisinfectantAccountingTable(context);
+      case HaccpLogType.equipmentWashing:
+        return _buildEquipmentWashingTable(context);
+      case HaccpLogType.generalCleaningSchedule:
+        return _buildGeneralCleaningTable(context);
+      case HaccpLogType.sieveFilterMagnet:
+        return _buildSieveFilterMagnetTable(context);
       default:
         return const SizedBox.shrink();
     }
+  }
+
+  Widget _buildMedExaminationsTable(BuildContext context) {
+    return Table(
+      columnWidths: const {0: FlexColumnWidth(0.4), 1: FlexColumnWidth(1), 2: FlexColumnWidth(0.7), 3: FlexColumnWidth(0.6), 4: FlexColumnWidth(0.8), 5: FlexColumnWidth(0.7), 6: FlexColumnWidth(0.7)},
+      border: TableBorder.all(color: Colors.grey),
+      children: [
+        TableRow(children: [_header('№'), _header('Ф. И. О.'), _header('Должность'), _header('Дата осмотра'), _header('Заключение'), _header('Решение'), _header('Подпись')]),
+        TableRow(children: [
+          _cell('1'),
+          _cell(log.medExamEmployeeName ?? '—'),
+          _cell(log.medExamPosition ?? '—'),
+          _cell(log.medExamDate != null ? _dateFmt.format(log.medExamDate!) : '—'),
+          _cell(log.medExamConclusion ?? '—'),
+          _cell(log.medExamEmployerDecision ?? '—'),
+          _cell(creator != null ? '${creator!.fullName}${creator!.surname != null ? ' ${creator!.surname}' : ''}' : '—'),
+        ]),
+      ],
+    );
+  }
+
+  Widget _buildDisinfectantAccountingTable(BuildContext context) {
+    return Table(
+      columnWidths: const {0: FlexColumnWidth(0.6), 1: FlexColumnWidth(1.2), 2: FlexColumnWidth(0.5), 3: FlexColumnWidth(0.6), 4: FlexColumnWidth(0.8)},
+      border: TableBorder.all(color: Colors.grey),
+      children: [
+        TableRow(children: [_header('Дата'), _header('Объект/Дезсредство'), _header('Кол-во'), _header('Поступление'), _header('Ответственный')]),
+        TableRow(children: [
+          _cell(_dateFmt.format(log.createdAt)),
+          _cell(log.disinfObjectName ?? log.disinfAgentName ?? '—'),
+          _cell(log.disinfObjectCount != null ? log.disinfObjectCount.toString() : (log.disinfQuantity != null ? log.disinfQuantity.toString() : '—')),
+          _cell(log.disinfReceiptDate != null ? _dateFmt.format(log.disinfReceiptDate!) : '—'),
+          _cell(log.disinfResponsibleName ?? creator?.fullName ?? '—'),
+        ]),
+      ],
+    );
+  }
+
+  Widget _buildEquipmentWashingTable(BuildContext context) {
+    return Table(
+      columnWidths: const {0: FlexColumnWidth(0.6), 1: FlexColumnWidth(0.4), 2: FlexColumnWidth(1), 3: FlexColumnWidth(0.8), 4: FlexColumnWidth(0.8), 5: FlexColumnWidth(0.7)},
+      border: TableBorder.all(color: Colors.grey),
+      children: [
+        TableRow(children: [_header('Дата'), _header('Время'), _header('Оборудование'), _header('Моющее'), _header('Дез. раствор'), _header('Контролёр')]),
+        TableRow(children: [
+          _cell(_dateFmt.format(log.createdAt)),
+          _cell(log.washTime ?? '—'),
+          _cell(log.washEquipmentName ?? '—'),
+          _cell(log.washSolutionName ?? '—'),
+          _cell(log.washDisinfectantName ?? '—'),
+          _cell(log.washControllerSignature ?? creator?.fullName ?? '—'),
+        ]),
+      ],
+    );
+  }
+
+  Widget _buildGeneralCleaningTable(BuildContext context) {
+    return Table(
+      columnWidths: const {0: FlexColumnWidth(0.3), 1: FlexColumnWidth(1.2), 2: FlexColumnWidth(0.6), 3: FlexColumnWidth(0.8)},
+      border: TableBorder.all(color: Colors.grey),
+      children: [
+        TableRow(children: [_header('№'), _header('Помещение'), _header('Дата'), _header('Ответственный')]),
+        TableRow(children: [
+          _cell('1'),
+          _cell(log.genCleanPremises ?? '—'),
+          _cell(log.genCleanDate != null ? _dateFmt.format(log.genCleanDate!) : '—'),
+          _cell(log.genCleanResponsible ?? creator?.fullName ?? '—'),
+        ]),
+      ],
+    );
+  }
+
+  Widget _buildSieveFilterMagnetTable(BuildContext context) {
+    return Table(
+      columnWidths: const {0: FlexColumnWidth(0.4), 1: FlexColumnWidth(1), 2: FlexColumnWidth(0.6), 3: FlexColumnWidth(0.6), 4: FlexColumnWidth(0.7), 5: FlexColumnWidth(0.6)},
+      border: TableBorder.all(color: Colors.grey),
+      children: [
+        TableRow(children: [_header('№ сита/магнита'), _header('Наименование'), _header('Состояние'), _header('Дата очистки'), _header('ФИО'), _header('Комментарии')]),
+        TableRow(children: [
+          _cell(log.sieveNo ?? '—'),
+          _cell(log.sieveNameLocation ?? '—'),
+          _cell(log.sieveCondition ?? '—'),
+          _cell(log.sieveCleaningDate != null ? _dateFmt.format(log.sieveCleaningDate!) : '—'),
+          _cell(log.sieveSignature ?? creator?.fullName ?? '—'),
+          _cell(log.sieveComments ?? '—'),
+        ]),
+      ],
+    );
   }
 
   @override

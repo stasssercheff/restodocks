@@ -740,9 +740,146 @@ class _JournalTableView extends StatelessWidget {
         return _buildBrakerageIncomingTable(idToEmp, idToName);
       case HaccpLogType.fryingOil:
         return _buildFryingOilTable(idToName);
+      case HaccpLogType.medBookRegistry:
+        return _buildMedBookTable(idToName);
+      case HaccpLogType.medExaminations:
+        return _buildMedExaminationsTable(idToName);
+      case HaccpLogType.disinfectantAccounting:
+        return _buildDisinfectantAccountingTable(idToName);
+      case HaccpLogType.equipmentWashing:
+        return _buildEquipmentWashingTable(idToName);
+      case HaccpLogType.generalCleaningSchedule:
+        return _buildGeneralCleaningTable(idToName);
+      case HaccpLogType.sieveFilterMagnet:
+        return _buildSieveFilterMagnetTable(idToName);
       default:
         return const SizedBox.shrink();
     }
+  }
+
+  Widget _buildMedExaminationsTable(Map<String, String> idToName) {
+    final rows = <TableRow>[
+      TableRow(children: [_header('№'), _header('Ф. И. О.'), _header('Должность'), _header('Дата осмотра'), _header('Заключение'), _header('Решение'), _header('Подпись')]),
+      ...logs.asMap().entries.map((e) {
+        final log = e.value;
+        return TableRow(children: [
+          _wrapTap(_cell('${e.key + 1}'), log),
+          _wrapTap(_cell(log.medExamEmployeeName ?? '—'), log),
+          _wrapTap(_cell(log.medExamPosition ?? '—'), log),
+          _wrapTap(_cell(log.medExamDate != null ? _dateFmt.format(log.medExamDate!) : '—'), log),
+          _wrapTap(_cell(log.medExamConclusion ?? '—'), log),
+          _wrapTap(_cell(log.medExamEmployerDecision ?? '—'), log),
+          _wrapTap(_cell(idToName[log.createdByEmployeeId] ?? '—'), log),
+        ]);
+      }),
+    ];
+    return Table(columnWidths: const {0: FlexColumnWidth(0.3), 1: FlexColumnWidth(1), 2: FlexColumnWidth(0.7), 3: FlexColumnWidth(0.6), 4: FlexColumnWidth(0.8), 5: FlexColumnWidth(0.7), 6: FlexColumnWidth(0.7)}, border: TableBorder.all(color: Colors.grey), children: rows);
+  }
+
+  Widget _buildDisinfectantAccountingTable(Map<String, String> idToName) {
+    final rows = <TableRow>[
+      TableRow(children: [_header('Дата'), _header('Объект/Дезсредство'), _header('Кол-во/Площадь'), _header('Поступление'), _header('Ответственный')]),
+      ...logs.map((log) => TableRow(children: [
+        _wrapTap(_cell(_dateFmt.format(log.createdAt)), log),
+        _wrapTap(_cell(log.disinfObjectName ?? log.disinfAgentName ?? '—'), log),
+        _wrapTap(_cell(log.disinfObjectCount != null ? log.disinfObjectCount.toString() : (log.disinfQuantity != null ? log.disinfQuantity.toString() : '—')), log),
+        _wrapTap(_cell(log.disinfReceiptDate != null ? _dateFmt.format(log.disinfReceiptDate!) : '—'), log),
+        _wrapTap(_cell(log.disinfResponsibleName ?? idToName[log.createdByEmployeeId] ?? '—'), log),
+      ])),
+    ];
+    return Table(columnWidths: const {0: FlexColumnWidth(0.6), 1: FlexColumnWidth(1.2), 2: FlexColumnWidth(0.5), 3: FlexColumnWidth(0.6), 4: FlexColumnWidth(0.8)}, border: TableBorder.all(color: Colors.grey), children: rows);
+  }
+
+  Widget _buildEquipmentWashingTable(Map<String, String> idToName) {
+    final rows = <TableRow>[
+      TableRow(children: [_header('Дата'), _header('Время'), _header('Оборудование'), _header('Моющее'), _header('Дез. раствор'), _header('Контролёр')]),
+      ...logs.map((log) => TableRow(children: [
+        _wrapTap(_cell(_dateFmt.format(log.createdAt)), log),
+        _wrapTap(_cell(log.washTime ?? '—'), log),
+        _wrapTap(_cell(log.washEquipmentName ?? '—'), log),
+        _wrapTap(_cell(log.washSolutionName ?? '—'), log),
+        _wrapTap(_cell(log.washDisinfectantName ?? '—'), log),
+        _wrapTap(_cell(log.washControllerSignature ?? idToName[log.createdByEmployeeId] ?? '—'), log),
+      ])),
+    ];
+    return Table(columnWidths: const {0: FlexColumnWidth(0.6), 1: FlexColumnWidth(0.4), 2: FlexColumnWidth(1), 3: FlexColumnWidth(0.8), 4: FlexColumnWidth(0.8), 5: FlexColumnWidth(0.7)}, border: TableBorder.all(color: Colors.grey), children: rows);
+  }
+
+  Widget _buildGeneralCleaningTable(Map<String, String> idToName) {
+    final rows = <TableRow>[
+      TableRow(children: [_header('№'), _header('Помещение'), _header('Дата'), _header('Ответственный')]),
+      ...logs.asMap().entries.map((e) {
+        final log = e.value;
+        return TableRow(children: [
+          _wrapTap(_cell('${e.key + 1}'), log),
+          _wrapTap(_cell(log.genCleanPremises ?? '—'), log),
+          _wrapTap(_cell(log.genCleanDate != null ? _dateFmt.format(log.genCleanDate!) : '—'), log),
+          _wrapTap(_cell(log.genCleanResponsible ?? idToName[log.createdByEmployeeId] ?? '—'), log),
+        ]);
+      }),
+    ];
+    return Table(columnWidths: const {0: FlexColumnWidth(0.3), 1: FlexColumnWidth(1.2), 2: FlexColumnWidth(0.6), 3: FlexColumnWidth(0.8)}, border: TableBorder.all(color: Colors.grey), children: rows);
+  }
+
+  Widget _buildSieveFilterMagnetTable(Map<String, String> idToName) {
+    final rows = <TableRow>[
+      TableRow(children: [_header('№ сита/магнита'), _header('Наименование / Расположение'), _header('Состояние'), _header('Дата очистки'), _header('ФИО'), _header('Комментарии')]),
+      ...logs.map((log) => TableRow(children: [
+        _wrapTap(_cell(log.sieveNo ?? '—'), log),
+        _wrapTap(_cell(log.sieveNameLocation ?? '—'), log),
+        _wrapTap(_cell(log.sieveCondition ?? '—'), log),
+        _wrapTap(_cell(log.sieveCleaningDate != null ? _dateFmt.format(log.sieveCleaningDate!) : '—'), log),
+        _wrapTap(_cell(log.sieveSignature ?? idToName[log.createdByEmployeeId] ?? '—'), log),
+        _wrapTap(_cell(log.sieveComments ?? '—'), log),
+      ])),
+    ];
+    return Table(columnWidths: const {0: FlexColumnWidth(0.4), 1: FlexColumnWidth(1), 2: FlexColumnWidth(0.6), 3: FlexColumnWidth(0.6), 4: FlexColumnWidth(0.7), 5: FlexColumnWidth(0.6)}, border: TableBorder.all(color: Colors.grey), children: rows);
+  }
+
+  Widget _buildMedBookTable(Map<String, String> idToName) {
+    final rows = <TableRow>[
+      TableRow(
+        children: [
+          _header('№ п/п'),
+          _header('Фамилия, имя, отчество'),
+          _header('Должность'),
+          _header('Номер медицинской книжки'),
+          _header('Срок действия медицинской книжки'),
+          _header('Расписка и дата получения медицинской книжки'),
+          _header('Расписка и дата возврата медицинской книжки'),
+        ],
+      ),
+      ...logs.asMap().entries.map((e) {
+        final log = e.value;
+        final sign = idToName[log.createdByEmployeeId] ?? '—';
+        final issued = log.medBookIssuedAt != null ? _dateFmt.format(log.medBookIssuedAt!) : '—';
+        final returned = log.medBookReturnedAt != null ? _dateFmt.format(log.medBookReturnedAt!) : '—';
+        return TableRow(
+          children: [
+            _wrapTap(_cell('${e.key + 1}'), log),
+            _wrapTap(_cell(log.medBookEmployeeName ?? '—'), log),
+            _wrapTap(_cell(log.medBookPosition ?? '—'), log),
+            _wrapTap(_cell(log.medBookNumber ?? '—'), log),
+            _wrapTap(_cell(log.medBookValidUntil != null ? _dateFmt.format(log.medBookValidUntil!) : '—'), log),
+            _wrapTap(_cell('$issued\n$sign'), log),
+            _wrapTap(_cell('$returned\n$sign'), log),
+          ],
+        );
+      }),
+    ];
+    return Table(
+      columnWidths: const {
+        0: FlexColumnWidth(0.4),
+        1: FlexColumnWidth(1.2),
+        2: FlexColumnWidth(0.9),
+        3: FlexColumnWidth(0.8),
+        4: FlexColumnWidth(0.9),
+        5: FlexColumnWidth(1),
+        6: FlexColumnWidth(1),
+      },
+      border: TableBorder.all(color: Colors.grey),
+      children: rows,
+    );
   }
 
   Widget _buildFryingOilTable(Map<String, String> idToName) {

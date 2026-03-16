@@ -96,6 +96,18 @@ class _HaccpJournalsScreenState extends State<HaccpJournalsScreen> {
         return Icons.fact_check;
       case HaccpLogType.fryingOil:
         return Icons.oil_barrel;
+      case HaccpLogType.medBookRegistry:
+        return Icons.medical_services;
+      case HaccpLogType.medExaminations:
+        return Icons.medical_information;
+      case HaccpLogType.disinfectantAccounting:
+        return Icons.cleaning_services;
+      case HaccpLogType.equipmentWashing:
+        return Icons.water_drop;
+      case HaccpLogType.generalCleaningSchedule:
+        return Icons.cleaning_services;
+      case HaccpLogType.sieveFilterMagnet:
+        return Icons.filter_alt;
       default:
         return Icons.assignment;
     }
