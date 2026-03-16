@@ -489,10 +489,11 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
                             ],
                           ),
                         )
-                      : _JournalPagesView(
+                      : _JournalTableView(
+                          logType: _logType,
+                          establishmentName: est.name,
                           logs: _logs,
                           employees: _employees,
-                          showEmployeeInfo: acc.currentEmployee?.canViewDepartment('management') ?? false,
                           onLogTap: _openLogDetail,
                         ),
                 ),
@@ -542,123 +543,261 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
   }
 }
 
-/// Журнальные страницы: группировка по 1 дню.
-class _JournalPagesView extends StatelessWidget {
-  const _JournalPagesView({
+/// Список записей журнала в виде таблицы по макету СанПиН (Приложения 1–5).
+class _JournalTableView extends StatelessWidget {
+  const _JournalTableView({
+    required this.logType,
+    required this.establishmentName,
     required this.logs,
     required this.employees,
-    required this.showEmployeeInfo,
     required this.onLogTap,
   });
 
+  final HaccpLogType logType;
+  final String establishmentName;
   final List<HaccpLog> logs;
   final List<Employee> employees;
-  final bool showEmployeeInfo;
   final void Function(HaccpLog log) onLogTap;
+
+  static final _dateFmt = DateFormat('dd.MM.yyyy');
+  static final _dateTimeFmt = DateFormat('dd.MM.yyyy HH:mm');
+
+  Widget _header(String text) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade300,
+          border: Border(right: BorderSide(color: Colors.grey.shade400), bottom: BorderSide(color: Colors.grey.shade400)),
+        ),
+        child: Text(text, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600)),
+      );
+
+  Widget _cell(String text) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+        decoration: BoxDecoration(
+          border: Border(right: BorderSide(color: Colors.grey.shade400), bottom: BorderSide(color: Colors.grey.shade400)),
+        ),
+        child: Text(text, style: const TextStyle(fontSize: 11)),
+      );
+
+  Widget _wrapTap(Widget child, HaccpLog log) => Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => onLogTap(log),
+          child: child,
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
     final idToEmp = {for (final e in employees) e.id: e};
-    final byDate = <DateTime, List<HaccpLog>>{};
-    for (final log in logs) {
-      final d = DateTime(log.createdAt.year, log.createdAt.month, log.createdAt.day);
-      byDate.putIfAbsent(d, () => []).add(log);
+    final idToName = {
+      for (final e in employees) e.id: '${e.fullName}${e.surname != null ? ' ${e.surname}' : ''}, ${e.roleDisplayName}',
+    };
+    if (!HaccpLogType.sanpinOnly.contains(logType)) {
+      return const Center(child: Text('Неизвестный тип журнала'));
     }
-    final dates = byDate.keys.toList()..sort((a, b) => b.compareTo(a));
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(12),
-      itemCount: dates.length,
-      itemBuilder: (_, i) {
-        final date = dates[i];
-        final dayLogs = byDate[date]!;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: EdgeInsets.only(top: i > 0 ? 12 : 0, bottom: 4),
-              child: Text(
-                DateFormat('dd.MM.yyyy').format(date),
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-              ),
-            ),
-            ...dayLogs.map((log) => _LogTile(
-                  log: log,
-                  employee: showEmployeeInfo ? idToEmp[log.createdByEmployeeId] : null,
-                  onTap: () => onLogTap(log),
-                )),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _LogTile extends StatelessWidget {
-  const _LogTile({required this.log, this.employee, required this.onTap});
-
-  final HaccpLog log;
-  final Employee? employee;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final timeStr = DateFormat('HH:mm').format(log.createdAt);
-    final summary = log.summaryLine();
-    final empName = employee != null
-        ? '${employee!.fullName}${employee!.surname != null ? ' ${employee!.surname}' : ''}'
-        : null;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              SizedBox(
-                width: 44,
-                child: Text(
-                  timeStr,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        fontFeatures: [const FontFeature.tabularFigures()],
-                      ),
-                ),
-              ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      summary.isNotEmpty ? summary : '—',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (empName != null && empName.isNotEmpty)
-                      Text(
-                        empName,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
-                            ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                  ],
-                ),
-              ),
-              Icon(Icons.chevron_right, size: 20, color: Theme.of(context).colorScheme.onSurfaceVariant),
-            ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+          child: Text(
+            'Рекомендуемый образец',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(color: Theme.of(context).colorScheme.primary),
           ),
         ),
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 80),
+              child: _buildTable(context, idToEmp, idToName),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTable(BuildContext context, Map<String, Employee> idToEmp, Map<String, String> idToName) {
+    switch (logType) {
+      case HaccpLogType.healthHygiene:
+        return _buildHealthHygieneTable(idToEmp);
+      case HaccpLogType.fridgeTemperature:
+        return _buildFridgeTable(idToEmp);
+      case HaccpLogType.warehouseTempHumidity:
+        return _buildWarehouseTable(idToEmp);
+      case HaccpLogType.finishedProductBrakerage:
+        return _buildBrakerageFinishedTable(idToName);
+      case HaccpLogType.incomingRawBrakerage:
+        return _buildBrakerageIncomingTable(idToEmp, idToName);
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
+  Widget _buildHealthHygieneTable(Map<String, Employee> idToEmp) {
+    final rows = <TableRow>[
+      TableRow(
+        children: [
+          _header('№'), _header('Дата'), _header('Ф.И.О.'), _header('Должность'),
+          _header('Подпись (инф.забол.)'), _header('Подпись (ОРВИ/кожа)'), _header('Результат'), _header('Подпись'),
+        ],
       ),
+      ...logs.asMap().entries.map((e) {
+        final i = e.key + 1;
+        final log = e.value;
+        final emp = idToEmp[log.createdByEmployeeId];
+        final name = emp != null ? '${emp.fullName}${emp.surname != null ? ' ${emp.surname}' : ''}' : '—';
+        final pos = emp?.roleDisplayName ?? '—';
+        final r = log.statusOk == true ? 'допущен' : (log.statusOk == false ? 'отстранен' : '—');
+        return TableRow(
+          children: [
+            _wrapTap(_cell('$i'), log),
+            _wrapTap(_cell(_dateFmt.format(log.createdAt)), log),
+            _wrapTap(_cell(name), log),
+            _wrapTap(_cell(pos), log),
+            _wrapTap(_cell(log.statusOk != null ? (log.statusOk! ? 'Да' : 'Нет') : '—'), log),
+            _wrapTap(_cell(log.status2Ok != null ? (log.status2Ok! ? 'Да' : 'Нет') : '—'), log),
+            _wrapTap(_cell(r), log),
+            _wrapTap(_cell(name), log),
+          ],
+        );
+      }),
+    ];
+    return Table(
+      columnWidths: const {
+        0: FlexColumnWidth(0.4), 1: FlexColumnWidth(1), 2: FlexColumnWidth(1.2), 3: FlexColumnWidth(0.9),
+        4: FlexColumnWidth(1.2), 5: FlexColumnWidth(1.2), 6: FlexColumnWidth(0.8), 7: FlexColumnWidth(1),
+      },
+      border: TableBorder.all(color: Colors.grey),
+      children: rows,
+    );
+  }
+
+  Widget _buildFridgeTable(Map<String, Employee> idToEmp) {
+    final rows = <TableRow>[
+      TableRow(
+        children: [
+          _header('Помещение'), _header('Оборудование'), _header('Дата'), _header('Температура °C'),
+        ],
+      ),
+      ...logs.map((log) => TableRow(
+            children: [
+              _wrapTap(_cell(establishmentName), log),
+              _wrapTap(_cell(log.equipment ?? '—'), log),
+              _wrapTap(_cell(_dateTimeFmt.format(log.createdAt)), log),
+              _wrapTap(_cell(log.value1 != null ? log.value1!.toStringAsFixed(1) : '—'), log),
+            ],
+          )),
+    ];
+    return Table(
+      columnWidths: const {
+        0: FlexColumnWidth(1.2), 1: FlexColumnWidth(1.2), 2: FlexColumnWidth(1.2), 3: FlexColumnWidth(0.8),
+      },
+      border: TableBorder.all(color: Colors.grey),
+      children: rows,
+    );
+  }
+
+  Widget _buildWarehouseTable(Map<String, Employee> idToEmp) {
+    final rows = <TableRow>[
+      TableRow(
+        children: [
+          _header('№'), _header('Помещение'), _header('Дата'), _header('Температура °C'), _header('Влажность %'),
+        ],
+      ),
+      ...logs.asMap().entries.map((e) {
+        final log = e.value;
+        final temp = log.value1 != null ? '+${log.value1!.toStringAsFixed(0)}' : '—';
+        final hum = log.value2 != null ? '${log.value2!.toStringAsFixed(0)}%' : '—';
+        return TableRow(
+          children: [
+            _wrapTap(_cell('${e.key + 1}'), log),
+            _wrapTap(_cell(establishmentName), log),
+            _wrapTap(_cell(_dateFmt.format(log.createdAt)), log),
+            _wrapTap(_cell(temp), log),
+            _wrapTap(_cell(hum), log),
+          ],
+        );
+      }),
+    ];
+    return Table(
+      columnWidths: const {
+        0: FlexColumnWidth(0.4), 1: FlexColumnWidth(1.2), 2: FlexColumnWidth(1), 3: FlexColumnWidth(0.7), 4: FlexColumnWidth(0.7),
+      },
+      border: TableBorder.all(color: Colors.grey),
+      children: rows,
+    );
+  }
+
+  Widget _buildBrakerageFinishedTable(Map<String, String> idToName) {
+    final rows = <TableRow>[
+      TableRow(
+        children: [
+          _header('Дата/час'), _header('Время бракеража'), _header('Блюдо'), _header('Органолептика'),
+          _header('Разрешение'), _header('Подписи'), _header('Взвешивание'), _header('Прим.'),
+        ],
+      ),
+      ...logs.map((log) => TableRow(
+            children: [
+              _wrapTap(_cell(_dateTimeFmt.format(log.createdAt)), log),
+              _wrapTap(_cell(log.timeBrakerage ?? '—'), log),
+              _wrapTap(_cell(log.productName ?? '—'), log),
+              _wrapTap(_cell(log.result ?? '—'), log),
+              _wrapTap(_cell(log.approvalToSell ?? '—'), log),
+              _wrapTap(_cell(log.commissionSignatures ?? '—'), log),
+              _wrapTap(_cell(log.weighingResult ?? '—'), log),
+              _wrapTap(_cell(log.note ?? '—'), log),
+            ],
+          )),
+    ];
+    return Table(
+      columnWidths: const {
+        0: FlexColumnWidth(1), 1: FlexColumnWidth(0.6), 2: FlexColumnWidth(1), 3: FlexColumnWidth(1),
+        4: FlexColumnWidth(0.7), 5: FlexColumnWidth(0.7), 6: FlexColumnWidth(0.7), 7: FlexColumnWidth(0.6),
+      },
+      border: TableBorder.all(color: Colors.grey),
+      children: rows,
+    );
+  }
+
+  Widget _buildBrakerageIncomingTable(Map<String, Employee> idToEmp, Map<String, String> idToName) {
+    final rows = <TableRow>[
+      TableRow(
+        children: [
+          _header('Поступление'), _header('Наименование'), _header('Фасовка'), _header('Поставщик'),
+          _header('Кол-во'), _header('№ док.'), _header('Оценка'), _header('Хранение/срок'), _header('Реализация'), _header('Подпись'), _header('Прим.'),
+        ],
+      ),
+      ...logs.map((log) {
+        final dateSold = log.dateSold != null ? _dateFmt.format(log.dateSold!) : '—';
+        final empName = idToName[log.createdByEmployeeId] ?? '—';
+        return TableRow(
+          children: [
+            _wrapTap(_cell(_dateTimeFmt.format(log.createdAt)), log),
+            _wrapTap(_cell(log.productName ?? '—'), log),
+            _wrapTap(_cell(log.packaging ?? '—'), log),
+            _wrapTap(_cell(log.manufacturerSupplier ?? '—'), log),
+            _wrapTap(_cell(log.quantityKg != null ? log.quantityKg!.toStringAsFixed(2) : '—'), log),
+            _wrapTap(_cell(log.documentNumber ?? '—'), log),
+            _wrapTap(_cell(log.result ?? '—'), log),
+            _wrapTap(_cell(log.storageConditions ?? '—'), log),
+            _wrapTap(_cell(dateSold), log),
+            _wrapTap(_cell(empName), log),
+            _wrapTap(_cell(log.note ?? '—'), log),
+          ],
+        );
+      }),
+    ];
+    return Table(
+      columnWidths: const {
+        0: FlexColumnWidth(0.9), 1: FlexColumnWidth(0.9), 2: FlexColumnWidth(0.5), 3: FlexColumnWidth(0.9),
+        4: FlexColumnWidth(0.4), 5: FlexColumnWidth(0.5), 6: FlexColumnWidth(0.8), 7: FlexColumnWidth(0.7),
+        8: FlexColumnWidth(0.7), 9: FlexColumnWidth(0.6), 10: FlexColumnWidth(0.5),
+      },
+      border: TableBorder.all(color: Colors.grey),
+      children: rows,
     );
   }
 }

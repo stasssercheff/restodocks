@@ -51,6 +51,21 @@ class _HaccpJournalsScreenState extends State<HaccpJournalsScreen> {
       appBar: AppBar(
         leading: appBarBackButton(context),
         title: Text(loc.t('haccp_journals') ?? 'Журналы и ХАССП'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(32),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'По форме СанПиН 2.3/2.4.3590-20 (Приложения 1–5)',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+            ),
+          ),
+        ),
       ),
       body: journals.isEmpty
           ? _EmptyState(
@@ -117,7 +132,7 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              loc.t('haccp_no_journals_subtitle') ?? loc.t('haccp_configure_in_settings') ?? 'Собственник и сотрудники управления выбирают журналы в Настройках',
+              loc.t('haccp_no_journals_subtitle') ?? 'Включите нужные журналы в Настройках (раздел «Журналы и ХАССП»). Формы соответствуют СанПиН 2.3/2.4.3590-20.',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
