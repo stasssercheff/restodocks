@@ -14,10 +14,13 @@ class HaccpLogDetailScreen extends StatelessWidget {
     super.key,
     required this.log,
     this.employee,
+    this.creator,
   });
 
   final HaccpLog log;
   final Employee? employee;
+  /// Для гигиенического журнала: кто заполнил запись (подпись медработника).
+  final Employee? creator;
 
   static final _dateFmt = DateFormat('dd.MM.yyyy');
   static final _dateTimeFmt = DateFormat('dd.MM.yyyy HH:mm');
@@ -35,23 +38,28 @@ class HaccpLogDetailScreen extends StatelessWidget {
         child: Text(text, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
       );
 
-  Widget _cell(String text) => Container(
+  Widget _cell(String text, {Color? color}) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         decoration: BoxDecoration(
+          color: color != null ? color.withValues(alpha: 0.15) : null,
           border: Border(
             right: BorderSide(color: Colors.grey.shade400),
             bottom: BorderSide(color: Colors.grey.shade400),
           ),
         ),
-        child: Text(text, style: const TextStyle(fontSize: 12)),
+        child: Text(text, style: TextStyle(fontSize: 12, color: color)),
       );
 
   /// Приложение 1: Гигиенический журнал (сотрудники).
   Widget _buildHealthHygieneTable(BuildContext context) {
+    final parsed = HaccpLog.parseHealthHygieneDescription(log.description);
     final empName = employee != null
         ? '${employee!.fullName}${employee!.surname != null ? ' ${employee!.surname}' : ''}'
         : '—';
-    final position = employee?.roleDisplayName ?? '—';
+    final position = parsed.positionOverride ?? employee?.roleDisplayName ?? '—';
+    final creatorName = creator != null
+        ? '${creator!.fullName}${creator!.surname != null ? ' ${creator!.surname}' : ''}'
+        : '—';
     final sign1 = log.status2Ok == true ? 'Да' : (log.status2Ok == false ? 'Нет' : '—');
     final sign2 = log.statusOk == true ? 'Да' : (log.statusOk == false ? 'Нет' : '—');
     final result = log.statusOk == true ? 'допущен' : (log.statusOk == false ? 'отстранен' : '—');
@@ -72,12 +80,12 @@ class HaccpLogDetailScreen extends StatelessWidget {
           children: [
             _header('№ п/п'),
             _header('Дата'),
-            _header('Ф.И.О. работника'),
+            _header('Ф. И. О. работника (последнее при наличии)'),
             _header('Должность'),
-            _header('Подпись об отсутствии признаков инфекционных заболеваний'),
-            _header('Подпись об отсутствии заболеваний верхних дыхательных путей и кожи'),
-            _header('Результат осмотра (допущен / отстранен)'),
-            _header('Подпись медработника'),
+            _header('Подпись сотрудника об отсутствии признаков инфекционных заболеваний у сотрудника и членов семьи'),
+            _header('Подпись сотрудника об отсутствии заболеваний верхних дыхательных путей и гнойничковых заболеваний кожи рук и открытых поверхностей тела'),
+            _header('Результат осмотра медицинским работником (ответственным лицом) (допущен / отстранен)'),
+            _header('Подпись медицинского работника (ответственного лица)'),
           ],
         ),
         TableRow(
@@ -89,7 +97,7 @@ class HaccpLogDetailScreen extends StatelessWidget {
             _cell(sign2),
             _cell(sign1),
             _cell(result),
-            _cell(empName),
+            _cell(creatorName),
           ],
         ),
       ],
@@ -124,33 +132,54 @@ class HaccpLogDetailScreen extends StatelessWidget {
     );
   }
 
-  /// Приложение 3: Журнал учета температуры и влажности в складских помещениях.
+  /// Приложение 3: 5 обязательных колонок. Наименование помещения — в шапке.
   Widget _buildWarehouseTempHumidityTable(BuildContext context, String establishmentName) {
-    final temp = log.value1 != null ? '+${log.value1!.toStringAsFixed(0)}' : '—';
-    final hum = log.value2 != null ? '${log.value2!.toStringAsFixed(0)}%' : '—';
-    return Table(
-      columnWidths: const {
-        0: FlexColumnWidth(0.5),
-        1: FlexColumnWidth(1.5),
-        2: FlexColumnWidth(1),
-        3: FlexColumnWidth(1),
-      },
-      border: TableBorder.all(color: Colors.grey),
+    final tempVal = log.value1;
+    final humVal = log.value2;
+    final temp = tempVal != null ? tempVal.toStringAsFixed(0) : '—';
+    final hum = humVal != null ? '${humVal.toStringAsFixed(0)}%' : '—';
+    final tempAlert = tempVal != null && tempVal > 25;
+    final humAlert = humVal != null && humVal > 75;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        TableRow(
+        if (log.equipment != null && log.equipment!.trim().isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              'Наименование складского помещения: ${log.equipment}',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+            ),
+          ),
+        Table(
+          columnWidths: const {
+            0: FlexColumnWidth(0.5),
+            1: FlexColumnWidth(1.2),
+            2: FlexColumnWidth(0.8),
+            3: FlexColumnWidth(0.8),
+            4: FlexColumnWidth(1.2),
+          },
+          border: TableBorder.all(color: Colors.grey),
           children: [
-            _header('№ п/п'),
-            _header('Наименование складского помещения'),
-            _header('Температура °C'),
-            _header('Влажность %'),
-          ],
-        ),
-        TableRow(
-          children: [
-            _cell('1'),
-            _cell(establishmentName),
-            _cell(temp),
-            _cell(hum),
+            TableRow(
+              children: [
+                _header('№ п/п'),
+                _header('Дата'),
+                _header('Температура, °C'),
+                _header('Относительная влажность, %'),
+                _header('Подпись ответственного лица'),
+              ],
+            ),
+            TableRow(
+              children: [
+                _cell('1'),
+                _cell(DateFormat('dd.MM.yyyy').format(log.createdAt)),
+                _cell(temp, color: tempAlert ? Colors.red : null),
+                _cell(hum, color: humAlert ? Colors.red : null),
+                _cell(employee?.fullName ?? '—'),
+              ],
+            ),
           ],
         ),
       ],
@@ -256,22 +285,23 @@ class HaccpLogDetailScreen extends StatelessWidget {
   Widget _buildFryingOilTable(BuildContext context) {
     return Table(
       columnWidths: const {
-        0: FlexColumnWidth(1.2), 1: FlexColumnWidth(1), 2: FlexColumnWidth(1.2), 3: FlexColumnWidth(1),
-        4: FlexColumnWidth(1), 5: FlexColumnWidth(0.8), 6: FlexColumnWidth(1.2), 7: FlexColumnWidth(0.7),
-        8: FlexColumnWidth(0.7), 9: FlexColumnWidth(1),
+        0: FlexColumnWidth(0.9), 1: FlexColumnWidth(0.6), 2: FlexColumnWidth(1), 3: FlexColumnWidth(1.2),
+        4: FlexColumnWidth(1), 5: FlexColumnWidth(1), 6: FlexColumnWidth(0.8), 7: FlexColumnWidth(1.2),
+        8: FlexColumnWidth(0.7), 9: FlexColumnWidth(0.7), 10: FlexColumnWidth(1),
       },
       border: TableBorder.all(color: Colors.grey),
       children: [
         TableRow(
           children: [
-            _header('Дата (час) начала'), _header('Вид жира'), _header('Оценка на начало'),
+            _header('Дата'), _header('Время начала'), _header('Вид жира'), _header('Оценка на начало'),
             _header('Оборудование'), _header('Вид продукции'), _header('Время окончания'),
             _header('Оценка по окончании'), _header('Переходящий остаток, кг'), _header('Утилизировано, кг'), _header('Контролёр'),
           ],
         ),
         TableRow(
           children: [
-            _cell(_dateTimeFmt.format(log.createdAt)),
+            _cell(_dateFmt.format(log.createdAt)),
+            _cell(_timeFmt.format(log.createdAt)),
             _cell(log.oilName ?? '—'),
             _cell(log.organolepticStart ?? '—'),
             _cell(log.fryingEquipmentType ?? '—'),

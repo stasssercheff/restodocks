@@ -122,9 +122,9 @@ class HaccpPdfExportService {
         children: [
           _headerCell('№ п/п'),
           _headerCell('Дата'),
-          _headerCell('ФИО сотрудника'),
+          _headerCell('Ф. И. О. работника (последнее при наличии)'),
           _headerCell('Должность'),
-          _headerCell('Подпись сотрудника об отсутствии признаков инфекционных заболеваний у сотрудника и членов его семьи'),
+          _headerCell('Подпись сотрудника об отсутствии признаков инфекционных заболеваний у сотрудника и членов семьи'),
           _headerCell('Подпись сотрудника об отсутствии заболеваний верхних дыхательных путей и гнойничковых заболеваний кожи рук и открытых поверхностей тела'),
           _headerCell('Результат осмотра медицинским работником (ответственным лицом) (допущен / отстранен)'),
           _headerCell('Подпись медицинского работника (ответственного лица)'),
@@ -155,8 +155,18 @@ class HaccpPdfExportService {
     final rowCount = logs.isEmpty ? 25 : logs.length;
     for (var i = 0; i < rowCount; i++) {
       final log = i < logs.length ? logs[i] : null;
-      final full = log != null ? (employeeIdToName[log.createdByEmployeeId] ?? '') : '';
-      final (name, position) = _parseEmp(full);
+      String name = '';
+      String position = '';
+      String creatorFull = '';
+      if (log != null) {
+        final parsed = HaccpLog.parseHealthHygieneDescription(log.description);
+        final subjectId = parsed.subjectEmployeeId ?? log.createdByEmployeeId;
+        final full = employeeIdToName[subjectId] ?? '';
+        final parsedEmp = _parseEmp(full);
+        name = parsedEmp.$1;
+        position = parsed.positionOverride ?? parsedEmp.$2;
+        creatorFull = employeeIdToName[log.createdByEmployeeId] ?? '';
+      }
       headerRows.add(
         pw.TableRow(
           children: [
@@ -167,7 +177,7 @@ class HaccpPdfExportService {
             _tableCell(col5(log)),
             _tableCell(col6(log)),
             _tableCell(col7(log)),
-            _tableCell(full),
+            _tableCell(creatorFull),
           ],
         ),
       );
@@ -333,65 +343,80 @@ class HaccpPdfExportService {
     return pw.Table(border: _tableBorder, columnWidths: colWidths, children: rows);
   }
 
-  /// Журнал температуры и влажности на складе: № п/п, помещение, дни 1–30 (формат «+22 / 45%»).
+  /// Приложение № 3: 5 обязательных колонок. Группировка по наименованию помещения. Шрифт Roboto — кириллица.
   static pw.Widget _buildWarehouseTempHumidityPage({
     required String establishmentName,
     required List<HaccpLog> logs,
-    required DateTime dateFrom,
-    required DateTime dateTo,
+    required Map<String, String> employeeIdToName,
+    required DateFormat dateFmt,
   }) {
-    const dayCount = 30;
-    final byDay = <int, (double?, double?)>{};
-    for (final log in logs) {
-      final day = log.createdAt.day;
-      byDay[day] = (log.value1, log.value2);
-    }
-
-    final colWidths = <int, pw.TableColumnWidth>{
-      0: const pw.FlexColumnWidth(0.4),
-      1: const pw.FlexColumnWidth(1.5),
-      ...List.generate(dayCount, (i) => i + 2).asMap().map((i, _) => MapEntry(i + 2, const pw.FlexColumnWidth(0.4))),
+    const colWidths = <int, pw.TableColumnWidth>{
+      0: pw.FlexColumnWidth(0.4),
+      1: pw.FlexColumnWidth(1.2),
+      2: pw.FlexColumnWidth(0.8),
+      3: pw.FlexColumnWidth(0.9),
+      4: pw.FlexColumnWidth(1.2),
     };
+    final headerRow = pw.TableRow(
+      decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+      children: [
+        _headerCellSmall('№ п/п'),
+        _headerCellSmall('Дата'),
+        _headerCellSmall('Температура, °C'),
+        _headerCellSmall('Относительная влажность, %'),
+        _headerCellSmall('Подпись ответственного лица'),
+      ],
+    );
 
-    String cellStr(int day) {
-      final v = byDay[day];
-      if (v == null) return '';
-      final t = v.$1;
-      final h = v.$2;
-      if (t != null && h != null) return '+${t.toStringAsFixed(0)} / ${h.toStringAsFixed(0)}%';
-      if (t != null) return '+${t.toStringAsFixed(0)}';
-      if (h != null) return '${h.toStringAsFixed(0)}%';
-      return '';
+    final premisesList = logs
+        .map((e) => e.equipment)
+        .whereType<String>()
+        .where((s) => s.trim().isNotEmpty)
+        .toSet()
+        .toList();
+    premisesList.sort();
+    if (premisesList.isEmpty) premisesList.add('—');
+
+    final children = <pw.Widget>[];
+    for (final premises in premisesList) {
+      final premLogs = premises == '—'
+          ? logs.where((l) => l.equipment == null || l.equipment!.trim().isEmpty).toList()
+          : logs.where((l) => l.equipment == premises).toList();
+      premLogs.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      final rows = <pw.TableRow>[headerRow];
+      for (var i = 0; i < premLogs.length; i++) {
+        final log = premLogs[i];
+        final sign = employeeIdToName[log.createdByEmployeeId] ?? '';
+        rows.add(
+          pw.TableRow(
+            children: [
+              _tableCell('${i + 1}'),
+              _tableCell(dateFmt.format(log.createdAt)),
+              _tableCell(log.value1 != null ? log.value1!.toStringAsFixed(0) : ''),
+              _tableCell(log.value2 != null ? '${log.value2!.toStringAsFixed(0)}%' : ''),
+              _tableCell(sign),
+            ],
+          ),
+        );
+      }
+      children.add(
+        pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+          children: [
+            pw.Padding(
+              padding: pw.EdgeInsets.only(bottom: 6),
+              child: pw.Text(
+                'Наименование складского помещения: $premises',
+                style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+              ),
+            ),
+            pw.Table(border: _tableBorder, columnWidths: colWidths, children: rows),
+            pw.SizedBox(height: 16),
+          ],
+        ),
+      );
     }
-
-    final rows = <pw.TableRow>[
-      pw.TableRow(
-        decoration: const pw.BoxDecoration(color: PdfColors.grey300),
-        children: [
-          _headerCellSmall('№ п/п'),
-          _headerCellSmall('Наименование складского помещения'),
-          ...List.generate(dayCount, (d) => _headerCellSmall('${d + 1}')),
-        ],
-      ),
-      pw.TableRow(
-        children: [
-          _tableCell('1'),
-          _tableCell(establishmentName),
-          ...List.generate(dayCount, (d) => _tableCell(cellStr(d + 1))),
-        ],
-      ),
-    ];
-    for (var r = 2; r <= 5; r++) {
-      rows.add(pw.TableRow(
-        children: [
-          _tableCell('$r'),
-          _tableCell(''),
-          ...List.generate(dayCount, (_) => _tableCell('')),
-        ],
-      ));
-    }
-
-    return pw.Table(border: _tableBorder, columnWidths: colWidths, children: rows);
+    return pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: children);
   }
 
   /// Приложение 4: Журнал бракеража готовой пищевой продукции — макет как в образце.
@@ -514,22 +539,26 @@ class HaccpPdfExportService {
     required Map<String, String> employeeIdToName,
     required DateFormat dateTimeFmt,
   }) {
+    final dateFmt = DateFormat('dd.MM.yyyy');
+    final timeFmt = DateFormat('HH:mm');
     final colWidths = <int, pw.TableColumnWidth>{
-      0: const pw.FlexColumnWidth(1),
-      1: const pw.FlexColumnWidth(0.8),
-      2: const pw.FlexColumnWidth(0.9),
+      0: const pw.FlexColumnWidth(0.7),
+      1: const pw.FlexColumnWidth(0.5),
+      2: const pw.FlexColumnWidth(0.8),
       3: const pw.FlexColumnWidth(0.9),
-      4: const pw.FlexColumnWidth(0.8),
-      5: const pw.FlexColumnWidth(0.6),
-      6: const pw.FlexColumnWidth(0.9),
-      7: const pw.FlexColumnWidth(0.5),
+      4: const pw.FlexColumnWidth(0.9),
+      5: const pw.FlexColumnWidth(0.8),
+      6: const pw.FlexColumnWidth(0.6),
+      7: const pw.FlexColumnWidth(0.9),
       8: const pw.FlexColumnWidth(0.5),
-      9: const pw.FlexColumnWidth(0.8),
+      9: const pw.FlexColumnWidth(0.5),
+      10: const pw.FlexColumnWidth(0.8),
     };
     final headerRow = pw.TableRow(
       decoration: const pw.BoxDecoration(color: PdfColors.grey300),
       children: [
-        _headerCellSmall('Дата (час) начала использования жира'),
+        _headerCellSmall('Дата'),
+        _headerCellSmall('Время начала использования жира'),
         _headerCellSmall('Вид фритюрного жира'),
         _headerCellSmall('Органолептическая оценка на начало жарки'),
         _headerCellSmall('Тип жарочного оборудования'),
@@ -549,7 +578,8 @@ class HaccpPdfExportService {
       dataRows.add(
         pw.TableRow(
           children: [
-            _tableCell(log != null ? dateTimeFmt.format(log.createdAt) : ''),
+            _tableCell(log != null ? dateFmt.format(log.createdAt) : ''),
+            _tableCell(log != null ? timeFmt.format(log.createdAt) : ''),
             _tableCell(log?.oilName ?? ''),
             _tableCell(log?.organolepticStart ?? ''),
             _tableCell(log?.fryingEquipmentType ?? ''),
@@ -614,7 +644,14 @@ class HaccpPdfExportService {
               ),
               pw.SizedBox(height: 24),
               pw.Center(
-                child: pw.Text(establishmentName, style: pw.TextStyle(fontSize: 14)),
+                child: pw.Column(
+                  mainAxisSize: pw.MainAxisSize.min,
+                  children: [
+                    pw.Text('Наименование организации', style: pw.TextStyle(fontSize: 10)),
+                    pw.SizedBox(height: 4),
+                    pw.Text(establishmentName, style: pw.TextStyle(fontSize: 14)),
+                  ],
+                ),
               ),
               pw.SizedBox(height: 24),
               pw.Center(
@@ -719,8 +756,8 @@ class HaccpPdfExportService {
               _buildWarehouseTempHumidityPage(
                 establishmentName: establishmentName,
                 logs: logs,
-                dateFrom: dateFrom,
-                dateTo: dateTo,
+                employeeIdToName: employeeIdToName,
+                dateFmt: dateFmt,
               ),
               pw.SizedBox(height: 10),
               pw.Center(child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),

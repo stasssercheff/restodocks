@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../models/employee.dart';
+import '../models/haccp_log.dart';
 import '../models/haccp_log_type.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
@@ -31,9 +33,45 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
   /// Разрешение к реализации: true = разрешено, false = запрещено, null = не выбрано.
   bool? _approvalToSell;
 
+  /// Гигиенический журнал: список сотрудников заведения, выбранный сотрудник и должность.
+  List<Employee> _healthEmployees = [];
+  String? _selectedHealthEmployeeId;
+  String _healthPositionDisplay = '';
+  bool _healthPositionIsCustom = false;
+
   HaccpLogType? get _logType {
     final t = HaccpLogType.fromCode(widget.logTypeCode);
     return t != null && HaccpLogType.supportedInApp.contains(t) ? t : null;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    if (_logType == HaccpLogType.healthHygiene) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadHealthEmployees());
+    }
+  }
+
+  Future<void> _loadHealthEmployees() async {
+    final acc = context.read<AccountManagerSupabase>();
+    final est = acc.establishment;
+    final current = acc.currentEmployee;
+    if (est == null || current == null) return;
+    try {
+      final list = await acc.getEmployeesForEstablishment(est.id);
+      if (mounted) {
+        setState(() {
+          _healthEmployees = list.where((e) => e.isActive).toList();
+          if (_selectedHealthEmployeeId == null && _healthEmployees.isNotEmpty) {
+            final idx = _healthEmployees.indexWhere((e) => e.id == current.id);
+            _selectedHealthEmployeeId = idx >= 0 ? _healthEmployees[idx].id : _healthEmployees.first.id;
+            final emp = _healthEmployees.firstWhere((e) => e.id == _selectedHealthEmployeeId, orElse: () => _healthEmployees.first);
+            _healthPositionDisplay = emp.roleDisplayName;
+            _healthPositionIsCustom = false;
+          }
+        });
+      }
+    } catch (_) {}
   }
 
   @override
@@ -125,6 +163,104 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     );
   }
 
+  static const String _customPositionValue = '__custom_position__';
+
+  Widget _healthEmployeeDropdown() {
+    final options = _healthEmployees;
+    if (options.isEmpty) {
+      return _tableCell(const Text('—'));
+    }
+    final value = _selectedHealthEmployeeId ?? options.first.id;
+    return _tableCell(
+      DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: value,
+          isExpanded: true,
+          isDense: true,
+          items: options.map((e) {
+            final name = e.surname != null ? '${e.surname} ${e.fullName}' : e.fullName;
+            return DropdownMenuItem(value: e.id, child: Text(name, overflow: TextOverflow.ellipsis));
+          }).toList(),
+          onChanged: (id) {
+            if (id == null) return;
+            final emp = options.firstWhere((e) => e.id == id, orElse: () => options.first);
+            setState(() {
+              _selectedHealthEmployeeId = id;
+              if (!_healthPositionIsCustom) _healthPositionDisplay = emp.roleDisplayName;
+            });
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _healthPositionDropdown() {
+    final roleNames = EmployeeRole.values.map((r) => r.displayName).toList();
+    final effectiveValue = _healthPositionIsCustom ? _customPositionValue : (roleNames.contains(_healthPositionDisplay) ? _healthPositionDisplay : (roleNames.isNotEmpty ? roleNames.first : _customPositionValue));
+    return _tableCell(
+      DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: effectiveValue,
+          isExpanded: true,
+          isDense: true,
+          items: [
+            ...roleNames.map((r) => DropdownMenuItem(value: r, child: Text(r, overflow: TextOverflow.ellipsis))),
+            DropdownMenuItem(
+              value: _customPositionValue,
+              child: Row(
+                children: [
+                  Icon(Icons.add_circle_outline, size: 18, color: Theme.of(context).colorScheme.primary),
+                  const SizedBox(width: 6),
+                  Text(_healthPositionIsCustom && _healthPositionDisplay.isNotEmpty ? 'Свой вариант: $_healthPositionDisplay' : 'Свой вариант', overflow: TextOverflow.ellipsis),
+                ],
+              ),
+            ),
+          ],
+          onChanged: (v) async {
+            if (v == _customPositionValue) {
+              final text = await _showCustomPositionDialog();
+              if (text != null && mounted) setState(() {
+                _healthPositionDisplay = text;
+                _healthPositionIsCustom = true;
+              });
+              return;
+            }
+            if (v != null) setState(() {
+              _healthPositionDisplay = v;
+              _healthPositionIsCustom = false;
+            });
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<String?> _showCustomPositionDialog() async {
+    final ctrl = TextEditingController(text: _healthPositionIsCustom ? _healthPositionDisplay : '');
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Должность (свой вариант)'),
+        content: TextField(
+          controller: ctrl,
+          decoration: const InputDecoration(
+            hintText: 'Введите название должности',
+            border: OutlineInputBorder(),
+          ),
+          autofocus: true,
+          onSubmitted: (_) => Navigator.of(ctx).pop(ctrl.text.trim().isEmpty ? null : ctrl.text.trim()),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel)),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(ctrl.text.trim().isEmpty ? null : ctrl.text.trim()),
+            child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// Форма по макету Приложения 1: Гигиенический журнал (сотрудники).
   Widget _buildHealthHygieneForm(LocalizationService loc) {
     return Column(
@@ -148,24 +284,20 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
           children: [
             _tableHeaderCell('№ п/п'),
             _tableHeaderCell('Дата'),
-            _tableHeaderCell('Ф.И.О. работника'),
+            _tableHeaderCell('Ф. И. О. работника (последнее при наличии)'),
             _tableHeaderCell('Должность'),
-            _tableHeaderCell('Подпись об отсутствии признаков инфекционных заболеваний'),
-            _tableHeaderCell('Подпись об отсутствии заболеваний верхних дыхательных путей и кожи'),
-            _tableHeaderCell('Результат осмотра (допущен / отстранен)'),
-            _tableHeaderCell('Подпись медработника'),
+            _tableHeaderCell('Подпись сотрудника об отсутствии признаков инфекционных заболеваний у сотрудника и членов семьи'),
+            _tableHeaderCell('Подпись сотрудника об отсутствии заболеваний верхних дыхательных путей и гнойничковых заболеваний кожи рук и открытых поверхностей тела'),
+            _tableHeaderCell('Результат осмотра медицинским работником (ответственным лицом) (допущен / отстранен)'),
+            _tableHeaderCell('Подпись медицинского работника (ответственного лица)'),
           ],
         ),
         TableRow(
           children: [
             _tableCell(const Text('1')),
             _tableCell(Text(DateFormat('dd.MM.yyyy').format(DateTime.now()))),
-            _tableCell(Consumer<AccountManagerSupabase>(
-              builder: (_, acc, __) => Text(acc.currentEmployee?.fullName ?? '—'),
-            )),
-            _tableCell(Consumer<AccountManagerSupabase>(
-              builder: (_, acc, __) => Text(acc.currentEmployee?.roleDisplayName ?? '—'),
-            )),
+            _tableCell(_healthEmployeeDropdown()),
+            _tableCell(_healthPositionDropdown()),
             _tableCell(Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -441,22 +573,24 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
   Widget _buildFryingOilForm(LocalizationService loc) {
     return Table(
       columnWidths: const {
-        0: FlexColumnWidth(1.2),
-        1: FlexColumnWidth(1),
-        2: FlexColumnWidth(1.2),
+        0: FlexColumnWidth(0.9),
+        1: FlexColumnWidth(0.7),
+        2: FlexColumnWidth(1),
         3: FlexColumnWidth(1),
         4: FlexColumnWidth(1),
         5: FlexColumnWidth(0.8),
         6: FlexColumnWidth(1.2),
         7: FlexColumnWidth(0.7),
         8: FlexColumnWidth(0.7),
-        9: FlexColumnWidth(1),
+        9: FlexColumnWidth(0.7),
+        10: FlexColumnWidth(1),
       },
       border: TableBorder.all(color: Theme.of(context).dividerColor),
       children: [
         TableRow(
           children: [
-            _tableHeaderCell('Дата (час) начала использования жира'),
+            _tableHeaderCell('Дата'),
+            _tableHeaderCell('Время начала использования жира'),
             _tableHeaderCell('Вид фритюрного жира'),
             _tableHeaderCell('Органолептическая оценка на начало жарки'),
             _tableHeaderCell('Тип жарочного оборудования'),
@@ -470,7 +604,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         ),
         TableRow(
           children: [
-            _tableCell(Text(DateFormat('dd.MM.yyyy HH:mm').format(DateTime.now()))),
+            _tableCell(Text(DateFormat('dd.MM.yyyy').format(DateTime.now()))),
+            _tableCell(Text(DateFormat('HH:mm').format(DateTime.now()))),
             _tableCell(_textField('oil_name', 'Вид жира')),
             _tableCell(_textField('organoleptic_start', 'Оценка на начало', multiline: true)),
             _tableCell(_textField('frying_equipment_type', 'Тип оборудования')),
@@ -582,12 +717,18 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
 
   Future<void> _saveStatus(HaccpLogServiceSupabase svc, String estId, String empId) async {
     if (_logType == HaccpLogType.healthHygiene) {
+      final subjectId = _selectedHealthEmployeeId ?? empId;
+      final description = HaccpLog.buildHealthHygieneDescription(
+        employeeId: subjectId,
+        positionOverride: _healthPositionDisplay.trim().isEmpty ? null : _healthPositionDisplay.trim(),
+      );
       await svc.insertStatus(
         establishmentId: estId,
         createdByEmployeeId: empId,
         logType: _logType!,
         statusOk: _healthy,
         status2Ok: _noArviOk,
+        description: description,
         note: _getText('note').isNotEmpty ? _getText('note') : null,
       );
     } else {

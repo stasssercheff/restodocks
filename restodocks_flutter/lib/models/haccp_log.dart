@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'haccp_log_type.dart';
 
 /// Запись журнала ХАССП (унифицированная обёртка для numeric/status/quality).
@@ -218,5 +220,31 @@ class HaccpLog {
     if (v == null) return null;
     if (v is num) return v.toDouble();
     return double.tryParse(v.toString());
+  }
+
+  /// Для гигиенического журнала: парсим description как JSON {employee_id?, position?}.
+  static ({String? subjectEmployeeId, String? positionOverride}) parseHealthHygieneDescription(String? description) {
+    if (description == null || description.trim().isEmpty) return (subjectEmployeeId: null, positionOverride: null);
+    try {
+      final map = jsonDecode(description) as Map<String, dynamic>?;
+      if (map == null) return (subjectEmployeeId: null, positionOverride: null);
+      final eid = map['employee_id']?.toString();
+      final pos = map['position']?.toString();
+      return (
+        subjectEmployeeId: eid?.isNotEmpty == true ? eid : null,
+        positionOverride: pos?.isNotEmpty == true ? pos : null,
+      );
+    } catch (_) {
+      return (subjectEmployeeId: null, positionOverride: null);
+    }
+  }
+
+  /// Собрать description для сохранения записи гигиенического журнала.
+  static String buildHealthHygieneDescription({required String employeeId, String? positionOverride}) {
+    final map = <String, dynamic>{'employee_id': employeeId};
+    if (positionOverride != null && positionOverride.trim().isNotEmpty) {
+      map['position'] = positionOverride.trim();
+    }
+    return jsonEncode(map);
   }
 }

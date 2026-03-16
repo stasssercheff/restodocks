@@ -356,43 +356,36 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
-    final choice = await showModalBottomSheet<String>(
+    final choice = await showDialog<String>(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                loc.t('haccp_period') ?? 'Период',
-                style: Theme.of(ctx).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 16),
-              ListTile(
-                leading: const Icon(Icons.today),
-                title: Text(loc.t('haccp_period_today') ?? 'Сегодня'),
-                onTap: () => Navigator.pop(ctx, 'today'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.calendar_month),
-                title: Text(loc.t('haccp_period_month_to_today') ?? 'С 1 числа по сегодня'),
-                subtitle: Text('${DateFormat('dd.MM').format(DateTime(now.year, now.month, 1))} — ${DateFormat('dd.MM.yyyy').format(now)}'),
-                onTap: () => Navigator.pop(ctx, 'month'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.calendar_view_month),
-                title: Text(loc.t('haccp_pdf_period_full_month') ?? 'Весь месяц'),
-                onTap: () => Navigator.pop(ctx, 'full_month'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.date_range),
-                title: Text(loc.t('haccp_pdf_period_custom') ?? 'С даты по дату'),
-                onTap: () => Navigator.pop(ctx, 'custom'),
-              ),
-            ],
-          ),
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('haccp_period') ?? 'Период'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.today),
+              title: Text(loc.t('haccp_period_today') ?? 'Сегодня'),
+              onTap: () => Navigator.pop(ctx, 'today'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.calendar_month),
+              title: Text(loc.t('haccp_period_month_to_today') ?? 'С 1 числа по сегодня'),
+              subtitle: Text('${DateFormat('dd.MM').format(DateTime(now.year, now.month, 1))} — ${DateFormat('dd.MM.yyyy').format(now)}'),
+              onTap: () => Navigator.pop(ctx, 'month'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.calendar_view_month),
+              title: Text(loc.t('haccp_pdf_period_full_month') ?? 'Весь месяц'),
+              onTap: () => Navigator.pop(ctx, 'full_month'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.date_range),
+              title: Text(loc.t('haccp_pdf_period_custom') ?? 'С даты по дату'),
+              onTap: () => Navigator.pop(ctx, 'custom'),
+            ),
+          ],
         ),
       ),
     );
@@ -621,10 +614,13 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
 
   void _openLogDetail(HaccpLog log) {
     final idToEmp = {for (final e in _employees) e.id: e};
-    final emp = idToEmp[log.createdByEmployeeId];
+    final parsed = HaccpLog.parseHealthHygieneDescription(log.description);
+    final subjectId = parsed.subjectEmployeeId ?? log.createdByEmployeeId;
+    final emp = idToEmp[subjectId];
+    final creator = idToEmp[log.createdByEmployeeId];
     context.push(
       '/haccp-journals/${widget.logTypeCode}/view',
-      extra: {'log': log, 'employee': emp},
+      extra: {'log': log, 'employee': emp, 'creator': creator},
     );
   }
 }
@@ -650,6 +646,7 @@ class _JournalTableView extends StatelessWidget {
 
   static final _dateFmt = DateFormat('dd.MM.yyyy');
   static final _dateTimeFmt = DateFormat('dd.MM.yyyy HH:mm');
+  static final _timeFmt = DateFormat('HH:mm');
 
   Widget _header(String text) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
@@ -752,14 +749,15 @@ class _JournalTableView extends StatelessWidget {
     final rows = <TableRow>[
       TableRow(
         children: [
-          _header('Дата (час) начала'), _header('Вид жира'), _header('Оценка на начало'),
+          _header('Дата'), _header('Время начала'), _header('Вид жира'), _header('Оценка на начало'),
           _header('Оборудование'), _header('Вид продукции'), _header('Время окончания жарки'),
           _header('Оценка по окончании'), _header('Переходящий остаток, кг'), _header('Утилизировано, кг'), _header('Контролёр'),
         ],
       ),
       ...logs.map((log) => TableRow(
             children: [
-              _wrapTap(_cell(_dateTimeFmt.format(log.createdAt)), log),
+              _wrapTap(_cell(_dateFmt.format(log.createdAt)), log),
+              _wrapTap(_cell(_timeFmt.format(log.createdAt)), log),
               _wrapTap(_cell(log.oilName ?? '—'), log),
               _wrapTap(_cell(log.organolepticStart ?? '—'), log),
               _wrapTap(_cell(log.fryingEquipmentType ?? '—'), log),
@@ -774,9 +772,9 @@ class _JournalTableView extends StatelessWidget {
     ];
     return Table(
       columnWidths: const {
-        0: FlexColumnWidth(1), 1: FlexColumnWidth(0.8), 2: FlexColumnWidth(0.8), 3: FlexColumnWidth(0.8),
-        4: FlexColumnWidth(0.7), 5: FlexColumnWidth(0.6), 6: FlexColumnWidth(0.8), 7: FlexColumnWidth(0.5),
-        8: FlexColumnWidth(0.5), 9: FlexColumnWidth(0.8),
+        0: FlexColumnWidth(0.7), 1: FlexColumnWidth(0.5), 2: FlexColumnWidth(0.8), 3: FlexColumnWidth(0.8),
+        4: FlexColumnWidth(0.8), 5: FlexColumnWidth(0.7), 6: FlexColumnWidth(0.6), 7: FlexColumnWidth(0.8),
+        8: FlexColumnWidth(0.5), 9: FlexColumnWidth(0.5), 10: FlexColumnWidth(0.8),
       },
       border: TableBorder.all(color: Colors.grey),
       children: rows,
@@ -800,9 +798,13 @@ class _JournalTableView extends StatelessWidget {
       ...logs.asMap().entries.map((e) {
         final i = e.key + 1;
         final log = e.value;
-        final emp = idToEmp[log.createdByEmployeeId];
+        final parsed = HaccpLog.parseHealthHygieneDescription(log.description);
+        final subjectId = parsed.subjectEmployeeId ?? log.createdByEmployeeId;
+        final emp = idToEmp[subjectId];
         final name = emp != null ? '${emp.fullName}${emp.surname != null ? ' ${emp.surname}' : ''}' : '—';
-        final pos = emp?.roleDisplayName ?? '—';
+        final pos = parsed.positionOverride ?? emp?.roleDisplayName ?? '—';
+        final creator = idToEmp[log.createdByEmployeeId];
+        final creatorName = creator != null ? '${creator.fullName}${creator.surname != null ? ' ${creator.surname}' : ''}' : '—';
         final r = log.statusOk == true ? 'допущен' : (log.statusOk == false ? 'отстранен' : '—');
         return TableRow(
           children: [
@@ -813,7 +815,7 @@ class _JournalTableView extends StatelessWidget {
             _wrapTap(_cell(log.statusOk != null ? (log.statusOk! ? 'Да' : 'Нет') : '—'), log),
             _wrapTap(_cell(log.status2Ok != null ? (log.status2Ok! ? 'Да' : 'Нет') : '—'), log),
             _wrapTap(_cell(r), log),
-            _wrapTap(_cell(name), log),
+            _wrapTap(_cell(creatorName), log),
           ],
         );
       }),

@@ -664,10 +664,11 @@ class AppRouter {
                       if (extra is! Map) return _slideTransitionPage(state, const SizedBox());
                       final log = extra['log'];
                       final employee = extra['employee'];
+                      final creator = extra['creator'];
                       if (log == null) return _slideTransitionPage(state, const SizedBox());
                       return _slideTransitionPage(
                         state,
-                        HaccpLogDetailScreen(log: log as HaccpLog, employee: employee as Employee?),
+                        HaccpLogDetailScreen(log: log as HaccpLog, employee: employee as Employee?, creator: creator as Employee?),
                       );
                     },
                   ),
