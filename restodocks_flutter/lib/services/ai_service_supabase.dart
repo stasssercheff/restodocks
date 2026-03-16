@@ -286,6 +286,20 @@ class AiServiceSupabase implements AiService {
           }
         }
         rows = _xlsxToRows(xlsxBytes);
+        // Специальный формат «Полное пособие Кухня» / супы.xlsx:
+        // один лист, блоки [Название] [№|Наименование продукта|Вес гр/шт] [ингредиенты] [Выход] + технология текстом.
+        // Для него надёжнее всего работает Dart-парсер _tryParsePolnoePosobieFormat, который умеет вытаскивать технологию.
+        if (rows.isNotEmpty && sheetIndex != null) {
+          final polnoe = _tryParsePolnoePosobieFormat(rows);
+          if (polnoe.isNotEmpty) {
+            lastParsedRows = rows;
+            if (lastParseHeaderSignature == null || lastParseHeaderSignature!.isEmpty) {
+              lastParseHeaderSignature = _headerSignatureFromRows(rows) ??
+                  (rows.isNotEmpty && rows[0].isNotEmpty ? _headerSignature(rows[0].map((c) => c.toString().trim()).toList()) : null);
+            }
+            return _applyParseCorrections(polnoe, lastParseHeaderSignature, establishmentId);
+          }
+        }
       }
       if (rows.isEmpty) rows = _csvToRows(xlsxBytes);
       if (rows.isEmpty && fmt != 'docx') {
