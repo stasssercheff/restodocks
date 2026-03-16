@@ -6,8 +6,25 @@ import 'package:provider/provider.dart';
 import '../models/employee.dart';
 import '../models/haccp_log.dart';
 import '../models/haccp_log_type.dart';
+import '../models/tech_card.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
+
+/// Одна строка формы гигиенического журнала (сотрудник + должность + допуск).
+class _HealthHygieneRow {
+  _HealthHygieneRow({
+    required this.employeeId,
+    this.positionOverride,
+    this.positionIsCustom = false,
+    this.statusOk = true,
+    this.status2Ok = true,
+  });
+  final String employeeId;
+  String? positionOverride;
+  bool positionIsCustom;
+  bool statusOk;
+  bool status2Ok;
+}
 
 /// Форма добавления записи в журнал ХАССП.
 /// Только 5 журналов по СанПиН 2.3/2.4.3590-20, макет как в рекомендуемых образцах.
@@ -24,8 +41,6 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
   final _formKey = GlobalKey<FormState>();
   double _tempValue = 4.0;
   double _humidityValue = 60;
-  bool _healthy = true;
-  bool _noArviOk = true;
   final Map<String, TextEditingController> _controllers = {};
   bool _saving = false;
   DateTime? _expiryDate;
@@ -33,11 +48,13 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
   /// Разрешение к реализации: true = разрешено, false = запрещено, null = не выбрано.
   bool? _approvalToSell;
 
-  /// Гигиенический журнал: список сотрудников заведения, выбранный сотрудник и должность.
+  /// Гигиенический журнал: список сотрудников заведения и строки таблицы (каждая — один сотрудник).
   List<Employee> _healthEmployees = [];
-  String? _selectedHealthEmployeeId;
-  String _healthPositionDisplay = '';
-  bool _healthPositionIsCustom = false;
+  List<_HealthHygieneRow> _healthRows = [];
+
+  /// Журнал бракеража готовой продукции: ТТК для выбора блюда.
+  List<TechCard> _finishedBrakerageTechCards = [];
+  String? _selectedFinishedBrakerageTechCardId;
 
   HaccpLogType? get _logType {
     final t = HaccpLogType.fromCode(widget.logTypeCode);
@@ -49,6 +66,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     super.initState();
     if (_logType == HaccpLogType.healthHygiene) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _loadHealthEmployees());
+    } else if (_logType == HaccpLogType.finishedProductBrakerage) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadFinishedBrakerageTechCards());
     }
   }
 
@@ -62,15 +81,34 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       if (mounted) {
         setState(() {
           _healthEmployees = list.where((e) => e.isActive).toList();
-          if (_selectedHealthEmployeeId == null && _healthEmployees.isNotEmpty) {
-            final idx = _healthEmployees.indexWhere((e) => e.id == current.id);
-            _selectedHealthEmployeeId = idx >= 0 ? _healthEmployees[idx].id : _healthEmployees.first.id;
-            final emp = _healthEmployees.firstWhere((e) => e.id == _selectedHealthEmployeeId, orElse: () => _healthEmployees.first);
-            _healthPositionDisplay = emp.roleDisplayName;
-            _healthPositionIsCustom = false;
+          if (_healthRows.isEmpty && _healthEmployees.isNotEmpty) {
+            _healthRows = _healthEmployees.map((e) => _HealthHygieneRow(
+              employeeId: e.id,
+              positionOverride: null,
+              positionIsCustom: false,
+              statusOk: true,
+              status2Ok: true,
+            )).toList();
           }
         });
       }
+    } catch (_) {}
+  }
+
+  Future<void> _loadFinishedBrakerageTechCards() async {
+    final acc = context.read<AccountManagerSupabase>();
+    final est = acc.establishment;
+    final emp = acc.currentEmployee;
+    final dataEstId = est?.dataEstablishmentId;
+    if (dataEstId == null) return;
+    try {
+      final svc = context.read<TechCardServiceSupabase>();
+      final all = await svc.getTechCardsForEstablishment(dataEstId);
+      final visible = emp == null ? all : all.where((tc) => emp.canSeeTechCard(tc.sections)).toList();
+      if (!mounted) return;
+      setState(() {
+        _finishedBrakerageTechCards = visible;
+      });
     } catch (_) {}
   }
 
@@ -165,78 +203,67 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
 
   static const String _customPositionValue = '__custom_position__';
 
-  Widget _healthEmployeeDropdown() {
-    final options = _healthEmployees;
-    if (options.isEmpty) {
-      return _tableCell(const Text('—'));
-    }
-    final value = _selectedHealthEmployeeId ?? options.first.id;
-    return _tableCell(
-      DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: value,
-          isExpanded: true,
-          isDense: true,
-          items: options.map((e) {
-            final name = e.surname != null ? '${e.surname} ${e.fullName}' : e.fullName;
-            return DropdownMenuItem(value: e.id, child: Text(name, overflow: TextOverflow.ellipsis));
-          }).toList(),
-          onChanged: (id) {
-            if (id == null) return;
-            final emp = options.firstWhere((e) => e.id == id, orElse: () => options.first);
-            setState(() {
-              _selectedHealthEmployeeId = id;
-              if (!_healthPositionIsCustom) _healthPositionDisplay = emp.roleDisplayName;
-            });
-          },
-        ),
-      ),
-    );
+  /// Список должностей: все из EmployeeRole + уникальные из карточек сотрудников всех подразделений.
+  List<String> get _healthPositionOptions {
+    final fromRoles = EmployeeRole.values.map((r) => r.displayName).toSet();
+    final fromEmployees = _healthEmployees.map((e) => e.roleDisplayName).where((s) => s.isNotEmpty).toSet();
+    final combined = [...fromRoles, ...fromEmployees.where((s) => !fromRoles.contains(s))]..sort();
+    return combined;
   }
 
-  Widget _healthPositionDropdown() {
-    final roleNames = EmployeeRole.values.map((r) => r.displayName).toList();
-    final effectiveValue = _healthPositionIsCustom ? _customPositionValue : (roleNames.contains(_healthPositionDisplay) ? _healthPositionDisplay : (roleNames.isNotEmpty ? roleNames.first : _customPositionValue));
-    return _tableCell(
-      DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: effectiveValue,
-          isExpanded: true,
-          isDense: true,
-          items: [
-            ...roleNames.map((r) => DropdownMenuItem(value: r, child: Text(r, overflow: TextOverflow.ellipsis))),
-            DropdownMenuItem(
-              value: _customPositionValue,
-              child: Row(
-                children: [
-                  Icon(Icons.add_circle_outline, size: 18, color: Theme.of(context).colorScheme.primary),
-                  const SizedBox(width: 6),
-                  Text(_healthPositionIsCustom && _healthPositionDisplay.isNotEmpty ? 'Свой вариант: $_healthPositionDisplay' : 'Свой вариант', overflow: TextOverflow.ellipsis),
-                ],
-              ),
+  Employee? _healthEmployeeById(String id) => _healthEmployees.cast<Employee?>().firstWhere((e) => e?.id == id, orElse: () => null);
+
+  String _healthPositionDisplayForRow(_HealthHygieneRow row) {
+    final emp = _healthEmployeeById(row.employeeId);
+    if (row.positionIsCustom && row.positionOverride != null && row.positionOverride!.isNotEmpty) return row.positionOverride!;
+    return emp?.roleDisplayName ?? '';
+  }
+
+  Widget _healthPositionDropdownForRow(int index) {
+    final row = _healthRows[index];
+    final positionOptions = _healthPositionOptions;
+    final currentDisplay = _healthPositionDisplayForRow(row);
+    final effectiveValue = row.positionIsCustom
+        ? _customPositionValue
+        : (positionOptions.contains(currentDisplay) ? currentDisplay : (positionOptions.isNotEmpty ? positionOptions.first : _customPositionValue));
+    return DropdownButtonHideUnderline(
+      child: DropdownButton<String>(
+        value: effectiveValue,
+        isExpanded: true,
+        isDense: true,
+        items: [
+          ...positionOptions.map((r) => DropdownMenuItem(value: r, child: Text(r, overflow: TextOverflow.ellipsis))),
+          DropdownMenuItem(
+            value: _customPositionValue,
+            child: Row(
+              children: [
+                Icon(Icons.add_circle_outline, size: 18, color: Theme.of(context).colorScheme.primary),
+                const SizedBox(width: 6),
+                Text(row.positionIsCustom && (row.positionOverride ?? '').isNotEmpty ? 'Свой вариант: ${row.positionOverride}' : 'Свой вариант', overflow: TextOverflow.ellipsis),
+              ],
             ),
-          ],
-          onChanged: (v) async {
-            if (v == _customPositionValue) {
-              final text = await _showCustomPositionDialog();
-              if (text != null && mounted) setState(() {
-                _healthPositionDisplay = text;
-                _healthPositionIsCustom = true;
-              });
-              return;
-            }
-            if (v != null) setState(() {
-              _healthPositionDisplay = v;
-              _healthPositionIsCustom = false;
+          ),
+        ],
+        onChanged: (v) async {
+          if (v == _customPositionValue) {
+            final text = await _showCustomPositionDialog(initial: row.positionOverride);
+            if (text != null && mounted) setState(() {
+              row.positionOverride = text;
+              row.positionIsCustom = true;
             });
-          },
-        ),
+            return;
+          }
+          if (v != null) setState(() {
+            row.positionOverride = v;
+            row.positionIsCustom = false;
+          });
+        },
       ),
     );
   }
 
-  Future<String?> _showCustomPositionDialog() async {
-    final ctrl = TextEditingController(text: _healthPositionIsCustom ? _healthPositionDisplay : '');
+  Future<String?> _showCustomPositionDialog({String? initial}) async {
+    final ctrl = TextEditingController(text: initial ?? '');
     return showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -261,64 +288,220 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     );
   }
 
-  /// Форма по макету Приложения 1: Гигиенический журнал (сотрудники).
+  /// Ячейка выбора блюда для журнала бракеража готовой продукции: выпадающий список с поиском по ТТК.
+  Widget _finishedProductPickerCell(LocalizationService loc) {
+    _controllers['product'] ??= TextEditingController();
+    final controller = _controllers['product']!;
+    final title = controller.text.isNotEmpty ? controller.text : (loc.t('haccp_product') ?? 'Выбрать блюдо');
+    return InkWell(
+      onTap: () async {
+        if (_finishedBrakerageTechCards.isEmpty) {
+          await _loadFinishedBrakerageTechCards();
+        }
+        final picked = await showDialog<TechCard?>(
+          context: context,
+          builder: (ctx) {
+            final searchCtrl = TextEditingController();
+            List<TechCard> filtered = List.of(_finishedBrakerageTechCards);
+            void applyFilter() {
+              final q = searchCtrl.text.trim().toLowerCase();
+              filtered = q.isEmpty
+                  ? List.of(_finishedBrakerageTechCards)
+                  : _finishedBrakerageTechCards
+                      .where((tc) => tc.dishName.toLowerCase().contains(q))
+                      .toList();
+            }
+            applyFilter();
+            return StatefulBuilder(
+              builder: (ctx, setStateDialog) {
+                return AlertDialog(
+                  title: Text(loc.t('haccp_product') ?? 'Наименование блюда'),
+                  content: SizedBox(
+                    width: 420,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextField(
+                          controller: searchCtrl,
+                          decoration: const InputDecoration(
+                            prefixIcon: Icon(Icons.search),
+                            hintText: 'Поиск по названию ТТК',
+                            border: OutlineInputBorder(),
+                          ),
+                          onChanged: (_) {
+                            setStateDialog(() {
+                              applyFilter();
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        Flexible(
+                          child: filtered.isEmpty
+                              ? Text(loc.t('no_results') ?? 'Ничего не найдено')
+                              : ListView.builder(
+                                  shrinkWrap: true,
+                                  itemCount: filtered.length,
+                                  itemBuilder: (ctx, index) {
+                                    final tc = filtered[index];
+                                    return ListTile(
+                                      title: Text(tc.dishName),
+                                      subtitle: tc.category.isNotEmpty ? Text(tc.category) : null,
+                                      onTap: () => Navigator.of(ctx).pop(tc),
+                                    );
+                                  },
+                                ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+        if (picked != null && mounted) {
+          setState(() {
+            controller.text = picked.dishName;
+            _selectedFinishedBrakerageTechCardId = picked.id;
+          });
+        }
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(Icons.arrow_drop_down),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Форма по макету Приложения 1: Гигиенический журнал (сотрудники). Несколько строк — по одной на сотрудника; можно добавлять/удалять.
   Widget _buildHealthHygieneForm(LocalizationService loc) {
+    final dateStr = DateFormat('dd.MM.yyyy').format(DateTime.now());
+    final currentEmp = context.watch<AccountManagerSupabase>().currentEmployee;
+    final creatorName = currentEmp != null
+        ? (currentEmp.surname != null ? '${currentEmp.surname} ${currentEmp.fullName}' : currentEmp.fullName)
+        : '—';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
         Table(
-      columnWidths: const {
-        0: FlexColumnWidth(0.5),
-        1: FlexColumnWidth(1.2),
-        2: FlexColumnWidth(1.5),
-        3: FlexColumnWidth(1),
-        4: FlexColumnWidth(1.8),
-        5: FlexColumnWidth(1.8),
-        6: FlexColumnWidth(1.2),
-        7: FlexColumnWidth(1),
-      },
-      border: TableBorder.all(color: Theme.of(context).dividerColor),
-      children: [
-        TableRow(
+          columnWidths: const {
+            0: FlexColumnWidth(0.4),
+            1: FlexColumnWidth(1),
+            2: FlexColumnWidth(1.5),
+            3: FlexColumnWidth(1),
+            4: FlexColumnWidth(1.8),
+            5: FlexColumnWidth(1.8),
+            6: FlexColumnWidth(1.2),
+            7: FlexColumnWidth(1),
+            8: FlexColumnWidth(0.35),
+          },
+          border: TableBorder.all(color: Theme.of(context).dividerColor),
           children: [
-            _tableHeaderCell('№ п/п'),
-            _tableHeaderCell('Дата'),
-            _tableHeaderCell('Ф. И. О. работника (последнее при наличии)'),
-            _tableHeaderCell('Должность'),
-            _tableHeaderCell('Подпись сотрудника об отсутствии признаков инфекционных заболеваний у сотрудника и членов семьи'),
-            _tableHeaderCell('Подпись сотрудника об отсутствии заболеваний верхних дыхательных путей и гнойничковых заболеваний кожи рук и открытых поверхностей тела'),
-            _tableHeaderCell('Результат осмотра медицинским работником (ответственным лицом) (допущен / отстранен)'),
-            _tableHeaderCell('Подпись медицинского работника (ответственного лица)'),
+            TableRow(
+              children: [
+                _tableHeaderCell('№ п/п'),
+                _tableHeaderCell('Дата'),
+                _tableHeaderCell('Ф. И. О. работника (последнее при наличии)'),
+                _tableHeaderCell('Должность'),
+                _tableHeaderCell('Подпись сотрудника об отсутствии признаков инфекционных заболеваний у сотрудника и членов семьи'),
+                _tableHeaderCell('Подпись сотрудника об отсутствии заболеваний верхних дыхательных путей и гнойничковых заболеваний кожи рук и открытых поверхностей тела'),
+                _tableHeaderCell('Результат осмотра медицинским работником (ответственным лицом) (допущен / отстранен)'),
+                _tableHeaderCell('Подпись медицинского работника (ответственного лица)'),
+                _tableHeaderCell(''),
+              ],
+            ),
+            ...List.generate(_healthRows.length, (i) {
+              final row = _healthRows[i];
+              final emp = _healthEmployeeById(row.employeeId);
+              final name = emp != null ? (emp.surname != null ? '${emp.surname} ${emp.fullName}' : emp.fullName) : '—';
+              return TableRow(
+                children: [
+                  _tableCell(Text('${i + 1}')),
+                  _tableCell(Text(dateStr)),
+                  _tableCell(Text(name)),
+                  _tableCell(_healthPositionDropdownForRow(i)),
+                  _tableCell(Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Switch(value: row.statusOk, onChanged: (v) => setState(() => row.statusOk = v ?? true)),
+                      Text(row.statusOk ? 'Да' : 'Нет', style: TextStyle(fontSize: 12, color: row.statusOk ? Colors.green : Colors.orange)),
+                    ],
+                  )),
+                  _tableCell(Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Switch(value: row.status2Ok, onChanged: (v) => setState(() => row.status2Ok = v ?? true)),
+                      Text(row.status2Ok ? 'Да' : 'Нет', style: TextStyle(fontSize: 12, color: row.status2Ok ? Colors.green : Colors.orange)),
+                    ],
+                  )),
+                  _tableCell(Text(row.statusOk ? 'допущен' : 'отстранен', style: const TextStyle(fontSize: 12))),
+                  _tableCell(Text(creatorName, style: const TextStyle(fontSize: 11))),
+                  _tableCell(IconButton(
+                    icon: const Icon(Icons.remove_circle_outline, size: 22),
+                    onPressed: () => setState(() => _healthRows.removeAt(i)),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  )),
+                ],
+              );
+            }),
           ],
         ),
-        TableRow(
-          children: [
-            _tableCell(const Text('1')),
-            _tableCell(Text(DateFormat('dd.MM.yyyy').format(DateTime.now()))),
-            _tableCell(_healthEmployeeDropdown()),
-            _tableCell(_healthPositionDropdown()),
-            _tableCell(Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Switch(value: _healthy, onChanged: (v) => setState(() => _healthy = v ?? true)),
-                Text(_healthy ? 'Да' : 'Нет', style: TextStyle(fontSize: 12, color: _healthy ? Colors.green : Colors.orange)),
-              ],
-            )),
-            _tableCell(Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Switch(value: _noArviOk, onChanged: (v) => setState(() => _noArviOk = v ?? true)),
-                Text(_noArviOk ? 'Да' : 'Нет', style: TextStyle(fontSize: 12, color: _noArviOk ? Colors.green : Colors.orange)),
-              ],
-            )),
-            _tableCell(Text(_healthy ? 'допущен' : 'отстранен', style: const TextStyle(fontSize: 12))),
-            _tableCell(Consumer<AccountManagerSupabase>(
-              builder: (_, acc, __) => Text(acc.currentEmployee?.fullName ?? '—', style: const TextStyle(fontSize: 11)),
-            )),
-          ],
-        ),
-      ],
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: () async {
+            final usedIds = _healthRows.map((r) => r.employeeId).toSet();
+            final available = _healthEmployees.where((e) => !usedIds.contains(e.id)).toList();
+            if (available.isEmpty) {
+              if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(loc.t('haccp_all_employees_added') ?? 'Все сотрудники уже добавлены')),
+              );
+              return;
+            }
+            final picked = await showDialog<String>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: Text(loc.t('haccp_add_employee_row') ?? 'Добавить сотрудника'),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: available.map((e) {
+                      final name = e.surname != null ? '${e.surname} ${e.fullName}' : e.fullName;
+                      return ListTile(
+                        title: Text(name),
+                        subtitle: Text(e.roleDisplayName),
+                        onTap: () => Navigator.of(ctx).pop(e.id),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+            );
+            if (picked != null && mounted) setState(() {
+              _healthRows.add(_HealthHygieneRow(employeeId: picked, positionOverride: null, positionIsCustom: false, statusOk: true, status2Ok: true));
+            });
+          },
+          icon: const Icon(Icons.add),
+          label: Text(loc.t('haccp_add_row') ?? 'Добавить строку'),
         ),
         const SizedBox(height: 8),
         _textField('note', loc.t('haccp_note') ?? 'Примечание'),
@@ -494,7 +677,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
           children: [
             _tableCell(Text(DateFormat('dd.MM.yyyy HH:mm').format(DateTime.now()))),
             _tableCell(_textField('time_brakerage', 'Время (например 12:00)')),
-            _tableCell(_textField('product', loc.t('haccp_product') ?? 'Наименование блюда')),
+            _tableCell(_finishedProductPickerCell(loc)),
             _tableCell(_textField('result', loc.t('haccp_result') ?? 'Результат оценки', multiline: true)),
             _tableCell(_approvalSelector()),
             _tableCell(_signatureFromAccount()),
@@ -717,20 +900,26 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
 
   Future<void> _saveStatus(HaccpLogServiceSupabase svc, String estId, String empId) async {
     if (_logType == HaccpLogType.healthHygiene) {
-      final subjectId = _selectedHealthEmployeeId ?? empId;
-      final description = HaccpLog.buildHealthHygieneDescription(
-        employeeId: subjectId,
-        positionOverride: _healthPositionDisplay.trim().isEmpty ? null : _healthPositionDisplay.trim(),
-      );
-      await svc.insertStatus(
-        establishmentId: estId,
-        createdByEmployeeId: empId,
-        logType: _logType!,
-        statusOk: _healthy,
-        status2Ok: _noArviOk,
-        description: description,
-        note: _getText('note').isNotEmpty ? _getText('note') : null,
-      );
+      if (_healthRows.isEmpty) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.read<LocalizationService>().t('haccp_add_at_least_one') ?? 'Добавьте хотя бы одного сотрудника')),
+        );
+        return;
+      }
+      final note = _getText('note').isNotEmpty ? _getText('note') : null;
+      for (final row in _healthRows) {
+        final posOverride = (row.positionOverride ?? '').trim().isEmpty ? null : (row.positionOverride ?? '').trim();
+        final description = HaccpLog.buildHealthHygieneDescription(employeeId: row.employeeId, positionOverride: posOverride);
+        await svc.insertStatus(
+          establishmentId: estId,
+          createdByEmployeeId: empId,
+          logType: _logType!,
+          statusOk: row.statusOk,
+          status2Ok: row.status2Ok,
+          description: description,
+          note: note,
+        );
+      }
     } else {
       throw StateError('Unexpected status type: $_logType');
     }
@@ -745,10 +934,12 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         ? (_approvalToSell! ? 'разрешено' : 'запрещено')
         : null;
     final isFryingOil = _logType == HaccpLogType.fryingOil;
+    final isFinishedBrakerage = _logType == HaccpLogType.finishedProductBrakerage;
     await svc.insertQuality(
       establishmentId: estId,
       createdByEmployeeId: empId,
       logType: _logType!,
+      techCardId: isFinishedBrakerage ? _selectedFinishedBrakerageTechCardId : null,
       productName: _getText('product').isNotEmpty ? _getText('product') : null,
       result: _getText('result').isNotEmpty ? _getText('result') : null,
       timeBrakerage: _getText('time_brakerage').isNotEmpty ? _getText('time_brakerage') : null,
