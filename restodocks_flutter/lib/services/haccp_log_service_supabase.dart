@@ -122,9 +122,20 @@ class HaccpLogServiceSupabase {
     String? oilName,
     String? agent,
     String? concentration,
+    String? timeBrakerage,
+    String? approvalToSell,
+    String? commissionSignatures,
+    String? weighingResult,
+    String? packaging,
+    String? manufacturerSupplier,
+    double? quantityKg,
+    String? documentNumber,
+    String? storageConditions,
+    DateTime? expiryDate,
+    DateTime? dateSold,
     String? note,
   }) async {
-    final row = await _supabase.client.from('haccp_quality_logs').insert({
+    final map = <String, dynamic>{
       'establishment_id': establishmentId,
       'created_by_employee_id': createdByEmployeeId,
       'log_type': logType.code,
@@ -138,7 +149,19 @@ class HaccpLogServiceSupabase {
       'agent': agent,
       'concentration': concentration,
       'note': note,
-    }).select().single();
+    };
+    if (timeBrakerage != null) map['time_brakerage'] = timeBrakerage;
+    if (approvalToSell != null) map['approval_to_sell'] = approvalToSell;
+    if (commissionSignatures != null) map['commission_signatures'] = commissionSignatures;
+    if (weighingResult != null) map['weighing_result'] = weighingResult;
+    if (packaging != null) map['packaging'] = packaging;
+    if (manufacturerSupplier != null) map['manufacturer_supplier'] = manufacturerSupplier;
+    if (quantityKg != null) map['quantity_kg'] = quantityKg;
+    if (documentNumber != null) map['document_number'] = documentNumber;
+    if (storageConditions != null) map['storage_conditions'] = storageConditions;
+    if (expiryDate != null) map['expiry_date'] = expiryDate.toIso8601String();
+    if (dateSold != null) map['date_sold'] = dateSold.toIso8601String();
+    final row = await _supabase.client.from('haccp_quality_logs').insert(map).select().single();
     return HaccpLog.fromQualityJson(Map<String, dynamic>.from(row));
   }
 

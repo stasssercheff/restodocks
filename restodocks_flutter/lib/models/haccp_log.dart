@@ -30,6 +30,19 @@ class HaccpLog {
   final String? oilName;
   final String? agent;
   final String? concentration;
+  // Приложение 4: бракераж готовой продукции
+  final String? timeBrakerage;
+  final String? approvalToSell;
+  final String? commissionSignatures;
+  final String? weighingResult;
+  // Приложение 5: бракераж скоропортящейся
+  final String? packaging;
+  final String? manufacturerSupplier;
+  final double? quantityKg;
+  final String? documentNumber;
+  final String? storageConditions;
+  final DateTime? expiryDate;
+  final DateTime? dateSold;
 
   final String? note;
 
@@ -56,6 +69,17 @@ class HaccpLog {
     this.oilName,
     this.agent,
     this.concentration,
+    this.timeBrakerage,
+    this.approvalToSell,
+    this.commissionSignatures,
+    this.weighingResult,
+    this.packaging,
+    this.manufacturerSupplier,
+    this.quantityKg,
+    this.documentNumber,
+    this.storageConditions,
+    this.expiryDate,
+    this.dateSold,
     this.note,
   });
 
@@ -146,6 +170,17 @@ class HaccpLog {
       oilName: json['oil_name']?.toString(),
       agent: json['agent']?.toString(),
       concentration: json['concentration']?.toString(),
+      timeBrakerage: json['time_brakerage']?.toString(),
+      approvalToSell: json['approval_to_sell']?.toString(),
+      commissionSignatures: json['commission_signatures']?.toString(),
+      weighingResult: json['weighing_result']?.toString(),
+      packaging: json['packaging']?.toString(),
+      manufacturerSupplier: json['manufacturer_supplier']?.toString(),
+      quantityKg: _parseNum(json['quantity_kg']),
+      documentNumber: json['document_number']?.toString(),
+      storageConditions: json['storage_conditions']?.toString(),
+      expiryDate: _parseDateTime(json['expiry_date']),
+      dateSold: _parseDateTime(json['date_sold']),
       note: json['note']?.toString(),
     );
   }

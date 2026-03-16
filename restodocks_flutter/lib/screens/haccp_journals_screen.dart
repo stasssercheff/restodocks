@@ -77,33 +77,17 @@ class _HaccpJournalsScreenState extends State<HaccpJournalsScreen> {
     );
   }
 
+  /// Иконки только для 5 журналов СанПиН (Приложения 1–5).
   static IconData _iconForType(HaccpLogType t) {
     switch (t) {
       case HaccpLogType.healthHygiene:
-      case HaccpLogType.pediculosis:
         return Icons.health_and_safety;
-      case HaccpLogType.uvLamps:
-        return Icons.lightbulb_outline;
       case HaccpLogType.fridgeTemperature:
       case HaccpLogType.warehouseTempHumidity:
         return Icons.thermostat;
-      case HaccpLogType.dishwasherControl:
-      case HaccpLogType.greaseTrapCleaning:
-        return Icons.kitchen;
       case HaccpLogType.finishedProductBrakerage:
       case HaccpLogType.incomingRawBrakerage:
         return Icons.fact_check;
-      case HaccpLogType.fryingOil:
-      case HaccpLogType.foodWaste:
-        return Icons.restaurant;
-      case HaccpLogType.glassCeramicsBreakage:
-        return Icons.broken_image;
-      case HaccpLogType.emergencyIncidents:
-        return Icons.warning_amber;
-      case HaccpLogType.disinsectionDeratization:
-      case HaccpLogType.generalCleaningSchedule:
-      case HaccpLogType.disinfectantConcentration:
-        return Icons.cleaning_services;
       default:
         return Icons.assignment;
     }

@@ -1,27 +1,20 @@
 /// Целевая таблица для логирования (приложение выбирает автоматически).
 enum HaccpLogTable { numeric, status, quality }
 
-/// Типы журналов ХАССП (совпадают с enum в БД).
-/// targetTable — в какую таблицу писать: numeric / status / quality
+/// Типы журналов ХАССП. В UI и настройках используются только [sanpinOnly] (Приложения 1–5 СанПиН 2.3/2.4.3590-20).
+/// Остальные значения оставлены для совместимости с БД при миграции.
 enum HaccpLogType {
-  // Группа А: Санитария и Персонал
-  healthHygiene('health_hygiene', 'Гигиенический журнал (Здоровье)', 'А', 'Приложение 1 к СанПиН 2.3/2.4.3590-20', HaccpLogTable.status),
-  uvLamps('uv_lamps', 'Учёт работы бак-ламп (Кварцевание)', 'А', 'Приложение 3 к СанПиН 2.3/2.4.3590-20', HaccpLogTable.numeric),
+  healthHygiene('health_hygiene', 'Гигиенический журнал (сотрудники)', 'А', 'Приложение № 1 к СанПиН 2.3/2.4.3590-20', HaccpLogTable.status),
+  fridgeTemperature('fridge_temperature', 'Журнал учета температурного режима холодильного оборудования', 'Б', 'Приложение № 2 к СанПиН 2.3/2.4.3590-20', HaccpLogTable.numeric),
+  warehouseTempHumidity('warehouse_temp_humidity', 'Журнал учета температуры и влажности в складских помещениях', 'Б', 'Приложение № 3 к СанПиН 2.3/2.4.3590-20', HaccpLogTable.numeric),
+  finishedProductBrakerage('finished_product_brakerage', 'Журнал бракеража готовой пищевой продукции', 'В', 'Приложение № 4 к СанПиН 2.3/2.4.3590-20', HaccpLogTable.quality),
+  incomingRawBrakerage('incoming_raw_brakerage', 'Журнал бракеража скоропортящейся пищевой продукции', 'В', 'Приложение № 5 к СанПиН 2.3/2.4.3590-20', HaccpLogTable.quality),
+  uvLamps('uv_lamps', 'Учёт работы бак-ламп', 'А', 'Приложение 3 к СанПиН 2.3/2.4.3590-20', HaccpLogTable.numeric),
   pediculosis('pediculosis', 'Осмотр на педикулёз', 'А', 'Форма учёта гигиенического контроля', HaccpLogTable.status),
-
-  // Группа Б: Оборудование и Склад
-  fridgeTemperature('fridge_temperature', 'Температурный режим холодильников', 'Б', 'Приложение 2 к СанПиН 2.3/2.4.3590-20', HaccpLogTable.numeric),
-  warehouseTempHumidity('warehouse_temp_humidity', 'Температура и влажность склада', 'Б', 'Приложение 5 к СанПиН 2.3/2.4.3590-20', HaccpLogTable.numeric),
   dishwasherControl('dishwasher_control', 'Контроль посудомоечных машин', 'Б', 'Приложение 6 к СанПиН 2.3/2.4.3590-20', HaccpLogTable.status),
   greaseTrapCleaning('grease_trap_cleaning', 'Очистка жироуловителей и вентиляции', 'Б', 'График ТО и чистки фильтров', HaccpLogTable.status),
-
-  // Группа В: Качество и Бракераж
-  finishedProductBrakerage('finished_product_brakerage', 'Бракераж готовой продукции', 'В', 'Приложение 4 к СанПиН 2.3/2.4.3590-20', HaccpLogTable.quality),
-  incomingRawBrakerage('incoming_raw_brakerage', 'Входной контроль сырья (Бракераж скоропорта)', 'В', 'Приложение 4 к СанПиН 2.3/2.4.3590-20', HaccpLogTable.quality),
-  fryingOil('frying_oil', 'Учёт фритюрных жиров (Замена масла)', 'В', 'Приложение 8 к СанПиН 2.3/2.4.3590-20', HaccpLogTable.quality),
-  foodWaste('food_waste', 'Учёт пищевых отходов (Утилизация)', 'В', 'Вес, причина списания', HaccpLogTable.quality),
-
-  // Группа Г: HACCP PRO
+  fryingOil('frying_oil', 'Учёт фритюрных жиров', 'В', 'Приложение 8 к СанПиН 2.3/2.4.3590-20', HaccpLogTable.quality),
+  foodWaste('food_waste', 'Учёт пищевых отходов', 'В', 'Вес, причина списания', HaccpLogTable.quality),
   glassCeramicsBreakage('glass_ceramics_breakage', 'Журнал боя стекла и керамики', 'Г', '«Стеклянная политика»', HaccpLogTable.status),
   emergencyIncidents('emergency_incidents', 'Регистрация аварийных ситуаций', 'Г', 'Вода, свет, канализация', HaccpLogTable.status),
   disinsectionDeratization('disinsection_deratization', 'Учёт дезинсекции и дератизации', 'Г', 'Приложение 9 к СанПиН 2.3/2.4.3590-20', HaccpLogTable.quality),
@@ -35,6 +28,15 @@ enum HaccpLogType {
   final String group;
   final String sanpinRef;
   final HaccpLogTable targetTable;
+
+  /// Журналы по рекомендуемым образцам СанПиН 2.3/2.4.3590-20 (Приложения 1–5). Только они показываются в настройках и в списке журналов.
+  static const List<HaccpLogType> sanpinOnly = [
+    HaccpLogType.healthHygiene,
+    HaccpLogType.fridgeTemperature,
+    HaccpLogType.warehouseTempHumidity,
+    HaccpLogType.finishedProductBrakerage,
+    HaccpLogType.incomingRawBrakerage,
+  ];
 
   static HaccpLogType? fromCode(String? code) {
     if (code == null || code.isEmpty) return null;

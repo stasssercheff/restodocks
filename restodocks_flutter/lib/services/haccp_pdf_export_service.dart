@@ -49,27 +49,27 @@ class HaccpPdfExportService {
   static const _sanpinHealthHygiene = 'Приложение № 1 к СанПиН 2.3/2.4.3590-20';
 
   /// Официальные названия и подписи по рекомендуемым формам (как на образцах).
+  /// Заголовки по формулировкам СанПиН 2.3/2.4.3590-20 (Приложения 1–5).
   static String _pdfTitle(HaccpLogType logType) {
     return switch (logType) {
-      HaccpLogType.healthHygiene => 'Гигиенический журнал',
+      HaccpLogType.healthHygiene => 'Гигиенический журнал (сотрудники)',
       HaccpLogType.fridgeTemperature => 'Журнал учета температурного режима холодильного оборудования',
-      HaccpLogType.warehouseTempHumidity => 'Журнал учета температурного режима холодильного оборудования и учета микроклимата складских помещений',
-      HaccpLogType.fryingOil => 'Журнал учета использования фритюрных жиров',
-      HaccpLogType.finishedProductBrakerage => 'Журнал бракеража готовой продукции',
+      HaccpLogType.warehouseTempHumidity => 'Журнал учета температуры и влажности в складских помещениях',
+      HaccpLogType.finishedProductBrakerage => 'Журнал бракеража готовой пищевой продукции',
       HaccpLogType.incomingRawBrakerage => 'Журнал бракеража скоропортящейся пищевой продукции',
       _ => logType.displayNameRu,
     };
   }
 
+  /// Подпись под таблицей (как в шаблоне — правый верхний угол каждого листа).
   static String _pdfFooter(HaccpLogType logType) {
     return switch (logType) {
-      HaccpLogType.healthHygiene => 'Рекомендуемая форма гигиенического журнала',
-      HaccpLogType.fridgeTemperature => 'Рекомендуемая форма журнала контроля температуры',
-      HaccpLogType.warehouseTempHumidity => 'Рекомендуемая форма журнала контроля влажности и температуры',
-      HaccpLogType.fryingOil => 'Рекомендованная форма контроля замены фритюрных жиров',
-      HaccpLogType.finishedProductBrakerage => 'Рекомендуемая форма журнала бракеража готовой продукции',
-      HaccpLogType.incomingRawBrakerage => 'Рекомендуемая форма журнала бракеража скоропортящейся пищевой продукции',
-      _ => 'Рекомендуемая форма журнала',
+      HaccpLogType.healthHygiene => 'Приложение № 1 к СанПиН 2.3/2.4.3590-20',
+      HaccpLogType.fridgeTemperature => 'Приложение № 2 к СанПиН 2.3/2.4.3590-20',
+      HaccpLogType.warehouseTempHumidity => 'Приложение № 3 к СанПиН 2.3/2.4.3590-20',
+      HaccpLogType.finishedProductBrakerage => 'Приложение № 4 к СанПиН 2.3/2.4.3590-20',
+      HaccpLogType.incomingRawBrakerage => 'Приложение № 5 к СанПиН 2.3/2.4.3590-20',
+      _ => 'СанПиН 2.3/2.4.3590-20',
     };
   }
 
@@ -389,14 +389,121 @@ class HaccpPdfExportService {
       ));
     }
 
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+    return pw.Table(border: _tableBorder, columnWidths: colWidths, children: rows);
+  }
+
+  /// Приложение 4: Журнал бракеража готовой пищевой продукции — макет как в образце.
+  static pw.Widget _buildBrakerageFinishedProductPage({
+    required List<HaccpLog> logs,
+    required Map<String, String> employeeIdToName,
+    required DateFormat dateTimeFmt,
+  }) {
+    final colWidths = <int, pw.TableColumnWidth>{
+      0: const pw.FlexColumnWidth(1.2),
+      1: const pw.FlexColumnWidth(0.7),
+      2: const pw.FlexColumnWidth(1.2),
+      3: const pw.FlexColumnWidth(1.2),
+      4: const pw.FlexColumnWidth(0.9),
+      5: const pw.FlexColumnWidth(0.9),
+      6: const pw.FlexColumnWidth(0.9),
+      7: const pw.FlexColumnWidth(0.8),
+    };
+    final headerRow = pw.TableRow(
+      decoration: const pw.BoxDecoration(color: PdfColors.grey300),
       children: [
-        pw.Table(border: _tableBorder, columnWidths: colWidths, children: rows),
-        pw.SizedBox(height: 10),
-        pw.Center(child: pw.Text(_pdfFooter(HaccpLogType.warehouseTempHumidity), style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
+        _headerCellSmall('Дата и час изготовления блюда'),
+        _headerCellSmall('Время снятия бракеража'),
+        _headerCellSmall('Наименование готового блюда'),
+        _headerCellSmall('Результаты органолептической оценки'),
+        _headerCellSmall('Разрешение к реализации'),
+        _headerCellSmall('Подписи членов бракеражной комиссии'),
+        _headerCellSmall('Результаты взвешивания порционных блюд'),
+        _headerCellSmall('Примечание'),
       ],
     );
+    final dataRows = <pw.TableRow>[headerRow];
+    final rowCount = logs.isEmpty ? 20 : logs.length;
+    for (var i = 0; i < rowCount; i++) {
+      final log = i < logs.length ? logs[i] : null;
+      dataRows.add(
+        pw.TableRow(
+          children: [
+            _tableCell(log != null ? dateTimeFmt.format(log.createdAt) : ''),
+            _tableCell(log?.timeBrakerage ?? ''),
+            _tableCell(log?.productName ?? ''),
+            _tableCell(log?.result ?? ''),
+            _tableCell(log?.approvalToSell ?? ''),
+            _tableCell(log?.commissionSignatures ?? ''),
+            _tableCell(log?.weighingResult ?? ''),
+            _tableCell(log?.note ?? ''),
+          ],
+        ),
+      );
+    }
+    return pw.Table(border: _tableBorder, columnWidths: colWidths, children: dataRows);
+  }
+
+  /// Приложение 5: Журнал бракеража скоропортящейся пищевой продукции — макет как в образце.
+  static pw.Widget _buildBrakerageIncomingRawPage({
+    required List<HaccpLog> logs,
+    required Map<String, String> employeeIdToName,
+    required DateFormat dateTimeFmt,
+  }) {
+    final dateFmt = DateFormat('dd.MM.yyyy');
+    final colWidths = <int, pw.TableColumnWidth>{
+      0: const pw.FlexColumnWidth(1),
+      1: const pw.FlexColumnWidth(1),
+      2: const pw.FlexColumnWidth(0.6),
+      3: const pw.FlexColumnWidth(1),
+      4: const pw.FlexColumnWidth(0.5),
+      5: const pw.FlexColumnWidth(0.8),
+      6: const pw.FlexColumnWidth(1),
+      7: const pw.FlexColumnWidth(0.8),
+      8: const pw.FlexColumnWidth(0.8),
+      9: const pw.FlexColumnWidth(0.6),
+      10: const pw.FlexColumnWidth(0.6),
+    };
+    final headerRow = pw.TableRow(
+      decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+      children: [
+        _headerCellSmall('Дата и час поступления'),
+        _headerCellSmall('Наименование'),
+        _headerCellSmall('Фасовка'),
+        _headerCellSmall('Изготовитель/поставщик'),
+        _headerCellSmall('Кол-во'),
+        _headerCellSmall('№ документа'),
+        _headerCellSmall('Органолептическая оценка'),
+        _headerCellSmall('Условия хранения, срок реализации'),
+        _headerCellSmall('Дата реализации'),
+        _headerCellSmall('Подпись'),
+        _headerCellSmall('Прим.'),
+      ],
+    );
+    final dataRows = <pw.TableRow>[headerRow];
+    final rowCount = logs.isEmpty ? 20 : logs.length;
+    for (var i = 0; i < rowCount; i++) {
+      final log = i < logs.length ? logs[i] : null;
+      final dateSoldStr = log?.dateSold != null ? dateFmt.format(log!.dateSold!) : '';
+      final empName = log != null ? (employeeIdToName[log.createdByEmployeeId] ?? '') : '';
+      dataRows.add(
+        pw.TableRow(
+          children: [
+            _tableCell(log != null ? dateTimeFmt.format(log.createdAt) : ''),
+            _tableCell(log?.productName ?? ''),
+            _tableCell(log?.packaging ?? ''),
+            _tableCell(log?.manufacturerSupplier ?? ''),
+            _tableCell(log?.quantityKg != null ? log.quantityKg!.toStringAsFixed(2) : ''),
+            _tableCell(log?.documentNumber ?? ''),
+            _tableCell(log?.result ?? ''),
+            _tableCell(log?.storageConditions ?? ''),
+            _tableCell(dateSoldStr),
+            _tableCell(empName),
+            _tableCell(log?.note ?? ''),
+          ],
+        ),
+      );
+    }
+    return pw.Table(border: _tableBorder, columnWidths: colWidths, children: dataRows);
   }
 
   /// Параметры экспорта.
@@ -413,13 +520,18 @@ class HaccpPdfExportService {
     bool includeStitchingSheet = true,
   }) async {
     final theme = await _getTheme();
-    final doc = pw.Document(theme: theme);
     final dateFmt = DateFormat('dd.MM.yyyy');
     final dateTimeFmt = DateFormat('dd.MM.yyyy HH:mm');
-
     final isHealthHygiene = logType == HaccpLogType.healthHygiene;
     final sanpin = isHealthHygiene ? _sanpinHealthHygiene : sanpinRef;
     final title = _pdfTitle(logType);
+
+    final doc = pw.Document(
+      theme: theme,
+      title: title,
+      subject: 'Журнал учёта. Документ для просмотра и печати. Редактирование не допускается.',
+      producer: 'Restodocks (СанПиН 2.3/2.4.3590-20)',
+    );
 
     if (includeCover) {
       doc.addPage(
@@ -465,16 +577,27 @@ class HaccpPdfExportService {
           build: (ctx) => pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.stretch,
             children: [
+              pw.Align(
+                alignment: pw.Alignment.centerRight,
+                child: pw.Text(sanpin, style: pw.TextStyle(fontSize: 9)),
+              ),
+              pw.SizedBox(height: 4),
+              pw.Center(
+                child: pw.Text('Рекомендуемый образец', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+              ),
+              pw.SizedBox(height: 4),
               pw.Center(
                 child: pw.Text(title, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
               ),
-              pw.SizedBox(height: 16),
+              pw.SizedBox(height: 8),
               _buildHealthHygienePage(
                 establishmentName: establishmentName,
                 logs: logs,
                 employeeIdToName: employeeIdToName,
                 dateTimeFmt: dateTimeFmt,
               ),
+              pw.SizedBox(height: 10),
+              pw.Center(child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
             ],
           ),
         ),
@@ -487,16 +610,24 @@ class HaccpPdfExportService {
           build: (ctx) => pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.stretch,
             children: [
+              pw.Align(
+                alignment: pw.Alignment.centerRight,
+                child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9)),
+              ),
+              pw.SizedBox(height: 4),
+              pw.Center(
+                child: pw.Text('Рекомендуемый образец', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+              ),
+              pw.SizedBox(height: 4),
               pw.Center(
                 child: pw.Text(title, style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
               ),
               pw.SizedBox(height: 8),
-              _buildTemperatureRowBasedPage(
+              _buildFridgeTemperaturePage(
                 establishmentName: establishmentName,
                 logs: logs,
-                employeeIdToName: employeeIdToName,
-                dateTimeFmt: dateTimeFmt,
-                includeHumidity: false,
+                dateFrom: dateFrom,
+                dateTo: dateTo,
               ),
               pw.SizedBox(height: 10),
               pw.Center(child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
@@ -512,16 +643,88 @@ class HaccpPdfExportService {
           build: (ctx) => pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.stretch,
             children: [
+              pw.Align(
+                alignment: pw.Alignment.centerRight,
+                child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9)),
+              ),
+              pw.SizedBox(height: 4),
+              pw.Center(
+                child: pw.Text('Рекомендуемый образец', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+              ),
+              pw.SizedBox(height: 4),
               pw.Center(
                 child: pw.Text(title, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
               ),
               pw.SizedBox(height: 8),
-              _buildTemperatureRowBasedPage(
+              _buildWarehouseTempHumidityPage(
                 establishmentName: establishmentName,
+                logs: logs,
+                dateFrom: dateFrom,
+                dateTo: dateTo,
+              ),
+              pw.SizedBox(height: 10),
+              pw.Center(child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
+            ],
+          ),
+        ),
+      );
+    } else if (logType == HaccpLogType.finishedProductBrakerage) {
+      doc.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: pw.EdgeInsets.fromLTRB(16, 40, 16, 50),
+          build: (ctx) => pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+            children: [
+              pw.Align(
+                alignment: pw.Alignment.centerRight,
+                child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9)),
+              ),
+              pw.SizedBox(height: 4),
+              pw.Center(
+                child: pw.Text('Рекомендуемый образец', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+              ),
+              pw.SizedBox(height: 4),
+              pw.Center(
+                child: pw.Text(title, style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+              ),
+              pw.SizedBox(height: 8),
+              _buildBrakerageFinishedProductPage(
                 logs: logs,
                 employeeIdToName: employeeIdToName,
                 dateTimeFmt: dateTimeFmt,
-                includeHumidity: true,
+              ),
+              pw.SizedBox(height: 10),
+              pw.Center(child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
+            ],
+          ),
+        ),
+      );
+    } else if (logType == HaccpLogType.incomingRawBrakerage) {
+      doc.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: pw.EdgeInsets.fromLTRB(16, 40, 16, 50),
+          build: (ctx) => pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+            children: [
+              pw.Align(
+                alignment: pw.Alignment.centerRight,
+                child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9)),
+              ),
+              pw.SizedBox(height: 4),
+              pw.Center(
+                child: pw.Text('Рекомендуемый образец', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+              ),
+              pw.SizedBox(height: 4),
+              pw.Center(
+                child: pw.Text(title, style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+              ),
+              pw.SizedBox(height: 8),
+              _buildBrakerageIncomingRawPage(
+                logs: logs,
+                employeeIdToName: employeeIdToName,
+                dateTimeFmt: dateTimeFmt,
               ),
               pw.SizedBox(height: 10),
               pw.Center(child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
