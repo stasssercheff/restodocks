@@ -129,9 +129,7 @@ class _LoginScreenState extends State<LoginScreen> {
         keyboardType: TextInputType.emailAddress,
         textInputAction: TextInputAction.next,
         autocorrect: false,
-        onFieldSubmitted: (_) {
-          if (!_isLoading) _login();
-        },
+        onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
         validator: (value) {
           if (value == null || value.isEmpty) return loc.t('email_required');
           if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
@@ -151,9 +149,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         obscureText: true,
         textInputAction: TextInputAction.done,
-        onFieldSubmitted: (_) {
-          if (!_isLoading) _login();
-        },
+        // Не вызываем _login() в onFieldSubmitted: при автозаполнении браузер может отправить submit поля и запустить вход без подтверждения. Вход только по явному Enter (HardwareKeyboard) или по кнопке «Войти».
         validator: (value) {
           if (value == null || value.isEmpty) return loc.t('password_required');
           if (value.length < 6) return loc.t('password_too_short');
