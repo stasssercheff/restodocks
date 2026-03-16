@@ -41,6 +41,9 @@ class AiServiceSupabase implements AiService {
   /// true, если карточки получены не по сохранённому шаблону (первая загрузка формата) — показать предупреждение.
   static bool lastParseWasFirstTimeFormat = false;
 
+  /// Если в Excel несколько листов и sheetIndex не передан — сюда записываются имена листов; парсер возвращает [] и ждёт повторного вызова с sheetIndex.
+  static List<String>? lastParseMultipleSheetNames;
+
   /// Преобразует сырую ошибку API (JSON, 429 и т.д.) в понятное пользователю сообщение.
   static String _sanitizeAiError(String raw) {
     if (raw.isEmpty) return 'Неизвестная ошибка';
@@ -236,6 +239,7 @@ class AiServiceSupabase implements AiService {
     lastParseHeaderSignature = null;
     lastParsedRows = null;
     lastParseWasFirstTimeFormat = true; // сбросится в false, если сработает шаблон
+    lastParseMultipleSheetNames = null;
     try {
       final fmt = _detectFormat(xlsxBytes);
       var rows = <List<String>>[];
@@ -260,39 +264,10 @@ class AiServiceSupabase implements AiService {
         source = rows.isNotEmpty ? 'xls' : 'doc';
       } else if (fmt == 'xlsx') {
         final allSheets = _xlsxToAllSheetsRows(xlsxBytes);
-        // Многолистовый Excel: если листов больше одного и sheetIndex не задан — парсим каждый.
-        // Для однолистовых (как супы.xlsx) сразу идём в одиночный путь ниже, чтобы работал спец‑парсер.
+        // Многолистовый Excel: парсим только один лист. Если листов больше одного и sheetIndex не задан — просим выбрать лист (возвращаем [] и имена).
         if (allSheets.length > 1 && sheetIndex == null) {
-          final merged = <TechCardRecognitionResult>[];
-          final kbzuPattern = RegExp(r'белки|жиры|углеводы|калори|бжу|кбжу|жирн|белк', caseSensitive: false);
-          for (final sheetRows in allSheets) {
-            var expanded = _expandSingleCellRows(sheetRows);
-            if (expanded.length < 2) continue;
-            final firstRows = expanded.take(3).expand((r) => r).map((c) => c.toLowerCase()).join(' ');
-            if (kbzuPattern.hasMatch(firstRows) && expanded.length <= 6 && !firstRows.contains('брутто') && !firstRows.contains('нетто')) continue;
-            // пф хц/пф гц: много блоков [название][заголовок][данные][Выход] — парсим Dart-парсером, иначе EF может вернуть одну карточку со всеми строками
-            var part = AiServiceSupabase._tryParsePfGcFormat(expanded);
-            if (part.length < 2) {
-              part = await _tryParseByStoredTemplates(expanded);
-              if (part.isEmpty) {
-                final excelErrors = <TtkParseError>[];
-                part = AiServiceSupabase.parseTtkByTemplate(expanded, errors: excelErrors);
-                if (part.isEmpty) part = AiServiceSupabase._tryParseKkFromRows(expanded);
-              }
-            }
-            final multiBlock = AiServiceSupabase._tryParseMultiColumnBlocks(expanded);
-            if (_shouldPreferMultiBlock(part, multiBlock)) part = multiBlock;
-            merged.addAll(part);
-          }
-          if (merged.isNotEmpty) {
-            await _saveTemplateFromKeywordParse(allSheets.first, 'xlsx');
-            lastParsedRows = allSheets.first;
-            if (lastParseHeaderSignature == null || lastParseHeaderSignature!.isEmpty) {
-              lastParseHeaderSignature = _headerSignatureFromRows(allSheets.first);
-            }
-            final corrected = await _applyParseCorrections(merged, lastParseHeaderSignature, establishmentId);
-            return _fillTechnologyFromStoredPf(corrected, establishmentId);
-          }
+          lastParseMultipleSheetNames = await getExcelSheetNames(xlsxBytes);
+          return [];
         }
         rows = _xlsxToRows(xlsxBytes);
         // Специальный формат «Полное пособие Кухня» / супы.xlsx:
@@ -1124,7 +1099,9 @@ class AiServiceSupabase implements AiService {
               if (first != null && first > 0) { yieldGrams = first < 100 ? first * 1000 : first; break; }
             }
           }
-          break;
+          // Не выходим из цикла — в супах/«Полное пособие» технология часто идёт после строки «Выход»
+          dataRow++;
+          continue;
         }
         if (d0 == '№' && dr.length > 1 && dr[1].toLowerCase().contains('наименование')) break;
         final product = dr.length > 1 ? dr[1].trim() : '';

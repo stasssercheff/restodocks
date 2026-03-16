@@ -514,6 +514,15 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
             }
           }
           list = await ai.parseTechCardsFromExcel(uBytes, establishmentId: establishmentId, sheetIndex: sheetIndex);
+          // Если парсер вернул пусто и «несколько листов» — показываем выбор листа и парсим выбранный
+          if (list.isEmpty && ai is AiServiceSupabase && AiServiceSupabase.lastParseMultipleSheetNames != null && AiServiceSupabase.lastParseMultipleSheetNames!.isNotEmpty && mounted) {
+            final names = AiServiceSupabase.lastParseMultipleSheetNames!;
+            sheetIndex = await _showSheetPicker(context, loc, file.name, names);
+            if (!mounted) return;
+            if (sheetIndex != null) {
+              list = await ai.parseTechCardsFromExcel(uBytes, establishmentId: establishmentId, sheetIndex: sheetIndex);
+            }
+          }
           if (list.isEmpty) list = _parseSimpleExcelNames(uBytes);
         }
         if (!mounted) return;
