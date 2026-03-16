@@ -803,6 +803,49 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     return categoryTranslations[c]?[lang] ?? c;
   }
 
+  /// Подставляет брутто в граммах по номенклатуре, когда продукт в шт и задан вес 1 шт (например яйцо 1 шт → 60 г).
+  void _autoFillBruttoFromNomenclature() {
+    final store = context.read<ProductStoreSupabase>();
+    final list = <TTIngredient>[];
+    for (final ing in _ingredients) {
+      if (ing.isPlaceholder || ing.productName.trim().isEmpty) {
+        list.add(ing);
+        continue;
+      }
+      final product = store.findProductForIngredient(ing.productId, ing.productName);
+      final unit = (product?.unit ?? ing.unit).toLowerCase();
+      final gpp = product?.gramsPerPiece;
+      if ((unit == 'шт' || unit == 'pcs') && gpp != null && gpp > 0) {
+        final g = ing.grossWeight;
+        final n = ing.netWeight;
+        // Брутто в документе часто в штуках (1–25); переводим в граммы по номенклатуре
+        if (g > 0 && g <= 25 && g == g.roundToDouble()) {
+          final grossGrams = g * gpp;
+          list.add(ing.copyWith(grossWeight: grossGrams));
+          continue;
+        }
+        // Брутто 0, нетто в штуках (1–20) — подставляем брутто в граммах
+        if (g <= 0 && n > 0 && n <= 20 && n == n.roundToDouble()) {
+          final grossGrams = n * gpp;
+          list.add(ing.copyWith(grossWeight: grossGrams));
+          continue;
+        }
+      }
+      // Продукт в граммах: брутто 0 при заполненном нетто — подставляем брутто = нетто (без отхода)
+      if (ing.grossWeight <= 0 && ing.netWeight > 0) {
+        final u = (product?.unit ?? ing.unit).toLowerCase();
+        if (u == 'g' || u == 'г' || u == 'kg' || u == 'кг' || u.isEmpty) {
+          list.add(ing.copyWith(grossWeight: ing.netWeight));
+          continue;
+        }
+      }
+      list.add(ing);
+    }
+    _ingredients
+      ..clear()
+      ..addAll(list);
+  }
+
   /// Простой вывод категории из названия блюда (для предзаполнения из ИИ).
   String _inferCategory(String dishName) {
     final lower = dishName.toLowerCase();
@@ -905,6 +948,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                 cost: 0,
               ));
             }
+            _autoFillBruttoFromNomenclature();
             if (addPlaceholders && _ingredients.isEmpty) {
               _ingredients.add(TTIngredient.emptyPlaceholder());
               _ingredients.add(TTIngredient.emptyPlaceholder());
@@ -1578,6 +1622,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     } else if (addPlaceholders && _ingredients.isEmpty) {
       _ingredients.add(TTIngredient.emptyPlaceholder());
     }
+    _autoFillBruttoFromNomenclature();
   }
 
 

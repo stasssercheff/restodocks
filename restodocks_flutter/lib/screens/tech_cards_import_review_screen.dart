@@ -110,6 +110,28 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
       sections: defaultSections,
       isSemiFinished: c.isSemiFinished ?? true,
     )).toList();
+    if (AiServiceSupabase.lastParseWasFirstTimeFormat) {
+      AiServiceSupabase.lastParseWasFirstTimeFormat = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _showFirstTimeImportNotice());
+    }
+  }
+
+  void _showFirstTimeImportNotice() {
+    if (!mounted) return;
+    final loc = context.read<LocalizationService>();
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('tech_cards_import_first_time_title') ?? 'Первый импорт формата'),
+        content: Text(loc.t('tech_cards_import_first_time_message') ?? 'Проверьте правильность внесённых данных, при необходимости исправьте — это поможет обучить систему для следующих загрузок.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(loc.t('ok') ?? 'OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   String _inferCategory(String dishName) {

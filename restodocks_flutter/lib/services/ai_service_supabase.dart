@@ -38,6 +38,9 @@ class AiServiceSupabase implements AiService {
   /// Строки последнего парсинга (для обучения: ищем corrected в них и сохраняем позицию).
   static List<List<String>>? lastParsedRows;
 
+  /// true, если карточки получены не по сохранённому шаблону (первая загрузка формата) — показать предупреждение.
+  static bool lastParseWasFirstTimeFormat = false;
+
   /// Преобразует сырую ошибку API (JSON, 429 и т.д.) в понятное пользователю сообщение.
   static String _sanitizeAiError(String raw) {
     if (raw.isEmpty) return 'Неизвестная ошибка';
@@ -226,6 +229,7 @@ class AiServiceSupabase implements AiService {
   Future<List<TechCardRecognitionResult>> parseTechCardsFromExcel(Uint8List xlsxBytes, {String? establishmentId}) async {
     lastParseHeaderSignature = null;
     lastParsedRows = null;
+    lastParseWasFirstTimeFormat = true; // сбросится в false, если сработает шаблон
     try {
       final fmt = _detectFormat(xlsxBytes);
       var rows = <List<String>>[];
@@ -416,6 +420,7 @@ class AiServiceSupabase implements AiService {
     lastParseTechCardErrors = null;
     lastParsedRows = null;
     lastParseHeaderSignature = null;
+    lastParseWasFirstTimeFormat = true;
     final rows = _textToRows(text);
     if (rows.length < 2) return [];
     var expanded = _expandSingleCellRows(rows);
@@ -2182,7 +2187,8 @@ class AiServiceSupabase implements AiService {
       };
       if (bestProductCol != null) payload['product_col'] = bestProductCol;
       if (bestGrossCol != null) payload['gross_col'] = bestGrossCol;
-      if (bestNetCol != null) payload['net_col'] = bestNetCol;
+      // Не перезаписываем net_col колонкой брутто (если пользователь не правил нетто — оба совпадают).
+      if (bestNetCol != null && bestNetCol != bestGrossCol) payload['net_col'] = bestNetCol;
       if (bestTechnologyCol != null) payload['technology_col'] = bestTechnologyCol;
       if (!hasDish && bestProductCol == null && bestTechnologyCol == null) return; // нечего сохранять
       final res = await client.functions.invoke('tt-parse-save-learning', body: {'learned_dish_name': payload});
@@ -2520,6 +2526,7 @@ class AiServiceSupabase implements AiService {
       }
       final raw = data['cards'];
       if (raw is! List || raw.isEmpty) return [];
+      lastParseWasFirstTimeFormat = false; // формат известен, шаблон сработал
       if (raw.isNotEmpty) {
         final c = raw.first as Map<String, dynamic>?;
         final ing = (c?['ingredients'] as List?)?.cast<Map<String, dynamic>>().take(5) ?? [];
