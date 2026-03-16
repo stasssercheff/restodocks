@@ -2692,7 +2692,8 @@ class AiServiceSupabase implements AiService {
           .eq('header_signature', headerSignature)
           .limit(1)
           .maybeSingle();
-      final techCol = raw is Map ? (raw['technology_col'] as num?)?.toInt() : null;
+      final map = raw is Map<String, dynamic> ? raw as Map<String, dynamic> : null;
+      final techCol = map != null ? (map['technology_col'] as num?)?.toInt() : null;
       if (techCol == null || techCol < 0) return list;
       // Граница таблицы: первая строка с маркером (как в parse_ttk_template)
       final boundaryRegex = RegExp(
