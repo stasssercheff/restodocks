@@ -998,58 +998,6 @@ class AiServiceSupabase implements AiService {
     return rows.length;
   }
 
-  /// Универсальный извлекатель технологии из строки таблицы.
-  /// Работает только с текстом: ищет колонку с "Технология" и/или длинные осмысленные фразы.
-  static String? _extractTechnologyFromRow(List<String> rawCells) {
-    if (rawCells.isEmpty) return null;
-    final cells = rawCells.map((c) => (c ?? '').toString().trim()).toList();
-    if (cells.every((c) => c.isEmpty)) return null;
-
-    bool isServiceToken(String s) {
-      final low = s.trim().toLowerCase();
-      if (low.isEmpty) return true;
-      if (low == '№' || low == 'выход' || low == 'декор') return true;
-      // чисто числа/веса — не технология
-      if (RegExp(r'^[\d\s.,/]+$').hasMatch(low)) return true;
-      return false;
-    }
-
-    bool looksLikeTechText(String s) {
-      final t = s.trim();
-      if (t.length < 20) return false;
-      if (!RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(t)) return false;
-      if (RegExp(r'^[\d\s.,/]+$').hasMatch(t)) return false;
-      return true;
-    }
-
-    // 1. Есть ячейка с "технология" — берём текст после неё
-    int? techHeaderCol;
-    for (var i = 0; i < cells.length; i++) {
-      final low = cells[i].toLowerCase();
-      if (low.contains('технология') || low.contains('technology')) {
-        techHeaderCol = i;
-        break;
-      }
-    }
-    if (techHeaderCol != null) {
-      final parts = <String>[];
-      for (var i = techHeaderCol + 1; i < cells.length; i++) {
-        final cell = cells[i].trim();
-        if (cell.isEmpty) continue;
-        if (looksLikeTechText(cell)) parts.add(cell);
-      }
-      if (parts.isNotEmpty) return parts.join(' ');
-      // "Технология" без текста — ожидаем продолжение в следующих строках
-      return '';
-    }
-
-    // 2. Без слова "Технология", но есть длинный осмысленный текст
-    final longTextParts = cells.where((c) => !isServiceToken(c) && looksLikeTechText(c)).toList();
-    if (longTextParts.isNotEmpty) return longTextParts.join(' ');
-
-    return null;
-  }
-
   /// Формат «Полное пособие Кухня» / супы.xlsx: [название] [№|Наименование продукта|Вес] [ингредиенты] [Выход] — повтор блоков.
   static List<TechCardRecognitionResult> _tryParsePolnoePosobieFormat(List<List<String>> rows) {
     final results = <TechCardRecognitionResult>[];
@@ -1113,35 +1061,50 @@ class AiServiceSupabase implements AiService {
         final product = dr.length > 1 ? dr[1].trim() : '';
         final grossStr = dr.length > 2 ? dr[2].trim() : '';
         final looksLikeIngredient = product.isNotEmpty && (RegExp(r'\d').hasMatch(grossStr) || grossStr.toLowerCase().contains('шт'));
-
-        // Попытаться вытащить технологию из текущей строки (заголовок или продолжение)
-        final techFromRow = _extractTechnologyFromRow(dr);
-        if (techFromRow != null) {
-          if (techFromRow.isNotEmpty) {
-            technologyText = (technologyText != null && technologyText!.isNotEmpty)
-                ? '$technologyText\n$techFromRow'
-                : techFromRow;
-          } else {
-            // Пустая строка после "Технология" — просто отмечаем, что технология начата
-            technologyText ??= '';
-          }
-          dataRow++;
-          continue;
-        }
-
         if (looksLikeIngredient) {
           // Не сбрасываем technologyText — технология может идти до или после ингредиентов
-        } else if (product.isEmpty && technologyText != null) {
-          // Дополнительные текстовые строки после начала технологии
-          final more = _extractTechnologyFromRow(dr);
-          if (more != null && more.isNotEmpty) {
-            technologyText = (technologyText!.isEmpty ? '' : '$technologyText\n') + more;
+        } else {
+          final rowText = dr.join(' ');
+          if (rowText.toLowerCase().contains('технология')) {
+            int? techCol;
+            for (var ci = 0; ci < dr.length; ci++) {
+              if (dr[ci].toLowerCase().contains('технология')) { techCol = ci; break; }
+            }
+            final techParts = <String>[];
+            for (var ci = (techCol != null ? techCol! + 1 : 0); ci < dr.length; ci++) {
+              final cell = dr[ci].trim();
+              if (cell.isEmpty) continue;
+              if (cell.length > 15 && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(cell) && _parseNum(cell) == null) techParts.add(cell);
+            }
+            if (techParts.isNotEmpty) {
+              technologyText = (technologyText != null ? '$technologyText\n' : '') + techParts.join(' ');
+            } else {
+              technologyText ??= ''; // заголовок «Технология» — текст в следующих строках
+            }
             dataRow++;
             continue;
           }
+          if (technologyText != null) {
+            final more = dr.where((c) => c.length > 15 && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(c) && _parseNum(c.trim()) == null).join(' ').trim();
+            if (more.isNotEmpty) {
+              technologyText = (technologyText!.isEmpty ? '' : '$technologyText\n') + more;
+              dataRow++;
+              continue;
+            }
+          }
         }
-
+        // Строка без продукта, но с длинным текстом (технология в отдельной строке/ячейке после ингредиентов)
         if (product.isEmpty) {
+          final techFromRow = dr.where((c) {
+            final t = c.trim();
+            return t.length > 20 && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(t) && _parseNum(t) == null &&
+                !RegExp(r'^№$|^выход$|^декор$', caseSensitive: false).hasMatch(t.toLowerCase());
+          }).join(' ').trim();
+          if (techFromRow.isNotEmpty) {
+            technologyText = (technologyText != null ? '$technologyText\n' : '') + techFromRow;
+            dataRow++;
+            continue;
+          }
           dataRow++;
           continue;
         }
