@@ -34,5 +34,15 @@ jobs:
           version: latest
 
       - name: Deploy Edge Functions (Production)
-        run: supabase functions deploy --project-ref $PROJECT_REF
+        run: |
+          # ai-parse-tech-cards-pdf бандлится в ~33MB и даёт 413 Request Entity Too Large — деплоим без неё
+          for dir in supabase/functions/*/; do
+            f=$(basename "$dir")
+            if [ "$f" = "_shared" ]; then continue; fi
+            if [ "$f" = "ai-parse-tech-cards-pdf" ]; then
+              echo "::warning::Skipping $f (bundle too large for Supabase Edge limit)"
+              continue
+            fi
+            supabase functions deploy "$f" --project-ref $PROJECT_REF
+          done
         working-directory: restodocks_flutter
