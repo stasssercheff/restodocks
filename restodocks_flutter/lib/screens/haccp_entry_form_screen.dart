@@ -515,10 +515,20 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                     color: Theme.of(context).colorScheme.primary,
                   ),
             ),
+            const SizedBox(height: 4),
+            Text(
+              'Таблица по форме СанПиН — при необходимости прокрутите вправо',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
             const SizedBox(height: 8),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-              child: _buildFormByType(loc),
+              child: SizedBox(
+                width: 1400,
+                child: _buildFormByType(loc),
+              ),
             ),
             const SizedBox(height: 24),
             FilledButton(

@@ -611,7 +611,10 @@ class _JournalTableView extends StatelessWidget {
             scrollDirection: Axis.horizontal,
             child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 80),
-              child: _buildTable(context, idToEmp, idToName),
+              child: SizedBox(
+                width: 1200,
+                child: _buildTable(context, idToEmp, idToName),
+              ),
             ),
           ),
         ),
