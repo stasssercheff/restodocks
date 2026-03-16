@@ -1046,7 +1046,10 @@ class AiServiceSupabase implements AiService {
     }).toList();
   }
 
-  /// Формат «Полное пособие Кухня» / супы.xlsx: [название] [№|Наименование продукта|Вес] [ингредиенты] [Выход] — повтор блоков.
+  /// Формат «Полное пособие Кухня» (CSV/Excel): блоки ТТК подряд.
+  /// Типы блюд: супы, салаты, антипасти, брускетты, севиче, пицца, рамен, горячее, сырная тарелка, оливки и т.д.
+  /// Структура блока: [название в кол.0] → [опционально: №|Наименование продукта|Вес гр/шт|Вид нарезки] → данные (продукт, вес; в кол.4–5 часто «Технология приготовления» и текст) → Декор → Выход.
+  /// У части блоков строки заголовка нет — сразу идут данные (напр. «Грибной крем суп» затем «,Грибной крем-суп пф,420»).
   static List<TechCardRecognitionResult> _tryParsePolnoePosobieFormat(List<List<String>> rows) {
     final results = <TechCardRecognitionResult>[];
     var r = 0;
@@ -1062,13 +1065,16 @@ class AiServiceSupabase implements AiService {
         final c1 = cells[1].toLowerCase();
         if (c1.contains('наименование') && c1.contains('продукт')) { r++; continue; }
       }
-      // Ищем блок: следующая строка — №|Наименование продукта
+      // Ищем блок: следующая строка — либо заголовок №|Наименование продукта, либо сразу данные (продукт|вес).
       if (r + 1 >= rows.length) { r++; continue; }
       final nextRow = rows[r + 1].map((c) => (c ?? '').toString().trim()).toList();
       final next0 = nextRow.isNotEmpty ? nextRow[0].trim().toLowerCase() : '';
-      final next1 = nextRow.length > 1 ? nextRow[1].toLowerCase() : '';
-      final headerOk = (next0 == '№' || next0.isEmpty) && next1.contains('наименование') && next1.contains('продукт');
-      if (!headerOk) {
+      final next1 = nextRow.length > 1 ? nextRow[1].trim() : '';
+      final next2 = nextRow.length > 2 ? nextRow[2].trim() : '';
+      final hasHeaderRow = (next0 == '№' || next0.isEmpty) && next1.toLowerCase().contains('наименование') && next1.toLowerCase().contains('продукт');
+      final nextRowLooksLikeData = next1.isNotEmpty && next1.length >= 2 &&
+          (_parseNum(next2) != null || next2.toLowerCase().contains('шт'));
+      if (!hasHeaderRow && !nextRowLooksLikeData) {
         r++;
         continue;
       }
@@ -1085,24 +1091,29 @@ class AiServiceSupabase implements AiService {
       final ingredients = <TechCardIngredientLine>[];
       String? technologyText;
       double? yieldGrams;
-      var dataRow = r + 2;
+      var dataRow = hasHeaderRow ? r + 2 : r + 1;
       while (dataRow < rows.length) {
         final dr = rows[dataRow].map((c) => (c ?? '').toString().trim()).toList();
         if (dr.every((c) => c.isEmpty)) { dataRow++; continue; }
-        // Начало следующего блока: [Название] а следующая строка — заголовок №|Наименование продукта.
-        // Если не остановиться здесь, можно «съесть» следующий суп как текст технологии текущего.
+        // Начало следующего блока: в кол.0 — название (буквы, не №/выход/декор). Не считаем блоком строку «продукт, пусто, вес» — иначе в название попадут ингредиенты.
         if (dr.isNotEmpty) {
           final maybeDish = dr[0].trim();
-          final looksLikeDishName = maybeDish.length >= 3 &&
+          final lower = maybeDish.toLowerCase();
+          final c1 = dr.length > 1 ? dr[1].trim() : '';
+          final col2IsNum = dr.length > 2 && _parseNum(dr[2].trim()) != null;
+          final looksLikeTitle = maybeDish.length >= 3 &&
               RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(maybeDish) &&
-              !RegExp(r'^№$|^выход$|^декор$|^итого$', caseSensitive: false).hasMatch(maybeDish.toLowerCase());
-          if (looksLikeDishName && dataRow + 1 < rows.length) {
+              !RegExp(r'^№$|^выход$|^декор$|^итого$', caseSensitive: false).hasMatch(lower);
+          var nextRowIsHeader = false;
+          if (dataRow + 1 < rows.length) {
             final nr = rows[dataRow + 1].map((c) => (c ?? '').toString().trim()).toList();
             final n0 = nr.isNotEmpty ? nr[0].trim().toLowerCase() : '';
             final n1 = nr.length > 1 ? nr[1].toLowerCase() : '';
-            final headerOk = (n0 == '№' || n0.isEmpty) && n1.contains('наименование') && n1.contains('продукт');
-            if (headerOk) break;
+            nextRowIsHeader = (n0 == '№' || n0.isEmpty) && n1.contains('наименование') && n1.contains('продукт');
           }
+          if (looksLikeTitle && nextRowIsHeader) break;
+          // Кол.1 пустая и в кол.2 не число — строка «только название» (Грибной крем суп, Пицца Болоньезе). Иначе это «продукт, , вес» — не блок.
+          if (looksLikeTitle && c1.isEmpty && !col2IsNum) break;
         }
         final d0 = dr.isNotEmpty ? dr[0].toLowerCase() : '';
         if (d0 == 'выход') {
@@ -1127,18 +1138,18 @@ class AiServiceSupabase implements AiService {
         final grossStr = dr.length > 2 ? dr[2].trim() : '';
         final looksLikeIngredient = product.isNotEmpty && (RegExp(r'\d').hasMatch(grossStr) || grossStr.toLowerCase().contains('шт'));
 
-        // Строки, где вместе с ингредиентом в конце лежит длинный текст технологии (как в супы.xlsx):
-        // извлекаем текст технологии независимо от того, считаем ли строку ингредиентом.
+        // Формат супы: подпись «Технология приготовления» / «Способ приготовления» — это заголовок (обычно отдельная строка), текст технологии — в следующих ячейках или в следующей строке. Не считаем «приготовления» признаком текста в этой же строке.
         final rowTextLower = dr.join(' ').toLowerCase();
         final hasTechnologyWord = rowTextLower.contains('технология');
+        final minLen = hasTechnologyWord ? 12 : 40;
         final hasLongTextCell = dr.any((c) {
           final t = c.trim();
-          return t.length > 40 && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(t) && _parseNum(t) == null;
+          return t.length > minLen && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(t) && _parseNum(t) == null;
         });
         if ((hasTechnologyWord || technologyText != null) && hasLongTextCell) {
           final techFromRow = dr.where((c) {
             final t = c.trim();
-            return t.length > 40 && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(t) && _parseNum(t) == null;
+            return t.length > minLen && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(t) && _parseNum(t) == null;
           }).join(' ').trim();
           if (techFromRow.isNotEmpty) {
             technologyText = (technologyText != null && technologyText!.isNotEmpty)
@@ -1151,27 +1162,29 @@ class AiServiceSupabase implements AiService {
           // Не сбрасываем technologyText — технология может идти до или после ингредиентов
         } else {
           final rowText = dr.join(' ');
-          if (rowText.toLowerCase().contains('технология')) {
+          final rowLower = rowText.toLowerCase();
+          if (rowLower.contains('технология') || rowLower.contains('приготовления')) {
             int? techCol;
             for (var ci = 0; ci < dr.length; ci++) {
-              if (dr[ci].toLowerCase().contains('технология')) { techCol = ci; break; }
+              final cell = dr[ci].toLowerCase();
+              if (cell.contains('технология') || cell.contains('приготовления')) { techCol = ci; break; }
             }
             final techParts = <String>[];
             for (var ci = (techCol != null ? techCol! + 1 : 0); ci < dr.length; ci++) {
               final cell = dr[ci].trim();
               if (cell.isEmpty) continue;
-              if (cell.length > 15 && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(cell) && _parseNum(cell) == null) techParts.add(cell);
+              if (cell.length > 6 && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(cell) && _parseNum(cell) == null) techParts.add(cell);
             }
             if (techParts.isNotEmpty) {
               technologyText = (technologyText != null ? '$technologyText\n' : '') + techParts.join(' ');
             } else {
-              technologyText ??= ''; // заголовок «Технология» — текст в следующих строках
+              technologyText ??= ''; // заголовок «Технология приготовления» — текст в следующих строках
             }
             dataRow++;
             continue;
           }
           if (technologyText != null) {
-            final more = dr.where((c) => c.length > 15 && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(c) && _parseNum(c.trim()) == null).join(' ').trim();
+            final more = dr.where((c) => c.length > 6 && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(c) && _parseNum(c.trim()) == null).join(' ').trim();
             if (more.isNotEmpty) {
               technologyText = (technologyText!.isEmpty ? '' : '$technologyText\n') + more;
               dataRow++;
@@ -1179,12 +1192,20 @@ class AiServiceSupabase implements AiService {
             }
           }
         }
-        // Строка без продукта, но с длинным текстом (технология в отдельной строке/ячейке после ингредиентов)
+        // Строка без продукта, но с текстом (технология в отдельной строке/ячейке после ингредиентов или Выход — формат супы)
         if (product.isEmpty) {
+          final firstCell = dr.isNotEmpty ? dr[0].trim() : '';
+          final secondEmpty = dr.length < 2 || dr[1].trim().isEmpty;
           final techFromRow = dr.where((c) {
             final t = c.trim();
-            return t.length > 20 && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(t) && _parseNum(t) == null &&
-                !RegExp(r'^№$|^выход$|^декор$', caseSensitive: false).hasMatch(t.toLowerCase());
+            if (t.length < 10) return false;
+            if (_parseNum(t) != null) return false;
+            if (!RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(t)) return false;
+            final tl = t.toLowerCase();
+            if (RegExp(r'^№$|^выход$|^декор$', caseSensitive: false).hasMatch(tl)) return false;
+            // Не тянуть в технологию ячейку, которая совпадает с кол.0 при пустой кол.1 — это заголовок следующего блока (Пицца, Wok, Салат и т.д.)
+            if (secondEmpty && firstCell == t) return false;
+            return true;
           }).join(' ').trim();
           if (techFromRow.isNotEmpty) {
             technologyText = (technologyText != null ? '$technologyText\n' : '') + techFromRow;
@@ -1228,7 +1249,7 @@ class AiServiceSupabase implements AiService {
     return results;
   }
 
-  /// Подсчитать количество блоков в формате «Полное пособие»/супы: строка названия + следующая строка заголовка «№|Наименование продукта».
+  /// Подсчёт блоков «Полное пособие»: строка названия + следующая строка — заголовок №|Наименование либо сразу данные (продукт|вес).
   static int _countPolnoePosobieBlocks(List<List<String>> rows) {
     var count = 0;
     for (var r = 0; r + 1 < rows.length; r++) {
@@ -1239,9 +1260,11 @@ class AiServiceSupabase implements AiService {
       if (dish.length < 3 || !RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(dish)) continue;
       if (RegExp(r'^№$|^выход$|^декор$|^итого$', caseSensitive: false).hasMatch(dish.toLowerCase())) continue;
       final n0 = nextRow.isNotEmpty ? nextRow[0].trim().toLowerCase() : '';
-      final n1 = nextRow.length > 1 ? nextRow[1].toLowerCase() : '';
-      final headerOk = (n0 == '№' || n0.isEmpty) && n1.contains('наименование') && n1.contains('продукт');
-      if (headerOk) count++;
+      final n1 = nextRow.length > 1 ? nextRow[1].trim() : '';
+      final n2 = nextRow.length > 2 ? nextRow[2].trim() : '';
+      final headerOk = (n0 == '№' || n0.isEmpty) && n1.toLowerCase().contains('наименование') && n1.toLowerCase().contains('продукт');
+      final dataOk = n1.isNotEmpty && n1.length >= 2 && (_parseNum(n2) != null || n2.toLowerCase().contains('шт'));
+      if (headerOk || dataOk) count++;
     }
     return count;
   }
