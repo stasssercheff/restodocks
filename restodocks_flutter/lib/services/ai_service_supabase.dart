@@ -3195,13 +3195,13 @@ class AiServiceSupabase implements AiService {
     }).toList()).toList();
   }
 
-  /// Парсинг по шаблонам. Сначала локально (Supabase REST), затем EF. Так при 503 на EF не спамим консоль.
+  /// Парсинг по шаблонам. Локальный — первый рубеж. При затыке — сервер.
   Future<List<TechCardRecognitionResult>> _tryParseByStoredTemplates(List<List<String>> rows) async {
-    // 1. Локальный парсер (REST, без EF) — нет 503 в консоли при успехе
+    // 1. Локальный (REST) — первый рубеж, быстрее
     final local = await _tryParseByStoredTemplatesLocally(rows);
     if (local.isNotEmpty) return local;
 
-    // 2. Edge Function (service_role) — для форматов без шаблона в БД
+    // 2. Сервер (EF) — при затыке в локальной версии
     try {
       final safeRows = _rowsForJson(rows);
       final data = await invoke('parse-ttk-by-templates', {'rows': safeRows});
@@ -3243,12 +3243,14 @@ class AiServiceSupabase implements AiService {
       }
       return _applyEggGrossFix(list);
     } catch (e) {
-      devLog('parse-ttk-by-templates: $e');
+      devLog('parse-ttk-by-templates: $e (fallback: local)');
+      final local = await _tryParseByStoredTemplatesLocally(rows);
+      if (local.isNotEmpty) return local;
       return [];
     }
   }
 
-  /// Локальный парсер: полный дубликат серверной логики. Читает tt_parse_templates и tt_parse_learned_dish_name
+  /// Локальный парсер — fallback при 503. Читает tt_parse_templates и tt_parse_learned_dish_name
   /// из Supabase (REST, без EF) — те же шаблоны, то же обучение. Когда EF 503 — парсим локально.
   Future<List<TechCardRecognitionResult>> _tryParseByStoredTemplatesLocally(List<List<String>> rows) async {
     try {
