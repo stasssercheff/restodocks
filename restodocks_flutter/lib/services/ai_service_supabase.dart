@@ -270,25 +270,7 @@ class AiServiceSupabase implements AiService {
           return [];
         }
         rows = _xlsxToRows(xlsxBytes);
-        // Специальный формат «Полное пособие Кухня» / супы.xlsx:
-        // один лист, блоки [Название] [№|Наименование продукта|Вес гр/шт] [ингредиенты] [Выход] + технология текстом.
-        // Для него надёжнее всего работает Dart-парсер _tryParsePolnoePosobieFormat, который умеет вытаскивать технологию.
-        if (rows.isNotEmpty) {
-          final polnoe = _tryParsePolnoePosobieFormat(rows);
-          // Важно: если спец‑парсер распознал лишь небольшую часть блоков, не останавливаемся на нём,
-          // а продолжаем общий пайплайн (шаблоны/мульти‑блоки), чтобы не получить «парсится только 3–4 карточки».
-          final expectedBlocks = _countPolnoePosobieBlocks(rows);
-          final acceptPolnoe = polnoe.isNotEmpty && (expectedBlocks <= 0 || polnoe.length >= (expectedBlocks * 0.5).ceil());
-          if (acceptPolnoe) {
-            lastParsedRows = rows;
-            if (lastParseHeaderSignature == null || lastParseHeaderSignature!.isEmpty) {
-              lastParseHeaderSignature = _headerSignatureFromRows(rows) ??
-                  (rows.isNotEmpty && rows[0].isNotEmpty ? _headerSignature(rows[0].map((c) => c.toString().trim()).toList()) : null);
-            }
-            final corrected = await _applyParseCorrections(polnoe, lastParseHeaderSignature, establishmentId);
-            return _fillTechnologyFromStoredPf(corrected, establishmentId);
-          }
-        }
+        // Ранний путь «Полное пособие» отключён — разбор идёт общим пайплайном (шаблоны, обучение, подгрузка технологии отдельно).
       }
       if (rows.isEmpty) rows = _csvToRows(xlsxBytes);
       // CSV-формат "Наименование,Продукт,Брутто,...,Технология" (как в ттк.csv)
@@ -1599,9 +1581,7 @@ class AiServiceSupabase implements AiService {
     // ГОСТ: строка "3. РЕЦЕПТУРА" — пропустить, заголовок в следующей строке
     rows = _skipGostSectionHeaders(rows);
 
-    // Формат «Полное пособие Кухня» / супы.xlsx: блоки [название блюда] [№|Наименование продукта|Вес] [данные] [Выход]
-    final polnoePosobie = _tryParsePolnoePosobieFormat(rows);
-    if (polnoePosobie.isNotEmpty) return polnoePosobie;
+    // Парсер «Полное пособие» отключён — не перехватываем разбор, идёт общий пайплайн (шаблоны, обучение).
 
     // пф гц: [название] ["" | наименование | Ед.изм | Норма закладки] [№ | продукт | ед | норма] [Выход] — повтор
     final pfGc = _tryParsePfGcFormat(rows);
